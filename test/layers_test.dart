@@ -1,7 +1,8 @@
 // Import direction for lib/: ui -> core <- adapters, composed only by main.dart.
 //
 // core is pure Dart. adapters own dart:io. ui owns Flutter. Neither
-// ui nor adapters reaches into the other; main.dart wires them together.
+// ui nor adapters reaches into the other; main.dart wires them together. HTTP and the keyring are
+// adapters' alone.
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -13,6 +14,8 @@ const _forbidden = <String, List<String>>{
     'dart:ui',
     'package:file_selector',
     'package:desktop_drop',
+    'package:http/',
+    'package:flutter_secure_storage',
     '/adapters/',
     '/ui/',
     '../adapters',
@@ -26,7 +29,13 @@ const _forbidden = <String, List<String>>{
     '/ui/',
     '../ui',
   ],
-  'ui': ['dart:io', '/adapters/', '../adapters'],
+  'ui': [
+    'dart:io',
+    'package:http/',
+    'package:flutter_secure_storage',
+    '/adapters/',
+    '../adapters',
+  ],
 };
 
 final _import = RegExp(r'''^\s*(?:import|export)\s+['"]([^'"]+)['"]''');
