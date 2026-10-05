@@ -229,7 +229,7 @@ class _TopBar extends StatelessWidget {
             IconBtn('menu', tooltip: 'Menu', onPressed: shell.toggle),
             const SizedBox(width: 10),
           ],
-          const Brand(size: 22, logo: false),
+          const Flexible(child: Brand(size: 22, logo: false)),
         ],
       ),
     );

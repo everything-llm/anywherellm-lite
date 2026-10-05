@@ -1,11 +1,8 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:everything/ui/icons.dart';
 import 'package:everything/ui/theme.dart';
 import 'package:everything/ui/widgets/basics.dart';
-import 'package:everything/ui/widgets/chip.dart';
 import 'package:everything/ui/widgets/fields.dart';
 import 'package:everything/ui/widgets/select.dart';
 
@@ -80,43 +77,6 @@ void main() {
       ),
     );
     expect(find.text('All'), findsOneWidget);
-  });
-
-  testWidgets('a chip says whether it is pressed, and its count', (
-    tester,
-  ) async {
-    final handle = tester.ensureSemantics();
-    var taps = 0;
-    await show(
-      tester,
-      NilsChip('docs', count: 3, pressed: true, onTap: () => taps++),
-    );
-    final data = find.semantics
-        .byLabel('docs, 3')
-        .evaluate()
-        .single
-        .getSemanticsData();
-    expect(data.flagsCollection.isToggled, Tristate.isTrue);
-    await tester.tap(find.byType(NilsChip));
-    expect(taps, 1);
-    handle.dispose();
-  });
-
-  testWidgets('a dim chip is faded and an idle one is not', (tester) async {
-    await show(
-      tester,
-      Column(
-        children: [
-          NilsChip('a', pressed: false, dim: true, onTap: () {}),
-          NilsChip('b', pressed: false, onTap: () {}),
-        ],
-      ),
-    );
-    final opacities = tester
-        .widgetList<Opacity>(find.byType(Opacity))
-        .map((o) => o.opacity)
-        .toList();
-    expect(opacities, containsAllInOrder([0.5, 1.0]));
   });
 
   testWidgets('a mono page head sets a name that is code in the mono face', (

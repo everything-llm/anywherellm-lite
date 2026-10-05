@@ -1,53 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../core/copy.dart';
 import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import 'dashed.dart';
-
-/// A small coloured label.
-class NilsBadge extends StatelessWidget {
-  const NilsBadge(this.spec, {super.key});
-
-  final BadgeSpec spec;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    final (fg, bg) = switch (spec.kind) {
-      BadgeKind.plain => (t.muted, t.line2),
-      BadgeKind.ok => (t.okfg, t.okbg),
-      BadgeKind.warn => (t.warnfg, t.warnbg),
-      BadgeKind.bad => (t.badfg, t.badbg),
-      BadgeKind.accent => (t.accent, t.accentbg),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(spec.text, style: Type.sans(12, color: fg, height: 1.4)),
-    );
-  }
-}
-
-/// Badges laid out in a wrapping row.
-class BadgeRow extends StatelessWidget {
-  const BadgeRow(this.badges, {super.key});
-
-  final List<Widget> badges;
-
-  @override
-  Widget build(BuildContext context) => Wrap(
-    spacing: 6,
-    runSpacing: 6,
-    alignment: WrapAlignment.end,
-    crossAxisAlignment: WrapCrossAlignment.center,
-    children: badges,
-  );
-}
 
 class NilsCard extends StatelessWidget {
   const NilsCard({

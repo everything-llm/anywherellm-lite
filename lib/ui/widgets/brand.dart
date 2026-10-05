@@ -27,15 +27,26 @@ class Brand extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              'n',
+              'e',
               style: Type.serif(19, color: t.onaccent, height: 1),
             ),
           ),
           const SizedBox(width: 10),
         ],
-        Text(
-          'nils',
-          style: Type.serif(size, color: t.ink, letterSpacing: -0.01 * size),
+        // Shrinks rather than overflows in a narrow sidebar or at a large text scale.
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'everything',
+              style: Type.serif(
+                size,
+                color: t.ink,
+                letterSpacing: -0.01 * size,
+              ),
+            ),
+          ),
         ),
       ],
     );

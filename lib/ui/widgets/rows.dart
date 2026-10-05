@@ -5,14 +5,12 @@ import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 
-/// One row of a [NilsList]: a title, a line of detail, badges on the right and, when it can be
-/// opened, a chevron.
+/// One row of a [NilsList]: a title, a line of detail and, when it can be opened, a chevron.
 class NilsRow extends StatelessWidget {
   const NilsRow({
     super.key,
     required this.title,
     this.meta,
-    this.badges = const [],
     this.mono = false,
     this.monoMeta = false,
     this.leading,
@@ -22,7 +20,6 @@ class NilsRow extends StatelessWidget {
 
   final String title;
   final String? meta;
-  final List<Widget> badges;
   final bool mono;
 
   /// The detail line in the mono face too, for a path.
@@ -39,7 +36,6 @@ class NilsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final phone = ScreenClass.ofContext(context).isPhone;
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -64,51 +60,22 @@ class NilsRow extends StatelessWidget {
         ],
       ],
     );
-    final tags = badges.isEmpty
-        ? null
-        : Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            alignment: phone ? WrapAlignment.start : WrapAlignment.end,
-            children: badges,
-          );
     final chevron = onTap == null
         ? null
         : NilsIcon('chevron', size: IconSize.sm, color: t.fade);
-    final content = LayoutBuilder(
-      builder: (context, box) {
-        // The web row wraps its badges under the text when they do not fit beside it.
-        final stacked = box.maxWidth < 520 || phone;
-        // Beside the text at its natural width, capped so the text keeps room. A Flexible would
-        // split the row evenly and push the badges to the middle.
-        final beside = stacked || tags == null
-            ? null
-            : ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: box.maxWidth * 0.5),
-                child: tags,
-              );
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 32),
-            child: Row(
-              spacing: 12,
-              children: [
-                ?leading,
-                Expanded(
-                  child: Column(
-                    spacing: 8,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [body, if (stacked) ?tags],
-                  ),
-                ),
-                ?beside,
-                ?chevron,
-              ],
-            ),
-          ),
-        );
-      },
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 32),
+        child: Row(
+          spacing: 12,
+          children: [
+            ?leading,
+            Expanded(child: body),
+            ?chevron,
+          ],
+        ),
+      ),
     );
     if (onTap == null) return content;
     return Semantics(

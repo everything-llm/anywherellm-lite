@@ -70,7 +70,7 @@ class SliverPageFrame extends StatelessWidget {
   }
 }
 
-/// Loads a page's data and builds its content. A failure shows nils's words.
+/// Loads a page's data and builds its content. A failure shows the server's words.
 ///
 /// The default form builds the children of a [PageFrame]. [LoadPage.slivers] builds the slivers
 /// of a [SliverPageFrame].
