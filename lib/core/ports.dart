@@ -1,5 +1,4 @@
 import 'connection.dart';
-import 'models.dart';
 import 'server_models.dart';
 
 export 'errors.dart';
@@ -39,18 +38,4 @@ abstract interface class SettingsStore {
   Future<void> save(Connection connection);
 
   Future<void> clear();
-}
-
-/// The nils libraries and inbox, as the UI sees them. Every method throws [ApiException] on
-/// failure.
-abstract interface class NilsApi {
-  Future<Overview> overview();
-  Future<List<ResearchEntry>> research();
-  Future<ResearchDoc> researchDoc(String path);
-  Future<List<SkillMeta>> skills();
-  Future<SkillDoc> skillDoc(String name);
-  Future<List<String>> inbox();
-
-  /// Stages [bytes] as [name]. nils may rename it, so read the inbox for what was staged.
-  Future<void> upload(String name, List<int> bytes);
 }

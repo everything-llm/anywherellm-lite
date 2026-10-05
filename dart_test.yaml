@@ -1,4 +1,0 @@
-tags:
-  # Tests that run the real `nils` of a checkout, found by NILS_REPO or next to this project.
-  # They only read.
-  live:
