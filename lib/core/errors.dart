@@ -9,3 +9,11 @@ class ApiException implements Exception {
   @override
   String toString() => message;
 }
+
+/// A call made before any server was set up in Settings.
+class NotConfigured extends ApiException {
+  const NotConfigured()
+    : super(
+        'No AnythingLLM server is set up yet. Add its address and key in Settings.',
+      );
+}

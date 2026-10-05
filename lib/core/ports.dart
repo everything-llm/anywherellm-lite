@@ -1,13 +1,32 @@
 import 'connection.dart';
 import 'models.dart';
+import 'server_models.dart';
 
 export 'errors.dart';
 
 /// The AnythingLLM server, as the UI sees it. Every method throws [ApiException] on failure.
+/// Every method but [verify] uses the connection in use, and throws [NotConfigured] when there
+/// is none.
 abstract interface class AnythingLlmApi {
   /// Asks the server whether [connection] opens it. Takes the connection as an argument so
   /// Settings can test one before it is saved.
   Future<void> verify(Connection connection);
+
+  /// Every workspace, without its documents.
+  Future<List<Workspace>> workspaces();
+
+  /// One workspace with its documents. A missing one is an [ApiException] with status 404.
+  Future<Workspace> workspace(String slug);
+
+  /// Every document, by folder.
+  Future<List<DocFolder>> documents();
+
+  /// The file extensions the server can read in, lower case with the dot: `.md`.
+  Future<Set<String>> acceptedExtensions();
+
+  /// Sends [bytes] as the file [name] into [folder], or the server's default folder, and
+  /// returns the documents the server made of it. Attaches them to no workspace.
+  Future<List<DocEntry>> upload(String name, List<int> bytes, {String? folder});
 }
 
 /// Where the connection is kept between runs.

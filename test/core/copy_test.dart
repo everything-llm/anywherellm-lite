@@ -2,8 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:everything/core/copy.dart';
 import 'package:everything/core/models.dart';
 
-import '../support/fake_api.dart';
-
 void main() {
   group('paths', () {
     test('areaOf is the first segment or (root)', () {
@@ -88,12 +86,6 @@ void main() {
   });
 
   group('staged files', () {
-    test('sourceExt is four upper-case letters at most', () {
-      expect(sourceExt('note.md'), 'MD');
-      expect(sourceExt('note.markdown'), 'MARK');
-      expect(sourceExt('README'), 'FILE');
-    });
-
     test('an upload over the server limit is refused', () {
       const limits = Limits.fallback;
       expect(uploadProblem(limits.upload, limits), isNull);
@@ -106,3 +98,17 @@ void main() {
     });
   });
 }
+
+ResearchMeta sampleMeta({
+  String status = 'current',
+  String verified = 'human',
+}) => ResearchMeta(
+  summary: 'A summary.',
+  kind: 'note',
+  status: status,
+  verified: verified,
+  date: '2026-01-02',
+  producedBy: 'claude',
+  tags: const ['ai'],
+  sources: const ['https://example.com'],
+);

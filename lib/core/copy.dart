@@ -82,13 +82,6 @@ String? researchTrustWarning(ResearchMeta meta) {
   return 'Its status is ${meta.status} and it is $verified.';
 }
 
-/// The file type shown on a staged file's tile.
-String sourceExt(String name) {
-  if (!name.contains('.')) return 'FILE';
-  final ext = name.split('.').last.toUpperCase();
-  return ext.length > 4 ? ext.substring(0, 4) : ext;
-}
-
 /// Why a file of [size] bytes cannot be staged, or null.
 String? uploadProblem(int size, Limits limits) {
   if (size <= limits.upload) return null;

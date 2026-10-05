@@ -32,6 +32,14 @@ class Connection {
   String toString() => 'Connection($baseUrl)';
 }
 
+/// The connection in use, or null before one is set up. Settings changes it and the client reads
+/// it on every call, so a saved connection is used at once.
+class ConnectionHolder {
+  ConnectionHolder([this.current]);
+
+  Connection? current;
+}
+
 /// The address as the client wants it: trimmed, http or https, no trailing slash, no `/api`.
 /// Throws [ApiException] saying what is wrong with [raw].
 String normalizeBaseUrl(String raw) {
