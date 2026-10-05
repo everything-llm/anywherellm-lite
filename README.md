@@ -1,4 +1,4 @@
-# everything
+# Nilson
 
 A lightweight Linux front end for an AnythingLLM server: browse its workspaces and documents, and upload files to it.
 

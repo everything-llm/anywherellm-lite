@@ -27,7 +27,7 @@ class Brand extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              'e',
+              'N',
               style: Type.serif(19, color: t.onaccent, height: 1),
             ),
           ),
@@ -39,7 +39,7 @@ class Brand extends StatelessWidget {
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
             child: Text(
-              'everything',
+              'Nilson',
               style: Type.serif(
                 size,
                 color: t.ink,
