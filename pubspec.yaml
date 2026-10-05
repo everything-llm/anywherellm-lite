@@ -1,0 +1,37 @@
+name: everything
+description: "Linux viewer and filer for the nils libraries."
+publish_to: 'none'
+version: 2.0.0+4
+
+# Pinned by series. Rolling forward is a deliberate edit to this file.
+environment:
+  sdk: ">=3.13.0 <3.14.0"
+  flutter: ">=3.47.0 <3.48.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  file_selector: ">=1.1.0 <1.2.0"
+  desktop_drop: ">=0.8.4 <0.9.0"
+  path_drawing: ">=1.0.1 <1.1.0"
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ">=6.0.0 <6.1.0"
+
+flutter:
+  uses-material-design: true
+  # SIL OFL; the licence texts sit beside the fonts.
+  fonts:
+    - family: Instrument Sans
+      fonts:
+        - asset: assets/fonts/InstrumentSans.ttf
+    - family: Instrument Serif
+      fonts:
+        - asset: assets/fonts/InstrumentSerif-Regular.ttf
+        - asset: assets/fonts/InstrumentSerif-Italic.ttf
+          style: italic
+    - family: JetBrains Mono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono.ttf

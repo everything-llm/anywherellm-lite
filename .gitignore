@@ -1,0 +1,156 @@
+# ==============================================================================
+# everything — strict .gitignore
+# ------------------------------------------------------------------------------
+# Anything not committed on purpose stays out of history. When in doubt this file
+# ignores it; add a negation (!pattern) only for something that truly belongs in
+# the repo. Audit what is being hidden with: git status --ignored
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Dart & Flutter — local tool state
+# ------------------------------------------------------------------------------
+.dart_tool/
+.packages
+.pub/
+.pub-cache/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# ------------------------------------------------------------------------------
+# Dart & Flutter — build output
+# ------------------------------------------------------------------------------
+/build/
+/coverage/
+*.dill
+*.snapshot
+*.symbols
+app.*.symbols
+app.*.map.json
+
+# ------------------------------------------------------------------------------
+# Dart & Flutter — generated sources
+# ------------------------------------------------------------------------------
+# None are committed in this project today. Drop a line if that ever changes.
+*.g.dart
+*.freezed.dart
+*.gr.dart
+*.gen.dart
+*.mocks.dart
+
+# ------------------------------------------------------------------------------
+# Dart & Flutter — tests & docs
+# ------------------------------------------------------------------------------
+test/**/failures/
+**/doc/api/
+
+# ------------------------------------------------------------------------------
+# Dart & Flutter — ephemeral platform scaffolding
+# ------------------------------------------------------------------------------
+# The engine download and its CMake output are re-fetched per machine. Also
+# covered by linux/.gitignore; repeated so the rule survives that file's removal.
+linux/flutter/ephemeral/
+**/ios/Flutter/.last_build_id
+.widget_preview/
+
+# ------------------------------------------------------------------------------
+# Dart & Flutter — package resolution
+# ------------------------------------------------------------------------------
+# pubspec.lock IS tracked on purpose: this is an application, so the lock file
+# pins the exact dependency set that ships. Do not add it here.
+pubspec_overrides.yaml
+.pubignore
+
+# ------------------------------------------------------------------------------
+# Platforms this app does not target
+# ------------------------------------------------------------------------------
+# Android was dropped; what is left on disk (signing keys, gradle caches) stays
+# out of git. The rest are not built here either. Delete a line to re-adopt one.
+/android/
+/ios/
+/macos/
+/windows/
+/web/
+
+# ------------------------------------------------------------------------------
+# Secrets & local-only config
+# ------------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+secrets*.json
+
+# ------------------------------------------------------------------------------
+# Editors & IDEs
+# ------------------------------------------------------------------------------
+.idea/
+*.iml
+*.ipr
+*.iws
+*.hprof
+# VS Code: hide machine-local state, keep the shareable workspace files.
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/tasks.json
+.fleet/
+*.sublime-project
+*.sublime-workspace
+.atom/
+.history/
+.build/
+.buildlog/
+migrate_working_dir/
+Session.vim
+*.swp
+*.swo
+*.swn
+.*.sw?
+tags
+tags.lock
+cscope.out
+
+# ------------------------------------------------------------------------------
+# Operating systems
+# ------------------------------------------------------------------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+.TemporaryItems
+.DocumentRevisions-V100
+.apdisk
+.VolumeIcon.icns
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+*.stackdump
+# Linux
+*~
+.Trash-*
+.fuse_hidden*
+.nfs*
+.goutputstream-*
+
+# ------------------------------------------------------------------------------
+# Misc
+# ------------------------------------------------------------------------------
+*.class
+*.log
+*.pyc
+.svn/
+.swiftpm/
