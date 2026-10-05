@@ -4,6 +4,7 @@ import '../icons.dart';
 import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
+import 'buttons.dart';
 
 /// The single-line input: 44px tall, rounded, a ring in the accent on focus.
 class NilsField extends StatelessWidget {
@@ -14,6 +15,8 @@ class NilsField extends StatelessWidget {
     this.hint,
     this.onChanged,
     this.icon,
+    this.suffix,
+    this.obscure = false,
   });
 
   final TextEditingController controller;
@@ -27,6 +30,12 @@ class NilsField extends StatelessWidget {
 
   /// The name of an icon drawn inside the field, before the text.
   final String? icon;
+
+  /// A widget drawn inside the field, after the text.
+  final Widget? suffix;
+
+  /// Hides the text. See [SecretField] for one with a button to show it.
+  final bool obscure;
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +52,7 @@ class NilsField extends StatelessWidget {
         controller: controller,
         autocorrect: false,
         enableSuggestions: false,
+        obscureText: obscure,
         onChanged: onChanged,
         style: Type.sans(15).copyWith(color: t.ink),
         cursorColor: t.accent,
@@ -62,6 +72,12 @@ class NilsField extends StatelessWidget {
                     child: NilsIcon(icon!, size: IconSize.sm, color: t.muted),
                   ),
                 ),
+          suffixIcon: suffix == null
+              ? null
+              : Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: suffix,
+                ),
           prefixIconConstraints: const BoxConstraints(minHeight: 44),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 12,
@@ -72,6 +88,81 @@ class NilsField extends StatelessWidget {
           focusedBorder: border(t.accent, 2),
         ),
       ),
+    );
+  }
+}
+
+/// A [NilsField] for a secret: the text is hidden, with a button to show it.
+class SecretField extends StatefulWidget {
+  const SecretField({
+    super.key,
+    required this.controller,
+    required this.label,
+    this.onChanged,
+  });
+
+  final TextEditingController controller;
+
+  /// The accessible name, also in the show and hide buttons' tooltips.
+  final String label;
+  final ValueChanged<String>? onChanged;
+
+  @override
+  State<SecretField> createState() => _SecretFieldState();
+}
+
+class _SecretFieldState extends State<SecretField> {
+  bool _shown = false;
+
+  @override
+  Widget build(BuildContext context) => NilsField(
+    controller: widget.controller,
+    label: widget.label,
+    onChanged: widget.onChanged,
+    obscure: !_shown,
+    suffix: IconBtn(
+      _shown ? 'eye-off' : 'eye',
+      tooltip: '${_shown ? 'Hide' : 'Show'} ${widget.label}',
+      onPressed: () => setState(() => _shown = !_shown),
+    ),
+  );
+}
+
+/// A field with its name written above it, and [help] in small text below. The name is also the
+/// field's accessible name. [secret] makes it a [SecretField].
+class LabeledField extends StatelessWidget {
+  const LabeledField({
+    super.key,
+    required this.label,
+    required this.controller,
+    this.hint,
+    this.help,
+    this.secret = false,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final String? hint;
+  final String? help;
+  final bool secret;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 6,
+      children: [
+        Text(
+          label,
+          style: Type.sans(14, weight: FontWeight.w500, color: t.ink),
+        ),
+        if (secret)
+          SecretField(controller: controller, label: label)
+        else
+          NilsField(controller: controller, label: label, hint: hint),
+        if (help != null) HelpText(help!),
+      ],
     );
   }
 }

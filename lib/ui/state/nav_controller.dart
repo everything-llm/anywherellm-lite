@@ -60,6 +60,11 @@ class InboxRoute extends AppRoute {
   const InboxRoute() : super('inbox');
 }
 
+/// The AnythingLLM address and key.
+class SettingsRoute extends AppRoute {
+  const SettingsRoute() : super('settings');
+}
+
 /// One place the sidebar and the tab bar both list: its icon, its label and where it goes, and
 /// the library whose findings its badge counts, when it is one.
 typedef NavEntry = ({
@@ -79,6 +84,7 @@ const navEntries = <NavEntry>[
   ),
   (icon: 'tool', label: 'Skills', route: SkillsListRoute(), library: 'skills'),
   (icon: 'file', label: 'Inbox', route: InboxRoute(), library: null),
+  (icon: 'settings', label: 'Settings', route: SettingsRoute(), library: null),
 ];
 
 /// The current page.

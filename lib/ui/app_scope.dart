@@ -4,6 +4,7 @@ import '../core/ports.dart';
 import 'state/inbox_controller.dart';
 import 'state/nav_controller.dart';
 import 'state/overview_controller.dart';
+import 'state/settings_controller.dart';
 import 'state/shell_controller.dart';
 
 /// The app's services, put in the tree once by `main.dart`. Controllers are listenable, so this
@@ -16,6 +17,7 @@ class AppScope extends InheritedWidget {
     required this.shell,
     required this.overview,
     required this.inbox,
+    required this.settings,
     required super.child,
   });
 
@@ -24,6 +26,7 @@ class AppScope extends InheritedWidget {
   final ShellController shell;
   final OverviewController overview;
   final InboxController inbox;
+  final SettingsController settings;
 
   static AppScope of(BuildContext context) {
     // Never notifies, so no dependency is needed. That also lets initState read it.

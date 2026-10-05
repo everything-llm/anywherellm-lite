@@ -7,11 +7,12 @@ import 'package:everything/ui/state/nav_controller.dart';
 import 'package:everything/ui/state/shell_controller.dart';
 
 import 'fake_api.dart';
+import 'fake_settings.dart';
 import 'rig.dart';
 
 /// The controllers a test can read and drive, and the app built on them.
 class Harness extends Rig {
-  Harness(super.api, [AppRoute? route])
+  Harness(super.api, {AppRoute? route, super.llm, super.store})
     : nav = NavController(route),
       shell = ShellController();
 
@@ -25,6 +26,7 @@ class Harness extends Rig {
       shell: shell,
       overview: overview,
       inbox: inbox,
+      settings: settings,
       child: const AppShell(),
     ),
   );
@@ -34,13 +36,20 @@ class Harness extends Rig {
 Future<Harness> pumpApp(
   WidgetTester tester, {
   FakeApi? api,
+  FakeAnythingLlm? llm,
+  FakeSettingsStore? store,
   Size size = const Size(1200, 800),
   AppRoute? route,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  final harness = Harness(api ?? FakeApi(), route);
+  final harness = Harness(
+    api ?? FakeApi(),
+    route: route,
+    llm: llm,
+    store: store,
+  );
   await tester.pumpWidget(harness.app);
   await tester.pumpAndSettle();
   return harness;

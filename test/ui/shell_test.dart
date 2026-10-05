@@ -25,6 +25,7 @@ void main() {
       expect(find.text('Research'), findsWidgets);
       expect(find.text('Skills'), findsWidgets);
       expect(find.text('Inbox'), findsWidgets);
+      expect(find.text('Settings'), findsWidgets);
       expect(find.byTooltip('Menu'), findsNothing);
     });
 
@@ -142,12 +143,18 @@ void main() {
   group('a phone window', () {
     const size = Size(500, 800);
 
-    testWidgets('has a tab bar with four tabs and no top bar menu', (
+    testWidgets('has a tab bar with five tabs and no top bar menu', (
       tester,
     ) async {
       await pumpApp(tester, size: size);
       expect(find.byTooltip('Menu'), findsNothing);
-      for (final label in ['Overview', 'Research', 'Skills', 'Inbox']) {
+      for (final label in [
+        'Overview',
+        'Research',
+        'Skills',
+        'Inbox',
+        'Settings',
+      ]) {
         expect(tab(label), findsWidgets, reason: label);
       }
     });
@@ -157,6 +164,13 @@ void main() {
       await tester.tap(tab('Inbox'));
       await tester.pumpAndSettle();
       expect(h.nav.route, const InboxRoute());
+    });
+
+    testWidgets('the Settings tab opens Settings', (tester) async {
+      final h = await pumpApp(tester, size: size);
+      await tester.tap(tab('Settings'));
+      await tester.pumpAndSettle();
+      expect(h.nav.route, const SettingsRoute());
     });
   });
 

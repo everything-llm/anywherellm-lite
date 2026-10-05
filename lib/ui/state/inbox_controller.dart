@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/copy.dart';
 import '../../core/ports.dart';
+import 'notice.dart';
 import 'overview_controller.dart';
 
 /// A file to stage. The UI wraps whatever the file picker or a drop gave it. [length] and
@@ -25,13 +26,6 @@ class UnreadableFile implements Exception {
 
   @override
   String toString() => message;
-}
-
-/// A problem to show on the Inbox page.
-class Notice {
-  const Notice(this.title, this.text);
-  final String title;
-  final String text;
 }
 
 /// The files staged for adding, and staging more.

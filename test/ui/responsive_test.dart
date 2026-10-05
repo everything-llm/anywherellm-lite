@@ -70,6 +70,7 @@ void main() {
     'skills list': const SkillsListRoute(),
     'skill doc': const SkillDocRoute('skill-$longWord'),
     'inbox': const InboxRoute(),
+    'settings': const SettingsRoute(),
   };
 
   for (final size in sizes) {

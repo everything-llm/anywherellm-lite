@@ -2,7 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'adapters/anythingllm_client.dart';
 import 'adapters/cli_nils_api.dart';
+import 'adapters/keyring_settings_store.dart';
 import 'adapters/nils_command.dart';
 import 'core/models.dart';
 import 'core/ports.dart';
@@ -13,6 +15,7 @@ import 'ui/shell.dart';
 import 'ui/state/inbox_controller.dart';
 import 'ui/state/nav_controller.dart';
 import 'ui/state/overview_controller.dart';
+import 'ui/state/settings_controller.dart';
 import 'ui/state/shell_controller.dart';
 
 /// The composition root: the one place that knows the adapters and the UI.
@@ -22,7 +25,18 @@ import 'ui/state/shell_controller.dart';
 /// executable for one, or for a sibling directory named `nils`.
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(NilsApp(home: SessionHost(open: () async => _connected(_command()))));
+  final settings = SettingsController(
+    HttpAnythingLlmApi(),
+    KeyringSettingsStore(),
+  )..load();
+  runApp(
+    NilsApp(
+      home: SessionHost(
+        settings: settings,
+        open: () async => _connected(_command()),
+      ),
+    ),
+  );
 }
 
 /// The environment variable [name], or null when it is unset or empty.
@@ -62,8 +76,9 @@ Future<(NilsApi, Overview)> _connected(NilsCommand command) async {
 
 /// Opens the API, then shows the app on it, or why it could not be opened.
 class SessionHost extends StatefulWidget {
-  const SessionHost({super.key, required this.open});
+  const SessionHost({super.key, required this.settings, required this.open});
 
+  final SettingsController settings;
   final Future<(NilsApi, Overview)> Function() open;
 
   @override
@@ -117,6 +132,7 @@ class _SessionHostState extends State<SessionHost> {
         shell: session.shell,
         overview: session.overview,
         inbox: session.inbox,
+        settings: widget.settings,
         child: const AppShell(),
       );
     },
