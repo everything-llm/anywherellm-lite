@@ -254,6 +254,23 @@ void main() {
       expect(find.text('Missing'), findsOneWidget);
     });
 
+    testWidgets('a replaced key closes the form once saved', (tester) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.tap(control('Replace'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.bySemanticsLabel('AnythingLLM developer API key').last,
+        'K9',
+      );
+      await tester.tap(control('Save key'));
+      await tester.pumpAndSettle();
+      expect(h.store.saved?.apiKey, 'K9');
+      expect(control('Save key'), findsNothing);
+      expect(control('Replace'), findsOneWidget);
+    });
+
     testWidgets('Forget asks once more, then deletes the key', (tester) async {
       final h = await pumpApp(tester, llm: planningServer());
       h.shell.openSettings();
@@ -316,6 +333,23 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
       expect(h.shell.sourcesOpen, isFalse);
+    });
+
+    testWidgets('Sources open in the layout does not become an open drawer', (
+      tester,
+    ) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      expect(h.shell.sourcesOpen, isTrue);
+      tester.view.physicalSize = const Size(1000, 800);
+      await tester.pumpAndSettle();
+      expect(h.shell.sourcesOpen, isFalse);
+      expect(
+        tester.getTopLeft(find.byType(SourcesPanel)).dx,
+        greaterThanOrEqualTo(1000),
+      );
+      tester.view.physicalSize = const Size(1280, 800);
+      await tester.pumpAndSettle();
+      expect(h.shell.sourcesOpen, isTrue);
     });
 
     testWidgets('below 820, the sidebar is a drawer behind the menu button', (

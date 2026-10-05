@@ -30,6 +30,7 @@ class SourcesController extends ChangeNotifier {
   bool loading = false;
 
   /// The extensions the server reads, or null when it has not said. Then the server decides.
+  /// Asked again for each workspace, so a new server is asked afresh.
   Set<String>? _accepted;
 
   /// The file being sent now, or null.
@@ -68,6 +69,9 @@ class SourcesController extends ChangeNotifier {
     _slug = _chat.activeSlug;
     files = const [];
     problems = const [];
+    loading = false;
+    sending = null;
+    _accepted = null;
     _clearRemoved();
     notifyListeners();
     if (_slug != null) unawaited(refresh());
@@ -115,16 +119,20 @@ class SourcesController extends ChangeNotifier {
     if (slug == null || picked.isEmpty) return;
     final refused = <Notice>[];
     final made = <String>[];
+    var accepted = _accepted;
     try {
-      _accepted ??= await _api.acceptedExtensions();
+      accepted ??= await _api.acceptedExtensions();
+      if (slug == _slug) _accepted = accepted;
     } on ApiException {
       // The server decides each file then.
     }
     for (final file in picked) {
-      sending = file.name;
-      notifyListeners();
+      if (slug == _slug) {
+        sending = file.name;
+        notifyListeners();
+      }
       try {
-        final wrongType = extensionProblem(file.name, _accepted);
+        final wrongType = extensionProblem(file.name, accepted);
         if (wrongType != null) throw ApiException(wrongType);
         final docs = await _api.upload(file.name, await file.read());
         made.addAll([for (final d in docs) d.path]);
@@ -142,6 +150,8 @@ class SourcesController extends ChangeNotifier {
         );
       }
     }
+    // The person moved to another workspace meanwhile: these notices are not about it.
+    if (slug != _slug) return;
     sending = null;
     problems = refused;
     await refresh();
@@ -224,9 +234,9 @@ class SourcesController extends ChangeNotifier {
     if (slug == null) return;
     try {
       await op(slug);
-      problems = const [];
+      if (slug == _slug) problems = const [];
     } on ApiException catch (error) {
-      problems = [Notice(failTitle, error.message)];
+      if (slug == _slug) problems = [Notice(failTitle, error.message)];
     }
     await refresh();
   }

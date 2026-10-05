@@ -152,8 +152,8 @@ class _KeyCardState extends State<_KeyCard> {
   }
 
   Future<void> _save() async {
-    await _settings.connect(_url.text, _key.text);
-    if (mounted && _settings.check == ConnectionCheck.ok) {
+    final saved = await _settings.connect(_url.text, _key.text);
+    if (mounted && saved) {
       setState(() {
         _key.clear();
         _replacing = false;

@@ -40,6 +40,7 @@ class AppShell extends StatelessWidget {
       builder: (context, box) {
         final screen = ScreenClass.of(box.maxWidth);
         final sourcesInline = ScreenClass.sourcesInline(box.maxWidth);
+        shell.fit(sourcesInline: sourcesInline);
         return ListenableBuilder(
           listenable: shell,
           builder: (context, _) {

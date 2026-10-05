@@ -56,7 +56,10 @@ class _Form extends StatelessWidget {
         ? 'Another chat is still answering…'
         : 'Ask about your files…';
     final canSend =
-        !chat.busy && chat.active != null && draft.text.trim().isNotEmpty;
+        !chat.busy &&
+        chat.ready &&
+        chat.active != null &&
+        draft.text.trim().isNotEmpty;
 
     void send() {
       if (!canSend) return;

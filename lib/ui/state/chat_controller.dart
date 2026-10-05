@@ -108,6 +108,9 @@ class ChatController extends ChangeNotifier {
 
   bool get busy => _running != null;
 
+  /// Whether the chat on screen can take a message: a draft, or a chat whose history is read.
+  bool get ready => activeThread == null || _turns.containsKey(activeThread);
+
   /// Whether the chat on screen is the one answering.
   bool get answeringHere => busy && turns.contains(_running!.answer);
 
@@ -200,8 +203,10 @@ class ChatController extends ChangeNotifier {
     if (slug == null || threadSlug == null || _turns.containsKey(threadSlug)) {
       return;
     }
+    final server = _server;
     await _try('Could not read the chat', () async {
       final history = await _api.history(slug, threadSlug);
+      if (_server != server) return;
       _turns[threadSlug] = [for (final m in history) Turn.saved(m)];
     });
   }
@@ -214,21 +219,26 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> createWorkspace(String name) =>
-      _try('Could not make the workspace', () async {
-        final made = await _api.createWorkspace(name.trim());
-        workspaces = [...workspaces, made];
-        _threads[made.slug] = [];
-        docCounts[made.slug] = 0;
-        await select(made.slug);
-      });
+  Future<void> createWorkspace(String name) {
+    final server = _server;
+    return _try('Could not make the workspace', () async {
+      final made = await _api.createWorkspace(name.trim());
+      if (_server != server) return;
+      workspaces = [...workspaces, made];
+      _threads[made.slug] = [];
+      docCounts[made.slug] = 0;
+      await select(made.slug);
+    });
+  }
 
   Future<void> rename(String threadSlug, String name) async {
     final slug = activeSlug;
     final clean = name.trim();
     if (slug == null || clean.isEmpty) return;
+    final server = _server;
     await _try('Could not rename the chat', () async {
       await _api.renameThread(slug, threadSlug, clean);
+      if (_server != server) return;
       _named.add(threadSlug);
       _replace(slug, Thread(slug: threadSlug, name: clean));
     });
@@ -238,11 +248,13 @@ class ChatController extends ChangeNotifier {
   Future<void> delete(String threadSlug) async {
     final slug = activeSlug;
     if (slug == null || isAnswering(threadSlug)) return;
+    final server = _server;
     await _try('Could not delete the chat', () async {
       await _api.deleteThread(slug, threadSlug);
-      final list = _threads[slug]!;
+      if (_server != server) return;
+      final list = _threads[slug] ?? [];
       final at = list.indexWhere((t) => t.slug == threadSlug);
-      list.removeAt(at);
+      if (at >= 0) list.removeAt(at);
       _turns.remove(threadSlug);
       if (activeThread == threadSlug) {
         _draft.clear();
@@ -257,12 +269,13 @@ class ChatController extends ChangeNotifier {
   Future<void> send(String message) async {
     final slug = activeSlug;
     final text = message.trim();
-    if (slug == null || text.isEmpty || busy) return;
+    if (slug == null || text.isEmpty || busy || !ready) return;
     final user = Turn.user(text);
     final answer = Turn.answer();
     final turns = [...this.turns, user, answer];
     final first = this.turns.every((t) => t.role != Role.user);
     final running = _running = _Running(answer)..thread = activeThread;
+    final server = _server;
     _setTurns(turns);
     notifyListeners();
 
@@ -270,6 +283,8 @@ class ChatController extends ChangeNotifier {
     if (threadSlug == null) {
       try {
         final made = await _api.createThread(slug);
+        // A new server has started afresh: the chat belongs to the old one.
+        if (_server != server) return;
         threadSlug = made.slug;
         _threads[slug] = [...threadsOf(slug), made];
         _turns[made.slug] = turns;
@@ -279,7 +294,12 @@ class ChatController extends ChangeNotifier {
         }
         running.thread = made.slug;
       } on ApiException catch (error) {
-        _finish(error: error.message);
+        _finish(running, error: error.message);
+        return;
+      }
+      // Stopped while the thread was being made: the chat stays, the answer does not run.
+      if (!identical(_running, running)) {
+        notifyListeners();
         return;
       }
     }
@@ -292,10 +312,12 @@ class ChatController extends ChangeNotifier {
             TextChunk(:final text) => answer._grow(text),
             ChatDone(:final citations) => answer.citations = citations,
           },
-          onError: (Object error) =>
-              _finish(error: error is ApiException ? error.message : '$error'),
+          onError: (Object error) => _finish(
+            running,
+            error: error is ApiException ? error.message : '$error',
+          ),
           onDone: () {
-            _finish();
+            _finish(running);
             if (first && !_named.contains(thread)) {
               unawaited(_nameAfter(slug, thread, text));
             }
@@ -310,15 +332,15 @@ class ChatController extends ChangeNotifier {
     if (running == null) return;
     running.stream?.cancel();
     if (running.answer.text.isEmpty) running.answer.text = 'Stopped.';
-    _finish();
+    _finish(running);
   }
 
-  /// Ends the running answer, with [error] when it failed.
-  void _finish({String? error}) {
-    final answer = _running?.answer;
+  /// Ends [running], with [error] when it failed, unless it was already stopped or dropped.
+  void _finish(_Running running, {String? error}) {
+    if (!identical(_running, running)) return;
     _running = null;
-    answer
-      ?..streaming = false
+    running.answer
+      ..streaming = false
       ..error = error
       ..notifyListeners();
     notifyListeners();

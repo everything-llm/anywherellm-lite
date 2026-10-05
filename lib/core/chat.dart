@@ -24,9 +24,12 @@ class ChatDone extends ChatEvent {
   final List<String> citations;
 }
 
-/// The name a chat takes from its first [message]: its first line, cut to 42 characters.
+/// The name a chat takes from its first [message]: its first line, cut to 42 code points so an
+/// emoji is never split.
 String defaultTitle(String message) {
   final line = message.trim().split('\n').first.trim();
   if (line.isEmpty) return newChatName;
-  return line.length <= 42 ? line : '${line.substring(0, 41).trimRight()}…';
+  final points = line.runes;
+  if (points.length <= 42) return line;
+  return '${String.fromCharCodes(points.take(41)).trimRight()}…';
 }

@@ -55,10 +55,12 @@ class SettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Saves [url] and [key] only once the server accepts them.
-  Future<void> connect(String url, String key) async {
+  /// Saves [url] and [key] only once the server accepts them. True when it did.
+  Future<bool> connect(String url, String key) async {
     await test(url, key);
-    if (check == ConnectionCheck.ok) await save(url, key);
+    if (check != ConnectionCheck.ok) return false;
+    await save(url, key);
+    return true;
   }
 
   /// Uses [url] and [key] from now on and keeps them in the keyring. If the keyring refuses,

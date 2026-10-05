@@ -197,6 +197,18 @@ void main() {
     });
   });
 
+  group('an empty answer', () {
+    test('is not an AnythingLLM server, except to a delete', () async {
+      final api = _api((request) async => http.Response('', 200));
+      final error = await _failure(api.workspaces());
+      expect(
+        error.message,
+        'The address did not answer like an AnythingLLM server.',
+      );
+      await api.deleteThread('s', 't');
+    });
+  });
+
   group('workspaces', () {
     test('lists each with its model and named threads', () async {
       final seen = <http.Request>[];

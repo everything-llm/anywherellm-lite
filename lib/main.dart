@@ -8,7 +8,6 @@ import 'core/ports.dart';
 import 'ui/app.dart';
 import 'ui/app_scope.dart';
 import 'ui/boot_screen.dart';
-import 'ui/layout.dart';
 import 'ui/shell.dart';
 import 'ui/state/chat_controller.dart';
 import 'ui/state/prefs_controller.dart';
@@ -24,15 +23,13 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   final holder = ConnectionHolder();
   final llm = HttpAnythingLlmApi(holder: holder);
-  final view = WidgetsBinding.instance.platformDispatcher.views.first;
-  final width = view.physicalSize.width / view.devicePixelRatio;
   runApp(
     NilsApp(
       home: SessionHost(
         llm: llm,
         settings: SettingsController(llm, KeyringSettingsStore(), holder),
         prefs: PrefsController(JsonPrefsStore()),
-        shell: ShellController(sourcesOpen: ScreenClass.sourcesInline(width)),
+        shell: ShellController(),
       ),
     ),
   );

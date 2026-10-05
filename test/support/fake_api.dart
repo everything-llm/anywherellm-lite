@@ -25,8 +25,8 @@ class FakeWorkspace {
 }
 
 /// An [AnythingLlmApi] for widget tests that keeps its workspaces in memory. Put an error in
-/// [errors] under a method's name to make it fail. Every call but [verify] is recorded in
-/// [calls] as `name` or `name:arg`.
+/// [errors] under a method's name to make it fail, or a completer in [gates] to hold it until the
+/// test completes it. Every call but [verify] is recorded in [calls] as `name` or `name:arg`.
 ///
 /// [streamChat] answers with [answer] and [cited], or, when [hold] is set, with whatever the
 /// test adds to the controller [chat] makes.
@@ -51,10 +51,12 @@ class FakeAnythingLlm implements AnythingLlmApi {
 
   final List<String> calls = [];
   final Map<String, Object> errors = {};
+  final Map<String, Completer<void>> gates = {};
   var _made = 0;
 
   Future<T> _run<T>(String name, T Function() value, [String? arg]) async {
     calls.add(arg == null ? name : '$name:$arg');
+    await gates[name]?.future;
     final error = errors[name];
     if (error != null) throw error;
     return value();

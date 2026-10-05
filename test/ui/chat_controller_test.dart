@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:everything/core/chat.dart';
 import 'package:everything/core/ports.dart';
 import 'package:everything/core/prefs.dart';
@@ -202,5 +204,67 @@ void main() {
     await rig.settings.clear();
     expect(rig.chat.workspaces, isEmpty);
     expect(rig.chat.activeSlug, isNull);
+  });
+
+  test(
+    'Stop while a draft\'s chat is made keeps the chat and runs no answer',
+    () async {
+      final llm = planningServer()..hold = true;
+      final rig = await started(llm);
+      await rig.chat.select('household');
+      final gate = llm.gates['createThread'] = Completer<void>();
+      final sending = rig.chat.send('hi');
+      await pumpEventQueue();
+      rig.chat.stop();
+      gate.complete();
+      await sending;
+      expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
+      expect(rig.chat.busy, isFalse);
+      expect(rig.chat.threadsOf('household'), hasLength(1));
+      expect(rig.chat.turns.last.text, 'Stopped.');
+    },
+  );
+
+  test('a new server while a draft\'s chat is made drops the chat', () async {
+    final llm = planningServer()..hold = true;
+    final rig = await started(llm);
+    await rig.chat.select('household');
+    final gate = llm.gates['createThread'] = Completer<void>();
+    final sending = rig.chat.send('hi');
+    await pumpEventQueue();
+    await rig.settings.save('https://other:3001', 'K2');
+    await pumpEventQueue();
+    gate.complete();
+    await sending;
+    await pumpEventQueue();
+    expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
+    expect(rig.chat.threadsOf('household'), isEmpty);
+    expect(rig.chat.busy, isFalse);
+  });
+
+  test('a chat whose history is still being read takes no message', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    final gate = llm.gates['history'] = Completer<void>();
+    final opening = rig.chat.open('priorities');
+    expect(rig.chat.ready, isFalse);
+    await rig.chat.send('hi');
+    expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
+    gate.complete();
+    await opening;
+    expect(rig.chat.ready, isTrue);
+    expect(rig.chat.turns, isEmpty);
+  });
+
+  test('a delete that returns after a new server changes nothing', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    final gate = llm.gates['deleteThread'] = Completer<void>();
+    final deleting = rig.chat.delete('budget');
+    await pumpEventQueue();
+    await rig.settings.clear();
+    gate.complete();
+    await deleting;
+    expect(rig.chat.workspaces, isEmpty);
   });
 }

@@ -25,6 +25,15 @@ void main() {
     expect((await JsonPrefsStore(file).load()).groundedOnly, isFalse);
   });
 
+  test('saves at once land in order, the last one winning', () async {
+    final store = JsonPrefsStore(File('${dir.path}/nilson/prefs.json'));
+    await Future.wait([
+      store.save(const Prefs(groundedOnly: false)),
+      store.save(const Prefs()),
+    ]);
+    expect((await store.load()).groundedOnly, isTrue);
+  });
+
   test('a file it cannot write is an ApiException naming the path', () async {
     final blocker = File('${dir.path}/blocker')..writeAsStringSync('');
     final store = JsonPrefsStore(File('${blocker.path}/prefs.json'));

@@ -98,6 +98,16 @@ void main() {
     });
   });
 
+  group('connect', () {
+    test('says whether it saved', () async {
+      expect(await settings.connect('https://h:3001', 'K1'), isTrue);
+      expect(store.saved, _saved);
+      llm.verifyError = const ApiException('rejected');
+      expect(await settings.connect('https://h:3001', 'K2'), isFalse);
+      expect(store.saved, _saved);
+    });
+  });
+
   group('clear', () {
     test('forgets the connection and empties the store', () async {
       await settings.save('https://h:3001', 'K1');

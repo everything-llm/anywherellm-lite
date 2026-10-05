@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:everything/core/ports.dart';
 import 'package:everything/core/upload.dart';
 import 'package:everything/ui/state/sources_controller.dart';
@@ -118,5 +120,45 @@ void main() {
     await rig.chat.select('household');
     await pumpEventQueue();
     expect(rig.sources.files, isEmpty);
+  });
+
+  test('a refresh cut short by forgetting the server stops loading', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    final gate = llm.gates['workspace'] = Completer<void>();
+    final refreshing = rig.sources.refresh();
+    expect(rig.sources.loading, isTrue);
+    await rig.settings.clear();
+    gate.complete();
+    await refreshing;
+    expect(rig.sources.loading, isFalse);
+  });
+
+  test(
+    'an upload that ends in another workspace leaves its notices out',
+    () async {
+      final llm = planningServer()
+        ..errors['upload'] = const ApiException('nope');
+      final rig = await started(llm);
+      final gate = llm.gates['upload'] = Completer<void>();
+      final uploading = rig.sources.upload([file('a.md')]);
+      await pumpEventQueue();
+      expect(rig.sources.sending, 'a.md');
+      await rig.chat.select('household');
+      gate.complete();
+      await uploading;
+      expect(rig.sources.problems, isEmpty);
+      expect(rig.sources.sending, isNull);
+    },
+  );
+
+  test('a new server is asked which files it reads', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    await rig.sources.upload([file('a.md')]);
+    await rig.settings.save('https://other:3001', 'K2');
+    await pumpEventQueue();
+    await rig.sources.upload([file('b.md')]);
+    expect(llm.calls.where((c) => c == 'acceptedExtensions'), hasLength(2));
   });
 }

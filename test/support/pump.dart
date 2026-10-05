@@ -18,7 +18,7 @@ class Harness extends Rig {
     super.prefsStore,
     super.connection,
     bool sourcesOpen = true,
-  }) : shell = ShellController(sourcesOpen: sourcesOpen);
+  }) : shell = ShellController(sourcesPinned: sourcesOpen);
 
   final ShellController shell;
 

@@ -49,10 +49,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   @override
   Future<Workspace> workspace(String slug) async {
     final found = jsonObjects(
-      _field(
-        await _get(_current, '/api/v1/workspace/${Uri.encodeComponent(slug)}'),
-        'workspace',
-      ),
+      _field(await _get(_current, _workspace(slug)), 'workspace'),
     );
     if (found.isEmpty) {
       throw ApiException('There is no workspace $slug.', status: 404);
@@ -89,7 +86,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   /// The server answers a delete with an empty body.
   @override
   Future<void> deleteThread(String slug, String thread) =>
-      _send('DELETE', _thread(slug, thread), null);
+      _send('DELETE', _thread(slug, thread), null, emptyOk: true);
 
   @override
   Future<List<ChatMessage>> history(String slug, String thread) async => [
@@ -221,11 +218,13 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   }
 
   /// The decoded JSON of a [method] to [path] on the connection in use, with [body] as JSON.
+  /// [emptyOk] takes an empty success as null.
   Future<Object?> _send(
     String method,
     String path,
-    Map<String, Object?>? body,
-  ) async {
+    Map<String, Object?>? body, {
+    bool emptyOk = false,
+  }) async {
     final connection = _current;
     return _call(
       connection,
@@ -233,6 +232,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       () async => http.Response.fromStream(
         await _client.send(_request(connection, method, path, body)),
       ),
+      emptyOk: emptyOk,
     );
   }
 
@@ -240,15 +240,16 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   Future<Object?> _call(
     Connection connection,
     Duration limit,
-    Future<http.Response> Function() send,
-  ) async {
+    Future<http.Response> Function() send, {
+    bool emptyOk = false,
+  }) async {
     final http.Response response;
     try {
       response = await send().timeout(limit);
     } on Exception catch (error) {
       throw _unreachable(connection, error, limit);
     }
-    return _decode(response);
+    return _decode(response, emptyOk: emptyOk);
   }
 
   /// [error], from sending a request, in plain words.
@@ -272,8 +273,9 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     _ => ApiException('Could not reach the server: $error'),
   };
 
-  /// The decoded JSON of [response], or null for an empty success, as a delete answers.
-  Object? _decode(http.Response response) {
+  /// The decoded JSON of [response], or null for an empty success when [emptyOk], as a delete
+  /// answers.
+  Object? _decode(http.Response response, {bool emptyOk = false}) {
     final status = response.statusCode;
     final body = _json(response);
     if (status == 401 || status == 403) {
@@ -285,7 +287,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
         status: status,
       );
     }
-    if (body == null && response.bodyBytes.isNotEmpty) {
+    if (body == null && !(emptyOk && response.bodyBytes.isEmpty)) {
       throw ApiException(
         'The address did not answer like an AnythingLLM server.',
         status: status,

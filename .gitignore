@@ -154,3 +154,6 @@ $RECYCLE.BIN/
 *.pyc
 .svn/
 .swiftpm/
+
+
+docs/.*

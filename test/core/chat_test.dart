@@ -13,6 +13,10 @@ void main() {
       expect(title, endsWith('…'));
     });
 
+    test('never splits an emoji', () {
+      expect(defaultTitle('${'a' * 40}😀 and more'), '${'a' * 40}😀…');
+    });
+
     test('keeps a line of exactly 42 characters whole', () {
       expect(defaultTitle('b' * 42), 'b' * 42);
     });

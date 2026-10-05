@@ -10,6 +10,9 @@ class JsonPrefsStore implements PrefsStore {
 
   final File _file;
 
+  /// The last write, which the next one waits for, so writes land in the order they were asked.
+  Future<void> _last = Future.value();
+
   static File _defaultFile() {
     final env = Platform.environment;
     final config = switch (env['XDG_CONFIG_HOME']) {
@@ -30,7 +33,13 @@ class JsonPrefsStore implements PrefsStore {
 
   /// Writes beside the file and renames over it, so a crash never leaves half a file.
   @override
-  Future<void> save(Prefs prefs) async {
+  Future<void> save(Prefs prefs) {
+    final write = _last.then((_) => _write(prefs));
+    _last = write.catchError((_) {});
+    return write;
+  }
+
+  Future<void> _write(Prefs prefs) async {
     try {
       await _file.parent.create(recursive: true);
       final temp = File('${_file.path}.tmp');
