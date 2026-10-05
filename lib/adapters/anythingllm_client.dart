@@ -13,16 +13,22 @@ import 'anythingllm_stream.dart';
 /// [AnythingLlmApi] over the server's HTTP API, with the bearer key on every request.
 ///
 /// Every call but [verify] reads the connection from the holder when it is made. An error message
-/// never contains the key.
+/// never contains the key. Unless [allowHttp], a call to an `http://` address fails before the key
+/// is sent.
 class HttpAnythingLlmApi implements AnythingLlmApi {
   HttpAnythingLlmApi({
     required this._holder,
+    this.allowHttp = true,
     http.Client? client,
     this.timeout = const Duration(seconds: 15),
     this.uploadTimeout = const Duration(minutes: 5),
   }) : _client = client ?? http.Client();
 
   final ConnectionHolder _holder;
+
+  /// Whether the key may go to an `http://` address. False on Android: Dart's HTTP client ignores
+  /// Android's cleartext policy, so the client applies it.
+  final bool allowHttp;
   final http.Client _client;
   final Duration timeout;
 
@@ -31,7 +37,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
 
   @override
   Future<void> verify(Connection connection) async {
-    final body = await _get(connection, '/api/v1/auth');
+    final body = await _get(_secure(connection), '/api/v1/auth');
     if (body is! Map || body['authenticated'] != true) {
       throw const ApiException('The server did not accept the key.');
     }
@@ -244,7 +250,18 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   }
 
   /// The connection in use.
-  Connection get _current => _holder.current ?? (throw const NotConfigured());
+  Connection get _current =>
+      _secure(_holder.current ?? (throw const NotConfigured()));
+
+  /// [connection], or an [ApiException] when it is `http://` and [allowHttp] is false.
+  Connection _secure(Connection connection) {
+    if (!allowHttp && Uri.parse(connection.baseUrl).scheme == 'http') {
+      throw const ApiException(
+        'Use an https:// address. This device does not send the API key over plain http.',
+      );
+    }
+    return connection;
+  }
 
   static String _workspace(String slug) =>
       '/api/v1/workspace/${Uri.encodeComponent(slug)}';

@@ -197,6 +197,45 @@ void main() {
     });
   });
 
+  group('without http', () {
+    const plain = Connection(baseUrl: 'http://h:3001', apiKey: 'SECRET-KEY');
+
+    test('an http address fails before the key is sent', () async {
+      var sent = 0;
+      final api = HttpAnythingLlmApi(
+        holder: ConnectionHolder(plain),
+        allowHttp: false,
+        client: MockClient((_) async {
+          sent++;
+          return http.Response('{"authenticated":true,"workspaces":[]}', 200);
+        }),
+      );
+      final https = isA<ApiException>().having(
+        (e) => e.message,
+        'message',
+        contains('https://'),
+      );
+      await expectLater(api.verify(plain), throwsA(https));
+      await expectLater(api.workspaces(), throwsA(https));
+      await expectLater(
+        api.streamChat('w', 't', 'hi', mode: ChatMode.chat).toList(),
+        throwsA(https),
+      );
+      expect(sent, 0);
+    });
+
+    test('an https address is used', () async {
+      final api = HttpAnythingLlmApi(
+        holder: ConnectionHolder(_connection),
+        allowHttp: false,
+        client: MockClient(
+          (_) async => http.Response('{"authenticated":true}', 200),
+        ),
+      );
+      await api.verify(_connection);
+    });
+  });
+
   group('an empty answer', () {
     test('is not an AnythingLLM server, except to a delete', () async {
       final api = _api((request) async => http.Response('', 200));
