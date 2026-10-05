@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:everything/adapters/anythingllm_client.dart';
+import 'package:everything/core/chat.dart';
 import 'package:everything/core/connection.dart';
 import 'package:everything/core/ports.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -164,7 +165,15 @@ void main() {
         return http.Response('{}', 200);
       }, current: null);
       await expectLater(api.workspaces(), throwsA(isA<NotConfigured>()));
-      await expectLater(api.documents(), throwsA(isA<NotConfigured>()));
+      await expectLater(api.history('w', 't'), throwsA(isA<NotConfigured>()));
+      await expectLater(
+        api.streamChat('w', 't', 'hi', mode: ChatMode.query).toList(),
+        throwsA(isA<NotConfigured>()),
+      );
+      await expectLater(
+        api.updateEmbeddings('w', adds: ['a']),
+        throwsA(isA<NotConfigured>()),
+      );
       await expectLater(
         api.upload('a.md', const [1]),
         throwsA(isA<NotConfigured>()),
@@ -189,7 +198,7 @@ void main() {
   });
 
   group('workspaces', () {
-    test('lists each with its model and thread count', () async {
+    test('lists each with its model and named threads', () async {
       final seen = <http.Request>[];
       final list = await _answering({
         'workspaces': [
@@ -197,9 +206,9 @@ void main() {
             'id': 1,
             'name': 'AnythingLLM',
             'slug': 'algorithms',
-            'chatModel': 'llama3',
             'threads': [
-              {'user_id': null, 'slug': 't1'},
+              {'user_id': null, 'slug': 't1', 'name': 'Budget'},
+              {'slug': 't2', 'name': null},
             ],
           },
           {'slug': 'bare', 'name': null, 'threads': null},
@@ -210,9 +219,11 @@ void main() {
         'https://host.example.ts.net:3001/api/v1/workspaces',
       );
       expect(list.map((w) => w.name), ['AnythingLLM', 'bare']);
-      expect(list.first.chatModel, 'llama3');
-      expect(list.first.threads, 1);
-      expect(list.last.chatModel, isNull);
+      expect(list.first.threads.map((t) => (t.slug, t.name)), [
+        ('t1', 'Budget'),
+        ('t2', 'Chat'),
+      ]);
+      expect(list.last.threads, isEmpty);
     });
 
     test('one workspace is the first of the list the server sends', () async {
@@ -236,6 +247,8 @@ void main() {
       expect(seen.single.url.path, '/api/v1/workspace/my%20space');
       expect(workspace.documents.map((d) => d.title), ['Agents', 'b.json']);
       expect(workspace.documents.first.path, 'claude/a.md-1.json');
+      expect(workspace.documents.first.words, 3);
+      expect(workspace.documents.last.words, isNull);
     });
 
     test('an empty list is a missing workspace', () async {
@@ -244,51 +257,6 @@ void main() {
       );
       expect(error.status, 404);
       expect(error.message, 'There is no workspace gone.');
-    });
-  });
-
-  group('documents', () {
-    test('come by folder, with the server\'s placeholders dropped', () async {
-      final folders = await _answering({
-        'localFiles': {
-          'name': 'documents',
-          'type': 'folder',
-          'items': [
-            {
-              'name': 'custom-documents',
-              'type': 'folder',
-              'items': [
-                {
-                  'name': 'notes.md-1f2e.json',
-                  'type': 'file',
-                  'title': 'notes.md',
-                  'description': 'Unknown',
-                  'docAuthor': 'Unknown',
-                  'docSource': 'a text file uploaded by the user.',
-                  'published': '10/5/2026, 11:48:20 AM',
-                  'wordCount': 93,
-                  'token_count_estimate': 115,
-                  'pinnedWorkspaces': [],
-                },
-              ],
-            },
-            {'name': 'empty', 'type': 'folder', 'items': []},
-          ],
-        },
-      }).documents();
-      expect(folders.map((f) => f.name), ['custom-documents', 'empty']);
-      final doc = folders.first.docs.single;
-      expect(doc.path, 'custom-documents/notes.md-1f2e.json');
-      expect(doc.title, 'notes.md');
-      expect(doc.description, isNull);
-      expect(doc.author, isNull);
-      expect(doc.published, '10/5/2026, 11:48:20 AM');
-      expect(doc.words, 93);
-      expect(doc.tokens, 115);
-    });
-
-    test('an answer without the tree is an empty list', () async {
-      expect(await _answering({'localFiles': null}).documents(), isEmpty);
     });
   });
 
@@ -307,25 +275,22 @@ void main() {
   });
 
   group('upload', () {
-    test('posts the file as multipart with the key, into the folder', () async {
+    test('posts the file as multipart with the key', () async {
       final seen = <http.Request>[];
-      final made = await _answering(
-        {
-          'success': true,
-          'error': null,
-          'documents': [
-            {
-              'location': 'my folder/notes.md-1.json',
-              'name': 'notes.md-1.json',
-              'title': 'notes.md',
-            },
-          ],
-        },
-        seen: seen,
-      ).upload('notes.md', utf8.encode('# hi'), folder: 'my folder');
+      final made = await _answering({
+        'success': true,
+        'error': null,
+        'documents': [
+          {
+            'location': 'custom-documents/notes.md-1.json',
+            'name': 'notes.md-1.json',
+            'title': 'notes.md',
+          },
+        ],
+      }, seen: seen).upload('notes.md', utf8.encode('# hi'));
       final request = seen.single;
       expect(request.method, 'POST');
-      expect(request.url.path, '/api/v1/document/upload/my%20folder');
+      expect(request.url.path, '/api/v1/document/upload');
       expect(request.headers['Authorization'], 'Bearer SECRET-KEY');
       expect(
         request.headers['content-type'],
@@ -333,17 +298,7 @@ void main() {
       );
       expect(request.body, contains('name="file"; filename="notes.md"'));
       expect(request.body, contains('# hi'));
-      expect(made.single.folder, 'my folder');
-      expect(made.single.path, 'my folder/notes.md-1.json');
-    });
-
-    test('with no folder posts to the default path', () async {
-      final seen = <http.Request>[];
-      await _answering({
-        'success': true,
-        'documents': [],
-      }, seen: seen).upload('a.md', const [1]);
-      expect(seen.single.url.path, '/api/v1/document/upload');
+      expect(made.single.path, 'custom-documents/notes.md-1.json');
     });
 
     test('a refusal gives the server\'s reason', () async {
@@ -361,6 +316,208 @@ void main() {
         _answering({'success': false, 'error': null}).upload('a.md', const [1]),
       );
       expect(error.message, 'The server could not read a.md in.');
+    });
+  });
+
+  group('workspace and chat writes', () {
+    test('a new workspace posts its name and reads the answer', () async {
+      final seen = <http.Request>[];
+      final made = await _answering({
+        'workspace': {'slug': 'q3', 'name': 'Q3 planning'},
+        'message': 'Workspace created',
+      }, seen: seen).createWorkspace('Q3 planning');
+      expect(seen.single.method, 'POST');
+      expect(seen.single.url.path, '/api/v1/workspace/new');
+      expect(jsonDecode(seen.single.body), {'name': 'Q3 planning'});
+      expect(
+        seen.single.headers['content-type'],
+        startsWith('application/json'),
+      );
+      expect((made.slug, made.name), ('q3', 'Q3 planning'));
+    });
+
+    test(
+      'a new workspace with no workspace in the answer is a failure',
+      () async {
+        final error = await _failure(
+          _answering({'workspace': null, 'message': 'Name taken'})
+              .createWorkspace('x'),
+        );
+        expect(error.message, 'Name taken');
+      },
+    );
+
+    test('a new chat is a thread named New chat', () async {
+      final seen = <http.Request>[];
+      final thread = await _answering({
+        'thread': {'slug': 'th-1', 'name': 'New chat'},
+      }, seen: seen).createThread('my space');
+      expect(seen.single.url.path, '/api/v1/workspace/my%20space/thread/new');
+      expect(jsonDecode(seen.single.body), {'name': 'New chat'});
+      expect((thread.slug, thread.name), ('th-1', 'New chat'));
+    });
+
+    test('renaming posts the name to the thread', () async {
+      final seen = <http.Request>[];
+      await _answering({
+        'thread': {'slug': 't', 'name': 'Budget'},
+      }, seen: seen).renameThread('w', 't', 'Budget');
+      expect(seen.single.url.path, '/api/v1/workspace/w/thread/t/update');
+      expect(jsonDecode(seen.single.body), {'name': 'Budget'});
+    });
+
+    test('deleting takes the server\'s empty answer as success', () async {
+      final seen = <http.Request>[];
+      await _api((request) async {
+        seen.add(request);
+        return http.Response('', 200);
+      }).deleteThread('w', 't');
+      expect(seen.single.method, 'DELETE');
+      expect(seen.single.url.path, '/api/v1/workspace/w/thread/t');
+    });
+
+    test('a history is each turn with its cited titles', () async {
+      final seen = <http.Request>[];
+      final turns = await _answering({
+        'history': [
+          {'role': 'user', 'content': 'What is due?', 'sentAt': 1},
+          {
+            'role': 'assistant',
+            'content': 'The roadmap.',
+            'sources': [
+              {'title': 'roadmap.pdf', 'chunk': '...'},
+              {'title': 'roadmap.pdf', 'chunk': '...'},
+              {'title': 'notes.md'},
+            ],
+          },
+        ],
+      }, seen: seen).history('w', 't');
+      expect(seen.single.url.path, '/api/v1/workspace/w/thread/t/chats');
+      expect(turns.map((t) => t.text), ['What is due?', 'The roadmap.']);
+      expect(turns.last.citations, ['roadmap.pdf', 'notes.md']);
+    });
+
+    test('embedding changes post the adds and deletes', () async {
+      final seen = <http.Request>[];
+      await _answering({
+        'workspace': {},
+      }, seen: seen).updateEmbeddings('w', adds: ['custom-documents/a.json']);
+      expect(seen.single.url.path, '/api/v1/workspace/w/update-embeddings');
+      expect(jsonDecode(seen.single.body), {
+        'adds': ['custom-documents/a.json'],
+        'deletes': <String>[],
+      });
+    });
+  });
+
+  group('stream chat', () {
+    /// A client that streams [lines] back, one chunk each, and records the request.
+    HttpAnythingLlmApi streaming(
+      List<String> lines, {
+      List<http.BaseRequest>? seen,
+      int status = 200,
+    }) => HttpAnythingLlmApi(
+      holder: ConnectionHolder(_connection),
+      client: MockClient.streaming((request, body) async {
+        seen?.add(request);
+        await body.drain<void>();
+        return http.StreamedResponse(
+          Stream.fromIterable([for (final l in lines) utf8.encode(l)]),
+          status,
+        );
+      }),
+    );
+
+    String data(Map<String, Object?> chunk) => 'data: ${jsonEncode(chunk)}\n\n';
+
+    test(
+      'posts the message and mode, and yields the text then the sources',
+      () async {
+        final seen = <http.BaseRequest>[];
+        final events = await streaming([
+          data({
+            'type': 'textResponseChunk',
+            'textResponse': 'Hel',
+            'close': false,
+          }),
+          data({
+            'type': 'textResponseChunk',
+            'textResponse': 'lo',
+            'close': false,
+          }),
+          data({
+            'type': 'textResponseChunk',
+            'textResponse': '',
+            'close': true,
+            'sources': [
+              {'title': 'roadmap.pdf'},
+            ],
+          }),
+        ], seen: seen).streamChat('w', 't', 'Hi', mode: ChatMode.chat).toList();
+        expect(
+          seen.single.url.path,
+          '/api/v1/workspace/w/thread/t/stream-chat',
+        );
+        expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
+        expect(
+          [
+            for (final e in events)
+              e is TextChunk ? e.text : (e as ChatDone).citations,
+          ],
+          [
+            'Hel',
+            'lo',
+            ['roadmap.pdf'],
+          ],
+        );
+      },
+    );
+
+    test('a chunk split across reads is joined before it is parsed', () async {
+      final line = data({'textResponse': 'whole', 'close': true});
+      final events = await streaming([
+        line.substring(0, 12),
+        line.substring(12),
+      ]).streamChat('w', 't', 'Hi', mode: ChatMode.query).toList();
+      expect((events.first as TextChunk).text, 'whole');
+      expect(events.last, isA<ChatDone>());
+    });
+
+    test('a stream that ends without close still finishes', () async {
+      final events = await streaming([
+        data({'textResponse': 'part'}),
+        ': keep-alive\n\n',
+        'data: not json\n\n',
+      ]).streamChat('w', 't', 'Hi', mode: ChatMode.query).toList();
+      expect(events.length, 2);
+      expect(events.last, isA<ChatDone>());
+    });
+
+    test('an error chunk fails with the server\'s words', () async {
+      final stream = streaming([
+        data({
+          'type': 'abort',
+          'textResponse': null,
+          'error': 'No LLM set',
+          'close': true,
+        }),
+      ]).streamChat('w', 't', 'Hi', mode: ChatMode.query);
+      await expectLater(
+        stream.toList(),
+        throwsA(
+          isA<ApiException>().having((e) => e.message, 'message', 'No LLM set'),
+        ),
+      );
+    });
+
+    test('a refused request is decoded like any other', () async {
+      final stream = streaming([
+        '{"error":"Invalid API Key"}',
+      ], status: 403).streamChat('w', 't', 'Hi', mode: ChatMode.query);
+      await expectLater(
+        stream.toList(),
+        throwsA(isA<ApiException>().having((e) => e.status, 'status', 403)),
+      );
     });
   });
 }

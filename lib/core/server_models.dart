@@ -40,8 +40,7 @@ class Workspace {
   const Workspace({
     required this.slug,
     required this.name,
-    this.chatModel,
-    this.threads = 0,
+    this.threads = const [],
     this.documents = const [],
   });
 
@@ -50,8 +49,10 @@ class Workspace {
     return Workspace(
       slug: slug,
       name: _known(json, 'name') ?? slug,
-      chatModel: _known(json, 'chatModel'),
-      threads: jsonObjects(json['threads']).length,
+      threads: [
+        for (final thread in jsonObjects(json['threads']))
+          Thread.fromJson(thread),
+      ],
       documents: [
         for (final doc in jsonObjects(json['documents']))
           WorkspaceDoc.fromJson(doc),
@@ -62,17 +63,60 @@ class Workspace {
   final String slug;
   final String name;
 
-  /// Null when the workspace uses the server's default model.
-  final String? chatModel;
-  final int threads;
+  /// Named only when every workspace is read at once: the server leaves the names out when it
+  /// answers for one.
+  final List<Thread> threads;
 
   /// Only filled when the workspace was read on its own.
   final List<WorkspaceDoc> documents;
 }
 
+/// One chat in a workspace. The server calls it a thread.
+class Thread {
+  const Thread({required this.slug, required this.name});
+
+  factory Thread.fromJson(Map<String, dynamic> json) =>
+      Thread(slug: _text(json, 'slug'), name: _known(json, 'name') ?? 'Chat');
+
+  final String slug;
+  final String name;
+}
+
+enum Role { user, assistant }
+
+/// One turn of a chat, as the server keeps it.
+class ChatMessage {
+  const ChatMessage({
+    required this.role,
+    required this.text,
+    this.citations = const [],
+  });
+
+  /// An entry of a chat's `history`.
+  factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
+    role: json['role'] == 'user' ? Role.user : Role.assistant,
+    text: switch (json['content']) {
+      final String text => text,
+      _ => '',
+    },
+    citations: citationsOf(json['sources']),
+  );
+
+  final Role role;
+  final String text;
+
+  /// The titles of the documents the answer drew on, each once, in the server's order.
+  final List<String> citations;
+}
+
+/// The document titles in a `sources` list, each once.
+List<String> citationsOf(Object? sources) =>
+    {for (final source in jsonObjects(sources)) ?_known(source, 'title')}
+        .toList();
+
 /// A document a workspace holds.
 class WorkspaceDoc {
-  const WorkspaceDoc({required this.path, required this.title});
+  const WorkspaceDoc({required this.path, required this.title, this.words});
 
   /// The `metadata` field is the document's own JSON as a string.
   factory WorkspaceDoc.fromJson(Map<String, dynamic> json) {
@@ -87,12 +131,14 @@ class WorkspaceDoc {
           (metadata == null ? null : _known(metadata, 'title')) ??
           _known(json, 'filename') ??
           _base(path),
+      words: metadata == null ? null : _int(metadata, 'wordCount'),
     );
   }
 
   /// `folder/name.json`, the same as [DocEntry.path].
   final String path;
   final String title;
+  final int? words;
 
   static Map<String, dynamic>? _decode(String text) {
     try {
@@ -104,56 +150,16 @@ class WorkspaceDoc {
   }
 }
 
-/// A folder of documents on the server.
-class DocFolder {
-  const DocFolder({required this.name, required this.docs});
-
-  factory DocFolder.fromJson(Map<String, dynamic> json) {
-    final name = _text(json, 'name');
-    return DocFolder(
-      name: name,
-      docs: [
-        for (final item in jsonObjects(json['items']))
-          if (item['type'] != 'folder') DocEntry.fromJson(item, folder: name),
-      ],
-    );
-  }
-
-  final String name;
-  final List<DocEntry> docs;
-}
-
-/// A document the server has read in. The server keeps its text but its API does not return it.
+/// A document the server made of an upload.
 class DocEntry {
-  const DocEntry({
-    required this.folder,
-    required this.name,
-    required this.title,
-    this.description,
-    this.author,
-    this.source,
-    this.published,
-    this.words,
-    this.tokens,
-  });
+  const DocEntry({required this.folder, required this.name});
 
-  /// The folder is [folder] when the answer is a folder's listing, and comes from `location`
-  /// when it is an upload's result.
-  factory DocEntry.fromJson(Map<String, dynamic> json, {String? folder}) {
+  /// An upload's result, whose `location` names the folder.
+  factory DocEntry.fromJson(Map<String, dynamic> json) {
     final location = _text(json, 'location');
-    final name = _known(json, 'name') ?? _base(location);
     return DocEntry(
-      folder: folder ?? _parent(location),
-      name: name,
-      title: _known(json, 'title') ?? name,
-      description: _known(json, 'description'),
-      author: _known(json, 'docAuthor'),
-      source: _known(json, 'docSource'),
-      // A locale string such as "10/5/2026, 11:48:20 AM", not the epoch the schema promises.
-      // Shown as the server wrote it.
-      published: _known(json, 'published'),
-      words: _int(json, 'wordCount'),
-      tokens: _int(json, 'token_count_estimate'),
+      folder: _parent(location),
+      name: _known(json, 'name') ?? _base(location),
     );
   }
 
@@ -161,14 +167,7 @@ class DocEntry {
 
   /// The stored file's name, such as `notes.md-1f2e.json`.
   final String name;
-  final String title;
-  final String? description;
-  final String? author;
-  final String? source;
-  final String? published;
-  final int? words;
-  final int? tokens;
 
-  /// `folder/name`: how a workspace names it, and the app's route to it.
+  /// `folder/name`: how a workspace names it.
   String get path => '$folder/$name';
 }

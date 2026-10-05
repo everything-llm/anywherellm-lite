@@ -4,9 +4,11 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import '../core/chat.dart';
 import '../core/connection.dart';
 import '../core/ports.dart';
 import '../core/server_models.dart';
+import 'anythingllm_stream.dart';
 
 /// [AnythingLlmApi] over the server's HTTP API, with the bearer key on every request.
 ///
@@ -59,16 +61,83 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   }
 
   @override
-  Future<List<DocFolder>> documents() async {
-    final root = _field(
-      await _get(_current, '/api/v1/documents'),
-      'localFiles',
-    );
-    return [
-      for (final json in jsonObjects(root is Map ? root['items'] : null))
-        DocFolder.fromJson(json),
-    ];
+  Future<Workspace> createWorkspace(String name) async {
+    final body = await _send('POST', '/api/v1/workspace/new', {'name': name});
+    final json = _field(body, 'workspace');
+    if (json is! Map<String, dynamic>) {
+      throw ApiException(_said(body) ?? 'The server did not make $name.');
+    }
+    return Workspace.fromJson(json);
   }
+
+  @override
+  Future<Thread> createThread(String slug) async {
+    final body = await _send('POST', '${_workspace(slug)}/thread/new', {
+      'name': newChatName,
+    });
+    final json = _field(body, 'thread');
+    if (json is! Map<String, dynamic>) {
+      throw ApiException(_said(body) ?? 'The server did not start a chat.');
+    }
+    return Thread.fromJson(json);
+  }
+
+  @override
+  Future<void> renameThread(String slug, String thread, String name) =>
+      _send('POST', '${_thread(slug, thread)}/update', {'name': name});
+
+  /// The server answers a delete with an empty body.
+  @override
+  Future<void> deleteThread(String slug, String thread) =>
+      _send('DELETE', _thread(slug, thread), null);
+
+  @override
+  Future<List<ChatMessage>> history(String slug, String thread) async => [
+    for (final json in jsonObjects(
+      _field(await _get(_current, '${_thread(slug, thread)}/chats'), 'history'),
+    ))
+      ChatMessage.fromJson(json),
+  ];
+
+  @override
+  Stream<ChatEvent> streamChat(
+    String slug,
+    String thread,
+    String message, {
+    required ChatMode mode,
+  }) async* {
+    final connection = _current;
+    final request = _request(
+      connection,
+      'POST',
+      '${_thread(slug, thread)}/stream-chat',
+      {'message': message, 'mode': mode.name},
+    )..headers['Accept'] = 'text/event-stream';
+    final http.StreamedResponse response;
+    try {
+      response = await _client.send(request).timeout(timeout);
+    } on Exception catch (error) {
+      throw _unreachable(connection, error);
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      _decode(await http.Response.fromStream(response));
+    }
+    try {
+      yield* chatEvents(response.stream);
+    } on http.ClientException catch (error) {
+      throw ApiException('The answer was cut off: ${error.message}');
+    }
+  }
+
+  @override
+  Future<void> updateEmbeddings(
+    String slug, {
+    List<String> adds = const [],
+    List<String> deletes = const [],
+  }) => _send('POST', '${_workspace(slug)}/update-embeddings', {
+    'adds': adds,
+    'deletes': deletes,
+  });
 
   /// The server answers with the MIME types it reads and their extensions.
   @override
@@ -87,15 +156,9 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   }
 
   @override
-  Future<List<DocEntry>> upload(
-    String name,
-    List<int> bytes, {
-    String? folder,
-  }) async {
+  Future<List<DocEntry>> upload(String name, List<int> bytes) async {
     final connection = _current;
-    final path = folder == null
-        ? '/api/v1/document/upload'
-        : '/api/v1/document/upload/${Uri.encodeComponent(folder)}';
+    const path = '/api/v1/document/upload';
     final body = await _call(connection, uploadTimeout, () async {
       final request =
           http.MultipartRequest('POST', Uri.parse('${connection.baseUrl}$path'))
@@ -117,6 +180,12 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   /// The connection in use.
   Connection get _current => _holder.current ?? (throw const NotConfigured());
 
+  static String _workspace(String slug) =>
+      '/api/v1/workspace/${Uri.encodeComponent(slug)}';
+
+  static String _thread(String slug, String thread) =>
+      '${_workspace(slug)}/thread/${Uri.encodeComponent(thread)}';
+
   Map<String, String> _headers(Connection connection) => {
     'Authorization': 'Bearer ${connection.apiKey}',
     'Accept': 'application/json',
@@ -132,6 +201,41 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     ),
   );
 
+  /// A [method] to [path] on [connection] with the key, and [body] as JSON when given.
+  http.Request _request(
+    Connection connection,
+    String method,
+    String path, [
+    Map<String, Object?>? body,
+  ]) {
+    final request = http.Request(
+      method,
+      Uri.parse('${connection.baseUrl}$path'),
+    )..headers.addAll(_headers(connection));
+    if (body != null) {
+      request
+        ..headers['Content-Type'] = 'application/json'
+        ..body = jsonEncode(body);
+    }
+    return request;
+  }
+
+  /// The decoded JSON of a [method] to [path] on the connection in use, with [body] as JSON.
+  Future<Object?> _send(
+    String method,
+    String path,
+    Map<String, Object?>? body,
+  ) async {
+    final connection = _current;
+    return _call(
+      connection,
+      timeout,
+      () async => http.Response.fromStream(
+        await _client.send(_request(connection, method, path, body)),
+      ),
+    );
+  }
+
   /// The decoded JSON of the response [send] gets, with failures in plain words.
   Future<Object?> _call(
     Connection connection,
@@ -141,24 +245,34 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     final http.Response response;
     try {
       response = await send().timeout(limit);
-    } on TimeoutException {
-      throw ApiException(
-        'The server did not answer within ${_duration(limit)}.',
-      );
-    } on HandshakeException {
-      throw const ApiException(
-        'The server\'s certificate could not be verified.',
-      );
-    } on SocketException catch (error) {
-      throw ApiException(
-        'Could not reach ${connection.host}: ${error.message}',
-      );
-    } on http.ClientException catch (error) {
-      throw ApiException('Could not reach the server: ${error.message}');
+    } on Exception catch (error) {
+      throw _unreachable(connection, error, limit);
     }
     return _decode(response);
   }
 
+  /// [error], from sending a request, in plain words.
+  ApiException _unreachable(
+    Connection connection,
+    Exception error, [
+    Duration? limit,
+  ]) => switch (error) {
+    TimeoutException() => ApiException(
+      'The server did not answer within ${_duration(limit ?? timeout)}.',
+    ),
+    HandshakeException() => const ApiException(
+      'The server\'s certificate could not be verified.',
+    ),
+    SocketException(:final message) => ApiException(
+      'Could not reach ${connection.host}: $message',
+    ),
+    http.ClientException(:final message) => ApiException(
+      'Could not reach the server: $message',
+    ),
+    _ => ApiException('Could not reach the server: $error'),
+  };
+
+  /// The decoded JSON of [response], or null for an empty success, as a delete answers.
   Object? _decode(http.Response response) {
     final status = response.statusCode;
     final body = _json(response);
@@ -171,7 +285,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
         status: status,
       );
     }
-    if (body == null) {
+    if (body == null && response.bodyBytes.isNotEmpty) {
       throw ApiException(
         'The address did not answer like an AnythingLLM server.',
         status: status,

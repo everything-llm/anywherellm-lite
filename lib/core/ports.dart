@@ -1,4 +1,6 @@
+import 'chat.dart';
 import 'connection.dart';
+import 'prefs.dart';
 import 'server_models.dart';
 
 export 'errors.dart';
@@ -11,21 +13,47 @@ abstract interface class AnythingLlmApi {
   /// Settings can test one before it is saved.
   Future<void> verify(Connection connection);
 
-  /// Every workspace, without its documents.
+  /// Every workspace with its named threads, without its documents.
   Future<List<Workspace>> workspaces();
 
   /// One workspace with its documents. A missing one is an [ApiException] with status 404.
   Future<Workspace> workspace(String slug);
 
-  /// Every document, by folder.
-  Future<List<DocFolder>> documents();
+  Future<Workspace> createWorkspace(String name);
+
+  /// A new chat named [newChatName].
+  Future<Thread> createThread(String slug);
+
+  Future<void> renameThread(String slug, String thread, String name);
+
+  Future<void> deleteThread(String slug, String thread);
+
+  /// The chat's turns, oldest first.
+  Future<List<ChatMessage>> history(String slug, String thread);
+
+  /// Asks [message] in the chat and streams the answer. The stream fails with [ApiException].
+  /// Cancelling the subscription stops the answer.
+  Stream<ChatEvent> streamChat(
+    String slug,
+    String thread,
+    String message, {
+    required ChatMode mode,
+  });
+
+  /// Embeds the documents at [adds] in the workspace and drops those at [deletes], by
+  /// `folder/name.json` path.
+  Future<void> updateEmbeddings(
+    String slug, {
+    List<String> adds = const [],
+    List<String> deletes = const [],
+  });
 
   /// The file extensions the server can read in, lower case with the dot: `.md`.
   Future<Set<String>> acceptedExtensions();
 
-  /// Sends [bytes] as the file [name] into [folder], or the server's default folder, and
-  /// returns the documents the server made of it. Attaches them to no workspace.
-  Future<List<DocEntry>> upload(String name, List<int> bytes, {String? folder});
+  /// Sends [bytes] as the file [name] into the server's default folder, and returns the
+  /// documents the server made of it. Attaches them to no workspace.
+  Future<List<DocEntry>> upload(String name, List<int> bytes);
 }
 
 /// Where the connection is kept between runs.
@@ -38,4 +66,13 @@ abstract interface class SettingsStore {
   Future<void> save(Connection connection);
 
   Future<void> clear();
+}
+
+/// Where [Prefs] are kept between runs.
+abstract interface class PrefsStore {
+  /// The saved prefs, or the defaults when none are saved or they cannot be read.
+  Future<Prefs> load();
+
+  /// Throws [ApiException] when the prefs cannot be written.
+  Future<void> save(Prefs prefs);
 }

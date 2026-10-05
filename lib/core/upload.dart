@@ -18,9 +18,6 @@ class UnreadableFile implements Exception {
   String toString() => message;
 }
 
-/// The folder the server puts an upload in when it is given none.
-const defaultFolder = 'custom-documents';
-
 /// `.md` for `notes.MD`, or empty for a name with no extension, such as `Makefile` or
 /// `.bashrc`.
 String extensionOf(String name) {
