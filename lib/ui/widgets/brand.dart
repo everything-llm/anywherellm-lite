@@ -27,7 +27,7 @@ class Brand extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              'N',
+              'n',
               style: Type.serif(19, color: t.onaccent, height: 1),
             ),
           ),

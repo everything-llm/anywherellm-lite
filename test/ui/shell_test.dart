@@ -1,167 +1,340 @@
+import 'package:everything/core/chat.dart';
+import 'package:everything/core/ports.dart';
+import 'package:everything/ui/settings/settings_dialog.dart';
+import 'package:everything/ui/sidebar.dart';
+import 'package:everything/ui/sources/sources_panel.dart';
+import 'package:everything/ui/widgets/controls.dart';
+import 'package:everything/ui/widgets/tappable.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:everything/core/server_models.dart';
-import 'package:everything/ui/sidebar.dart';
-import 'package:everything/ui/state/nav_controller.dart';
-import 'package:everything/ui/widgets/tappable.dart';
 
 import '../support/fake_api.dart';
 import '../support/pump.dart';
 
-/// A sidebar entry by its label; the pages have headings of their own with the same words.
-Finder inSidebar(String label) =>
-    find.descendant(of: find.byType(Sidebar), matching: find.text(label));
-
-/// A tab of the bottom bar. Only on a phone is the sidebar not mounted, so the labels are unique.
-Finder tab(String label) => find.byWidgetPredicate(
+/// A control by the label a screen reader hears.
+Finder control(String label) => find.byWidgetPredicate(
   (widget) => widget is Tappable && widget.label == label,
 );
 
+Finder inSidebar(String text) =>
+    find.descendant(of: find.byType(Sidebar), matching: find.text(text));
+
+Finder inSources(Finder finder) =>
+    find.descendant(of: find.byType(SourcesPanel), matching: finder);
+
+Finder get message => find.bySemanticsLabel('Message');
+
+/// The text field that has the focus, or else the composer.
+Finder get typingInto {
+  final focused = find.byWidgetPredicate(
+    (widget) => widget is EditableText && widget.focusNode.hasFocus,
+  );
+  return focused.evaluate().isEmpty ? find.byType(EditableText).last : focused;
+}
+
+/// Types [text] where the focus is and presses Enter. Pumps a fixed time rather than settling,
+/// since the caret of a streaming answer never stops blinking.
+Future<void> typeAndEnter(WidgetTester tester, String text) async {
+  await tester.enterText(typingInto, text);
+  await tester.pump();
+  await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
+}
+
 void main() {
   group('a wide window', () {
-    testWidgets('shows the sidebar beside the page', (tester) async {
-      await pumpApp(tester);
-      expect(find.byType(Sidebar), findsOneWidget);
-      expect(find.text('Workspaces'), findsWidgets);
-      expect(find.text('Documents'), findsWidgets);
-      expect(find.text('Upload'), findsWidgets);
-      expect(find.text('Settings'), findsWidgets);
-      expect(find.byTooltip('Menu'), findsNothing);
+    testWidgets('shows the workspaces, the chat and its Sources side by side', (
+      tester,
+    ) async {
+      await pumpApp(tester, llm: planningServer());
+      expect(inSidebar('Q3 planning'), findsOneWidget);
+      expect(inSidebar('2 docs'), findsOneWidget);
+      expect(inSidebar('Budget questions'), findsOneWidget);
+      expect(inSidebar('Quarter priorities'), findsOneWidget);
+      expect(inSidebar('AnythingLLM · key set'), findsOneWidget);
+      expect(find.text('About 40k.'), findsOneWidget);
+      expect(inSources(find.text('Q3 roadmap.pdf')), findsOneWidget);
+      expect(find.byTooltip('Workspaces'), findsNothing);
     });
 
-    testWidgets('opens on the workspaces', (tester) async {
-      final h = await pumpApp(tester);
-      expect(h.nav.route, const WorkspacesRoute());
-    });
-
-    testWidgets('a sidebar entry opens its page', (tester) async {
-      final h = await pumpApp(tester, connection: sampleConnection);
-      await tester.tap(inSidebar('Documents'));
+    testWidgets('a workspace with no chats invites a first question', (
+      tester,
+    ) async {
+      await pumpApp(tester, llm: planningServer());
+      await tester.tap(inSidebar('Household'));
       await tester.pumpAndSettle();
-      expect(h.nav.route, const DocumentsRoute());
-      await tester.tap(inSidebar('Upload'));
-      await tester.pumpAndSettle();
-      expect(h.nav.route, const UploadRoute());
-      await tester.tap(inSidebar('Settings'));
-      await tester.pumpAndSettle();
-      expect(h.nav.route, const SettingsRoute());
-      await tester.tap(inSidebar('Workspaces'));
-      await tester.pumpAndSettle();
-      expect(h.nav.route, const WorkspacesRoute());
-    });
-  });
-
-  group('a tablet window', () {
-    const size = Size(780, 800);
-
-    testWidgets('has a top bar and no inline sidebar', (tester) async {
-      await pumpApp(tester, size: size);
-      expect(find.byTooltip('Menu'), findsOneWidget);
-      expect(tester.getTopLeft(find.byType(Sidebar)).dx, lessThan(0));
+      expect(find.textContaining('Ask anything about what'), findsOneWidget);
+      expect(find.text('No files yet.'), findsOneWidget);
+      await tester.tap(control('What can I do here?'));
+      await tester.pump();
+      expect(find.text('What can I do here?'), findsWidgets);
     });
 
     testWidgets(
-      'the menu opens the sidebar as a drawer and a tap outside closes it',
+      'Enter sends, the answer streams, and its citation opens Sources',
       (tester) async {
-        final h = await pumpApp(tester, size: size);
-        await tester.tap(find.byTooltip('Menu'));
-        await tester.pumpAndSettle();
-        expect(h.shell.sideOpen, isTrue);
-        expect(tester.getTopLeft(find.byType(Sidebar)).dx, 0);
+        final llm = planningServer()
+          ..hold = true
+          ..cited = ['Q3 roadmap.pdf'];
+        final h = await pumpApp(tester, llm: llm);
+        await typeAndEnter(tester, 'What is due?');
+        expect(find.text('What is due?'), findsOneWidget);
+        expect(find.byType(Caret), findsOneWidget);
+        expect(control('Stop'), findsOneWidget);
 
-        await tester.tapAt(const Offset(700, 400));
+        llm.chat!.add(const TextChunk('The roadmap.'));
+        llm.chat!.add(const ChatDone(['Q3 roadmap.pdf']));
+        await llm.chat!.close();
         await tester.pumpAndSettle();
-        expect(h.shell.sideOpen, isFalse);
-        expect(tester.getTopLeft(find.byType(Sidebar)).dx, lessThan(0));
+        expect(find.byType(Caret), findsNothing);
+        expect(control('Send'), findsOneWidget);
+
+        h.shell.closeSources();
+        await tester.pumpAndSettle();
+        await tester.tap(control('Source 1: Q3 roadmap.pdf').last);
+        await tester.pump();
+        expect(h.shell.sourcesOpen, isTrue);
+        expect(h.sources.flashed, 'custom-documents/Q3 roadmap.pdf.json');
+        await tester.pumpAndSettle(const Duration(seconds: 2));
       },
     );
 
-    testWidgets('Escape closes the drawer', (tester) async {
-      final h = await pumpApp(tester, size: size);
-      await tester.tap(find.byTooltip('Menu'));
+    testWidgets('Shift+Enter starts a new line instead of sending', (
+      tester,
+    ) async {
+      final llm = planningServer();
+      await pumpApp(tester, llm: llm);
+      await tester.enterText(find.byType(TextField).last, 'one');
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pumpAndSettle();
+      expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
+    });
+
+    testWidgets('Stop ends the answer', (tester) async {
+      final llm = planningServer()..hold = true;
+      final h = await pumpApp(tester, llm: llm);
+      await typeAndEnter(tester, 'Go');
+      await tester.tap(control('Stop'));
+      await tester.pumpAndSettle();
+      expect(find.text('Stopped.'), findsOneWidget);
+      expect(h.chat.busy, isFalse);
+    });
+
+    testWidgets('+ makes a workspace from the name typed', (tester) async {
+      final llm = planningServer();
+      await pumpApp(tester, llm: llm);
+      await tester.tap(control('New workspace'));
+      await tester.pumpAndSettle();
+      await typeAndEnter(tester, 'Reading notes');
+      expect(llm.calls, contains('createWorkspace:Reading notes'));
+      expect(inSidebar('Reading notes'), findsOneWidget);
+    });
+
+    testWidgets('Esc leaves the new workspace name without making one', (
+      tester,
+    ) async {
+      final llm = planningServer();
+      await pumpApp(tester, llm: llm);
+      await tester.tap(control('New workspace'));
+      await tester.pumpAndSettle();
+      await tester.enterText(typingInto, 'x');
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byType(EditableText), findsOneWidget);
+      expect(llm.calls, isNot(contains('createWorkspace:x')));
+    });
+
+    testWidgets('the pencil renames the chat on Enter', (tester) async {
+      final llm = planningServer();
+      await pumpApp(tester, llm: llm);
+      await tester.tap(control('Rename chat'));
+      await tester.pumpAndSettle();
+      await typeAndEnter(tester, 'Money');
+      expect(llm.calls, contains('renameThread:budget:Money'));
+      expect(inSidebar('Money'), findsOneWidget);
+    });
+
+    testWidgets('the trash deletes the chat', (tester) async {
+      final llm = planningServer();
+      final h = await pumpApp(tester, llm: llm);
+      await tester.tap(control('Delete chat'));
+      await tester.pumpAndSettle();
+      expect(llm.calls, contains('deleteThread:budget'));
+      expect(inSidebar('Budget questions'), findsNothing);
+      expect(h.chat.activeThread, 'priorities');
+    });
+
+    testWidgets('a file switched off is dimmed and counted out', (
+      tester,
+    ) async {
+      final llm = planningServer();
+      final h = await pumpApp(tester, llm: llm);
+      await tester.tap(find.byType(NilsSwitch).first);
+      await tester.pumpAndSettle();
+      expect(h.sources.onCount, 1);
+      expect(
+        find.descendant(of: control('Sources'), matching: find.text('1')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('removing a file can be undone from the toast', (tester) async {
+      final llm = planningServer();
+      final h = await pumpApp(tester, llm: llm);
+      await tester.tap(control('Remove Q3 roadmap.pdf'));
+      await tester.pumpAndSettle();
+      expect(find.text('Removed Q3 roadmap.pdf'), findsOneWidget);
+      await tester.tap(control('Undo'));
+      await tester.pumpAndSettle();
+      expect(h.sources.files, hasLength(2));
+      expect(find.text('Removed Q3 roadmap.pdf'), findsNothing);
+    });
+
+    testWidgets('Sources closes and opens from the header', (tester) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      await tester.tap(control('Close'));
+      await tester.pumpAndSettle();
+      expect(h.shell.sourcesOpen, isFalse);
+      await tester.tap(control('Sources'));
+      await tester.pumpAndSettle();
+      expect(h.shell.sourcesOpen, isTrue);
+    });
+  });
+
+  group('Settings', () {
+    testWidgets('with no key, the composer sends the person to Settings', (
+      tester,
+    ) async {
+      final h = await pumpApp(tester, connection: null);
+      expect(find.text('Welcome to Nilson'), findsOneWidget);
+      expect(inSidebar('AnythingLLM · no key'), findsOneWidget);
+      await tester.tap(control('Open Settings'));
+      await tester.pumpAndSettle();
+      expect(h.shell.settingsOpen, isTrue);
+      expect(find.text('Missing'), findsOneWidget);
+    });
+
+    testWidgets('a key the server takes is saved and the workspaces load', (
+      tester,
+    ) async {
+      final llm = planningServer();
+      final h = await pumpApp(tester, llm: llm, connection: null);
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.bySemanticsLabel('AnythingLLM developer API key').last,
+        'K9',
+      );
+      await tester.tap(control('Save key'));
+      await tester.pumpAndSettle();
+      expect(h.store.saved?.apiKey, 'K9');
+      expect(find.text('The key was saved.'), findsOneWidget);
+      expect(find.text('Set'), findsOneWidget);
+      expect(inSidebar('Q3 planning'), findsOneWidget);
+    });
+
+    testWidgets('a key the server refuses is not saved', (tester) async {
+      final llm = planningServer()
+        ..verifyError = const ApiException('The server rejected the key.');
+      final h = await pumpApp(tester, llm: llm, connection: null);
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.bySemanticsLabel('AnythingLLM developer API key').last,
+        'WRONG',
+      );
+      await tester.tap(control('Save key'));
+      await tester.pumpAndSettle();
+      expect(h.store.saved, isNull);
+      expect(find.text('The server rejected the key.'), findsOneWidget);
+      expect(find.text('Missing'), findsOneWidget);
+    });
+
+    testWidgets('Forget asks once more, then deletes the key', (tester) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.tap(control('Forget'));
+      await tester.pumpAndSettle();
+      expect(control('Delete it?'), findsOneWidget);
+      await tester.tap(control('Delete it?'));
+      await tester.pumpAndSettle();
+      expect(h.settings.configured, isFalse);
+      expect(find.text('The saved key was deleted.'), findsOneWidget);
+    });
+
+    testWidgets('the Answers switch sets the mode', (tester) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(SettingsDialog),
+          matching: find.byType(NilsSwitch),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(h.prefsStore.saved.groundedOnly, isFalse);
+    });
+
+    testWidgets('Esc and Done close it', (tester) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      h.shell.openSettings();
       await tester.pumpAndSettle();
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
-      expect(h.shell.sideOpen, isFalse);
-    });
-
-    testWidgets('choosing a page closes the drawer', (tester) async {
-      final h = await pumpApp(tester, size: size);
-      await tester.tap(find.byTooltip('Menu'));
+      expect(find.byType(SettingsDialog), findsNothing);
+      h.shell.openSettings();
       await tester.pumpAndSettle();
-      await tester.tap(inSidebar('Upload'));
+      await tester.tap(control('Done'));
       await tester.pumpAndSettle();
-      expect(h.nav.route, const UploadRoute());
-      expect(h.shell.sideOpen, isFalse);
+      expect(h.shell.settingsOpen, isFalse);
     });
   });
 
-  group('a phone window', () {
-    const size = Size(500, 800);
-
-    testWidgets('has a tab bar with four tabs and no top bar menu', (
+  group('a narrow window', () {
+    testWidgets('below 1120, Sources is a drawer over the chat', (
       tester,
     ) async {
-      await pumpApp(tester, size: size);
-      expect(find.byTooltip('Menu'), findsNothing);
-      for (final label in ['Workspaces', 'Documents', 'Upload', 'Settings']) {
-        expect(tab(label), findsWidgets, reason: label);
-      }
-    });
-
-    testWidgets('a tab opens its page', (tester) async {
-      final h = await pumpApp(tester, size: size);
-      await tester.tap(tab('Upload'));
-      await tester.pumpAndSettle();
-      expect(h.nav.route, const UploadRoute());
-    });
-
-    testWidgets('the Settings tab opens Settings', (tester) async {
-      final h = await pumpApp(tester, size: size);
-      await tester.tap(tab('Settings'));
-      await tester.pumpAndSettle();
-      expect(h.nav.route, const SettingsRoute());
-    });
-  });
-
-  group('the Back button', () {
-    testWidgets('steps from a document up to its list', (tester) async {
-      final llm = FakeAnythingLlm()
-        ..workspacesValue = [const Workspace(slug: 'a', name: 'A')];
       final h = await pumpApp(
         tester,
-        llm: llm,
-        connection: sampleConnection,
-        size: const Size(400, 800),
-        route: const WorkspaceRoute('a'),
+        llm: planningServer(),
+        size: const Size(1000, 800),
+        sourcesOpen: false,
       );
-      await tester.binding.handlePopRoute();
+      expect(
+        tester.getTopLeft(find.byType(SourcesPanel)).dx,
+        greaterThanOrEqualTo(1000),
+      );
+      await tester.tap(control('Sources'));
       await tester.pumpAndSettle();
-      expect(h.nav.route, const WorkspacesRoute());
+      expect(tester.getTopRight(find.byType(SourcesPanel)).dx, 1000);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(h.shell.sourcesOpen, isFalse);
     });
 
-    testWidgets('closes an open drawer before it does anything else', (
+    testWidgets('below 820, the sidebar is a drawer behind the menu button', (
       tester,
     ) async {
-      final h = await pumpApp(tester, size: const Size(760, 800));
-      await tester.tap(find.byTooltip('Menu'));
+      final h = await pumpApp(
+        tester,
+        llm: planningServer(),
+        size: const Size(780, 800),
+        sourcesOpen: false,
+      );
+      expect(tester.getTopLeft(find.byType(Sidebar)).dx, lessThan(0));
+      await tester.tap(find.byTooltip('Workspaces'));
       await tester.pumpAndSettle();
-      expect(h.shell.sideOpen, isTrue);
-      await tester.binding.handlePopRoute();
+      expect(tester.getTopLeft(find.byType(Sidebar)).dx, 0);
+      await tester.tap(inSidebar('Quarter priorities'));
       await tester.pumpAndSettle();
+      expect(h.chat.activeThread, 'priorities');
       expect(h.shell.sideOpen, isFalse);
-      expect(h.nav.route, const WorkspacesRoute());
-    });
-  });
-
-  group('the tabs', () {
-    testWidgets('grow with a very large font instead of overflowing', (
-      tester,
-    ) async {
-      tester.platformDispatcher.textScaleFactorTestValue = 1.6;
-      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-      // An overflow would fail the test as an uncaught exception.
-      await pumpApp(tester, size: const Size(360, 800));
     });
   });
 }

@@ -27,10 +27,12 @@ class Tokens extends ThemeExtension<Tokens> {
     required this.badfg,
     required this.badbg,
     required this.badln,
-    required this.code,
     required this.fade,
     required this.scrim,
     required this.shadow,
+    required this.bubble,
+    required this.okdot,
+    required this.off,
   });
 
   final Color bg;
@@ -54,10 +56,18 @@ class Tokens extends ThemeExtension<Tokens> {
   final Color badfg;
   final Color badbg;
   final Color badln;
-  final Color code;
   final Color fade;
   final Color scrim;
   final Color shadow;
+
+  /// The fill behind the person's own messages.
+  final Color bubble;
+
+  /// The status dot when a key is set.
+  final Color okdot;
+
+  /// A switch that is off, and a send button with nothing to send.
+  final Color off;
 
   static final light = Tokens(
     bg: oklch(0.985, 0.006, 85),
@@ -81,10 +91,12 @@ class Tokens extends ThemeExtension<Tokens> {
     badfg: oklch(0.45, 0.16, 25),
     badbg: oklch(0.96, 0.03, 25),
     badln: oklch(0.8, 0.09, 25),
-    code: oklch(0.965, 0.008, 85),
     fade: oklch(0.62, 0.015, 80),
     scrim: oklch(0.2, 0.02, 60, 0.4),
     shadow: oklch(0.3, 0.02, 60, 0.12),
+    bubble: oklch(0.94, 0.014, 85),
+    okdot: oklch(0.62, 0.15, 150),
+    off: oklch(0.85, 0.01, 85),
   );
 
   static final dark = Tokens(
@@ -109,10 +121,12 @@ class Tokens extends ThemeExtension<Tokens> {
     badfg: oklch(0.82, 0.11, 25),
     badbg: oklch(0.32, 0.06, 25),
     badln: oklch(0.5, 0.1, 25),
-    code: oklch(0.22, 0.008, 60),
     fade: oklch(0.6, 0.01, 80),
     scrim: oklch(0.1, 0.01, 60, 0.6),
     shadow: oklch(0, 0, 0, 0.3),
+    bubble: oklch(0.28, 0.01, 60),
+    okdot: oklch(0.7, 0.15, 150),
+    off: oklch(0.4, 0.01, 60),
   );
 
   static Tokens of(BuildContext context) =>

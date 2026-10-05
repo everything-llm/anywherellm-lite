@@ -100,7 +100,7 @@ class _DropZoneState extends State<DropZone> {
         },
         child: Semantics(
           button: true,
-          label: 'Upload a file. $_hint',
+          label: 'Add a file. $_hint',
           excludeSemantics: true,
           child: GestureDetector(
             onTap: _browse,
@@ -116,7 +116,7 @@ class _DropZoneState extends State<DropZone> {
                 child: Column(
                   children: [
                     Text(
-                      'Upload a file',
+                      'Add a file',
                       style: Type.sans(
                         14,
                         weight: FontWeight.w500,

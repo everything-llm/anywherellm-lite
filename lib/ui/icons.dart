@@ -3,28 +3,37 @@ import 'package:path_drawing/path_drawing.dart';
 
 /// The icon paths, drawn as strokes on a 24 unit box.
 const _paths = {
-  'book': 'M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4z M5 17a3 3 0 0 1 3-3h11',
-  'tool': 'M14.5 6.5a4 4 0 0 0-5 5L4 17l3 3 5.5-5.5a4 4 0 0 0 5-5l-2.5 2.5-2-.5-.5-2z',
-  'chevron': 'M9 6l6 6-6 6',
-  'menu': 'M4 6h16 M4 12h16 M4 18h16',
-  'file': 'M6 3h8l5 5v13H6z M14 3v5h5',
-  'folder': 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
+  'chat': 'M4 5h16v11H9l-5 4z',
   'settings': 'M4 7h9 M17 7h3 M4 17h3 M11 17h9 M13 7a2 2 0 1 0 4 0 2 2 0 0 0-4 0z M7 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0z',
-  'eye': 'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z',
-  'eye-off': 'M3 3l18 18 M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1 M6.3 6.3A17 17 0 0 0 2 12s3.6 7 10 7a9.7 9.7 0 0 0 4.1-.9 M9.9 9.9a3 3 0 0 0 4.2 4.2',
-  'search': 'M17.5 11a6.5 6.5 0 0 1-13 0 6.5 6.5 0 0 1 13 0z M16 16l4.5 4.5',
+};
+
+/// The small icons, drawn on a 16 unit box.
+const _small = {
+  'plus': 'M8 3v10M3 8h10',
+  'pencil': 'M10.5 2.5l3 3L6 13H3v-3z',
+  'trash': 'M3.5 4.5h9M6.5 4.5V3h3v1.5M4.5 4.5l.6 8h5.8l.6-8',
+  'close': 'M3.5 3.5l9 9M12.5 3.5l-9 9',
+  'doc': 'M4 1.8h5l3.2 3.2v9.2H4z M9 1.8V5h3.2',
+  'send': 'M8 13V3M3.5 7.5 8 3l4.5 4.5',
+  'hamburger': 'M2 4h12M2 8h12M2 12h12',
 };
 
 final _parsed = <String, Path>{};
 
-Path _path(String name) =>
-    _parsed.putIfAbsent(name, () => parseSvgPathData(_paths[name]!));
+Path _path(String name) => _parsed.putIfAbsent(
+  name,
+  () => parseSvgPathData(_paths[name] ?? _small[name]!),
+);
 
-/// Icon sizes: `.ico` 18, `.sm` 15 and `.big` 22.
+/// The side of the box [name] is drawn on.
+double _box(String name) => _small.containsKey(name) ? 16 : 24;
+
+/// Icon sizes in logical pixels.
 enum IconSize {
+  xs(14),
+  small(16),
   sm(15),
-  normal(18),
-  big(22);
+  normal(18);
 
   const IconSize(this.px);
   final double px;
@@ -36,7 +45,6 @@ class NilsIcon extends StatelessWidget {
     super.key,
     this.size = IconSize.normal,
     this.color,
-    this.rotated = false,
   });
 
   final String name;
@@ -45,36 +53,36 @@ class NilsIcon extends StatelessWidget {
   /// Defaults to the surrounding [IconTheme] colour, which buttons and rows set.
   final Color? color;
 
-  /// A quarter turn clockwise. The chevrons rotate when a section opens.
-  final bool rotated;
-
   @override
   Widget build(BuildContext context) {
-    assert(_paths.containsKey(name), 'no icon named $name');
+    assert(
+      _paths.containsKey(name) || _small.containsKey(name),
+      'no icon named $name',
+    );
     final icon = SizedBox.square(
       dimension: size.px,
       child: CustomPaint(
         painter: _IconPainter(
           _path(name),
+          _box(name),
           color ?? IconTheme.of(context).color ?? const Color(0xFF000000),
         ),
       ),
     );
-    return ExcludeSemantics(
-      child: rotated ? RotatedBox(quarterTurns: 1, child: icon) : icon,
-    );
+    return ExcludeSemantics(child: icon);
   }
 }
 
 class _IconPainter extends CustomPainter {
-  const _IconPainter(this.path, this.color);
+  const _IconPainter(this.path, this.box, this.color);
 
   final Path path;
+  final double box;
   final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final scale = size.width / 24;
+    final scale = size.width / box;
     canvas.drawPath(
       path.transform(
         (Matrix4.identity()..scaleByDouble(scale, scale, 1, 1)).storage,
@@ -82,7 +90,7 @@ class _IconPainter extends CustomPainter {
       Paint()
         ..color = color
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.7 * scale
+        ..strokeWidth = (box == 16 ? 1.6 : 1.7) * scale
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round,
     );
@@ -90,5 +98,5 @@ class _IconPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_IconPainter old) =>
-      old.path != path || old.color != color;
+      old.path != path || old.box != box || old.color != color;
 }

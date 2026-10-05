@@ -60,11 +60,21 @@ class IconBtn extends StatelessWidget {
     super.key,
     required this.tooltip,
     required this.onPressed,
+    this.box = 34,
+    this.size = IconSize.normal,
+    this.dangerHover = false,
   });
 
   final String icon;
   final String tooltip;
   final VoidCallback? onPressed;
+
+  /// The side of the square.
+  final double box;
+  final IconSize size;
+
+  /// A destructive action: the bad colour fills it on hover.
+  final bool dangerHover;
 
   @override
   Widget build(BuildContext context) {
@@ -73,62 +83,13 @@ class IconBtn extends StatelessWidget {
       label: tooltip,
       tooltip: tooltip,
       onTap: onPressed,
-      radius: BorderRadius.circular(8),
+      radius: BorderRadius.circular(box < 30 ? 6 : 8),
+      hoverColor: dangerHover ? t.badbg : null,
       dimWhenDisabled: 0.4,
       child: SizedBox.square(
-        dimension: 34,
+        dimension: box,
         child: Center(
-          child: NilsIcon(icon, size: IconSize.normal, color: t.ink2),
-        ),
-      ),
-    );
-  }
-}
-
-/// A chevron and a label that fold something open and shut.
-///
-/// [label] is what a screen reader hears. [child] is what is drawn beside the chevron.
-class Disclosure extends StatelessWidget {
-  const Disclosure({
-    super.key,
-    required this.open,
-    required this.onToggle,
-    required this.label,
-    required this.child,
-    this.minHeight = 24,
-  });
-
-  final bool open;
-  final VoidCallback onToggle;
-  final String label;
-  final Widget child;
-  final double minHeight;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Tappable(
-        label: label,
-        expanded: open,
-        onTap: onToggle,
-        radius: BorderRadius.circular(6),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: minHeight),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              NilsIcon(
-                'chevron',
-                size: IconSize.sm,
-                color: t.muted,
-                rotated: open,
-              ),
-              const SizedBox(width: 4),
-              Flexible(child: child),
-            ],
-          ),
+          child: NilsIcon(icon, size: size, color: t.ink2),
         ),
       ),
     );

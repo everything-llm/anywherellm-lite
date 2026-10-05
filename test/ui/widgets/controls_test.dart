@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:everything/ui/icons.dart';
 import 'package:everything/ui/theme.dart';
-import 'package:everything/ui/widgets/basics.dart';
-import 'package:everything/ui/widgets/fields.dart';
-import 'package:everything/ui/widgets/select.dart';
+import 'package:everything/ui/widgets/controls.dart';
+import 'package:flutter/material.dart';
+
+import 'dart:ui' show Tristate;
+
+import 'package:flutter_test/flutter_test.dart';
 
 Future<void> show(WidgetTester tester, Widget child) => tester.pumpWidget(
   MaterialApp(
@@ -16,88 +17,51 @@ Future<void> show(WidgetTester tester, Widget child) => tester.pumpWidget(
 );
 
 void main() {
-  testWidgets('a search field reports what is typed and shows its hint', (
+  testWidgets('a switch reports its state and flips when tapped', (
     tester,
   ) async {
-    final controller = TextEditingController();
-    addTearDown(controller.dispose);
-    final typed = <String>[];
+    bool? changed;
     await show(
       tester,
-      SearchField(
-        controller: controller,
-        hint: 'Search research',
-        onChanged: typed.add,
+      NilsSwitch(
+        value: true,
+        label: 'Use a.md in answers',
+        onChanged: (v) => changed = v,
       ),
     );
-    expect(find.text('Search research'), findsOneWidget);
-    await tester.enterText(find.byType(TextField), 'maps');
-    expect(typed, ['maps']);
-    expect(find.byType(NilsIcon), findsOneWidget);
+    final data = find.semantics
+        .byLabel('Use a.md in answers')
+        .evaluate()
+        .single
+        .getSemanticsData();
+    expect(data.flagsCollection.isButton, isTrue);
+    expect(data.flagsCollection.isToggled, Tristate.isTrue);
+    await tester.tap(find.byType(NilsSwitch));
+    expect(changed, isFalse);
   });
 
-  testWidgets('a select shows the current choice and changes it from a menu', (
-    tester,
-  ) async {
-    final picked = <String>[];
+  testWidgets('a badge shows its text', (tester) async {
+    await show(tester, const NilsBadge('Set', kind: BadgeKind.ok));
+    expect(find.text('Set'), findsOneWidget);
+  });
+
+  testWidgets('every icon draws, on either box', (tester) async {
+    const names = [
+      'chat',
+      'settings',
+      'plus',
+      'pencil',
+      'trash',
+      'close',
+      'doc',
+      'send',
+      'hamburger',
+    ];
     await show(
       tester,
-      NilsSelect(
-        label: 'Filter by type',
-        value: '',
-        options: const [
-          (value: '', label: 'All types'),
-          (value: 'report', label: 'report (2)'),
-        ],
-        onChanged: picked.add,
-      ),
+      Wrap(children: [for (final name in names) NilsIcon(name)]),
     );
-    expect(find.text('All types'), findsOneWidget);
-    expect(
-      tester.getSemantics(find.byType(NilsSelect)).label,
-      'Filter by type, All types',
-    );
-    await tester.tap(find.byType(NilsSelect));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('report (2)'));
-    await tester.pumpAndSettle();
-    expect(picked, ['report']);
-  });
-
-  testWidgets('a select with an unknown value shows its first option', (
-    tester,
-  ) async {
-    await show(
-      tester,
-      NilsSelect(
-        label: 'Filter',
-        value: 'gone',
-        options: const [(value: '', label: 'All')],
-        onChanged: (_) {},
-      ),
-    );
-    expect(find.text('All'), findsOneWidget);
-  });
-
-  testWidgets('a mono page head sets a name that is code in the mono face', (
-    tester,
-  ) async {
-    await show(tester, const PageHead('commit', mono: true));
-    final style = tester.widget<Text>(find.text('commit')).style!;
-    expect(style.fontFamily, 'JetBrains Mono');
-    expect(style.fontSize, 28);
-  });
-
-  testWidgets('every new icon draws', (tester) async {
-    await show(
-      tester,
-      Row(
-        children: [
-          for (final name in ['folder', 'search']) NilsIcon(name),
-        ],
-      ),
-    );
-    expect(find.byType(NilsIcon), findsNWidgets(2));
+    expect(find.byType(NilsIcon), findsNWidgets(names.length));
     expect(tester.takeException(), isNull);
   });
 }

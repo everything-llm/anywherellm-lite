@@ -30,3 +30,7 @@ class Rise extends StatelessWidget {
     );
   }
 }
+
+/// [duration], or none when the system asks for reduced motion.
+Duration motion(BuildContext context, Duration duration) =>
+    MediaQuery.disableAnimationsOf(context) ? Duration.zero : duration;

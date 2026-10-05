@@ -61,7 +61,7 @@ void main() {
 
   test('every token is opaque except the scrim and the shadow', () {
     final t = Tokens.light;
-    for (final c in [t.bg, t.side, t.panel, t.ink, t.accent, t.line, t.code]) {
+    for (final c in [t.bg, t.side, t.panel, t.ink, t.accent, t.line]) {
       expect(c.a, 1);
     }
     expect(t.scrim.a, lessThan(1));

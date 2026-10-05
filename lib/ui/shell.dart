@@ -2,170 +2,173 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app_scope.dart';
-import 'icons.dart';
+import 'chat/chat_view.dart';
 import 'layout.dart';
-import 'pages/router.dart';
+import 'settings/settings_dialog.dart';
 import 'sidebar.dart';
-import 'state/nav_controller.dart';
+import 'sources/sources_panel.dart';
 import 'tokens.dart';
-import 'type.dart';
-import 'widgets/brand.dart';
-import 'widgets/buttons.dart';
-import 'widgets/tappable.dart';
+import 'widgets/rise.dart';
 
-/// The window: sidebar and page, arranged for the width they have.
+/// The window: sidebar, chat and Sources, arranged for the width they have, with Settings over
+/// them when it is open.
 ///
-/// The shell and its media queries. See [ScreenClass] for the breakpoints.
-class AppShell extends StatefulWidget {
+/// Below 820 the sidebar is a drawer from the left; below 1120 Sources is a drawer from the
+/// right. Esc and Back close the topmost thing open: Settings, then a drawer.
+class AppShell extends StatelessWidget {
   const AppShell({super.key});
 
   @override
-  State<AppShell> createState() => _AppShellState();
-}
-
-class _AppShellState extends State<AppShell> {
-  AppScope? _scope;
-  AppRoute? _seen;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final scope = AppScope.of(context);
-    if (_scope != scope) {
-      _scope?.nav.removeListener(_routeChanged);
-      _scope = scope..nav.addListener(_routeChanged);
-      _seen = scope.nav.route;
-    }
-  }
-
-  @override
-  void dispose() {
-    _scope?.nav.removeListener(_routeChanged);
-    super.dispose();
-  }
-
-  /// Showing a new page closes the drawer.
-  void _routeChanged() {
-    final scope = _scope!;
-    if (scope.nav.route == _seen) return;
-    _seen = scope.nav.route;
-    scope.shell.close();
-  }
-
-  /// Back closes the drawer, then steps up from a document to its list. Only when neither applies
-  /// does it leave the app.
-  void _back() {
-    final scope = _scope!;
-    if (scope.shell.sideOpen) {
-      scope.shell.close();
-    } else if (scope.nav.parent case final parent?) {
-      scope.nav.go(parent);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
+    final shell = scope.shell;
     final t = Tokens.of(context);
+    final duration = motion(context, const Duration(milliseconds: 250));
+
+    bool closeTop() {
+      if (shell.settingsOpen) {
+        shell.closeSettings();
+      } else if (shell.sideOpen) {
+        shell.closeSide();
+      } else {
+        return false;
+      }
+      return true;
+    }
+
     return LayoutBuilder(
       builder: (context, box) {
         final screen = ScreenClass.of(box.maxWidth);
+        final sourcesInline = ScreenClass.sourcesInline(box.maxWidth);
         return ListenableBuilder(
-          listenable: Listenable.merge([scope.nav, scope.shell]),
-          builder: (context, child) => PopScope(
-            canPop: !scope.shell.sideOpen && scope.nav.parent == null,
-            onPopInvokedWithResult: (didPop, _) {
-              if (!didPop) _back();
-            },
-            child: child!,
-          ),
-          child: CallbackShortcuts(
-            bindings: {
-              const SingleActivator(LogicalKeyboardKey.escape): () {
-                if (scope.shell.sideOpen) scope.shell.close();
+          listenable: shell,
+          builder: (context, _) {
+            final sideDrawer = screen.sidebarDrawer && shell.sideOpen;
+            final sourcesDrawer = !sourcesInline && shell.sourcesOpen;
+            return PopScope(
+              canPop: !shell.settingsOpen && !shell.sideOpen && !sourcesDrawer,
+              onPopInvokedWithResult: (didPop, _) {
+                if (!didPop && !closeTop()) shell.closeSources();
               },
-            },
-            child: Focus(
-              autofocus: true,
-              // InkWell needs a Material above it, and the shell has no Scaffold.
-              child: Material(
-                color: t.bg,
-                child: Column(
-                  children: [
-                    Expanded(child: _Frame(screen: screen)),
-                    if (screen.hasTabBar) const _TabBar(),
-                  ],
+              child: CallbackShortcuts(
+                bindings: {
+                  const SingleActivator(LogicalKeyboardKey.escape): () {
+                    if (!closeTop() && sourcesDrawer) shell.closeSources();
+                  },
+                },
+                child: Focus(
+                  autofocus: true,
+                  // InkWell needs a Material above it, and the shell has no Scaffold.
+                  child: Material(
+                    color: t.bg,
+                    child: Stack(
+                      children: [
+                        Row(
+                          children: [
+                            if (screen.sidebarInline) const Sidebar(),
+                            Expanded(
+                              child: ChatView(showMenu: screen.sidebarDrawer),
+                            ),
+                            if (sourcesInline)
+                              AnimatedContainer(
+                                duration: duration,
+                                curve: Curves.easeOut,
+                                width: shell.sourcesOpen ? Sizes.sources : 0,
+                                child: ClipRect(
+                                  child: OverflowBox(
+                                    alignment: Alignment.centerLeft,
+                                    minWidth: Sizes.sources,
+                                    maxWidth: Sizes.sources,
+                                    child: _Hidden(
+                                      hidden: !shell.sourcesOpen,
+                                      child: const SourcesPanel(),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        if (sideDrawer || sourcesDrawer)
+                          _Scrim(onTap: shell.closeDrawers),
+                        if (screen.sidebarDrawer)
+                          _Drawer(
+                            open: sideDrawer,
+                            left: true,
+                            width: Sizes.sidebar,
+                            duration: duration,
+                            child: const Sidebar(),
+                          ),
+                        if (!sourcesInline)
+                          _Drawer(
+                            open: sourcesDrawer,
+                            left: false,
+                            width: Sizes.sources,
+                            duration: duration,
+                            child: const SourcesPanel(),
+                          ),
+                        if (shell.settingsOpen) ...[
+                          _Scrim(onTap: shell.closeSettings),
+                          const Center(child: SettingsDialog()),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
   }
 }
 
-class _Frame extends StatelessWidget {
-  const _Frame({required this.screen});
+class _Scrim extends StatelessWidget {
+  const _Scrim({required this.onTap});
 
-  final ScreenClass screen;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    final t = Tokens.of(context);
-    final fast = MediaQuery.disableAnimationsOf(context);
-    final duration = fast ? Duration.zero : const Duration(milliseconds: 250);
-    return ListenableBuilder(
-      listenable: scope.shell,
-      builder: (context, _) {
-        final shell = scope.shell;
-        final sideDrawerOpen = screen.sidebarDrawer && shell.sideOpen;
-        return Stack(
-          children: [
-            Row(
-              children: [
-                if (screen.sidebarInline) const Sidebar(),
-                Expanded(
-                  child: Column(
-                    children: [
-                      if (!screen.sidebarInline)
-                        _TopBar(showMenu: screen.sidebarDrawer),
-                      const Expanded(child: _MainArea()),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            if (sideDrawerOpen)
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => shell.close(),
-                  child: ColoredBox(color: t.scrim),
-                ),
-              ),
-            if (screen.sidebarDrawer)
-              _Drawer(
-                open: sideDrawerOpen,
-                duration: duration,
-                child: const Sidebar(),
-              ),
-          ],
-        );
-      },
-    );
-  }
+  Widget build(BuildContext context) => Positioned.fill(
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: ColoredBox(color: Tokens.of(context).scrim),
+    ),
+  );
+}
+
+/// Takes [child] out of focus, semantics and hit testing while it is out of sight.
+class _Hidden extends StatelessWidget {
+  const _Hidden({required this.hidden, required this.child});
+
+  final bool hidden;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ExcludeFocus(
+    excluding: hidden,
+    child: ExcludeSemantics(
+      excluding: hidden,
+      child: IgnorePointer(ignoring: hidden, child: child),
+    ),
+  );
 }
 
 class _Drawer extends StatelessWidget {
   const _Drawer({
     required this.open,
+    required this.left,
+    required this.width,
     required this.duration,
     required this.child,
   });
 
   final bool open;
+
+  /// Slides from the left edge, or else from the right.
+  final bool left;
+  final double width;
   final Duration duration;
   final Widget child;
 
@@ -173,139 +176,17 @@ class _Drawer extends StatelessWidget {
   Widget build(BuildContext context) => Positioned(
     top: 0,
     bottom: 0,
-    left: 0,
-    width: Sizes.sidebar,
-    child: ExcludeFocus(
-      excluding: !open,
-      child: ExcludeSemantics(
-        excluding: !open,
-        child: IgnorePointer(
-          ignoring: !open,
-          child: AnimatedSlide(
-            duration: duration,
-            curve: Curves.easeOut,
-            offset: Offset(open ? 0 : -1.05, 0),
-            child: child,
-          ),
-        ),
+    left: left ? 0 : null,
+    right: left ? null : 0,
+    width: width,
+    child: _Hidden(
+      hidden: !open,
+      child: AnimatedSlide(
+        duration: duration,
+        curve: Curves.easeOut,
+        offset: Offset(open ? 0 : (left ? -1.05 : 1.05), 0),
+        child: child,
       ),
     ),
   );
-}
-
-/// The current page, built afresh on each visit, which fetches its data again.
-class _MainArea extends StatelessWidget {
-  const _MainArea();
-
-  @override
-  Widget build(BuildContext context) {
-    final nav = AppScope.of(context).nav;
-    return ListenableBuilder(
-      listenable: nav,
-      builder: (context, _) =>
-          KeyedSubtree(key: ValueKey(nav.route), child: pageFor(nav.route)),
-    );
-  }
-}
-
-class _TopBar extends StatelessWidget {
-  const _TopBar({required this.showMenu});
-
-  final bool showMenu;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    final shell = AppScope.of(context).shell;
-    return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: t.line)),
-      ),
-      child: Row(
-        children: [
-          if (showMenu) ...[
-            IconBtn('menu', tooltip: 'Menu', onPressed: shell.toggle),
-            const SizedBox(width: 10),
-          ],
-          const Flexible(child: Brand(size: 22, logo: false)),
-        ],
-      ),
-    );
-  }
-}
-
-class _TabBar extends StatelessWidget {
-  const _TabBar();
-
-  @override
-  Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    final t = Tokens.of(context);
-    return ListenableBuilder(
-      listenable: scope.nav,
-      builder: (context, _) {
-        final section = scope.nav.route.section;
-        Widget tab(
-          String icon,
-          String label,
-          bool current,
-          VoidCallback onTap,
-        ) {
-          final color = current ? t.accent : t.muted;
-          return Expanded(
-            child: Tappable(
-              label: label,
-              selected: current,
-              onTap: onTap,
-              child: Container(
-                constraints: const BoxConstraints(minHeight: 56),
-                alignment: Alignment.center,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    NilsIcon(icon, size: IconSize.big, color: color),
-                    const SizedBox(height: 2),
-                    Text(
-                      label,
-                      style: Type.sans(
-                        11,
-                        weight: current ? FontWeight.w600 : FontWeight.w400,
-                        color: color,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }
-
-        // Like Material's own navigation bar, keep the labels from outgrowing their tabs when the
-        // person has asked for very large text.
-        return MediaQuery.withClampedTextScaling(
-          maxScaleFactor: 1.2,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
-            decoration: BoxDecoration(
-              color: t.side,
-              border: Border(top: BorderSide(color: t.line)),
-            ),
-            child: Row(
-              children: [
-                for (final e in navEntries)
-                  tab(
-                    e.icon,
-                    e.label,
-                    section == e.route.section,
-                    () => scope.nav.go(e.route),
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 }
