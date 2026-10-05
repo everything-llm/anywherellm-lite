@@ -63,9 +63,8 @@ pubspec_overrides.yaml
 # ------------------------------------------------------------------------------
 # Platforms this app does not target
 # ------------------------------------------------------------------------------
-# Android was dropped; what is left on disk (signing keys, gradle caches) stays
-# out of git. The rest are not built here either. Delete a line to re-adopt one.
-/android/
+# Linux and Android are built; android/.gitignore keeps Gradle state and keys out.
+# Delete a line to re-adopt one.
 /ios/
 /macos/
 /windows/
