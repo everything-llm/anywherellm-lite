@@ -1,16 +1,22 @@
-import 'package:everything/core/models.dart';
+import 'package:everything/core/connection.dart';
 import 'package:everything/core/ports.dart';
+import 'package:everything/core/server_models.dart';
 
-/// A [NilsApi] for widget tests. Set the fields to change what it answers, and put an error in
-/// [errors] under a method's name to make it fail. Every call is recorded in [calls] as `name`
-/// or `name:arg`.
-class FakeApi implements NilsApi {
-  Overview overviewValue = sampleOverview();
-  List<ResearchEntry> researchValue = [];
-  Map<String, ResearchDoc> researchDocs = {};
-  List<SkillMeta> skillsValue = [];
-  Map<String, SkillDoc> skillDocs = {};
-  List<String> inboxValue = [];
+/// A connection for tests that need a server set up.
+const sampleConnection = Connection(baseUrl: 'https://h:3001', apiKey: 'K1');
+
+/// An [AnythingLlmApi] for widget tests. Set the fields to change what it answers, and put an
+/// error in [errors] under a method's name to make it fail. Every call but [verify] is recorded
+/// in [calls] as `name` or `name:arg`.
+class FakeAnythingLlm implements AnythingLlmApi {
+  /// Every connection [verify] was given, in order.
+  final List<Connection> verified = [];
+  Object? verifyError;
+
+  /// Each workspace's full answer, documents included. [workspaces] answers without them.
+  List<Workspace> workspacesValue = [];
+  List<DocFolder> foldersValue = [];
+  Set<String> acceptedValue = {'.md', '.txt', '.pdf'};
 
   final List<String> calls = [];
   final Map<String, Object> errors = {};
@@ -23,59 +29,96 @@ class FakeApi implements NilsApi {
   }
 
   @override
-  Future<Overview> overview() => _run('overview', () => overviewValue);
+  Future<void> verify(Connection connection) async {
+    verified.add(connection);
+    if (verifyError != null) throw verifyError!;
+  }
 
   @override
-  Future<List<ResearchEntry>> research() =>
-      _run('research', () => researchValue);
+  Future<List<Workspace>> workspaces() => _run(
+    'workspaces',
+    () => [
+      for (final w in workspacesValue)
+        Workspace(
+          slug: w.slug,
+          name: w.name,
+          chatModel: w.chatModel,
+          threads: w.threads,
+        ),
+    ],
+  );
 
   @override
-  Future<ResearchDoc> researchDoc(String path) =>
-      _run('researchDoc', () => researchDocs[path]!, path);
+  Future<Workspace> workspace(String slug) => _run(
+    'workspace',
+    () => workspacesValue.firstWhere(
+      (w) => w.slug == slug,
+      orElse: () =>
+          throw ApiException('There is no workspace $slug.', status: 404),
+    ),
+    slug,
+  );
 
   @override
-  Future<List<SkillMeta>> skills() => _run('skills', () => skillsValue);
+  Future<List<DocFolder>> documents() => _run('documents', () => foldersValue);
 
   @override
-  Future<SkillDoc> skillDoc(String name) =>
-      _run('skillDoc', () => skillDocs[name]!, name);
+  Future<Set<String>> acceptedExtensions() =>
+      _run('acceptedExtensions', () => acceptedValue);
 
+  /// Files the server reads into [folder], as a document titled by [name].
   @override
-  Future<List<String>> inbox() => _run('inbox', () => inboxValue);
-
-  @override
-  Future<void> upload(String name, List<int> bytes) => _run('upload', () {
-    inboxValue = [...inboxValue, name.toLowerCase().replaceAll(' ', '-')];
-  }, name);
+  Future<List<DocEntry>> upload(
+    String name,
+    List<int> bytes, {
+    String? folder,
+  }) => _run('upload', () {
+    final doc = DocEntry(
+      folder: folder ?? 'custom-documents',
+      name: '$name-1.json',
+      title: name,
+    );
+    foldersValue = [
+      for (final f in foldersValue)
+        f.name == doc.folder
+            ? DocFolder(name: f.name, docs: [...f.docs, doc])
+            : f,
+      if (!foldersValue.any((f) => f.name == doc.folder))
+        DocFolder(name: doc.folder, docs: [doc]),
+    ];
+    return [doc];
+  }, '$name:${folder ?? ''}');
 }
 
-Overview sampleOverview({List<Finding> findings = const []}) => Overview(
-  findings: findings,
-  locations: sampleLocations(),
-  research: const LibraryCounts(count: 3, tags: 2, topics: 1),
-  skills: const LibraryCounts(count: 1, errors: 1),
+DocEntry sampleDoc(
+  String folder,
+  String title, {
+  String? description,
+  int? words = 120,
+}) => DocEntry(
+  folder: folder,
+  name: '$title.md-0001.json',
+  title: title,
+  description: description ?? 'About $title',
+  source: 'a text file uploaded by the user.',
+  published: '10/5/2026, 11:48:20 AM',
+  words: words,
 );
 
-Locations sampleLocations() => const Locations(
-  researchRoot: '/repo/storage/data/research',
-  skillsRoot: '/repo/storage/data/skills',
-  inbox: '/repo/storage/inbox',
-  prompt: 'storage/PROMPT.md',
-);
+/// The document a [documentServer] holds in one of its two workspaces.
+final heldDoc = sampleDoc('claude', 'agents');
 
-ResearchMeta sampleMeta({
-  String summary = 'A summary.',
-  String kind = 'note',
-  String status = 'current',
-  String verified = 'human',
-  List<String> tags = const ['ai'],
-}) => ResearchMeta(
-  summary: summary,
-  kind: kind,
-  status: status,
-  verified: verified,
-  date: '2026-01-02',
-  producedBy: 'claude',
-  tags: tags,
-  sources: const ['https://example.com'],
-);
+/// A server with [heldDoc] in its `claude` folder, held by the workspace `research` and not by
+/// `other`.
+FakeAnythingLlm documentServer() => FakeAnythingLlm()
+  ..foldersValue = [
+    DocFolder(name: 'claude', docs: [heldDoc]),
+  ]
+  ..workspacesValue = [
+    Workspace(
+      slug: 'research',
+      name: 'Research',
+      documents: [WorkspaceDoc(path: heldDoc.path, title: heldDoc.title)],
+    ),
+    const Workspace(slug: 'other', name: 'Other'),
+  ];

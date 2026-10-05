@@ -16,6 +16,9 @@ sealed class AppRoute {
   /// The page one step up: a document goes back to its list. Null on a section's own page.
   AppRoute? get up => null;
 
+  /// Whether the page reads the server, so it waits behind the connection gate.
+  bool get needsServer => true;
+
   @override
   bool operator ==(Object other) =>
       other is AppRoute && other.runtimeType == runtimeType && other.arg == arg;
@@ -24,74 +27,61 @@ sealed class AppRoute {
   int get hashCode => Object.hash(runtimeType, arg);
 }
 
-/// What the libraries hold, what their last check found, and where nils keeps things.
-class OverviewRoute extends AppRoute {
-  const OverviewRoute() : super('overview');
+class WorkspacesRoute extends AppRoute {
+  const WorkspacesRoute() : super('workspaces');
 }
 
-class ResearchListRoute extends AppRoute {
-  const ResearchListRoute() : super('research');
+class WorkspaceRoute extends AppRoute {
+  const WorkspaceRoute(String slug) : super('workspaces', slug);
+
+  String get slug => arg!;
+
+  @override
+  AppRoute get up => const WorkspacesRoute();
 }
 
-class ResearchDocRoute extends AppRoute {
-  const ResearchDocRoute(String path) : super('research', path);
+class DocumentsRoute extends AppRoute {
+  const DocumentsRoute() : super('documents');
+}
+
+/// One document, by its `folder/name` path.
+class DocumentRoute extends AppRoute {
+  const DocumentRoute(String path) : super('documents', path);
 
   String get path => arg!;
 
   @override
-  AppRoute get up => const ResearchListRoute();
+  AppRoute get up => const DocumentsRoute();
 }
 
-class SkillsListRoute extends AppRoute {
-  const SkillsListRoute() : super('skills');
-}
-
-class SkillDocRoute extends AppRoute {
-  const SkillDocRoute(String name) : super('skills', name);
-
-  String get name => arg!;
-
-  @override
-  AppRoute get up => const SkillsListRoute();
-}
-
-/// The files staged for adding, and the way to stage more.
-class InboxRoute extends AppRoute {
-  const InboxRoute() : super('inbox');
+/// Sending files to the server.
+class UploadRoute extends AppRoute {
+  const UploadRoute() : super('upload');
 }
 
 /// The AnythingLLM address and key.
 class SettingsRoute extends AppRoute {
   const SettingsRoute() : super('settings');
+
+  @override
+  bool get needsServer => false;
 }
 
-/// One place the sidebar and the tab bar both list: its icon, its label and where it goes, and
-/// the library whose findings its badge counts, when it is one.
-typedef NavEntry = ({
-  String icon,
-  String label,
-  AppRoute route,
-  String? library,
-});
+/// One place the sidebar and the tab bar both list: its icon, its label and where it goes.
+typedef NavEntry = ({String icon, String label, AppRoute route});
 
 const navEntries = <NavEntry>[
-  (icon: 'folder', label: 'Overview', route: OverviewRoute(), library: null),
-  (
-    icon: 'book',
-    label: 'Research',
-    route: ResearchListRoute(),
-    library: 'research',
-  ),
-  (icon: 'tool', label: 'Skills', route: SkillsListRoute(), library: 'skills'),
-  (icon: 'file', label: 'Inbox', route: InboxRoute(), library: null),
-  (icon: 'settings', label: 'Settings', route: SettingsRoute(), library: null),
+  (icon: 'folder', label: 'Workspaces', route: WorkspacesRoute()),
+  (icon: 'book', label: 'Documents', route: DocumentsRoute()),
+  (icon: 'file', label: 'Upload', route: UploadRoute()),
+  (icon: 'settings', label: 'Settings', route: SettingsRoute()),
 ];
 
 /// The current page.
 class NavController extends ChangeNotifier {
-  /// Starts on [initial], or on the overview.
+  /// Starts on [initial], or on the workspaces.
   NavController([AppRoute? initial])
-    : _route = initial ?? const OverviewRoute();
+    : _route = initial ?? const WorkspacesRoute();
 
   AppRoute _route;
 

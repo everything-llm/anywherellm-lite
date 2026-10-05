@@ -3,6 +3,7 @@ import 'package:everything/core/ports.dart';
 import 'package:everything/ui/state/settings_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/fake_api.dart';
 import '../support/fake_settings.dart';
 
 const _saved = Connection(baseUrl: 'https://h:3001', apiKey: 'K1');
@@ -15,7 +16,7 @@ void main() {
   setUp(() {
     llm = FakeAnythingLlm();
     store = FakeSettingsStore();
-    settings = SettingsController(llm, store);
+    settings = SettingsController(llm, store, ConnectionHolder());
   });
 
   tearDown(() => settings.dispose());

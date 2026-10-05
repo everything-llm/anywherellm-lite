@@ -1,16 +1,9 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../core/copy.dart';
 import '../../core/list_filter.dart';
-import '../app_scope.dart';
-import '../tokens.dart';
 import '../widgets/basics.dart';
-import '../widgets/buttons.dart';
-import '../widgets/chip.dart';
 import '../widgets/fields.dart';
-import '../widgets/findings.dart';
 import '../widgets/rows.dart';
 import '../widgets/select.dart';
 import 'page_frame.dart';
@@ -20,18 +13,14 @@ typedef LibraryRowBuilder<T> = Widget Function(
   BuildContext context,
   T item,
   BorderRadius corners,
-  ListFilter filter,
 );
 
-/// A library's page: the title, what the last check found in this library, then the items
-/// grouped, narrowed by a search, one facet (type or topic) and tags.
+/// A list page: the title, then the items grouped, narrowed by a search and one facet.
 ///
-/// The narrowing lives here and goes when the page does. [library] names the findings to show,
-/// `research` or `skills`.
+/// The narrowing lives here and goes when the page does.
 class LibraryList<T> extends StatefulWidget {
   const LibraryList({
     super.key,
-    required this.library,
     required this.title,
     required this.sub,
     required this.noun,
@@ -46,7 +35,6 @@ class LibraryList<T> extends StatefulWidget {
     required this.emptyText,
   });
 
-  final String library;
   final String title;
   final String sub;
 
@@ -60,7 +48,7 @@ class LibraryList<T> extends StatefulWidget {
   final String facetLabel;
   final String allFacets;
 
-  /// Shown when the library holds nothing at all.
+  /// Shown when the list holds nothing at all.
   final String emptyTitle;
   final String emptyText;
 
@@ -70,14 +58,11 @@ class LibraryList<T> extends StatefulWidget {
 
 class _LibraryListState<T> extends State<LibraryList<T>> {
   final _search = TextEditingController();
-  final _tagSearch = TextEditingController();
   ListFilter _filter = const ListFilter();
-  bool _tagsOpen = false;
 
   @override
   void dispose() {
     _search.dispose();
-    _tagSearch.dispose();
     super.dispose();
   }
 
@@ -86,22 +71,14 @@ class _LibraryListState<T> extends State<LibraryList<T>> {
     setState(() => _filter = const ListFilter());
   }
 
-  void _toggleTags() {
-    _tagSearch.clear();
-    setState(() => _tagsOpen = !_tagsOpen);
-  }
-
   @override
   Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
     return LoadPage<List<T>>.slivers(
-      load: () {
-        // The sidebar's badges and this page's findings are as old as the last check.
-        unawaited(scope.overview.refresh());
-        return widget.load();
-      },
+      load: widget.load,
       slivers: (context, items) {
-        final head = SliverToBoxAdapter(child: _Head(widget));
+        final head = SliverToBoxAdapter(
+          child: PageHead(widget.title, sub: widget.sub),
+        );
         if (items.isEmpty) {
           return [
             head,
@@ -134,7 +111,7 @@ class _LibraryListState<T> extends State<LibraryList<T>> {
               group,
               count: rows.length,
               itemBuilder: (context, i, corners) =>
-                  widget.row(context, rows[i], corners, _filter),
+                  widget.row(context, rows[i], corners),
             ),
         ];
       },
@@ -142,7 +119,6 @@ class _LibraryListState<T> extends State<LibraryList<T>> {
   }
 
   Widget _controls(FilterResult<T> result, int total) {
-    final t = Tokens.of(context);
     final search = SearchField(
       controller: _search,
       hint: widget.searchHint,
@@ -177,29 +153,6 @@ class _LibraryListState<T> extends State<LibraryList<T>> {
                   children: [search, select],
                 ),
         ),
-        if (result.tags.isNotEmpty)
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              for (final tag in result.mainTags) _chip(tag),
-              if (result.hasMoreTags)
-                Disclosure(
-                  open: _tagsOpen,
-                  onToggle: _toggleTags,
-                  label: _tagsOpen ? 'Hide all tags' : 'All tags',
-                  minHeight: 32,
-                  child: Text(
-                    _tagsOpen
-                        ? 'Hide all tags'
-                        : 'All tags (${result.tags.length})',
-                    style: TextStyle(color: t.accent, fontSize: 13),
-                  ),
-                ),
-            ],
-          ),
-        if (_tagsOpen && result.hasMoreTags) _panel(result.tags),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -217,75 +170,4 @@ class _LibraryListState<T> extends State<LibraryList<T>> {
       ],
     );
   }
-
-  Widget _chip(TagChoice tag) => NilsChip(
-    tag.label,
-    count: tag.count,
-    pressed: tag.pressed,
-    dim: tag.dim,
-    onTap: () => setState(() => _filter = _filter.toggled(tag.label)),
-  );
-
-  Widget _panel(List<TagChoice> tags) {
-    final query = _tagSearch.text;
-    final matching = matchingTags(tags, query);
-    final note = panelNote(matching, query);
-    return NilsCard(
-      gap: 10,
-      padding: const EdgeInsets.all(12),
-      children: [
-        NilsField(
-          controller: _tagSearch,
-          label: 'Find a tag',
-          hint: 'Find a tag',
-          onChanged: (_) => setState(() {}),
-        ),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 200),
-          child: SingleChildScrollView(
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [for (final tag in panelTags(matching)) _chip(tag)],
-            ),
-          ),
-        ),
-        if (note.isNotEmpty) HelpText(note, status: true),
-      ],
-    );
-  }
 }
-
-/// The title and, above the list, what the last check found in this library.
-class _Head extends StatelessWidget {
-  const _Head(this.list);
-
-  final LibraryList<dynamic> list;
-
-  @override
-  Widget build(BuildContext context) {
-    final overview = AppScope.of(context).overview;
-    return ListenableBuilder(
-      listenable: overview,
-      builder: (context, _) {
-        final findings = overview.findingsFor(list.library);
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 22,
-          children: [
-            PageHead(list.title, sub: list.sub),
-            if (findings.isNotEmpty) FindingsSection(findings),
-          ],
-        );
-      },
-    );
-  }
-}
-
-/// A row's tag as a badge, in the accent when the list is filtered by it.
-Widget tagBadge(String tag, ListFilter filter) => NilsBadge(
-  BadgeSpec(
-    tag,
-    filter.tags.contains(tag) ? BadgeKind.accent : BadgeKind.plain,
-  ),
-);

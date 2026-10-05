@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../core/copy.dart';
-import '../core/models.dart';
 import 'app_scope.dart';
 import 'icons.dart';
 import 'layout.dart';
@@ -19,7 +17,7 @@ class Sidebar extends StatelessWidget {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
     return ListenableBuilder(
-      listenable: Listenable.merge([scope.nav, scope.overview]),
+      listenable: scope.nav,
       builder: (context, _) {
         final section = scope.nav.route.section;
         return Semantics(
@@ -47,9 +45,6 @@ class Sidebar extends StatelessWidget {
                       label: e.label,
                       current: section == e.route.section,
                       onTap: () => scope.nav.go(e.route),
-                      findings: e.library == null
-                          ? const []
-                          : scope.overview.findingsFor(e.library!),
                     ),
                   ),
               ],
@@ -68,7 +63,6 @@ class NavItem extends StatelessWidget {
     required this.label,
     required this.current,
     required this.onTap,
-    this.findings = const [],
   });
 
   final String icon;
@@ -76,16 +70,11 @@ class NavItem extends StatelessWidget {
   final bool current;
   final VoidCallback onTap;
 
-  /// What the last check found in this section's library. A badge counts them.
-  final List<Finding> findings;
-
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final severe = findings.any((f) => f.severity == 'error');
-    final things = findingsNote(findings.length);
     return Tappable(
-      label: findings.isEmpty ? label : '$label, $things',
+      label: label,
       selected: current,
       onTap: onTap,
       radius: BorderRadius.circular(8),
@@ -108,26 +97,6 @@ class NavItem extends StatelessWidget {
                 ),
               ),
             ),
-            if (findings.isNotEmpty)
-              Tooltip(
-                message: things,
-                child: Container(
-                  constraints: const BoxConstraints(minWidth: 20),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 1,
-                  ),
-                  decoration: BoxDecoration(
-                    color: severe ? t.badbg : t.warnbg,
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                  child: Text(
-                    '${findings.length}',
-                    textAlign: TextAlign.center,
-                    style: Type.sans(12, color: severe ? t.badfg : t.warnfg),
-                  ),
-                ),
-              ),
           ],
         ),
       ),

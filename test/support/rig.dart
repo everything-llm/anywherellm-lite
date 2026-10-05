@@ -1,30 +1,28 @@
-import 'package:everything/ui/state/inbox_controller.dart';
-import 'package:everything/ui/state/overview_controller.dart';
+import 'package:everything/core/connection.dart';
 import 'package:everything/ui/state/settings_controller.dart';
+import 'package:everything/ui/state/upload_controller.dart';
 
 import 'fake_api.dart';
 import 'fake_settings.dart';
 
-/// A [FakeApi] with the overview, inbox and settings controllers over it.
+/// A [FakeAnythingLlm] with the settings and upload controllers over it. [connection] is in use
+/// from the start, as if read from the keyring.
 class Rig {
-  Rig(this.api, {FakeAnythingLlm? llm, FakeSettingsStore? store})
+  Rig({FakeAnythingLlm? llm, FakeSettingsStore? store, Connection? connection})
     : llm = llm ?? FakeAnythingLlm(),
       store = store ?? FakeSettingsStore() {
-    overview = OverviewController(api, api.overviewValue);
-    inbox = InboxController(api, overview);
-    settings = SettingsController(this.llm, this.store);
+    final holder = ConnectionHolder(connection);
+    settings = SettingsController(this.llm, this.store, holder);
+    upload = UploadController(this.llm, holder);
   }
 
-  final FakeApi api;
   final FakeAnythingLlm llm;
   final FakeSettingsStore store;
-  late final OverviewController overview;
-  late final InboxController inbox;
   late final SettingsController settings;
+  late final UploadController upload;
 
   void dispose() {
     settings.dispose();
-    inbox.dispose();
-    overview.dispose();
+    upload.dispose();
   }
 }

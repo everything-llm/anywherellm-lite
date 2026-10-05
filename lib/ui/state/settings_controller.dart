@@ -8,13 +8,15 @@ enum ConnectionCheck { idle, testing, ok, failed }
 
 /// The AnythingLLM address and key: the one in use, testing a candidate, saving and removing.
 class SettingsController extends ChangeNotifier {
-  SettingsController(this._api, this._store);
+  /// Keeps the connection in use in [holder], where the client reads it.
+  SettingsController(this._api, this._store, this._holder);
 
   final AnythingLlmApi _api;
   final SettingsStore _store;
+  final ConnectionHolder _holder;
 
   /// The connection in use, or null before one is saved.
-  Connection? connection;
+  Connection? get connection => _holder.current;
 
   ConnectionCheck check = ConnectionCheck.idle;
 
@@ -30,7 +32,7 @@ class SettingsController extends ChangeNotifier {
   /// start.
   Future<void> load() async {
     await _keyring('Could not read the saved connection', () async {
-      connection = await _store.load();
+      _holder.current = await _store.load();
     });
     notifyListeners();
   }
@@ -58,7 +60,7 @@ class SettingsController extends ChangeNotifier {
   Future<void> save(String url, String key) async {
     final candidate = _parse(url, key);
     if (candidate == null) return;
-    connection = candidate;
+    _holder.current = candidate;
     check = ConnectionCheck.idle;
     await _keyring(
       'Could not save the connection',
@@ -70,7 +72,7 @@ class SettingsController extends ChangeNotifier {
 
   /// Forgets the connection and removes it from the keyring.
   Future<void> clear() async {
-    connection = null;
+    _holder.current = null;
     check = ConnectionCheck.idle;
     message = null;
     await _keyring(

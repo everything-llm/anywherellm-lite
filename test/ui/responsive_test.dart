@@ -1,7 +1,7 @@
 import 'dart:ui' show Size;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:everything/core/models.dart';
+import 'package:everything/core/server_models.dart';
 import 'package:everything/ui/sidebar.dart';
 import 'package:everything/ui/state/nav_controller.dart';
 
@@ -13,63 +13,43 @@ const sizes = [Size(1400, 900), Size(780, 700), Size(500, 700), Size(360, 480)];
 
 const longWord =
     'an-extremely-long-unbroken-name-that-has-no-place-to-wrap-and-must-not-overflow-anything';
-const longPath = 'folder-$longWord/file-$longWord.md';
 
-/// Data that stresses every layout: long unbroken words, many badges, long commands.
-FakeApi awkward() {
-  final meta = sampleMeta(
-    summary: 'A summary that keeps going. ' * 12,
-    tags: ['tag-$longWord', 'b', 'c', 'd', 'e', 'f', 'g', 'h'],
+/// Data that stresses every layout: long unbroken words and long descriptions.
+FakeAnythingLlm awkward() {
+  final doc = DocEntry(
+    folder: 'folder-$longWord',
+    name: 'file-$longWord.json',
+    title: 'title-$longWord',
+    description: 'A description that keeps going. ' * 12,
+    author: 'author-$longWord',
+    source: 'source-$longWord',
+    published: '10/5/2026, 11:48:20 AM',
+    words: 123456,
+    tokens: 234567,
   );
-  return FakeApi()
-    ..overviewValue = sampleOverview(
-      findings: [
-        Finding(
-          library: 'research',
-          path: longPath,
-          message: 'message $longWord',
-          severity: 'error',
-        ),
-      ],
-    )
-    ..researchValue = [ResearchEntry(path: longPath, meta: meta)]
-    ..researchDocs = {
-      longPath: ResearchDoc(
-        path: longPath,
-        text: 'text $longWord\n' * 40,
-        meta: meta,
-      ),
-    }
-    ..skillsValue = [
-      SkillMeta(
-        name: 'skill-$longWord',
-        description: 'description $longWord',
-        topic: 'topic-$longWord',
-        tags: ['t-$longWord', 'x'],
+  return FakeAnythingLlm()
+    ..workspacesValue = [
+      Workspace(
+        slug: 'slug-$longWord',
+        name: 'name-$longWord',
+        chatModel: 'model-$longWord',
+        threads: 3,
+        documents: [WorkspaceDoc(path: doc.path, title: doc.title)],
       ),
     ]
-    ..skillDocs = {
-      'skill-$longWord': SkillDoc(
-        name: 'skill-$longWord',
-        text: 'body $longWord',
-        meta: SkillMeta(
-          name: 'skill-$longWord',
-          description: 'description $longWord',
-          topic: 'topic-$longWord',
-          tags: ['t-$longWord'],
-        ),
-      ),
-    }
-    ..inboxValue = ['staged-$longWord.md', 'b.md', 'c.md', 'd.md'];
+    ..foldersValue = [
+      DocFolder(name: doc.folder, docs: [doc]),
+    ];
 }
 
 void main() {
+  final doc = awkward().foldersValue.first.docs.first;
   final routes = <String, AppRoute>{
-    'research list': const ResearchListRoute(),
-    'research doc': const ResearchDocRoute(longPath),
-    'skills list': const SkillsListRoute(),
-    'skill doc': const SkillDocRoute('skill-$longWord'),
-    'inbox': const InboxRoute(),
+    'workspaces': const WorkspacesRoute(),
+    'workspace': const WorkspaceRoute('slug-$longWord'),
+    'documents': const DocumentsRoute(),
+    'document': DocumentRoute(doc.path),
+    'upload': const UploadRoute(),
     'settings': const SettingsRoute(),
   };
 
@@ -78,26 +58,40 @@ void main() {
       testWidgets(
         '$name fits at ${size.width.toInt()}x${size.height.toInt()}',
         (tester) async {
-          await pumpApp(tester, api: awkward(), size: size, route: route);
+          await pumpApp(
+            tester,
+            llm: awkward(),
+            connection: sampleConnection,
+            size: size,
+            route: route,
+          );
           expect(tester.takeException(), isNull);
         },
       );
     }
+    testWidgets(
+      'the no-server page fits at ${size.width.toInt()}x${size.height.toInt()}',
+      (tester) async {
+        await pumpApp(tester, size: size);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   testWidgets('resizing through every layout keeps working', (tester) async {
     final h = await pumpApp(
       tester,
-      api: awkward(),
+      llm: awkward(),
+      connection: sampleConnection,
       size: sizes.first,
-      route: const ResearchListRoute(),
+      route: const DocumentsRoute(),
     );
     for (final size in [...sizes, ...sizes.reversed]) {
       tester.view.physicalSize = size;
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull, reason: 'at ${size.width}');
     }
-    expect(h.nav.route, const ResearchListRoute());
+    expect(h.nav.route, const DocumentsRoute());
     expect(find.byType(Sidebar), findsOneWidget);
   });
 }

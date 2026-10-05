@@ -2,28 +2,20 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
-import '../state/inbox_controller.dart';
+import '../../core/upload.dart';
 import '../tokens.dart';
 import '../type.dart';
 import 'dashed.dart';
 
 /// What the zone says it takes and how, for the eye and for a screen reader.
-const _hint = 'Drop .md files here, or click to browse';
+const _hint = 'Drop files here, or click to browse';
 
-const _markdown = XTypeGroup(
-  label: 'Markdown',
-  extensions: ['md'],
-  mimeTypes: ['text/markdown'],
-);
-
-/// A picked or dropped file, for [DropZone.onFiles]. Nothing is read until it is staged,
-/// and a folder or an unreadable file becomes a reason instead of an error.
+/// A picked or dropped file, for [DropZone.onFiles]. Nothing is read until it is sent, and a
+/// folder or an unreadable file becomes a reason instead of an error.
 UploadFile _upload(XFile file) {
   Future<T> reading<T>(Future<T> Function() read) async {
     if (file is DropItemDirectory) {
-      throw const UnreadableFile(
-        'it is a folder; stage the .md files inside it',
-      );
+      throw const UnreadableFile('it is a folder; upload the files inside it');
     }
     try {
       return await read();
@@ -32,18 +24,23 @@ UploadFile _upload(XFile file) {
     }
   }
 
-  return UploadFile(
-    name: file.name,
-    length: () => reading(file.length),
-    read: () => reading(file.readAsBytes),
-  );
+  return UploadFile(name: file.name, read: () => reading(file.readAsBytes));
 }
 
-/// Drop `.md` files here, or click to browse.
+/// Drop files here, or click to browse.
 class DropZone extends StatefulWidget {
-  const DropZone({super.key, required this.onFiles, required this.onProblem});
+  const DropZone({
+    super.key,
+    required this.onFiles,
+    required this.onProblem,
+    this.extensions,
+  });
 
-  /// Stages the files.
+  /// The extensions the picker offers, with the dot, or null for any file. A drop takes any
+  /// file; [onFiles] decides.
+  final Set<String>? extensions;
+
+  /// Sends the files.
   final Future<void> Function(List<UploadFile> files) onFiles;
 
   /// Reports a failure that is not about one file.
@@ -61,7 +58,16 @@ class _DropZoneState extends State<DropZone> {
   Future<void> _browse() async {
     final List<XFile> picked;
     try {
-      picked = await openFiles(acceptedTypeGroups: const [_markdown]);
+      final extensions = widget.extensions;
+      picked = await openFiles(
+        acceptedTypeGroups: [
+          if (extensions != null)
+            XTypeGroup(
+              label: 'Files the server reads',
+              extensions: [for (final e in extensions) e.replaceFirst('.', '')],
+            ),
+        ],
+      );
     } catch (error) {
       widget.onProblem('Could not open the file picker', '$error');
       return;
@@ -94,7 +100,7 @@ class _DropZoneState extends State<DropZone> {
         },
         child: Semantics(
           button: true,
-          label: 'Stage a file. $_hint',
+          label: 'Upload a file. $_hint',
           excludeSemantics: true,
           child: GestureDetector(
             onTap: _browse,
@@ -110,7 +116,7 @@ class _DropZoneState extends State<DropZone> {
                 child: Column(
                   children: [
                     Text(
-                      'Stage a file',
+                      'Upload a file',
                       style: Type.sans(
                         14,
                         weight: FontWeight.w500,

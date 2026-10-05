@@ -1,6 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:everything/core/models.dart';
+import 'package:everything/core/server_models.dart';
 import 'package:everything/ui/sidebar.dart';
 import 'package:everything/ui/state/nav_controller.dart';
 import 'package:everything/ui/widgets/tappable.dart';
@@ -22,76 +22,32 @@ void main() {
     testWidgets('shows the sidebar beside the page', (tester) async {
       await pumpApp(tester);
       expect(find.byType(Sidebar), findsOneWidget);
-      expect(find.text('Research'), findsWidgets);
-      expect(find.text('Skills'), findsWidgets);
-      expect(find.text('Inbox'), findsWidgets);
+      expect(find.text('Workspaces'), findsWidgets);
+      expect(find.text('Documents'), findsWidgets);
+      expect(find.text('Upload'), findsWidgets);
       expect(find.text('Settings'), findsWidgets);
       expect(find.byTooltip('Menu'), findsNothing);
     });
 
-    testWidgets('opens on the overview', (tester) async {
+    testWidgets('opens on the workspaces', (tester) async {
       final h = await pumpApp(tester);
-      expect(h.nav.route, const OverviewRoute());
+      expect(h.nav.route, const WorkspacesRoute());
     });
 
     testWidgets('a sidebar entry opens its page', (tester) async {
-      final h = await pumpApp(tester);
-      await tester.tap(inSidebar('Skills'));
+      final h = await pumpApp(tester, connection: sampleConnection);
+      await tester.tap(inSidebar('Documents'));
       await tester.pumpAndSettle();
-      expect(h.nav.route, const SkillsListRoute());
-      await tester.tap(inSidebar('Inbox'));
+      expect(h.nav.route, const DocumentsRoute());
+      await tester.tap(inSidebar('Upload'));
       await tester.pumpAndSettle();
-      expect(h.nav.route, const InboxRoute());
-      await tester.tap(inSidebar('Research'));
+      expect(h.nav.route, const UploadRoute());
+      await tester.tap(inSidebar('Settings'));
       await tester.pumpAndSettle();
-      expect(h.nav.route, const ResearchListRoute());
-      await tester.tap(inSidebar('Overview'));
+      expect(h.nav.route, const SettingsRoute());
+      await tester.tap(inSidebar('Workspaces'));
       await tester.pumpAndSettle();
-      expect(h.nav.route, const OverviewRoute());
-    });
-
-    testWidgets('a library with findings shows a badge that counts them', (
-      tester,
-    ) async {
-      final api = FakeApi()
-        ..overviewValue = sampleOverview(
-          findings: const [
-            Finding(
-              library: 'research',
-              path: 'a.md',
-              message: 'm',
-              severity: 'error',
-            ),
-            Finding(
-              library: 'research',
-              path: 'b.md',
-              message: 'm',
-              severity: 'warning',
-            ),
-            Finding(
-              library: 'skills',
-              path: 'c',
-              message: 'm',
-              severity: 'warning',
-            ),
-          ],
-        );
-      await pumpApp(tester, api: api);
-      final research = find.ancestor(
-        of: inSidebar('Research'),
-        matching: find.byType(NavItem),
-      );
-      expect(
-        find.descendant(of: research, matching: find.text('2')),
-        findsOneWidget,
-      );
-      expect(find.byTooltip('2 things to look at'), findsOneWidget);
-      expect(find.byTooltip('1 thing to look at'), findsOneWidget);
-    });
-
-    testWidgets('a clean library has no badge', (tester) async {
-      await pumpApp(tester);
-      expect(find.textContaining('to look at'), findsNothing);
+      expect(h.nav.route, const WorkspacesRoute());
     });
   });
 
@@ -133,9 +89,9 @@ void main() {
       final h = await pumpApp(tester, size: size);
       await tester.tap(find.byTooltip('Menu'));
       await tester.pumpAndSettle();
-      await tester.tap(inSidebar('Inbox'));
+      await tester.tap(inSidebar('Upload'));
       await tester.pumpAndSettle();
-      expect(h.nav.route, const InboxRoute());
+      expect(h.nav.route, const UploadRoute());
       expect(h.shell.sideOpen, isFalse);
     });
   });
@@ -143,27 +99,21 @@ void main() {
   group('a phone window', () {
     const size = Size(500, 800);
 
-    testWidgets('has a tab bar with five tabs and no top bar menu', (
+    testWidgets('has a tab bar with four tabs and no top bar menu', (
       tester,
     ) async {
       await pumpApp(tester, size: size);
       expect(find.byTooltip('Menu'), findsNothing);
-      for (final label in [
-        'Overview',
-        'Research',
-        'Skills',
-        'Inbox',
-        'Settings',
-      ]) {
+      for (final label in ['Workspaces', 'Documents', 'Upload', 'Settings']) {
         expect(tab(label), findsWidgets, reason: label);
       }
     });
 
     testWidgets('a tab opens its page', (tester) async {
       final h = await pumpApp(tester, size: size);
-      await tester.tap(tab('Inbox'));
+      await tester.tap(tab('Upload'));
       await tester.pumpAndSettle();
-      expect(h.nav.route, const InboxRoute());
+      expect(h.nav.route, const UploadRoute());
     });
 
     testWidgets('the Settings tab opens Settings', (tester) async {
@@ -176,17 +126,18 @@ void main() {
 
   group('the Back button', () {
     testWidgets('steps from a document up to its list', (tester) async {
-      final api = FakeApi()
-        ..researchDocs = {'a.md': const ResearchDoc(path: 'a.md', text: 'RAW')};
+      final llm = FakeAnythingLlm()
+        ..workspacesValue = [const Workspace(slug: 'a', name: 'A')];
       final h = await pumpApp(
         tester,
-        api: api,
+        llm: llm,
+        connection: sampleConnection,
         size: const Size(400, 800),
-        route: const ResearchDocRoute('a.md'),
+        route: const WorkspaceRoute('a'),
       );
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(h.nav.route, const ResearchListRoute());
+      expect(h.nav.route, const WorkspacesRoute());
     });
 
     testWidgets('closes an open drawer before it does anything else', (
@@ -199,7 +150,7 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(h.shell.sideOpen, isFalse);
-      expect(h.nav.route, const OverviewRoute());
+      expect(h.nav.route, const WorkspacesRoute());
     });
   });
 

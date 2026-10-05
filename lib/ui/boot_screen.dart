@@ -7,7 +7,7 @@ import 'widgets/brand.dart';
 import 'widgets/buttons.dart';
 import 'widgets/centered_screen.dart';
 
-/// Shown while the first read of the libraries is under way.
+/// Shown while the saved connection is read from the keyring.
 class BootScreen extends StatelessWidget {
   const BootScreen({super.key});
 
@@ -24,7 +24,7 @@ class BootScreen extends StatelessWidget {
             Semantics(
               liveRegion: true,
               child: Text(
-                'Reading the libraries...',
+                'Reading the saved connection...',
                 style: Type.sans(14.5, color: t.muted),
               ),
             ),
@@ -35,7 +35,7 @@ class BootScreen extends StatelessWidget {
   }
 }
 
-/// Shown when the libraries could not be read.
+/// Shown when the app could not start.
 class BootError extends StatelessWidget {
   const BootError({super.key, required this.message, required this.onRetry});
 
@@ -45,7 +45,7 @@ class BootError extends StatelessWidget {
   @override
   Widget build(BuildContext context) => CenteredScreen(
     children: [
-      AlertBox(AlertKind.bad, 'The libraries could not be read', text: message),
+      AlertBox(AlertKind.bad, 'The app could not start', text: message),
       const SizedBox(height: 16),
       NilsButton('Try again', primary: true, onPressed: onRetry),
     ],

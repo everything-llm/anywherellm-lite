@@ -1,3 +1,4 @@
+import 'package:everything/core/connection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:everything/ui/app.dart';
@@ -12,7 +13,7 @@ import 'rig.dart';
 
 /// The controllers a test can read and drive, and the app built on them.
 class Harness extends Rig {
-  Harness(super.api, {AppRoute? route, super.llm, super.store})
+  Harness({AppRoute? route, super.llm, super.store, super.connection})
     : nav = NavController(route),
       shell = ShellController();
 
@@ -21,23 +22,23 @@ class Harness extends Rig {
 
   Widget get app => NilsApp(
     home: AppScope(
-      api: api,
+      llm: llm,
       nav: nav,
       shell: shell,
-      overview: overview,
-      inbox: inbox,
+      upload: upload,
       settings: settings,
       child: const AppShell(),
     ),
   );
 }
 
-/// Sizes the test window, builds the app on [api] and lets the first loads finish.
+/// Sizes the test window, builds the app on [llm] and lets the first loads finish. With no
+/// [connection], no server is set up.
 Future<Harness> pumpApp(
   WidgetTester tester, {
-  FakeApi? api,
   FakeAnythingLlm? llm,
   FakeSettingsStore? store,
+  Connection? connection,
   Size size = const Size(1200, 800),
   AppRoute? route,
 }) async {
@@ -45,10 +46,10 @@ Future<Harness> pumpApp(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final harness = Harness(
-    api ?? FakeApi(),
     route: route,
     llm: llm,
     store: store,
+    connection: connection,
   );
   await tester.pumpWidget(harness.app);
   await tester.pumpAndSettle();

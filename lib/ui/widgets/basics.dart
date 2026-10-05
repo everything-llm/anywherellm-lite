@@ -94,29 +94,6 @@ class KvCard extends StatelessWidget {
   );
 }
 
-/// The alert a document page shows when its front matter could not be read. [library] is `research`
-/// or `skills`.
-class FrontMatterAlert extends StatelessWidget {
-  const FrontMatterAlert(this.library, {super.key});
-
-  final String library;
-
-  @override
-  Widget build(BuildContext context) => AlertBox(
-    AlertKind.bad,
-    'The front matter could not be read',
-    text: frontMatterHelp(library),
-  );
-}
-
-/// The "Tags" row of a document card: each tag as a badge, or "none".
-Kv tagsKv(List<String> tags) => Kv(
-  'Tags',
-  child: tags.isEmpty
-      ? const Text('none')
-      : BadgeRow([for (final tag in tags) NilsBadge(BadgeSpec(tag))]),
-);
-
 enum KvRule { bottom, top, none }
 
 /// A label and its value on one line, wrapping when they do not fit.

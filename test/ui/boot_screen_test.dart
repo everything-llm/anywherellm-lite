@@ -11,7 +11,7 @@ void main() {
         home: BootError(message: 'nope', onRetry: () => retried = true),
       ),
     );
-    expect(find.text('The libraries could not be read'), findsOneWidget);
+    expect(find.text('The app could not start'), findsOneWidget);
     expect(find.text('nope'), findsOneWidget);
     await tester.tap(find.text('Try again'));
     expect(retried, isTrue);
