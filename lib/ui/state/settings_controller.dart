@@ -55,6 +55,12 @@ class SettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Saves [url] and [key] only once the server accepts them.
+  Future<void> connect(String url, String key) async {
+    await test(url, key);
+    if (check == ConnectionCheck.ok) await save(url, key);
+  }
+
   /// Uses [url] and [key] from now on and keeps them in the keyring. If the keyring refuses,
   /// they are still used for this run and the refusal is shown.
   Future<void> save(String url, String key) async {
@@ -66,7 +72,7 @@ class SettingsController extends ChangeNotifier {
       'Could not save the connection',
       () => _store.save(candidate),
     );
-    message = keyringProblem == null ? 'Saved.' : null;
+    message = keyringProblem == null ? 'The key was saved.' : null;
     notifyListeners();
   }
 
@@ -74,11 +80,11 @@ class SettingsController extends ChangeNotifier {
   Future<void> clear() async {
     _holder.current = null;
     check = ConnectionCheck.idle;
-    message = null;
     await _keyring(
       'Could not remove the saved connection',
       () => _store.clear(),
     );
+    message = keyringProblem == null ? 'The saved key was deleted.' : null;
     notifyListeners();
   }
 

@@ -80,7 +80,7 @@ void main() {
       await settings.save('https://h:3001/', 'K1');
       expect(settings.connection, _saved);
       expect(store.saved, _saved);
-      expect(settings.message, 'Saved.');
+      expect(settings.message, 'The key was saved.');
     });
 
     test('a keyring that refuses still leaves the connection in use', () async {
@@ -104,7 +104,7 @@ void main() {
       await settings.clear();
       expect(settings.configured, isFalse);
       expect(store.saved, isNull);
-      expect(settings.message, isNull);
+      expect(settings.message, 'The saved key was deleted.');
     });
 
     test('a keyring that refuses is a notice', () async {

@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:everything/core/chat.dart';
 import 'package:everything/core/connection.dart';
 import 'package:everything/core/ports.dart';
 import 'package:everything/core/server_models.dart';
@@ -5,21 +8,50 @@ import 'package:everything/core/server_models.dart';
 /// A connection for tests that need a server set up.
 const sampleConnection = Connection(baseUrl: 'https://h:3001', apiKey: 'K1');
 
-/// An [AnythingLlmApi] for widget tests. Set the fields to change what it answers, and put an
-/// error in [errors] under a method's name to make it fail. Every call but [verify] is recorded
-/// in [calls] as `name` or `name:arg`.
+/// A workspace on the fake server: its chats and the documents embedded in it.
+class FakeWorkspace {
+  FakeWorkspace(
+    this.slug,
+    this.name, {
+    List<Thread>? threads,
+    List<WorkspaceDoc>? docs,
+  }) : threads = threads ?? [],
+       docs = docs ?? [];
+
+  final String slug;
+  final String name;
+  final List<Thread> threads;
+  final List<WorkspaceDoc> docs;
+}
+
+/// An [AnythingLlmApi] for widget tests that keeps its workspaces in memory. Put an error in
+/// [errors] under a method's name to make it fail. Every call but [verify] is recorded in
+/// [calls] as `name` or `name:arg`.
+///
+/// [streamChat] answers with [answer] and [cited], or, when [hold] is set, with whatever the
+/// test adds to the controller [chat] makes.
 class FakeAnythingLlm implements AnythingLlmApi {
-  /// Every connection [verify] was given, in order.
   final List<Connection> verified = [];
   Object? verifyError;
 
-  /// Each workspace's full answer, documents included. [workspaces] answers without them.
-  List<Workspace> workspacesValue = [];
-  List<DocFolder> foldersValue = [];
+  List<FakeWorkspace> spaces = [];
+  final Map<String, List<ChatMessage>> histories = {};
+
+  /// Every document the server holds, by path, embedded or not.
+  final Map<String, WorkspaceDoc> library = {};
   Set<String> acceptedValue = {'.md', '.txt', '.pdf'};
+
+  String answer = 'Here is what your sources say.';
+  List<String> cited = const [];
+  bool hold = false;
+  StreamController<ChatEvent>? chat;
+
+  /// The mode of every message asked, in order.
+  final List<ChatMode> modes = [];
 
   final List<String> calls = [];
   final Map<String, Object> errors = {};
+  var _made = 0;
 
   Future<T> _run<T>(String name, T Function() value, [String? arg]) async {
     calls.add(arg == null ? name : '$name:$arg');
@@ -27,6 +59,12 @@ class FakeAnythingLlm implements AnythingLlmApi {
     if (error != null) throw error;
     return value();
   }
+
+  FakeWorkspace _space(String slug) => spaces.firstWhere(
+    (w) => w.slug == slug,
+    orElse: () =>
+        throw ApiException('There is no workspace $slug.', status: 404),
+  );
 
   @override
   Future<void> verify(Connection connection) async {
@@ -38,87 +76,136 @@ class FakeAnythingLlm implements AnythingLlmApi {
   Future<List<Workspace>> workspaces() => _run(
     'workspaces',
     () => [
-      for (final w in workspacesValue)
-        Workspace(
-          slug: w.slug,
-          name: w.name,
-          chatModel: w.chatModel,
-          threads: w.threads,
-        ),
+      for (final w in spaces)
+        Workspace(slug: w.slug, name: w.name, threads: [...w.threads]),
     ],
   );
 
   @override
-  Future<Workspace> workspace(String slug) => _run(
-    'workspace',
-    () => workspacesValue.firstWhere(
-      (w) => w.slug == slug,
-      orElse: () =>
-          throw ApiException('There is no workspace $slug.', status: 404),
-    ),
-    slug,
+  Future<Workspace> workspace(String slug) => _run('workspace', () {
+    final w = _space(slug);
+    return Workspace(slug: w.slug, name: w.name, documents: [...w.docs]);
+  }, slug);
+
+  @override
+  Future<Workspace> createWorkspace(String name) => _run('createWorkspace', () {
+    final made = FakeWorkspace(name.toLowerCase().replaceAll(' ', '-'), name);
+    spaces.add(made);
+    return Workspace(slug: made.slug, name: made.name);
+  }, name);
+
+  @override
+  Future<Thread> createThread(String slug) => _run('createThread', () {
+    final made = Thread(slug: 'th-${++_made}', name: newChatName);
+    _space(slug).threads.add(made);
+    return made;
+  }, slug);
+
+  @override
+  Future<void> renameThread(String slug, String thread, String name) =>
+      _run('renameThread', () {
+        final list = _space(slug).threads;
+        final at = list.indexWhere((t) => t.slug == thread);
+        list[at] = Thread(slug: thread, name: name);
+      }, '$thread:$name');
+
+  @override
+  Future<void> deleteThread(String slug, String thread) => _run(
+    'deleteThread',
+    () => _space(slug).threads.removeWhere((t) => t.slug == thread),
+    thread,
   );
 
   @override
-  Future<List<DocFolder>> documents() => _run('documents', () => foldersValue);
+  Future<List<ChatMessage>> history(String slug, String thread) =>
+      _run('history', () => histories[thread] ?? const [], thread);
+
+  @override
+  Stream<ChatEvent> streamChat(
+    String slug,
+    String thread,
+    String message, {
+    required ChatMode mode,
+  }) {
+    calls.add('streamChat:$thread:$message');
+    modes.add(mode);
+    final error = errors['streamChat'];
+    if (error != null) return Stream.error(error);
+    if (hold) {
+      chat = StreamController<ChatEvent>();
+      return chat!.stream;
+    }
+    return Stream.fromIterable([TextChunk(answer), ChatDone(cited)]);
+  }
+
+  @override
+  Future<void> updateEmbeddings(
+    String slug, {
+    List<String> adds = const [],
+    List<String> deletes = const [],
+  }) => _run('updateEmbeddings', () {
+    final docs = _space(slug).docs;
+    docs.removeWhere((d) => deletes.contains(d.path));
+    for (final path in adds) {
+      if (!docs.any((d) => d.path == path)) docs.add(library[path]!);
+    }
+  }, '+${adds.join(',')}-${deletes.join(',')}');
 
   @override
   Future<Set<String>> acceptedExtensions() =>
       _run('acceptedExtensions', () => acceptedValue);
 
-  /// Files the server reads into [folder], as a document titled by [name].
+  /// Files the server reads in as `custom-documents/<name>.json`.
   @override
-  Future<List<DocEntry>> upload(
-    String name,
-    List<int> bytes, {
-    String? folder,
-  }) => _run('upload', () {
-    final doc = DocEntry(
-      folder: folder ?? 'custom-documents',
-      name: '$name-1.json',
-      title: name,
-    );
-    foldersValue = [
-      for (final f in foldersValue)
-        f.name == doc.folder
-            ? DocFolder(name: f.name, docs: [...f.docs, doc])
-            : f,
-      if (!foldersValue.any((f) => f.name == doc.folder))
-        DocFolder(name: doc.folder, docs: [doc]),
-    ];
-    return [doc];
-  }, '$name:${folder ?? ''}');
+  Future<List<DocEntry>> upload(String name, List<int> bytes) =>
+      _run('upload', () {
+        final doc = DocEntry(folder: 'custom-documents', name: '$name.json');
+        library[doc.path] = WorkspaceDoc(
+          path: doc.path,
+          title: name,
+          words: bytes.length,
+        );
+        return [doc];
+      }, name);
 }
 
-DocEntry sampleDoc(
-  String folder,
-  String title, {
-  String? description,
-  int? words = 120,
-}) => DocEntry(
-  folder: folder,
-  name: '$title.md-0001.json',
-  title: title,
-  description: description ?? 'About $title',
-  source: 'a text file uploaded by the user.',
-  published: '10/5/2026, 11:48:20 AM',
-  words: words,
-);
+/// A document in the server's library, ready to embed or put in a workspace.
+WorkspaceDoc libraryDoc(FakeAnythingLlm llm, String title, {int? words = 120}) {
+  final doc = WorkspaceDoc(
+    path: 'custom-documents/$title.json',
+    title: title,
+    words: words,
+  );
+  llm.library[doc.path] = doc;
+  return doc;
+}
 
-/// The document a [documentServer] holds in one of its two workspaces.
-final heldDoc = sampleDoc('claude', 'agents');
-
-/// A server with [heldDoc] in its `claude` folder, held by the workspace `research` and not by
-/// `other`.
-FakeAnythingLlm documentServer() => FakeAnythingLlm()
-  ..foldersValue = [
-    DocFolder(name: 'claude', docs: [heldDoc]),
-  ]
-  ..workspacesValue = [
-    Workspace(
-      slug: 'research',
-      name: 'Research',
-      documents: [WorkspaceDoc(path: heldDoc.path, title: heldDoc.title)],
+/// A server with the mockup's workspaces: Q3 planning with two chats and two files, and an empty
+/// Household.
+FakeAnythingLlm planningServer() {
+  final llm = FakeAnythingLlm();
+  llm.spaces = [
+    FakeWorkspace(
+      'q3',
+      'Q3 planning',
+      threads: [
+        const Thread(slug: 'priorities', name: 'Quarter priorities'),
+        const Thread(slug: 'budget', name: 'Budget questions'),
+      ],
+      docs: [
+        libraryDoc(llm, 'Q3 roadmap.pdf'),
+        libraryDoc(llm, 'Customer interviews.docx'),
+      ],
     ),
-    const Workspace(slug: 'other', name: 'Other'),
+    FakeWorkspace('household', 'Household'),
   ];
+  llm.histories['budget'] = const [
+    ChatMessage(role: Role.user, text: 'What is the budget?'),
+    ChatMessage(
+      role: Role.assistant,
+      text: 'About 40k.',
+      citations: ['Q3 roadmap.pdf'],
+    ),
+  ];
+  return llm;
+}
