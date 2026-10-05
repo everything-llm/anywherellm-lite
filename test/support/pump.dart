@@ -29,6 +29,7 @@ class Harness extends Rig {
       prefs: prefs,
       chat: chat,
       sources: sources,
+      files: files,
       child: const AppShell(),
     ),
   );

@@ -16,6 +16,10 @@ const _small = {
   'doc': 'M4 1.8h5l3.2 3.2v9.2H4z M9 1.8V5h3.2',
   'send': 'M8 13V3M3.5 7.5 8 3l4.5 4.5',
   'hamburger': 'M2 4h12M2 8h12M2 12h12',
+  'folder': 'M2 4h4l1.5 1.5H14v7.5H2z',
+  'chevron': 'M6 4l4 4-4 4',
+  'lock': 'M4.5 7.5h7v6h-7z M6 7.5V5.5a2 2 0 0 1 4 0v2',
+  'refresh': 'M13 8a5 5 0 1 1-1.5-3.5 M13 2.5v3h-3',
 };
 
 final _parsed = <String, Path>{};

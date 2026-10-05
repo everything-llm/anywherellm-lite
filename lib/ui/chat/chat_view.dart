@@ -5,8 +5,8 @@ import '../icons.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
-import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
+import '../widgets/pane_header.dart';
 import '../widgets/tappable.dart';
 import 'composer.dart';
 import 'message_list.dart';
@@ -129,79 +129,54 @@ class _Header extends StatelessWidget {
       builder: (context, _) {
         final chat = scope.chat;
         final workspace = chat.active;
-        final title = Type.serif(26, color: t.ink, height: 1.2);
-        return Container(
-          height: 60,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: BoxDecoration(
-            border: Border(bottom: BorderSide(color: t.line2)),
-          ),
-          // Labels give way to icons when the header itself is narrow, whatever the window.
-          child: LayoutBuilder(
-            builder: (context, box) {
-              final compact = box.maxWidth < 560;
-              return Row(
-                children: [
-                  if (showMenu) ...[
-                    IconBtn(
-                      'hamburger',
-                      tooltip: 'Workspaces',
-                      size: IconSize.small,
-                      onPressed: scope.shell.toggleSide,
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  Expanded(
-                    child: Semantics(
-                      header: true,
-                      child: Text.rich(
-                        TextSpan(
-                          style: title,
-                          children: workspace == null
-                              ? const [TextSpan(text: 'Nilson')]
-                              : [
-                                  TextSpan(
-                                    text: workspace.name,
-                                    style: title.copyWith(color: t.muted),
-                                  ),
-                                  TextSpan(
-                                    text: ' / ',
-                                    style: title.copyWith(color: t.fade),
-                                  ),
-                                  TextSpan(text: chat.title),
-                                ],
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+        final title = PaneHeader.titleStyle(context);
+        return PaneHeader(
+          showMenu: showMenu,
+          onMenu: scope.shell.toggleSide,
+          title: Text.rich(
+            TextSpan(
+              style: title,
+              children: workspace == null
+                  ? const [TextSpan(text: 'Nilson')]
+                  : [
+                      TextSpan(
+                        text: workspace.name,
+                        style: title.copyWith(color: t.muted),
                       ),
+                      TextSpan(
+                        text: ' / ',
+                        style: title.copyWith(color: t.fade),
+                      ),
+                      TextSpan(text: chat.title),
+                    ],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          actions: workspace == null
+              ? null
+              : (compact) => [
+                  const SizedBox(width: 12),
+                  _HeaderButton(
+                    label: 'New chat',
+                    icon: 'plus',
+                    compact: compact,
+                    onTap: chat.newChat,
+                  ),
+                  const SizedBox(width: 8),
+                  _HeaderButton(
+                    label: 'Sources',
+                    icon: 'doc',
+                    compact: compact,
+                    pressed: scope.shell.sourcesOpen,
+                    onTap: scope.shell.toggleSources,
+                    trailing: NilsBadge(
+                      '${scope.sources.onCount}',
+                      kind: BadgeKind.accent,
+                      pill: true,
                     ),
                   ),
-                  if (workspace != null) ...[
-                    const SizedBox(width: 12),
-                    _HeaderButton(
-                      label: 'New chat',
-                      icon: 'plus',
-                      compact: compact,
-                      onTap: chat.newChat,
-                    ),
-                    const SizedBox(width: 8),
-                    _HeaderButton(
-                      label: 'Sources',
-                      icon: 'doc',
-                      compact: compact,
-                      pressed: scope.shell.sourcesOpen,
-                      onTap: scope.shell.toggleSources,
-                      trailing: NilsBadge(
-                        '${scope.sources.onCount}',
-                        kind: BadgeKind.accent,
-                        pill: true,
-                      ),
-                    ),
-                  ],
                 ],
-              );
-            },
-          ),
         );
       },
     );

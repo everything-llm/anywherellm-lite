@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../core/ports.dart';
+import '../../core/server_models.dart';
 import '../../core/sources.dart';
 import '../../core/upload.dart';
 import 'chat_controller.dart';
@@ -86,8 +87,7 @@ class SourcesController extends ChangeNotifier {
     try {
       final workspace = await _api.workspace(slug);
       if (slug != _slug) return;
-      files = mergeSources(workspace.documents, _prefs.prefs.offIn(slug));
-      _chat.setDocCount(slug, workspace.documents.length);
+      _apply(workspace);
     } on ApiException catch (error) {
       if (slug != _slug) return;
       problems = [
@@ -99,6 +99,21 @@ class SourcesController extends ChangeNotifier {
         notifyListeners();
       }
     }
+  }
+
+  /// Shows [workspace], already read by someone else, when it is the active one.
+  void show(Workspace workspace) {
+    if (workspace.slug != _slug) return;
+    _apply(workspace);
+    notifyListeners();
+  }
+
+  void _apply(Workspace workspace) {
+    files = mergeSources(
+      workspace.documents,
+      _prefs.prefs.offIn(workspace.slug),
+    );
+    _chat.setDocCount(workspace.slug, workspace.documents.length);
   }
 
   /// Switches [file] on, embedding it in the workspace, or off, taking it out.
@@ -117,8 +132,6 @@ class SourcesController extends ChangeNotifier {
   Future<void> upload(List<UploadFile> picked) async {
     final slug = _slug;
     if (slug == null || picked.isEmpty) return;
-    final refused = <Notice>[];
-    final made = <String>[];
     var accepted = _accepted;
     try {
       accepted ??= await _api.acceptedExtensions();
@@ -126,21 +139,21 @@ class SourcesController extends ChangeNotifier {
     } on ApiException {
       // The server decides each file then.
     }
-    for (final file in picked) {
-      if (slug == _slug) {
-        sending = file.name;
+    final sent = await sendEach(
+      _api,
+      picked,
+      accepted: accepted,
+      onSending: (name) {
+        if (slug != _slug) return;
+        sending = name;
         notifyListeners();
-      }
-      try {
-        final wrongType = extensionProblem(file.name, accepted);
-        if (wrongType != null) throw ApiException(wrongType);
-        final docs = await _api.upload(file.name, await file.read());
-        made.addAll([for (final d in docs) d.path]);
-      } on Exception catch (error) {
-        if (error is! ApiException && error is! UnreadableFile) rethrow;
-        refused.add(Notice('Could not add ${file.name}', '$error'));
-      }
-    }
+      },
+    );
+    final refused = [
+      for (final (name, why) in sent.refused)
+        Notice('Could not add $name', why),
+    ];
+    final made = [for (final d in sent.made) d.path];
     if (made.isNotEmpty) {
       try {
         await _api.updateEmbeddings(slug, adds: made);

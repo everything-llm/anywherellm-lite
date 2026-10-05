@@ -25,6 +25,12 @@ class PrefsController extends ChangeNotifier {
   Future<void> setOff(String slug, List<OffDoc> docs) =>
       _change(prefs.withOff(slug, docs));
 
+  /// Forgets the document at [path] wherever it was switched off, as when it is deleted.
+  Future<void> forgetDoc(String path) async {
+    final next = prefs.withoutDoc(path);
+    if (next.encode() != prefs.encode()) await _change(next);
+  }
+
   Future<void> _change(Prefs next) async {
     prefs = next;
     notifyListeners();

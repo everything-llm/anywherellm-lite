@@ -3,10 +3,12 @@ import 'package:flutter/services.dart';
 
 import 'app_scope.dart';
 import 'chat/chat_view.dart';
+import 'files/files_view.dart';
 import 'layout.dart';
 import 'settings/settings_dialog.dart';
 import 'sidebar.dart';
 import 'sources/sources_panel.dart';
+import 'state/shell_controller.dart';
 import 'tokens.dart';
 import 'widgets/rise.dart';
 
@@ -45,6 +47,7 @@ class AppShell extends StatelessWidget {
           listenable: shell,
           builder: (context, _) {
             final sideDrawer = screen.sidebarDrawer && shell.sideOpen;
+            final files = shell.pane == Pane.files;
             final sourcesDrawer = !sourcesInline && shell.sourcesOpen;
             return PopScope(
               canPop: !shell.settingsOpen && !shell.sideOpen && !sourcesDrawer,
@@ -68,7 +71,27 @@ class AppShell extends StatelessWidget {
                           children: [
                             if (screen.sidebarInline) const Sidebar(),
                             Expanded(
-                              child: ChatView(showMenu: screen.sidebarDrawer),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  // The chat stays built while Files is on screen, so a draft
+                                  // and a running answer survive the switch.
+                                  Offstage(
+                                    offstage: files,
+                                    child: TickerMode(
+                                      enabled: !files,
+                                      child: ExcludeFocus(
+                                        excluding: files,
+                                        child: ChatView(
+                                          showMenu: screen.sidebarDrawer,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (files)
+                                    FilesView(showMenu: screen.sidebarDrawer),
+                                ],
+                              ),
                             ),
                             if (sourcesInline)
                               AnimatedContainer(

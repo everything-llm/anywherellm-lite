@@ -153,9 +153,15 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   }
 
   @override
-  Future<List<DocEntry>> upload(String name, List<int> bytes) async {
+  Future<List<DocEntry>> upload(
+    String name,
+    List<int> bytes, {
+    String? folder,
+  }) async {
     final connection = _current;
-    const path = '/api/v1/document/upload';
+    final path = folder == null
+        ? '/api/v1/document/upload'
+        : '/api/v1/document/upload/${Uri.encodeComponent(folder)}';
     final body = await _call(connection, uploadTimeout, () async {
       final request =
           http.MultipartRequest('POST', Uri.parse('${connection.baseUrl}$path'))
@@ -164,14 +170,77 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
               http.MultipartFile.fromBytes('file', bytes, filename: name),
             );
       return http.Response.fromStream(await _client.send(request));
-    });
-    if (body is Map && body['success'] == false) {
-      throw ApiException(_said(body) ?? 'The server could not read $name in.');
-    }
+    }, refused: 'The server could not read $name in.');
     return [
       for (final json in jsonObjects(_field(body, 'documents')))
         DocEntry.fromJson(json),
     ];
+  }
+
+  /// The server answers with the workspace it wrote, or a `message` saying why it did not.
+  @override
+  Future<void> updateWorkspace(String slug, Map<String, Object?> fields) async {
+    final body = await _send('POST', '${_workspace(slug)}/update', fields);
+    if (_field(body, 'workspace') is! Map) {
+      throw ApiException(_said(body) ?? 'The server did not save $slug.');
+    }
+  }
+
+  @override
+  Future<void> pinDocument(String slug, String path, {required bool pinned}) =>
+      _send('POST', '${_workspace(slug)}/update-pin', {
+        'docPath': path,
+        'pinStatus': pinned,
+      });
+
+  /// The server answers with its `documents` folder, whose items are the library's folders.
+  @override
+  Future<List<LibraryFolder>> libraryFolders() async => libraryOf(
+    _field(await _get(_current, '/api/v1/documents'), 'localFiles'),
+  );
+
+  /// The server finds a document by its file name in any folder.
+  @override
+  Future<DocBody> document(String path) async {
+    final name = docName(path);
+    final json = _field(
+      await _get(_current, '/api/v1/document/${Uri.encodeComponent(name)}'),
+      'document',
+    );
+    if (json is! Map<String, dynamic>) {
+      throw ApiException('There is no document $name.', status: 404);
+    }
+    return DocBody.fromJson(json);
+  }
+
+  @override
+  Future<void> createFolder(String name) => _send(
+    'POST',
+    '/api/v1/document/create-folder',
+    {'name': name},
+    refused: 'The server did not make the folder $name.',
+  );
+
+  @override
+  Future<void> moveDocuments(List<(String, String)> moves) =>
+      _send('POST', '/api/v1/document/move-files', {
+        'files': [
+          for (final (from, to) in moves) {'from': from, 'to': to},
+        ],
+      }, refused: 'The server did not move the documents.');
+
+  @override
+  Future<void> removeDocuments(List<String> paths) => _send(
+    'DELETE',
+    '/api/v1/system/remove-documents',
+    {'names': paths},
+    refused: 'The server did not delete the documents.',
+  );
+
+  @override
+  Future<Map<String, Object?>> systemSettings() async {
+    final settings = _field(await _get(_current, '/api/v1/system'), 'settings');
+    return settings is Map<String, dynamic> ? settings : const {};
   }
 
   /// The connection in use.
@@ -218,12 +287,13 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   }
 
   /// The decoded JSON of a [method] to [path] on the connection in use, with [body] as JSON.
-  /// [emptyOk] takes an empty success as null.
+  /// [emptyOk] and [refused] are as for [_decode].
   Future<Object?> _send(
     String method,
     String path,
     Map<String, Object?>? body, {
     bool emptyOk = false,
+    String refused = _refused,
   }) async {
     final connection = _current;
     return _call(
@@ -233,6 +303,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
         await _client.send(_request(connection, method, path, body)),
       ),
       emptyOk: emptyOk,
+      refused: refused,
     );
   }
 
@@ -242,6 +313,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     Duration limit,
     Future<http.Response> Function() send, {
     bool emptyOk = false,
+    String refused = _refused,
   }) async {
     final http.Response response;
     try {
@@ -249,7 +321,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     } on Exception catch (error) {
       throw _unreachable(connection, error, limit);
     }
-    return _decode(response, emptyOk: emptyOk);
+    return _decode(response, emptyOk: emptyOk, refused: refused);
   }
 
   /// [error], from sending a request, in plain words.
@@ -273,9 +345,16 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     _ => ApiException('Could not reach the server: $error'),
   };
 
+  static const _refused = 'The server refused the request.';
+
   /// The decoded JSON of [response], or null for an empty success when [emptyOk], as a delete
-  /// answers.
-  Object? _decode(http.Response response, {bool emptyOk = false}) {
+  /// answers. An answer with `success: false` fails, even with HTTP 200, with the server's reason
+  /// or else [refused].
+  Object? _decode(
+    http.Response response, {
+    bool emptyOk = false,
+    String refused = _refused,
+  }) {
     final status = response.statusCode;
     final body = _json(response);
     if (status == 401 || status == 403) {
@@ -292,6 +371,9 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
         'The address did not answer like an AnythingLLM server.',
         status: status,
       );
+    }
+    if (body is Map && body['success'] == false) {
+      throw ApiException(_said(body) ?? refused, status: status);
     }
     return body;
   }

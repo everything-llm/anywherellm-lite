@@ -54,6 +54,17 @@ class Prefs {
     },
   );
 
+  /// These prefs with the document at [path] forgotten in every workspace.
+  Prefs withoutDoc(String path) => Prefs(
+    groundedOnly: groundedOnly,
+    switchedOff: {
+      for (final MapEntry(:key, :value) in switchedOff.entries)
+        if (value.where((d) => d.path != path).toList() case final kept
+            when kept.isNotEmpty)
+          key: kept,
+    },
+  );
+
   String encode() => jsonEncode({
     'groundedOnly': groundedOnly,
     'switchedOff': {

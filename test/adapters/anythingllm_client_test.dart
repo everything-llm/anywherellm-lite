@@ -532,4 +532,175 @@ void main() {
       );
     });
   });
+
+  group('files', () {
+    test(
+      'a workspace read on its own carries its prompt, settings and pins',
+      () async {
+        final w = await _answering({
+          'workspace': [
+            {
+              'slug': 'w',
+              'name': 'W',
+              'openAiPrompt': 'Be brief.',
+              'openAiTemp': 0.7,
+              'topN': 4,
+              'chatMode': 'automatic',
+              'documents': [
+                {'docpath': 'c/a.json', 'pinned': true, 'watched': false},
+              ],
+            },
+          ],
+        }).workspace('w');
+        expect(w.prompt, 'Be brief.');
+        expect(w.settings!.values['topN'], 4);
+        expect(w.documents.single.pinned, isTrue);
+      },
+    );
+
+    test(
+      'a workspace update posts the fields and needs the workspace back',
+      () async {
+        final seen = <http.Request>[];
+        await _answering({
+          'workspace': {'slug': 'w'},
+          'message': null,
+        }, seen: seen).updateWorkspace('w', {'topN': 6, 'openAiPrompt': null});
+        expect(seen.single.method, 'POST');
+        expect(seen.single.url.path, '/api/v1/workspace/w/update');
+        expect(jsonDecode(seen.single.body), {'topN': 6, 'openAiPrompt': null});
+
+        final error = await _failure(
+          _answering({'workspace': null, 'message': 'Invalid topN'})
+              .updateWorkspace('w', {'topN': 0}),
+        );
+        expect(error.message, 'Invalid topN');
+      },
+    );
+
+    test('pinning posts the path and the state', () async {
+      final seen = <http.Request>[];
+      await _answering({
+        'message': 'ok',
+      }, seen: seen).pinDocument('w', 'c/a.json', pinned: true);
+      expect(seen.single.url.path, '/api/v1/workspace/w/update-pin');
+      expect(jsonDecode(seen.single.body), {
+        'docPath': 'c/a.json',
+        'pinStatus': true,
+      });
+    });
+
+    test('the library is the folders under the documents root', () async {
+      final seen = <http.Request>[];
+      final folders = await _answering({
+        'localFiles': {
+          'name': 'documents',
+          'type': 'folder',
+          'items': [
+            {
+              'name': 'claude',
+              'type': 'folder',
+              'items': [
+                {'name': 'a.json', 'type': 'file', 'title': 'a.md'},
+              ],
+            },
+          ],
+        },
+      }, seen: seen).libraryFolders();
+      expect(seen.single.url.path, '/api/v1/documents');
+      expect(folders.single.files.single.path, 'claude/a.json');
+    });
+
+    test('a document is asked for by its file name alone', () async {
+      final seen = <http.Request>[];
+      final doc = await _answering({
+        'document': {
+          'name': 'a.json',
+          'title': 'a.md',
+          'pageContent': 'Hello.',
+        },
+      }, seen: seen).document('claude/a.json');
+      expect(seen.single.url.path, '/api/v1/document/a.json');
+      expect((doc.title, doc.text), ('a.md', 'Hello.'));
+
+      final missing = await _failure(
+        _answering({'document': null}).document('claude/b.json'),
+      );
+      expect(missing.status, 404);
+    });
+
+    test('folder, move and delete send what the server expects', () async {
+      final seen = <http.Request>[];
+      final api = _answering({'success': true, 'message': null}, seen: seen);
+      await api.createFolder('notes');
+      await api.moveDocuments([('claude/a.json', 'notes/a.json')]);
+      await api.removeDocuments(['notes/a.json']);
+      expect(
+        [for (final r in seen) '${r.method} ${r.url.path}'],
+        [
+          'POST /api/v1/document/create-folder',
+          'POST /api/v1/document/move-files',
+          'DELETE /api/v1/system/remove-documents',
+        ],
+      );
+      expect(
+        [for (final r in seen) jsonDecode(r.body)],
+        [
+          {'name': 'notes'},
+          {
+            'files': [
+              {'from': 'claude/a.json', 'to': 'notes/a.json'},
+            ],
+          },
+          {
+            'names': ['notes/a.json'],
+          },
+        ],
+      );
+    });
+
+    test('success false with status 200 is a refusal', () async {
+      final api = _answering({'success': false, 'message': 'Folder exists'});
+      expect((await _failure(api.createFolder('x'))).message, 'Folder exists');
+      final quiet = _answering({'success': false});
+      expect(
+        (await _failure(quiet.removeDocuments(['x']))).message,
+        'The server did not delete the documents.',
+      );
+    });
+
+    test('an upload into a folder goes to that folder\'s route', () async {
+      final seen = <http.Request>[];
+      await _answering({
+        'success': true,
+        'documents': <Object>[],
+      }, seen: seen).upload('a.md', const [1], folder: 'my notes');
+      expect(seen.single.url.path, '/api/v1/document/upload/my%20notes');
+    });
+
+    test('the system settings are the settings object', () async {
+      final seen = <http.Request>[];
+      final settings = await _answering({
+        'settings': {'LLMProvider': 'ollama'},
+      }, seen: seen).systemSettings();
+      expect(seen.single.url.path, '/api/v1/system');
+      expect(settings, {'LLMProvider': 'ollama'});
+    });
+
+    test('no files error carries the key', () async {
+      final api = _api((_) async => http.Response('{"error":"nope"}', 500));
+      for (final call in <Future<void> Function()>[
+        () => api.updateWorkspace('w', {'topN': 1}),
+        () => api.pinDocument('w', 'a', pinned: true),
+        api.libraryFolders,
+        () => api.document('a'),
+        () => api.createFolder('a'),
+        () => api.moveDocuments([('a', 'b')]),
+        () => api.removeDocuments(['a']),
+        api.systemSettings,
+      ]) {
+        expect((await _failure(call())).message, isNot(contains('SECRET-KEY')));
+      }
+    });
+  });
 }

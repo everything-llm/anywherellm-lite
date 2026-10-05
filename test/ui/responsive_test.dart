@@ -1,6 +1,7 @@
 import 'dart:ui' show Size;
 
 import 'package:everything/core/server_models.dart';
+import 'package:everything/ui/state/shell_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
@@ -69,6 +70,47 @@ void main() {
       await h.settings.clear();
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final size in sizes) {
+    final at = '${size.width.toInt()}x${size.height.toInt()}';
+
+    testWidgets('Files and each kind of node fit at $at', (tester) async {
+      final llm = awkward();
+      llm.spaces.first.prompt = 'prompt-$longWord';
+      final h = await pumpApp(tester, llm: llm, size: size);
+      h.shell
+        ..showPane(Pane.files)
+        ..toggleSide();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      for (final path in [
+        '/workspaces/w',
+        '/workspaces/w/docs',
+        '/workspaces/w/chats',
+        '/library/custom-documents',
+      ]) {
+        h.files.toggle(path);
+      }
+      for (final path in [
+        '/workspaces/w',
+        '/workspaces/w/docs',
+        '/workspaces/w/PROMPT.md',
+        '/workspaces/w/settings.json',
+        '/workspaces/w/chats/t',
+        '/workspaces/w/docs/custom-documents/file-$longWord.pdf.json',
+        '/library',
+        '/library/custom-documents',
+        '/library/custom-documents/file-$longWord.pdf.json',
+        '/settings/models.json',
+        '/keys',
+      ]) {
+        await h.files.select(path);
+        await tester.pumpAndSettle();
+        expect(h.files.node, isNotNull, reason: path);
+        expect(tester.takeException(), isNull, reason: path);
+      }
     });
   }
 

@@ -67,3 +67,25 @@ class SectionLabel extends StatelessWidget {
     ),
   );
 }
+
+/// A sidebar group's heading: a rule above, the [label], and one small [action] at the end.
+class SidebarSection extends StatelessWidget {
+  const SidebarSection(this.label, {super.key, required this.action});
+
+  final String label;
+  final Widget action;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(10, 14, 4, 6),
+    decoration: BoxDecoration(
+      border: Border(top: BorderSide(color: Tokens.of(context).line)),
+    ),
+    child: Row(
+      children: [
+        Expanded(child: SectionLabel(label)),
+        action,
+      ],
+    ),
+  );
+}

@@ -10,6 +10,7 @@ import 'ui/app_scope.dart';
 import 'ui/boot_screen.dart';
 import 'ui/shell.dart';
 import 'ui/state/chat_controller.dart';
+import 'ui/state/files_controller.dart';
 import 'ui/state/prefs_controller.dart';
 import 'ui/state/settings_controller.dart';
 import 'ui/state/shell_controller.dart';
@@ -59,6 +60,7 @@ class _SessionHostState extends State<SessionHost> {
   late Future<void> _loaded;
   late final ChatController _chat;
   late final SourcesController _sources;
+  late final FilesController _files;
 
   /// The controllers listen before the keyring is read, so reading a saved connection is what
   /// loads the workspaces.
@@ -67,11 +69,19 @@ class _SessionHostState extends State<SessionHost> {
     super.initState();
     _chat = ChatController(widget.llm, widget.settings, widget.prefs);
     _sources = SourcesController(widget.llm, _chat, widget.prefs);
+    _files = FilesController(
+      widget.llm,
+      widget.settings,
+      _chat,
+      widget.prefs,
+      _sources,
+    );
     _loaded = _load();
   }
 
   @override
   void dispose() {
+    _files.dispose();
     _sources.dispose();
     _chat.dispose();
     super.dispose();
@@ -101,6 +111,7 @@ class _SessionHostState extends State<SessionHost> {
         prefs: widget.prefs,
         chat: _chat,
         sources: _sources,
+        files: _files,
         child: const AppShell(),
       );
     },

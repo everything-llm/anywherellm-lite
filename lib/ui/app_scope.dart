@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import 'state/chat_controller.dart';
+import 'state/files_controller.dart';
 import 'state/prefs_controller.dart';
 import 'state/settings_controller.dart';
 import 'state/shell_controller.dart';
@@ -16,6 +17,7 @@ class AppScope extends InheritedWidget {
     required this.prefs,
     required this.chat,
     required this.sources,
+    required this.files,
     required super.child,
   });
 
@@ -24,6 +26,7 @@ class AppScope extends InheritedWidget {
   final PrefsController prefs;
   final ChatController chat;
   final SourcesController sources;
+  final FilesController files;
 
   static AppScope of(BuildContext context) {
     // Never notifies, so no dependency is needed. That also lets initState read it.

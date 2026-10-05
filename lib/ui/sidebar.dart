@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../core/copy.dart';
 import '../core/server_models.dart';
 import 'app_scope.dart';
+import 'files/file_tree.dart';
 import 'icons.dart';
 import 'layout.dart';
+import 'state/shell_controller.dart';
 import 'tokens.dart';
 import 'type.dart';
 import 'widgets/basics.dart';
@@ -31,16 +33,78 @@ class Sidebar extends StatelessWidget {
           color: t.side,
           border: Border(right: BorderSide(color: t.line)),
         ),
-        child: const Column(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
+            const Padding(
               padding: EdgeInsets.fromLTRB(8, 2, 8, 16),
               child: Align(alignment: Alignment.centerLeft, child: Brand()),
             ),
-            Expanded(child: _Workspaces()),
-            SizedBox(height: 8),
-            SidebarSettingsButton(),
+            const _PaneSwitch(),
+            const SizedBox(height: 12),
+            Expanded(
+              child: ListenableBuilder(
+                listenable: AppScope.of(context).shell,
+                builder: (context, _) =>
+                    AppScope.of(context).shell.pane == Pane.files
+                    ? const FileTree()
+                    : const _Workspaces(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const SidebarSettingsButton(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Chats or Files: what the sidebar and the main pane show.
+class _PaneSwitch extends StatelessWidget {
+  const _PaneSwitch();
+
+  @override
+  Widget build(BuildContext context) {
+    final shell = AppScope.of(context).shell;
+    final t = Tokens.of(context);
+    return ListenableBuilder(
+      listenable: shell,
+      builder: (context, _) => Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: t.hover,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            for (final (pane, label) in const [
+              (Pane.chats, 'Chats'),
+              (Pane.files, 'Files'),
+            ])
+              Expanded(
+                child: Tappable(
+                  label: label,
+                  selected: shell.pane == pane,
+                  onTap: () => shell.showPane(pane),
+                  radius: BorderRadius.circular(8),
+                  color: shell.pane == pane ? t.panel : null,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: Type.sans(
+                        13.5,
+                        weight: shell.pane == pane
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                        color: t.ink,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -83,28 +147,19 @@ class _WorkspacesState extends State<_Workspaces> {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final chat = scope.chat;
-    final t = Tokens.of(context);
     return ListenableBuilder(
       listenable: chat,
       builder: (context, _) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            padding: const EdgeInsets.fromLTRB(10, 14, 4, 6),
-            decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: t.line)),
-            ),
-            child: Row(
-              children: [
-                const Expanded(child: SectionLabel('Workspaces')),
-                IconBtn(
-                  'plus',
-                  tooltip: 'New workspace',
-                  box: 24,
-                  size: IconSize.xs,
-                  onPressed: () => setState(() => _adding = true),
-                ),
-              ],
+          SidebarSection(
+            'Workspaces',
+            action: IconBtn(
+              'plus',
+              tooltip: 'New workspace',
+              box: 24,
+              size: IconSize.xs,
+              onPressed: () => setState(() => _adding = true),
             ),
           ),
           if (_adding)

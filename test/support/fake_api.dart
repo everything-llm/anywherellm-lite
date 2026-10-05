@@ -15,13 +15,34 @@ class FakeWorkspace {
     this.name, {
     List<Thread>? threads,
     List<WorkspaceDoc>? docs,
+    this.prompt,
+    Map<String, Object?>? settings,
   }) : threads = threads ?? [],
-       docs = docs ?? [];
+       docs = docs ?? [],
+       settings = settings ?? {...defaultSettings};
 
   final String slug;
   final String name;
   final List<Thread> threads;
   final List<WorkspaceDoc> docs;
+  String? prompt;
+
+  /// The workspace's columns from [workspaceSettingSpecs].
+  final Map<String, Object?> settings;
+
+  static const defaultSettings = <String, Object?>{
+    'openAiTemp': 0.7,
+    'openAiHistory': 20,
+    'topN': 4,
+    'similarityThreshold': 0.25,
+    'chatProvider': null,
+    'chatModel': null,
+    'agentProvider': null,
+    'agentModel': null,
+    'vectorSearchMode': 'default',
+    'queryRefusalResponse': null,
+    'chatMode': 'automatic',
+  };
 }
 
 /// An [AnythingLlmApi] for widget tests that keeps its workspaces in memory. Put an error in
@@ -39,6 +60,17 @@ class FakeAnythingLlm implements AnythingLlmApi {
 
   /// Every document the server holds, by path, embedded or not.
   final Map<String, WorkspaceDoc> library = {};
+
+  /// Library folders made with [createFolder], which show even while empty.
+  final Set<String> folders = {};
+
+  /// What [systemSettings] answers.
+  Map<String, Object?> system = const {
+    'LLMProvider': 'ollama',
+    'OllamaLLMModelPref': 'qwen3:8b',
+    'EmbeddingEngine': 'native',
+    'VectorDB': 'lancedb',
+  };
   Set<String> acceptedValue = {'.md', '.txt', '.pdf'};
 
   String answer = 'Here is what your sources say.';
@@ -86,7 +118,13 @@ class FakeAnythingLlm implements AnythingLlmApi {
   @override
   Future<Workspace> workspace(String slug) => _run('workspace', () {
     final w = _space(slug);
-    return Workspace(slug: w.slug, name: w.name, documents: [...w.docs]);
+    return Workspace(
+      slug: w.slug,
+      name: w.name,
+      documents: [...w.docs],
+      prompt: w.prompt,
+      settings: WorkspaceSettings({...w.settings}),
+    );
   }, slug);
 
   @override
@@ -157,18 +195,113 @@ class FakeAnythingLlm implements AnythingLlmApi {
   Future<Set<String>> acceptedExtensions() =>
       _run('acceptedExtensions', () => acceptedValue);
 
-  /// Files the server reads in as `custom-documents/<name>.json`.
+  /// Files the server reads in as `<folder>/<name>.json`, `custom-documents` by default.
   @override
-  Future<List<DocEntry>> upload(String name, List<int> bytes) =>
-      _run('upload', () {
-        final doc = DocEntry(folder: 'custom-documents', name: '$name.json');
-        library[doc.path] = WorkspaceDoc(
+  Future<List<DocEntry>> upload(
+    String name,
+    List<int> bytes, {
+    String? folder,
+  }) => _run('upload', () {
+    final doc = DocEntry(
+      folder: folder ?? 'custom-documents',
+      name: '$name.json',
+    );
+    library[doc.path] = WorkspaceDoc(
+      path: doc.path,
+      title: name,
+      words: bytes.length,
+    );
+    return [doc];
+  }, folder == null ? name : '$folder/$name');
+
+  @override
+  Future<void> updateWorkspace(String slug, Map<String, Object?> fields) =>
+      _run('updateWorkspace', () {
+        final w = _space(slug);
+        for (final MapEntry(:key, :value) in fields.entries) {
+          if (key == 'openAiPrompt') {
+            w.prompt = value as String?;
+          } else {
+            w.settings[key] = value;
+          }
+        }
+      }, slug);
+
+  @override
+  Future<void> pinDocument(String slug, String path, {required bool pinned}) =>
+      _run('pinDocument', () {
+        final docs = _space(slug).docs;
+        final at = docs.indexWhere((d) => d.path == path);
+        final doc = docs[at];
+        docs[at] = WorkspaceDoc(
           path: doc.path,
-          title: name,
-          words: bytes.length,
+          title: doc.title,
+          words: doc.words,
+          pinned: pinned,
         );
-        return [doc];
-      }, name);
+      }, '$path:$pinned');
+
+  @override
+  Future<List<LibraryFolder>> libraryFolders() => _run('libraryFolders', () {
+    final byFolder = <String, List<LibraryFile>>{
+      for (final folder in folders) folder: [],
+    };
+    for (final doc in library.values) {
+      final folder = docFolder(doc.path);
+      (byFolder[folder] ??= []).add(
+        LibraryFile(folder: folder, name: docName(doc.path), title: doc.title),
+      );
+    }
+    return [
+      for (final MapEntry(:key, :value) in byFolder.entries)
+        LibraryFolder(name: key, files: value),
+    ];
+  });
+
+  @override
+  Future<DocBody> document(String path) => _run('document', () {
+    final doc = library[path];
+    if (doc == null) throw ApiException('There is no document $path.');
+    return DocBody(
+      title: doc.title,
+      text: 'The text of ${doc.title}.',
+      details: {'docAuthor': 'Ada'},
+    );
+  }, path);
+
+  @override
+  Future<void> createFolder(String name) =>
+      _run('createFolder', () => folders.add(name), name);
+
+  /// Moves documents that no workspace uses, as the server does, and leaves the others.
+  @override
+  Future<void> moveDocuments(List<(String, String)> moves) =>
+      _run('moveDocuments', () {
+        for (final (from, to) in moves) {
+          if (spaces.any((w) => w.docs.any((d) => d.path == from))) continue;
+          final doc = library.remove(from)!;
+          library[to] = WorkspaceDoc(
+            path: to,
+            title: doc.title,
+            words: doc.words,
+          );
+        }
+      }, [for (final (from, to) in moves) '$from>$to'].join(','));
+
+  @override
+  Future<void> removeDocuments(List<String> paths) =>
+      _run('removeDocuments', () {
+        for (final path in paths) {
+          library.remove(path);
+          for (final w in spaces) {
+            w.docs.removeWhere((d) => d.path == path);
+          }
+        }
+      }, paths.join(','));
+
+  @override
+  Future<Map<String, Object?>> systemSettings() =>
+      _run('systemSettings', () => system);
 }
 
 /// A document in the server's library, ready to embed or put in a workspace.
