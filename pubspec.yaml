@@ -1,5 +1,5 @@
 name: everything
-description: "A lightweight Linux front end for an AnythingLLM server."
+description: "A lightweight Linux and Android front end for an AnythingLLM server."
 publish_to: 'none'
 version: 2.0.0+4
 
@@ -16,6 +16,7 @@ dependencies:
   path_drawing: ">=1.0.1 <1.1.0"
   http: ">=1.6.0 <1.7.0"
   flutter_secure_storage: ">=11.2.0 <11.3.0"
+  path_provider: ">=2.1.0 <2.2.0"
 
 dev_dependencies:
   flutter_test:

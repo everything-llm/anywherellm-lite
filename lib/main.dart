@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'adapters/anythingllm_client.dart';
 import 'adapters/json_prefs_store.dart';
@@ -19,17 +22,27 @@ import 'ui/state/sources_controller.dart';
 /// The composition root: the one place that knows the adapters and the UI.
 ///
 /// The app talks only to the AnythingLLM server set up in Settings. The address and key live in
-/// the system keyring; the other preferences in a JSON file.
-void main() {
+/// the system keyring; the other preferences in a JSON file. Android uses https only and keeps
+/// the file in the app's private storage.
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final android = Platform.isAndroid;
+  final prefsFile = android
+      ? File('${(await getApplicationSupportDirectory()).path}/prefs.json')
+      : null;
   final holder = ConnectionHolder();
-  final llm = HttpAnythingLlmApi(holder: holder);
+  final llm = HttpAnythingLlmApi(holder: holder, allowHttp: !android);
   runApp(
     NilsApp(
       home: SessionHost(
         llm: llm,
-        settings: SettingsController(llm, KeyringSettingsStore(), holder),
-        prefs: PrefsController(JsonPrefsStore()),
+        settings: SettingsController(
+          llm,
+          KeyringSettingsStore(),
+          holder,
+          allowHttp: !android,
+        ),
+        prefs: PrefsController(JsonPrefsStore(prefsFile)),
         shell: ShellController(),
       ),
     ),

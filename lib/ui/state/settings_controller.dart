@@ -9,11 +9,20 @@ enum ConnectionCheck { idle, testing, ok, failed }
 /// The AnythingLLM address and key: the one in use, testing a candidate, saving and removing.
 class SettingsController extends ChangeNotifier {
   /// Keeps the connection in use in [holder], where the client reads it.
-  SettingsController(this._api, this._store, this._holder);
+  SettingsController(
+    this._api,
+    this._store,
+    this._holder, {
+    this.allowHttp = true,
+  });
 
   final AnythingLlmApi _api;
   final SettingsStore _store;
   final ConnectionHolder _holder;
+
+  /// Whether the client sends the key to an `http://` address, for Settings' wording. The client
+  /// enforces it.
+  final bool allowHttp;
 
   /// The connection in use, or null before one is saved.
   Connection? get connection => _holder.current;

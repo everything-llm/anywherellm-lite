@@ -7,8 +7,12 @@ import '../tokens.dart';
 import '../type.dart';
 import 'dashed.dart';
 
-/// What the zone says it takes and how, for the eye and for a screen reader.
-const _hint = 'Drop files here, or click to browse';
+/// What the zone says it takes and how, for the eye and for a screen reader, in the words of a
+/// touch [platform] or a mouse one.
+String _hint(TargetPlatform platform) => switch (platform) {
+  TargetPlatform.android || TargetPlatform.iOS => 'Tap to choose files',
+  _ => 'Drop files here, or click to browse',
+};
 
 /// A picked or dropped file, for [DropZone.onFiles]. Nothing is read until it is sent, and a
 /// folder or an unreadable file becomes a reason instead of an error.
@@ -84,6 +88,7 @@ class _DropZoneState extends State<DropZone> {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final lit = _over || _hover || _focused;
+    final hint = _hint(Theme.of(context).platform);
     return DropTarget(
       onDragEntered: (_) => setState(() => _over = true),
       onDragExited: (_) => setState(() => _over = false),
@@ -100,7 +105,7 @@ class _DropZoneState extends State<DropZone> {
         },
         child: Semantics(
           button: true,
-          label: 'Add a file. $_hint',
+          label: 'Add a file. $hint',
           excludeSemantics: true,
           child: GestureDetector(
             onTap: _browse,
@@ -125,7 +130,7 @@ class _DropZoneState extends State<DropZone> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _hint,
+                      hint,
                       textAlign: TextAlign.center,
                       style: Type.sans(12.5, color: t.muted),
                     ),

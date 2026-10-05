@@ -137,10 +137,16 @@ class _KeyCardState extends State<_KeyCard> {
   bool _confirmForget = false;
   Timer? _forgetTimer;
 
+  /// The address the field shows as an example, and starts with where http is allowed.
+  String get _example => _settings.allowHttp
+      ? 'http://localhost:3001'
+      : 'https://host.example.ts.net:3001';
+
   @override
   void initState() {
     super.initState();
-    _url.text = _settings.connection?.baseUrl ?? 'http://localhost:3001';
+    _url.text =
+        _settings.connection?.baseUrl ?? (_settings.allowHttp ? _example : '');
   }
 
   @override
@@ -238,7 +244,7 @@ class _KeyCardState extends State<_KeyCard> {
               NilsField(
                 controller: _url,
                 label: 'AnythingLLM server address',
-                hint: 'http://localhost:3001',
+                hint: _example,
               ),
               NilsField(
                 controller: _key,

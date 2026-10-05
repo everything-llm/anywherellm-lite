@@ -1,11 +1,13 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../core/connection.dart';
 import '../core/ports.dart';
 
-/// [SettingsStore] in the system keyring (libsecret), as one entry holding the address and key.
+/// [SettingsStore] in the system keyring (libsecret on Linux, the Android Keystore on Android), as
+/// one entry holding the address and key.
 class KeyringSettingsStore implements SettingsStore {
   KeyringSettingsStore([FlutterSecureStorage? storage])
     : _storage = storage ?? const FlutterSecureStorage();
@@ -53,8 +55,8 @@ class KeyringSettingsStore implements SettingsStore {
       return await op();
     } on Exception {
       throw ApiException(
-        'The system keyring could not be $what. '
-        'Is a secret service such as gnome-keyring running and unlocked?',
+        'The system keyring could not be $what.'
+        '${Platform.isLinux ? ' Is a secret service such as gnome-keyring running and unlocked?' : ''}',
       );
     }
   }
