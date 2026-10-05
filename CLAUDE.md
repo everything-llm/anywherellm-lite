@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Nilson is a Flutter Linux desktop chat client for an AnythingLLM server. It shows workspaces and their chats (AnythingLLM threads), streams answers, and manages each workspace's files in a Sources panel. Its Files pane shows the server's data as one folder tree. It keeps the server address and API key in the system keyring and its other preferences in a JSON file. It calls AnythingLLM's developer API directly; there is no backend of its own.
+Nilson is a Flutter chat client for Linux desktop and Android for an AnythingLLM server. It shows workspaces and their chats (AnythingLLM threads), streams answers, and manages each workspace's files in a Sources panel. Its Files pane shows the server's data as one folder tree. It keeps the server address and API key in the system keyring and its other preferences in a JSON file. It calls AnythingLLM's developer API directly; there is no backend of its own.
 
 ## Commands
 
@@ -14,15 +14,19 @@ flutter test                                   # whole suite; fakes the server a
 flutter test test/ui/shell_test.dart           # one file
 flutter test --plain-name 'a new server starts afresh'   # one test by name
 flutter build linux --debug                    # -> build/linux/x64/debug/bundle/nilson
+flutter run -d <android-device>                # a phone over adb, or an emulator
+flutter build apk --debug                      # -> build/app/outputs/flutter-apk/app-debug.apk
 ```
 
 The Linux build needs `libsecret-1-dev`. Saving a key at run time needs a running, unlocked secret service such as gnome-keyring.
 
+The Android build is a debug APK only, with no release signing. It needs the Android SDK; `minSdk` is Flutter's default (24), which is what `flutter_secure_storage` requires. On Android the key lives in the Android Keystore.
+
 ## Naming
 
-- The product is **Nilson**: window title, wordmark, binary `nilson`, application ID `local.nilson.nilson`. The Dart package and the repository folder are still `everything`, so imports are `package:everything/...`.
+- The product is **Nilson**: window title, wordmark, binary `nilson`, application ID `local.nilson.nilson` on Linux and Android (`applicationId` and `namespace` in `android/app/build.gradle.kts`). The Dart package and the repository folder are still `everything`, so imports are `package:everything/...`.
 - The `Nils*` UI-kit classes (`NilsApp`, `NilsButton`, `NilsSwitch`, `NilsBadge`, ...) are names left from an earlier version. They are not a backend reference.
-- `flutter_secure_storage` keys its keyring entry by the application ID (`<APPLICATION_ID>.secureStorage`). Changing `APPLICATION_ID` in `linux/CMakeLists.txt` orphans any saved key.
+- `flutter_secure_storage` keys its keyring entry by the application ID (`<APPLICATION_ID>.secureStorage`). Changing `APPLICATION_ID` in `linux/CMakeLists.txt`, or `applicationId` on Android, orphans any saved key.
 
 ## Architecture
 
@@ -38,12 +42,14 @@ Imports run `ui -> core <- adapters`. `lib/main.dart` is the only file that know
 
 **The connection** lives in one shared `ConnectionHolder`, built in `main.dart`. `HttpAnythingLlmApi` reads it on every call, so a saved connection takes effect without a restart. `SettingsController` is the only writer, through `load`, `save` and `clear`, which notify listeners. `ChatController` listens and starts afresh when the connection changes; `SessionHost` builds it before reading the keyring, so reading a saved connection is what loads the workspaces. `verify(Connection)` takes an explicit connection so Settings can test one before saving; `SettingsController.connect` verifies first and saves only on success.
 
+**https only on Android.** Dart's `HttpClient` ignores Android's cleartext policy, so the client enforces it itself. `main.dart` builds `HttpAnythingLlmApi` with `allowHttp: !Platform.isAndroid`. When it is false, every call and `verify` fail on an `http://` address before the key is sent, so `connect` never saves one. `SettingsController.allowHttp` gets the same value, so Settings shows an https example address on Android.
+
 **Adapters:**
 
 - `adapters/anythingllm_client.dart` maps HTTP failures to plain-language `ApiException`s. No message may contain the key; a test asserts this, and `Connection.toString` omits it.
 - `adapters/anythingllm_stream.dart` turns a `stream-chat` response (server-sent `data:` lines) into `TextChunk`s and one closing `ChatDone`. An `error` chunk fails the stream. Cancelling the subscription is how Stop ends an answer.
 - `adapters/keyring_settings_store.dart` stores the address and key as one JSON keyring entry.
-- `adapters/json_prefs_store.dart` stores `Prefs` in `$XDG_CONFIG_HOME/nilson/prefs.json` (default `~/.config`), written to a temp file and renamed.
+- `adapters/json_prefs_store.dart` stores `Prefs` in `$XDG_CONFIG_HOME/nilson/prefs.json` (default `~/.config`), written to a temp file and renamed. On Android, `main.dart` passes `prefs.json` in `path_provider`'s application support directory.
 
 **AnythingLLM API facts the client relies on:**
 
