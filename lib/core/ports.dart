@@ -1,14 +1,25 @@
+import 'connection.dart';
 import 'models.dart';
 
-/// A read or a write nils refused or could not do. [status] is null when nils gave no answer.
-class ApiException implements Exception {
-  const ApiException(this.message, {this.status});
+export 'errors.dart';
 
-  final String message;
-  final int? status;
+/// The AnythingLLM server, as the UI sees it. Every method throws [ApiException] on failure.
+abstract interface class AnythingLlmApi {
+  /// Asks the server whether [connection] opens it. Takes the connection as an argument so
+  /// Settings can test one before it is saved.
+  Future<void> verify(Connection connection);
+}
 
-  @override
-  String toString() => message;
+/// Where the connection is kept between runs.
+abstract interface class SettingsStore {
+  /// The saved connection, or null when none is saved. Throws [ApiException] when the store
+  /// cannot be read.
+  Future<Connection?> load();
+
+  /// Throws [ApiException] when the store cannot be written.
+  Future<void> save(Connection connection);
+
+  Future<void> clear();
 }
 
 /// The nils libraries and inbox, as the UI sees them. Every method throws [ApiException] on

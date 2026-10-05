@@ -1,0 +1,60 @@
+import 'errors.dart';
+
+/// Where an AnythingLLM server is and the key that opens it.
+class Connection {
+  const Connection({required this.baseUrl, required this.apiKey});
+
+  /// The connection [url] and [key] describe, with the address cleaned by [normalizeBaseUrl].
+  /// Throws [ApiException] saying what is wrong with them.
+  factory Connection.parse(String url, String key) {
+    final baseUrl = normalizeBaseUrl(url);
+    final apiKey = key.trim();
+    if (apiKey.isEmpty) throw const ApiException('Enter the API key.');
+    return Connection(baseUrl: baseUrl, apiKey: apiKey);
+  }
+
+  /// `https://host:port`, with no trailing slash and no `/api`. See [normalizeBaseUrl].
+  final String baseUrl;
+  final String apiKey;
+
+  /// The server's host name, for messages.
+  String get host => Uri.parse(baseUrl).host;
+
+  @override
+  bool operator ==(Object other) =>
+      other is Connection && other.baseUrl == baseUrl && other.apiKey == apiKey;
+
+  @override
+  int get hashCode => Object.hash(baseUrl, apiKey);
+
+  /// Never prints the key, so a log line or a failed assertion cannot leak it.
+  @override
+  String toString() => 'Connection($baseUrl)';
+}
+
+/// The address as the client wants it: trimmed, http or https, no trailing slash, no `/api`.
+/// Throws [ApiException] saying what is wrong with [raw].
+String normalizeBaseUrl(String raw) {
+  final text = raw.trim();
+  if (text.isEmpty) throw const ApiException('Enter the server address.');
+  final uri = Uri.tryParse(text);
+  if (uri == null ||
+      !const {'http', 'https'}.contains(uri.scheme) ||
+      uri.host.isEmpty) {
+    throw const ApiException(
+      'The address must start with http:// or https:// and name a host, '
+      'for example https://host.example.ts.net:3001.',
+    );
+  }
+  if (uri.hasQuery || uri.hasFragment || uri.userInfo.isNotEmpty) {
+    throw const ApiException(
+      'The address must not contain a query, a fragment or a login.',
+    );
+  }
+  final path = uri.path.replaceFirst(RegExp(r'/+$'), '');
+  return uri
+      .replace(
+        path: path.endsWith('/api') ? path.substring(0, path.length - 4) : path,
+      )
+      .toString();
+}
