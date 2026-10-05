@@ -1,5 +1,5 @@
 name: everything
-description: "Linux viewer and filer for the nils libraries."
+description: "A lightweight Linux front end for an AnythingLLM server."
 publish_to: 'none'
 version: 2.0.0+4
 

@@ -1,55 +1,51 @@
 # everything
 
-A Linux viewer and filer for the nils research and skills libraries, and the place that holds how AnythingLLM talks to them.
+A lightweight Linux front end for an AnythingLLM server: browse its workspaces and documents, and upload files to it.
 
 ## What it does
 
-- Browses the research and skills libraries, with the findings of their last check.
-- Stages markdown files into the inbox.
-- Files nothing into a library. That is done in AnythingLLM, through the nils tools.
+The app talks only to the AnythingLLM server you set up in Settings, through AnythingLLM's developer API.
 
-It has no server, no model and no key. It runs the `nils` command in a checkout of the nils repository, one process per read: `nils view ...` to read and `nils inbox add` to stage.
+| Section | Shows |
+| --- | --- |
+| Workspaces | Each workspace with its slug, chat model and thread count. Open one to list its documents. |
+| Documents | Every document the server has read in, grouped by folder, with search and a folder filter. Open one to see its details and which workspaces hold it. |
+| Upload | Drop or pick files to send into a folder you choose. Files of a type the server does not read are refused before they are sent. |
+| Settings | The server address and API key, with a connection test. |
+
+Until a server is set up, the app opens on Settings and the other sections point there.
+
+**What it leaves to AnythingLLM:**
+
+- **Chat.** There is none in this app.
+- **Document text.** AnythingLLM's API does not return it, so a document page shows its details only.
+- **Adding a document to a workspace.** Uploaded files land in a folder; add them to a workspace in AnythingLLM.
+
+## Where the key lives
+
+The address and the API key are kept together in one entry in the system keyring, through `flutter_secure_storage`. No file in the project or in `~/.config` holds them, and no error message shows the key.
+
+If the keyring cannot be read or written, the app still starts, uses what you entered for that run, and says so on the Settings page.
 
 ## Requirements
 
 - Flutter 3.47 on Linux.
-- A checkout of nils with `uv sync` done. The app finds it from `NILS_REPO`, else above the working directory and the executable, else in a sibling directory named `nils`.
+- `libsecret-1-dev`, for building: `sudo apt install libsecret-1-dev`.
+- A running, unlocked secret service, such as gnome-keyring, for saving the key.
+- An AnythingLLM server and an API key created under Settings, Developer API in AnythingLLM.
 
 ## Run
 
 ```bash
 flutter pub get
-NILS_REPO=/path/to/nils flutter run -d linux
+flutter run -d linux
 ```
+
+Then open Settings, enter the server address (for example `https://host.example.ts.net:3001`) and the key, press Test connection, then Save.
 
 ## Check
 
 ```bash
 flutter analyze
-flutter test                      # fakes the nils process
-flutter test --tags live          # runs the real nils; reads only
+flutter test        # fakes the server and the keyring
 ```
-
-## AnythingLLM
-
-AnythingLLM holds the model and the key. It starts `nils mcp` as a child process and calls the nils tools through it.
-
-1. Add nils to `anythingllm_mcp_servers.json` in AnythingLLM's `plugins` storage directory:
-
-   ```json
-   {
-     "mcpServers": {
-       "nils": {
-         "command": "uv",
-         "args": ["run", "--directory", "/path/to/nils", "nils", "mcp"],
-         "env": {}
-       }
-     }
-   }
-   ```
-
-1. Create a workspace, turn on agent mode in it, and paste the text of `storage/PROMPT.md` from the nils checkout as its system prompt.
-
-1. Stage a file here, then ask the workspace to file it.
-
-A commit tool writes to a library. The prompt tells the model to wait for a yes, and AnythingLLM's own tool-call confirmation is a setting of AnythingLLM. Neither this app nor nils can force a person to be asked.
