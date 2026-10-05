@@ -1,31 +1,33 @@
 # Nilson
 
-A lightweight Linux front end for an AnythingLLM server: browse its workspaces and documents, and upload files to it.
+A lightweight Linux chat client for an AnythingLLM server. Ask questions in a workspace and get answers drawn from the files you add to it.
 
 ## What it does
 
 The app talks only to the AnythingLLM server you set up in Settings, through AnythingLLM's developer API.
 
-| Section | Shows |
+| Part | What it does |
 | --- | --- |
-| Workspaces | Each workspace with its slug, chat model and thread count. Open one to list its documents. |
-| Documents | Every document the server has read in, grouped by folder, with search and a folder filter. Open one to see its details and which workspaces hold it. |
-| Upload | Drop or pick files to send into a folder you choose. Files of a type the server does not read are refused before they are sent. |
-| Settings | The server address and API key, with a connection test. |
+| Sidebar | Lists your workspaces and how many files each holds. The open workspace lists its chats. Make a workspace with **+**, start a chat with **New chat**, and rename (pencil, or double-click) or delete (trash) the open chat. |
+| Chat | Shows the open chat. Enter sends and Shift+Enter starts a new line. Answers stream in, and **Stop** ends one early. Numbered chips under an answer name the files it used; click one to find the file in Sources. Only one answer runs at a time. |
+| Sources | Lists the open workspace's files. Drop files on the panel, or click it to browse; they are uploaded and added to the workspace. A switch takes a file out of answers without forgetting it. The trash removes a file, with a few seconds to undo. |
+| Settings | Holds the server address and API key. A key is saved only once the server accepts it. Also holds the **Only answer from my documents** switch. |
 
-Until a server is set up, the app opens on Settings and the other sections point there.
+Until a key is saved, the app opens with Settings showing, and the composer points there.
 
-**What it leaves to AnythingLLM:**
+**How the Sources switch works.** AnythingLLM has no per-file switch, so turning a file off takes it out of the workspace on the server. The app remembers it, so it stays listed and can be turned on again. Removing a file takes it out of the workspace; the file stays in AnythingLLM's document library.
 
-- **Chat.** There is none in this app.
-- **Document text.** AnythingLLM's API does not return it, so a document page shows its details only.
-- **Adding a document to a workspace.** Uploaded files land in a folder; add them to a workspace in AnythingLLM.
+**Only answer from my documents.** On, each question is asked in AnythingLLM's `query` mode, which answers only from the workspace's files. Off, it is asked in `chat` mode, which may also answer from general knowledge. The workspace's own settings on the server are not changed.
 
-## Where the key lives
+## Where things are kept
 
-The address and the API key are kept together in one entry in the system keyring, through `flutter_secure_storage`. No file in the project or in `~/.config` holds them, and no error message shows the key.
+| What | Where |
+| --- | --- |
+| Server address and API key | One entry in the system keyring, through `flutter_secure_storage`. No error message shows the key. |
+| The Answers switch and the switched-off files | `~/.config/nilson/prefs.json`, or under `$XDG_CONFIG_HOME` when set. Nothing secret. |
+| Workspaces, chats and files | The AnythingLLM server. |
 
-If the keyring cannot be read or written, the app still starts, uses what you entered for that run, and says so on the Settings page.
+If the keyring cannot be read or written, the app still starts, uses what you entered for that run, and says so in Settings.
 
 ## Requirements
 
@@ -41,11 +43,11 @@ flutter pub get
 flutter run -d linux
 ```
 
-Then open Settings, enter the server address (for example `https://host.example.ts.net:3001`) and the key, press Test connection, then Save.
+Settings opens on the first run. Enter the server address (for example `https://host.example.ts.net:3001`) and the key, then press Save key.
 
 ## Check
 
 ```bash
 flutter analyze
-flutter test        # fakes the server and the keyring
+flutter test        # fakes the server, the keyring and the preferences file
 ```
