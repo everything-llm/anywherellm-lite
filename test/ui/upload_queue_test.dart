@@ -156,9 +156,7 @@ void main() {
     expect(control('Delete'), findsNothing);
   });
 
-  testWidgets('what waits in Sources stays with its workspace', (
-    tester,
-  ) async {
+  testWidgets('what waits in Sources stays with its workspace', (tester) async {
     final llm = planningServer();
     final h = await pumpApp(tester, llm: llm);
     await drop(tester, SourcesPanel, [file('a.md')]);
@@ -197,5 +195,9 @@ void main() {
     expect(h.sources.problems.single.title, 'Could not add the link');
     expect(find.text('example.com/x'), findsOneWidget);
     expect(find.text('Finance'), findsOneWidget);
+    await tester.tap(control('Add'));
+    await tester.tap(control('Add'));
+    await tester.pumpAndSettle();
+    expect(h.sources.problems, hasLength(1));
   });
 }

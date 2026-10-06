@@ -34,6 +34,13 @@ class PrefsController extends ChangeNotifier {
     }
   }
 
+  /// Keeps a workspace whose slug changed where it stands in the arrangement.
+  Future<void> renameWorkspace(String from, String to) async {
+    if (prefs.workspaceOrder.contains(from)) {
+      await _change(prefs.withRenamedWorkspace(from, to));
+    }
+  }
+
   Future<void> setTheme(ThemePref theme) => _change(prefs.withTheme(theme));
 
   Future<void> setTextSize(TextSize size) => _change(prefs.withTextSize(size));

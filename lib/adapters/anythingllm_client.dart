@@ -63,8 +63,9 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   /// Whether each connection asked so far is a relay.
   final _relays = <Connection, bool>{};
 
-  /// The run [streamChat] is following in each chat, by workspace and thread.
-  final _runs = <(String, String), (Connection, String)>{};
+  /// The run [streamChat] is following in each chat, by workspace and thread: its id once the
+  /// relay answers the start, or null when it did not start it.
+  final _runs = <(String, String), (Connection, Future<String?>)>{};
 
   final _random = Random.secure();
 
@@ -176,12 +177,15 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     }
   }
 
-  /// Cancels the chat's run on the relay. The run is forgotten before the call is sent, so the
-  /// subscription can be cancelled at once.
+  /// Cancels the chat's run on the relay, once the relay has said which run it is. The run is
+  /// forgotten before the call is sent, so the subscription can be cancelled at once.
   @override
   Future<void> stopChat(String slug, String thread) async {
-    final (connection, id) = _runs.remove((slug, thread)) ?? (null, null);
-    if (connection == null || id == null) return;
+    final run = _runs.remove((slug, thread));
+    if (run == null) return;
+    final (connection, started) = run;
+    final id = await started;
+    if (id == null) return;
     await _call(
       connection,
       timeout,
@@ -198,8 +202,8 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   }
 
   /// Whether [connection] is a relay: `GET /runs` answers a JSON list there, and AnythingLLM's
-  /// web page or an error anywhere else. A refused key is not remembered, so a corrected one is
-  /// asked again.
+  /// web page or an error anywhere else. A refused key or a 5xx is not remembered, so a
+  /// corrected key or a relay failing for a moment is asked again on the next message.
   Future<bool> _isRelay(Connection connection) async {
     if (_relays[connection] case final known?) return known;
     final response = await _fetch(
@@ -211,7 +215,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       ),
     );
     final status = response.statusCode;
-    if (status == 401 || status == 403) return false;
+    if (status == 401 || status == 403 || status >= 500) return false;
     return _relays[connection] = status == 200 && _json(response) is List;
   }
 
@@ -247,8 +251,9 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     return out.stream;
   }
 
-  /// Starts the run of [body] and follows it until it ends or [gone] completes. The relay
-  /// answers a chat that already has a run going with 409 and says so.
+  /// Starts the run of [body] and follows it until it ends or [gone] completes. The chat's run
+  /// is known before the relay answers, so a stop sent meanwhile cancels it once it has an id.
+  /// The relay answers a chat that already has a run going with 409 and says so.
   Stream<ChatEvent> _startRun(
     Connection connection,
     String slug,
@@ -257,6 +262,25 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     Duration limit,
     Future<void> gone,
   ) async* {
+    final chat = (slug, thread);
+    final id = _beginRun(connection, slug, thread, body, limit);
+    final started = id.then<String?>((id) => id, onError: (_) => null);
+    _runs[chat] = (connection, started);
+    try {
+      yield* chatEventsOf(_runChunks(connection, await id, gone));
+    } finally {
+      if (identical(_runs[chat]?.$2, started)) _runs.remove(chat);
+    }
+  }
+
+  /// Asks the relay to run [body], and gives the run's id.
+  Future<String> _beginRun(
+    Connection connection,
+    String slug,
+    String thread,
+    Map<String, Object?> body,
+    Duration limit,
+  ) async {
     final run = await _call(
       connection,
       limit,
@@ -276,19 +300,13 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     if (id is! String) {
       throw const ApiException('The relay did not start the answer.');
     }
-    final chat = (slug, thread);
-    _runs[chat] = (connection, id);
-    try {
-      yield* chatEventsOf(_runChunks(connection, id, gone));
-    } finally {
-      if (_runs[chat]?.$2 == id) _runs.remove(chat);
-    }
+    return id;
   }
 
   /// The `stream-chat` chunks of run [id], as the relay hands them back, until the run ends or
   /// [gone] completes. A connection that drops, or stays [quiet] too long, is opened again after
   /// the last event seen, after each of [rejoinDelays] in turn; an event coming in starts them
-  /// over.
+  /// over. So is one the relay answers with a 5xx.
   Stream<Map<String, dynamic>> _runChunks(
     Connection connection,
     String id,
@@ -315,25 +333,27 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
         )) {
           if (event.id case final seen?) after = seen;
           misses = 0;
-          final Object? data;
-          try {
-            data = jsonDecode(event.data);
-          } on FormatException {
-            continue;
-          }
           switch (event.name) {
-            case 'chunk' when data is Map<String, dynamic>:
-              yield data;
+            case 'chunk':
+              if (jsonOrNull(event.data) case final Map<String, dynamic> c) {
+                yield c;
+              }
             case 'failed':
+              final data = jsonOrNull(event.data);
+              final plain = event.data.trim();
               throw ApiException(
-                _said(data) ?? 'The relay could not finish the answer.',
+                _said(data) ??
+                    (data == null && plain.isNotEmpty
+                        ? plain
+                        : 'The relay could not finish the answer.'),
               );
             case 'done' || 'cancelled':
               return;
           }
         }
-      } on ApiException {
-        rethrow;
+      } on ApiException catch (error) {
+        if ((error.status ?? 0) < 500) rethrow;
+        // The relay failed for a moment: rejoin below.
       } on Exception {
         // Dropped or silent: rejoin below.
       }
@@ -761,7 +781,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   /// The decoded JSON of [response], or null when it is not JSON.
   Object? _json(http.Response response) {
     try {
-      return jsonDecode(utf8.decode(response.bodyBytes));
+      return jsonOrNull(utf8.decode(response.bodyBytes));
     } on FormatException {
       return null;
     }

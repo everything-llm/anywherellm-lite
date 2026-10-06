@@ -598,9 +598,13 @@ class _ChatRowState extends State<_ChatRow> {
                 final chat = scope.chat;
                 scope.shell.closeSide();
                 if (chat.activeSlug != widget.workspace) {
-                  await chat.select(widget.workspace);
+                  await chat.select(
+                    widget.workspace,
+                    thread: widget.thread.slug,
+                  );
+                } else {
+                  await chat.open(widget.thread.slug);
                 }
-                await chat.open(widget.thread.slug);
               },
               onDoubleTap: widget.current ? _startRename : null,
               radius: BorderRadius.circular(8),

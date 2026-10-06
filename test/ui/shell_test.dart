@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
@@ -286,6 +288,22 @@ void main() {
       expect(inChat(find.text(ChatMode.query.about)), findsOneWidget);
       expect(find.text('Ask about your files…'), findsOneWidget);
     });
+
+    testWidgets(
+      'an empty chat follows the chat mode before the server answers',
+      (tester) async {
+        final llm = planningServer();
+        final h = await pumpApp(tester, llm: llm);
+        h.chat.newChat();
+        await tester.pumpAndSettle();
+        final gate = llm.gates['updateWorkspace'] = Completer<void>();
+        await tester.tap(inSources(control('Query')));
+        await tester.pump();
+        expect(inChat(find.text(ChatMode.query.about)), findsOneWidget);
+        gate.complete();
+        await tester.pumpAndSettle();
+      },
+    );
 
     testWidgets('an unknown chat mode claims only what every mode does', (
       tester,

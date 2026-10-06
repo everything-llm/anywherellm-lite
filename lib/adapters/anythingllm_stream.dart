@@ -64,13 +64,19 @@ Stream<Map<String, dynamic>> _dataChunks(Stream<List<int>> bytes) async* {
   await for (final line
       in bytes.transform(utf8.decoder).transform(const LineSplitter())) {
     if (!line.startsWith('data:')) continue;
-    final Object? chunk;
-    try {
-      chunk = jsonDecode(line.substring(5).trim());
-    } on FormatException {
-      continue;
+    if (jsonOrNull(line.substring(5).trim())
+        case final Map<String, dynamic> c) {
+      yield c;
     }
-    if (chunk is Map<String, dynamic>) yield chunk;
+  }
+}
+
+/// The decoded JSON of [text], or null when it is not JSON.
+Object? jsonOrNull(String text) {
+  try {
+    return jsonDecode(text);
+  } on FormatException {
+    return null;
   }
 }
 

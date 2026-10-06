@@ -73,6 +73,11 @@ class FilesController extends ChangeNotifier {
 
   bool contentLoading = false;
 
+  /// Whether a workspace's `settings.json` shows as JSON rather than the form. It holds while
+  /// the same file is read afresh, as after a save.
+  bool get settingsAsJson => _settingsAsJson;
+  bool _settingsAsJson = false;
+
   /// The file being sent now, or null.
   String? sending;
 
@@ -131,6 +136,7 @@ class FilesController extends ChangeNotifier {
     _tree = null;
     _loaded = false;
     selected = null;
+    _settingsAsJson = false;
     _clearContent();
     problems = const [];
     exporting = false;
@@ -206,6 +212,7 @@ class FilesController extends ChangeNotifier {
 
   /// Shows the node at [path], reading its text or document.
   Future<void> select(String path) async {
+    if (path != selected) _settingsAsJson = false;
     selected = path;
     _clearContent();
     final node = this.node;
@@ -228,6 +235,12 @@ class FilesController extends ChangeNotifier {
       problems = [Notice('Could not read ${node.name}', error.message)];
     }
     contentLoading = false;
+    notifyListeners();
+  }
+
+  void showSettingsAsJson(bool json) {
+    if (_settingsAsJson == json) return;
+    _settingsAsJson = json;
     notifyListeners();
   }
 

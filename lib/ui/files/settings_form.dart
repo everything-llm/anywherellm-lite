@@ -98,7 +98,7 @@ class _SettingsFormState extends State<SettingsForm> {
       }
       switch (spec.type) {
         case SettingType.text:
-          values[key] = _text[key]!.text;
+          values[key] = text;
         case SettingType.integer:
           final whole = int.tryParse(text);
           whole == null

@@ -41,10 +41,13 @@ class MessageList extends StatelessWidget {
       listenable: scope.prefs,
       builder: (context, _) {
         final media = MediaQuery.of(context);
-        final scale =
-            media.textScaler.scale(1) * scope.prefs.prefs.textSize.scale;
         return MediaQuery(
-          data: media.copyWith(textScaler: TextScaler.linear(scale)),
+          data: media.copyWith(
+            textScaler: _TimesScaler(
+              media.textScaler,
+              scope.prefs.prefs.textSize.scale,
+            ),
+          ),
           child: _turns(turns),
         );
       },
@@ -119,7 +122,7 @@ class _Empty extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               ListenableBuilder(
-                listenable: sources,
+                listenable: Listenable.merge([sources, sources.chatMode]),
                 builder: (context, _) => Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -513,4 +516,26 @@ class _Citation extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The system's text scaling, which may be non-linear, times the person's chat text size.
+class _TimesScaler extends TextScaler {
+  const _TimesScaler(this.base, this.factor);
+
+  final TextScaler base;
+  final double factor;
+
+  @override
+  double scale(double fontSize) => base.scale(fontSize) * factor;
+
+  @Deprecated('Use scale instead.')
+  @override
+  double get textScaleFactor => scale(14) / 14;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _TimesScaler && other.base == base && other.factor == factor;
+
+  @override
+  int get hashCode => Object.hash(base, factor);
 }

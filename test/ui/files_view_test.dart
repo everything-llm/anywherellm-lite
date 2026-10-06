@@ -96,6 +96,28 @@ void main() {
     expect(llm.calls, isNot(contains('updateWorkspace:q3')));
   });
 
+  testWidgets('saving from Edit as JSON stays on the JSON', (tester) async {
+    final llm = planningServer();
+    final h = await pumpApp(tester, llm: llm);
+    h.shell.showPane(Pane.files);
+    await tester.pumpAndSettle();
+    await tapTree(tester, 'Q3 planning');
+    await tapTree(tester, 'settings.json');
+    await tester.tap(inPane(control('Edit as JSON')));
+    await tester.pumpAndSettle();
+    final edited = const JsonEncoder.withIndent('  ')
+        .convert({...llm.spaces.first.settings, 'topN': 6});
+    await tester.enterText(inPane(find.byType(TextField)), edited);
+    await tester.pump();
+    await tester.tap(inPane(control('Save')));
+    await tester.pumpAndSettle();
+    expect(llm.spaces.first.settings['topN'], 6);
+    expect(inPane(control('Edit as JSON')), findsNothing);
+    await tapTree(tester, 'PROMPT.md');
+    await tapTree(tester, 'settings.json');
+    expect(inPane(control('Edit as JSON')), findsOneWidget);
+  });
+
   group('the settings form', () {
     Future<FakeAnythingLlm> openSettings(WidgetTester tester) async {
       final llm = planningServer();
@@ -137,6 +159,18 @@ void main() {
       expect(llm.calls, contains('updateWorkspace:q3'));
       expect(llm.spaces.first.settings['chatMode'], 'query');
       expect(llm.spaces.first.settings['topN'], 9);
+    });
+
+    testWidgets('a text setting is saved without its spaces', (tester) async {
+      final llm = await openSettings(tester);
+      await tester.enterText(
+        typingField(inPane(find.bySemanticsLabel('LLM model'))),
+        ' gpt-4o ',
+      );
+      await tester.pump();
+      await tester.tap(inPane(control('Save')));
+      await tester.pumpAndSettle();
+      expect(llm.spaces.first.settings['chatModel'], 'gpt-4o');
     });
 
     testWidgets('a bad number is flagged and nothing is sent', (tester) async {

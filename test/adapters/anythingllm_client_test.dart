@@ -1361,16 +1361,22 @@ void main() {
     String chunk(int id, Map<String, Object?> data) => event(id, 'chunk', data);
 
     /// A relay that starts run `r_1` and answers its events with what [follow] gives for each
-    /// try, counting from 0. Every request goes into [seen].
+    /// try, counting from 0. Every request goes into [seen]. The start waits for [started], the
+    /// asking whether it is a relay answers [probeStatus] for each ask, and a try at the events
+    /// answers [eventsStatus].
     HttpAnythingLlmApi relay(
       Stream<List<int>> Function(int attempt) follow, {
       List<http.Request>? seen,
       int startStatus = 201,
       Object? start,
+      Future<void>? started,
+      int Function(int probe)? probeStatus,
+      int Function(int attempt)? eventsStatus,
       List<Duration> rejoinDelays = const [Duration.zero],
       Duration quiet = const Duration(seconds: 5),
     }) {
       var attempt = 0;
+      var probe = 0;
       return HttpAnythingLlmApi(
         holder: ConnectionHolder(_connection),
         quiet: quiet,
@@ -1384,9 +1390,14 @@ void main() {
           );
           final path = request.url.path;
           if (path == '/runs' && request.method == 'GET') {
-            return http.StreamedResponse(Stream.value(utf8.encode('[]')), 200);
+            final status = probeStatus?.call(probe++) ?? 200;
+            return http.StreamedResponse(
+              Stream.value(utf8.encode(status == 200 ? '[]' : 'Bad Gateway')),
+              status,
+            );
           }
           if (path == '/runs') {
+            await started;
             return http.StreamedResponse(
               Stream.value(
                 utf8.encode(
@@ -1397,7 +1408,15 @@ void main() {
             );
           }
           if (path == '/runs/r_1/events') {
-            return http.StreamedResponse(follow(attempt++), 200);
+            final n = attempt++;
+            final status = eventsStatus?.call(n) ?? 200;
+            if (status != 200) {
+              return http.StreamedResponse(
+                Stream.value(utf8.encode('{"error":"Store busy."}')),
+                status,
+              );
+            }
+            return http.StreamedResponse(follow(n), 200);
           }
           if (path == '/runs/r_1/cancel') {
             return http.StreamedResponse(
@@ -1522,6 +1541,26 @@ void main() {
       );
     });
 
+    test('a relay failing when asked is asked again next time', () async {
+      final seen = <http.Request>[];
+      final api = relay(
+        (_) => lines([event(1, 'done', {})]),
+        seen: seen,
+        probeStatus: (probe) => probe == 0 ? 503 : 200,
+      );
+      api.streamChat('w', 't', 'One').listen((_) {}, onError: (_) {});
+      await pumpEventQueue();
+      await api.streamChat('w', 't', 'Two').toList();
+      expect(
+        seen.where((r) => r.method == 'GET' && r.url.path == '/runs'),
+        hasLength(2),
+      );
+      expect(
+        seen.where((r) => r.method == 'POST' && r.url.path == '/runs'),
+        hasLength(1),
+      );
+    });
+
     test('a web page at /runs is AnythingLLM itself', () async {
       final paths = <String>[];
       final api = HttpAnythingLlmApi(
@@ -1583,6 +1622,44 @@ void main() {
       expect((events.first as TextChunk).text, 'Hi');
     });
 
+    test('a relay failing for a moment while rejoining is rejoined', () async {
+      final events = await relay(
+        (_) => lines([
+          chunk(2, {'type': 'textResponseChunk', 'textResponse': 'Hi'}),
+          event(3, 'done', {}),
+        ]),
+        eventsStatus: (attempt) => attempt == 0 ? 503 : 200,
+      ).streamChat('w', 't', 'Hi').toList();
+      expect((events.first as TextChunk).text, 'Hi');
+    });
+
+    test('an end that carries no JSON still ends the answer', () async {
+      for (final end in [
+        'id: 1\nevent: done\ndata:\n\n',
+        'id: 1\nevent: done\ndata: ok\n\n',
+      ]) {
+        final seen = <http.Request>[];
+        await relay(
+          (_) => lines([end]),
+          seen: seen,
+          rejoinDelays: const [Duration.zero, Duration.zero],
+        ).streamChat('w', 't', 'Hi').toList();
+        expect(
+          seen.where((r) => r.url.path == '/runs/r_1/events'),
+          hasLength(1),
+        );
+      }
+    });
+
+    test('a failed run in plain words gives those words', () async {
+      final error = await _failure(
+        relay(
+          (_) => lines(['id: 1\nevent: failed\ndata: The model crashed.\n\n']),
+        ).streamChat('w', 't', 'Hi').toList(),
+      );
+      expect(error.message, 'The model crashed.');
+    });
+
     test('a run that cannot be rejoined says the answer goes on', () async {
       final error = await _failure(
         relay(
@@ -1638,6 +1715,30 @@ void main() {
       expect(seen.last.method, 'POST');
       expect(seen.last.url.path, '/runs/r_1/cancel');
     });
+
+    test(
+      'stop before the relay has started the run cancels it once it has',
+      () async {
+        final seen = <http.Request>[];
+        final started = Completer<void>();
+        final api = relay(
+          (_) => StreamController<List<int>>().stream,
+          seen: seen,
+          started: started.future,
+        );
+        final subscription = api.streamChat('w', 't', 'Hi').listen((_) {});
+        await pumpEventQueue();
+        expect(seen.last.url.path, '/runs');
+        final stopped = api.stopChat('w', 't');
+        final cancelled = subscription.cancel();
+        started.complete();
+        await stopped;
+        await cancelled;
+        expect(seen.last.method, 'POST');
+        expect(seen.last.url.path, '/runs/r_1/cancel');
+        expect(seen.where((r) => r.url.path == '/runs/r_1/events'), isEmpty);
+      },
+    );
 
     test('stop with no run going sends nothing', () async {
       final seen = <http.Request>[];

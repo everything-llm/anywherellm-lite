@@ -112,8 +112,23 @@ class Prefs {
     },
   );
 
-  /// These prefs with the workspaces arranged as [slugs].
-  Prefs withOrder(List<String> slugs) => _copy(workspaceOrder: slugs);
+  /// These prefs with the workspaces arranged as [slugs], and every other slug in the order
+  /// kept after them, as another server's workspaces are.
+  Prefs withOrder(List<String> slugs) => _copy(
+    workspaceOrder: [
+      ...slugs,
+      ...workspaceOrder.where((s) => !slugs.contains(s)),
+    ],
+  );
+
+  /// These prefs with [from] renamed [to] where it stands in the order, as when a workspace's
+  /// slug changes.
+  Prefs withRenamedWorkspace(String from, String to) => _copy(
+    workspaceOrder: [
+      for (final s in workspaceOrder)
+        if (s == from) to else if (s != to) s,
+    ],
+  );
 
   /// These prefs with [slug] dropped from the order, as when the workspace is deleted.
   Prefs withoutWorkspace(String slug) =>

@@ -78,6 +78,26 @@ void main() {
       expect(h.chat.activeSlug, 'household');
       expect(h.chat.activeThread, 'chores');
     });
+
+    testWidgets('an older chat of another workspace reads only that chat', (
+      tester,
+    ) async {
+      final llm = planningServer();
+      llm.spaces[1].threads.addAll(const [
+        Thread(slug: 'chores', name: 'Chores'),
+        Thread(slug: 'meals', name: 'Meals'),
+      ]);
+      final h = await pumpApp(tester, llm: llm);
+      await tester.enterText(search, 'chores');
+      await tester.pumpAndSettle();
+      llm.calls.clear();
+      await tester.tap(inSidebar(control('Chores')));
+      await tester.pumpAndSettle();
+      expect(h.chat.activeThread, 'chores');
+      expect(llm.calls.where((c) => c.startsWith('history')), [
+        'history:chores',
+      ]);
+    });
   });
 
   group('order', () {

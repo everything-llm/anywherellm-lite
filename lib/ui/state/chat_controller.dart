@@ -38,6 +38,13 @@ class Turn extends ChangeNotifier {
   /// Why the answer failed, or null.
   String? error;
 
+  /// Whether the person stopped the answer.
+  bool stopped = false;
+
+  /// Whether the server may finish this answer after the app let go of it: it failed or was
+  /// stopped.
+  bool get unfinished => role == Role.assistant && (error != null || stopped);
+
   /// What an agent is doing while the answer runs, such as a tool it runs, or null.
   String? status;
 
@@ -107,21 +114,14 @@ class ChatController extends ChangeNotifier {
   /// The chats whose names the person chose, which the first message does not rename.
   final Set<String> _named = {};
 
-  /// The server's slash-command presets, or none when they cannot be read. Setting them sets
-  /// [commands].
-  List<SlashCommand> get _presets => _presetList;
-  set _presets(List<SlashCommand> presets) {
-    _presetList = presets;
-    commands = withBuiltIns(presets);
-  }
-
-  List<SlashCommand> _presetList = const [];
+  /// The server's slash-command presets, or none when they cannot be read.
+  List<SlashCommand> _presets = const [];
 
   /// Why the server's presets are missing from [commands], or null when they were read.
   String? commandsNote;
 
   /// The commands a message can start with: `/reset`, then the server's presets.
-  List<SlashCommand> commands = withBuiltIns(const []);
+  List<SlashCommand> get commands => withBuiltIns(_presets);
 
   /// The answer running. Only one runs at a time.
   _Running? _running;
@@ -189,6 +189,7 @@ class ChatController extends ChangeNotifier {
     _turns.clear();
     _draft.clear();
     docCounts.clear();
+    _clearing = false;
     _presets = const [];
     commandsNote = null;
     activeSlug = null;
@@ -214,7 +215,7 @@ class ChatController extends ChangeNotifier {
     });
     loading = false;
     if (active == null) {
-      await select(workspaces.firstOrNull?.slug);
+      await select(_firstSlug);
     } else {
       notifyListeners();
     }
@@ -259,33 +260,43 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The first workspace in the order the person arranged, or null when there is none.
+  String? get _firstSlug =>
+      _prefs.prefs.inOrder(workspaces, (w) => w.slug).firstOrNull?.slug;
+
   void setDocCount(String slug, int count) {
     if (docCounts[slug] == count) return;
     docCounts[slug] = count;
     notifyListeners();
   }
 
-  /// Shows workspace [slug] on its newest chat, or a draft when it has none.
-  Future<void> select(String? slug) async {
+  /// Shows workspace [slug] on chat [thread], or on its newest chat, or a draft when it has
+  /// none.
+  Future<void> select(String? slug, {String? thread}) async {
     activeSlug = slug;
     _draft.clear();
-    final last = slug == null ? null : threadsOf(slug).lastOrNull;
-    await open(last?.slug);
+    await open(
+      thread ?? (slug == null ? null : threadsOf(slug).lastOrNull?.slug),
+    );
   }
 
-  /// Shows chat [threadSlug] of the active workspace, reading its turns the first time.
+  /// Shows chat [threadSlug] of the active workspace, reading its turns the first time, and
+  /// again when its last answer is [Turn.unfinished], so what the server saved since shows.
   Future<void> open(String? threadSlug) async {
     activeThread = threadSlug;
     _clearLinkNotice();
     notifyListeners();
     final slug = activeSlug;
-    if (slug == null || threadSlug == null || _turns.containsKey(threadSlug)) {
+    if (slug == null || threadSlug == null) return;
+    final known = _turns[threadSlug];
+    if (known != null &&
+        (known.lastOrNull?.unfinished != true || isAnswering(threadSlug))) {
       return;
     }
     final server = _server;
     await _try('Could not read the chat', () async {
       final history = await _api.history(slug, threadSlug);
-      if (_server != server) return;
+      if (_server != server || isAnswering(threadSlug)) return;
       _turns[threadSlug] = [for (final m in history) Turn.saved(m)];
     });
   }
@@ -329,13 +340,14 @@ class ChatController extends ChangeNotifier {
     // Read again outside the rename's own notice, so a failed read stays shown.
     if (renamed case final made? when _server == server && made.slug != slug) {
       final shown = activeSlug == slug;
+      unawaited(_prefs.renameWorkspace(slug, made.slug));
       await load();
       if (shown) await select(made.slug);
     }
   }
 
   /// Deletes workspace [slug] with its chats, unless an answer is running in it. Shows the first
-  /// workspace left when it was the one on screen.
+  /// workspace left, in the person's order, when it was the one on screen.
   Future<void> deleteWorkspace(String slug) async {
     if (answeringIn(slug)) return;
     final server = _server;
@@ -354,7 +366,7 @@ class ChatController extends ChangeNotifier {
       ];
       unawaited(_prefs.setOff(slug, const []));
       unawaited(_prefs.forgetWorkspace(slug));
-      if (activeSlug == slug) await select(workspaces.firstOrNull?.slug);
+      if (activeSlug == slug) await select(_firstSlug);
     });
   }
 
@@ -482,8 +494,11 @@ class ChatController extends ChangeNotifier {
         _turns[thread] = [];
       });
     } finally {
-      _clearing = false;
-      notifyListeners();
+      // A new server has started afresh, clearing included.
+      if (_server == server) {
+        _clearing = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -495,6 +510,7 @@ class ChatController extends ChangeNotifier {
       unawaited(_stopOnServer(running.slug, thread));
     }
     running.stream?.cancel();
+    running.answer.stopped = true;
     if (running.answer.text.isEmpty) running.answer.text = 'Stopped.';
     _finish(running);
   }
@@ -574,11 +590,16 @@ class ChatController extends ChangeNotifier {
     linkNotice = null;
   }
 
+  /// Runs [op], showing its failure as a [Notice] titled [failTitle]. A new server meanwhile has
+  /// started afresh, so neither its success nor its failure is shown.
   Future<void> _try(String failTitle, Future<void> Function() op) async {
+    final server = _server;
     try {
       await op();
+      if (_server != server) return;
       problem = null;
     } on ApiException catch (error) {
+      if (_server != server) return;
       problem = Notice(failTitle, error.message);
     }
     notifyListeners();

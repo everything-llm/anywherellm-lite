@@ -174,18 +174,18 @@ class SourcesController extends ChangeNotifier {
   }
 
   /// Has the server read in the web page at [url] with the details in [meta], then adds what it
-  /// made.
-  Future<void> addLink(String url, {DocMeta meta = const DocMeta()}) async {
+  /// made. Answers at once whether it took [url]: one that is not a link is refused and says why.
+  bool addLink(String url, {DocMeta meta = const DocMeta()}) {
     final slug = _slug;
     final link = url.trim();
-    if (slug == null || link.isEmpty) return;
-    final wrong = linkProblem(link);
-    if (wrong != null) {
+    if (slug == null || link.isEmpty) return false;
+    if (linkProblem(link) case final wrong?) {
       problems = [Notice('Could not add the link', wrong)];
       notifyListeners();
-      return;
+      return false;
     }
-    await _readIn(slug, link, () => _api.uploadLink(link, meta: meta));
+    unawaited(_readIn(slug, link, () => _api.uploadLink(link, meta: meta)));
+    return true;
   }
 
   /// Saves [text] as a document called [title] with the details in [meta], then adds it.

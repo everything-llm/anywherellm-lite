@@ -85,6 +85,22 @@ void main() {
     expect(const Prefs().inOrder(['x', 'y'], (s) => s), ['x', 'y']);
   });
 
+  test('arranging keeps the slugs it does not name, as another server\'s', () {
+    final prefs = const Prefs(workspaceOrder: ['x', 'a', 'y'])
+        .withOrder(['b', 'a']);
+    expect(prefs.workspaceOrder, ['b', 'a', 'x', 'y']);
+  });
+
+  test('a renamed workspace keeps its place', () {
+    final prefs = const Prefs(workspaceOrder: ['a', 'b', 'c']);
+    expect(prefs.withRenamedWorkspace('b', 'z').workspaceOrder, [
+      'a',
+      'z',
+      'c',
+    ]);
+    expect(prefs.withRenamedWorkspace('b', 'c').workspaceOrder, ['a', 'c']);
+  });
+
   test('switching a document off keeps the other prefs', () {
     final prefs = const Prefs()
         .withTheme(ThemePref.light)

@@ -143,25 +143,21 @@ class TextPage extends StatelessWidget {
 
 /// A workspace's `settings.json`: the form, or the JSON itself when asked for. Its key changes
 /// each time the settings are read afresh, which drops the draft.
-class _SettingsPage extends StatefulWidget {
+class _SettingsPage extends StatelessWidget {
   const _SettingsPage({super.key, required this.node});
 
   final FileNode node;
 
   @override
-  State<_SettingsPage> createState() => _SettingsPageState();
-}
-
-class _SettingsPageState extends State<_SettingsPage> {
-  bool _json = false;
-
-  @override
-  Widget build(BuildContext context) => _json
-      ? _Editor(node: widget.node, onForm: () => setState(() => _json = false))
-      : SettingsForm(
-          slug: widget.node.slug!,
-          onJson: () => setState(() => _json = true),
-        );
+  Widget build(BuildContext context) {
+    final files = AppScope.of(context).files;
+    return files.settingsAsJson
+        ? _Editor(node: node, onForm: () => files.showSettingsAsJson(false))
+        : SettingsForm(
+            slug: node.slug!,
+            onJson: () => files.showSettingsAsJson(true),
+          );
+  }
 }
 
 /// The editor for a workspace's `PROMPT.md`, or for its `settings.json` as raw JSON. Its key

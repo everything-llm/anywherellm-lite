@@ -163,6 +163,34 @@ void main() {
     expect(rig.chat.busy, isFalse);
   });
 
+  test('a failed answer\'s chat is read again when it is opened', () async {
+    final llm = planningServer()..hold = true;
+    final rig = await started(llm);
+    await rig.chat.send('And next quarter?');
+    llm.chat!.addError(const ApiException('Lost the connection to the relay.'));
+    await pumpEventQueue();
+    llm.histories['budget'] = [
+      ...llm.histories['budget']!,
+      const ChatMessage(role: Role.user, text: 'And next quarter?'),
+      const ChatMessage(role: Role.assistant, text: 'About 45k.'),
+    ];
+    await rig.chat.open('priorities');
+    await rig.chat.open('budget');
+    expect(rig.chat.turns.last.text, 'About 45k.');
+    expect(rig.chat.turns.last.error, isNull);
+  });
+
+  test('a finished answer\'s chat is not read again', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    await rig.chat.send('And next quarter?');
+    await pumpEventQueue();
+    await rig.chat.open('priorities');
+    llm.calls.clear();
+    await rig.chat.open('budget');
+    expect(llm.calls.where((c) => c.startsWith('history')), isEmpty);
+  });
+
   test('an agent answer shows its status, then its whole answer', () async {
     final llm = planningServer()..hold = true;
     final rig = await started(llm);
@@ -231,6 +259,26 @@ void main() {
     await rig.chat.rename('budget', 'Money');
     expect(rig.chat.problem!.text, 'locked');
     expect(rig.chat.title, 'Budget questions');
+  });
+
+  test('opens the first workspace in the person\'s order', () async {
+    final rig = await started(
+      planningServer(),
+      prefs: const Prefs(workspaceOrder: ['household', 'q3']),
+    );
+    expect(rig.chat.activeSlug, 'household');
+  });
+
+  test('select can open a chat other than the newest', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    await rig.chat.select('household');
+    llm.calls.clear();
+    await rig.chat.select('q3', thread: 'priorities');
+    expect(rig.chat.activeThread, 'priorities');
+    expect(llm.calls.where((c) => c.startsWith('history')), [
+      'history:priorities',
+    ]);
   });
 
   test('a new server starts afresh', () async {
@@ -322,6 +370,33 @@ void main() {
       await rig.chat.renameWorkspace('q3', 'Q3 planning');
       expect(llm.calls.where((c) => c.startsWith('renameWorkspace')), isEmpty);
     });
+
+    test(
+      'a rename that changes the slug keeps its place in the order',
+      () async {
+        final llm = planningServer()..renamedSlug = 'q4';
+        final rig = await started(
+          llm,
+          prefs: const Prefs(workspaceOrder: ['q3', 'household']),
+        );
+        await rig.chat.renameWorkspace('q3', 'Q4 planning');
+        expect(rig.prefs.prefs.workspaceOrder, ['q4', 'household']);
+      },
+    );
+
+    test(
+      'deleting the open workspace opens the first left in the order',
+      () async {
+        final llm = planningServer()
+          ..spaces.add(FakeWorkspace('garden', 'Garden'));
+        final rig = await started(
+          llm,
+          prefs: const Prefs(workspaceOrder: ['q3', 'garden', 'household']),
+        );
+        await rig.chat.deleteWorkspace('q3');
+        expect(rig.chat.activeSlug, 'garden');
+      },
+    );
 
     test('a rename that changes the slug reads the workspaces again', () async {
       final llm = planningServer()..renamedSlug = 'q4';
@@ -488,6 +563,22 @@ void main() {
       await clearing;
       expect(rig.chat.busy, isFalse);
       expect(rig.chat.turns, isEmpty);
+    });
+
+    test('a new server while a chat clears leaves nothing busy', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      final gate = llm.gates['resetChat'] = Completer<void>();
+      final clearing = rig.chat.send('/reset');
+      await pumpEventQueue();
+      expect(rig.chat.busy, isTrue);
+      await rig.settings.clear();
+      expect(rig.chat.busy, isFalse);
+      llm.errors['resetChat'] = const ApiException('Gone');
+      gate.complete();
+      await clearing;
+      expect(rig.chat.busy, isFalse);
+      expect(rig.chat.problem, isNull);
     });
 
     test('a preset whose prompt is /reset clears the chat too', () async {

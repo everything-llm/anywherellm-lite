@@ -21,26 +21,31 @@ class SpeechDictation implements Dictation {
     required void Function() onDone,
   }) async {
     _onDone = onDone;
-    final ready = await _speech.initialize(
-      onStatus: (status) {
-        // Done comes after the last words, which notListening does not wait for.
-        if (status == SpeechToText.doneStatus) _finish();
-      },
-      onError: (_) => _finish(),
-    );
-    if (!ready) {
-      _onDone = null;
-      return false;
+    var listening = false;
+    try {
+      final ready = await _speech.initialize(
+        onStatus: (status) {
+          // Done comes after the last words, which notListening does not wait for.
+          if (status == SpeechToText.doneStatus) _finish();
+        },
+        onError: (_) => _finish(),
+      );
+      if (ready) {
+        await _speech.listen(
+          onResult: (result) => onWords(result.recognizedWords),
+          listenOptions: SpeechListenOptions(
+            partialResults: true,
+            listenMode: ListenMode.dictation,
+            pauseFor: const Duration(seconds: 4),
+          ),
+        );
+        listening = true;
+      }
+    } on Exception {
+      // A recognizer that is busy or missing throws instead of answering false.
     }
-    await _speech.listen(
-      onResult: (result) => onWords(result.recognizedWords),
-      listenOptions: SpeechListenOptions(
-        partialResults: true,
-        listenMode: ListenMode.dictation,
-        pauseFor: const Duration(seconds: 4),
-      ),
-    );
-    return true;
+    if (!listening) _onDone = null;
+    return listening;
   }
 
   @override

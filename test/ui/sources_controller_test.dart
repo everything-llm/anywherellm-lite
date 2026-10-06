@@ -168,7 +168,8 @@ void main() {
     test('a link is read in and embedded', () async {
       final llm = planningServer();
       final rig = await started(llm);
-      await rig.sources.addLink(' https://example.com/page ');
+      expect(rig.sources.addLink(' https://example.com/page '), isTrue);
+      await pumpEventQueue();
       expect(
         llm.calls,
         containsAllInOrder([
@@ -199,7 +200,8 @@ void main() {
       final llm = planningServer();
       final rig = await started(llm);
       const meta = DocMeta(author: 'Ada', source: 'Finance');
-      await rig.sources.addLink('https://example.com/page', meta: meta);
+      rig.sources.addLink('https://example.com/page', meta: meta);
+      await pumpEventQueue();
       await rig.sources.addText('Notes', 'Some text', meta: meta);
       await rig.sources.upload([
         UploadFile(
@@ -220,7 +222,7 @@ void main() {
     test('an address that is not a link never reaches the server', () async {
       final llm = planningServer();
       final rig = await started(llm);
-      await rig.sources.addLink('example.com');
+      expect(rig.sources.addLink('example.com'), isFalse);
       expect(llm.calls.where((c) => c.startsWith('uploadLink')), isEmpty);
       expect(rig.sources.problems.single.text, contains('https://'));
     });
@@ -229,7 +231,8 @@ void main() {
       final llm = planningServer()
         ..errors['uploadLink'] = const ApiException('The page did not load.');
       final rig = await started(llm);
-      await rig.sources.addLink('https://example.com');
+      rig.sources.addLink('https://example.com');
+      await pumpEventQueue();
       expect(
         rig.sources.problems.single.title,
         'Could not add https://example.com',

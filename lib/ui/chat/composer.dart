@@ -177,7 +177,9 @@ class _ComposerState extends State<Composer> {
     widget.focus.requestFocus();
   }
 
+  /// Attaches the files picked, unless another chat was shown while the picker was open.
   Future<void> _attach() async {
+    final shown = _chatShown;
     final List<XFile> picked;
     try {
       picked = await openFiles();
@@ -199,7 +201,7 @@ class _ComposerState extends State<Composer> {
         problems.add('${file.name} could not be read.');
       }
     }
-    if (!mounted) return;
+    if (!mounted || _chatShown != shown) return;
     setState(() {
       _attached = [..._attached, ...added];
       _problem = problems.isEmpty ? null : problems.join(' ');
