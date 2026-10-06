@@ -6,12 +6,10 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 
 | Gap | What it needs |
 | --- | --- |
-| Embed widgets, users and invites | `/v1/embed/*` and `/v1/admin/*`. Users and invites matter only in multi-user mode. |
+| Users and invites | `/v1/admin/*`. They matter only in multi-user mode. |
 | Generate or edit an image | `POST /v1/openai/images/generations`, multipart with `prompt`, optional `size` and optional `image_references` to edit. It answers a base64 PNG, and only when the server has an image provider set up. |
-| Files an agent makes | `GET /v1/document/generated-files/{storageFilename}`, named in the answer's `outputs`, which the stream parser ignores today. It waits on the agents check below. |
 | Chats that are in no chat thread | `GET /v1/workspace/{slug}/chats` answers `history`: the chats sent outside any thread, such as the web UI's default workspace chat. Every workspace on the server checked on 2026-10-06 answered an empty list, so this waits until someone uses the default chat. |
 | Large libraries a page at a time | `GET /v1/documents/folder/{name}` with `offset` and `limit`. The library is read in one call today. |
-| Vector count | `GET /v1/system/vector-count`, shown in the Files pane. It counts the whole server; the web UI's per-workspace count is not in `/v1`. |
 | Settings when a workspace is made | `POST /v1/workspace/new` takes `similarityThreshold`, `openAiTemp`, `openAiHistory`, `openAiPrompt`, `queryRefusalResponse` and `topN`. Today they are set afterwards in `settings.json`. |
 
 ## Needs a check against a live server
@@ -27,7 +25,7 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 | Gap | Note |
 | --- | --- |
 | Send a dictated message on its own | The web UI's auto-submit speech. Dictation fills the message and waits for Send. |
-| Read answers aloud | The web UI's auto-speak. Needs on-device text-to-speech, such as `flutter_tts`, which is a new dependency. |
+| Read every answer aloud as it arrives | The web UI's auto-speak. Read aloud is a button on each answer, on Android only. |
 | Spellcheck, auto-scroll and HTML in answers | The web UI's Customization > Chat preferences. Each is a local setting. |
 
 ## Needs a new dependency
@@ -35,6 +33,7 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 | Gap | What it needs |
 | --- | --- |
 | A microphone on Linux | `speech_to_text` has no Linux implementation, so only Android has one. Linux needs another recogniser. |
+| Read aloud on Linux | `flutter_tts` has no Linux implementation. Linux needs another speech engine, such as speech-dispatcher. |
 | Dropping files onto the chat to attach them | `desktop_drop` is already in use for Sources. Decide whether a drop on the chat attaches or adds a source. |
 
 ## Needs the private session API
@@ -43,8 +42,8 @@ The web UI's own endpoints sign in with a session token, not the developer key, 
 
 | Gap | Why the developer API cannot do it |
 | --- | --- |
-| Regenerate | No call deletes the old answer, so a resend leaves both answers in the history. |
-| Edit a prompt or an answer | No call edits a stored chat. |
+| Regenerate in place | Retry asks again, but no call deletes the old answer, so both stay in the history. |
+| Edit a stored prompt or answer | No call edits a stored chat. Edit puts a sent message back in the composer to send anew. |
 | Thumbs up or down | No feedback call. |
 | Fork a chat from a message | No fork call. |
 | Delete one message | No call deletes a stored chat. |
@@ -66,4 +65,4 @@ The web UI's own endpoints sign in with a session token, not the developer key, 
 
 ## Out of scope
 
-Instance administration stays in the web UI: `system/update-env` (it writes the server's `.env`), LLM, embedder and vector-database providers, Scheduled Jobs, Event Logs, Model Router, Telegram, Branding, the Community Hub, Developer API keys, multi-user mode and password protection, the Browser Extension and AnythingLLM Mobile pairing, and the web UI's display language (the app has no translations).
+Instance administration beyond `system.json` stays in the web UI: switching the vector database (it deletes every vector), the server's password and signing secret, Scheduled Jobs, Event Logs, Model Router, Telegram, Branding, the Community Hub, Developer API keys, multi-user mode and password protection, the Browser Extension and AnythingLLM Mobile pairing, and the web UI's display language (the app has no translations).
