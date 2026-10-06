@@ -27,6 +27,7 @@ class Turn extends ChangeNotifier {
       citations = message.citations,
       attachments = message.attachments,
       files = message.files,
+      metrics = message.metrics,
       streaming = false;
 
   final Role role;
@@ -38,6 +39,9 @@ class Turn extends ChangeNotifier {
 
   /// What an agent made with the answer.
   List<GeneratedFile> files = const [];
+
+  /// How the answer ran, when the server measured it.
+  AnswerMetrics? metrics;
   bool streaming;
 
   /// Why the answer failed, or null.
@@ -468,10 +472,11 @@ class ChatController extends ChangeNotifier {
             TextChunk(:final text) => answer._grow(text),
             StatusChunk(:final text) => answer._setStatus(text),
             WholeAnswer(:final text) => answer._replace(text),
-            ChatDone(:final citations, :final files) =>
+            ChatDone(:final citations, :final files, :final metrics) =>
               answer
                 ..citations = citations
-                ..files = files,
+                ..files = files
+                ..metrics = metrics,
           },
           onError: (Object error) => _finish(
             running,

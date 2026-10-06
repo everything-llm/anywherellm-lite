@@ -1,4 +1,5 @@
-// What an answer made besides its text: files and images an agent generated.
+// What an answer carries besides its text: files and images an agent made, and the numbers
+// of how it ran.
 
 /// A file or image an agent made with an answer. Its bytes come from the server by
 /// [storageName], which the server gave it; [name] is what it is called for the person.
@@ -57,3 +58,62 @@ String sizeText(int bytes) => switch (bytes) {
   < 1024 * 1024 => '${(bytes / 1024).toStringAsFixed(1)} KB',
   _ => '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB',
 };
+
+/// How an answer ran, as the server measured it. Any part may be missing.
+class AnswerMetrics {
+  const AnswerMetrics({
+    this.model,
+    this.tokens,
+    this.seconds,
+    this.speed,
+    this.cost,
+  });
+
+  final String? model;
+
+  /// The tokens the answer took.
+  final int? tokens;
+  final double? seconds;
+
+  /// Tokens a second.
+  final double? speed;
+
+  /// What the answer cost, in dollars, when the server priced it.
+  final double? cost;
+
+  /// The parts in words, such as `glm-5.3 · 1,642 tokens · 22 tok/s · 73.9 s · $0.0049`.
+  String get text => [
+    ?model,
+    if (tokens case final tokens?) '${_grouped(tokens)} tokens',
+    if (speed case final speed?) '${speed.round()} tok/s',
+    if (seconds case final seconds?) '${seconds.toStringAsFixed(1)} s',
+    if (cost case final cost?) '\$${cost.toStringAsFixed(cost < 1 ? 4 : 2)}',
+  ].join(' · ');
+}
+
+/// The `metrics` of an answer, or null when it has none: the server sends `{}` for an answer it
+/// did not measure.
+AnswerMetrics? metricsOf(Object? metrics) {
+  if (metrics is! Map<String, dynamic>) return null;
+  double? number(String key) => switch (metrics[key]) {
+    final num n when n.isFinite && n >= 0 => n.toDouble(),
+    _ => null,
+  };
+  final input = number('inputCost');
+  final output = number('outputCost');
+  final found = AnswerMetrics(
+    model: switch (metrics['model']) {
+      final String model when model.trim().isNotEmpty => model.trim(),
+      _ => null,
+    },
+    tokens: number('completion_tokens')?.round(),
+    seconds: number('duration'),
+    speed: number('outputTps'),
+    cost: input == null && output == null ? null : (input ?? 0) + (output ?? 0),
+  );
+  return found.text.isEmpty ? null : found;
+}
+
+/// [n] with commas between thousands: `1,642`.
+String _grouped(int n) =>
+    n.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+$)'), (_) => ',');

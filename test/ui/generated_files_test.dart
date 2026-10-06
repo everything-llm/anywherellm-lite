@@ -54,6 +54,19 @@ void main() {
     expect(h.saved['report.pdf'], [37, 80, 68, 70]);
   });
 
+  testWidgets(
+    'an answer shows how it ran, and one not measured shows nothing',
+    (tester) async {
+      final llm = planningServer();
+      await pumpApp(tester, llm: llm);
+      await ask(tester, 'First');
+      expect(find.textContaining('tokens'), findsNothing);
+      llm.measured = const AnswerMetrics(model: 'glm-5.3', tokens: 1642);
+      await ask(tester, 'Second');
+      expect(find.text('glm-5.3 · 1,642 tokens'), findsOneWidget);
+    },
+  );
+
   testWidgets('a file the server no longer has says so', (tester) async {
     final llm = planningServer()..made = const [_report];
     final h = await pumpApp(tester, llm: llm);

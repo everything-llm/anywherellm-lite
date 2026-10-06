@@ -188,6 +188,7 @@ class ChatMessage {
     this.citations = const [],
     this.attachments = const [],
     this.files = const [],
+    this.metrics,
   });
 
   /// An entry of a chat's `history`.
@@ -203,6 +204,7 @@ class ChatMessage {
         ?_known(attachment, 'name'),
     ],
     files: generatedFilesOf(json['outputs']),
+    metrics: metricsOf(json['metrics']),
   );
 
   final Role role;
@@ -216,6 +218,9 @@ class ChatMessage {
 
   /// What an agent made with the answer.
   final List<GeneratedFile> files;
+
+  /// How the answer ran, when the server measured it.
+  final AnswerMetrics? metrics;
 }
 
 /// A source an answer drew on: a document by its [title], or a web page an agent read, which

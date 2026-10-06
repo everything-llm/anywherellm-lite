@@ -541,6 +541,7 @@ void main() {
           {
             'role': 'assistant',
             'content': 'Here is your report.',
+            'metrics': {'model': 'glm-5.3', 'outputTps': 41.8},
             'outputs': [
               {
                 'type': 'PdfFileDownload',
@@ -566,6 +567,7 @@ void main() {
           },
         ],
       }).history('w', 't');
+      expect(turns.single.metrics?.text, 'glm-5.3 · 42 tok/s');
       final files = turns.single.files;
       expect(files.map((f) => (f.name, f.storageName, f.size, f.isImage)), [
         ('report.pdf', 'pdf-1f2e.pdf', 2048, false),
@@ -702,6 +704,7 @@ void main() {
           'sources': [],
           'close': true,
           'error': false,
+          'metrics': {'model': 'glm-5.3', 'completion_tokens': 12},
           'outputs': [
             {
               'type': 'imageGenerationCard',
@@ -716,6 +719,7 @@ void main() {
         }),
       ]).streamChat('w', 't', 'Draw a cat').toList();
       final done = events.last as ChatDone;
+      expect(done.metrics?.text, 'glm-5.3 · 12 tokens');
       expect(done.files.single.name, 'cat.png');
       expect(done.files.single.isImage, isTrue);
     });

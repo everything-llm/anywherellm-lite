@@ -296,7 +296,18 @@ class _Answer extends StatelessWidget {
         ],
         if (!turn.streaming && split.answer.isNotEmpty) ...[
           const SizedBox(height: 6),
-          CopyButton(split.answer, tooltip: 'Copy answer'),
+          Wrap(
+            spacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              CopyButton(split.answer, tooltip: 'Copy answer'),
+              if (turn.metrics case final metrics?)
+                Text(
+                  metrics.text,
+                  style: Type.sans(12, color: Tokens.of(context).muted),
+                ),
+            ],
+          ),
         ],
       ],
     );

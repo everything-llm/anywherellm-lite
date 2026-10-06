@@ -84,6 +84,9 @@ class FakeAnythingLlm implements AnythingLlmApi {
   /// The files an agent made, which [streamChat] sends with the answer.
   List<GeneratedFile> made = const [];
 
+  /// How [streamChat]'s answer ran.
+  AnswerMetrics? measured;
+
   /// What [generatedFile] answers, by storage name. Any other name is not found.
   final Map<String, List<int>> generated = {};
   bool hold = false;
@@ -213,7 +216,11 @@ class FakeAnythingLlm implements AnythingLlmApi {
     return Stream.fromIterable([
       for (final line in agentStatus) StatusChunk(line),
       TextChunk(answer),
-      ChatDone([for (final title in cited) Citation(title)], files: made),
+      ChatDone(
+        [for (final title in cited) Citation(title)],
+        files: made,
+        metrics: measured,
+      ),
     ]);
   }
 

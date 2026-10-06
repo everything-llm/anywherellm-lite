@@ -73,12 +73,13 @@ String agentStatus(String thought) {
 final _runningTool = RegExp(r'^@agent is executing `([^`]+)`');
 final _agentPrefix = RegExp(r'^@agent:?\s*');
 
-/// The answer is complete. [citations] are what it drew on, and [files] what an agent made
-/// with it.
+/// The answer is complete. [citations] are what it drew on, [files] what an agent made with
+/// it, and [metrics] how it ran.
 class ChatDone extends ChatEvent {
-  const ChatDone(this.citations, {this.files = const []});
+  const ChatDone(this.citations, {this.files = const [], this.metrics});
   final List<Citation> citations;
   final List<GeneratedFile> files;
+  final AnswerMetrics? metrics;
 }
 
 /// The address a link in an answer opens, or null for one the app will not open. Only web
