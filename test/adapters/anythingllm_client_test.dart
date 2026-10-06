@@ -427,6 +427,27 @@ void main() {
       expect(seen.single.url.path, '/api/v1/workspace/w/thread/t');
     });
 
+    test('deleting a workspace sends DELETE and takes a bare OK', () async {
+      final seen = <http.Request>[];
+      await _api((request) async {
+        seen.add(request);
+        return http.Response('OK', 200);
+      }).deleteWorkspace('scratch');
+      expect(seen.single.method, 'DELETE');
+      expect(seen.single.url.path, '/api/v1/workspace/scratch');
+    });
+
+    test('a delete answered with a web page is not a success', () async {
+      final error = await _failure(
+        _api((_) async => http.Response('<html>login</html>', 200))
+            .deleteWorkspace('scratch'),
+      );
+      expect(
+        error.message,
+        'The address did not answer like an AnythingLLM server.',
+      );
+    });
+
     test('a history is each turn with its cited titles', () async {
       final seen = <http.Request>[];
       final turns = await _answering({

@@ -7,7 +7,7 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 | Gap | What it needs |
 | --- | --- |
 | Rename a workspace | `POST /v1/workspace/{slug}/update` with `name`. |
-| Delete a workspace | `DELETE /v1/workspace/{slug}`, behind a confirmation. |
+| Delete a workspace | `AnythingLlmApi.deleteWorkspace` exists and was checked live. It needs a sidebar action behind a confirmation. |
 | Delete a library folder | `DELETE /v1/document/remove-folder` from the Files pane. |
 | Clear a chat's history (`/reset`) | `reset: true` on `thread/{t}/stream-chat`. |
 | Test what a question retrieves | `POST /v1/workspace/{slug}/vector-search`, shown with each snippet's score. |

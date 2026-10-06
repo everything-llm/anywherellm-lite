@@ -138,6 +138,12 @@ class FakeAnythingLlm implements AnythingLlmApi {
   }, name);
 
   @override
+  Future<void> deleteWorkspace(String slug) => _run('deleteWorkspace', () {
+    _space(slug);
+    spaces.removeWhere((w) => w.slug == slug);
+  }, slug);
+
+  @override
   Future<Thread> createThread(String slug) => _run('createThread', () {
     final made = Thread(slug: 'th-${++_made}', name: newChatName);
     _space(slug).threads.add(made);

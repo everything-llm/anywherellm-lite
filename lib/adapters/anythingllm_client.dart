@@ -74,6 +74,12 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     return Workspace.fromJson(json);
   }
 
+  /// The server answers a delete with no JSON. Deleting a workspace leaves its documents in the
+  /// library.
+  @override
+  Future<void> deleteWorkspace(String slug) =>
+      _send('DELETE', _workspace(slug), null, emptyOk: true);
+
   @override
   Future<Thread> createThread(String slug) async {
     final body = await _send('POST', '${_workspace(slug)}/thread/new', {
@@ -409,8 +415,8 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
 
   static const _refused = 'The server refused the request.';
 
-  /// The decoded JSON of [response], or null for an empty success when [emptyOk], as a delete
-  /// answers. An answer with `success: false` fails, even with HTTP 200, with the server's reason
+  /// The decoded JSON of [response], or null for a success that is empty or the bare status
+  /// text `OK` when [emptyOk], as a delete answers. An answer with `success: false` fails, even with HTTP 200, with the server's reason
   /// or else [refused].
   Object? _decode(
     http.Response response, {
@@ -428,7 +434,9 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
         status: status,
       );
     }
-    if (body == null && !(emptyOk && response.bodyBytes.isEmpty)) {
+    if (body == null &&
+        !(emptyOk &&
+            (response.bodyBytes.isEmpty || response.body.trim() == 'OK'))) {
       throw ApiException(
         'The address did not answer like an AnythingLLM server.',
         status: status,

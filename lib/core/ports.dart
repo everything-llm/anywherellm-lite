@@ -21,6 +21,9 @@ abstract interface class AnythingLlmApi {
 
   Future<Workspace> createWorkspace(String name);
 
+  /// Deletes the workspace with its chats. Its documents stay in the library.
+  Future<void> deleteWorkspace(String slug);
+
   /// A new chat named [newChatName].
   Future<Thread> createThread(String slug);
 
