@@ -1377,6 +1377,16 @@ void main() {
       expect(error.message, contains('Query parameter cannot be empty.'));
     });
 
+    test('the vector count is the server\'s number', () async {
+      final seen = <http.Request>[];
+      expect(
+        await _answering({'vectorCount': 796}, seen: seen).vectorCount(),
+        796,
+      );
+      expect(seen.single.url.path, '/api/v1/system/vector-count');
+      await _failure(_answering({'vectorCount': 'many'}).vectorCount());
+    });
+
     test('a generated file is its bytes, by its storage name', () async {
       final seen = <http.Request>[];
       final bytes = await _api((request) async {

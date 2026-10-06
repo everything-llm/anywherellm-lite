@@ -4,6 +4,7 @@ import 'package:anywherellm/ui/state/files_controller.dart';
 import 'package:anywherellm/ui/state/prefs_controller.dart';
 import 'package:anywherellm/ui/state/settings_controller.dart';
 import 'package:anywherellm/ui/state/sources_controller.dart';
+import 'package:anywherellm/ui/state/system_controller.dart';
 
 import 'fake_api.dart';
 import 'fake_settings.dart';
@@ -28,6 +29,7 @@ class Rig {
     chat = ChatController(this.llm, settings, prefs);
     sources = SourcesController(this.llm, chat, prefs);
     files = FilesController(this.llm, settings, chat, prefs, sources);
+    system = SystemController(this.llm, settings);
   }
 
   final FakeAnythingLlm llm;
@@ -38,6 +40,7 @@ class Rig {
   late final ChatController chat;
   late final SourcesController sources;
   late final FilesController files;
+  late final SystemController system;
 
   /// Reads the prefs and the workspaces, as the app does at start.
   Future<void> start() async {
@@ -47,6 +50,7 @@ class Rig {
   }
 
   void dispose() {
+    system.dispose();
     files.dispose();
     sources.dispose();
     chat.dispose();

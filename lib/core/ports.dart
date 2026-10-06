@@ -136,6 +136,9 @@ abstract interface class AnythingLlmApi {
 
   /// The server's settings, with every secret replaced by whether it is set.
   Future<Map<String, Object?>> systemSettings();
+
+  /// How many vectors the server's vector database holds, across every workspace.
+  Future<int> vectorCount();
 }
 
 /// Where the connection is kept between runs.

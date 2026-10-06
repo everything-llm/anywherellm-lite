@@ -25,6 +25,7 @@ import 'ui/state/prefs_controller.dart';
 import 'ui/state/settings_controller.dart';
 import 'ui/state/shell_controller.dart';
 import 'ui/state/sources_controller.dart';
+import 'ui/state/system_controller.dart';
 
 /// The composition root: the one place that knows the adapters and the UI.
 ///
@@ -86,6 +87,7 @@ class _SessionHostState extends State<SessionHost> {
   late final ChatController _chat;
   late final SourcesController _sources;
   late final FilesController _files;
+  late final SystemController _system;
 
   /// Reads answers aloud on Android, and is null where the device has no such engine to use.
   ReadAloud? _readAloud;
@@ -107,6 +109,7 @@ class _SessionHostState extends State<SessionHost> {
       widget.prefs,
       _sources,
     );
+    _system = SystemController(widget.llm, widget.settings);
     if (Platform.isAndroid) _readAloud = ReadAloud(DeviceSpeaker(), _chat);
     _loaded = _load();
   }
@@ -114,6 +117,7 @@ class _SessionHostState extends State<SessionHost> {
   @override
   void dispose() {
     _readAloud?.dispose();
+    _system.dispose();
     _files.dispose();
     _sources.dispose();
     _chat.dispose();
@@ -145,6 +149,7 @@ class _SessionHostState extends State<SessionHost> {
         chat: _chat,
         sources: _sources,
         files: _files,
+        system: _system,
         launch: widget.launch,
         save: saveWithDialog,
         scanner: Platform.isAndroid ? cameraScanner : null,

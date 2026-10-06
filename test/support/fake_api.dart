@@ -73,6 +73,9 @@ class FakeAnythingLlm implements AnythingLlmApi {
     'EmbeddingEngine': 'native',
     'VectorDB': 'lancedb',
   };
+
+  /// What [vectorCount] answers.
+  int vectors = 796;
   Set<String> acceptedValue = {'.md', '.txt', '.pdf'};
 
   /// What [slashCommands] answers.
@@ -439,6 +442,9 @@ class FakeAnythingLlm implements AnythingLlmApi {
   @override
   Future<List<int>> exportChats(ChatExport format) =>
       _run('exportChats', () => exported.codeUnits, format.name);
+
+  @override
+  Future<int> vectorCount() => _run('vectorCount', () => vectors);
 
   @override
   Future<List<int>> generatedFile(String storageName) =>

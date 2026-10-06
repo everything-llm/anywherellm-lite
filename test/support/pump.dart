@@ -152,6 +152,7 @@ class Harness extends Rig {
       chat: chat,
       sources: sources,
       files: files,
+      system: system,
       launch: (url) async {
         opened.add(url);
         if (openThrows case final error?) throw error;

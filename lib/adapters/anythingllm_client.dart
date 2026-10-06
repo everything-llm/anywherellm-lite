@@ -599,6 +599,15 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     return settings is Map<String, dynamic> ? settings : const {};
   }
 
+  @override
+  Future<int> vectorCount() async => switch (_field(
+    await _get(_current, '/api/v1/system/vector-count'),
+    'vectorCount',
+  )) {
+    final num count => count.toInt(),
+    _ => throw const ApiException(_refused),
+  };
+
   /// The connection in use.
   Connection get _current =>
       _secure(_holder.current ?? (throw const NotConfigured()));

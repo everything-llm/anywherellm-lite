@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/ui/chat/chat_view.dart';
 import 'package:anywherellm/ui/files/file_tree.dart';
 import 'package:anywherellm/ui/files/files_view.dart';
@@ -292,6 +293,36 @@ void main() {
     expect(find.text('Could not save Q3 roadmap.pdf'), findsOneWidget);
     expect(
       find.text('This device cannot save a file this way.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('the settings folder counts the server\'s vectors', (
+    tester,
+  ) async {
+    final h = await pumpApp(tester, llm: planningServer());
+    h.shell.showPane(Pane.files);
+    await tester.pumpAndSettle();
+    await tapTree(tester, 'settings');
+    expect(
+      inPane(find.text('796 vectors in lancedb, across every workspace.')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a vector count the server refuses says why', (tester) async {
+    final llm = planningServer()
+      ..errors['vectorCount'] = const ApiException(
+        'The server rejected the key.',
+      );
+    final h = await pumpApp(tester, llm: llm);
+    h.shell.showPane(Pane.files);
+    await tester.pumpAndSettle();
+    await tapTree(tester, 'settings');
+    expect(
+      inPane(
+        find.text('Could not count the vectors: The server rejected the key.'),
+      ),
       findsOneWidget,
     );
   });
