@@ -10,6 +10,15 @@ import 'state/sources_controller.dart';
 /// Opens [url] outside the app, in the browser or the mail app. Says whether something did.
 typedef LinkOpener = Future<bool> Function(Uri url);
 
+/// Asks where to save a file called [suggestedName], then writes what [bytes] gives there.
+/// Returns where it saved, or null when the person cancelled or [bytes] gave null. [bytes] runs
+/// only after a place is chosen. Throws [Exception] when the device cannot ask or the file cannot
+/// be written.
+typedef FileSaver = Future<String?> Function(
+  String suggestedName,
+  Future<List<int>?> Function() bytes,
+);
+
 /// The app's controllers, put in the tree once by `main.dart`. Controllers are listenable, so
 /// this never notifies: widgets listen to the controller they read.
 class AppScope extends InheritedWidget {
@@ -22,6 +31,7 @@ class AppScope extends InheritedWidget {
     required this.sources,
     required this.files,
     required this.launch,
+    required this.save,
     required super.child,
   });
 
@@ -32,6 +42,7 @@ class AppScope extends InheritedWidget {
   final SourcesController sources;
   final FilesController files;
   final LinkOpener launch;
+  final FileSaver save;
 
   static AppScope of(BuildContext context) {
     // Never notifies, so no dependency is needed. That also lets initState read it.

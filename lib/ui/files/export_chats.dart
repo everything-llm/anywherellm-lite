@@ -1,12 +1,10 @@
-import 'dart:typed_data';
-
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/server_models.dart';
 import '../app_scope.dart';
 import '../widgets/buttons.dart';
 import '../widgets/fields.dart';
+import 'save_file.dart';
 
 /// Saves every chat on the server to a file, in the format chosen.
 class ExportChats extends StatefulWidget {
@@ -22,28 +20,13 @@ class _ExportChatsState extends State<ExportChats> {
   /// Asks where to save first, so nothing is fetched when the person cancels.
   Future<void> _export(ChatExport format) async {
     final files = AppScope.of(context).files;
-    final FileSaveLocation? place;
-    try {
-      place = await getSaveLocation(suggestedName: format.fileName);
-    } on Exception catch (error) {
-      files.report('Could not open the save dialog', '$error');
-      return;
-    } on UnimplementedError {
-      files.report(
-        'Could not open the save dialog',
-        'This device cannot save a file this way.',
-      );
-      return;
-    }
-    if (place == null) return;
-    final bytes = await files.exportChats(format);
-    if (bytes == null || !mounted) return;
-    try {
-      await XFile.fromData(Uint8List.fromList(bytes)).saveTo(place.path);
-      setState(() => _saved = place!.path);
-    } on Exception catch (error) {
-      files.report('Could not save the chats', '$error');
-    }
+    final path = await saveFile(
+      context,
+      format.fileName,
+      () => files.exportChats(format),
+      failTitle: 'Could not save the chats',
+    );
+    if (path != null && mounted) setState(() => _saved = path);
   }
 
   @override

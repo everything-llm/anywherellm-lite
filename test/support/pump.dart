@@ -31,6 +31,15 @@ class Harness extends Rig {
   /// What opening a link throws, when set.
   Object? openThrows;
 
+  /// Every file the app saved, by the name it suggested, with its bytes.
+  final Map<String, List<int>> saved = {};
+
+  /// Whether the person picks a place in the save dialog rather than cancelling.
+  bool saveChosen = true;
+
+  /// What saving a file throws, when set.
+  Exception? saveThrows;
+
   Widget get app => AnywhereLlmApp(
     home: AppScope(
       shell: shell,
@@ -43,6 +52,14 @@ class Harness extends Rig {
         opened.add(url);
         if (openThrows case final error?) throw error;
         return openSucceeds;
+      },
+      save: (name, bytes) async {
+        if (saveThrows case final error?) throw error;
+        if (!saveChosen) return null;
+        final data = await bytes();
+        if (data == null) return null;
+        saved[name] = data;
+        return '/saved/$name';
       },
       child: const AppShell(),
     ),

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../core/copy.dart';
@@ -10,6 +12,8 @@ import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/confirm_box.dart';
 import '../widgets/controls.dart';
+import '../widgets/fields.dart';
+import 'save_file.dart';
 
 /// A library document: who uses it, moving and deleting it, its details and text.
 class LibraryDocView extends StatefulWidget {
@@ -179,9 +183,11 @@ class DocBodyView extends StatelessWidget {
         const SizedBox(height: 14),
         const SectionLabel('Text'),
         const SizedBox(height: 8),
-        if (doc.text case final text?)
-          SelectableText(text, style: Type.mono(13, color: t.ink, height: 1.5))
-        else
+        if (doc.text case final text?) ...[
+          _DownloadText(doc, key: ObjectKey(doc)),
+          const SizedBox(height: 12),
+          SelectableText(text, style: Type.mono(13, color: t.ink, height: 1.5)),
+        ] else
           Text(
             'The server did not send this document\'s text.',
             style: Type.sans(13.5, color: t.muted),
@@ -194,4 +200,39 @@ class DocBodyView extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Saves the text the server read from [doc] to a file, and says where it went.
+class _DownloadText extends StatefulWidget {
+  const _DownloadText(this.doc, {super.key});
+
+  final DocBody doc;
+
+  @override
+  State<_DownloadText> createState() => _DownloadTextState();
+}
+
+class _DownloadTextState extends State<_DownloadText> {
+  String? _saved;
+
+  Future<void> _download() async {
+    final path = await saveFile(
+      context,
+      textFileName(widget.doc.title),
+      () async => utf8.encode(widget.doc.text!),
+      failTitle: 'Could not save ${widget.doc.title}',
+    );
+    if (path != null && mounted) setState(() => _saved = path);
+  }
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: 10,
+    runSpacing: 8,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    children: [
+      AppButton('Download text', onPressed: _download),
+      if (_saved case final path?) HelpText('Saved to $path', status: true),
+    ],
+  );
 }

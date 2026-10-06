@@ -335,4 +335,13 @@ void main() {
       contains(r'[Results \] \[2026\] \\ end](<https://x.test/a(b>)'),
     );
   });
+
+  test('a document\'s text is saved under its title, as a text file', () {
+    expect(textFileName('Q3 roadmap.pdf'), 'Q3 roadmap.pdf.txt');
+    expect(textFileName('notes.md'), 'notes.md');
+    expect(textFileName('meeting-notes.TXT'), 'meeting-notes.TXT');
+    expect(textFileName('Version 1.16'), 'Version 1.16.txt');
+    expect(textFileName('Q&A: what/why?'), 'Q&A- what-why-.txt');
+    expect(textFileName('  '), 'document.txt');
+  });
 }

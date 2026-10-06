@@ -260,6 +260,19 @@ String chatMarkdown(String name, List<ChatMessage> turns) {
   return out.toString();
 }
 
+final _notInFileName = RegExp(r'[\x00-\x1f/\\:*?"<>|]');
+
+final _plainText = RegExp(r'\.(txt|md|markdown)$', caseSensitive: false);
+
+/// The name a document called [title] is saved under by default: the title with any character a
+/// file name cannot hold made `-`, ending in `.txt` unless it already names a plain-text file.
+/// The saved file holds the text the server read, so `report.pdf` becomes `report.pdf.txt`.
+String textFileName(String title) {
+  final name = title.replaceAll(_notInFileName, '-').trim();
+  if (name.isEmpty) return 'document.txt';
+  return _plainText.hasMatch(name) ? name : '$name.txt';
+}
+
 /// [text] safe inside a Markdown link's brackets.
 String _linkText(String text) =>
     text.replaceAllMapped(RegExp(r'[\\\[\]]'), (m) => '\\${m[0]}');
