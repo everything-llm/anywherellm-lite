@@ -6,12 +6,10 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 
 | Gap | What it needs |
 | --- | --- |
-| Test what a question retrieves | `POST /v1/workspace/{slug}/vector-search`, shown with each snippet's score. |
-| Export every chat | `GET /v1/system/export-chats`, saved to a file. |
 | Embed widgets, users and invites | `/v1/embed/*` and `/v1/admin/*`. Users and invites matter only in multi-user mode. |
 | Generate or edit an image | `POST /v1/openai/images/generations`, multipart with `prompt`, optional `size` and optional `image_references` to edit. It answers a base64 PNG, and only when the server has an image provider set up. |
 | Files an agent makes | `GET /v1/document/generated-files/{storageFilename}`, named in the answer's `outputs`, which the stream parser ignores today. It waits on the agents check below. |
-| Chats that are in no chat thread | `GET /v1/workspace/{slug}/chats` with `limit`, `orderBy` and `apiSessionId`. A workspace's default chat in the web UI never shows in the sidebar. What it answers needs a check against a live server first. |
+| Chats that are in no chat thread | `GET /v1/workspace/{slug}/chats` answers `history`: the chats sent outside any thread, such as the web UI's default workspace chat. Every workspace on the server checked on 2026-10-06 answered an empty list, so this waits until someone uses the default chat. |
 | Large libraries a page at a time | `GET /v1/documents/folder/{name}` with `offset` and `limit`. The library is read in one call today. |
 | Vector count | `GET /v1/system/vector-count`, shown in the Files pane. |
 | Settings when a workspace is made | `POST /v1/workspace/new` takes `similarityThreshold`, `openAiTemp`, `openAiHistory`, `openAiPrompt`, `queryRefusalResponse` and `topN`. Today they are set afterwards in `settings.json`. |

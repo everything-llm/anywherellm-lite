@@ -126,6 +126,18 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('a tested question fits at $at', (tester) async {
+      final h = await pumpApp(tester, llm: awkward(), size: size);
+      h.shell.openSources();
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Test a question').last);
+      await tester.pumpAndSettle();
+      await h.sources.search('file-$longWord');
+      await tester.pumpAndSettle();
+      expect(h.sources.hits, isNotEmpty);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('files waiting to be added fit at $at', (tester) async {
       final h = await pumpApp(tester, llm: awkward(), size: size);
       h.shell.openSources();
@@ -197,6 +209,7 @@ void main() {
         '/library',
         '/library/custom-documents',
         '/library/custom-documents/file-$longWord.pdf.json',
+        '/settings',
         '/settings/models.json',
         '/keys',
       ]) {

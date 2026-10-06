@@ -13,6 +13,7 @@ import '../widgets/upload_queue.dart';
 import '../widgets/rise.dart';
 import '../widgets/tappable.dart';
 import 'add_source.dart';
+import 'test_question.dart';
 
 /// The active workspace's files: add them, switch them on and off, remove them.
 class SourcesPanel extends StatelessWidget {
@@ -84,6 +85,8 @@ class SourcesPanel extends StatelessWidget {
                             ),
                             const SizedBox(height: 8),
                             const AddSource(),
+                            const SizedBox(height: 4),
+                            const TestQuestion(),
                             if (sources.sending case final name?) ...[
                               const SizedBox(height: 10),
                               Text(
