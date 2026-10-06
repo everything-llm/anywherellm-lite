@@ -23,6 +23,21 @@ class PrefsController extends ChangeNotifier {
   Future<void> setOff(String slug, List<OffDoc> docs) =>
       _change(prefs.withOff(slug, docs));
 
+  /// Arranges the workspaces as [slugs].
+  Future<void> setWorkspaceOrder(List<String> slugs) =>
+      _change(prefs.withOrder(slugs));
+
+  /// Drops a deleted workspace from the arrangement.
+  Future<void> forgetWorkspace(String slug) async {
+    if (prefs.workspaceOrder.contains(slug)) {
+      await _change(prefs.withoutWorkspace(slug));
+    }
+  }
+
+  Future<void> setTheme(ThemePref theme) => _change(prefs.withTheme(theme));
+
+  Future<void> setTextSize(TextSize size) => _change(prefs.withTextSize(size));
+
   /// Forgets the documents at [paths] wherever they were switched off, as when they are deleted.
   Future<void> forgetDocs(Iterable<String> paths) async {
     final next = prefs.withoutDocs(paths.toSet());

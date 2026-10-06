@@ -81,6 +81,8 @@ void main() {
     await tester.pumpAndSettle();
     await tapTree(tester, 'Q3 planning');
     await tapTree(tester, 'settings.json');
+    await tester.tap(inPane(control('Edit as JSON')));
+    await tester.pumpAndSettle();
     expect(
       inPane(find.textContaining('chatMode is the workspace\'s chat mode')),
       findsOneWidget,
@@ -92,6 +94,93 @@ void main() {
     expect(find.text('Could not save settings.json'), findsOneWidget);
     expect(find.text('{"topN": 0}'), findsOneWidget);
     expect(llm.calls, isNot(contains('updateWorkspace:q3')));
+  });
+
+  group('the settings form', () {
+    Future<FakeAnythingLlm> openSettings(WidgetTester tester) async {
+      final llm = planningServer();
+      // Tall, so the whole form is on screen.
+      final h = await pumpApp(tester, llm: llm, size: const Size(1280, 1800));
+      h.shell.showPane(Pane.files);
+      await tester.pumpAndSettle();
+      await tapTree(tester, 'Q3 planning');
+      await tapTree(tester, 'settings.json');
+      return llm;
+    }
+
+    testWidgets('shows the settings as a form with Save off until a change', (
+      tester,
+    ) async {
+      await openSettings(tester);
+      expect(inPane(find.text('Chat mode')), findsOneWidget);
+      expect(inPane(find.text('Max context snippets')), findsOneWidget);
+      expect(
+        inPane(find.text('Document similarity threshold')),
+        findsOneWidget,
+      );
+      final save = tester.widget<Tappable>(inPane(control('Save')));
+      expect(save.onTap, isNull);
+    });
+
+    testWidgets('saves only what changed', (tester) async {
+      final llm = await openSettings(tester);
+      await tester.tap(inPane(control('Query')));
+      await tester.pump();
+      await tester.enterText(
+        inPane(find.widgetWithText(TextField, '4')).first,
+        '9',
+      );
+      await tester.pump();
+      llm.calls.clear();
+      await tester.tap(inPane(control('Save')));
+      await tester.pumpAndSettle();
+      expect(llm.calls, contains('updateWorkspace:q3'));
+      expect(llm.spaces.first.settings['chatMode'], 'query');
+      expect(llm.spaces.first.settings['topN'], 9);
+    });
+
+    testWidgets('a bad number is flagged and nothing is sent', (tester) async {
+      final llm = await openSettings(tester);
+      await tester.enterText(
+        inPane(find.widgetWithText(TextField, '4')).first,
+        'many',
+      );
+      await tester.pump();
+      llm.calls.clear();
+      await tester.tap(inPane(control('Save')));
+      await tester.pumpAndSettle();
+      expect(inPane(find.text('A whole number.')), findsOneWidget);
+      expect(llm.calls, isNot(contains('updateWorkspace:q3')));
+    });
+
+    testWidgets('a value the server refuses shows why and keeps the draft', (
+      tester,
+    ) async {
+      final llm = await openSettings(tester);
+      await tester.enterText(
+        inPane(find.widgetWithText(TextField, '4')).first,
+        '0',
+      );
+      await tester.pump();
+      await tester.tap(inPane(control('Save')));
+      await tester.pumpAndSettle();
+      expect(find.text('Could not save settings.json'), findsOneWidget);
+      expect(llm.calls, isNot(contains('updateWorkspace:q3')));
+    });
+
+    testWidgets('a similarity preset and Revert', (tester) async {
+      final llm = await openSettings(tester);
+      await tester.tap(inPane(control('High')));
+      await tester.pump();
+      await tester.tap(inPane(control('Revert')));
+      await tester.pump();
+      expect(tester.widget<Tappable>(inPane(control('Save'))).onTap, isNull);
+      await tester.tap(inPane(control('High')));
+      await tester.pump();
+      await tester.tap(inPane(control('Save')));
+      await tester.pumpAndSettle();
+      expect(llm.spaces.first.settings['similarityThreshold'], 0.75);
+    });
   });
 
   testWidgets('a chat shows read only, and a secret shows locked', (

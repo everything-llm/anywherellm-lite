@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/connection.dart';
 import '../../core/errors.dart';
+import '../../core/prefs.dart';
 import '../app_scope.dart';
 import '../state/settings_controller.dart';
 import '../tokens.dart';
@@ -12,6 +13,7 @@ import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
 import '../widgets/fields.dart';
+import '../widgets/segmented.dart';
 import '../widgets/qr_mark.dart';
 
 /// The AnythingLLM address and key, and how answers are made. Drawn over the app by the shell.
@@ -70,6 +72,8 @@ class SettingsDialog extends StatelessWidget {
                 ),
                 const _Section('AnythingLLM API'),
                 const _KeyCard(),
+                const _Section('Appearance'),
+                const _AppearanceCard(),
                 const SizedBox(height: 22),
                 Text(
                   'Your questions and the relevant passages from your files are sent to '
@@ -116,6 +120,61 @@ class _Card extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         spacing: 10,
         children: children,
+      ),
+    );
+  }
+}
+
+/// The theme, and the size of a chat's text.
+class _AppearanceCard extends StatelessWidget {
+  const _AppearanceCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final prefs = AppScope.of(context).prefs;
+    Widget row(String label, Widget control) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 8,
+      children: [
+        Text(
+          label,
+          style: Type.sans(14.5, weight: FontWeight.w500, color: t.ink),
+        ),
+        control,
+      ],
+    );
+    return ListenableBuilder(
+      listenable: prefs,
+      builder: (context, _) => _Card(
+        children: [
+          row(
+            'Theme',
+            Segmented<ThemePref>(
+              options: const [
+                (ThemePref.system, 'System'),
+                (ThemePref.light, 'Light'),
+                (ThemePref.dark, 'Dark'),
+              ],
+              value: prefs.prefs.theme,
+              onChanged: prefs.setTheme,
+            ),
+          ),
+          row(
+            'Chat text size',
+            Segmented<TextSize>(
+              options: const [
+                (TextSize.small, 'Small'),
+                (TextSize.normal, 'Normal'),
+                (TextSize.large, 'Large'),
+              ],
+              value: prefs.prefs.textSize,
+              onChanged: prefs.setTextSize,
+            ),
+          ),
+          if (prefs.problem case final problem?)
+            HelpText('${problem.title}. ${problem.text}', status: true),
+        ],
       ),
     );
   }

@@ -28,13 +28,30 @@ class MessageList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final chat = AppScope.of(context).chat;
+    final scope = AppScope.of(context);
+    final chat = scope.chat;
     final workspace = chat.active;
     final turns = chat.turns;
     if (workspace == null) return const SizedBox.shrink();
     if (turns.isEmpty) {
       return _Empty(workspace: workspace.name, onSuggest: onSuggest);
     }
+    // The person's text size scales the turns, not the controls around them.
+    return ListenableBuilder(
+      listenable: scope.prefs,
+      builder: (context, _) {
+        final media = MediaQuery.of(context);
+        final scale =
+            media.textScaler.scale(1) * scope.prefs.prefs.textSize.scale;
+        return MediaQuery(
+          data: media.copyWith(textScaler: TextScaler.linear(scale)),
+          child: _turns(turns),
+        );
+      },
+    );
+  }
+
+  Widget _turns(List<Turn> turns) {
     return ListView.builder(
       reverse: true,
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),

@@ -14,6 +14,7 @@ import '../widgets/pane_header.dart';
 import 'doc_views.dart';
 import 'file_tree.dart';
 import 'folder_view.dart';
+import 'settings_form.dart';
 
 /// The node picked in the file tree: a folder's contents and actions, a file's text, an editor
 /// for a workspace's prompt and settings, or a document.
@@ -90,7 +91,11 @@ class FilesView extends StatelessWidget {
       NodeKind.locked => const Blank(
         'Locked. AnywhereLLM never reads this: it holds keys and secrets.',
       ),
-      NodeKind.prompt || NodeKind.settings => _Editor(
+      NodeKind.prompt => _Editor(
+        key: ValueKey('${node.path}#${files.revision}'),
+        node: node,
+      ),
+      NodeKind.settings => _SettingsPage(
         key: ValueKey('${node.path}#${files.revision}'),
         node: node,
       ),
@@ -136,12 +141,38 @@ class TextPage extends StatelessWidget {
   );
 }
 
-/// The editor for a workspace's `PROMPT.md` or `settings.json`. Its key changes each time the
-/// text is read afresh, which drops the draft.
-class _Editor extends StatefulWidget {
-  const _Editor({super.key, required this.node});
+/// A workspace's `settings.json`: the form, or the JSON itself when asked for. Its key changes
+/// each time the settings are read afresh, which drops the draft.
+class _SettingsPage extends StatefulWidget {
+  const _SettingsPage({super.key, required this.node});
 
   final FileNode node;
+
+  @override
+  State<_SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<_SettingsPage> {
+  bool _json = false;
+
+  @override
+  Widget build(BuildContext context) => _json
+      ? _Editor(node: widget.node, onForm: () => setState(() => _json = false))
+      : SettingsForm(
+          slug: widget.node.slug!,
+          onJson: () => setState(() => _json = true),
+        );
+}
+
+/// The editor for a workspace's `PROMPT.md`, or for its `settings.json` as raw JSON. Its key
+/// changes each time the text is read afresh, which drops the draft.
+class _Editor extends StatefulWidget {
+  const _Editor({super.key, required this.node, this.onForm});
+
+  final FileNode node;
+
+  /// Switches back to the form, for settings.
+  final VoidCallback? onForm;
 
   @override
   State<_Editor> createState() => _EditorState();
@@ -197,6 +228,11 @@ class _EditorState extends State<_Editor> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (widget.onForm case final onForm?)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextAction('settings', 'Edit as a form', onForm),
+              ),
             for (final note in notes)
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),

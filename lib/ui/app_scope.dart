@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import 'chat/dictation.dart';
 import 'state/chat_controller.dart';
 import 'state/files_controller.dart';
 import 'state/prefs_controller.dart';
@@ -36,6 +37,7 @@ class AppScope extends InheritedWidget {
     required this.launch,
     required this.save,
     this.scanner,
+    this.dictation,
     required super.child,
   });
 
@@ -50,6 +52,9 @@ class AppScope extends InheritedWidget {
 
   /// Reads a QR code in Settings, or null where the device has no camera to scan with.
   final CodeScanner? scanner;
+
+  /// Writes what the person says in the composer, or null where the device cannot listen.
+  final Dictation? dictation;
 
   static AppScope of(BuildContext context) {
     // Never notifies, so no dependency is needed. That also lets initState read it.

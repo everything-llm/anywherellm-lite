@@ -12,6 +12,8 @@ import 'core/ports.dart';
 import 'ui/app.dart';
 import 'ui/app_scope.dart';
 import 'ui/boot_screen.dart';
+import 'ui/chat/dictation.dart';
+import 'ui/chat/speech_dictation.dart';
 import 'ui/files/save_file.dart';
 import 'ui/settings/scan_code.dart';
 import 'ui/shell.dart';
@@ -35,8 +37,10 @@ Future<void> main() async {
       : null;
   final holder = ConnectionHolder();
   final llm = HttpAnythingLlmApi(holder: holder, allowHttp: !android);
+  final prefs = PrefsController(JsonPrefsStore(prefsFile));
   runApp(
     AnywhereLlmApp(
+      prefs: prefs,
       home: SessionHost(
         llm: llm,
         settings: SettingsController(
@@ -45,7 +49,7 @@ Future<void> main() async {
           holder,
           allowHttp: !android,
         ),
-        prefs: PrefsController(JsonPrefsStore(prefsFile)),
+        prefs: prefs,
         shell: ShellController(),
         launch: (url) => launchUrl(url, mode: LaunchMode.externalApplication),
       ),
@@ -80,6 +84,9 @@ class _SessionHostState extends State<SessionHost> {
   late final ChatController _chat;
   late final SourcesController _sources;
   late final FilesController _files;
+
+  /// Listens for speech on Android, and is null where the device has no such service to use.
+  final Dictation? _dictation = Platform.isAndroid ? SpeechDictation() : null;
 
   /// The controllers listen before the keyring is read, so reading a saved connection is what
   /// loads the workspaces.
@@ -134,6 +141,7 @@ class _SessionHostState extends State<SessionHost> {
         launch: widget.launch,
         save: saveWithDialog,
         scanner: Platform.isAndroid ? cameraScanner : null,
+        dictation: _dictation,
         child: const AppShell(),
       );
     },

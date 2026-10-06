@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/copy.dart';
+import '../core/find.dart';
 import '../core/server_models.dart';
 import 'app_scope.dart';
 import 'files/file_tree.dart';
@@ -14,6 +15,7 @@ import 'widgets/basics.dart';
 import 'widgets/brand.dart';
 import 'widgets/buttons.dart';
 import 'widgets/confirm_box.dart';
+import 'widgets/fields.dart';
 import 'widgets/inline_input.dart';
 import 'widgets/min_height.dart';
 import 'widgets/segmented.dart';
@@ -95,10 +97,12 @@ class _Workspaces extends StatefulWidget {
 class _WorkspacesState extends State<_Workspaces> {
   bool _adding = false;
   final _name = TextEditingController();
+  final _search = TextEditingController();
 
   @override
   void dispose() {
     _name.dispose();
+    _search.dispose();
     super.dispose();
   }
 
@@ -116,55 +120,128 @@ class _WorkspacesState extends State<_Workspaces> {
     scope.shell.closeSide();
   }
 
+  /// Moves a workspace in the arrangement the person keeps.
+  void _reorder(List<Workspace> shown, int from, int to) {
+    final slugs = [for (final w in shown) w.slug];
+    slugs.insert(to, slugs.removeAt(from));
+    AppScope.of(context).prefs.setWorkspaceOrder(slugs);
+  }
+
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final chat = scope.chat;
     return ListenableBuilder(
-      listenable: chat,
-      builder: (context, _) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SidebarSection(
-            'Workspaces',
-            action: IconBtn(
-              'plus',
-              tooltip: 'New workspace',
-              box: 24,
-              size: IconSize.xs,
-              onPressed: () => setState(() => _adding = true),
-            ),
-          ),
-          if (_adding)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: InlineInput(
-                controller: _name,
-                label: 'New workspace name',
-                hint: 'Workspace name',
-                height: 36,
-                onSubmit: _create,
-                onCancel: _cancel,
+      listenable: Listenable.merge([chat, scope.prefs, _search]),
+      builder: (context, _) {
+        final query = _search.text.trim();
+        final searching = query.isNotEmpty;
+        final ordered = scope.prefs.prefs.inOrder(
+          chat.workspaces,
+          (w) => w.slug,
+        );
+        // A search keeps a workspace whose name matches, or that holds a chat whose name does.
+        final shown = [
+          for (final w in ordered)
+            if (!searching ||
+                matchesSearch(query, w.name) ||
+                chat
+                    .threadsOf(w.slug)
+                    .any((thread) => matchesSearch(query, thread.name)))
+              w,
+        ];
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SidebarSection(
+              'Workspaces',
+              action: IconBtn(
+                'plus',
+                tooltip: 'New workspace',
+                box: 24,
+                size: IconSize.xs,
+                onPressed: () => setState(() => _adding = true),
               ),
             ),
-          Expanded(
-            child: ListView(
-              children: [
-                for (final w in chat.workspaces)
-                  _WorkspaceRow(w, key: ValueKey(w.slug)),
-              ],
+            if (_adding)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: InlineInput(
+                  controller: _name,
+                  label: 'New workspace name',
+                  hint: 'Workspace name',
+                  height: 36,
+                  onSubmit: _create,
+                  onCancel: _cancel,
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: AppField(
+                controller: _search,
+                label: 'Search workspaces and chats',
+                hint: 'Search',
+                icon: 'search',
+                suffix: searching
+                    ? IconBtn(
+                        'close',
+                        tooltip: 'Clear search',
+                        box: 28,
+                        size: IconSize.xs,
+                        onPressed: _search.clear,
+                      )
+                    : null,
+              ),
             ),
-          ),
-        ],
-      ),
+            Expanded(
+              child: shown.isEmpty && searching
+                  ? Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text(
+                        'Nothing matches "$query".',
+                        style: Type.sans(13.5, color: Tokens.of(context).muted),
+                      ),
+                    )
+                  : ReorderableListView.builder(
+                      // The row's own header starts a drag, not the whole row.
+                      buildDefaultDragHandles: false,
+                      itemCount: shown.length,
+                      onReorderItem: (from, to) => _reorder(shown, from, to),
+                      // The dragged row is drawn in the app's overlay, outside AppScope, so
+                      // it is shown as a name alone.
+                      proxyDecorator: (child, i, animation) =>
+                          _DragGhost(shown[i].name),
+                      itemBuilder: (context, i) => _WorkspaceRow(
+                        shown[i],
+                        key: ValueKey(shown[i].slug),
+                        index: i,
+                        query: query,
+                      ),
+                    ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
 
 class _WorkspaceRow extends StatefulWidget {
-  const _WorkspaceRow(this.workspace, {super.key});
+  const _WorkspaceRow(
+    this.workspace, {
+    super.key,
+    required this.index,
+    required this.query,
+  });
 
   final Workspace workspace;
+
+  /// Where the row sits in the list, for dragging it to another place.
+  final int index;
+
+  /// What the sidebar is searching for. While it is not empty, every workspace shows its chats
+  /// that match, and nothing can be dragged.
+  final String query;
 
   @override
   State<_WorkspaceRow> createState() => _WorkspaceRowState();
@@ -265,42 +342,46 @@ class _WorkspaceRowState extends State<_WorkspaceRow> {
       child: Row(
         children: [
           Expanded(
-            child: Tappable(
-              label: workspace.name,
-              selected: active,
-              tooltip: active ? 'Double-click to rename' : null,
-              onTap: () {
-                if (!active) chat.select(workspace.slug);
-              },
-              onDoubleTap: active ? _startRename : null,
-              radius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 9,
-                ),
-                child: Row(
-                  children: [
-                    AppIcon('chat', size: IconSize.small, color: t.muted),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        workspace.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Type.sans(
-                          14.5,
-                          weight: active ? FontWeight.w600 : FontWeight.w400,
-                          color: t.ink,
+            child: _Draggable(
+              index: widget.index,
+              enabled: widget.query.isEmpty,
+              child: Tappable(
+                label: workspace.name,
+                selected: active,
+                tooltip: active ? 'Double-click to rename' : null,
+                onTap: () {
+                  if (!active) chat.select(workspace.slug);
+                },
+                onDoubleTap: active ? _startRename : null,
+                radius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 9,
+                  ),
+                  child: Row(
+                    children: [
+                      AppIcon('chat', size: IconSize.small, color: t.muted),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          workspace.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Type.sans(
+                            14.5,
+                            weight: active ? FontWeight.w600 : FontWeight.w400,
+                            color: t.ink,
+                          ),
                         ),
                       ),
-                    ),
-                    if (count != null && count > 0)
-                      Text(
-                        plural(count, 'doc', 'docs'),
-                        style: Type.sans(12, color: t.muted),
-                      ),
-                  ],
+                      if (count != null && count > 0)
+                        Text(
+                          plural(count, 'doc', 'docs'),
+                          style: Type.sans(12, color: t.muted),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -339,7 +420,7 @@ class _WorkspaceRowState extends State<_WorkspaceRow> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _header(context, active: active),
-        if (active) ...[
+        if (active && widget.query.isEmpty) ...[
           Tappable(
             label: 'New chat',
             onTap: () {
@@ -359,17 +440,91 @@ class _WorkspaceRowState extends State<_WorkspaceRow> {
             ),
           ),
           for (final thread in chat.threadsOf(workspace.slug).reversed)
-            _ChatRow(thread, current: chat.activeThread == thread.slug),
-        ],
+            _ChatRow(
+              thread,
+              workspace: workspace.slug,
+              current: chat.activeThread == thread.slug,
+            ),
+        ] else if (widget.query.isNotEmpty)
+          for (final thread in chat.threadsOf(workspace.slug).reversed)
+            if (matchesSearch(widget.query, thread.name))
+              _ChatRow(
+                thread,
+                workspace: workspace.slug,
+                current: active && chat.activeThread == thread.slug,
+              ),
       ],
     );
   }
 }
 
+/// A workspace as it looks while it is dragged.
+class _DragGhost extends StatelessWidget {
+  const _DragGhost(this.name);
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Material(
+      color: t.panel,
+      elevation: 6,
+      shadowColor: t.shadow,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        child: Row(
+          children: [
+            AppIcon('chat', size: IconSize.small, color: t.muted),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Type.sans(14.5, weight: FontWeight.w600, color: t.ink),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Starts dragging its [child] to another place in the list: at once with a mouse, after a
+/// press and hold on a touch screen, which would otherwise scroll.
+class _Draggable extends StatelessWidget {
+  const _Draggable({
+    required this.index,
+    required this.enabled,
+    required this.child,
+  });
+
+  final int index;
+  final bool enabled;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled) return child;
+    return switch (Theme.of(context).platform) {
+      TargetPlatform.android || TargetPlatform.iOS || TargetPlatform.fuchsia =>
+        ReorderableDelayedDragStartListener(index: index, child: child),
+      _ => ReorderableDragStartListener(index: index, child: child),
+    };
+  }
+}
+
 class _ChatRow extends StatefulWidget {
-  const _ChatRow(this.thread, {required this.current});
+  const _ChatRow(this.thread, {required this.workspace, required this.current});
 
   final Thread thread;
+
+  /// The slug of the workspace the chat belongs to, which a search can show without it being
+  /// the one on screen.
+  final String workspace;
   final bool current;
 
   @override
@@ -439,9 +594,13 @@ class _ChatRowState extends State<_ChatRow> {
               label: widget.thread.name,
               selected: widget.current,
               tooltip: widget.current ? 'Double-click to rename' : null,
-              onTap: () {
-                scope.chat.open(widget.thread.slug);
+              onTap: () async {
+                final chat = scope.chat;
                 scope.shell.closeSide();
+                if (chat.activeSlug != widget.workspace) {
+                  await chat.select(widget.workspace);
+                }
+                await chat.open(widget.thread.slug);
               },
               onDoubleTap: widget.current ? _startRename : null,
               radius: BorderRadius.circular(8),

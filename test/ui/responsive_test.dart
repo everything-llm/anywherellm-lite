@@ -10,6 +10,7 @@ import 'package:anywherellm/ui/sidebar.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/drop_zone.dart';
+import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 
@@ -133,8 +134,38 @@ void main() {
             ),
         ];
       await pumpApp(tester, llm: llm, size: size);
-      await tester.enterText(typingField().last, '/');
+      await tester.enterText(composerField, '/');
       await tester.pump();
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the microphone and a dictation problem fit at $at', (
+      tester,
+    ) async {
+      final h = await pumpApp(
+        tester,
+        llm: awkward(),
+        size: size,
+        canDictate: true,
+      );
+      h.dictation!.available = false;
+      await tester.tap(
+        find.byWidgetPredicate((w) => w is Tappable && w.label == 'Dictate'),
+      );
+      await tester.pump();
+      expect(find.text('Could not listen'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a search with long names fits at $at', (tester) async {
+      final h = await pumpApp(tester, llm: awkward(), size: size);
+      h.shell.toggleSide();
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.bySemanticsLabel('Search workspaces and chats').last,
+        longWord.substring(0, 5),
+      );
+      await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });
 
@@ -142,7 +173,7 @@ void main() {
       final llm = awkward()
         ..errors['slashCommands'] = const ApiException('no', status: 401);
       await pumpApp(tester, llm: llm, size: size);
-      await tester.enterText(typingField().last, '/');
+      await tester.enterText(composerField, '/');
       await tester.pump();
       expect(find.textContaining('has a password'), findsOneWidget);
       expect(tester.takeException(), isNull);

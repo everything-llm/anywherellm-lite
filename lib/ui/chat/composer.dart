@@ -52,6 +52,17 @@ class _ComposerState extends State<Composer> {
 
   String _typed = '';
 
+  /// Whether the microphone is listening, and what the message held when it began, which what
+  /// is heard follows.
+  bool _listening = false;
+  String _before = '';
+
+  /// Counts the goes, so words that arrive after a message was sent are not put in the next.
+  int _go = 0;
+
+  /// Why dictation could not start, or null.
+  String? _micProblem;
+
   @override
   void initState() {
     super.initState();
@@ -70,7 +81,50 @@ class _ComposerState extends State<Composer> {
   void dispose() {
     _shown.removeListener(_chatChanged);
     widget.draft.removeListener(_changed);
+    _go++;
+    if (_listening) _scope.dictation?.stop();
     super.dispose();
+  }
+
+  /// Starts or ends listening. What is heard follows the message as it stood, and the person
+  /// can still edit it.
+  Future<void> _dictate() async {
+    final dictation = _scope.dictation;
+    if (dictation == null) return;
+    if (_listening) {
+      await dictation.stop();
+      return;
+    }
+    final draft = widget.draft.text;
+    _before = draft.isEmpty || draft.endsWith(' ') || draft.endsWith('\n')
+        ? draft
+        : '$draft ';
+    final go = ++_go;
+    setState(() {
+      _listening = true;
+      _micProblem = null;
+    });
+    final started = await dictation.start(
+      onWords: (words) {
+        if (go != _go) return;
+        final text = '$_before$words';
+        widget.draft.value = TextEditingValue(
+          text: text,
+          selection: TextSelection.collapsed(offset: text.length),
+        );
+      },
+      onDone: () {
+        if (mounted) setState(() => _listening = false);
+      },
+    );
+    if (!started && mounted) {
+      setState(() {
+        _listening = false;
+        _micProblem =
+            'Speech recognition is not available, or the microphone is not allowed. '
+            "Allow it in Android's settings for the app.";
+      });
+    }
   }
 
   Object _chatOnScreen() => (
@@ -159,10 +213,15 @@ class _ComposerState extends State<Composer> {
     ];
   });
 
-  void _sent() => setState(() {
-    _attached = const [];
-    _problem = null;
-  });
+  void _sent() {
+    _go++;
+    if (_listening) _scope.dictation?.stop();
+    setState(() {
+      _attached = const [];
+      _problem = null;
+      _listening = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -196,6 +255,9 @@ class _ComposerState extends State<Composer> {
                 onAttach: _attach,
                 onRemove: _remove,
                 onSent: _sent,
+                onDictate: scope.dictation == null ? null : _dictate,
+                listening: _listening,
+                micProblem: _micProblem,
               );
             },
           ),
@@ -220,6 +282,9 @@ class _Form extends StatelessWidget {
     required this.onAttach,
     required this.onRemove,
     required this.onSent,
+    required this.onDictate,
+    required this.listening,
+    required this.micProblem,
   });
 
   final TextEditingController draft;
@@ -237,6 +302,13 @@ class _Form extends StatelessWidget {
   final VoidCallback onAttach;
   final ValueChanged<Attachment> onRemove;
   final VoidCallback onSent;
+
+  /// Starts or ends dictation, or null where the device cannot listen.
+  final VoidCallback? onDictate;
+  final bool listening;
+
+  /// Why dictation could not start, or null.
+  final String? micProblem;
 
   @override
   Widget build(BuildContext context) {
@@ -320,6 +392,10 @@ class _Form extends StatelessWidget {
         children: [
           if (problem case final problem?) ...[
             AlertBox(AlertKind.bad, 'Could not attach', text: problem),
+            const SizedBox(height: 8),
+          ],
+          if (micProblem case final problem?) ...[
+            AlertBox(AlertKind.bad, 'Could not listen', text: problem),
             const SizedBox(height: 8),
           ],
           if (menu) ...[
@@ -423,6 +499,18 @@ class _Form extends StatelessWidget {
                   ),
                 ),
               const Spacer(),
+              if (onDictate != null)
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: IconBtn(
+                    'mic',
+                    tooltip: listening ? 'Stop dictating' : 'Dictate',
+                    active: listening,
+                    onPressed: chat.busy ? null : onDictate,
+                    box: 34,
+                    size: IconSize.small,
+                  ),
+                ),
               if (here)
                 _RoundButton(
                   label: 'Stop',

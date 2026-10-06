@@ -126,7 +126,6 @@ class ChatController extends ChangeNotifier {
   /// The answer running. Only one runs at a time.
   _Running? _running;
 
-
   bool loading = false;
 
   /// Why the last load or change failed.
@@ -354,6 +353,7 @@ class ChatController extends ChangeNotifier {
           if (w.slug != slug) w,
       ];
       unawaited(_prefs.setOff(slug, const []));
+      unawaited(_prefs.forgetWorkspace(slug));
       if (activeSlug == slug) await select(workspaces.firstOrNull?.slug);
     });
   }

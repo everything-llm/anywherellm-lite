@@ -39,7 +39,7 @@ Finder get typingInto {
   final focused = find.byWidgetPredicate(
     (widget) => widget is EditableText && widget.focusNode.hasFocus,
   );
-  return focused.evaluate().isEmpty ? typingField().last : focused;
+  return focused.evaluate().isEmpty ? composerField : focused;
 }
 
 /// Types [text] where the focus is and presses Enter. Pumps a fixed time rather than settling,
@@ -153,8 +153,7 @@ void main() {
       await tester.enterText(typingInto, 'x');
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
-      // Only the composer is left to type in; a selectable answer is read-only.
-      expect(typingField(), findsOneWidget);
+      expect(find.bySemanticsLabel('New workspace name'), findsNothing);
       expect(llm.calls, isNot(contains('createWorkspace:x')));
     });
 
@@ -511,7 +510,14 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(control('Replace'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(EditableText).first);
+      await tester.tap(
+        find
+            .descendant(
+              of: find.byType(SettingsDialog),
+              matching: find.byType(EditableText),
+            )
+            .first,
+      );
       raiseKeyboard(tester, 300);
       await tester.pumpAndSettle();
       await tester.binding.handlePopRoute();
@@ -577,7 +583,13 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(control('Scan QR code'));
       await tester.pumpAndSettle();
-      expect(find.byType(AppField), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(SettingsDialog),
+          matching: find.byType(AppField),
+        ),
+        findsNothing,
+      );
       await tester.tap(find.text('Fake scan'));
       await tester.pumpAndSettle();
       expect(find.text('Fake scan'), findsNothing);

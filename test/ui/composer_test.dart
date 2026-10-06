@@ -38,7 +38,7 @@ void main() {
     await h.chat.select('household');
     await tester.pumpAndSettle();
     expect(find.text('contract.pdf'), findsNothing);
-    await tester.enterText(typingField().last, 'Hi');
+    await tester.enterText(composerField, 'Hi');
     await tester.pump();
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump(const Duration(milliseconds: 500));

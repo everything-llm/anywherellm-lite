@@ -58,4 +58,40 @@ void main() {
       expect(next.offIn('w').single.path, 'f/b.json');
     },
   );
+
+  test('the order, theme and text size round-trip', () {
+    final prefs = const Prefs()
+        .withOrder(['b', 'a'])
+        .withTheme(ThemePref.dark)
+        .withTextSize(TextSize.large);
+    final back = Prefs.decode(prefs.encode());
+    expect(back.workspaceOrder, ['b', 'a']);
+    expect(back.theme, ThemePref.dark);
+    expect(back.textSize, TextSize.large);
+  });
+
+  test('an unknown theme or size reads as the default', () {
+    final prefs = Prefs.decode(
+      '{"theme": "neon", "textSize": 3, "workspaceOrder": ["a", 4, "b"]}',
+    );
+    expect(prefs.theme, ThemePref.system);
+    expect(prefs.textSize, TextSize.normal);
+    expect(prefs.workspaceOrder, ['a', 'b']);
+  });
+
+  test('inOrder puts the arranged ones first and keeps the rest in place', () {
+    final prefs = const Prefs().withOrder(['c', 'a']);
+    expect(prefs.inOrder(['a', 'b', 'c', 'd'], (s) => s), ['c', 'a', 'b', 'd']);
+    expect(const Prefs().inOrder(['x', 'y'], (s) => s), ['x', 'y']);
+  });
+
+  test('switching a document off keeps the other prefs', () {
+    final prefs = const Prefs()
+        .withTheme(ThemePref.light)
+        .withOrder(['a'])
+        .withOff('a', const [OffDoc(path: 'f/x.json', title: 'x')]);
+    expect(prefs.theme, ThemePref.light);
+    expect(prefs.workspaceOrder, ['a']);
+    expect(prefs.withoutWorkspace('a').workspaceOrder, isEmpty);
+  });
 }
