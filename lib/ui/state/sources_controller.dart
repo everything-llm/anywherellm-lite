@@ -33,7 +33,7 @@ class SourcesController extends ChangeNotifier {
 
   /// The workspace's chat mode on the server, which every message answers in, or null before it
   /// is read or when the server names one this app does not know.
-  ChatMode? chatMode;
+  final chatMode = ValueNotifier<ChatMode?>(null);
 
   /// The extensions the server reads, or null when it has not said. Then the server decides.
   /// Asked again for each workspace, so a new server is asked afresh.
@@ -70,6 +70,7 @@ class SourcesController extends ChangeNotifier {
   @override
   void dispose() {
     _chat.removeListener(_chatChanged);
+    chatMode.dispose();
     _removedTimer?.cancel();
     _flashTimer?.cancel();
     super.dispose();
@@ -79,7 +80,7 @@ class SourcesController extends ChangeNotifier {
     if (_chat.activeSlug == _slug) return;
     _slug = _chat.activeSlug;
     files = const [];
-    chatMode = null;
+    chatMode.value = null;
     problems = const [];
     loading = false;
     sending = null;
@@ -127,7 +128,9 @@ class SourcesController extends ChangeNotifier {
       workspace.documents,
       _prefs.prefs.offIn(workspace.slug),
     );
-    chatMode = ChatMode.fromServer(workspace.settings?.values['chatMode']);
+    chatMode.value = ChatMode.fromServer(
+      workspace.settings?.values['chatMode'],
+    );
     _chat.setDocCount(workspace.slug, workspace.documents.length);
   }
 
@@ -302,9 +305,9 @@ class SourcesController extends ChangeNotifier {
   /// the workspace again.
   Future<void> setChatMode(ChatMode mode) async {
     final slug = _slug;
-    if (slug == null || mode == chatMode) return;
-    final was = chatMode;
-    chatMode = mode;
+    if (slug == null || mode == chatMode.value) return;
+    final was = chatMode.value;
+    chatMode.value = mode;
     notifyListeners();
     try {
       await _api.updateWorkspace(slug, {'chatMode': mode.name});
@@ -312,7 +315,7 @@ class SourcesController extends ChangeNotifier {
       problems = const [];
     } on ApiException catch (error) {
       if (slug != _slug) return;
-      chatMode = was;
+      chatMode.value = was;
       problems = [Notice('Could not change the chat mode', error.message)];
       notifyListeners();
       return;

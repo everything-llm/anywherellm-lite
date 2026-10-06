@@ -37,11 +37,13 @@ String extensionOf(String name) {
   return dot <= 0 ? '' : name.substring(dot).toLowerCase();
 }
 
-/// The file type on a file's tile: its extension in capitals, four letters at most, or `FILE`
-/// when it has none or what follows the last dot is not one, as in a title like `.NET/React`.
+final _extension = RegExp(r'^\.[A-Z0-9]+$');
+
+/// The file type on a file's tile: the extension of [name] in capitals, four letters at most, or
+/// `FILE` when it has none or what follows the last dot is not one, as in `notes.v2-final`.
 String sourceExt(String name) {
   final extension = extensionOf(name).toUpperCase();
-  if (!RegExp(r'^\.[A-Z0-9]+$').hasMatch(extension)) return 'FILE';
+  if (!_extension.hasMatch(extension)) return 'FILE';
   return extension.length > 5
       ? extension.substring(1, 5)
       : extension.substring(1);

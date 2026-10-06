@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/chat.dart';
 import '../../core/sources.dart';
 import '../app_scope.dart';
 import '../icons.dart';
@@ -66,10 +67,7 @@ class SourcesPanel extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  'Answers draw on the switched-on files.',
-                  style: Type.sans(13, color: t.muted),
-                ),
+                Text(everyModeDrawsOn, style: Type.sans(13, color: t.muted)),
                 const SizedBox(height: 12),
                 const ChatModeChooser(),
                 const SizedBox(height: 14),

@@ -21,13 +21,27 @@ class SourceFile {
   final bool on;
   final int? words;
 
-  /// The type on the file's tile: `PDF`, `MD`, or `FILE`.
-  String get tile => sourceExt(title);
+  /// The type on the file's tile: `PDF`, `MD`, `WEB` or `FILE`.
+  String get tile => docType(path);
 
   /// `1204 words`, or empty when the server did not count them.
   String get meta => words == null ? '' : plural(words!, 'word', 'words');
 
   OffDoc get asOff => OffDoc(path: path, title: title, words: words);
+}
+
+final _storedId = RegExp(
+  r'-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+  caseSensitive: false,
+);
+
+/// The type of the document at [path], read from the name the server stored it under rather than
+/// its title: `report.pdf-<id>.json` is `PDF`, and a web page's `url-<page>-<id>.json` is `WEB`.
+String docType(String path) {
+  var name = docName(path);
+  if (name.endsWith('.json')) name = name.substring(0, name.length - 5);
+  name = name.replaceFirst(_storedId, '');
+  return name.startsWith('url-') ? 'WEB' : sourceExt(name);
 }
 
 /// The documents [embedded] in a workspace, switched on, followed by those switched [off] there.

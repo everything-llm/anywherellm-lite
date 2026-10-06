@@ -7,7 +7,7 @@ import 'server_models.dart';
 enum ChatMode {
   automatic(
     'Agent',
-    'Uses tools, such as web search, when the question needs them.',
+    'Answers from general knowledge, the switched-on files and tools such as web search.',
   ),
   chat(
     'Chat',
@@ -27,6 +27,9 @@ enum ChatMode {
   static ChatMode? fromServer(Object? value) =>
       values.where((m) => m.name == value).firstOrNull;
 }
+
+/// What answers draw on in every [ChatMode], for when the mode is not known.
+const everyModeDrawsOn = 'Answers draw on the switched-on files.';
 
 /// What a new chat is called until its first message names it.
 const newChatName = 'New chat';

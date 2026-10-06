@@ -293,11 +293,11 @@ void main() {
     test('is read with the workspace and changed on the server', () async {
       final llm = planningServer();
       final rig = await started(llm);
-      expect(rig.sources.chatMode, ChatMode.automatic);
+      expect(rig.sources.chatMode.value, ChatMode.automatic);
       await rig.sources.setChatMode(ChatMode.query);
       expect(llm.calls, contains('updateWorkspace:q3'));
       expect(llm.spaces.first.settings['chatMode'], 'query');
-      expect(rig.sources.chatMode, ChatMode.query);
+      expect(rig.sources.chatMode.value, ChatMode.query);
     });
 
     test('a refused change goes back and says why', () async {
@@ -305,7 +305,7 @@ void main() {
         ..errors['updateWorkspace'] = const ApiException('No');
       final rig = await started(llm);
       await rig.sources.setChatMode(ChatMode.chat);
-      expect(rig.sources.chatMode, ChatMode.automatic);
+      expect(rig.sources.chatMode.value, ChatMode.automatic);
       expect(
         rig.sources.problems.single.title,
         'Could not change the chat mode',
@@ -318,7 +318,7 @@ void main() {
       final rig = await started(llm);
       await rig.chat.select('household');
       await pumpEventQueue();
-      expect(rig.sources.chatMode, ChatMode.chat);
+      expect(rig.sources.chatMode.value, ChatMode.chat);
     });
   });
 }

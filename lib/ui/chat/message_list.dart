@@ -59,15 +59,6 @@ class MessageList extends StatelessWidget {
   }
 }
 
-/// What answers draw on in a workspace's chat [mode], for an empty chat.
-String _drawsOn(ChatMode? mode) => switch (mode) {
-  ChatMode.automatic => 'Answers draw on the switched-on files, and on tools such as web search when they need them.',
-  ChatMode.chat =>
-    'Answers draw on the switched-on files and on general knowledge.',
-  ChatMode.query => 'Answers come only from the switched-on files.',
-  null => 'Answers draw on the switched-on files.',
-};
-
 class _Empty extends StatelessWidget {
   const _Empty({required this.workspace, required this.onSuggest});
 
@@ -77,6 +68,7 @@ class _Empty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    final sources = AppScope.of(context).sources;
     final headline = Type.serif(
       40,
       color: t.ink,
@@ -109,33 +101,35 @@ class _Empty extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
-                child: ListenableBuilder(
-                  listenable: AppScope.of(context).sources,
-                  builder: (context, _) => Text(
-                    _drawsOn(AppScope.of(context).sources.chatMode),
-                    textAlign: TextAlign.center,
-                    style: Type.sans(15.5, color: t.muted, height: 1.5),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 22),
               ListenableBuilder(
-                listenable: AppScope.of(context).sources,
-                builder: (context, _) => Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
+                listenable: sources,
+                builder: (context, _) => Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    for (final s
-                        in AppScope.of(context).sources.files.isEmpty
-                            ? const ['What can I do here?']
-                            : const [
-                                'Summarise my files',
-                                'What are the key points?',
-                              ])
-                      _Suggestion(s, onTap: () => onSuggest(s)),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 480),
+                      child: Text(
+                        sources.chatMode.value?.about ?? everyModeDrawsOn,
+                        textAlign: TextAlign.center,
+                        style: Type.sans(15.5, color: t.muted, height: 1.5),
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final s
+                            in sources.files.isEmpty
+                                ? const ['What can I do here?']
+                                : const [
+                                    'Summarise my files',
+                                    'What are the key points?',
+                                  ])
+                          _Suggestion(s, onTap: () => onSuggest(s)),
+                      ],
+                    ),
                   ],
                 ),
               ),

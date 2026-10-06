@@ -1,5 +1,6 @@
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/ui/chat/chat_view.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
 import 'package:anywherellm/ui/sidebar.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
@@ -23,6 +24,9 @@ Finder inSidebar(String text) =>
 
 Finder inSources(Finder finder) =>
     find.descendant(of: find.byType(SourcesPanel), matching: finder);
+
+Finder inChat(Finder finder) =>
+    find.descendant(of: find.byType(ChatView), matching: finder);
 
 Finder get message => find.bySemanticsLabel('Message');
 
@@ -239,7 +243,7 @@ void main() {
       await tester.tap(inSources(control('Query')));
       await tester.pumpAndSettle();
       expect(llm.spaces.first.settings['chatMode'], 'query');
-      expect(h.sources.chatMode, ChatMode.query);
+      expect(h.sources.chatMode.value, ChatMode.query);
       expect(inSources(find.text(ChatMode.query.about)), findsOneWidget);
     });
 
@@ -249,19 +253,24 @@ void main() {
       final h = await pumpApp(tester, llm: planningServer());
       h.chat.newChat();
       await tester.pumpAndSettle();
-      expect(
-        find.text(
-          'Answers draw on the switched-on files, and on tools such as web search when they need them.',
-        ),
-        findsOneWidget,
-      );
+      expect(inChat(find.text(ChatMode.automatic.about)), findsOneWidget);
       expect(find.text('Ask anything…'), findsOneWidget);
       await tester.tap(inSources(control('Query')));
       await tester.pumpAndSettle();
-      expect(
-        find.text('Answers come only from the switched-on files.'),
-        findsOneWidget,
-      );
+      expect(inChat(find.text(ChatMode.query.about)), findsOneWidget);
+      expect(find.text('Ask about your files…'), findsOneWidget);
+    });
+
+    testWidgets('an unknown chat mode claims only what every mode does', (
+      tester,
+    ) async {
+      final llm = planningServer()
+        ..errors['workspace'] = const ApiException('down');
+      final h = await pumpApp(tester, llm: llm);
+      h.chat.newChat();
+      await tester.pumpAndSettle();
+      expect(h.sources.chatMode.value, isNull);
+      expect(inChat(find.text(everyModeDrawsOn)), findsOneWidget);
       expect(find.text('Ask about your files…'), findsOneWidget);
     });
 

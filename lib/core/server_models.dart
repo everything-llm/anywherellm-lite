@@ -427,11 +427,11 @@ class DocBody {
   final Map<String, String> details;
 }
 
-/// A passage of a workspace's documents that a question finds, as an answer would get it.
 final _metadataBlock = RegExp(
   r'^\s*<document_metadata>[\s\S]*?</document_metadata>\s*',
 );
 
+/// A passage of a workspace's documents that a question finds, as an answer would get it.
 class SearchHit {
   const SearchHit({
     required this.title,

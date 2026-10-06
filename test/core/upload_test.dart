@@ -35,8 +35,7 @@ void main() {
       expect(sourceExt('README'), 'FILE');
       expect(sourceExt('.bashrc'), 'FILE');
       expect(sourceExt('Q3 roadmap.pdf'), 'PDF');
-      expect(sourceExt('Jobs for a .NET/React Candidate, 2026'), 'FILE');
-      expect(sourceExt('Version 2.0 notes'), 'FILE');
+      expect(sourceExt('notes.v2-final'), 'FILE');
     },
   );
 

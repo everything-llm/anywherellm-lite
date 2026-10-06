@@ -140,7 +140,7 @@ class _ComposerState extends State<Composer> {
             listenable: Listenable.merge([
               scope.settings,
               scope.chat,
-              scope.sources,
+              scope.sources.chatMode,
               draft,
             ]),
             builder: (context, _) {
@@ -217,9 +217,10 @@ class _Form extends StatelessWidget {
         ? 'Answering…'
         : elsewhere
         ? 'Another chat is still answering…'
-        : scope.sources.chatMode == ChatMode.query
-        ? 'Ask about your files…'
-        : 'Ask anything…';
+        : switch (scope.sources.chatMode.value) {
+            ChatMode.automatic || ChatMode.chat => 'Ask anything…',
+            ChatMode.query || null => 'Ask about your files…',
+          };
     final canSend =
         !chat.busy &&
         chat.ready &&

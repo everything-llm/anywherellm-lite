@@ -19,7 +19,7 @@ class ChatModeChooser extends StatelessWidget {
     return ListenableBuilder(
       listenable: Listenable.merge([sources, chat]),
       builder: (context, _) {
-        final mode = sources.chatMode;
+        final mode = sources.chatMode.value;
         final slug = chat.activeSlug;
         final busy = slug == null || chat.answeringIn(slug);
         return Column(
