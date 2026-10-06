@@ -1,5 +1,6 @@
 // Asking a workspace: what a streamed answer is made of, and how a chat gets its name.
 
+import 'outputs.dart';
 import 'server_models.dart';
 import 'upload.dart';
 
@@ -72,10 +73,12 @@ String agentStatus(String thought) {
 final _runningTool = RegExp(r'^@agent is executing `([^`]+)`');
 final _agentPrefix = RegExp(r'^@agent:?\s*');
 
-/// The answer is complete. [citations] are what it drew on.
+/// The answer is complete. [citations] are what it drew on, and [files] what an agent made
+/// with it.
 class ChatDone extends ChatEvent {
-  const ChatDone(this.citations);
+  const ChatDone(this.citations, {this.files = const []});
   final List<Citation> citations;
+  final List<GeneratedFile> files;
 }
 
 /// The address a link in an answer opens, or null for one the app will not open. Only web

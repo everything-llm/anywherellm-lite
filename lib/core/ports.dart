@@ -131,6 +131,9 @@ abstract interface class AnythingLlmApi {
   /// Every chat on the server, in [format], as the file's bytes.
   Future<List<int>> exportChats(ChatExport format);
 
+  /// The bytes of a file or image an agent made, by the [storageName] the server gave it.
+  Future<List<int>> generatedFile(String storageName);
+
   /// The server's settings, with every secret replaced by whether it is set.
   Future<Map<String, Object?>> systemSettings();
 }

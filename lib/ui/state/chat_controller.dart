@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/chat.dart';
 import '../../core/commands.dart';
 import '../../core/connection.dart';
+import '../../core/outputs.dart';
 import '../../core/ports.dart';
 import '../../core/server_models.dart';
 import 'notice.dart';
@@ -25,6 +26,7 @@ class Turn extends ChangeNotifier {
       text = message.text,
       citations = message.citations,
       attachments = message.attachments,
+      files = message.files,
       streaming = false;
 
   final Role role;
@@ -33,6 +35,9 @@ class Turn extends ChangeNotifier {
   /// The names of the files sent with a question.
   List<String> attachments = const [];
   List<Citation> citations = const [];
+
+  /// What an agent made with the answer.
+  List<GeneratedFile> files = const [];
   bool streaming;
 
   /// Why the answer failed, or null.
@@ -137,6 +142,9 @@ class ChatController extends ChangeNotifier {
 
   Timer? _linkTimer;
 
+  /// The bytes of each file an agent made, by storage name, read once per server.
+  final Map<String, Future<List<int>?>> _madeFiles = {};
+
   static const linkNoticeFor = Duration(seconds: 6);
 
   Workspace? get active =>
@@ -188,6 +196,7 @@ class ChatController extends ChangeNotifier {
     _threads.clear();
     _turns.clear();
     _draft.clear();
+    _madeFiles.clear();
     docCounts.clear();
     _clearing = false;
     _presets = const [];
@@ -459,7 +468,10 @@ class ChatController extends ChangeNotifier {
             TextChunk(:final text) => answer._grow(text),
             StatusChunk(:final text) => answer._setStatus(text),
             WholeAnswer(:final text) => answer._replace(text),
-            ChatDone(:final citations) => answer.citations = citations,
+            ChatDone(:final citations, :final files) =>
+              answer
+                ..citations = citations
+                ..files = files,
           },
           onError: (Object error) => _finish(
             running,
@@ -570,6 +582,30 @@ class ChatController extends ChangeNotifier {
     _threads[slug] = [
       for (final t in threadsOf(slug)) t.slug == thread.slug ? thread : t,
     ];
+    notifyListeners();
+  }
+
+  /// The bytes of [file], which an agent made with an answer, read once; null when they could
+  /// not be read, and why shows as [problem]. A failed read is tried again next time.
+  Future<List<int>?> fileBytes(GeneratedFile file) =>
+      _madeFiles[file.storageName] ??= _readFile(file);
+
+  Future<List<int>?> _readFile(GeneratedFile file) async {
+    final server = _server;
+    try {
+      return await _api.generatedFile(file.storageName);
+    } on ApiException catch (error) {
+      _madeFiles.remove(file.storageName);
+      if (_server == server) {
+        report('Could not get ${file.name}', error.message);
+      }
+      return null;
+    }
+  }
+
+  /// Shows [text] as [problem], titled [title].
+  void report(String title, String text) {
+    problem = Notice(title, text);
     notifyListeners();
   }
 

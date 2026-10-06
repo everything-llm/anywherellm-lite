@@ -512,16 +512,21 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       SearchHit.fromJson(json),
   ];
 
-  /// The server answers with the file itself, which is not always JSON; a failure is decoded as
-  /// any other.
   @override
-  Future<List<int>> exportChats(ChatExport format) async {
+  Future<List<int>> exportChats(ChatExport format) =>
+      _file('/api/v1/system/export-chats?type=${format.name}');
+
+  @override
+  Future<List<int>> generatedFile(String storageName) => _file(
+    '/api/v1/document/generated-files/${Uri.encodeComponent(storageName)}',
+  );
+
+  /// The bytes of the file the server answers [path] with, which is not always JSON; a failure
+  /// is decoded as any other.
+  Future<List<int>> _file(String path) async {
     final connection = _current;
-    final request = _request(
-      connection,
-      'GET',
-      '/api/v1/system/export-chats?type=${format.name}',
-    )..headers['Accept'] = '*/*';
+    final request = _request(connection, 'GET', path)
+      ..headers['Accept'] = '*/*';
     final response = await _fetch(
       connection,
       uploadTimeout,

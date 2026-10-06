@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../core/chat.dart';
+import '../core/outputs.dart';
 import '../core/ports.dart';
 import '../core/server_models.dart';
 
@@ -16,12 +17,13 @@ Stream<ChatEvent> chatEvents(Stream<List<int>> bytes) =>
 /// has the `sources`. An agent answer also streams `agentThought` chunks, which become
 /// [StatusChunk]s; its pieces include what it wrote before and between tools, so the whole
 /// answer then comes as one `textResponse` chunk, a [WholeAnswer]. A `finalizeResponseStream`
-/// chunk after the close has an agent's `sources`.
+/// chunk after the close has an agent's `sources`, and the `outputs` it made, as files.
 ///
 /// Ends with one [ChatDone], at `finalizeResponseStream` or when the chunks end. Fails with
 /// [ApiException] when the server reports an error.
 Stream<ChatEvent> chatEventsOf(Stream<Map<String, dynamic>> chunks) async* {
   var citations = const <Citation>[];
+  var files = const <GeneratedFile>[];
   var whole = false;
   await for (final chunk in chunks) {
     final error = chunk['error'];
@@ -31,6 +33,8 @@ Stream<ChatEvent> chatEventsOf(Stream<Map<String, dynamic>> chunks) async* {
     final text = chunk['textResponse'];
     final found = citationsOf(chunk['sources']);
     if (found.isNotEmpty) citations = found;
+    final made = generatedFilesOf(chunk['outputs']);
+    if (made.isNotEmpty) files = made;
     switch (chunk['type']) {
       case 'abort':
         throw const ApiException('The server stopped the answer.');
@@ -48,7 +52,7 @@ Stream<ChatEvent> chatEventsOf(Stream<Map<String, dynamic>> chunks) async* {
         if (!whole && text is String && text.isNotEmpty) {
           yield WholeAnswer(text);
         }
-        yield ChatDone(citations);
+        yield ChatDone(citations, files: files);
         return;
       case 'usageMetrics':
         break;
@@ -56,7 +60,7 @@ Stream<ChatEvent> chatEventsOf(Stream<Map<String, dynamic>> chunks) async* {
         if (text is String && text.isNotEmpty) yield TextChunk(text);
     }
   }
-  yield ChatDone(citations);
+  yield ChatDone(citations, files: files);
 }
 
 /// The JSON object of each `data:` line in [bytes]; any other line is skipped.

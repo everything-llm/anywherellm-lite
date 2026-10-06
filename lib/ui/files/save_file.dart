@@ -24,18 +24,19 @@ Future<String?> saveWithDialog(
 }
 
 /// Saves what [bytes] gives as [suggestedName] through [AppScope.save], and returns where, or
-/// null. A failure shows in Files as [failTitle].
+/// null. A failure shows as [failTitle] through [report], or in Files when it is null.
 Future<String?> saveFile(
   BuildContext context,
   String suggestedName,
   Future<List<int>?> Function() bytes, {
   required String failTitle,
+  void Function(String title, String text)? report,
 }) async {
   final scope = AppScope.of(context);
   try {
     return await scope.save(suggestedName, bytes);
   } on Exception catch (error) {
-    scope.files.report(failTitle, _plain(error));
+    (report ?? scope.files.report)(failTitle, _plain(error));
     return null;
   }
 }

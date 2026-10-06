@@ -535,6 +535,44 @@ void main() {
       expect(turns.last.attachments, isEmpty);
     });
 
+    test('a history answer keeps the files an agent made', () async {
+      final turns = await _answering({
+        'history': [
+          {
+            'role': 'assistant',
+            'content': 'Here is your report.',
+            'outputs': [
+              {
+                'type': 'PdfFileDownload',
+                'payload': {
+                  'filename': 'report.pdf',
+                  'storageFilename': 'pdf-1f2e.pdf',
+                  'fileSize': 2048,
+                },
+              },
+              {
+                'type': 'imageGenerationCard',
+                'payload': {'storageFilename': 'img-9a.png', 'prompt': 'a cat'},
+              },
+              {
+                'type': 'PdfFileDownload',
+                'payload': {'filename': 'x', 'storageFilename': '../../.env'},
+              },
+              {
+                'type': 'rechartVisualize',
+                'payload': {'data': []},
+              },
+            ],
+          },
+        ],
+      }).history('w', 't');
+      final files = turns.single.files;
+      expect(files.map((f) => (f.name, f.storageName, f.size, f.isImage)), [
+        ('report.pdf', 'pdf-1f2e.pdf', 2048, false),
+        ('img-9a.png', 'img-9a.png', null, true),
+      ]);
+    });
+
     test('embedding changes post the adds and deletes', () async {
       final seen = <http.Request>[];
       await _answering({
@@ -653,6 +691,33 @@ void main() {
       ]).streamChat('w', 't', 'Hi').toList();
       expect(events.whereType<WholeAnswer>(), isEmpty);
       expect(events.whereType<TextChunk>().single.text, 'Looking it up.');
+    });
+
+    test('an agent\'s closing chunk hands on the files it made', () async {
+      final events = await streaming([
+        data({'type': 'textResponse', 'textResponse': 'Made it.'}),
+        data({
+          'type': 'finalizeResponseStream',
+          'textResponse': 'Made it.',
+          'sources': [],
+          'close': true,
+          'error': false,
+          'outputs': [
+            {
+              'type': 'imageGenerationCard',
+              'payload': {
+                'filename': 'cat.png',
+                'storageFilename': 'img-1.png',
+                'fileSize': 900,
+                'url': '/v1/document/generated-files/img-1.png',
+              },
+            },
+          ],
+        }),
+      ]).streamChat('w', 't', 'Draw a cat').toList();
+      final done = events.last as ChatDone;
+      expect(done.files.single.name, 'cat.png');
+      expect(done.files.single.isImage, isTrue);
     });
 
     test('an agent answer: status, then the whole answer, then its sources', () async {
@@ -1306,6 +1371,30 @@ void main() {
         ).searchDocs('q3', ''),
       );
       expect(error.message, contains('Query parameter cannot be empty.'));
+    });
+
+    test('a generated file is its bytes, by its storage name', () async {
+      final seen = <http.Request>[];
+      final bytes = await _api((request) async {
+        seen.add(request);
+        return http.Response.bytes(
+          [37, 80, 68, 70],
+          200,
+          headers: {'content-type': 'application/pdf'},
+        );
+      }).generatedFile('pdf-1f2e.pdf');
+      expect(
+        seen.single.url.path,
+        '/api/v1/document/generated-files/pdf-1f2e.pdf',
+      );
+      expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
+      expect(bytes, [37, 80, 68, 70]);
+      final gone = await _failure(
+        _answering({
+          'error': 'File not found',
+        }, status: 404).generatedFile('pdf-0.pdf'),
+      );
+      expect(gone.message, contains('File not found'));
     });
 
     test('an export is the file as the server sends it', () async {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/connection.dart';
+import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
 
@@ -79,6 +80,12 @@ class FakeAnythingLlm implements AnythingLlmApi {
 
   String answer = 'Here is what your sources say.';
   List<String> cited = const [];
+
+  /// The files an agent made, which [streamChat] sends with the answer.
+  List<GeneratedFile> made = const [];
+
+  /// What [generatedFile] answers, by storage name. Any other name is not found.
+  final Map<String, List<int>> generated = {};
   bool hold = false;
   StreamController<ChatEvent>? chat;
 
@@ -206,7 +213,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
     return Stream.fromIterable([
       for (final line in agentStatus) StatusChunk(line),
       TextChunk(answer),
-      ChatDone([for (final title in cited) Citation(title)]),
+      ChatDone([for (final title in cited) Citation(title)], files: made),
     ]);
   }
 
@@ -425,6 +432,14 @@ class FakeAnythingLlm implements AnythingLlmApi {
   @override
   Future<List<int>> exportChats(ChatExport format) =>
       _run('exportChats', () => exported.codeUnits, format.name);
+
+  @override
+  Future<List<int>> generatedFile(String storageName) =>
+      _run('generatedFile', () {
+        final bytes = generated[storageName];
+        if (bytes == null) throw const ApiException('File not found');
+        return bytes;
+      }, storageName);
 
   @override
   Future<Map<String, Object?>> systemSettings() =>

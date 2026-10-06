@@ -14,6 +14,7 @@ import '../widgets/controls.dart';
 import '../widgets/rise.dart';
 import '../widgets/tappable.dart';
 import 'answer_body.dart';
+import 'generated_files.dart';
 
 /// The chat on screen, newest at the bottom. Empty, it invites a first question.
 ///
@@ -288,6 +289,10 @@ class _Answer extends StatelessWidget {
         if (!turn.streaming && turn.citations.isNotEmpty) ...[
           const SizedBox(height: 12),
           _Citations(turn.citations),
+        ],
+        if (!turn.streaming && turn.files.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          GeneratedFiles(turn.files),
         ],
         if (!turn.streaming && split.answer.isNotEmpty) ...[
           const SizedBox(height: 6),

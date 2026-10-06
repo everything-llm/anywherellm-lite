@@ -3,6 +3,8 @@
 
 import 'dart:convert';
 
+import 'outputs.dart';
+
 /// A string or number field as text, trimmed, or empty when it is missing.
 String _text(Map<String, dynamic> json, String key) => switch (json[key]) {
   final String value => value.trim(),
@@ -185,6 +187,7 @@ class ChatMessage {
     required this.text,
     this.citations = const [],
     this.attachments = const [],
+    this.files = const [],
   });
 
   /// An entry of a chat's `history`.
@@ -199,6 +202,7 @@ class ChatMessage {
       for (final attachment in jsonObjects(json['attachments']))
         ?_known(attachment, 'name'),
     ],
+    files: generatedFilesOf(json['outputs']),
   );
 
   final Role role;
@@ -209,6 +213,9 @@ class ChatMessage {
 
   /// What the answer drew on, each once, in the server's order.
   final List<Citation> citations;
+
+  /// What an agent made with the answer.
+  final List<GeneratedFile> files;
 }
 
 /// A source an answer drew on: a document by its [title], or a web page an agent read, which
