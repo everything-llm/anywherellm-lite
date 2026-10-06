@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/chat.dart';
+import '../../core/commands.dart';
 import '../app_scope.dart';
 import '../icons.dart';
 import '../layout.dart';
@@ -11,10 +12,12 @@ import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/tappable.dart';
+import 'slash_menu.dart';
 
 /// Where a question is written. Enter sends it and Shift+Enter starts a new line. While this
 /// chat answers, Send becomes Stop; while another chat answers, nothing can be sent. Files
-/// attached go with the next question only.
+/// attached go with the next question only. A message that starts with a slash offers the
+/// commands that match it.
 class Composer extends StatefulWidget {
   const Composer({super.key, required this.draft, required this.focus});
 
@@ -31,6 +34,57 @@ class _ComposerState extends State<Composer> {
 
   /// Why the last pick added nothing, or null.
   String? _problem;
+
+  /// The command in the menu that Enter picks.
+  int _highlight = 0;
+
+  /// The message as it was when Esc closed the menu. The menu stays closed until it changes.
+  String? _dismissed;
+
+  String _typed = '';
+
+  @override
+  void initState() {
+    super.initState();
+    widget.draft.addListener(_changed);
+  }
+
+  @override
+  void dispose() {
+    widget.draft.removeListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() {
+    if (widget.draft.text == _typed) return;
+    setState(() {
+      _typed = widget.draft.text;
+      _highlight = 0;
+      if (_dismissed != _typed) _dismissed = null;
+    });
+  }
+
+  /// Puts [command] in the message, ready for the rest of it.
+  void _pick(SlashCommand command) {
+    final text = '${command.command} ';
+    widget.draft.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    widget.focus.requestFocus();
+  }
+
+  /// Starts a command in an empty message, which opens the menu.
+  void _slash() {
+    if (widget.draft.text.isEmpty) {
+      widget.draft.value = const TextEditingValue(
+        text: '/',
+        selection: TextSelection.collapsed(offset: 1),
+      );
+    }
+    setState(() => _dismissed = null);
+    widget.focus.requestFocus();
+  }
 
   Future<void> _attach() async {
     final List<XFile> picked;
@@ -84,17 +138,29 @@ class _ComposerState extends State<Composer> {
           constraints: const BoxConstraints(maxWidth: Sizes.column),
           child: ListenableBuilder(
             listenable: Listenable.merge([scope.settings, scope.chat, draft]),
-            builder: (context, _) => scope.settings.configured
-                ? _Form(
-                    draft: draft,
-                    focus: widget.focus,
-                    attached: _attached,
-                    problem: _problem,
-                    onAttach: _attach,
-                    onRemove: _remove,
-                    onSent: _sent,
-                  )
-                : const _NoKey(),
+            builder: (context, _) {
+              if (!scope.settings.configured) return const _NoKey();
+              final matches = scope.chat.busy || _dismissed == draft.text
+                  ? const <SlashCommand>[]
+                  : commandsFor(draft.text, scope.chat.commands);
+              return _Form(
+                draft: draft,
+                focus: widget.focus,
+                attached: _attached,
+                problem: _problem,
+                matches: matches,
+                highlight: matches.isEmpty
+                    ? 0
+                    : _highlight.clamp(0, matches.length - 1),
+                onHighlight: (i) => setState(() => _highlight = i),
+                onPick: _pick,
+                onDismiss: () => setState(() => _dismissed = draft.text),
+                onSlash: _slash,
+                onAttach: _attach,
+                onRemove: _remove,
+                onSent: _sent,
+              );
+            },
           ),
         ),
       ),
@@ -108,6 +174,12 @@ class _Form extends StatelessWidget {
     required this.focus,
     required this.attached,
     required this.problem,
+    required this.matches,
+    required this.highlight,
+    required this.onHighlight,
+    required this.onPick,
+    required this.onDismiss,
+    required this.onSlash,
     required this.onAttach,
     required this.onRemove,
     required this.onSent,
@@ -117,6 +189,14 @@ class _Form extends StatelessWidget {
   final FocusNode focus;
   final List<Attachment> attached;
   final String? problem;
+
+  /// The commands that match the message, or none when the menu is closed.
+  final List<SlashCommand> matches;
+  final int highlight;
+  final ValueChanged<int> onHighlight;
+  final ValueChanged<SlashCommand> onPick;
+  final VoidCallback onDismiss;
+  final VoidCallback onSlash;
   final VoidCallback onAttach;
   final ValueChanged<Attachment> onRemove;
   final VoidCallback onSent;
@@ -147,6 +227,33 @@ class _Form extends StatelessWidget {
       onSent();
     }
 
+    /// Enter picks the highlighted command, or sends the message once it is that command.
+    void enter() {
+      final command = matches[highlight].command;
+      if (draft.text.trim().toLowerCase() == command.toLowerCase()) {
+        send();
+      } else {
+        onPick(matches[highlight]);
+      }
+    }
+
+    final menu = matches.isNotEmpty;
+    final bindings = <ShortcutActivator, VoidCallback>{
+      const SingleActivator(LogicalKeyboardKey.enter): menu ? enter : send,
+      const SingleActivator(LogicalKeyboardKey.numpadEnter): menu
+          ? enter
+          : send,
+      if (menu) ...{
+        const SingleActivator(LogicalKeyboardKey.tab): () =>
+            onPick(matches[highlight]),
+        const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
+            onHighlight((highlight + 1) % matches.length),
+        const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
+            onHighlight((highlight - 1) % matches.length),
+        const SingleActivator(LogicalKeyboardKey.escape): onDismiss,
+      },
+    };
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 12, 10),
       decoration: BoxDecoration(
@@ -174,6 +281,10 @@ class _Form extends StatelessWidget {
             AlertBox(AlertKind.bad, 'Could not attach', text: problem),
             const SizedBox(height: 8),
           ],
+          if (menu) ...[
+            SlashMenu(commands: matches, highlight: highlight, onPick: onPick),
+            Divider(height: 13, thickness: 1, color: t.line),
+          ],
           if (attached.isNotEmpty) ...[
             Wrap(
               spacing: 6,
@@ -188,10 +299,7 @@ class _Form extends StatelessWidget {
           ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 26, maxHeight: 140),
             child: CallbackShortcuts(
-              bindings: {
-                const SingleActivator(LogicalKeyboardKey.enter): send,
-                const SingleActivator(LogicalKeyboardKey.numpadEnter): send,
-              },
+              bindings: bindings,
               child: Semantics(
                 label: 'Message',
                 textField: true,
@@ -222,6 +330,13 @@ class _Form extends StatelessWidget {
                 'attach',
                 tooltip: 'Attach files to this message',
                 onPressed: chat.busy ? null : onAttach,
+                box: 30,
+                size: IconSize.small,
+              ),
+              IconBtn(
+                'slash',
+                tooltip: 'Commands',
+                onPressed: chat.busy ? null : onSlash,
                 box: 30,
                 size: IconSize.small,
               ),

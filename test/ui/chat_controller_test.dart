@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:anywherellm/core/chat.dart';
+import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -285,5 +286,77 @@ void main() {
     ]);
     final question = rig.chat.turns[rig.chat.turns.length - 2];
     expect(question.attachments, ['photo.png', 'report.pdf']);
+  });
+
+  group('slash commands', () {
+    const clear = SlashCommand(command: '/clear', prompt: '/reset');
+
+    test('offers /reset, then the server\'s presets', () async {
+      final llm = planningServer()..presets = const [clear];
+      final rig = await started(llm);
+      await pumpEventQueue();
+      expect(
+        [for (final c in rig.chat.commands) c.command],
+        ['/reset', '/clear'],
+      );
+    });
+
+    test('presets that cannot be read leave /reset alone', () async {
+      final llm = planningServer()
+        ..errors['slashCommands'] = const ApiException('No login');
+      final rig = await started(llm);
+      await pumpEventQueue();
+      expect(rig.chat.problem, isNull);
+      expect([for (final c in rig.chat.commands) c.command], ['/reset']);
+    });
+
+    test('/reset clears the chat on the server and on screen', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.chat.send('/reset');
+      expect(llm.calls, contains('resetChat:budget'));
+      expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
+      expect(rig.chat.turns, isEmpty);
+      expect(rig.chat.threadsOf('q3').map((t) => t.name), [
+        'Quarter priorities',
+        'Budget questions',
+      ]);
+    });
+
+    test('a preset whose prompt is /reset clears the chat too', () async {
+      final llm = planningServer()..presets = const [clear];
+      final rig = await started(llm);
+      await pumpEventQueue();
+      await rig.chat.send('/clear');
+      expect(llm.calls, contains('resetChat:budget'));
+      expect(rig.chat.turns, isEmpty);
+    });
+
+    test('a failed reset keeps the turns and says why', () async {
+      final llm = planningServer()
+        ..errors['resetChat'] = const ApiException('Refused');
+      final rig = await started(llm);
+      await rig.chat.send('/reset');
+      expect(rig.chat.turns, hasLength(2));
+      expect(rig.chat.problem?.title, 'Could not clear the chat');
+    });
+
+    test('/reset in a draft only empties it, making no thread', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.chat.select('household');
+      await rig.chat.send('/reset');
+      expect(llm.calls, isNot(contains('createThread:household')));
+      expect(llm.calls.where((c) => c.startsWith('resetChat')), isEmpty);
+      expect(rig.chat.turns, isEmpty);
+    });
+
+    test('any other preset goes to the server as typed', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.chat.send('/deep-research tides');
+      await pumpEventQueue();
+      expect(llm.calls, contains('streamChat:budget:/deep-research tides'));
+    });
   });
 }

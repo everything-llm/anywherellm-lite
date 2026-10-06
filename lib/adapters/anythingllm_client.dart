@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import '../core/chat.dart';
+import '../core/commands.dart';
 import '../core/connection.dart';
 import '../core/ports.dart';
 import '../core/server_models.dart';
@@ -117,35 +118,45 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     required ChatMode mode,
     List<Attachment> attachments = const [],
   }) async* {
-    final connection = _current;
-    final request = _request(
-      connection,
-      'POST',
-      '${_thread(slug, thread)}/stream-chat',
-      {
-        'message': message,
-        'mode': mode.name,
-        if (attachments.isNotEmpty)
-          'attachments': [for (final a in attachments) attachmentJson(a)],
-      },
-    )..headers['Accept'] = 'text/event-stream';
-    final http.StreamedResponse response;
-    try {
-      response = await _client
-          .send(request)
-          .timeout(attachments.isEmpty ? timeout : uploadTimeout);
-    } on Exception catch (error) {
-      throw _unreachable(connection, error);
-    }
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      _decode(await http.Response.fromStream(response));
-    }
+    final response = await _openStream('${_thread(slug, thread)}/stream-chat', {
+      'message': message,
+      'mode': mode.name,
+      if (attachments.isNotEmpty)
+        'attachments': [for (final a in attachments) attachmentJson(a)],
+    }, attachments.isEmpty ? timeout : uploadTimeout);
     try {
       yield* chatEvents(response.stream);
     } on http.ClientException catch (error) {
       throw ApiException('The answer was cut off: ${error.message}');
     }
   }
+
+  /// A `stream-chat` with `reset` and no message, which clears the history and answers with
+  /// one closing chunk.
+  @override
+  Future<void> resetChat(String slug, String thread) async {
+    final response = await _openStream('${_thread(slug, thread)}/stream-chat', {
+      'reset': true,
+    }, timeout);
+    try {
+      await chatEvents(response.stream).drain<void>();
+    } on http.ClientException catch (error) {
+      throw ApiException('The reply was cut off: ${error.message}');
+    }
+  }
+
+  /// The presets live under `/api/system`, not `/api/v1`. That route takes the browser's login,
+  /// not the API key, so it answers only while the server has no password.
+  @override
+  Future<List<SlashCommand>> slashCommands() async => [
+    for (final json in jsonObjects(
+      _field(
+        await _get(_current, '/api/system/slash-command-presets'),
+        'presets',
+      ),
+    ))
+      ?SlashCommand.fromJson(json),
+  ];
 
   @override
   Future<void> updateEmbeddings(
@@ -334,6 +345,28 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       headers: _headers(connection),
     ),
   );
+
+  /// The open response to a POST of [body] to [path], whose body streams server-sent events.
+  /// A failed status is an [ApiException] with the server's words.
+  Future<http.StreamedResponse> _openStream(
+    String path,
+    Map<String, Object?> body,
+    Duration limit,
+  ) async {
+    final connection = _current;
+    final request = _request(connection, 'POST', path, body)
+      ..headers['Accept'] = 'text/event-stream';
+    final http.StreamedResponse response;
+    try {
+      response = await _client.send(request).timeout(limit);
+    } on Exception catch (error) {
+      throw _unreachable(connection, error, limit);
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      _decode(await http.Response.fromStream(response));
+    }
+    return response;
+  }
 
   /// A [method] to [path] on [connection] with the key, and [body] as JSON when given.
   http.Request _request(

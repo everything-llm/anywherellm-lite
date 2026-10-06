@@ -600,6 +600,69 @@ void main() {
         throwsA(isA<ApiException>().having((e) => e.status, 'status', 403)),
       );
     });
+
+    test('reset posts only the reset flag and reads the reply', () async {
+      Object? sent;
+      final api = HttpAnythingLlmApi(
+        holder: ConnectionHolder(_connection),
+        client: MockClient.streaming((request, body) async {
+          expect(request.url.path, '/api/v1/workspace/w/thread/t/stream-chat');
+          sent = jsonDecode(utf8.decode(await body.expand((b) => b).toList()));
+          return http.StreamedResponse(
+            Stream.value(
+              utf8.encode(
+                data({
+                  'textResponse': 'Chat history was reset!',
+                  'close': true,
+                }),
+              ),
+            ),
+            200,
+          );
+        }),
+      );
+      await api.resetChat('w', 't');
+      expect(sent, {'reset': true});
+    });
+
+    test('a reset the server fails says why', () async {
+      final error = await _failure(
+        streaming([
+          data({'type': 'abort', 'error': 'Thread t not found.'}),
+        ]).resetChat('w', 't'),
+      );
+      expect(error.message, 'Thread t not found.');
+    });
+  });
+
+  group('slash commands', () {
+    test('reads the presets from the system route, with the key', () async {
+      final seen = <http.Request>[];
+      final presets = await _answering({
+        'presets': [
+          {
+            'id': 1,
+            'command': '/deep-research',
+            'prompt': '@agent Research:',
+            'description': 'Research in depth',
+          },
+          {'id': 2, 'command': 'broken'},
+        ],
+      }, seen: seen).slashCommands();
+      expect(seen.single.url.path, '/api/system/slash-command-presets');
+      expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
+      expect([for (final p in presets) p.command], ['/deep-research']);
+      expect(presets.single.description, 'Research in depth');
+    });
+
+    test('a server with a password refuses them', () async {
+      final error = await _failure(
+        _answering({
+          'error': 'No auth token found.',
+        }, status: 401).slashCommands(),
+      );
+      expect(error.status, 401);
+    });
   });
 
   group('files', () {

@@ -1,7 +1,9 @@
 import 'dart:ui' show Size;
 
+import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
+import 'package:flutter/widgets.dart' show EditableText;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
@@ -74,6 +76,25 @@ void main() {
       expect(tester.takeException(), isNull);
       h.shell.openSettings();
       await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the slash menu fits at $at', (tester) async {
+      final llm = awkward()
+        ..presets = [
+          for (var i = 0; i < 8; i++)
+            SlashCommand(
+              command: '/cmd$i-$longWord',
+              prompt: 'p',
+              description: 'description-$longWord',
+            ),
+        ];
+      await pumpApp(tester, llm: llm, size: size);
+      await tester.enterText(
+        find.byWidgetPredicate((w) => w is EditableText && !w.readOnly).last,
+        '/',
+      );
+      await tester.pump();
       expect(tester.takeException(), isNull);
     });
 

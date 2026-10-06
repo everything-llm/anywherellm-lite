@@ -9,7 +9,6 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 | Rename a workspace | `POST /v1/workspace/{slug}/update` with `name`. |
 | Delete a workspace | `AnythingLlmApi.deleteWorkspace` exists and was checked live. It needs a sidebar action behind a confirmation. |
 | Delete a library folder | `DELETE /v1/document/remove-folder` from the Files pane. |
-| Clear a chat's history (`/reset`) | `reset: true` on `thread/{t}/stream-chat`. |
 | Test what a question retrieves | `POST /v1/workspace/{slug}/vector-search`, shown with each snippet's score. |
 | Export every chat | `GET /v1/system/export-chats`, saved to a file. |
 | Embed widgets, users and invites | `/v1/embed/*` and `/v1/admin/*`. Users and invites matter only in multi-user mode. |
@@ -42,7 +41,8 @@ The web UI's own endpoints sign in with a session token, not the developer key, 
 | Delete one message | No call deletes a stored chat. |
 | Memories | Not in `/v1`. |
 | Suggested chat messages | Not in `/v1`. |
-| Slash commands | `reset` is the only one `/v1` takes; the list of presets is not in `/v1`. |
+| Slash-command presets on a server with a password | The list comes from `/api/system/slash-command-presets`, which answers without a session only while the server has no password. With one, the menu offers `/reset` alone; a preset typed in full still runs. |
+| Make, edit or delete a slash-command preset | No `/v1` call writes presets. |
 | Server text-to-speech | Not in `/v1`. |
 | Text size and other UI preferences | The web UI keeps them in its own settings, not in `/v1`. |
 

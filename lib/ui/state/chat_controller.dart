@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../core/chat.dart';
+import '../../core/commands.dart';
 import '../../core/connection.dart';
 import '../../core/ports.dart';
 import '../../core/server_models.dart';
@@ -90,6 +91,12 @@ class ChatController extends ChangeNotifier {
   /// The chats whose names the person chose, which the first message does not rename.
   final Set<String> _named = {};
 
+  /// The server's slash-command presets, or none when they cannot be read.
+  List<SlashCommand> _presets = const [];
+
+  /// The commands a message can start with: `/reset`, then the server's presets.
+  List<SlashCommand> get commands => withBuiltIns(_presets);
+
   /// The answer running. Only one runs at a time.
   _Running? _running;
 
@@ -139,6 +146,7 @@ class ChatController extends ChangeNotifier {
     _turns.clear();
     _draft.clear();
     docCounts.clear();
+    _presets = const [];
     activeSlug = null;
     activeThread = null;
     problem = null;
@@ -166,6 +174,21 @@ class ChatController extends ChangeNotifier {
       notifyListeners();
     }
     unawaited(_countDocs());
+    unawaited(_readCommands());
+  }
+
+  /// Reads the server's presets. Best effort: a server that will not list them leaves `/reset`
+  /// alone in the menu, and a preset typed in full still runs, since the server expands it.
+  Future<void> _readCommands() async {
+    final server = _server;
+    try {
+      final presets = await _api.slashCommands();
+      if (_server != server) return;
+      _presets = presets;
+      notifyListeners();
+    } on ApiException {
+      return;
+    }
   }
 
   /// Asks each workspace how many documents it holds, all at once. Best effort: a count that
@@ -272,7 +295,7 @@ class ChatController extends ChangeNotifier {
   }
 
   /// Asks [message], with [attachments], in the chat on screen, making its thread first when it
-  /// is a draft.
+  /// is a draft. A message that [resetsChat] clears the chat instead.
   Future<void> send(
     String message, {
     List<Attachment> attachments = const [],
@@ -280,6 +303,7 @@ class ChatController extends ChangeNotifier {
     final slug = activeSlug;
     final text = message.trim();
     if (slug == null || text.isEmpty || busy || !ready) return;
+    if (resetsChat(text, _presets)) return _reset(slug);
     final user = Turn.user(
       text,
       attachments: [for (final a in attachments) a.name],
@@ -337,6 +361,23 @@ class ChatController extends ChangeNotifier {
           },
           cancelOnError: true,
         );
+  }
+
+  /// Clears the history of the chat on screen, on the server and here. A draft has none, so it
+  /// is only emptied.
+  Future<void> _reset(String slug) async {
+    final thread = activeThread;
+    if (thread == null) {
+      _draft.clear();
+      notifyListeners();
+      return;
+    }
+    final server = _server;
+    await _try('Could not clear the chat', () async {
+      await _api.resetChat(slug, thread);
+      if (_server != server) return;
+      _turns[thread] = [];
+    });
   }
 
   /// Stops the running answer, keeping what came so far.

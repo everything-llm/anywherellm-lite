@@ -1,4 +1,5 @@
 import 'chat.dart';
+import 'commands.dart';
 import 'connection.dart';
 import 'prefs.dart';
 import 'server_models.dart';
@@ -43,6 +44,14 @@ abstract interface class AnythingLlmApi {
     required ChatMode mode,
     List<Attachment> attachments = const [],
   });
+
+  /// Clears the chat's history, so the model no longer sees its turns and history no longer
+  /// lists them.
+  Future<void> resetChat(String slug, String thread);
+
+  /// The server's slash-command presets. They are read outside the developer API, which
+  /// answers only while the server has no password; otherwise this fails.
+  Future<List<SlashCommand>> slashCommands();
 
   /// Embeds the documents at [adds] in the workspace and drops those at [deletes], by
   /// `folder/name.json` path.

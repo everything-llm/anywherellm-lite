@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:anywherellm/core/chat.dart';
+import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
@@ -72,6 +73,9 @@ class FakeAnythingLlm implements AnythingLlmApi {
     'VectorDB': 'lancedb',
   };
   Set<String> acceptedValue = {'.md', '.txt', '.pdf'};
+
+  /// What [slashCommands] answers.
+  List<SlashCommand> presets = const [];
 
   String answer = 'Here is what your sources say.';
   List<String> cited = const [];
@@ -188,6 +192,14 @@ class FakeAnythingLlm implements AnythingLlmApi {
     }
     return Stream.fromIterable([TextChunk(answer), ChatDone(cited)]);
   }
+
+  @override
+  Future<void> resetChat(String slug, String thread) =>
+      _run('resetChat', () => histories.remove(thread), thread);
+
+  @override
+  Future<List<SlashCommand>> slashCommands() =>
+      _run('slashCommands', () => presets);
 
   @override
   Future<void> updateEmbeddings(
