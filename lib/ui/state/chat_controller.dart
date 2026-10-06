@@ -32,7 +32,7 @@ class Turn extends ChangeNotifier {
 
   /// The names of the files sent with a question.
   List<String> attachments = const [];
-  List<String> citations = const [];
+  List<Citation> citations = const [];
   bool streaming;
 
   /// Why the answer failed, or null.
@@ -502,6 +502,12 @@ class ChatController extends ChangeNotifier {
     _threads[slug] = [
       for (final t in threadsOf(slug)) t.slug == thread.slug ? thread : t,
     ];
+    notifyListeners();
+  }
+
+  /// Shows a failure that is not the server's, such as a link that would not open.
+  void report(String title, String text) {
+    problem = Notice(title, text);
     notifyListeners();
   }
 

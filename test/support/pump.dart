@@ -22,6 +22,12 @@ class Harness extends Rig {
 
   final ShellController shell;
 
+  /// Every address the app asked to open, in order.
+  final List<Uri> opened = [];
+
+  /// Whether opening a link succeeds, as when the device has a browser.
+  bool openSucceeds = true;
+
   Widget get app => AnywhereLlmApp(
     home: AppScope(
       shell: shell,
@@ -30,6 +36,10 @@ class Harness extends Rig {
       chat: chat,
       sources: sources,
       files: files,
+      openLink: (url) async {
+        opened.add(url);
+        return openSucceeds;
+      },
       child: const AppShell(),
     ),
   );

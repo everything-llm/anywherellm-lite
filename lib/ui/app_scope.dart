@@ -7,6 +7,9 @@ import 'state/settings_controller.dart';
 import 'state/shell_controller.dart';
 import 'state/sources_controller.dart';
 
+/// Opens [url] outside the app, in the browser or the mail app. Says whether something did.
+typedef LinkOpener = Future<bool> Function(Uri url);
+
 /// The app's controllers, put in the tree once by `main.dart`. Controllers are listenable, so
 /// this never notifies: widgets listen to the controller they read.
 class AppScope extends InheritedWidget {
@@ -18,6 +21,7 @@ class AppScope extends InheritedWidget {
     required this.chat,
     required this.sources,
     required this.files,
+    required this.openLink,
     required super.child,
   });
 
@@ -27,6 +31,7 @@ class AppScope extends InheritedWidget {
   final ChatController chat;
   final SourcesController sources;
   final FilesController files;
+  final LinkOpener openLink;
 
   static AppScope of(BuildContext context) {
     // Never notifies, so no dependency is needed. That also lets initState read it.

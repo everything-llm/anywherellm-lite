@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'adapters/anythingllm_client.dart';
 import 'adapters/json_prefs_store.dart';
@@ -44,6 +45,7 @@ Future<void> main() async {
         ),
         prefs: PrefsController(JsonPrefsStore(prefsFile)),
         shell: ShellController(),
+        openLink: (url) => launchUrl(url, mode: LaunchMode.externalApplication),
       ),
     ),
   );
@@ -58,12 +60,14 @@ class SessionHost extends StatefulWidget {
     required this.settings,
     required this.prefs,
     required this.shell,
+    required this.openLink,
   });
 
   final AnythingLlmApi llm;
   final SettingsController settings;
   final PrefsController prefs;
   final ShellController shell;
+  final LinkOpener openLink;
 
   @override
   State<SessionHost> createState() => _SessionHostState();
@@ -125,6 +129,7 @@ class _SessionHostState extends State<SessionHost> {
         chat: _chat,
         sources: _sources,
         files: _files,
+        openLink: widget.openLink,
         child: const AppShell(),
       );
     },

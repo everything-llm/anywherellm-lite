@@ -5,6 +5,7 @@ import 'package:anywherellm/ui/sidebar.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/widgets/controls.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
+import 'package:anywherellm/core/server_models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -85,7 +86,7 @@ void main() {
         expect(control('Stop'), findsOneWidget);
 
         llm.chat!.add(const TextChunk('The roadmap.'));
-        llm.chat!.add(const ChatDone(['Q3 roadmap.pdf']));
+        llm.chat!.add(const ChatDone([Citation('Q3 roadmap.pdf')]));
         await llm.chat!.close();
         await tester.pumpAndSettle();
         expect(find.byType(Caret), findsNothing);
@@ -262,7 +263,7 @@ void main() {
         expect(find.text('Running web-browsing'), findsOneWidget);
         llm.chat!
           ..add(const WholeAnswer('Headline'))
-          ..add(ChatDone([for (var i = 1; i <= 9; i++) 'Story $i']));
+          ..add(ChatDone([for (var i = 1; i <= 9; i++) Citation('Story $i')]));
         await llm.chat!.close();
         await tester.pumpAndSettle();
         expect(find.text('Running web-browsing'), findsNothing);

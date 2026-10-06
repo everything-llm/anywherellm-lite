@@ -4,6 +4,7 @@ import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/prefs.dart';
+import 'package:anywherellm/core/server_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
@@ -33,7 +34,9 @@ void main() {
         'What is the budget?',
         'About 40k.',
       ]);
-      expect(rig.chat.turns.last.citations, ['Q3 roadmap.pdf']);
+      expect(rig.chat.turns.last.citations.map((c) => c.title), [
+        'Q3 roadmap.pdf',
+      ]);
     },
   );
 
@@ -104,11 +107,11 @@ void main() {
     await rig.chat.send('another');
     expect(llm.calls.where((c) => c.startsWith('streamChat')), hasLength(1));
 
-    llm.chat!.add(const ChatDone(['Q3 roadmap.pdf']));
+    llm.chat!.add(const ChatDone([Citation('Q3 roadmap.pdf')]));
     await llm.chat!.close();
     await pumpEventQueue();
     expect(answer.streaming, isFalse);
-    expect(answer.citations, ['Q3 roadmap.pdf']);
+    expect(answer.citations.map((c) => c.title), ['Q3 roadmap.pdf']);
     expect(rig.chat.busy, isFalse);
   });
 
@@ -150,12 +153,12 @@ void main() {
     llm.chat!
       ..add(const TextChunk('Draft'))
       ..add(const WholeAnswer('<think>Pick</think>Headline'))
-      ..add(const ChatDone(['A story']));
+      ..add(const ChatDone([Citation('A story')]));
     await llm.chat!.close();
     await pumpEventQueue();
     expect(answer.text, '<think>Pick</think>Headline');
     expect(answer.status, isNull);
-    expect(answer.citations, ['A story']);
+    expect(answer.citations.map((c) => c.title), ['A story']);
     expect(answer.streaming, isFalse);
   });
 

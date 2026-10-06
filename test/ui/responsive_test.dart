@@ -42,7 +42,13 @@ FakeAnythingLlm awkward() {
     ChatMessage(
       role: Role.assistant,
       text: 'An answer that keeps going. ' * 40,
-      citations: ['file-$longWord.pdf', 'gone-$longWord.md'],
+      citations: [
+        Citation('file-$longWord.pdf'),
+        Citation(
+          'gone-$longWord.md',
+          url: Uri.parse('https://example.com/$longWord/$longWord'),
+        ),
+      ],
     ),
     ChatMessage(
       role: Role.user,
@@ -180,7 +186,15 @@ void main() {
       expect(tester.takeException(), isNull);
       llm.chat!
         ..add(const WholeAnswer('Headline'))
-        ..add(ChatDone([for (var i = 0; i < 9; i++) 'story-$i-$longWord']));
+        ..add(
+          ChatDone([
+            for (var i = 0; i < 9; i++)
+              Citation(
+                'story-$i-$longWord',
+                url: Uri.parse('https://example.com/$longWord'),
+              ),
+          ]),
+        );
       await llm.chat!.close();
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);

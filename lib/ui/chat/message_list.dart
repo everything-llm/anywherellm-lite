@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/chat.dart';
 import '../../core/server_models.dart';
 import '../app_scope.dart';
+import '../links.dart';
 import '../icons.dart';
 import '../layout.dart';
 import '../state/chat_controller.dart';
@@ -373,9 +374,9 @@ class _ReasoningState extends State<_Reasoning> {
 /// The sources an answer drew on. An agent's can be dozens of web pages, so past the first few
 /// they fold behind a count.
 class _Citations extends StatefulWidget {
-  const _Citations(this.titles);
+  const _Citations(this.citations);
 
-  final List<String> titles;
+  final List<Citation> citations;
 
   static const shown = 5;
 
@@ -389,24 +390,24 @@ class _CitationsState extends State<_Citations> {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final titles = widget.titles;
-    final folded = !_all && titles.length > _Citations.shown + 1;
-    final count = folded ? _Citations.shown : titles.length;
+    final citations = widget.citations;
+    final folded = !_all && citations.length > _Citations.shown + 1;
+    final count = folded ? _Citations.shown : citations.length;
     return Wrap(
       spacing: 6,
       runSpacing: 6,
       children: [
-        for (final (i, title) in titles.take(count).indexed)
-          _Citation(number: i + 1, title: title),
+        for (final (i, citation) in citations.take(count).indexed)
+          _Citation(number: i + 1, citation: citation),
         if (folded)
           Tappable(
-            label: '${titles.length - count} more sources',
+            label: '${citations.length - count} more sources',
             onTap: () => setState(() => _all = true),
             radius: BorderRadius.circular(99),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               child: Text(
-                '${titles.length - count} more',
+                '${citations.length - count} more',
                 style: Type.sans(12.5, color: t.muted),
               ),
             ),
@@ -416,13 +417,13 @@ class _CitationsState extends State<_Citations> {
   }
 }
 
-/// One source. A file in Sources lights up there when tapped; anything else, such as a web
-/// page an agent read or a file since removed, only shows its title.
+/// One source. A file in Sources lights up there when tapped, and a web page an agent read opens
+/// in the browser; anything else, such as a file since removed, only shows its title.
 class _Citation extends StatelessWidget {
-  const _Citation({required this.number, required this.title});
+  const _Citation({required this.number, required this.citation});
 
   final int number;
-  final String title;
+  final Citation citation;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -433,18 +434,25 @@ class _Citation extends StatelessWidget {
   Widget _build(BuildContext context, Widget? _) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
+    final title = citation.title;
+    final url = citation.url;
     final present = scope.sources.byTitle(title) != null;
+    final live = present || url != null;
     return Tappable(
-      label: 'Source $number: $title',
-      tooltip: present ? 'Show in Sources' : null,
+      label: present || url == null
+          ? 'Source $number: $title'
+          : 'Source $number: $title, opens in the browser',
+      tooltip: present ? 'Show in Sources' : url?.toString(),
       onTap: present
           ? () {
               scope.shell.openSources();
               scope.sources.flash(title);
             }
-          : null,
+          : url == null
+          ? null
+          : () => openLink(context, url.toString()),
       radius: BorderRadius.circular(99),
-      color: present ? t.accentbg : t.hover,
+      color: live ? t.accentbg : t.hover,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(6, 4, 10, 4),
         child: Row(
@@ -455,7 +463,7 @@ class _Citation extends StatelessWidget {
               height: 16,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: present ? t.accent : t.muted,
+                color: live ? t.accent : t.muted,
                 shape: BoxShape.circle,
               ),
               child: Text(
@@ -475,7 +483,7 @@ class _Citation extends StatelessWidget {
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Type.sans(12.5, color: present ? t.accent : t.ink2),
+                style: Type.sans(12.5, color: live ? t.accent : t.ink2),
               ),
             ),
           ],

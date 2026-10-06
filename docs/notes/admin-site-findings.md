@@ -97,7 +97,9 @@ The server now has a password, which it did not have when the slash-command menu
 
 ## Links and cards in answers
 
-The workspace prompt asks the model for links and for `Card:` Markdown from tools, and for links to every page it publishes. AnywhereLLM draws links in answers but cannot open them, because `url_launcher` is not a dependency yet (TODO.md, "Needs a new dependency"). With this server's prompt, most answers that use a tool end in a link, so this matters more than TODO.md suggests. How a card's Markdown renders in the app is unchecked.
+The workspace prompt asks the model for links and for `Card:` Markdown from tools, and for links to every page it publishes. A read-only look at the 19 stored answers on 2026-10-06 found no `Card:` text: the one card was a linked image, `[![title](https://<server host>:8445/...)](https://<server host>:8445/...)`, served from the AnythingLLM server's own host. Web sources name their page in `chunkSource` as `link://https://...`; 123 of 182 stored sources did.
+
+AnywhereLLM now opens links in answers and web citations in the browser, and draws images from the server's own host only, so a card shows and an image address a model wrote cannot be fetched.
 
 ## Candidate next steps
 

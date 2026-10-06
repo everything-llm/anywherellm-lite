@@ -25,7 +25,6 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 
 | Gap | What it needs |
 | --- | --- |
-| Links in answers open in the browser | `url_launcher`. Links are styled but do nothing when tapped. |
 | A microphone in the composer | On-device speech recognition, such as `speech_to_text`. The web UI uses the browser's. |
 | Dropping files onto the chat to attach them | `desktop_drop` is already in use for Sources. Decide whether a drop on the chat attaches or adds a source. |
 

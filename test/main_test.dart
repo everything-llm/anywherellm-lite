@@ -25,6 +25,7 @@ Future<void> _boot(WidgetTester tester, FakeSettingsStore store) async {
         settings: SettingsController(llm, store, ConnectionHolder()),
         prefs: PrefsController(FakePrefsStore()),
         shell: ShellController(),
+        openLink: (_) async => true,
       ),
     ),
   );
