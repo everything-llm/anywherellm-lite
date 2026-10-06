@@ -394,3 +394,48 @@ class DocBody {
   /// The known keys of [docDetailLabels], in its order.
   final Map<String, String> details;
 }
+
+/// A passage of a workspace's documents that a question finds, as an answer would get it.
+class SearchHit {
+  const SearchHit({
+    required this.title,
+    required this.text,
+    required this.score,
+  });
+
+  /// The `metadata` holds the document's title; [score] is from 0 to 1, higher is closer.
+  factory SearchHit.fromJson(Map<String, dynamic> json) {
+    final metadata = json['metadata'];
+    final score = json['score'];
+    return SearchHit(
+      title:
+          (metadata is Map<String, dynamic>
+              ? _known(metadata, 'title')
+              : null) ??
+          'Untitled',
+      text: json['text'] is String ? json['text'] as String : '',
+      score: score is num ? score.toDouble() : 0,
+    );
+  }
+
+  final String title;
+  final String text;
+  final double score;
+}
+
+/// The formats the server exports every chat in, with the extension of each.
+enum ChatExport {
+  jsonl('JSON Lines', 'jsonl'),
+  json('JSON', 'json'),
+  csv('CSV', 'csv'),
+  jsonAlpaca('Alpaca JSON', 'json');
+
+  const ChatExport(this.label, this.extension);
+
+  final String label;
+  final String extension;
+
+  /// The name a saved export gets by default.
+  String get fileName =>
+      'anythingllm-chats${this == jsonAlpaca ? '-alpaca' : ''}.$extension';
+}

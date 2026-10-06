@@ -76,6 +76,9 @@ class FilesController extends ChangeNotifier {
   /// The file being sent now, or null.
   String? sending;
 
+  /// Whether every chat is being exported now.
+  bool exporting = false;
+
   /// Why the last load or change failed.
   List<Notice> problems = const [];
 
@@ -408,6 +411,25 @@ class FilesController extends ChangeNotifier {
     if (shownOff) unawaited(_sources.refresh());
     _expanded.remove(libraryPath(name));
     await select('/library');
+  }
+
+  /// Every chat on the server in [format], or null when the server would not give them, which
+  /// [problems] then says.
+  Future<List<int>?> exportChats(ChatExport format) async {
+    final server = _server;
+    exporting = true;
+    notifyListeners();
+    List<int>? bytes;
+    try {
+      bytes = await _api.exportChats(format);
+      problems = const [];
+    } on ApiException catch (error) {
+      problems = [Notice('Could not export the chats', error.message)];
+    }
+    if (_server != server) return null;
+    exporting = false;
+    notifyListeners();
+    return bytes;
   }
 
   /// Shows a failure that is not about one node, such as a file picker that would not open.

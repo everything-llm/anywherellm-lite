@@ -1046,4 +1046,85 @@ void main() {
       expect('$link $text', isNot(contains('SECRET-KEY')));
     });
   });
+
+  group('search and export', () {
+    test('a search posts the question and reads each hit', () async {
+      final seen = <http.Request>[];
+      final hits = await _answering({
+        'results': [
+          {
+            'id': '1',
+            'text': 'A passage.',
+            'metadata': {'title': 'Q3 roadmap.pdf', 'author': 'Unknown'},
+            'distance': 0.35,
+            'score': 0.65,
+          },
+          {'id': '2', 'metadata': {}, 'score': 0.4},
+        ],
+      }, seen: seen).searchDocs('q3', 'budget');
+      expect(seen.single.url.path, '/api/v1/workspace/q3/vector-search');
+      expect(jsonDecode(seen.single.body), {'query': 'budget'});
+      expect(
+        [for (final h in hits) (h.title, h.text, h.score)],
+        [('Q3 roadmap.pdf', 'A passage.', 0.65), ('Untitled', '', 0.4)],
+      );
+    });
+
+    test('a search the server refuses says why', () async {
+      final error = await _failure(
+        _api(
+          (_) async => http.Response(
+            '{"message":"Query parameter cannot be empty."}',
+            400,
+          ),
+        ).searchDocs('q3', ''),
+      );
+      expect(error.message, contains('Query parameter cannot be empty.'));
+    });
+
+    test('an export is the file as the server sends it', () async {
+      final seen = <http.Request>[];
+      final bytes = await _api((request) async {
+        seen.add(request);
+        return http.Response(
+          'id,prompt\n1,hi\n',
+          200,
+          headers: {'content-type': 'text/csv; charset=utf-8'},
+        );
+      }).exportChats(ChatExport.csv);
+      expect(seen.single.url.path, '/api/v1/system/export-chats');
+      expect(seen.single.url.queryParameters, {'type': 'csv'});
+      expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
+      expect(utf8.decode(bytes), 'id,prompt\n1,hi\n');
+    });
+
+    test('an export answered with a web page or a bad key fails', () async {
+      final page = await _failure(
+        _api(
+          (_) async => http.Response(
+            '<html>login</html>',
+            200,
+            headers: {'content-type': 'text/html'},
+          ),
+        ).exportChats(ChatExport.json),
+      );
+      expect(page.message, isNot(contains('SECRET-KEY')));
+      final key = await _failure(
+        _api((_) async => http.Response('', 403)).exportChats(ChatExport.json),
+      );
+      expect(key.message, 'The server rejected the key.');
+    });
+
+    test('each format names its file', () {
+      expect(
+        [for (final f in ChatExport.values) f.fileName],
+        [
+          'anythingllm-chats.jsonl',
+          'anythingllm-chats.json',
+          'anythingllm-chats.csv',
+          'anythingllm-chats-alpaca.json',
+        ],
+      );
+    });
+  });
 }

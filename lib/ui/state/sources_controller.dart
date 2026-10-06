@@ -48,6 +48,11 @@ class SourcesController extends ChangeNotifier {
   String? flashed;
   Timer? _flashTimer;
 
+  /// The question last tested, and what it found, or null before one is tested.
+  String? searched;
+  List<SearchHit>? hits;
+  bool searching = false;
+
   static const undoFor = Duration(seconds: 6);
   static const flashFor = Duration(milliseconds: 1800);
 
@@ -73,6 +78,9 @@ class SourcesController extends ChangeNotifier {
     loading = false;
     sending = null;
     _accepted = null;
+    searched = null;
+    hits = null;
+    searching = false;
     _clearRemoved();
     notifyListeners();
     if (_slug != null) unawaited(refresh());
@@ -250,6 +258,37 @@ class SourcesController extends ChangeNotifier {
         await _remember(slug, file, off: true);
       }
     });
+  }
+
+  /// Finds the passages of the switched-on files that [query] would give an answer, as the
+  /// workspace's own settings choose them.
+  Future<void> search(String query) async {
+    final slug = _slug;
+    final question = query.trim();
+    if (slug == null || question.isEmpty) return;
+    searched = question;
+    searching = true;
+    notifyListeners();
+    try {
+      final found = await _api.searchDocs(slug, question);
+      if (slug != _slug || searched != question) return;
+      hits = found;
+      problems = const [];
+    } on ApiException catch (error) {
+      if (slug != _slug || searched != question) return;
+      hits = null;
+      problems = [Notice('Could not test the question', error.message)];
+    }
+    searching = false;
+    notifyListeners();
+  }
+
+  /// Puts the tested question and what it found away.
+  void clearSearch() {
+    searched = null;
+    hits = null;
+    searching = false;
+    notifyListeners();
   }
 
   /// Lights up the file titled [title] for a moment.

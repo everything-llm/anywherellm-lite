@@ -1,6 +1,7 @@
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/prefs.dart';
+import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/upload.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -270,5 +271,19 @@ void main() {
     await rig.chat.createWorkspace('Travel');
     await pumpEventQueue();
     expect(nodeAt(rig.files.tree, '/workspaces/travel/PROMPT.md'), isNotNull);
+  });
+
+  test('exporting gives the file and a refusal says why', () async {
+    final llm = planningServer()..exported = 'a,b';
+    final rig = await started(llm);
+    expect(
+      String.fromCharCodes((await rig.files.exportChats(ChatExport.csv))!),
+      'a,b',
+    );
+    expect(llm.calls, contains('exportChats:csv'));
+    expect(rig.files.exporting, isFalse);
+    llm.errors['exportChats'] = const ApiException('No');
+    expect(await rig.files.exportChats(ChatExport.json), isNull);
+    expect(rig.files.problems.single.title, 'Could not export the chats');
   });
 }

@@ -238,4 +238,53 @@ void main() {
       expect(llm.calls.where((c) => c.startsWith('updateEmbeddings')), isEmpty);
     });
   });
+
+  group('testing a question', () {
+    test('finds passages of the workspace\'s files, closest first', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.sources.search(' roadmap ');
+      expect(llm.calls, contains('searchDocs:q3:roadmap'));
+      expect(rig.sources.searched, 'roadmap');
+      expect(rig.sources.hits?.map((h) => h.title), ['Q3 roadmap.pdf']);
+      expect(rig.sources.searching, isFalse);
+    });
+
+    test('a blank question is not sent', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.sources.search('  ');
+      expect(llm.calls.where((c) => c.startsWith('searchDocs')), isEmpty);
+      expect(rig.sources.hits, isNull);
+    });
+
+    test('a refused question becomes a notice', () async {
+      final llm = planningServer()
+        ..errors['searchDocs'] = const ApiException('No vectors');
+      final rig = await started(llm);
+      await rig.sources.search('roadmap');
+      expect(rig.sources.problems.single.text, 'No vectors');
+      expect(rig.sources.hits, isNull);
+    });
+
+    test('another workspace puts the question away', () async {
+      final rig = await started(planningServer());
+      await rig.sources.search('roadmap');
+      await rig.chat.select('household');
+      expect(rig.sources.searched, isNull);
+      expect(rig.sources.hits, isNull);
+    });
+
+    test('an answer for an older question is dropped', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      final gate = llm.gates['searchDocs'] = Completer<void>();
+      final first = rig.sources.search('roadmap');
+      await pumpEventQueue();
+      rig.sources.clearSearch();
+      gate.complete();
+      await first;
+      expect(rig.sources.hits, isNull);
+    });
+  });
 }

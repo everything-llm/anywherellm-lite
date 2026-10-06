@@ -281,6 +281,46 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
         'pinStatus': pinned,
       });
 
+  @override
+  Future<List<SearchHit>> searchDocs(String slug, String query) async => [
+    for (final json in jsonObjects(
+      _field(
+        await _send('POST', '${_workspace(slug)}/vector-search', {
+          'query': query,
+        }),
+        'results',
+      ),
+    ))
+      SearchHit.fromJson(json),
+  ];
+
+  /// The server answers with the file itself, which is not always JSON; a failure is decoded as
+  /// any other.
+  @override
+  Future<List<int>> exportChats(ChatExport format) async {
+    final connection = _current;
+    final http.Response response;
+    try {
+      response = await _client
+          .get(
+            Uri.parse(
+              '${connection.baseUrl}/api/v1/system/export-chats?type=${format.name}',
+            ),
+            headers: {'Authorization': 'Bearer ${connection.apiKey}'},
+          )
+          .timeout(uploadTimeout);
+    } on Exception catch (error) {
+      throw _unreachable(connection, error, uploadTimeout);
+    }
+    final type = response.headers['content-type'] ?? '';
+    final ok = response.statusCode >= 200 && response.statusCode < 300;
+    if (!ok || type.startsWith('text/html')) {
+      _decode(response);
+      throw const ApiException(_refused);
+    }
+    return response.bodyBytes;
+  }
+
   /// The server answers with its `documents` folder, whose items are the library's folders.
   @override
   Future<List<LibraryFolder>> libraryFolders() async => libraryOf(

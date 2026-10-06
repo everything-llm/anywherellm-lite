@@ -393,6 +393,33 @@ class FakeAnythingLlm implements AnythingLlmApi {
         }
       }, paths.join(','));
 
+  /// Finds a passage in each document of the workspace whose title shares a word with the
+  /// question, closest first.
+  @override
+  Future<List<SearchHit>> searchDocs(String slug, String query) => _run(
+    'searchDocs',
+    () {
+      final words = query.toLowerCase().split(' ').toSet();
+      return [
+        for (final (i, d) in _space(slug).docs.indexed)
+          if (d.title.toLowerCase().split(RegExp(r'[ .]')).any(words.contains))
+            SearchHit(
+              title: d.title,
+              text: 'A passage of ${d.title}.',
+              score: 0.9 - i / 10,
+            ),
+      ];
+    },
+    '$slug:$query',
+  );
+
+  /// What [exportChats] answers, for any format.
+  String exported = '{"prompt":"hi"}';
+
+  @override
+  Future<List<int>> exportChats(ChatExport format) =>
+      _run('exportChats', () => exported.codeUnits, format.name);
+
   @override
   Future<Map<String, Object?>> systemSettings() =>
       _run('systemSettings', () => system);

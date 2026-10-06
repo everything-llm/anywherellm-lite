@@ -118,6 +118,13 @@ abstract interface class AnythingLlmApi {
   /// Deletes the library documents at [paths], which takes them out of every workspace too.
   Future<void> removeDocuments(List<String> paths);
 
+  /// The passages of workspace [slug]'s documents that [query] finds, closest first, with the
+  /// workspace's own number and threshold, as an answer would get them.
+  Future<List<SearchHit>> searchDocs(String slug, String query);
+
+  /// Every chat on the server, in [format], as the file's bytes.
+  Future<List<int>> exportChats(ChatExport format);
+
   /// The server's settings, with every secret replaced by whether it is set.
   Future<Map<String, Object?>> systemSettings();
 }
