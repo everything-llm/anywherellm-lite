@@ -114,4 +114,34 @@ void main() {
       expect(agentStatus('Thinking about it\nmore'), 'Thinking about it');
     });
   });
+
+  test('only web and mail links open', () {
+    expect(
+      [
+        for (final href in [
+          'https://example.com/a',
+          'http://example.com',
+          'mailto:ada@example.com',
+          'javascript:alert(1)',
+          'file:///etc/passwd',
+          '/relative/path',
+          'myapp://open',
+          'https://',
+          'mailto:',
+        ])
+          openableLink(href)?.toString(),
+      ],
+      [
+        'https://example.com/a',
+        'http://example.com',
+        'mailto:ada@example.com',
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+      ],
+    );
+  });
 }

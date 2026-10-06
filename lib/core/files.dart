@@ -250,7 +250,11 @@ String chatMarkdown(String name, List<ChatMessage> turns) {
       ..write('\n**${turn.role == Role.user ? 'You' : 'Answer'}**\n\n')
       ..write('${splitReasoning(turn.text).answer}\n');
     if (turn.citations.isNotEmpty) {
-      out.write('\nSources: ${turn.citations.join(', ')}\n');
+      final sources = [
+        for (final c in turn.citations)
+          c.url == null ? c.title : '[${c.title}](${c.url})',
+      ];
+      out.write('\nSources: ${sources.join(', ')}\n');
     }
   }
   return out.toString();

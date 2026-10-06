@@ -515,7 +515,10 @@ void main() {
       }, seen: seen).history('w', 't');
       expect(seen.single.url.path, '/api/v1/workspace/w/thread/t/chats');
       expect(turns.map((t) => t.text), ['What is due?', 'The roadmap.']);
-      expect(turns.last.citations, ['roadmap.pdf', 'notes.md']);
+      expect(turns.last.citations.map((c) => c.title), [
+        'roadmap.pdf',
+        'notes.md',
+      ]);
       expect(turns.first.attachments, ['photo.png']);
       expect(turns.last.attachments, isEmpty);
     });
@@ -580,7 +583,9 @@ void main() {
       expect(
         [
           for (final e in events)
-            e is TextChunk ? e.text : (e as ChatDone).citations,
+            e is TextChunk
+                ? e.text
+                : [for (final c in (e as ChatDone).citations) c.title],
         ],
         [
           'Hel',
@@ -675,7 +680,11 @@ void main() {
           'thoughts': [],
           'outputs': [],
           'sources': [
-            {'title': 'A story', 'chunkSource': 'link://x', 'score': 0.5},
+            {
+              'title': 'A story',
+              'chunkSource': 'link://https://x.test/story',
+              'score': 0.5,
+            },
             {'title': 'A story'},
             {'title': 'Another'},
           ],
@@ -690,7 +699,8 @@ void main() {
               TextChunk(:final text) => 'text $text',
               StatusChunk(:final text) => 'status $text',
               WholeAnswer(:final text) => 'whole $text',
-              ChatDone(:final citations) => 'done $citations',
+              ChatDone(:final citations) =>
+                'done ${[for (final c in citations) '${c.title} ${c.url}']}',
             },
         ],
         [
@@ -700,7 +710,7 @@ void main() {
           'status Using SearXNG to search for "news"',
           'text Head',
           'whole <think>Pick.</think>Headline: [x](https://x.test)',
-          'done [A story, Another]',
+          'done [A story https://x.test/story, Another null]',
         ],
       );
     });
@@ -738,7 +748,10 @@ void main() {
         ]).streamChat('w', 't', 'Hi').toList();
         expect((events.first as TextChunk).text, 'Hi');
         expect(events.whereType<WholeAnswer>(), isEmpty);
-        expect((events.last as ChatDone).citations, ['roadmap.pdf']);
+        expect(
+          (events.last as ChatDone).citations.map((c) => (c.title, c.url)),
+          [('roadmap.pdf', null)],
+        );
         expect(events.length, 2);
       },
     );

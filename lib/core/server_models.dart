@@ -197,14 +197,38 @@ class ChatMessage {
   /// The names of the files sent with the message.
   final List<String> attachments;
 
-  /// The titles of the documents the answer drew on, each once, in the server's order.
-  final List<String> citations;
+  /// What the answer drew on, each once, in the server's order.
+  final List<Citation> citations;
 }
 
-/// The document titles in a `sources` list, each once.
-List<String> citationsOf(Object? sources) =>
-    {for (final source in jsonObjects(sources)) ?_known(source, 'title')}
-        .toList();
+/// A source an answer drew on: a document by its [title], or a web page an agent read, which
+/// also has its [url].
+class Citation {
+  const Citation(this.title, {this.url});
+
+  final String title;
+  final Uri? url;
+}
+
+/// The sources in a `sources` list, one per title. A web page's address is its `chunkSource`
+/// after `link://`, as `link://https://example.com/page`; a document has none.
+List<Citation> citationsOf(Object? sources) {
+  final byTitle = <String, Citation>{};
+  for (final source in jsonObjects(sources)) {
+    final title = _known(source, 'title');
+    if (title == null || byTitle.containsKey(title)) continue;
+    final chunk = source['chunkSource'];
+    final page = chunk is String && chunk.startsWith('link://')
+        ? Uri.tryParse(chunk.substring('link://'.length))
+        : null;
+    final web =
+        page != null &&
+        page.host.isNotEmpty &&
+        (page.scheme == 'http' || page.scheme == 'https');
+    byTitle[title] = Citation(title, url: web ? page : null);
+  }
+  return byTitle.values.toList();
+}
 
 /// A document a workspace holds.
 class WorkspaceDoc {

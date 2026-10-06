@@ -15,7 +15,7 @@ import '../core/server_models.dart';
 /// Ends with one [ChatDone], at `finalizeResponseStream` or when the stream ends. Fails with
 /// [ApiException] when the server reports an error.
 Stream<ChatEvent> chatEvents(Stream<List<int>> bytes) async* {
-  var citations = const <String>[];
+  var citations = const <Citation>[];
   var whole = false;
   await for (final line
       in bytes.transform(utf8.decoder).transform(const LineSplitter())) {

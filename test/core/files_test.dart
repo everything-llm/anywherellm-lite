@@ -113,7 +113,7 @@ void main() {
         ChatMessage(
           role: Role.assistant,
           text: '<think>Check the roadmap.</think>About 40k.\n',
-          citations: ['Q3 roadmap.pdf', 'Notes.md'],
+          citations: [Citation('Q3 roadmap.pdf'), Citation('Notes.md')],
         ),
       ]),
       '# Budget\n'
@@ -281,5 +281,30 @@ void main() {
       });
       expect((doc.pinned, doc.watched), (true, false));
     });
+  });
+
+  test('a web source keeps its page, a document none, each title once', () {
+    final cited = citationsOf([
+      {'title': 'A story', 'chunkSource': 'link://https://news.test/a?b=1'},
+      {'title': 'A story', 'chunkSource': 'link://https://news.test/other'},
+      {'title': 'Q3 roadmap.pdf', 'chunkSource': ''},
+      {'title': 'Odd', 'chunkSource': 'link://javascript:alert(1)'},
+      {'title': 'Uploaded page', 'url': 'file://example.com_.html'},
+    ]);
+    expect(
+      [for (final c in cited) (c.title, c.url?.toString())],
+      [
+        ('A story', 'https://news.test/a?b=1'),
+        ('Q3 roadmap.pdf', null),
+        ('Odd', null),
+        ('Uploaded page', null),
+      ],
+    );
+    expect(
+      chatMarkdown('Chat', [
+        ChatMessage(role: Role.assistant, text: 'Hi', citations: cited),
+      ]),
+      contains('Sources: [A story](https://news.test/a?b=1), Q3 roadmap.pdf'),
+    );
   });
 }

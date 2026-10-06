@@ -206,7 +206,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
     return Stream.fromIterable([
       for (final line in agentStatus) StatusChunk(line),
       TextChunk(answer),
-      ChatDone(cited),
+      ChatDone([for (final title in cited) Citation(title)]),
     ]);
   }
 
@@ -462,7 +462,7 @@ FakeAnythingLlm planningServer() {
     ChatMessage(
       role: Role.assistant,
       text: 'About 40k.',
-      citations: ['Q3 roadmap.pdf'],
+      citations: [Citation('Q3 roadmap.pdf')],
     ),
   ];
   return llm;

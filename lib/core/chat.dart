@@ -1,5 +1,7 @@
 // Asking a workspace: what a streamed answer is made of, and how a chat gets its name.
 
+import 'server_models.dart';
+
 /// A workspace's chat mode on the server, which every message in it answers in. Its [name] is
 /// the server's value.
 enum ChatMode {
@@ -63,10 +65,22 @@ String agentStatus(String thought) {
   return text.split('\n').first.trim();
 }
 
-/// The answer is complete. [citations] are the titles of the documents it drew on.
+/// The answer is complete. [citations] are what it drew on.
 class ChatDone extends ChatEvent {
   const ChatDone(this.citations);
-  final List<String> citations;
+  final List<Citation> citations;
+}
+
+/// The address a link in an answer opens, or null for one the app will not open. Only web
+/// pages and mail open; `javascript:`, `file:`, app schemes and relative paths do not.
+Uri? openableLink(String href) {
+  final uri = Uri.tryParse(href.trim());
+  if (uri == null) return null;
+  return switch (uri.scheme) {
+    'http' || 'https' when uri.host.isNotEmpty => uri,
+    'mailto' when uri.path.contains('@') => uri,
+    _ => null,
+  };
 }
 
 /// The name a chat takes from its first [message]: its first line, cut to 42 code points so an
