@@ -211,6 +211,10 @@ class FakeAnythingLlm implements AnythingLlmApi {
   }
 
   @override
+  Future<void> stopChat(String slug, String thread) =>
+      _run('stopChat', () {}, thread);
+
+  @override
   Future<void> resetChat(String slug, String thread) =>
       _run('resetChat', () => histories.remove(thread), thread);
 

@@ -487,13 +487,32 @@ class ChatController extends ChangeNotifier {
     }
   }
 
-  /// Stops the running answer, keeping what came so far.
+  /// Stops the running answer, on the server too, keeping what came so far.
   void stop() {
     final running = _running;
     if (running == null) return;
+    if (running.thread case final thread? when running.stream != null) {
+      unawaited(_stopOnServer(running.slug, thread));
+    }
     running.stream?.cancel();
     if (running.answer.text.isEmpty) running.answer.text = 'Stopped.';
     _finish(running);
+  }
+
+  /// Stops the chat's answer on the server, and says so when that fails: the answer then goes
+  /// on there and is saved to the chat.
+  Future<void> _stopOnServer(String slug, String thread) async {
+    final server = _server;
+    try {
+      await _api.stopChat(slug, thread);
+    } on ApiException catch (error) {
+      if (_server != server) return;
+      problem = Notice(
+        'Could not stop the answer on the server',
+        error.message,
+      );
+      notifyListeners();
+    }
   }
 
   /// Ends [running], with [error] when it failed, unless it was already stopped or dropped.

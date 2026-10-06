@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:http/http.dart' as http;
 
@@ -17,6 +18,12 @@ import 'anythingllm_stream.dart';
 /// Every call but [verify] reads the connection from the holder when it is made. An error message
 /// never contains the key. Unless [allowHttp], a call to an `http://` address fails before the key
 /// is sent.
+///
+/// The address may be the everythingllm relay instead of AnythingLLM itself: it passes
+/// `/api/v1/` through, and also keeps an answer going after the app lets go of it, as a run. A
+/// connection is a relay when `GET /runs` answers a JSON list, asked once per connection. On a
+/// relay, [streamChat] starts a run and follows its events, rejoining after the last one it saw
+/// when the connection drops.
 class HttpAnythingLlmApi implements AnythingLlmApi {
   HttpAnythingLlmApi({
     required this._holder,
@@ -24,6 +31,14 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     http.Client? client,
     this.timeout = const Duration(seconds: 15),
     this.uploadTimeout = const Duration(minutes: 5),
+    this.quiet = const Duration(seconds: 45),
+    this.rejoinDelays = const [
+      Duration(seconds: 1),
+      Duration(seconds: 2),
+      Duration(seconds: 4),
+      Duration(seconds: 8),
+      Duration(seconds: 16),
+    ],
   }) : _client = client ?? http.Client();
 
   final ConnectionHolder _holder;
@@ -36,6 +51,22 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
 
   /// The server reads an upload in before it answers, which takes a while for a long PDF.
   final Duration uploadTimeout;
+
+  /// How long a relay's run may send nothing before its connection counts as dropped. The relay
+  /// pings every 15 s.
+  final Duration quiet;
+
+  /// The waits before each try at rejoining a run whose connection dropped. A run fails once
+  /// they are used up without an event coming in between.
+  final List<Duration> rejoinDelays;
+
+  /// Whether each connection asked so far is a relay.
+  final _relays = <Connection, bool>{};
+
+  /// The run [streamChat] is following in each chat, by workspace and thread.
+  final _runs = <(String, String), (Connection, String)>{};
+
+  final _random = Random.secure();
 
   @override
   Future<void> verify(Connection connection) async {
@@ -130,13 +161,196 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     String message, {
     List<Attachment> attachments = const [],
   }) async* {
+    final connection = _current;
     // No `mode`: the server then answers in the workspace's own chat mode.
-    yield* _events('${_thread(slug, thread)}/stream-chat', {
+    final body = {
       'message': message,
       if (attachments.isNotEmpty)
         'attachments': [for (final a in attachments) attachmentJson(a)],
-    }, attachments.isEmpty ? timeout : uploadTimeout);
+    };
+    final limit = attachments.isEmpty ? timeout : uploadTimeout;
+    if (await _isRelay(connection)) {
+      yield* _run(connection, slug, thread, body, limit);
+    } else {
+      yield* _events('${_thread(slug, thread)}/stream-chat', body, limit);
+    }
   }
+
+  /// Cancels the chat's run on the relay. The run is forgotten before the call is sent, so the
+  /// subscription can be cancelled at once.
+  @override
+  Future<void> stopChat(String slug, String thread) async {
+    final (connection, id) = _runs.remove((slug, thread)) ?? (null, null);
+    if (connection == null || id == null) return;
+    await _call(
+      connection,
+      timeout,
+      () async => http.Response.fromStream(
+        await _client.send(
+          _request(
+            connection,
+            'POST',
+            '/runs/${Uri.encodeComponent(id)}/cancel',
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Whether [connection] is a relay: `GET /runs` answers a JSON list there, and AnythingLLM's
+  /// web page or an error anywhere else. A refused key is not remembered, so a corrected one is
+  /// asked again.
+  Future<bool> _isRelay(Connection connection) async {
+    if (_relays[connection] case final known?) return known;
+    final response = await _fetch(
+      connection,
+      timeout,
+      () => _client.get(
+        Uri.parse('${connection.baseUrl}/runs?status=running'),
+        headers: _headers(connection),
+      ),
+    );
+    final status = response.statusCode;
+    if (status == 401 || status == 403) return false;
+    return _relays[connection] = status == 200 && _json(response) is List;
+  }
+
+  /// The answer to [body] as a run on the relay at [connection]. Cancelling it closes the
+  /// connection that follows the run at once, which an `async*` body waiting for the next event
+  /// would not do; the run itself goes on.
+  Stream<ChatEvent> _run(
+    Connection connection,
+    String slug,
+    String thread,
+    Map<String, Object?> body,
+    Duration limit,
+  ) {
+    final gone = Completer<void>();
+    StreamSubscription<ChatEvent>? answer;
+    late final StreamController<ChatEvent> out;
+    out = StreamController<ChatEvent>(
+      onListen: () => answer = _startRun(
+        connection,
+        slug,
+        thread,
+        body,
+        limit,
+        gone.future,
+      ).listen(out.add, onError: out.addError, onDone: out.close),
+      onPause: () => answer?.pause(),
+      onResume: () => answer?.resume(),
+      onCancel: () {
+        if (!gone.isCompleted) gone.complete();
+        return answer?.cancel();
+      },
+    );
+    return out.stream;
+  }
+
+  /// Starts the run of [body] and follows it until it ends or [gone] completes. The relay
+  /// answers a chat that already has a run going with 409 and says so.
+  Stream<ChatEvent> _startRun(
+    Connection connection,
+    String slug,
+    String thread,
+    Map<String, Object?> body,
+    Duration limit,
+    Future<void> gone,
+  ) async* {
+    final run = await _call(
+      connection,
+      limit,
+      () async => http.Response.fromStream(
+        await _client.send(
+          _request(connection, 'POST', '/runs', {
+            'workspace': slug,
+            'thread': thread,
+            'clientId': _clientId(),
+            'body': body,
+          }),
+        ),
+      ),
+      refused: 'The relay did not start the answer.',
+    );
+    final id = _field(run, 'id');
+    if (id is! String) {
+      throw const ApiException('The relay did not start the answer.');
+    }
+    final chat = (slug, thread);
+    _runs[chat] = (connection, id);
+    try {
+      yield* chatEventsOf(_runChunks(connection, id, gone));
+    } finally {
+      if (_runs[chat]?.$2 == id) _runs.remove(chat);
+    }
+  }
+
+  /// The `stream-chat` chunks of run [id], as the relay hands them back, until the run ends or
+  /// [gone] completes. A connection that drops, or stays [quiet] too long, is opened again after
+  /// the last event seen, after each of [rejoinDelays] in turn; an event coming in starts them
+  /// over.
+  Stream<Map<String, dynamic>> _runChunks(
+    Connection connection,
+    String id,
+    Future<void> gone,
+  ) async* {
+    var left = false;
+    unawaited(gone.then((_) => left = true));
+    var after = 0;
+    var misses = 0;
+    while (!left) {
+      final request = _request(
+        connection,
+        'GET',
+        '/runs/${Uri.encodeComponent(id)}/events',
+      )..headers['Accept'] = 'text/event-stream';
+      if (after > 0) request.headers['Last-Event-ID'] = '$after';
+      try {
+        final response = await _client.send(request).timeout(timeout);
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          _decode(await http.Response.fromStream(response));
+        }
+        await for (final event in serverSentEvents(
+          _until(response.stream.timeout(quiet), gone),
+        )) {
+          if (event.id case final seen?) after = seen;
+          misses = 0;
+          final Object? data;
+          try {
+            data = jsonDecode(event.data);
+          } on FormatException {
+            continue;
+          }
+          switch (event.name) {
+            case 'chunk' when data is Map<String, dynamic>:
+              yield data;
+            case 'failed':
+              throw ApiException(
+                _said(data) ?? 'The relay could not finish the answer.',
+              );
+            case 'done' || 'cancelled':
+              return;
+          }
+        }
+      } on ApiException {
+        rethrow;
+      } on Exception {
+        // Dropped or silent: rejoin below.
+      }
+      if (left) return;
+      if (misses == rejoinDelays.length) {
+        throw const ApiException(
+          'Lost the connection to the relay. The answer is still being written there and will '
+          'be in the chat when it is done.',
+        );
+      }
+      await Future.any([Future<void>.delayed(rejoinDelays[misses++]), gone]);
+    }
+  }
+
+  /// A new id for one message's run, so a request sent twice starts it once.
+  String _clientId() =>
+      'c_${List.generate(16, (_) => _random.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
 
   /// A `stream-chat` with `reset` and no message, which clears the history and answers with
   /// one closing chunk.
@@ -595,3 +809,24 @@ const _documentTypes = {
   '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 };
+
+/// [source] until [gone] completes, when it is cancelled and the stream ends.
+Stream<T> _until<T>(Stream<T> source, Future<void> gone) {
+  StreamSubscription<T>? from;
+  late final StreamController<T> out;
+  out = StreamController<T>(
+    onListen: () {
+      from = source.listen(out.add, onError: out.addError, onDone: out.close);
+      unawaited(
+        gone.then((_) async {
+          await from?.cancel();
+          await out.close();
+        }),
+      );
+    },
+    onPause: () => from?.pause(),
+    onResume: () => from?.resume(),
+    onCancel: () => from?.cancel(),
+  );
+  return out.stream;
+}

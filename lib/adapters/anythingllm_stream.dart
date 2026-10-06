@@ -6,27 +6,24 @@ import '../core/server_models.dart';
 
 /// The answer in a `stream-chat` response: server-sent events, each a `data:` line of JSON.
 ///
+/// See [chatEventsOf] for what the chunks become.
+Stream<ChatEvent> chatEvents(Stream<List<int>> bytes) =>
+    chatEventsOf(_dataChunks(bytes));
+
+/// The answer in the `stream-chat` [chunks], each a chunk's JSON as the server sent it.
+///
 /// A chat or query answer streams `textResponse` pieces, and the closing chunk (`close: true`)
 /// has the `sources`. An agent answer also streams `agentThought` chunks, which become
 /// [StatusChunk]s; its pieces include what it wrote before and between tools, so the whole
 /// answer then comes as one `textResponse` chunk, a [WholeAnswer]. A `finalizeResponseStream`
 /// chunk after the close has an agent's `sources`.
 ///
-/// Ends with one [ChatDone], at `finalizeResponseStream` or when the stream ends. Fails with
+/// Ends with one [ChatDone], at `finalizeResponseStream` or when the chunks end. Fails with
 /// [ApiException] when the server reports an error.
-Stream<ChatEvent> chatEvents(Stream<List<int>> bytes) async* {
+Stream<ChatEvent> chatEventsOf(Stream<Map<String, dynamic>> chunks) async* {
   var citations = const <Citation>[];
   var whole = false;
-  await for (final line
-      in bytes.transform(utf8.decoder).transform(const LineSplitter())) {
-    if (!line.startsWith('data:')) continue;
-    final Object? chunk;
-    try {
-      chunk = jsonDecode(line.substring(5).trim());
-    } on FormatException {
-      continue;
-    }
-    if (chunk is! Map<String, dynamic>) continue;
+  await for (final chunk in chunks) {
     final error = chunk['error'];
     if (error is String && error.trim().isNotEmpty) {
       throw ApiException(error.trim());
@@ -60,4 +57,55 @@ Stream<ChatEvent> chatEvents(Stream<List<int>> bytes) async* {
     }
   }
   yield ChatDone(citations);
+}
+
+/// The JSON object of each `data:` line in [bytes]; any other line is skipped.
+Stream<Map<String, dynamic>> _dataChunks(Stream<List<int>> bytes) async* {
+  await for (final line
+      in bytes.transform(utf8.decoder).transform(const LineSplitter())) {
+    if (!line.startsWith('data:')) continue;
+    final Object? chunk;
+    try {
+      chunk = jsonDecode(line.substring(5).trim());
+    } on FormatException {
+      continue;
+    }
+    if (chunk is Map<String, dynamic>) yield chunk;
+  }
+}
+
+/// One server-sent event: its [id] when it has a number for one, its [name], and its [data].
+typedef ServerSentEvent = ({int? id, String name, String data});
+
+/// The events in [bytes], each ended by a blank line. A comment (`: ping`) is skipped, an event
+/// with no `event:` field is named `message`, and the lines of a multi-line `data` are joined
+/// with newlines.
+Stream<ServerSentEvent> serverSentEvents(Stream<List<int>> bytes) async* {
+  int? id;
+  String? name;
+  final data = <String>[];
+  await for (final line
+      in bytes.transform(utf8.decoder).transform(const LineSplitter())) {
+    if (line.isEmpty) {
+      if (name != null || data.isNotEmpty) {
+        yield (id: id, name: name ?? 'message', data: data.join('\n'));
+      }
+      (id, name) = (null, null);
+      data.clear();
+      continue;
+    }
+    if (line.startsWith(':')) continue;
+    final colon = line.indexOf(':');
+    final field = colon < 0 ? line : line.substring(0, colon);
+    var value = colon < 0 ? '' : line.substring(colon + 1);
+    if (value.startsWith(' ')) value = value.substring(1);
+    switch (field) {
+      case 'id':
+        id = int.tryParse(value);
+      case 'event':
+        name = value;
+      case 'data':
+        data.add(value);
+    }
+  }
 }

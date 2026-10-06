@@ -130,6 +130,29 @@ void main() {
     expect(rig.chat.turns.last.text, 'Half');
   });
 
+  test('stop stops the answer on the server too', () async {
+    final llm = planningServer()..hold = true;
+    final rig = await started(llm);
+    await rig.chat.send('one');
+    final thread = rig.chat.activeThread;
+    rig.chat.stop();
+    await pumpEventQueue();
+    expect(llm.calls, contains('stopChat:$thread'));
+    expect(rig.chat.problem, isNull);
+  });
+
+  test('a stop the server refuses says the answer goes on there', () async {
+    final llm = planningServer()
+      ..hold = true
+      ..errors['stopChat'] = const ApiException('Could not reach the relay.');
+    final rig = await started(llm);
+    await rig.chat.send('one');
+    rig.chat.stop();
+    await pumpEventQueue();
+    expect(rig.chat.problem?.title, 'Could not stop the answer on the server');
+    expect(rig.chat.busy, isFalse);
+  });
+
   test('a failed answer says why and frees the chat', () async {
     final llm = planningServer()
       ..errors['streamChat'] = const ApiException('No LLM set');
@@ -231,6 +254,7 @@ void main() {
       gate.complete();
       await sending;
       expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
+      expect(llm.calls.where((c) => c.startsWith('stopChat')), isEmpty);
       expect(rig.chat.busy, isFalse);
       expect(rig.chat.threadsOf('household'), hasLength(1));
       expect(rig.chat.turns.last.text, 'Stopped.');

@@ -40,13 +40,19 @@ abstract interface class AnythingLlmApi {
 
   /// Asks [message] in the chat, with [attachments] for this message only, and streams the
   /// answer in the workspace's own chat mode. The stream fails with [ApiException]. Cancelling
-  /// the subscription stops the answer.
+  /// the subscription lets go of the answer: a server that keeps answers going without the app
+  /// finishes it and saves it to the chat, and any other stops it.
   Stream<ChatEvent> streamChat(
     String slug,
     String thread,
     String message, {
     List<Attachment> attachments = const [],
   });
+
+  /// Stops the answer [streamChat] is running in the chat, on a server that keeps answers going
+  /// without the app. Does nothing when there is none. Call it before cancelling the
+  /// subscription.
+  Future<void> stopChat(String slug, String thread);
 
   /// Clears the chat's history, so the model no longer sees its turns and history no longer
   /// lists them.

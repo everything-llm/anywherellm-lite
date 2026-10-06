@@ -36,6 +36,18 @@ HttpAnythingLlmApi _answering(
   return http.Response(jsonEncode(body), status);
 });
 
+/// [handler] behind AnythingLLM itself, which has no relay's `/runs`: that request is answered
+/// 404 and never reaches [handler].
+MockClient _notRelay(MockClientStreamHandler handler) => MockClient.streaming((
+  request,
+  body,
+) async {
+  if (request.url.path == '/runs') {
+    return http.StreamedResponse(Stream.value(utf8.encode('Not Found')), 404);
+  }
+  return handler(request, body);
+});
+
 Future<ApiException> _failure(Future<void> call) async {
   try {
     await call;
@@ -544,7 +556,7 @@ void main() {
       int status = 200,
     }) => HttpAnythingLlmApi(
       holder: ConnectionHolder(_connection),
-      client: MockClient.streaming((request, body) async {
+      client: _notRelay((request, body) async {
         seen?.add(request);
         await body.drain<void>();
         return http.StreamedResponse(
@@ -599,7 +611,7 @@ void main() {
       late Map<String, dynamic> body;
       await HttpAnythingLlmApi(
         holder: ConnectionHolder(_connection),
-        client: MockClient.streaming((request, bytes) async {
+        client: _notRelay((request, bytes) async {
           body = jsonDecode(
             await utf8.decodeStream(bytes),
           ) as Map<String, dynamic>;
@@ -1078,7 +1090,7 @@ void main() {
       final seen = <http.BaseRequest>[];
       final api = HttpAnythingLlmApi(
         holder: ConnectionHolder(_connection),
-        client: MockClient.streaming((request, body) async {
+        client: _notRelay((request, body) async {
           seen.add(request);
           await body.drain<void>();
           return http.StreamedResponse(
@@ -1132,7 +1144,7 @@ void main() {
       final seen = <http.BaseRequest>[];
       final api = HttpAnythingLlmApi(
         holder: ConnectionHolder(_connection),
-        client: MockClient.streaming((request, body) async {
+        client: _notRelay((request, body) async {
           seen.add(request);
           await body.drain<void>();
           return http.StreamedResponse(const Stream.empty(), 200);
@@ -1339,6 +1351,318 @@ void main() {
           'anythingllm-chats-alpaca.json',
         ],
       );
+    });
+  });
+
+  group('on a relay', () {
+    String event(int id, String name, Object data) =>
+        'id: $id\nevent: $name\ndata: ${jsonEncode(data)}\n\n';
+
+    String chunk(int id, Map<String, Object?> data) => event(id, 'chunk', data);
+
+    /// A relay that starts run `r_1` and answers its events with what [follow] gives for each
+    /// try, counting from 0. Every request goes into [seen].
+    HttpAnythingLlmApi relay(
+      Stream<List<int>> Function(int attempt) follow, {
+      List<http.Request>? seen,
+      int startStatus = 201,
+      Object? start,
+      List<Duration> rejoinDelays = const [Duration.zero],
+      Duration quiet = const Duration(seconds: 5),
+    }) {
+      var attempt = 0;
+      return HttpAnythingLlmApi(
+        holder: ConnectionHolder(_connection),
+        quiet: quiet,
+        rejoinDelays: rejoinDelays,
+        client: MockClient.streaming((request, body) async {
+          final bytes = await body.toBytes();
+          seen?.add(
+            http.Request(request.method, request.url)
+              ..headers.addAll(request.headers)
+              ..bodyBytes = bytes,
+          );
+          final path = request.url.path;
+          if (path == '/runs' && request.method == 'GET') {
+            return http.StreamedResponse(Stream.value(utf8.encode('[]')), 200);
+          }
+          if (path == '/runs') {
+            return http.StreamedResponse(
+              Stream.value(
+                utf8.encode(
+                  jsonEncode(start ?? {'id': 'r_1', 'status': 'running'}),
+                ),
+              ),
+              startStatus,
+            );
+          }
+          if (path == '/runs/r_1/events') {
+            return http.StreamedResponse(follow(attempt++), 200);
+          }
+          if (path == '/runs/r_1/cancel') {
+            return http.StreamedResponse(
+              Stream.value(utf8.encode('{"id":"r_1","status":"cancelled"}')),
+              200,
+            );
+          }
+          return http.StreamedResponse(
+            Stream.value(utf8.encode('Not Found')),
+            404,
+          );
+        }),
+      );
+    }
+
+    Stream<List<int>> lines(List<String> events) =>
+        Stream.fromIterable([for (final e in events) utf8.encode(e)]);
+
+    /// [events], then the connection breaking.
+    Stream<List<int>> broken(List<String> events) async* {
+      yield* lines(events);
+      throw http.ClientException('Connection reset');
+    }
+
+    test('starts a run of the stream-chat body and reads its chunks', () async {
+      final seen = <http.Request>[];
+      final events = await relay(
+        (_) => lines([
+          chunk(1, {
+            'type': 'agentThought',
+            'thought': '@agent: Using SearXNG to search for news',
+          }),
+          ': ping\n\n',
+          chunk(2, {'type': 'textResponseChunk', 'textResponse': 'Hel'}),
+          chunk(3, {
+            'type': 'textResponse',
+            'textResponse': 'Hello',
+            'close': true,
+          }),
+          chunk(4, {
+            'type': 'finalizeResponseStream',
+            'sources': [
+              {'title': 'News', 'chunkSource': 'link://https://news.example/a'},
+            ],
+          }),
+          event(5, 'done', {}),
+        ]),
+        seen: seen,
+      ).streamChat('w', 't', 'Hi').toList();
+
+      expect(seen.map((r) => '${r.method} ${r.url.path}'), [
+        'GET /runs',
+        'POST /runs',
+        'GET /runs/r_1/events',
+      ]);
+      expect(seen.first.url.query, 'status=running');
+      final start = jsonDecode(seen[1].body) as Map<String, dynamic>;
+      expect(start['workspace'], 'w');
+      expect(start['thread'], 't');
+      expect(start['clientId'], matches(RegExp(r'^c_[0-9a-f]{32}$')));
+      expect(start['body'], {'message': 'Hi'});
+      expect(seen[2].headers['Authorization'], 'Bearer SECRET-KEY');
+      expect(seen[2].headers.containsKey('Last-Event-ID'), isFalse);
+
+      expect(events, hasLength(4));
+      expect((events[0] as StatusChunk).text, isNotEmpty);
+      expect((events[1] as TextChunk).text, 'Hel');
+      expect((events[2] as WholeAnswer).text, 'Hello');
+      final done = events[3] as ChatDone;
+      expect(done.citations.single.url, Uri.parse('https://news.example/a'));
+    });
+
+    test('a chat answer ends at done after its closing chunk', () async {
+      final events = await relay(
+        (_) => lines([
+          chunk(1, {'type': 'textResponseChunk', 'textResponse': 'Hi'}),
+          chunk(2, {
+            'type': 'textResponseChunk',
+            'textResponse': '',
+            'close': true,
+            'sources': [
+              {'title': 'notes.md'},
+            ],
+          }),
+          event(3, 'done', {}),
+        ]),
+      ).streamChat('w', 't', 'Hi').toList();
+      expect((events.first as TextChunk).text, 'Hi');
+      expect((events.last as ChatDone).citations.single.title, 'notes.md');
+    });
+
+    test('attachments go in the run\'s body', () async {
+      final seen = <http.Request>[];
+      await relay((_) => lines([event(1, 'done', {})]), seen: seen)
+          .streamChat(
+            'w',
+            't',
+            'Look',
+            attachments: [
+              Attachment.of('photo.png', const [1, 2, 3]),
+            ],
+          )
+          .toList();
+      final start = jsonDecode(seen[1].body) as Map<String, dynamic>;
+      expect((start['body'] as Map)['attachments'], [
+        {
+          'name': 'photo.png',
+          'mime': 'image/png',
+          'contentString': 'data:image/png;base64,AQID',
+        },
+      ]);
+    });
+
+    test('asks whether the server is a relay once per connection', () async {
+      final seen = <http.Request>[];
+      final api = relay((_) => lines([event(1, 'done', {})]), seen: seen);
+      await api.streamChat('w', 't', 'One').toList();
+      await api.streamChat('w', 't', 'Two').toList();
+      expect(
+        seen.where((r) => r.method == 'GET' && r.url.path == '/runs'),
+        hasLength(1),
+      );
+    });
+
+    test('a web page at /runs is AnythingLLM itself', () async {
+      final paths = <String>[];
+      final api = HttpAnythingLlmApi(
+        holder: ConnectionHolder(_connection),
+        client: MockClient.streaming((request, body) async {
+          await body.drain<void>();
+          paths.add(request.url.path);
+          if (request.url.path == '/runs') {
+            return http.StreamedResponse(
+              Stream.value(utf8.encode('<!doctype html><html></html>')),
+              200,
+              headers: {'content-type': 'text/html'},
+            );
+          }
+          return http.StreamedResponse(
+            Stream.value(utf8.encode('data: {"close":true}\n\n')),
+            200,
+          );
+        }),
+      );
+      await api.streamChat('w', 't', 'Hi').toList();
+      expect(paths, ['/runs', '/api/v1/workspace/w/thread/t/stream-chat']);
+    });
+
+    test('a dropped connection rejoins after the last event seen', () async {
+      final seen = <http.Request>[];
+      final events = await relay(
+        (attempt) => attempt == 0
+            ? broken([
+                chunk(1, {'type': 'textResponseChunk', 'textResponse': 'Hel'}),
+              ])
+            : lines([
+                chunk(2, {'type': 'textResponseChunk', 'textResponse': 'lo'}),
+                event(3, 'done', {}),
+              ]),
+        seen: seen,
+      ).streamChat('w', 't', 'Hi').toList();
+      expect(
+        [for (final e in events.whereType<TextChunk>()) e.text].join(),
+        'Hello',
+      );
+      final follows = seen
+          .where((r) => r.url.path == '/runs/r_1/events')
+          .toList();
+      expect(follows, hasLength(2));
+      expect(follows.last.headers['Last-Event-ID'], '1');
+    });
+
+    test('a quiet connection is rejoined too', () async {
+      final events = await relay(
+        (attempt) => attempt == 0
+            ? StreamController<List<int>>().stream
+            : lines([
+                chunk(1, {'type': 'textResponseChunk', 'textResponse': 'Hi'}),
+                event(2, 'done', {}),
+              ]),
+        quiet: const Duration(milliseconds: 50),
+      ).streamChat('w', 't', 'Hi').toList();
+      expect((events.first as TextChunk).text, 'Hi');
+    });
+
+    test('a run that cannot be rejoined says the answer goes on', () async {
+      final error = await _failure(
+        relay(
+          (_) => lines([]),
+          rejoinDelays: const [Duration.zero, Duration.zero],
+        ).streamChat('w', 't', 'Hi').toList(),
+      );
+      expect(error.message, startsWith('Lost the connection to the relay.'));
+    });
+
+    test('a failed run gives the relay\'s words', () async {
+      final error = await _failure(
+        relay(
+          (_) => lines([
+            event(1, 'failed', {
+              'error': 'The relay restarted during the answer.',
+            }),
+          ]),
+        ).streamChat('w', 't', 'Hi').toList(),
+      );
+      expect(error.message, 'The relay restarted during the answer.');
+    });
+
+    test('a chat with a run going says so', () async {
+      final error = await _failure(
+        relay(
+          (_) => lines([]),
+          startStatus: 409,
+          start: {'error': 'That thread already has an answer running.'},
+        ).streamChat('w', 't', 'Hi').toList(),
+      );
+      expect(error.message, 'That thread already has an answer running.');
+      expect(error.status, 409);
+    });
+
+    test('stop cancels the run on the relay', () async {
+      final seen = <http.Request>[];
+      final held = StreamController<List<int>>();
+      final api = relay((_) => held.stream, seen: seen);
+      final first = Completer<void>();
+      final subscription = api.streamChat('w', 't', 'Hi').listen((_) {
+        if (!first.isCompleted) first.complete();
+      });
+      held.add(
+        utf8.encode(
+          chunk(1, {'type': 'textResponseChunk', 'textResponse': 'H'}),
+        ),
+      );
+      await first.future;
+      await api.stopChat('w', 't');
+      await subscription.cancel();
+      expect(held.hasListener, isFalse);
+      expect(seen.last.method, 'POST');
+      expect(seen.last.url.path, '/runs/r_1/cancel');
+    });
+
+    test('stop with no run going sends nothing', () async {
+      final seen = <http.Request>[];
+      await relay((_) => lines([]), seen: seen).stopChat('w', 't');
+      expect(seen, isEmpty);
+    });
+
+    test('letting go of the answer leaves the run going', () async {
+      final seen = <http.Request>[];
+      final held = StreamController<List<int>>();
+      final api = relay((_) => held.stream, seen: seen);
+      final first = Completer<void>();
+      final subscription = api.streamChat('w', 't', 'Hi').listen((_) {
+        if (!first.isCompleted) first.complete();
+      });
+      held.add(
+        utf8.encode(
+          chunk(1, {'type': 'textResponseChunk', 'textResponse': 'H'}),
+        ),
+      );
+      await first.future;
+      await subscription.cancel();
+      expect(held.hasListener, isFalse);
+      await api.stopChat('w', 't');
+      expect(seen.where((r) => r.url.path.endsWith('/cancel')), isEmpty);
     });
   });
 }
