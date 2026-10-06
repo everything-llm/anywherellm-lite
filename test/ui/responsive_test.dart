@@ -37,6 +37,20 @@ FakeAnythingLlm awkward() {
       text: 'An answer that keeps going. ' * 40,
       citations: ['file-$longWord.pdf', 'gone-$longWord.md'],
     ),
+    ChatMessage(
+      role: Role.user,
+      text: 'And these?',
+      attachments: ['photo-$longWord.png'],
+    ),
+    ChatMessage(
+      role: Role.assistant,
+      text:
+          '## Heading-$longWord\n\n'
+          '- item-$longWord\n\n'
+          '```\nconst code = "$longWord-$longWord";\n```\n\n'
+          '| Name | Value | Notes |\n|---|---|---|\n'
+          '| $longWord | $longWord | $longWord |\n',
+    ),
   ];
   return llm;
 }
@@ -58,6 +72,20 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       h.shell.openSettings();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('adding a link or text in Sources fits at $at', (tester) async {
+      final h = await pumpApp(tester, llm: awkward(), size: size);
+      h.shell.openSources();
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Paste text').last);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.bySemanticsLabel('Cancel').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Add a link').last);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });

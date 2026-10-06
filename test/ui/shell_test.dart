@@ -144,7 +144,11 @@ void main() {
       await tester.enterText(typingInto, 'x');
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
-      expect(find.byType(EditableText), findsOneWidget);
+      // Only the composer is left to type in; a selectable answer is read-only.
+      expect(
+        find.byWidgetPredicate((w) => w is EditableText && !w.readOnly),
+        findsOneWidget,
+      );
       expect(llm.calls, isNot(contains('createWorkspace:x')));
     });
 

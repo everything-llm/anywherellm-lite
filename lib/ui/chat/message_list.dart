@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/server_models.dart';
 import '../app_scope.dart';
+import '../icons.dart';
 import '../layout.dart';
 import '../state/chat_controller.dart';
 import '../tokens.dart';
@@ -10,6 +11,7 @@ import '../widgets/basics.dart';
 import '../widgets/controls.dart';
 import '../widgets/rise.dart';
 import '../widgets/tappable.dart';
+import 'answer_body.dart';
 
 /// The chat on screen, newest at the bottom. Empty, it invites a first question.
 ///
@@ -44,7 +46,7 @@ class MessageList extends StatelessWidget {
               padding: EdgeInsets.only(top: i == turns.length - 1 ? 0 : 26),
               child: Rise(
                 child: turn.role == Role.user
-                    ? _UserBubble(turn.text)
+                    ? _UserBubble(turn.text, attachments: turn.attachments)
                     : _Answer(turn),
               ),
             ),
@@ -168,9 +170,12 @@ class _SuggestionState extends State<_Suggestion> {
 }
 
 class _UserBubble extends StatelessWidget {
-  const _UserBubble(this.text);
+  const _UserBubble(this.text, {this.attachments = const []});
 
   final String text;
+
+  /// The names of the files sent with the question.
+  final List<String> attachments;
 
   @override
   Widget build(BuildContext context) {
@@ -193,9 +198,30 @@ class _UserBubble extends StatelessWidget {
                 bottomRight: Radius.circular(4),
               ),
             ),
-            child: Text(
-              text,
-              style: Type.sans(15.5, color: t.ink, height: 1.5),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(text, style: Type.sans(15.5, color: t.ink, height: 1.5)),
+                for (final name in attachments)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AppIcon('attach', size: IconSize.xs, color: t.muted),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Type.sans(13, color: t.muted),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
@@ -214,28 +240,12 @@ class _Answer extends StatelessWidget {
       ListenableBuilder(listenable: turn, builder: _build);
 
   Widget _build(BuildContext context, Widget? _) {
-    final t = Tokens.of(context);
-    final style = Type.sans(15.5, color: t.ink, height: 1.65);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (turn.text.isNotEmpty || turn.streaming)
-          Text.rich(
-            TextSpan(
-              style: style,
-              children: [
-                TextSpan(text: turn.text),
-                if (turn.streaming)
-                  const WidgetSpan(
-                    alignment: PlaceholderAlignment.middle,
-                    child: Padding(
-                      padding: EdgeInsets.only(left: 2),
-                      child: Caret(),
-                    ),
-                  ),
-              ],
-            ),
-          ),
+        if (turn.text.isNotEmpty) AnswerBody(turn.text),
+        if (turn.streaming)
+          const Padding(padding: EdgeInsets.only(top: 6), child: Caret()),
         if (turn.error case final error?) ...[
           const SizedBox(height: 10),
           AlertBox(AlertKind.bad, 'The answer stopped', text: error),
@@ -250,6 +260,10 @@ class _Answer extends StatelessWidget {
                 _Citation(number: i + 1, title: title),
             ],
           ),
+        ],
+        if (!turn.streaming && turn.text.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          CopyButton(turn.text, tooltip: 'Copy answer'),
         ],
       ],
     );

@@ -12,6 +12,7 @@ import '../widgets/controls.dart';
 import '../widgets/drop_zone.dart';
 import '../widgets/rise.dart';
 import '../widgets/tappable.dart';
+import 'add_source.dart';
 
 /// The active workspace's files: add them, switch them on and off, remove them.
 class SourcesPanel extends StatelessWidget {
@@ -69,6 +70,8 @@ class SourcesPanel extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 DropZone(onFiles: sources.upload, onProblem: sources.report),
+                const SizedBox(height: 8),
+                const AddSource(),
                 if (sources.sending case final name?) ...[
                   const SizedBox(height: 10),
                   Text('Adding $name…', style: Type.sans(12.5, color: t.muted)),
