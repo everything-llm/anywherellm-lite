@@ -172,6 +172,63 @@ void main() {
       expect(h.chat.activeThread, 'priorities');
     });
 
+    testWidgets('the pencil renames the workspace on Enter', (tester) async {
+      final llm = planningServer();
+      await pumpApp(tester, llm: llm);
+      await tester.tap(control('Rename workspace'));
+      await tester.pumpAndSettle();
+      await typeAndEnter(tester, 'Q4 planning');
+      expect(llm.calls, contains('renameWorkspace:q3:Q4 planning'));
+      expect(inSidebar('Q4 planning'), findsOneWidget);
+    });
+
+    testWidgets('the workspace trash asks first, and Cancel keeps it', (
+      tester,
+    ) async {
+      final llm = planningServer();
+      final h = await pumpApp(tester, llm: llm);
+      await tester.tap(control('Delete workspace'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Delete Q3 planning and its 2 chats? Its documents stay in the library.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(control('Cancel'));
+      await tester.pumpAndSettle();
+      expect(llm.calls, isNot(contains('deleteWorkspace:q3')));
+      await tester.tap(control('Delete workspace'));
+      await tester.pumpAndSettle();
+      await tester.tap(control('Delete'));
+      await tester.pumpAndSettle();
+      expect(llm.calls, contains('deleteWorkspace:q3'));
+      expect(inSidebar('Q3 planning'), findsNothing);
+      expect(h.chat.activeSlug, 'household');
+    });
+
+    testWidgets('Esc leaves the workspace delete question', (tester) async {
+      final llm = planningServer();
+      await pumpApp(tester, llm: llm);
+      await tester.tap(control('Delete workspace'));
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(control('Cancel'), findsNothing);
+      expect(llm.calls, isNot(contains('deleteWorkspace:q3')));
+    });
+
+    testWidgets('a workspace cannot be deleted while it answers', (
+      tester,
+    ) async {
+      final llm = planningServer()..hold = true;
+      await pumpApp(tester, llm: llm);
+      await typeAndEnter(tester, 'Go');
+      await tester.tap(control('Delete workspace'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(control('Cancel'), findsNothing);
+    });
+
     testWidgets('a file switched off is dimmed and counted out', (
       tester,
     ) async {

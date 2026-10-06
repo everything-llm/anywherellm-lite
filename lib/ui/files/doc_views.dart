@@ -8,6 +8,7 @@ import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
+import '../widgets/confirm_box.dart';
 import '../widgets/controls.dart';
 
 /// A library document: who uses it, moving and deleting it, its details and text.
@@ -45,7 +46,7 @@ class _LibraryDocViewState extends State<LibraryDocView> {
         ),
         const SizedBox(height: 16),
         if (_confirming)
-          _Confirm(
+          ConfirmBox(
             text: users.isEmpty
                 ? 'Delete ${widget.node.name} from the library?'
                 : 'Delete ${widget.node.name} from the library and from ${plural(users.length, 'workspace', 'workspaces')}?',
@@ -193,33 +194,4 @@ class DocBodyView extends StatelessWidget {
       ],
     );
   }
-}
-
-class _Confirm extends StatelessWidget {
-  const _Confirm({
-    required this.text,
-    required this.onCancel,
-    required this.onConfirm,
-  });
-
-  final String text;
-  final VoidCallback onCancel;
-  final VoidCallback onConfirm;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      AlertBox(AlertKind.warn, text),
-      const SizedBox(height: 10),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          AppButton('Cancel', onPressed: onCancel),
-          AppButton('Delete', primary: true, onPressed: onConfirm),
-        ],
-      ),
-    ],
-  );
 }

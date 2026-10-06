@@ -3,6 +3,7 @@ import 'dart:ui' show Size;
 import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter/widgets.dart' show EditableText;
 import 'package:flutter_test/flutter_test.dart';
 
@@ -112,6 +113,21 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('renaming and deleting a workspace fit at $at', (tester) async {
+      final h = await pumpApp(tester, llm: awkward(), size: size);
+      h.shell.toggleSide();
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Rename workspace').last);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Delete workspace').last);
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Cancel'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('a draft and the no-key banner fit at $at', (tester) async {
       final h = await pumpApp(tester, llm: awkward(), size: size);
       h.chat.newChat();
@@ -161,6 +177,14 @@ void main() {
         expect(h.files.node, isNotNull, reason: path);
         expect(tester.takeException(), isNull, reason: path);
       }
+      h.shell.closeSide();
+      await h.files.select('/library/custom-documents');
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Delete folder…'));
+      await tester.tap(find.text('Delete folder…'));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Cancel'), findsWidgets);
+      expect(tester.takeException(), isNull);
     });
   }
 

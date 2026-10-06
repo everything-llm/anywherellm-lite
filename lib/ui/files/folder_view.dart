@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/copy.dart';
 import '../../core/files.dart';
 import '../app_scope.dart';
 import '../icons.dart';
@@ -7,6 +8,7 @@ import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
+import '../widgets/confirm_box.dart';
 import '../widgets/drop_zone.dart';
 import '../widgets/fields.dart';
 import '../widgets/inline_input.dart';
@@ -47,6 +49,8 @@ class FolderView extends StatelessWidget {
           const SizedBox(height: 16),
         ],
         if (node.kind == NodeKind.libraryFolder) ...[
+          _DeleteFolder(node),
+          const SizedBox(height: 16),
           DropZone(
             onFiles: (picked) => files.upload(node.ref!, picked),
             onProblem: files.report,
@@ -68,6 +72,58 @@ class FolderView extends StatelessWidget {
           _Attach(node.slug!),
         ],
       ],
+    );
+  }
+}
+
+/// Deletes a library folder with its documents, after asking once more.
+class _DeleteFolder extends StatefulWidget {
+  const _DeleteFolder(this.node);
+
+  final FileNode node;
+
+  @override
+  State<_DeleteFolder> createState() => _DeleteFolderState();
+}
+
+class _DeleteFolderState extends State<_DeleteFolder> {
+  bool _confirming = false;
+
+  String _question() {
+    final files = AppScope.of(context).files;
+    final name = widget.node.ref!;
+    final docs = [
+      for (final f in files.library)
+        if (f.name == name) ...f.files,
+    ];
+    final users = {
+      for (final d in docs)
+        for (final w in files.usersOf(d.path)) w.name,
+    };
+    final what = docs.isEmpty
+        ? 'Delete the folder $name?'
+        : 'Delete the folder $name and its ${plural(docs.length, 'document', 'documents')}?';
+    return users.isEmpty ? what : '$what They also leave ${users.join(', ')}.';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_confirming) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: AppButton(
+          'Delete folder…',
+          onPressed: () => setState(() => _confirming = true),
+        ),
+      );
+    }
+    return ConfirmBox(
+      text: _question(),
+      onCancel: () => setState(() => _confirming = false),
+      onConfirm: () {
+        setState(() => _confirming = false);
+        AppScope.of(context).files.deleteFolder(widget.node.ref!);
+      },
     );
   }
 }

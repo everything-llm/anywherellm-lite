@@ -131,4 +131,29 @@ void main() {
     );
     expect(inTree('Q3 roadmap.pdf'), findsNothing);
   });
+
+  testWidgets('deleting a folder asks first and names the workspaces', (
+    tester,
+  ) async {
+    final llm = planningServer();
+    final h = await pumpApp(tester, llm: llm);
+    h.shell.showPane(Pane.files);
+    await tester.pumpAndSettle();
+    await tapTree(tester, 'custom-documents');
+    await tester.tap(inPane(control('Delete folder…')));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining(
+        RegExp(
+          r'^Delete the folder custom-documents and its \d+ documents\? They also leave Q3 planning\.$',
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(llm.calls, isNot(contains('removeFolder:custom-documents')));
+    await tester.tap(inPane(control('Delete')));
+    await tester.pumpAndSettle();
+    expect(llm.calls, contains('removeFolder:custom-documents'));
+    expect(inTree('custom-documents'), findsNothing);
+  });
 }
