@@ -82,8 +82,8 @@ class FakeAnythingLlm implements AnythingLlmApi {
   bool hold = false;
   StreamController<ChatEvent>? chat;
 
-  /// The mode of every message asked, in order.
-  final List<ChatMode> modes = [];
+  /// The status lines [streamChat] sends before the answer, as an agent does.
+  List<String> agentStatus = const [];
 
   /// The files sent with the last message asked.
   List<Attachment> lastAttachments = const [];
@@ -193,11 +193,9 @@ class FakeAnythingLlm implements AnythingLlmApi {
     String slug,
     String thread,
     String message, {
-    required ChatMode mode,
     List<Attachment> attachments = const [],
   }) {
     calls.add('streamChat:$thread:$message');
-    modes.add(mode);
     lastAttachments = attachments;
     final error = errors['streamChat'];
     if (error != null) return Stream.error(error);
@@ -205,7 +203,11 @@ class FakeAnythingLlm implements AnythingLlmApi {
       chat = StreamController<ChatEvent>();
       return chat!.stream;
     }
-    return Stream.fromIterable([TextChunk(answer), ChatDone(cited)]);
+    return Stream.fromIterable([
+      for (final line in agentStatus) StatusChunk(line),
+      TextChunk(answer),
+      ChatDone(cited),
+    ]);
   }
 
   @override

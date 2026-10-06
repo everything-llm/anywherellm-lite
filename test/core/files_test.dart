@@ -136,6 +136,11 @@ void main() {
       expect(parseSettings(_edited('openAiTemp', null), _settings), {
         'openAiTemp': null,
       });
+      for (final mode in ['chat', 'query']) {
+        expect(parseSettings(_edited('chatMode', mode), _settings), {
+          'chatMode': mode,
+        });
+      }
     });
 
     test('a key left out is left as it is', () {
@@ -155,7 +160,10 @@ void main() {
       (_edited('similarityThreshold', 1.5), 'from 0 to 1'),
       (_edited('openAiTemp', '0.7'), 'openAiTemp must be a number'),
       (_edited('chatModel', 3), 'chatModel must be text or null'),
-      (_edited('chatMode', 'query'), 'chatMode cannot be changed here'),
+      (
+        _edited('chatMode', 'agent'),
+        'chatMode must be one of automatic, chat, query',
+      ),
     ]) {
       test('refuses $text', () {
         expect(

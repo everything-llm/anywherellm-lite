@@ -128,12 +128,11 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     String slug,
     String thread,
     String message, {
-    required ChatMode mode,
     List<Attachment> attachments = const [],
   }) async* {
+    // No `mode`: the server then answers in the workspace's own chat mode.
     final response = await _openStream('${_thread(slug, thread)}/stream-chat', {
       'message': message,
-      'mode': mode.name,
       if (attachments.isNotEmpty)
         'attachments': [for (final a in attachments) attachmentJson(a)],
     }, attachments.isEmpty ? timeout : uploadTimeout);

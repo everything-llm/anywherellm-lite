@@ -251,6 +251,7 @@ class _Answer extends StatelessWidget {
           if (split.answer.isNotEmpty) const SizedBox(height: 10),
         ],
         if (split.answer.isNotEmpty) AnswerBody(split.answer),
+        if (turn.streaming && turn.status != null) _Status(turn.status!),
         if (turn.streaming && !thinking)
           const Padding(padding: EdgeInsets.only(top: 6), child: Caret()),
         if (turn.error case final error?) ...[
@@ -259,20 +260,42 @@ class _Answer extends StatelessWidget {
         ],
         if (!turn.streaming && turn.citations.isNotEmpty) ...[
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final (i, title) in turn.citations.indexed)
-                _Citation(number: i + 1, title: title),
-            ],
-          ),
+          _Citations(turn.citations),
         ],
         if (!turn.streaming && split.answer.isNotEmpty) ...[
           const SizedBox(height: 6),
           CopyButton(split.answer, tooltip: 'Copy answer'),
         ],
       ],
+    );
+  }
+}
+
+/// What the agent is doing while the answer runs, such as a tool it runs. It goes when the
+/// answer is done.
+class _Status extends StatelessWidget {
+  const _Status(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Semantics(
+        liveRegion: true,
+        child: Text(
+          text,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: Type.sans(
+            13,
+            color: t.muted,
+            height: 1.4,
+          ).copyWith(fontStyle: FontStyle.italic),
+        ),
+      ),
     );
   }
 }
@@ -347,6 +370,54 @@ class _ReasoningState extends State<_Reasoning> {
 }
 
 /// A numbered chip naming a document the answer drew on. Tapping it shows the file in Sources.
+/// The sources an answer drew on. An agent's can be dozens of web pages, so past the first few
+/// they fold behind a count.
+class _Citations extends StatefulWidget {
+  const _Citations(this.titles);
+
+  final List<String> titles;
+
+  static const shown = 5;
+
+  @override
+  State<_Citations> createState() => _CitationsState();
+}
+
+class _CitationsState extends State<_Citations> {
+  bool _all = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final titles = widget.titles;
+    final folded = !_all && titles.length > _Citations.shown + 1;
+    final count = folded ? _Citations.shown : titles.length;
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (final (i, title) in titles.take(count).indexed)
+          _Citation(number: i + 1, title: title),
+        if (folded)
+          Tappable(
+            label: '${titles.length - count} more sources',
+            onTap: () => setState(() => _all = true),
+            radius: BorderRadius.circular(99),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              child: Text(
+                '${titles.length - count} more',
+                style: Type.sans(12.5, color: t.muted),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// One source. A file in Sources lights up there when tapped; anything else, such as a web
+/// page an agent read or a file since removed, only shows its title.
 class _Citation extends StatelessWidget {
   const _Citation({required this.number, required this.title});
 
@@ -363,9 +434,8 @@ class _Citation extends StatelessWidget {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
     final present = scope.sources.byTitle(title) != null;
-    final name = present ? title : 'Removed file';
     return Tappable(
-      label: 'Source $number: $name',
+      label: 'Source $number: $title',
       tooltip: present ? 'Show in Sources' : null,
       onTap: present
           ? () {
@@ -374,7 +444,7 @@ class _Citation extends StatelessWidget {
             }
           : null,
       radius: BorderRadius.circular(99),
-      color: t.accentbg,
+      color: present ? t.accentbg : t.hover,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(6, 4, 10, 4),
         child: Row(
@@ -385,7 +455,7 @@ class _Citation extends StatelessWidget {
               height: 16,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: t.accent,
+                color: present ? t.accent : t.muted,
                 shape: BoxShape.circle,
               ),
               child: Text(
@@ -402,10 +472,10 @@ class _Citation extends StatelessWidget {
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 240),
               child: Text(
-                name,
+                title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Type.sans(12.5, color: t.accent),
+                style: Type.sans(12.5, color: present ? t.accent : t.ink2),
               ),
             ),
           ],

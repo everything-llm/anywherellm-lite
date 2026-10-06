@@ -229,6 +229,52 @@ void main() {
       expect(control('Cancel'), findsNothing);
     });
 
+    testWidgets('the chat mode chooser shows and changes the workspace mode', (
+      tester,
+    ) async {
+      final llm = planningServer();
+      final h = await pumpApp(tester, llm: llm);
+      expect(inSources(find.text(ChatMode.automatic.about)), findsOneWidget);
+      await tester.tap(inSources(control('Query')));
+      await tester.pumpAndSettle();
+      expect(llm.spaces.first.settings['chatMode'], 'query');
+      expect(h.sources.chatMode, ChatMode.query);
+      expect(inSources(find.text(ChatMode.query.about)), findsOneWidget);
+    });
+
+    testWidgets('the chat mode waits while an answer runs', (tester) async {
+      final llm = planningServer()..hold = true;
+      await pumpApp(tester, llm: llm);
+      await typeAndEnter(tester, 'Go');
+      await tester.tap(inSources(control('Chat')));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(llm.calls, isNot(contains('updateWorkspace:q3')));
+    });
+
+    testWidgets(
+      'an agent answer shows its status, then folds its many sources',
+      (tester) async {
+        final llm = planningServer()..hold = true;
+        final h = await pumpApp(tester, llm: llm);
+        await typeAndEnter(tester, 'News?');
+        llm.chat!.add(const StatusChunk('Running web-browsing'));
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.text('Running web-browsing'), findsOneWidget);
+        llm.chat!
+          ..add(const WholeAnswer('Headline'))
+          ..add(ChatDone([for (var i = 1; i <= 9; i++) 'Story $i']));
+        await llm.chat!.close();
+        await tester.pumpAndSettle();
+        expect(find.text('Running web-browsing'), findsNothing);
+        expect(h.chat.turns.last.text, 'Headline');
+        expect(control('Source 5: Story 5'), findsOneWidget);
+        expect(control('Source 6: Story 6'), findsNothing);
+        await tester.tap(control('4 more sources'));
+        await tester.pumpAndSettle();
+        expect(control('Source 9: Story 9'), findsOneWidget);
+      },
+    );
+
     testWidgets('a file switched off is dimmed and counted out', (
       tester,
     ) async {
@@ -343,20 +389,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(h.settings.configured, isFalse);
       expect(find.text('The saved key was deleted.'), findsOneWidget);
-    });
-
-    testWidgets('the Answers switch sets the mode', (tester) async {
-      final h = await pumpApp(tester, llm: planningServer());
-      h.shell.openSettings();
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.descendant(
-          of: find.byType(SettingsDialog),
-          matching: find.byType(AppSwitch),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(h.prefsStore.saved.groundedOnly, isFalse);
     });
 
     testWidgets('Esc and Done close it', (tester) async {

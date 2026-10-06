@@ -31,22 +31,15 @@ class OffDoc {
 }
 
 class Prefs {
-  const Prefs({this.groundedOnly = true, this.switchedOff = const {}});
-
-  /// Whether answers come only from the workspace's documents.
-  final bool groundedOnly;
+  const Prefs({this.switchedOff = const {}});
 
   /// The documents switched off in each workspace, by its slug.
   final Map<String, List<OffDoc>> switchedOff;
 
   List<OffDoc> offIn(String slug) => switchedOff[slug] ?? const [];
 
-  Prefs withGroundedOnly(bool on) =>
-      Prefs(groundedOnly: on, switchedOff: switchedOff);
-
   /// These prefs with [slug]'s switched-off documents set to [docs].
   Prefs withOff(String slug, List<OffDoc> docs) => Prefs(
-    groundedOnly: groundedOnly,
     switchedOff: {
       for (final entry in switchedOff.entries)
         if (entry.key != slug) entry.key: entry.value,
@@ -56,7 +49,6 @@ class Prefs {
 
   /// These prefs with the document at [path] forgotten in every workspace.
   Prefs withoutDoc(String path) => Prefs(
-    groundedOnly: groundedOnly,
     switchedOff: {
       for (final MapEntry(:key, :value) in switchedOff.entries)
         if (value.where((d) => d.path != path).toList() case final kept
@@ -66,14 +58,14 @@ class Prefs {
   );
 
   String encode() => jsonEncode({
-    'groundedOnly': groundedOnly,
     'switchedOff': {
       for (final entry in switchedOff.entries)
         entry.key: [for (final doc in entry.value) doc.toJson()],
     },
   });
 
-  /// Reads what [encode] wrote. Anything it cannot read falls back to the default.
+  /// Reads what [encode] wrote. Anything it cannot read falls back to the default, and keys it
+  /// no longer uses, such as the old `groundedOnly`, are ignored.
   static Prefs decode(String text) {
     final Object? json;
     try {
@@ -84,7 +76,6 @@ class Prefs {
     if (json is! Map) return const Prefs();
     final off = json['switchedOff'];
     return Prefs(
-      groundedOnly: json['groundedOnly'] != false,
       switchedOff: {
         if (off is Map)
           for (final entry in off.entries)

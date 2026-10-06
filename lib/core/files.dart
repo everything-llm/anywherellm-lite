@@ -283,11 +283,6 @@ Map<String, Object?> parseSettings(String text, WorkspaceSettings was) {
     if (spec == null) throw ApiException('$key is not a workspace setting.');
     _check(key, spec, value);
     if (value == was.values[key]) continue;
-    if (!spec.writable) {
-      throw ApiException(
-        '$key cannot be changed here. AnywhereLLM sends the answer mode with each message.',
-      );
-    }
     changed[key] = value;
   }
   return changed;
@@ -296,8 +291,15 @@ Map<String, Object?> parseSettings(String text, WorkspaceSettings was) {
 void _check(String key, SettingSpec spec, Object? value) {
   if (value == null) return;
   if (spec.type == SettingType.text) {
-    if (value is String) return;
-    throw ApiException('$key must be text or null.');
+    final choices = spec.choices;
+    if (value is String && (choices == null || choices.contains(value))) {
+      return;
+    }
+    throw ApiException(
+      choices == null
+          ? '$key must be text or null.'
+          : '$key must be one of ${choices.join(', ')}.',
+    );
   }
   final whole = spec.type == SettingType.integer;
   final max = spec.max;

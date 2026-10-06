@@ -99,7 +99,7 @@ void main() {
       final llm = planningServer();
       final rig = await started(llm);
       await rig.files.select('/workspaces/q3/settings.json');
-      final draft = rig.files.text!.replaceFirst('"automatic"', '"query"');
+      final draft = rig.files.text!.replaceFirst('"automatic"', '"agent"');
       llm.calls.clear();
       expect(await rig.files.save(draft), isFalse);
       expect(llm.calls, isNot(contains('updateWorkspace:q3')));

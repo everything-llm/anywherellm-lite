@@ -14,6 +14,7 @@ import 'widgets/brand.dart';
 import 'widgets/buttons.dart';
 import 'widgets/confirm_box.dart';
 import 'widgets/inline_input.dart';
+import 'widgets/segmented.dart';
 import 'widgets/settings_button.dart';
 import 'widgets/tappable.dart';
 
@@ -68,46 +69,12 @@ class _PaneSwitch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final shell = AppScope.of(context).shell;
-    final t = Tokens.of(context);
     return ListenableBuilder(
       listenable: shell,
-      builder: (context, _) => Container(
-        padding: const EdgeInsets.all(3),
-        decoration: BoxDecoration(
-          color: t.hover,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: [
-            for (final (pane, label) in const [
-              (Pane.chats, 'Chats'),
-              (Pane.files, 'Files'),
-            ])
-              Expanded(
-                child: Tappable(
-                  label: label,
-                  selected: shell.pane == pane,
-                  onTap: () => shell.showPane(pane),
-                  radius: BorderRadius.circular(8),
-                  color: shell.pane == pane ? t.panel : null,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Text(
-                      label,
-                      textAlign: TextAlign.center,
-                      style: Type.sans(
-                        13.5,
-                        weight: shell.pane == pane
-                            ? FontWeight.w600
-                            : FontWeight.w400,
-                        color: t.ink,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
+      builder: (context, _) => Segmented(
+        options: const [(Pane.chats, 'Chats'), (Pane.files, 'Files')],
+        value: shell.pane,
+        onChanged: shell.showPane,
       ),
     );
   }

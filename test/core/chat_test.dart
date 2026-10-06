@@ -86,4 +86,32 @@ void main() {
       expect(split.thinking, isFalse);
     });
   });
+
+  group('chat modes', () {
+    test('each is the server\'s value, and an unknown one is none', () {
+      expect(
+        [
+          for (final v in ['automatic', 'chat', 'query', 'agent', null])
+            ChatMode.fromServer(v),
+        ],
+        [ChatMode.automatic, ChatMode.chat, ChatMode.query, null, null],
+      );
+      expect(
+        [for (final m in ChatMode.values) m.label],
+        ['Agent', 'Chat', 'Query'],
+      );
+    });
+
+    test('an agent\'s thoughts read as plain status lines', () {
+      expect(
+        agentStatus('@agent is executing `web-browsing` tool {\n "q": 1\n}'),
+        'Running web-browsing',
+      );
+      expect(
+        agentStatus('@agent: I found 47 results - reviewing.'),
+        'I found 47 results - reviewing.',
+      );
+      expect(agentStatus('Thinking about it\nmore'), 'Thinking about it');
+    });
+  });
 }

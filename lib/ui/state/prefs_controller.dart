@@ -20,8 +20,6 @@ class PrefsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setGroundedOnly(bool on) => _change(prefs.withGroundedOnly(on));
-
   Future<void> setOff(String slug, List<OffDoc> docs) =>
       _change(prefs.withOff(slug, docs));
 

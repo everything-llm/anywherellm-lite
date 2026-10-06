@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../core/chat.dart';
 import '../../core/ports.dart';
 import '../../core/server_models.dart';
 import '../../core/sources.dart';
@@ -29,6 +30,10 @@ class SourcesController extends ChangeNotifier {
 
   List<SourceFile> files = const [];
   bool loading = false;
+
+  /// The workspace's chat mode on the server, which every message answers in, or null before it
+  /// is read or when the server names one this app does not know.
+  ChatMode? chatMode;
 
   /// The extensions the server reads, or null when it has not said. Then the server decides.
   /// Asked again for each workspace, so a new server is asked afresh.
@@ -74,6 +79,7 @@ class SourcesController extends ChangeNotifier {
     if (_chat.activeSlug == _slug) return;
     _slug = _chat.activeSlug;
     files = const [];
+    chatMode = null;
     problems = const [];
     loading = false;
     sending = null;
@@ -121,6 +127,7 @@ class SourcesController extends ChangeNotifier {
       workspace.documents,
       _prefs.prefs.offIn(workspace.slug),
     );
+    chatMode = ChatMode.fromServer(workspace.settings?.values['chatMode']);
     _chat.setDocCount(workspace.slug, workspace.documents.length);
   }
 
@@ -289,6 +296,28 @@ class SourcesController extends ChangeNotifier {
     hits = null;
     searching = false;
     notifyListeners();
+  }
+
+  /// Sets the workspace's chat mode on the server, as its settings in the web UI do, then reads
+  /// the workspace again.
+  Future<void> setChatMode(ChatMode mode) async {
+    final slug = _slug;
+    if (slug == null || mode == chatMode) return;
+    final was = chatMode;
+    chatMode = mode;
+    notifyListeners();
+    try {
+      await _api.updateWorkspace(slug, {'chatMode': mode.name});
+      if (slug != _slug) return;
+      problems = const [];
+    } on ApiException catch (error) {
+      if (slug != _slug) return;
+      chatMode = was;
+      problems = [Notice('Could not change the chat mode', error.message)];
+      notifyListeners();
+      return;
+    }
+    await refresh();
   }
 
   /// Lights up the file titled [title] for a moment.

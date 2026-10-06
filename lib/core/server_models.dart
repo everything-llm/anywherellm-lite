@@ -94,19 +94,19 @@ class Workspace {
 /// How a setting's value is written: a whole number, any number, or text.
 enum SettingType { integer, number, text }
 
-/// One workspace setting: its type, the bounds of a number, and whether this app writes it.
+/// One workspace setting: its type, the bounds of a number, and the only values text may take,
+/// when it has a fixed set.
 class SettingSpec {
-  const SettingSpec(this.type, {this.min = 0, this.max, this.writable = true});
+  const SettingSpec(this.type, {this.min = 0, this.max, this.choices});
 
   final SettingType type;
   final num min;
   final num? max;
-  final bool writable;
+  final List<String>? choices;
 }
 
 /// The workspace settings Files shows, in the order it shows them. Each may be null on the
-/// server, which means the system default. `chatMode` is never written: the app sends the answer
-/// mode with each message.
+/// server, which means the system default.
 const workspaceSettingSpecs = {
   'openAiTemp': SettingSpec(SettingType.number),
   'openAiHistory': SettingSpec(SettingType.integer),
@@ -118,7 +118,10 @@ const workspaceSettingSpecs = {
   'agentModel': SettingSpec(SettingType.text),
   'vectorSearchMode': SettingSpec(SettingType.text),
   'queryRefusalResponse': SettingSpec(SettingType.text),
-  'chatMode': SettingSpec(SettingType.text, writable: false),
+  'chatMode': SettingSpec(
+    SettingType.text,
+    choices: ['automatic', 'chat', 'query'],
+  ),
 };
 
 /// A workspace's answer settings, by the server's column names in [workspaceSettingSpecs].

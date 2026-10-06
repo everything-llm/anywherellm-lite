@@ -39,12 +39,12 @@ abstract interface class AnythingLlmApi {
   Future<List<ChatMessage>> history(String slug, String thread);
 
   /// Asks [message] in the chat, with [attachments] for this message only, and streams the
-  /// answer. The stream fails with [ApiException]. Cancelling the subscription stops the answer.
+  /// answer in the workspace's own chat mode. The stream fails with [ApiException]. Cancelling
+  /// the subscription stops the answer.
   Stream<ChatEvent> streamChat(
     String slug,
     String thread,
     String message, {
-    required ChatMode mode,
     List<Attachment> attachments = const [],
   });
 

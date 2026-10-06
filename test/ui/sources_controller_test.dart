@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/upload.dart';
@@ -285,6 +286,39 @@ void main() {
       gate.complete();
       await first;
       expect(rig.sources.hits, isNull);
+    });
+  });
+
+  group('chat mode', () {
+    test('is read with the workspace and changed on the server', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      expect(rig.sources.chatMode, ChatMode.automatic);
+      await rig.sources.setChatMode(ChatMode.query);
+      expect(llm.calls, contains('updateWorkspace:q3'));
+      expect(llm.spaces.first.settings['chatMode'], 'query');
+      expect(rig.sources.chatMode, ChatMode.query);
+    });
+
+    test('a refused change goes back and says why', () async {
+      final llm = planningServer()
+        ..errors['updateWorkspace'] = const ApiException('No');
+      final rig = await started(llm);
+      await rig.sources.setChatMode(ChatMode.chat);
+      expect(rig.sources.chatMode, ChatMode.automatic);
+      expect(
+        rig.sources.problems.single.title,
+        'Could not change the chat mode',
+      );
+    });
+
+    test('another workspace shows its own mode', () async {
+      final llm = planningServer();
+      llm.spaces.last.settings['chatMode'] = 'chat';
+      final rig = await started(llm);
+      await rig.chat.select('household');
+      await pumpEventQueue();
+      expect(rig.sources.chatMode, ChatMode.chat);
     });
   });
 }

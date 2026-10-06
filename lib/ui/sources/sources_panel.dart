@@ -13,6 +13,7 @@ import '../widgets/upload_queue.dart';
 import '../widgets/rise.dart';
 import '../widgets/tappable.dart';
 import 'add_source.dart';
+import 'chat_mode_chooser.dart';
 import 'test_question.dart';
 
 /// The active workspace's files: add them, switch them on and off, remove them.
@@ -66,9 +67,11 @@ class SourcesPanel extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Only switched-on files are used to answer.',
+                  'Answers draw on the switched-on files.',
                   style: Type.sans(13, color: t.muted),
                 ),
+                const SizedBox(height: 12),
+                const ChatModeChooser(),
                 const SizedBox(height: 14),
                 // Everything below the heading scrolls together, so an open form or a long
                 // list of files waiting to be added never pushes past the panel.

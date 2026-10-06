@@ -38,8 +38,21 @@ class Turn extends ChangeNotifier {
   /// Why the answer failed, or null.
   String? error;
 
+  /// What an agent is doing while the answer runs, such as a tool it runs, or null.
+  String? status;
+
   void _grow(String more) {
     text += more;
+    notifyListeners();
+  }
+
+  void _setStatus(String line) {
+    status = line;
+    notifyListeners();
+  }
+
+  void _replace(String whole) {
+    text = whole;
     notifyListeners();
   }
 }
@@ -400,13 +413,14 @@ class ChatController extends ChangeNotifier {
         return;
       }
     }
-    final mode = _prefs.prefs.groundedOnly ? ChatMode.query : ChatMode.chat;
     final thread = threadSlug;
     running.stream = _api
-        .streamChat(slug, thread, text, mode: mode, attachments: attachments)
+        .streamChat(slug, thread, text, attachments: attachments)
         .listen(
           (event) => switch (event) {
             TextChunk(:final text) => answer._grow(text),
+            StatusChunk(:final text) => answer._setStatus(text),
+            WholeAnswer(:final text) => answer._replace(text),
             ChatDone(:final citations) => answer.citations = citations,
           },
           onError: (Object error) => _finish(
@@ -455,6 +469,7 @@ class ChatController extends ChangeNotifier {
     _running = null;
     running.answer
       ..streaming = false
+      ..status = null
       ..error = error
       ..notifyListeners();
     notifyListeners();

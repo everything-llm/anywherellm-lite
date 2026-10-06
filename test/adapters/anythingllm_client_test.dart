@@ -168,7 +168,7 @@ void main() {
       await expectLater(api.workspaces(), throwsA(isA<NotConfigured>()));
       await expectLater(api.history('w', 't'), throwsA(isA<NotConfigured>()));
       await expectLater(
-        api.streamChat('w', 't', 'hi', mode: ChatMode.query).toList(),
+        api.streamChat('w', 't', 'hi').toList(),
         throwsA(isA<NotConfigured>()),
       );
       await expectLater(
@@ -219,7 +219,7 @@ void main() {
       await expectLater(api.verify(plain), throwsA(https));
       await expectLater(api.workspaces(), throwsA(https));
       await expectLater(
-        api.streamChat('w', 't', 'hi', mode: ChatMode.chat).toList(),
+        api.streamChat('w', 't', 'hi').toList(),
         throwsA(https),
       );
       expect(sent, 0);
@@ -553,46 +553,193 @@ void main() {
 
     String data(Map<String, Object?> chunk) => 'data: ${jsonEncode(chunk)}\n\n';
 
+    test('posts the message, and yields the text then the sources', () async {
+      final seen = <http.BaseRequest>[];
+      final events = await streaming([
+        data({
+          'type': 'textResponseChunk',
+          'textResponse': 'Hel',
+          'close': false,
+        }),
+        data({
+          'type': 'textResponseChunk',
+          'textResponse': 'lo',
+          'close': false,
+        }),
+        data({
+          'type': 'textResponseChunk',
+          'textResponse': '',
+          'close': true,
+          'sources': [
+            {'title': 'roadmap.pdf'},
+          ],
+        }),
+      ], seen: seen).streamChat('w', 't', 'Hi').toList();
+      expect(seen.single.url.path, '/api/v1/workspace/w/thread/t/stream-chat');
+      expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
+      expect(
+        [
+          for (final e in events)
+            e is TextChunk ? e.text : (e as ChatDone).citations,
+        ],
+        [
+          'Hel',
+          'lo',
+          ['roadmap.pdf'],
+        ],
+      );
+    });
+
+    test('sends no mode, so the workspace\'s own chat mode applies', () async {
+      late Map<String, dynamic> body;
+      await HttpAnythingLlmApi(
+        holder: ConnectionHolder(_connection),
+        client: MockClient.streaming((request, bytes) async {
+          body = jsonDecode(
+            await utf8.decodeStream(bytes),
+          ) as Map<String, dynamic>;
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(data({'close': true}))),
+            200,
+          );
+        }),
+      ).streamChat('w', 't', 'Hi').toList();
+      expect(body, {'message': 'Hi'});
+    });
+
+    test('an agent answer: status, then the whole answer, then its sources', () async {
+      // As the server streamed one in agent mode, with the text shortened.
+      final events = await streaming([
+        data({
+          'id': 'a',
+          'type': 'textResponseChunk',
+          'textResponse': '<think>Plan',
+          'sources': [],
+          'close': false,
+          'error': null,
+        }),
+        data({
+          'id': 'a',
+          'type': 'textResponseChunk',
+          'textResponse': '.</think>',
+          'sources': [],
+          'close': false,
+          'error': null,
+        }),
+        data({
+          'id': 'a',
+          'type': 'agentThought',
+          'thought':
+              '@agent is executing `web-browsing` tool {\n  "query": "news"\n}',
+          'sources': [],
+          'close': false,
+          'error': null,
+          'animate': true,
+        }),
+        data({
+          'id': 'a',
+          'type': 'agentThought',
+          'thought': '@agent: Using SearXNG to search for "news"',
+          'sources': [],
+          'close': false,
+          'error': null,
+          'animate': true,
+        }),
+        data({
+          'id': 'a',
+          'type': 'textResponseChunk',
+          'textResponse': 'Head',
+          'sources': [],
+          'close': false,
+          'error': null,
+        }),
+        data({
+          'id': 'a',
+          'type': 'usageMetrics',
+          'metrics': {'total_tokens': 9},
+          'close': false,
+          'error': null,
+        }),
+        data({
+          'id': 'a',
+          'type': 'textResponse',
+          'textResponse': '<think>Pick.</think>Headline: [x](https://x.test)',
+          'sources': [],
+          'close': true,
+          'error': null,
+        }),
+        data({
+          'uuid': 'a',
+          'type': 'finalizeResponseStream',
+          'textResponse': '<think>Pick.</think>Headline: [x](https://x.test)',
+          'thoughts': [],
+          'outputs': [],
+          'sources': [
+            {'title': 'A story', 'chunkSource': 'link://x', 'score': 0.5},
+            {'title': 'A story'},
+            {'title': 'Another'},
+          ],
+          'close': true,
+          'error': false,
+        }),
+      ]).streamChat('w', 't', 'Hi').toList();
+      expect(
+        [
+          for (final e in events)
+            switch (e) {
+              TextChunk(:final text) => 'text $text',
+              StatusChunk(:final text) => 'status $text',
+              WholeAnswer(:final text) => 'whole $text',
+              ChatDone(:final citations) => 'done $citations',
+            },
+        ],
+        [
+          'text <think>Plan',
+          'text .</think>',
+          'status Running web-browsing',
+          'status Using SearXNG to search for "news"',
+          'text Head',
+          'whole <think>Pick.</think>Headline: [x](https://x.test)',
+          'done [A story, Another]',
+        ],
+      );
+    });
+
     test(
-      'posts the message and mode, and yields the text then the sources',
+      'a chat answer\'s sources come with its close, before the finalize',
       () async {
-        final seen = <http.BaseRequest>[];
         final events = await streaming([
           data({
+            'uuid': 'c',
             'type': 'textResponseChunk',
-            'textResponse': 'Hel',
+            'textResponse': 'Hi',
+            'sources': [],
             'close': false,
+            'error': false,
           }),
           data({
-            'type': 'textResponseChunk',
-            'textResponse': 'lo',
-            'close': false,
-          }),
-          data({
+            'uuid': 'c',
             'type': 'textResponseChunk',
             'textResponse': '',
-            'close': true,
             'sources': [
               {'title': 'roadmap.pdf'},
             ],
+            'close': true,
+            'error': false,
           }),
-        ], seen: seen).streamChat('w', 't', 'Hi', mode: ChatMode.chat).toList();
-        expect(
-          seen.single.url.path,
-          '/api/v1/workspace/w/thread/t/stream-chat',
-        );
-        expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
-        expect(
-          [
-            for (final e in events)
-              e is TextChunk ? e.text : (e as ChatDone).citations,
-          ],
-          [
-            'Hel',
-            'lo',
-            ['roadmap.pdf'],
-          ],
-        );
+          data({
+            'uuid': 'c',
+            'type': 'finalizeResponseStream',
+            'close': true,
+            'error': false,
+            'chatId': 7,
+            'sources': [],
+          }),
+        ]).streamChat('w', 't', 'Hi').toList();
+        expect((events.first as TextChunk).text, 'Hi');
+        expect(events.whereType<WholeAnswer>(), isEmpty);
+        expect((events.last as ChatDone).citations, ['roadmap.pdf']);
+        expect(events.length, 2);
       },
     );
 
@@ -601,7 +748,7 @@ void main() {
       final events = await streaming([
         line.substring(0, 12),
         line.substring(12),
-      ]).streamChat('w', 't', 'Hi', mode: ChatMode.query).toList();
+      ]).streamChat('w', 't', 'Hi').toList();
       expect((events.first as TextChunk).text, 'whole');
       expect(events.last, isA<ChatDone>());
     });
@@ -611,7 +758,7 @@ void main() {
         data({'textResponse': 'part'}),
         ': keep-alive\n\n',
         'data: not json\n\n',
-      ]).streamChat('w', 't', 'Hi', mode: ChatMode.query).toList();
+      ]).streamChat('w', 't', 'Hi').toList();
       expect(events.length, 2);
       expect(events.last, isA<ChatDone>());
     });
@@ -624,7 +771,7 @@ void main() {
           'error': 'No LLM set',
           'close': true,
         }),
-      ]).streamChat('w', 't', 'Hi', mode: ChatMode.query);
+      ]).streamChat('w', 't', 'Hi');
       await expectLater(
         stream.toList(),
         throwsA(
@@ -636,7 +783,7 @@ void main() {
     test('a refused request is decoded like any other', () async {
       final stream = streaming([
         '{"error":"Invalid API Key"}',
-      ], status: 403).streamChat('w', 't', 'Hi', mode: ChatMode.query);
+      ], status: 403).streamChat('w', 't', 'Hi');
       await expectLater(
         stream.toList(),
         throwsA(isA<ApiException>().having((e) => e.status, 'status', 403)),
@@ -905,7 +1052,6 @@ void main() {
             'w',
             't',
             'What is this?',
-            mode: ChatMode.chat,
             attachments: [
               Attachment.of('photo.PNG', const [1, 2, 3]),
               Attachment.of('report.pdf', utf8.encode('%PDF')),
@@ -948,7 +1094,7 @@ void main() {
           return http.StreamedResponse(const Stream.empty(), 200);
         }),
       );
-      await api.streamChat('w', 't', 'Hi', mode: ChatMode.chat).toList();
+      await api.streamChat('w', 't', 'Hi').toList();
       final body = jsonDecode(
         (seen.single as http.Request).body,
       ) as Map<String, dynamic>;

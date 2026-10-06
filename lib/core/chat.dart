@@ -1,8 +1,30 @@
 // Asking a workspace: what a streamed answer is made of, and how a chat gets its name.
 
-/// How the server answers: [query] only from the workspace's documents, [chat] from general
-/// knowledge too.
-enum ChatMode { query, chat }
+/// A workspace's chat mode on the server, which every message in it answers in. Its [name] is
+/// the server's value.
+enum ChatMode {
+  automatic(
+    'Agent',
+    'Uses tools, such as web search, when the question needs them.',
+  ),
+  chat(
+    'Chat',
+    'Answers from general knowledge and the switched-on files, without tools.',
+  ),
+  query(
+    'Query',
+    'Answers only from the switched-on files, and says so when they do not cover it.',
+  );
+
+  const ChatMode(this.label, this.about);
+
+  final String label;
+  final String about;
+
+  /// The mode the server calls [value], or null for none it knows.
+  static ChatMode? fromServer(Object? value) =>
+      values.where((m) => m.name == value).firstOrNull;
+}
 
 /// What a new chat is called until its first message names it.
 const newChatName = 'New chat';
@@ -16,6 +38,29 @@ sealed class ChatEvent {
 class TextChunk extends ChatEvent {
   const TextChunk(this.text);
   final String text;
+}
+
+/// What the agent is doing now, such as running a tool. It is not part of the answer.
+class StatusChunk extends ChatEvent {
+  const StatusChunk(this.text);
+  final String text;
+}
+
+/// The whole answer, which takes the place of the text streamed so far. An agent streams what it
+/// writes before and between its tools, then sends its answer whole.
+class WholeAnswer extends ChatEvent {
+  const WholeAnswer(this.text);
+  final String text;
+}
+
+/// An agent's status [thought] in plain words: `@agent: Using SearXNG…` loses its prefix, and
+/// `@agent is executing `web-browsing` tool {…}` becomes `Running web-browsing`.
+String agentStatus(String thought) {
+  final line = thought.trim();
+  final tool = RegExp(r'^@agent is executing `([^`]+)`').firstMatch(line);
+  if (tool != null) return 'Running ${tool.group(1)}';
+  final text = line.replaceFirst(RegExp(r'^@agent:?\s*'), '');
+  return text.split('\n').first.trim();
 }
 
 /// The answer is complete. [citations] are the titles of the documents it drew on.

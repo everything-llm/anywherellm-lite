@@ -137,19 +137,27 @@ void main() {
     expect(rig.chat.busy, isFalse);
   });
 
-  test(
-    'answers only from documents unless general answers are allowed',
-    () async {
-      final llm = planningServer();
-      final rig = await started(llm);
-      await rig.chat.send('a');
-      await pumpEventQueue();
-      await rig.prefs.setGroundedOnly(false);
-      await rig.chat.send('b');
-      await pumpEventQueue();
-      expect(llm.modes, [ChatMode.query, ChatMode.chat]);
-    },
-  );
+  test('an agent answer shows its status, then its whole answer', () async {
+    final llm = planningServer()..hold = true;
+    final rig = await started(llm);
+    await rig.chat.send('News?');
+    final answer = rig.chat.turns.last;
+    llm.chat!
+      ..add(const TextChunk('<think>Plan</think>'))
+      ..add(const StatusChunk('Running web-browsing'));
+    await pumpEventQueue();
+    expect(answer.status, 'Running web-browsing');
+    llm.chat!
+      ..add(const TextChunk('Draft'))
+      ..add(const WholeAnswer('<think>Pick</think>Headline'))
+      ..add(const ChatDone(['A story']));
+    await llm.chat!.close();
+    await pumpEventQueue();
+    expect(answer.text, '<think>Pick</think>Headline');
+    expect(answer.status, isNull);
+    expect(answer.citations, ['A story']);
+    expect(answer.streaming, isFalse);
+  });
 
   test('new chat starts a draft, unless the chat is already empty', () async {
     final rig = await started(planningServer());

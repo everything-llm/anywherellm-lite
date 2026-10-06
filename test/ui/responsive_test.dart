@@ -1,5 +1,6 @@
 import 'dart:ui' show Size;
 
+import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/upload.dart';
@@ -165,6 +166,23 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Delete workspace').last);
       await tester.pumpAndSettle();
       expect(find.bySemanticsLabel('Cancel'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('an agent answer fits at $at', (tester) async {
+      final llm = awkward()..hold = true;
+      final h = await pumpApp(tester, llm: llm, size: size);
+      h.chat.newChat();
+      await tester.pumpAndSettle();
+      await h.chat.send('news');
+      llm.chat!.add(StatusChunk('Using SearXNG to search for $longWord'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(tester.takeException(), isNull);
+      llm.chat!
+        ..add(const WholeAnswer('Headline'))
+        ..add(ChatDone([for (var i = 0; i < 9; i++) 'story-$i-$longWord']));
+      await llm.chat!.close();
+      await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });
 
