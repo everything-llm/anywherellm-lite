@@ -19,11 +19,11 @@ import 'anythingllm_stream.dart';
 /// never contains the key. Unless [allowHttp], a call to an `http://` address fails before the key
 /// is sent.
 ///
-/// The address may be the everythingllm relay instead of AnythingLLM itself: it passes
-/// `/api/v1/` through, and also keeps an answer going after the app lets go of it, as a run. A
-/// connection is a relay when `GET /runs` answers a JSON list, asked once per connection. On a
-/// relay, [streamChat] starts a run and follows its events, rejoining after the last one it saw
-/// when the connection drops.
+/// The everythingllm relay may sit beside AnythingLLM at [relayPath] on the same address and take
+/// the same key: it keeps an answer going after the app lets go of it, as a run. A server has the
+/// relay when its `GET /everythingllm/health` answers the relay's JSON, asked once per connection.
+/// With the relay, [streamChat] starts a run and follows its events, rejoining after the last one
+/// it saw when the connection drops.
 class HttpAnythingLlmApi implements AnythingLlmApi {
   HttpAnythingLlmApi({
     required this._holder,
@@ -68,6 +68,9 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   final _runs = <(String, String), (Connection, Future<String?>)>{};
 
   final _random = Random.secure();
+
+  /// Where the relay sits on AnythingLLM's address.
+  static const relayPath = '/everythingllm';
 
   @override
   Future<void> verify(Connection connection) async {
@@ -194,29 +197,32 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
           _request(
             connection,
             'POST',
-            '/runs/${Uri.encodeComponent(id)}/cancel',
+            '$relayPath/v1/runs/${Uri.encodeComponent(id)}/cancel',
           ),
         ),
       ),
     );
   }
 
-  /// Whether [connection] is a relay: `GET /runs` answers a JSON list there, and AnythingLLM's
-  /// web page or an error anywhere else. A refused key or a 5xx is not remembered, so a
-  /// corrected key or a relay failing for a moment is asked again on the next message.
+  /// Whether the server at [connection] has the relay: its `GET /everythingllm/health` answers
+  /// JSON naming the `everythingllm` service with `runs` among its features. The route is open, so
+  /// the key is not sent. AnythingLLM answers a path it does not know with its web page and a 200,
+  /// so the body decides. A 5xx is not remembered, so a relay failing for a moment is asked again
+  /// on the next message.
   Future<bool> _isRelay(Connection connection) async {
     if (_relays[connection] case final known?) return known;
     final response = await _fetch(
       connection,
       timeout,
-      () => _client.get(
-        Uri.parse('${connection.baseUrl}/runs?status=running'),
-        headers: _headers(connection),
-      ),
+      () => _client.get(Uri.parse('${connection.baseUrl}$relayPath/health')),
     );
-    final status = response.statusCode;
-    if (status == 401 || status == 403 || status >= 500) return false;
-    return _relays[connection] = status == 200 && _json(response) is List;
+    if (response.statusCode >= 500) return false;
+    final health = response.statusCode == 200 ? _json(response) : null;
+    return _relays[connection] =
+        health is Map &&
+        health['service'] == 'everythingllm' &&
+        health['features'] is List &&
+        (health['features'] as List).contains('runs');
   }
 
   /// The answer to [body] as a run on the relay at [connection]. Cancelling it closes the
@@ -286,7 +292,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       limit,
       () async => http.Response.fromStream(
         await _client.send(
-          _request(connection, 'POST', '/runs', {
+          _request(connection, 'POST', '$relayPath/v1/runs', {
             'workspace': slug,
             'thread': thread,
             'clientId': _clientId(),
@@ -320,7 +326,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       final request = _request(
         connection,
         'GET',
-        '/runs/${Uri.encodeComponent(id)}/events',
+        '$relayPath/v1/runs/${Uri.encodeComponent(id)}/events',
       )..headers['Accept'] = 'text/event-stream';
       if (after > 0) request.headers['Last-Event-ID'] = '$after';
       try {
