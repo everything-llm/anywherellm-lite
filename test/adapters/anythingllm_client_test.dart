@@ -37,17 +37,19 @@ HttpAnythingLlmApi _answering(
   return http.Response(jsonEncode(body), status);
 });
 
-/// [handler] behind AnythingLLM itself, which has no relay's `/runs`: that request is answered
-/// 404 and never reaches [handler].
-MockClient _notRelay(MockClientStreamHandler handler) => MockClient.streaming((
-  request,
-  body,
-) async {
-  if (request.url.path == '/runs') {
-    return http.StreamedResponse(Stream.value(utf8.encode('Not Found')), 404);
-  }
-  return handler(request, body);
-});
+/// [handler] behind AnythingLLM itself, which has no relay: it answers the relay's health check
+/// with its web page, and that request never reaches [handler].
+MockClient _notRelay(MockClientStreamHandler handler) =>
+    MockClient.streaming((request, body) async {
+      if (request.url.path == '/everythingllm/health') {
+        return http.StreamedResponse(
+          Stream.value(utf8.encode('<!doctype html><html></html>')),
+          200,
+          headers: {'content-type': 'text/html'},
+        );
+      }
+      return handler(request, body);
+    });
 
 Future<ApiException> _failure(Future<void> call) async {
   try {
@@ -1541,7 +1543,7 @@ void main() {
 
     /// A relay that starts run `r_1` and answers its events with what [follow] gives for each
     /// try, counting from 0. Every request goes into [seen]. The start waits for [started], the
-    /// asking whether it is a relay answers [probeStatus] for each ask, and a try at the events
+    /// health check answers [probeStatus] for each ask with [health], and a try at the events
     /// answers [eventsStatus].
     HttpAnythingLlmApi relay(
       Stream<List<int>> Function(int attempt) follow, {
@@ -1550,6 +1552,7 @@ void main() {
       Object? start,
       Future<void>? started,
       int Function(int probe)? probeStatus,
+      Object? health,
       int Function(int attempt)? eventsStatus,
       List<Duration> rejoinDelays = const [Duration.zero],
       Duration quiet = const Duration(seconds: 5),
@@ -1568,14 +1571,27 @@ void main() {
               ..bodyBytes = bytes,
           );
           final path = request.url.path;
-          if (path == '/runs' && request.method == 'GET') {
+          if (path == '/everythingllm/health') {
             final status = probeStatus?.call(probe++) ?? 200;
             return http.StreamedResponse(
-              Stream.value(utf8.encode(status == 200 ? '[]' : 'Bad Gateway')),
+              Stream.value(
+                utf8.encode(
+                  status == 200
+                      ? jsonEncode(
+                          health ??
+                              {
+                                'ok': true,
+                                'service': 'everythingllm',
+                                'features': ['runs'],
+                              },
+                        )
+                      : 'Bad Gateway',
+                ),
+              ),
               status,
             );
           }
-          if (path == '/runs') {
+          if (path == '/everythingllm/v1/runs') {
             await started;
             return http.StreamedResponse(
               Stream.value(
@@ -1586,7 +1602,7 @@ void main() {
               startStatus,
             );
           }
-          if (path == '/runs/r_1/events') {
+          if (path == '/everythingllm/v1/runs/r_1/events') {
             final n = attempt++;
             final status = eventsStatus?.call(n) ?? 200;
             if (status != 200) {
@@ -1597,7 +1613,7 @@ void main() {
             }
             return http.StreamedResponse(follow(n), 200);
           }
-          if (path == '/runs/r_1/cancel') {
+          if (path == '/everythingllm/v1/runs/r_1/cancel') {
             return http.StreamedResponse(
               Stream.value(utf8.encode('{"id":"r_1","status":"cancelled"}')),
               200,
@@ -1647,11 +1663,11 @@ void main() {
       ).streamChat('w', 't', 'Hi').toList();
 
       expect(seen.map((r) => '${r.method} ${r.url.path}'), [
-        'GET /runs',
-        'POST /runs',
-        'GET /runs/r_1/events',
+        'GET /everythingllm/health',
+        'POST /everythingllm/v1/runs',
+        'GET /everythingllm/v1/runs/r_1/events',
       ]);
-      expect(seen.first.url.query, 'status=running');
+      expect(seen.first.headers.containsKey('Authorization'), isFalse);
       final start = jsonDecode(seen[1].body) as Map<String, dynamic>;
       expect(start['workspace'], 'w');
       expect(start['thread'], 't');
@@ -1715,7 +1731,7 @@ void main() {
       await api.streamChat('w', 't', 'One').toList();
       await api.streamChat('w', 't', 'Two').toList();
       expect(
-        seen.where((r) => r.method == 'GET' && r.url.path == '/runs'),
+        seen.where((r) => r.url.path == '/everythingllm/health'),
         hasLength(1),
       );
     });
@@ -1731,37 +1747,83 @@ void main() {
       await pumpEventQueue();
       await api.streamChat('w', 't', 'Two').toList();
       expect(
-        seen.where((r) => r.method == 'GET' && r.url.path == '/runs'),
+        seen.where((r) => r.url.path == '/everythingllm/health'),
         hasLength(2),
       );
       expect(
-        seen.where((r) => r.method == 'POST' && r.url.path == '/runs'),
+        seen.where((r) => r.url.path == '/everythingllm/v1/runs'),
         hasLength(1),
       );
     });
 
-    test('a web page at /runs is AnythingLLM itself', () async {
-      final paths = <String>[];
-      final api = HttpAnythingLlmApi(
-        holder: ConnectionHolder(_connection),
-        client: MockClient.streaming((request, body) async {
-          await body.drain<void>();
-          paths.add(request.url.path);
-          if (request.url.path == '/runs') {
+    test(
+      'a web page at the relay\'s health check is AnythingLLM itself',
+      () async {
+        final paths = <String>[];
+        final api = HttpAnythingLlmApi(
+          holder: ConnectionHolder(_connection),
+          client: MockClient.streaming((request, body) async {
+            await body.drain<void>();
+            paths.add(request.url.path);
+            if (request.url.path == '/everythingllm/health') {
+              return http.StreamedResponse(
+                Stream.value(utf8.encode('<!doctype html><html></html>')),
+                200,
+                headers: {'content-type': 'text/html'},
+              );
+            }
             return http.StreamedResponse(
-              Stream.value(utf8.encode('<!doctype html><html></html>')),
+              Stream.value(utf8.encode('data: {"close":true}\n\n')),
               200,
-              headers: {'content-type': 'text/html'},
             );
-          }
-          return http.StreamedResponse(
-            Stream.value(utf8.encode('data: {"close":true}\n\n')),
-            200,
-          );
-        }),
+          }),
+        );
+        await api.streamChat('w', 't', 'Hi').toList();
+        await api.streamChat('w', 't', 'Again').toList();
+        expect(paths, [
+          '/everythingllm/health',
+          '/api/v1/workspace/w/thread/t/stream-chat',
+          '/api/v1/workspace/w/thread/t/stream-chat',
+        ]);
+      },
+    );
+
+    for (final (what, health) in [
+      (
+        'another service',
+        {
+          'ok': true,
+          'service': 'other',
+          'features': ['runs'],
+        },
+      ),
+      ('no runs', {'ok': true, 'service': 'everythingllm', 'features': []}),
+    ]) {
+      test('a health answer naming $what is no relay', () async {
+        final seen = <http.Request>[];
+        final api = relay(
+          (_) => lines([event(1, 'done', {})]),
+          seen: seen,
+          health: health,
+        );
+        // The fake has no stream-chat, so the direct answer fails.
+        await _failure(api.streamChat('w', 't', 'Hi').drain<void>());
+        expect(seen.map((r) => r.url.path), [
+          '/everythingllm/health',
+          '/api/v1/workspace/w/thread/t/stream-chat',
+        ]);
+      });
+    }
+
+    test('a key the relay refuses fails the answer in its words', () async {
+      final error = await _failure(
+        relay(
+          (_) => lines([]),
+          startStatus: 403,
+          start: {'error': 'No valid api key found.'},
+        ).streamChat('w', 't', 'Hi').drain<void>(),
       );
-      await api.streamChat('w', 't', 'Hi').toList();
-      expect(paths, ['/runs', '/api/v1/workspace/w/thread/t/stream-chat']);
+      expect(error.status, 403);
     });
 
     test('a dropped connection rejoins after the last event seen', () async {
@@ -1782,7 +1844,7 @@ void main() {
         'Hello',
       );
       final follows = seen
-          .where((r) => r.url.path == '/runs/r_1/events')
+          .where((r) => r.url.path == '/everythingllm/v1/runs/r_1/events')
           .toList();
       expect(follows, hasLength(2));
       expect(follows.last.headers['Last-Event-ID'], '1');
@@ -1824,7 +1886,7 @@ void main() {
           rejoinDelays: const [Duration.zero, Duration.zero],
         ).streamChat('w', 't', 'Hi').toList();
         expect(
-          seen.where((r) => r.url.path == '/runs/r_1/events'),
+          seen.where((r) => r.url.path == '/everythingllm/v1/runs/r_1/events'),
           hasLength(1),
         );
       }
@@ -1892,7 +1954,7 @@ void main() {
       await subscription.cancel();
       expect(held.hasListener, isFalse);
       expect(seen.last.method, 'POST');
-      expect(seen.last.url.path, '/runs/r_1/cancel');
+      expect(seen.last.url.path, '/everythingllm/v1/runs/r_1/cancel');
     });
 
     test(
@@ -1907,15 +1969,18 @@ void main() {
         );
         final subscription = api.streamChat('w', 't', 'Hi').listen((_) {});
         await pumpEventQueue();
-        expect(seen.last.url.path, '/runs');
+        expect(seen.last.url.path, '/everythingllm/v1/runs');
         final stopped = api.stopChat('w', 't');
         final cancelled = subscription.cancel();
         started.complete();
         await stopped;
         await cancelled;
         expect(seen.last.method, 'POST');
-        expect(seen.last.url.path, '/runs/r_1/cancel');
-        expect(seen.where((r) => r.url.path == '/runs/r_1/events'), isEmpty);
+        expect(seen.last.url.path, '/everythingllm/v1/runs/r_1/cancel');
+        expect(
+          seen.where((r) => r.url.path == '/everythingllm/v1/runs/r_1/events'),
+          isEmpty,
+        );
       },
     );
 
