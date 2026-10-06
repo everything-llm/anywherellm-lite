@@ -16,11 +16,12 @@ flutter test --plain-name 'a new server starts afresh'   # one test by name
 flutter build linux --debug                    # -> build/linux/x64/debug/bundle/anywherellm
 flutter run -d <android-device>                # a phone over adb, or an emulator
 flutter build apk --debug                      # -> build/app/outputs/flutter-apk/app-debug.apk
+flutter build apk --release                    # needs android/key.properties
 ```
 
 The Linux build needs `libsecret-1-dev`. Saving a key at run time needs a running, unlocked secret service such as gnome-keyring.
 
-The Android build is a debug APK only, with no release signing. Its launcher icon and launch screen are made from `assets/icon` (`icon.png`, `icon-foreground.png` for the adaptive icon, `splash.png`), drawn from the app's mark in Instrument Serif and the dark theme's colours. After changing them, run `dart run flutter_launcher_icons` and `dart run flutter_native_splash:create` (configured in `flutter_launcher_icons.yaml` and `flutter_native_splash.yaml`) and commit the generated resources. It needs the Android SDK; `minSdk` is Flutter's default (24), which is what `flutter_secure_storage` requires. On Android the key lives in the Android Keystore.
+A release APK is signed with the key named in `android/key.properties` (gitignored), which the personal F-Droid repo's `appstore sync` writes the first time it builds the app. Without that file the release build fails rather than signing with the debug key, because every later update must carry the first release's key. `android.enableResourceOptimizations=false` keeps the launcher icon at the path fdroidserver reads, and `allowBackup` is off so a restored backup never carries a Keystore-encrypted key to a device that cannot decrypt it. Its launcher icon and launch screen are made from `assets/icon` (`icon.png`, `icon-foreground.png` for the adaptive icon, `splash.png`), drawn from the app's mark in Instrument Serif and the dark theme's colours. After changing them, run `dart run flutter_launcher_icons` and `dart run flutter_native_splash:create` (configured in `flutter_launcher_icons.yaml` and `flutter_native_splash.yaml`) and commit the generated resources. It needs the Android SDK; `minSdk` is Flutter's default (24), which is what `flutter_secure_storage` requires. On Android the key lives in the Android Keystore.
 
 ## Naming
 

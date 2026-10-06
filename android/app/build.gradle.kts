@@ -1,8 +1,21 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// Release signing is read from android/key.properties, which is gitignored; `appstore sync`
+// writes it the first time it builds this app. Android keys an installed app to its signing
+// certificate, so the first key to publish local.anywherellm.anywherellm must sign every later
+// update -- which is why a missing key.properties fails the release build instead of falling
+// back to the debug keystore.
+val keystoreProperties = Properties().apply {
+    val f = rootProject.file("key.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+val hasReleaseKey = keystoreProperties.getProperty("storeFile") != null
 
 android {
     namespace = "local.anywherellm.anywherellm"
@@ -28,13 +41,41 @@ android {
         versionName = flutter.versionName
     }
 
-    buildTypes {
-        release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+    signingConfigs {
+        if (hasReleaseKey) {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
         }
     }
+
+    buildTypes {
+        release {
+            // Left unset when there is no key: the failure below is raised when a release is
+            // assembled, not while the project is configured, so `flutter run` still builds.
+            if (hasReleaseKey) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+    }
+}
+
+if (!hasReleaseKey) {
+    tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }
+        .configureEach {
+            doFirst {
+                throw GradleException(
+                    "android/key.properties is missing, so this release build has no signing " +
+                    "key. Publishing debug-signed would tie every future update of " +
+                    "local.anywherellm.anywherellm to ~/.android/debug.keystore. Run " +
+                    "`appstore sync`, which writes it, or create it with storeFile, " +
+                    "storePassword, keyAlias and keyPassword."
+                )
+            }
+        }
 }
 
 kotlin {
