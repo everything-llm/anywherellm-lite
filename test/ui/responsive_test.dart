@@ -45,6 +45,7 @@ FakeAnythingLlm awkward() {
     ChatMessage(
       role: Role.assistant,
       text:
+          '<think>reasoning-$longWord</think>'
           '## Heading-$longWord\n\n'
           '- item-$longWord\n\n'
           '```\nconst code = "$longWord-$longWord";\n```\n\n'

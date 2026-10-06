@@ -4,6 +4,7 @@
 
 import 'dart:convert';
 
+import 'chat.dart';
 import 'errors.dart';
 import 'server_models.dart';
 
@@ -247,7 +248,7 @@ String chatMarkdown(String name, List<ChatMessage> turns) {
   for (final turn in turns) {
     out
       ..write('\n**${turn.role == Role.user ? 'You' : 'Answer'}**\n\n')
-      ..write('${turn.text.trim()}\n');
+      ..write('${splitReasoning(turn.text).answer}\n');
     if (turn.citations.isNotEmpty) {
       out.write('\nSources: ${turn.citations.join(', ')}\n');
     }

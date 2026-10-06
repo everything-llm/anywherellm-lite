@@ -80,3 +80,33 @@ String? attachmentProblem(String name, int size) => size > maxAttachmentBytes
     ? '$name is ${(size / (1024 * 1024)).toStringAsFixed(1)} MB; a message takes '
           '${maxAttachmentBytes ~/ (1024 * 1024)} MB at most. Add it in Sources instead.'
     : null;
+
+/// An answer split into the model's reasoning and the answer itself.
+typedef Reasoned = ({String reasoning, String answer, bool thinking});
+
+final _thought = RegExp(r'<(think|thinking)>([\s\S]*?)(?:</\1>|$)');
+
+/// Splits [text] into the reasoning a model wrapped in `<think>` or `<thinking>` tags and the
+/// answer around it. [Reasoned.thinking] is true while a block is still open, as when the
+/// answer is streaming. Text with no such block is all answer, except the start of an opening
+/// tag that has not all arrived yet, which is held back.
+Reasoned splitReasoning(String text) {
+  final start = text.trimLeft();
+  if (start.isNotEmpty &&
+      start.length < '<thinking>'.length &&
+      ('<thinking>'.startsWith(start) || '<think>'.startsWith(start))) {
+    return (reasoning: '', answer: '', thinking: true);
+  }
+  final parts = <String>[];
+  var thinking = false;
+  final answer = text.replaceAllMapped(_thought, (match) {
+    parts.add(match[2]!.trim());
+    thinking = !match[0]!.endsWith('</${match[1]}>');
+    return '';
+  });
+  return (
+    reasoning: parts.where((p) => p.isNotEmpty).join('\n\n'),
+    answer: answer.trim(),
+    thinking: thinking,
+  );
+}

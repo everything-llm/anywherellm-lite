@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/chat.dart';
 import '../../core/server_models.dart';
 import '../app_scope.dart';
 import '../icons.dart';
@@ -240,11 +241,17 @@ class _Answer extends StatelessWidget {
       ListenableBuilder(listenable: turn, builder: _build);
 
   Widget _build(BuildContext context, Widget? _) {
+    final split = splitReasoning(turn.text);
+    final thinking = turn.streaming && split.thinking;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (turn.text.isNotEmpty) AnswerBody(turn.text),
-        if (turn.streaming)
+        if (thinking || split.reasoning.isNotEmpty) ...[
+          _Reasoning(split.reasoning, thinking: thinking),
+          if (split.answer.isNotEmpty) const SizedBox(height: 10),
+        ],
+        if (split.answer.isNotEmpty) AnswerBody(split.answer),
+        if (turn.streaming && !thinking)
           const Padding(padding: EdgeInsets.only(top: 6), child: Caret()),
         if (turn.error case final error?) ...[
           const SizedBox(height: 10),
@@ -261,10 +268,79 @@ class _Answer extends StatelessWidget {
             ],
           ),
         ],
-        if (!turn.streaming && turn.text.isNotEmpty) ...[
+        if (!turn.streaming && split.answer.isNotEmpty) ...[
           const SizedBox(height: 6),
-          CopyButton(turn.text, tooltip: 'Copy answer'),
+          CopyButton(split.answer, tooltip: 'Copy answer'),
         ],
+      ],
+    );
+  }
+}
+
+/// The model's reasoning before its answer, folded away. While the model is still reasoning it
+/// says so; afterwards a tap shows or hides what it wrote.
+class _Reasoning extends StatefulWidget {
+  const _Reasoning(this.text, {required this.thinking});
+
+  final String text;
+  final bool thinking;
+
+  @override
+  State<_Reasoning> createState() => _ReasoningState();
+}
+
+class _ReasoningState extends State<_Reasoning> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final label = widget.thinking
+        ? 'Thinking…'
+        : _open
+        ? 'Hide reasoning'
+        : 'Show reasoning';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Tappable(
+          label: label,
+          onTap: widget.text.isEmpty
+              ? null
+              : () => setState(() => _open = !_open),
+          radius: BorderRadius.circular(6),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedRotation(
+                  turns: _open ? 0.25 : 0,
+                  duration: const Duration(milliseconds: 150),
+                  child: AppIcon('chevron', size: IconSize.xs, color: t.muted),
+                ),
+                const SizedBox(width: 6),
+                Text(label, style: Type.sans(13.5, color: t.muted)),
+                if (widget.thinking) ...[
+                  const SizedBox(width: 8),
+                  const Caret(),
+                ],
+              ],
+            ),
+          ),
+        ),
+        if (_open && widget.text.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 6, left: 6),
+            padding: const EdgeInsets.only(left: 12),
+            decoration: BoxDecoration(
+              border: Border(left: BorderSide(color: t.line, width: 2)),
+            ),
+            child: SelectableText(
+              widget.text,
+              style: Type.sans(14, color: t.muted, height: 1.55),
+            ),
+          ),
       ],
     );
   }

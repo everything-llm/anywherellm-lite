@@ -47,4 +47,43 @@ void main() {
       );
     });
   });
+
+  group('splitReasoning', () {
+    test('takes a think block out of the answer', () {
+      final split = splitReasoning('<think>Red, clearly.</think>red');
+      expect(split.reasoning, 'Red, clearly.');
+      expect(split.answer, 'red');
+      expect(split.thinking, isFalse);
+    });
+
+    test('an open block is reasoning still arriving', () {
+      final split = splitReasoning('<think>Let me see');
+      expect(split.reasoning, 'Let me see');
+      expect(split.answer, isEmpty);
+      expect(split.thinking, isTrue);
+    });
+
+    test('the start of an opening tag is held back', () {
+      for (final partial in ['<', '<th', '<think', '  <thinki']) {
+        final split = splitReasoning(partial);
+        expect(split.answer, isEmpty, reason: partial);
+        expect(split.thinking, isTrue, reason: partial);
+      }
+    });
+
+    test('takes thinking tags and several blocks', () {
+      final split = splitReasoning(
+        '<thinking>One.</thinking>A <think>Two.</think>B',
+      );
+      expect(split.reasoning, 'One.\n\nTwo.');
+      expect(split.answer, 'A B');
+    });
+
+    test('text without a block is all answer', () {
+      final split = splitReasoning('Use `a < b` here.');
+      expect(split.reasoning, isEmpty);
+      expect(split.answer, 'Use `a < b` here.');
+      expect(split.thinking, isFalse);
+    });
+  });
 }

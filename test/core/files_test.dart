@@ -106,13 +106,13 @@ void main() {
     });
   });
 
-  test('a chat renders as Markdown with each turn and its sources', () {
+  test('a chat renders as Markdown with each turn and its sources, without reasoning', () {
     expect(
       chatMarkdown('Budget', const [
         ChatMessage(role: Role.user, text: 'What is the budget?'),
         ChatMessage(
           role: Role.assistant,
-          text: 'About 40k.\n',
+          text: '<think>Check the roadmap.</think>About 40k.\n',
           citations: ['Q3 roadmap.pdf', 'Notes.md'],
         ),
       ]),
