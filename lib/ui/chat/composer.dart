@@ -400,6 +400,20 @@ class _Form extends StatelessWidget {
             AlertBox(AlertKind.bad, 'Could not listen', text: problem),
             const SizedBox(height: 8),
           ],
+          if (chat.editing != null) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Editing a sent message: sending replaces it and everything after it.',
+                    style: Type.sans(12, color: t.muted),
+                  ),
+                ),
+                TextAction('close', 'Send as new', chat.cancelEdit),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
           if (menu) ...[
             SlashMenu(
               commands: matches,

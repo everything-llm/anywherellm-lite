@@ -7,6 +7,10 @@ import 'server_models.dart';
 
 export 'errors.dart';
 
+/// How a server signs in to its web UI: not at all, with one password, or with a user name and
+/// password, which the app does not do.
+enum ServerAuth { none, password, multiUser }
+
 /// The AnythingLLM server, as the UI sees it. Every method throws [ApiException] on failure.
 /// Every method but [verify] uses the connection in use, and throws [NotConfigured] when there
 /// is none.
@@ -14,6 +18,14 @@ abstract interface class AnythingLlmApi {
   /// Asks the server whether [connection] opens it. Takes the connection as an argument so
   /// Settings can test one before it is saved.
   Future<void> verify(Connection connection);
+
+  /// How the server at [connection] signs in to its web UI, which its own routes outside the
+  /// developer API take instead of the key.
+  Future<ServerAuth> serverAuth(Connection connection);
+
+  /// Signs in to the server with [connection]'s password, so a wrong one fails here and not on
+  /// the first call that needs it. A refused password is an [ApiException] with status 403.
+  Future<void> signIn(Connection connection);
 
   /// Every workspace with its named threads, without its documents.
   Future<List<Workspace>> workspaces();
@@ -59,9 +71,17 @@ abstract interface class AnythingLlmApi {
   /// lists them.
   Future<void> resetChat(String slug, String thread);
 
-  /// The server's slash-command presets. They are read outside the developer API, which
-  /// answers only while the server has no password; otherwise this fails.
+  /// The server's slash-command presets. They are read outside the developer API, with the
+  /// server's password when it has one; without it this fails with status 401.
   Future<List<SlashCommand>> slashCommands();
+
+  /// Deletes the chat's exchanges from [chatId] on, that one included, so a question asked again
+  /// replaces them. Needs the server's password when it has one.
+  Future<void> dropFrom(String slug, String thread, int chatId);
+
+  /// Marks the answer [chatId] good or bad, or neither when [good] is null. Needs the server's
+  /// password when it has one.
+  Future<void> setFeedback(String slug, int chatId, bool? good);
 
   /// Embeds the documents at [adds] in the workspace and drops those at [deletes], by
   /// `folder/name.json` path.

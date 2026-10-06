@@ -189,6 +189,8 @@ class ChatMessage {
     this.attachments = const [],
     this.files = const [],
     this.metrics,
+    this.chatId,
+    this.feedback,
   });
 
   /// An entry of a chat's `history`.
@@ -205,6 +207,14 @@ class ChatMessage {
     ],
     files: generatedFilesOf(json['outputs']),
     metrics: metricsOf(json['metrics']),
+    chatId: switch (json['chatId']) {
+      final int id => id,
+      _ => null,
+    },
+    feedback: switch (json['feedbackScore']) {
+      final bool good => good,
+      _ => null,
+    },
   );
 
   final Role role;
@@ -221,6 +231,12 @@ class ChatMessage {
 
   /// How the answer ran, when the server measured it.
   final AnswerMetrics? metrics;
+
+  /// The server's id for the exchange; a question and its answer share it.
+  final int? chatId;
+
+  /// Whether the answer was marked good or bad, or null when neither.
+  final bool? feedback;
 }
 
 /// A source an answer drew on: a document by its [title], or a web page an agent read, which

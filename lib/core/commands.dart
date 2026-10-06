@@ -61,10 +61,13 @@ List<SlashCommand> commandsFor(String draft, List<SlashCommand> commands) {
 final _space = RegExp(r'\s');
 
 /// Why the server's presets could not be listed, from the [error] reading them failed with. A
-/// 401 or 403 means the server has a password, since the list takes the web UI's session.
-String whyNoPresets(ApiException error) =>
+/// 401 or 403 means the list, which takes the web UI's login, refused the app: it has no
+/// password for the server, or the one [signedIn] with was refused.
+String whyNoPresets(ApiException error, {bool signedIn = false}) =>
     error.status == 401 || error.status == 403
-    ? 'This server has a password, so its own commands can\'t be listed here. One typed in full still runs.'
+    ? signedIn
+          ? 'The server did not accept the saved password, so its own commands can\'t be listed. Replace it in Settings. One typed in full still runs.'
+          : 'This server has a password. Add it in Settings to list its own commands. One typed in full still runs.'
     : 'The server\'s own commands could not be listed. One typed in full still runs.';
 
 /// [message] with each preset swapped for its prompt where it starts the message or follows a

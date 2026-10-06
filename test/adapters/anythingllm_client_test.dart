@@ -538,6 +538,23 @@ void main() {
       expect(turns.last.attachments, isEmpty);
     });
 
+    test('a history turn keeps its exchange id and feedback', () async {
+      final turns = await _answering({
+        'history': [
+          {'role': 'user', 'content': 'Q', 'chatId': 7},
+          {
+            'role': 'assistant',
+            'content': 'A',
+            'chatId': 7,
+            'feedbackScore': true,
+          },
+          {'role': 'user', 'content': 'Old'},
+        ],
+      }).history('w', 't');
+      expect(turns.map((t) => t.chatId), [7, 7, null]);
+      expect(turns.map((t) => t.feedback), [null, true, null]);
+    });
+
     test('a history answer keeps the files an agent made', () async {
       final turns = await _answering({
         'history': [
@@ -696,6 +713,19 @@ void main() {
       ]).streamChat('w', 't', 'Hi').toList();
       expect(events.whereType<WholeAnswer>(), isEmpty);
       expect(events.whereType<TextChunk>().single.text, 'Looking it up.');
+    });
+
+    test('the closing chunk gives the exchange\'s id', () async {
+      final events = await streaming([
+        data({'type': 'textResponseChunk', 'textResponse': 'Hi'}),
+        data({
+          'type': 'finalizeResponseStream',
+          'close': true,
+          'error': false,
+          'chatId': 42,
+        }),
+      ]).streamChat('w', 't', 'Hi').toList();
+      expect((events.last as ChatDone).chatId, 42);
     });
 
     test('an agent\'s closing chunk hands on the files it made', () async {
@@ -953,32 +983,125 @@ void main() {
   });
 
   group('slash commands', () {
-    test('reads the presets from the system route, with the key', () async {
-      final seen = <http.Request>[];
-      final presets = await _answering({
-        'presets': [
-          {
-            'id': 1,
-            'command': '/deep-research',
-            'prompt': '@agent Research:',
-            'description': 'Research in depth',
-          },
-          {'id': 2, 'command': 'broken'},
-        ],
-      }, seen: seen).slashCommands();
-      expect(seen.single.url.path, '/api/system/slash-command-presets');
-      expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
+    test('reads the presets from the system route, signed in', () async {
+      final server = _SignInServer()
+        ..routes['/api/system/slash-command-presets'] = {
+          'presets': [
+            {
+              'id': 1,
+              'command': '/deep-research',
+              'prompt': '@agent Research:',
+              'description': 'Research in depth',
+            },
+            {'id': 2, 'command': 'broken'},
+          ],
+        };
+      final presets = await server.api().slashCommands();
+      expect(server.seen.map((r) => r.url.path), [
+        '/api/request-token',
+        '/api/system/slash-command-presets',
+      ]);
+      expect(jsonDecode(server.seen.first.body), {'password': 'PASS-WORD'});
+      expect(server.seen.last.headers['Authorization'], 'Bearer TOKEN-1');
       expect([for (final p in presets) p.command], ['/deep-research']);
       expect(presets.single.description, 'Research in depth');
     });
 
-    test('a server with a password refuses them', () async {
-      final error = await _failure(
-        _answering({
-          'error': 'No auth token found.',
-        }, status: 401).slashCommands(),
-      );
+    test('without a password they need one, and nothing is sent', () async {
+      final server = _SignInServer();
+      final error = await _failure(server.api(password: null).slashCommands());
       expect(error.status, 401);
+      expect(error.message, contains('Add it in Settings'));
+      expect(server.seen, isEmpty);
+    });
+  });
+
+  group('signed in', () {
+    test('signs in once and keeps the token for later calls', () async {
+      final server = _SignInServer()
+        ..routes['/api/system/slash-command-presets'] = {'presets': []};
+      final api = server.api();
+      await api.slashCommands();
+      await api.slashCommands();
+      expect(
+        server.seen.where((r) => r.url.path == '/api/request-token'),
+        hasLength(1),
+      );
+    });
+
+    test('a token the server refuses is replaced once', () async {
+      final server = _SignInServer()
+        ..routes['/api/system/slash-command-presets'] = {'presets': []};
+      final api = server.api();
+      await api.slashCommands();
+      server.valid = 'none';
+      await api.slashCommands();
+      expect(server.seen.map((r) => r.url.path).toList(), [
+        '/api/request-token',
+        '/api/system/slash-command-presets',
+        '/api/system/slash-command-presets',
+        '/api/request-token',
+        '/api/system/slash-command-presets',
+      ]);
+      expect(server.seen.last.headers['Authorization'], 'Bearer TOKEN-2');
+    });
+
+    test('a wrong password is refused in plain words', () async {
+      final server = _SignInServer();
+      final error = await _failure(
+        server.api().signIn(_connection.withPassword('WRONG')),
+      );
+      expect(error.status, 403);
+      expect(error.message, 'The server did not accept the password.');
+    });
+
+    test('a call that takes the login never sends the key', () async {
+      final server = _SignInServer()
+        ..routes['/api/workspace/w/thread/t/delete-edited-chats'] = 'OK'
+        ..routes['/api/workspace/w/chat-feedback/7'] = {'success': true};
+      final api = server.api();
+      await api.dropFrom('w', 't', 7);
+      await api.setFeedback('w', 7, true);
+      for (final request in server.seen) {
+        expect(request.headers['Authorization'], isNot(contains('SECRET-KEY')));
+      }
+      final drop = server.seen.firstWhere(
+        (r) => r.url.path.endsWith('delete-edited-chats'),
+      );
+      expect(drop.method, 'DELETE');
+      expect(jsonDecode(drop.body), {'startingId': 7});
+      expect(jsonDecode(server.seen.last.body), {'feedback': true});
+    });
+
+    test('no error message carries the password or the token', () async {
+      final server = _SignInServer()
+        ..routes['/api/system/slash-command-presets'] = {'error': 'boom'}
+        ..status = 500;
+      final api = server.api();
+      final error = await _failure(api.slashCommands());
+      expect(error.message, isNot(contains('PASS-WORD')));
+      expect(error.message, isNot(contains('TOKEN')));
+      final refused = await _failure(
+        api.signIn(_connection.withPassword('PASS-WRONG')),
+      );
+      expect(refused.message, isNot(contains('PASS-WRONG')));
+    });
+
+    test('asks how the server signs in without the key', () async {
+      final seen = <http.Request>[];
+      Future<ServerAuth> ask(Map<String, Object?> results) =>
+          _answering({'results': results}, seen: seen).serverAuth(_connection);
+      expect(
+        await ask({'RequiresAuth': true, 'MultiUserMode': false}),
+        ServerAuth.password,
+      );
+      expect(await ask({'RequiresAuth': false}), ServerAuth.none);
+      expect(
+        await ask({'RequiresAuth': true, 'MultiUserMode': true}),
+        ServerAuth.multiUser,
+      );
+      expect(seen.first.url.path, '/api/setup-complete');
+      expect(seen.first.headers.containsKey('Authorization'), isFalse);
     });
   });
 
@@ -2010,4 +2133,38 @@ void main() {
       expect(seen.where((r) => r.url.path.endsWith('/cancel')), isEmpty);
     });
   });
+}
+
+/// AnythingLLM's web-UI login: `request-token` takes `PASS-WORD` and hands out `TOKEN-1`,
+/// `TOKEN-2` and so on, and each route in [routes] answers its body to the token in [valid]
+/// alone, and 401 to anything else. Every request goes into [seen].
+class _SignInServer {
+  final Map<String, Object> routes = {};
+  final List<http.Request> seen = [];
+  int status = 200;
+  String valid = '';
+  var _made = 0;
+
+  HttpAnythingLlmApi api({String? password = 'PASS-WORD'}) => _api((
+    request,
+  ) async {
+    seen.add(request);
+    if (request.url.path == '/api/request-token') {
+      final given = (jsonDecode(request.body) as Map)['password'];
+      if (given != 'PASS-WORD') {
+        return http.Response(
+          jsonEncode({'valid': false, 'token': null, 'message': 'no'}),
+          200,
+        );
+      }
+      valid = 'TOKEN-${++_made}';
+      return http.Response(jsonEncode({'valid': true, 'token': valid}), 200);
+    }
+    if (request.headers['Authorization'] != 'Bearer $valid') {
+      return http.Response(jsonEncode({'error': 'Invalid auth'}), 401);
+    }
+    final body = routes[request.url.path];
+    if (body == null) return http.Response('Not Found', 404);
+    return http.Response(body is String ? body : jsonEncode(body), status);
+  }, current: _connection.withPassword(password));
 }

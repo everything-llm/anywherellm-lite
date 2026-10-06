@@ -26,6 +26,7 @@ Stream<ChatEvent> chatEventsOf(Stream<Map<String, dynamic>> chunks) async* {
   var citations = const <Citation>[];
   var files = const <GeneratedFile>[];
   AnswerMetrics? metrics;
+  int? chatId;
   var whole = false;
   await for (final chunk in chunks) {
     final error = chunk['error'];
@@ -38,6 +39,7 @@ Stream<ChatEvent> chatEventsOf(Stream<Map<String, dynamic>> chunks) async* {
     final made = generatedFilesOf(chunk['outputs']);
     if (made.isNotEmpty) files = made;
     metrics = metricsOf(chunk['metrics']) ?? metrics;
+    if (chunk['chatId'] case final int id) chatId = id;
     switch (chunk['type']) {
       case 'abort':
         throw const ApiException('The server stopped the answer.');
@@ -55,7 +57,12 @@ Stream<ChatEvent> chatEventsOf(Stream<Map<String, dynamic>> chunks) async* {
         if (!whole && text is String && text.isNotEmpty) {
           yield WholeAnswer(text);
         }
-        yield ChatDone(citations, files: files, metrics: metrics);
+        yield ChatDone(
+          citations,
+          files: files,
+          metrics: metrics,
+          chatId: chatId,
+        );
         return;
       case 'usageMetrics':
         break;
@@ -63,7 +70,7 @@ Stream<ChatEvent> chatEventsOf(Stream<Map<String, dynamic>> chunks) async* {
         if (text is String && text.isNotEmpty) yield TextChunk(text);
     }
   }
-  yield ChatDone(citations, files: files, metrics: metrics);
+  yield ChatDone(citations, files: files, metrics: metrics, chatId: chatId);
 }
 
 /// The JSON object of each `data:` line in [bytes]; any other line is skipped.

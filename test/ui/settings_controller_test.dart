@@ -128,4 +128,49 @@ void main() {
       );
     });
   });
+
+  group('password', () {
+    test('a server with a password says so once connected', () async {
+      llm.auth = ServerAuth.password;
+      await settings.connect('https://h:3001', 'K1');
+      await pumpEventQueue();
+      expect(settings.auth, ServerAuth.password);
+    });
+
+    test('an open server asks for none', () async {
+      await settings.connect('https://h:3001', 'K1');
+      await pumpEventQueue();
+      expect(settings.auth, ServerAuth.none);
+    });
+
+    test('is saved only once the server takes it', () async {
+      await settings.connect('https://h:3001', 'K1');
+      expect(await settings.savePassword('WRONG'), isFalse);
+      expect(
+        settings.passwordMessage,
+        'The server did not accept the password.',
+      );
+      expect(store.saved!.password, isNull);
+      expect(await settings.savePassword('PASS-WORD'), isTrue);
+      expect(settings.connection!.password, 'PASS-WORD');
+      expect(store.saved!.password, 'PASS-WORD');
+    });
+
+    test('stays when the key is replaced on the same server', () async {
+      store.saved = _saved.withPassword('PASS-WORD');
+      await settings.load();
+      await settings.connect('https://h:3001', 'K2');
+      expect(settings.connection!.password, 'PASS-WORD');
+      await settings.connect('https://other:3001', 'K2');
+      expect(settings.connection!.password, isNull);
+    });
+
+    test('forgetting it keeps the key', () async {
+      store.saved = _saved.withPassword('PASS-WORD');
+      await settings.load();
+      await settings.forgetPassword();
+      expect(settings.connection, _saved);
+      expect(store.saved, _saved);
+    });
+  });
 }

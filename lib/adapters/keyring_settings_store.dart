@@ -7,7 +7,7 @@ import '../core/connection.dart';
 import '../core/ports.dart';
 
 /// [SettingsStore] in the system keyring (libsecret on Linux, the Android Keystore on Android), as
-/// one entry holding the address and key.
+/// one entry holding the address, the key and the server's password when one is saved.
 class KeyringSettingsStore implements SettingsStore {
   KeyringSettingsStore([FlutterSecureStorage? storage])
     : _storage = storage ?? const FlutterSecureStorage();
@@ -25,7 +25,7 @@ class KeyringSettingsStore implements SettingsStore {
       return Connection(
         baseUrl: json['baseUrl'] as String,
         apiKey: json['apiKey'] as String,
-      );
+      ).withPassword(json['password'] as String?);
     } on Object {
       throw const ApiException(
         'The saved connection in the keyring is unreadable. Enter it again and save.',
@@ -41,6 +41,7 @@ class KeyringSettingsStore implements SettingsStore {
       value: jsonEncode({
         'baseUrl': connection.baseUrl,
         'apiKey': connection.apiKey,
+        'password': ?connection.password,
       }),
     ),
   );

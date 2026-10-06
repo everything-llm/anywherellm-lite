@@ -11,10 +11,14 @@ import '../support/fake_api.dart';
 import '../support/fake_settings.dart';
 import '../support/rig.dart';
 
-Future<Rig> started(FakeAnythingLlm llm, {Prefs prefs = const Prefs()}) async {
+Future<Rig> started(
+  FakeAnythingLlm llm, {
+  Prefs prefs = const Prefs(),
+  String? password,
+}) async {
   final rig = Rig(
     llm: llm,
-    connection: sampleConnection,
+    connection: sampleConnection.withPassword(password),
     prefsStore: FakePrefsStore(prefs),
   );
   addTearDown(rig.dispose);
@@ -691,5 +695,128 @@ void main() {
         expect(rig.chat.canRetry, isFalse);
       },
     );
+  });
+
+  group('signed in', () {
+    /// The planning server, with the budget chat's one exchange given id 5.
+    FakeAnythingLlm withIds() {
+      final llm = planningServer();
+      llm.histories['budget'] = [
+        const ChatMessage(
+          role: Role.user,
+          text: 'What is the budget?',
+          chatId: 5,
+        ),
+        const ChatMessage(role: Role.assistant, text: 'About 40k.', chatId: 5),
+      ];
+      return llm;
+    }
+
+    test('retry deletes the old exchange before asking again', () async {
+      final llm = withIds()..answer = 'About 45k.';
+      final rig = await started(llm, password: 'PASS-WORD');
+      await rig.chat.retry();
+      await pumpEventQueue();
+      final asked = llm.calls.indexOf('streamChat:budget:What is the budget?');
+      expect(
+        llm.calls.indexOf('dropFrom:budget:5'),
+        inInclusiveRange(0, asked),
+      );
+      expect(llm.histories['budget'], isEmpty);
+      expect(rig.chat.turns.map((t) => t.text), [
+        'What is the budget?',
+        'About 45k.',
+      ]);
+      expect(rig.chat.turns.last.chatId, 100);
+    });
+
+    test('a delete that fails asks nothing again', () async {
+      final llm = withIds()
+        ..errors['dropFrom'] = const ApiException('no', status: 500);
+      final rig = await started(llm, password: 'PASS-WORD');
+      await rig.chat.retry();
+      expect(llm.calls.where((c) => c.startsWith('streamChat:')), isEmpty);
+      expect(rig.chat.problem?.title, 'Could not replace the old exchange');
+      expect(rig.chat.turns, hasLength(2));
+      expect(rig.chat.busy, isFalse);
+    });
+
+    test('signed out, retry deletes nothing', () async {
+      final llm = withIds();
+      final rig = await started(llm);
+      await rig.chat.retry();
+      expect(llm.calls.where((c) => c.startsWith('dropFrom')), isEmpty);
+    });
+
+    test('an edited question replaces it and what came after', () async {
+      final llm = withIds()..answer = 'About 50k.';
+      final rig = await started(llm, password: 'PASS-WORD');
+      rig.chat.edit(rig.chat.turns.first);
+      expect(rig.chat.editing, same(rig.chat.turns.first));
+      await rig.chat.send('What is the Q3 budget?');
+      await pumpEventQueue();
+      expect(llm.calls, contains('dropFrom:budget:5'));
+      expect(rig.chat.editing, isNull);
+      expect(rig.chat.turns.map((t) => t.text), [
+        'What is the Q3 budget?',
+        'About 50k.',
+      ]);
+    });
+
+    test('signed out, editing only fills the composer', () async {
+      final rig = await started(withIds());
+      rig.chat.edit(rig.chat.turns.first);
+      expect(rig.chat.editing, isNull);
+    });
+
+    test('marks an answer, and a second tap clears it', () async {
+      final llm = withIds();
+      final rig = await started(llm, password: 'PASS-WORD');
+      final answer = rig.chat.turns.last;
+      await rig.chat.mark(answer, true);
+      expect(answer.feedback, isTrue);
+      await rig.chat.mark(answer, true);
+      expect(answer.feedback, isNull);
+      expect(llm.calls.where((c) => c.startsWith('setFeedback')), [
+        'setFeedback:5:true',
+        'setFeedback:5:null',
+      ]);
+    });
+
+    test('a mark the server refuses goes back', () async {
+      final llm = withIds()
+        ..errors['setFeedback'] = const ApiException('no', status: 500);
+      final rig = await started(llm, password: 'PASS-WORD');
+      final answer = rig.chat.turns.last;
+      await rig.chat.mark(answer, false);
+      expect(answer.feedback, isNull);
+      expect(rig.chat.problem?.title, 'Could not mark the answer');
+    });
+
+    test(
+      'saving a password keeps the chat and lists the commands again',
+      () async {
+        final llm = withIds()
+          ..errors['slashCommands'] = const ApiException('no', status: 401);
+        final rig = await started(llm);
+        await pumpEventQueue();
+        final turns = rig.chat.turns;
+        llm.errors.remove('slashCommands');
+        await rig.settings.savePassword('PASS-WORD');
+        await pumpEventQueue();
+        expect(rig.chat.signedIn, isTrue);
+        expect(rig.chat.turns, same(turns));
+        expect(rig.chat.commandsNote, isNull);
+        expect(llm.calls.where((c) => c == 'workspaces'), hasLength(1));
+      },
+    );
+
+    test('a refused saved password says to replace it', () async {
+      final llm = withIds()
+        ..errors['slashCommands'] = const ApiException('no', status: 403);
+      final rig = await started(llm, password: 'PASS-WORD');
+      await pumpEventQueue();
+      expect(rig.chat.commandsNote, contains('Replace it in Settings'));
+    });
   });
 }

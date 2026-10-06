@@ -473,6 +473,75 @@ void main() {
       expect(inSidebar('Q3 planning'), findsOneWidget);
     });
 
+    Future<Harness> connected(WidgetTester tester, FakeAnythingLlm llm) async {
+      final h = await pumpApp(tester, llm: llm, connection: null);
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.bySemanticsLabel('AnythingLLM developer API key').last,
+        'K9',
+      );
+      await tester.tap(control('Save key'));
+      await tester.pumpAndSettle();
+      return h;
+    }
+
+    testWidgets(
+      'a server with a password asks for it, and saves one it takes',
+      (tester) async {
+        final h = await connected(
+          tester,
+          planningServer()..auth = ServerAuth.password,
+        );
+        expect(find.text('Server password'), findsWidgets);
+        await tester.enterText(
+          find.bySemanticsLabel('Server password').last,
+          'WRONG',
+        );
+        await tester.tap(control('Save password'));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('The server did not accept the password.'),
+          findsOneWidget,
+        );
+        expect(h.store.saved?.password, isNull);
+        await tester.enterText(
+          find.bySemanticsLabel('Server password').last,
+          'PASS-WORD',
+        );
+        await tester.tap(control('Save password'));
+        await tester.pumpAndSettle();
+        expect(h.store.saved?.password, 'PASS-WORD');
+        expect(find.text('The password was saved.'), findsOneWidget);
+        expect(control('Save password'), findsNothing);
+        await tester.tap(control('Forget').last);
+        await tester.pumpAndSettle();
+        expect(h.store.saved?.password, isNull);
+        expect(h.store.saved?.apiKey, 'K9');
+      },
+    );
+
+    testWidgets('the password card fits the smallest window', (tester) async {
+      final h = await pumpApp(
+        tester,
+        llm: planningServer()..auth = ServerAuth.password,
+        size: const Size(360, 480),
+      );
+      await h.settings.connect('https://h:3001', 'K1');
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      final field = find.bySemanticsLabel('Server password').last;
+      await tester.ensureVisible(field);
+      await tester.pumpAndSettle();
+      expect(field, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('an open server asks for no password', (tester) async {
+      await connected(tester, planningServer());
+      expect(find.text('Server password'), findsNothing);
+    });
+
     testWidgets('a key the server refuses is not saved', (tester) async {
       final llm = planningServer()
         ..verifyError = const ApiException('The server rejected the key.');

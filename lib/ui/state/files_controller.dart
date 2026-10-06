@@ -28,7 +28,7 @@ class FilesController extends ChangeNotifier {
     this._chat,
     this._prefs,
     this._sources,
-  ) : _server = _settings.connection {
+  ) : _server = _settings.connection?.withPassword(null) {
     _settings.addListener(_serverChanged);
     _chat.addListener(_chatChanged);
   }
@@ -128,8 +128,10 @@ class FilesController extends ChangeNotifier {
   }
 
   void _serverChanged() {
-    if (_settings.connection == _server) return;
-    _server = _settings.connection;
+    // A password saved or forgotten is the same server.
+    final now = _settings.connection?.withPassword(null);
+    if (now == _server) return;
+    _server = now;
     _details.clear();
     _asked.clear();
     _library = null;

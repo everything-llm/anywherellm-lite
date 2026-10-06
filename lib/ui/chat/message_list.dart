@@ -75,7 +75,10 @@ class MessageList extends StatelessWidget {
                     ? _UserBubble(
                         turn.text,
                         attachments: turn.attachments,
-                        onEdit: () => onSuggest(turn.text),
+                        onEdit: () {
+                          chat.edit(turn);
+                          onSuggest(turn.text);
+                        },
                       )
                     : _Answer(turn, retry: i == 0 ? _retryOf(chat) : null),
               ),
@@ -233,7 +236,7 @@ class _UserBubble extends StatelessWidget {
   /// The names of the files sent with the question.
   final List<String> attachments;
 
-  /// Puts [text] back in the composer.
+  /// Puts [text] back in the composer, to replace the question when the app is signed in.
   final VoidCallback onEdit;
 
   @override
@@ -360,6 +363,17 @@ class _Answer extends StatelessWidget {
                   box: 30,
                   size: IconSize.xs,
                 ),
+              if (_feedbackOf(context, turn) case final chat?) ...[
+                for (final good in const [true, false])
+                  IconBtn(
+                    good ? 'thumb-up' : 'thumb-down',
+                    tooltip: good ? 'Good answer' : 'Bad answer',
+                    active: turn.feedback == good,
+                    onPressed: () => chat.mark(turn, good),
+                    box: 30,
+                    size: IconSize.xs,
+                  ),
+              ],
               if (turn.metrics case final metrics?)
                 Text(
                   metrics.text,
@@ -371,6 +385,13 @@ class _Answer extends StatelessWidget {
       ],
     );
   }
+}
+
+/// The chat that can mark [turn] good or bad, or null when it cannot: the app is not signed in
+/// to the server, or the server has not said the answer's id.
+ChatController? _feedbackOf(BuildContext context, Turn turn) {
+  final chat = AppScope.of(context).chat;
+  return chat.signedIn && turn.chatId != null ? chat : null;
 }
 
 /// Reads [turn] aloud, or stops it while it is being read.

@@ -10,7 +10,8 @@ import 'settings_controller.dart';
 /// The server itself, apart from its workspaces: its settings, how many vectors its database
 /// holds, and its chat embeds. A new server starts it afresh.
 class SystemController extends ChangeNotifier {
-  SystemController(this._api, this._settings) : _server = _settings.connection {
+  SystemController(this._api, this._settings)
+    : _server = _settings.connection?.withPassword(null) {
     _settings.addListener(_serverChanged);
   }
 
@@ -221,8 +222,10 @@ class SystemController extends ChangeNotifier {
   }
 
   void _serverChanged() {
-    if (_settings.connection == _server) return;
-    _server = _settings.connection;
+    // A password saved or forgotten is the same server.
+    final now = _settings.connection?.withPassword(null);
+    if (now == _server) return;
+    _server = now;
     vectors = null;
     vectorDb = null;
     problem = null;

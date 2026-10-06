@@ -38,13 +38,11 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 
 ## Needs the private session API
 
-The web UI's own endpoints sign in with a session token, not the developer key, and promise no compatibility. Using them adds a second way to sign in.
+The web UI's own endpoints sign in with a session token, not the developer key, and promise no compatibility. The app signs in to them with the server's password when one is saved, for the presets, Retry and Edit that replace the old exchange, and thumbs up or down. The gaps below would use the same sign-in.
 
 | Gap | Why the developer API cannot do it |
 | --- | --- |
-| Regenerate in place | Retry asks again, but no call deletes the old answer, so both stay in the history. |
-| Edit a stored prompt or answer | No call edits a stored chat. Edit puts a sent message back in the composer to send anew. |
-| Thumbs up or down | No feedback call. |
+| Edit a stored answer's text | `update-chat` rewrites one exchange's text in place. Edit replaces a question and everything after it instead. |
 | Fork a chat from a message | No fork call. |
 | Delete one message | No call deletes a stored chat. |
 | Memories | Not in `/v1`. |
@@ -53,7 +51,6 @@ The web UI's own endpoints sign in with a session token, not the developer key, 
 | Custom system prompt variables | Adding, editing and deleting them is not in `/v1`. The server fills the built-in ones on every answer. |
 | Workspace Chats across the server, and Clear Chats | Not in `/v1`. Export is in Files under `/settings`. |
 | Suggested chat messages | Not in `/v1`. |
-| Slash-command presets on a server with a password | The list comes from `/api/system/slash-command-presets`, which answers without a session only while the server has no password. With one, the menu offers `/reset` alone and says why; a preset typed in full still runs. |
 | Make, edit or delete a slash-command preset | No `/v1` call writes presets. |
 | Server text-to-speech | Not in `/v1`. |
 

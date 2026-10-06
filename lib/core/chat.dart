@@ -76,10 +76,18 @@ final _agentPrefix = RegExp(r'^@agent:?\s*');
 /// The answer is complete. [citations] are what it drew on, [files] what an agent made with
 /// it, and [metrics] how it ran.
 class ChatDone extends ChatEvent {
-  const ChatDone(this.citations, {this.files = const [], this.metrics});
+  const ChatDone(
+    this.citations, {
+    this.files = const [],
+    this.metrics,
+    this.chatId,
+  });
   final List<Citation> citations;
   final List<GeneratedFile> files;
   final AnswerMetrics? metrics;
+
+  /// The server's id for the exchange, when it said.
+  final int? chatId;
 }
 
 /// The address a link in an answer opens, or null for one the app will not open. Only web

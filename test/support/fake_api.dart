@@ -58,6 +58,15 @@ class FakeAnythingLlm implements AnythingLlmApi {
   final List<Connection> verified = [];
   Object? verifyError;
 
+  /// How [serverAuth] says the server signs in.
+  ServerAuth auth = ServerAuth.none;
+
+  /// The password [signIn] takes; any other is refused.
+  String serverPassword = 'PASS-WORD';
+
+  /// The id [streamChat]'s next answer is given, counting up.
+  int nextChatId = 100;
+
   List<FakeWorkspace> spaces = [];
   final Map<String, List<ChatMessage>> histories = {};
 
@@ -138,6 +147,20 @@ class FakeAnythingLlm implements AnythingLlmApi {
     verified.add(connection);
     if (verifyError != null) throw verifyError!;
   }
+
+  @override
+  Future<ServerAuth> serverAuth(Connection connection) =>
+      _run('serverAuth', () => auth);
+
+  @override
+  Future<void> signIn(Connection connection) => _run('signIn', () {
+    if (connection.password != serverPassword) {
+      throw const ApiException(
+        'The server did not accept the password.',
+        status: 403,
+      );
+    }
+  });
 
   @override
   Future<List<Workspace>> workspaces() => _run(
@@ -230,6 +253,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
         [for (final title in cited) Citation(title)],
         files: made,
         metrics: measured,
+        chatId: nextChatId++,
       ),
     ]);
   }
@@ -245,6 +269,20 @@ class FakeAnythingLlm implements AnythingLlmApi {
   @override
   Future<List<SlashCommand>> slashCommands() =>
       _run('slashCommands', () => presets);
+
+  /// Drops the history's entries from the one with [chatId] on.
+  @override
+  Future<void> dropFrom(String slug, String thread, int chatId) =>
+      _run('dropFrom', () {
+        final kept = histories[thread];
+        if (kept == null) return;
+        final at = kept.indexWhere((m) => m.chatId == chatId);
+        if (at >= 0) histories[thread] = kept.sublist(0, at);
+      }, '$thread:$chatId');
+
+  @override
+  Future<void> setFeedback(String slug, int chatId, bool? good) =>
+      _run('setFeedback', () {}, '$chatId:$good');
 
   @override
   Future<void> updateEmbeddings(

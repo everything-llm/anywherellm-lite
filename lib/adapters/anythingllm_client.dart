@@ -70,6 +70,10 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
 
   final _random = Random.secure();
 
+  /// The web UI's login token for each connection signed in so far, kept only while the app
+  /// runs. The password is what is saved; a token lapses after 30 days or a new password.
+  final _tokens = <Connection, String>{};
+
   /// Where the relay sits on AnythingLLM's address.
   static const relayPath = '/everythingllm';
 
@@ -79,6 +83,40 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     if (body is! Map || body['authenticated'] != true) {
       throw const ApiException('The server did not accept the key.');
     }
+  }
+
+  /// `GET /api/setup-complete` answers without a key or a login, as the web UI asks it before
+  /// it shows its sign-in.
+  @override
+  Future<ServerAuth> serverAuth(Connection connection) async {
+    final secure = _secure(connection);
+    final results = _field(
+      await _call(
+        secure,
+        timeout,
+        () => _client.get(
+          Uri.parse('${secure.baseUrl}/api/setup-complete'),
+          headers: {'Accept': 'application/json'},
+        ),
+      ),
+      'results',
+    );
+    if (results is! Map) {
+      throw const ApiException(
+        'The address did not answer like an AnythingLLM server.',
+      );
+    }
+    if (results['MultiUserMode'] == true) return ServerAuth.multiUser;
+    return results['RequiresAuth'] == true
+        ? ServerAuth.password
+        : ServerAuth.none;
+  }
+
+  @override
+  Future<void> signIn(Connection connection) async {
+    final secure = _secure(connection);
+    _tokens.remove(secure);
+    await _token(secure);
   }
 
   @override
@@ -211,7 +249,8 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   /// so the body decides. A 5xx is not remembered, so a relay failing for a moment is asked again
   /// on the next message.
   Future<bool> _isRelay(Connection connection) async {
-    if (_relays[connection] case final known?) return known;
+    final server = connection.withPassword(null);
+    if (_relays[server] case final known?) return known;
     final response = await _fetch(
       connection,
       timeout,
@@ -219,7 +258,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     );
     if (response.statusCode >= 500) return false;
     final health = response.statusCode == 200 ? _json(response) : null;
-    return _relays[connection] =
+    return _relays[server] =
         health is Map &&
         health['service'] == 'everythingllm' &&
         health['features'] is List &&
@@ -388,18 +427,35 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     timeout,
   ).drain<void>();
 
-  /// The presets live under `/api/system`, not `/api/v1`. That route takes the browser's login,
-  /// not the API key, so it answers only while the server has no password.
+  /// The presets live under `/api/system`, not `/api/v1`, and take the web UI's login, so they
+  /// answer with the server's password, or on a server that has none.
   @override
   Future<List<SlashCommand>> slashCommands() async => [
     for (final json in jsonObjects(
       _field(
-        await _get(_current, '/api/system/slash-command-presets'),
+        await _session('GET', '/api/system/slash-command-presets'),
         'presets',
       ),
     ))
       ?SlashCommand.fromJson(json),
   ];
+
+  /// The server answers a bare `OK`.
+  @override
+  Future<void> dropFrom(String slug, String thread, int chatId) => _session(
+    'DELETE',
+    '/api/workspace/${Uri.encodeComponent(slug)}/thread/'
+        '${Uri.encodeComponent(thread)}/delete-edited-chats',
+    body: {'startingId': chatId},
+    emptyOk: true,
+  );
+
+  @override
+  Future<void> setFeedback(String slug, int chatId, bool? good) => _session(
+    'POST',
+    '/api/workspace/${Uri.encodeComponent(slug)}/chat-feedback/$chatId',
+    body: {'feedback': good},
+  );
 
   @override
   Future<void> updateEmbeddings(
@@ -731,6 +787,68 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     'Accept': 'application/json',
   };
 
+  /// The decoded JSON of a [method] to [path], one of the web UI's own routes, with [body] as
+  /// JSON, signed in with the connection's password in place of the key. A refused token is
+  /// forgotten and the call made once more with a new one.
+  Future<Object?> _session(
+    String method,
+    String path, {
+    Map<String, Object?>? body,
+    bool emptyOk = false,
+  }) async {
+    final connection = _current;
+    for (var again = false; ; again = true) {
+      final token = await _token(connection);
+      try {
+        return await _call(
+          connection,
+          timeout,
+          () async => http.Response.fromStream(
+            await _client.send(
+              _request(connection, method, path, body)
+                ..headers['Authorization'] = 'Bearer $token',
+            ),
+          ),
+          emptyOk: emptyOk,
+          rejected: _passwordRefused,
+        );
+      } on ApiException catch (error) {
+        if (again || (error.status != 401 && error.status != 403)) rethrow;
+        _tokens.remove(connection);
+      }
+    }
+  }
+
+  /// The web UI's login token for [connection], signing in with its password when there is none
+  /// yet. Without a password this fails with status 401, and with a refused one with 403.
+  Future<String> _token(Connection connection) async {
+    if (_tokens[connection] case final token?) return token;
+    final password =
+        connection.password ??
+        (throw const ApiException(_needsPassword, status: 401));
+    final body = await _call(
+      connection,
+      timeout,
+      () => _client.post(
+        Uri.parse('${connection.baseUrl}/api/request-token'),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'password': password}),
+      ),
+      rejected: _passwordRefused,
+    );
+    if (body is! Map || body['valid'] != true) {
+      throw const ApiException(_passwordRefused, status: 403);
+    }
+    final token = body['token'];
+    if (token is! String || token.isEmpty) {
+      throw const ApiException(_passwordRefused, status: 403);
+    }
+    return _tokens[connection] = token;
+  }
+
   /// The decoded JSON of a GET to [path] on [connection].
   Future<Object?> _get(Connection connection, String path) => _call(
     connection,
@@ -807,17 +925,20 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     );
   }
 
-  /// The decoded JSON of the response [send] gets, with failures in plain words.
+  /// The decoded JSON of the response [send] gets, with failures in plain words. [emptyOk],
+  /// [refused] and [rejected] are as for [_decode].
   Future<Object?> _call(
     Connection connection,
     Duration limit,
     Future<http.Response> Function() send, {
     bool emptyOk = false,
     String refused = _refused,
+    String rejected = _keyRejected,
   }) async => _decode(
     await _fetch(connection, limit, send),
     emptyOk: emptyOk,
     refused: refused,
+    rejected: rejected,
   );
 
   /// The response [send] gets within [limit], or an [ApiException] in plain words when the
@@ -856,19 +977,24 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   };
 
   static const _refused = 'The server refused the request.';
+  static const _keyRejected = 'The server rejected the key.';
+  static const _needsPassword =
+      'This needs the server password. Add it in Settings.';
+  static const _passwordRefused = 'The server did not accept the password.';
 
   /// The decoded JSON of [response], or null for a success that is empty or the bare status
   /// text `OK` when [emptyOk], as a delete answers. An answer with `success: false` fails, even with HTTP 200, with the server's reason
-  /// or else [refused].
+  /// or else [refused]. A 401 or 403 fails with [rejected], whatever the server said.
   Object? _decode(
     http.Response response, {
     bool emptyOk = false,
     String refused = _refused,
+    String rejected = _keyRejected,
   }) {
     final status = response.statusCode;
     final body = _json(response);
     if (status == 401 || status == 403) {
-      throw ApiException('The server rejected the key.', status: status);
+      throw ApiException(rejected, status: status);
     }
     if (status < 200 || status >= 300) {
       throw ApiException(
