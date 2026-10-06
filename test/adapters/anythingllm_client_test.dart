@@ -437,6 +437,28 @@ void main() {
       expect(seen.single.url.path, '/api/v1/workspace/scratch');
     });
 
+    test(
+      'renaming a workspace posts the name and returns the workspace',
+      () async {
+        final seen = <http.Request>[];
+        final renamed = await _answering({
+          'workspace': {'slug': 'scratch', 'name': 'Renamed'},
+          'message': null,
+        }, seen: seen).renameWorkspace('scratch', 'Renamed');
+        expect(seen.single.url.path, '/api/v1/workspace/scratch/update');
+        expect(jsonDecode(seen.single.body), {'name': 'Renamed'});
+        expect((renamed.slug, renamed.name), ('scratch', 'Renamed'));
+      },
+    );
+
+    test('a rename the server refuses says why', () async {
+      final error = await _failure(
+        _answering({'workspace': null, 'message': 'Name taken'})
+            .renameWorkspace('scratch', 'Renamed'),
+      );
+      expect(error.message, 'Name taken');
+    });
+
     test('a delete answered with a web page is not a success', () async {
       final error = await _failure(
         _api((_) async => http.Response('<html>login</html>', 200))
@@ -767,12 +789,14 @@ void main() {
       await api.createFolder('notes');
       await api.moveDocuments([('claude/a.json', 'notes/a.json')]);
       await api.removeDocuments(['notes/a.json']);
+      await api.removeFolder('notes');
       expect(
         [for (final r in seen) '${r.method} ${r.url.path}'],
         [
           'POST /api/v1/document/create-folder',
           'POST /api/v1/document/move-files',
           'DELETE /api/v1/system/remove-documents',
+          'DELETE /api/v1/document/remove-folder',
         ],
       );
       expect(
@@ -787,6 +811,7 @@ void main() {
           {
             'names': ['notes/a.json'],
           },
+          {'name': 'notes'},
         ],
       );
     });
@@ -794,6 +819,7 @@ void main() {
     test('success false with status 200 is a refusal', () async {
       final api = _answering({'success': false, 'message': 'Folder exists'});
       expect((await _failure(api.createFolder('x'))).message, 'Folder exists');
+      expect((await _failure(api.removeFolder('x'))).message, 'Folder exists');
       final quiet = _answering({'success': false});
       expect(
         (await _failure(quiet.removeDocuments(['x']))).message,

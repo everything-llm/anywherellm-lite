@@ -75,6 +75,19 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     return Workspace.fromJson(json);
   }
 
+  /// The server answers with the workspace it wrote, or a `message` saying why it did not.
+  @override
+  Future<Workspace> renameWorkspace(String slug, String name) async {
+    final body = await _send('POST', '${_workspace(slug)}/update', {
+      'name': name,
+    });
+    final json = _field(body, 'workspace');
+    if (json is! Map<String, dynamic>) {
+      throw ApiException(_said(body) ?? 'The server did not rename $slug.');
+    }
+    return Workspace.fromJson(json);
+  }
+
   /// The server answers a delete with no JSON. Deleting a workspace leaves its documents in the
   /// library.
   @override
@@ -287,6 +300,14 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     '/api/v1/document/create-folder',
     {'name': name},
     refused: 'The server did not make the folder $name.',
+  );
+
+  @override
+  Future<void> removeFolder(String name) => _send(
+    'DELETE',
+    '/api/v1/document/remove-folder',
+    {'name': name},
+    refused: 'The server did not delete the folder $name.',
   );
 
   @override

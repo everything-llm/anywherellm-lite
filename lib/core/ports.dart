@@ -22,6 +22,9 @@ abstract interface class AnythingLlmApi {
 
   Future<Workspace> createWorkspace(String name);
 
+  /// Renames the workspace and returns it as the server now has it.
+  Future<Workspace> renameWorkspace(String slug, String name);
+
   /// Deletes the workspace with its chats. Its documents stay in the library.
   Future<void> deleteWorkspace(String slug);
 
@@ -92,6 +95,10 @@ abstract interface class AnythingLlmApi {
   Future<DocBody> document(String path);
 
   Future<void> createFolder(String name);
+
+  /// Deletes the library folder [name] and the documents in it, which takes them out of every
+  /// workspace too.
+  Future<void> removeFolder(String name);
 
   /// Moves each library document from its first path to its second.
   Future<void> moveDocuments(List<(String from, String to)> moves);

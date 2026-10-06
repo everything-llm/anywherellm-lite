@@ -22,8 +22,8 @@ class FakeWorkspace {
        docs = docs ?? [],
        settings = settings ?? {...defaultSettings};
 
-  final String slug;
-  final String name;
+  String slug;
+  String name;
   final List<Thread> threads;
   final List<WorkspaceDoc> docs;
   String? prompt;
@@ -88,6 +88,9 @@ class FakeAnythingLlm implements AnythingLlmApi {
   /// The files sent with the last message asked.
   List<Attachment> lastAttachments = const [];
 
+  /// The slug [renameWorkspace] gives the workspace, when set. The server keeps it otherwise.
+  String? renamedSlug;
+
   final List<String> calls = [];
   final Map<String, Object> errors = {};
   final Map<String, Completer<void>> gates = {};
@@ -140,6 +143,15 @@ class FakeAnythingLlm implements AnythingLlmApi {
     spaces.add(made);
     return Workspace(slug: made.slug, name: made.name);
   }, name);
+
+  @override
+  Future<Workspace> renameWorkspace(String slug, String name) =>
+      _run('renameWorkspace', () {
+        final w = _space(slug)
+          ..name = name
+          ..slug = renamedSlug ?? slug;
+        return Workspace(slug: w.slug, name: w.name);
+      }, '$slug:$name');
 
   @override
   Future<void> deleteWorkspace(String slug) => _run('deleteWorkspace', () {
@@ -320,6 +332,21 @@ class FakeAnythingLlm implements AnythingLlmApi {
   @override
   Future<void> createFolder(String name) =>
       _run('createFolder', () => folders.add(name), name);
+
+  @override
+  Future<void> removeFolder(String name) => _run('removeFolder', () {
+    final paths = [
+      for (final path in library.keys)
+        if (docFolder(path) == name) path,
+    ];
+    for (final path in paths) {
+      library.remove(path);
+      for (final w in spaces) {
+        w.docs.removeWhere((d) => d.path == path);
+      }
+    }
+    folders.remove(name);
+  }, name);
 
   /// Moves documents that no workspace uses, as the server does, and leaves the others.
   @override
