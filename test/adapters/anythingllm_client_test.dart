@@ -1007,13 +1007,33 @@ void main() {
       expect(presets.single.description, 'Research in depth');
     });
 
-    test('without a password they need one, and nothing is sent', () async {
+    test('a protected server without a saved password asks for one', () async {
       final server = _SignInServer();
       final error = await _failure(server.api(password: null).slashCommands());
       expect(error.status, 401);
       expect(error.message, contains('Add it in Settings'));
-      expect(server.seen, isEmpty);
+      expect(server.seen.single.url.path, '/api/system/slash-command-presets');
+      expect(server.seen.single.headers.containsKey('Authorization'), isFalse);
     });
+
+    test(
+      'a password-free server lists its presets without signing in',
+      () async {
+        final api = _api((request) async {
+          expect(request.url.path, '/api/system/slash-command-presets');
+          expect(request.headers.containsKey('Authorization'), isFalse);
+          return http.Response(
+            jsonEncode({
+              'presets': [
+                {'id': 1, 'command': '/brief', 'prompt': 'Be brief:'},
+              ],
+            }),
+            200,
+          );
+        }, current: _connection.withPassword(null));
+        expect((await api.slashCommands()).single.command, '/brief');
+      },
+    );
   });
 
   group('signed in', () {

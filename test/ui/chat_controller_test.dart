@@ -293,6 +293,23 @@ void main() {
     expect(rig.chat.activeSlug, isNull);
   });
 
+  test('a late workspace list does not restore a forgotten server', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    await pumpEventQueue();
+    final gate = llm.gates['workspaces'] = Completer<void>();
+    final loading = rig.chat.load();
+    await rig.settings.clear();
+    gate.complete();
+    await loading;
+    await pumpEventQueue();
+    expect(rig.chat.workspaces, isEmpty);
+    expect(rig.chat.threadsOf('q3'), isEmpty);
+    expect(rig.chat.activeSlug, isNull);
+    expect(rig.chat.loading, isFalse);
+    expect(rig.chat.docCounts, isEmpty);
+  });
+
   test(
     'Stop while a draft\'s chat is made keeps the chat and runs no answer',
     () async {

@@ -788,8 +788,9 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   };
 
   /// The decoded JSON of a [method] to [path], one of the web UI's own routes, with [body] as
-  /// JSON, signed in with the connection's password in place of the key. A refused token is
-  /// forgotten and the call made once more with a new one.
+  /// JSON, signed in with the connection's password in place of the key, or without credentials
+  /// when no password is saved. A refused token is forgotten and the call made once more with
+  /// a new one. A server that requires credentials says so with 401 or 403.
   Future<Object?> _session(
     String method,
     String path, {
@@ -797,6 +798,20 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     bool emptyOk = false,
   }) async {
     final connection = _current;
+    if (connection.password == null) {
+      return _call(
+        connection,
+        timeout,
+        () async => http.Response.fromStream(
+          await _client.send(
+            _request(connection, method, path, body)
+              ..headers.remove('Authorization'),
+          ),
+        ),
+        emptyOk: emptyOk,
+        rejected: _needsPassword,
+      );
+    }
     for (var again = false; ; again = true) {
       final token = await _token(connection);
       try {

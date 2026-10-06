@@ -121,14 +121,25 @@ class Prefs {
     ],
   );
 
-  /// These prefs with [from] renamed [to] where it stands in the order, as when a workspace's
-  /// slug changes.
-  Prefs withRenamedWorkspace(String from, String to) => _copy(
-    workspaceOrder: [
-      for (final s in workspaceOrder)
-        if (s == from) to else if (s != to) s,
-    ],
-  );
+  /// These prefs with [from]'s order and switched-off documents moved to [to], as when a
+  /// workspace's slug changes.
+  Prefs withRenamedWorkspace(String from, String to) => from == to
+      ? this
+      : _copy(
+          switchedOff: {
+            for (final entry in switchedOff.entries)
+              if (entry.key != from && entry.key != to) entry.key: entry.value,
+            if (switchedOff.containsKey(from) || switchedOff.containsKey(to))
+              to: {
+                for (final doc in offIn(to)) doc.path: doc,
+                for (final doc in offIn(from)) doc.path: doc,
+              }.values.toList(),
+          },
+          workspaceOrder: [
+            for (final s in workspaceOrder)
+              if (s == from) to else if (s != to) s,
+          ],
+        );
 
   /// These prefs with [slug] dropped from the order, as when the workspace is deleted.
   Prefs withoutWorkspace(String slug) =>

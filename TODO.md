@@ -2,6 +2,15 @@
 
 What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each row says what blocks it.
 
+## Defects to fix
+
+Found in a review of the server-password, relay, embeds and read-aloud changes.
+
+| Defect | Fix | Where |
+| --- | --- | --- |
+| On a server with no password the app never uses the web UI's own routes, so the server's slash-command presets are never listed, and the message wrongly says the server has a password. | When the server has no password (`ServerAuth.none`), call the web-UI route with no token rather than throwing "This needs the server password"; keep the password path only for a server that has one. Also stop `whyNoPresets` claiming a password when the 401 was raised by the app itself. Same sign-in covers presets, Retry and Edit that replace the old exchange, and thumbs up or down. | `_token`/`_session` in `lib/adapters/anythingllm_client.dart`; `whyNoPresets` in `lib/core/commands.dart`; `_readCommands` in `lib/ui/state/chat_controller.dart`. |
+| Attaching a file in the composer, then saving or forgetting the server password in Settings, silently clears the attachment though the server on screen did not change. | Track the chat on screen by the connection without its password, so saving or forgetting a password is the same server. | `_chatOnScreen` in `lib/ui/chat/composer.dart` (compare `_scope.settings.connection?.withPassword(null)`). |
+
 ## In the developer API, not built yet
 
 | Gap | What it needs |

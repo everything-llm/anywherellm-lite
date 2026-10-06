@@ -65,27 +65,27 @@ typedef Sent = ({List<DocEntry> made, List<(String name, String why)> refused});
 /// Sends each of [picked] in turn into library [folder], or the default folder, and keeps going
 /// past a file that cannot be added. [accepted] are the extensions the server reads, or null to
 /// let it decide. [onSending] hears each file's name as it goes.
+/// Stops before reading or sending another file when [shouldContinue] returns false.
 Future<Sent> sendEach(
   AnythingLlmApi api,
   List<UploadFile> picked, {
   Set<String>? accepted,
   String? folder,
   void Function(String name)? onSending,
+  bool Function()? shouldContinue,
 }) async {
   final made = <DocEntry>[];
   final refused = <(String, String)>[];
   for (final file in picked) {
+    if (shouldContinue?.call() == false) break;
     onSending?.call(file.name);
     try {
       final wrongType = extensionProblem(file.name, accepted);
       if (wrongType != null) throw ApiException(wrongType);
+      final bytes = await file.read();
+      if (shouldContinue?.call() == false) break;
       made.addAll(
-        await api.upload(
-          file.name,
-          await file.read(),
-          folder: folder,
-          meta: file.meta,
-        ),
+        await api.upload(file.name, bytes, folder: folder, meta: file.meta),
       );
     } on Exception catch (error) {
       if (error is! ApiException && error is! UnreadableFile) rethrow;

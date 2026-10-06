@@ -34,9 +34,10 @@ class PrefsController extends ChangeNotifier {
     }
   }
 
-  /// Keeps a workspace whose slug changed where it stands in the arrangement.
+  /// Keeps a workspace's order and switched-off files when its slug changes.
   Future<void> renameWorkspace(String from, String to) async {
-    if (prefs.workspaceOrder.contains(from)) {
+    if (prefs.workspaceOrder.contains(from) ||
+        prefs.switchedOff.containsKey(from)) {
       await _change(prefs.withRenamedWorkspace(from, to));
     }
   }

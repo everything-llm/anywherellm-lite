@@ -273,6 +273,25 @@ void main() {
     expect(nodeAt(rig.files.tree, '/workspaces/travel/PROMPT.md'), isNotNull);
   });
 
+  test('a late Files load neither restores old data nor stays busy', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    final gate = llm.gates['libraryFolders'] = Completer<void>();
+    final loading = rig.files.load();
+    await rig.settings.clear();
+    gate.complete();
+    await loading;
+    expect(rig.files.loading, isFalse);
+    expect(rig.files.library, isEmpty);
+    expect(rig.files.detail('q3'), isNull);
+    llm.gates.remove('libraryFolders');
+    await rig.settings.save(sampleConnection.baseUrl, sampleConnection.apiKey);
+    await pumpEventQueue();
+    await rig.files.ensureLoaded();
+    expect(rig.files.library, isNotEmpty);
+    expect(rig.files.detail('q3'), isNotNull);
+  });
+
   test('exporting gives the file and a refusal says why', () async {
     final llm = planningServer()..exported = 'a,b';
     final rig = await started(llm);

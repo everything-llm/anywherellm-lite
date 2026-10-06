@@ -119,6 +119,10 @@ class ChatController extends ChangeNotifier {
   /// saving or forgetting one does not start afresh.
   Connection? _server;
 
+  /// The server in use, without its optional web UI password. Follows a saved connection even
+  /// while Settings is waiting for the keyring to finish writing it.
+  Connection? get server => _settings.connection?.withPassword(null);
+
   /// The server's saved password, which signs in to the web UI's own routes.
   String? _password;
 
@@ -240,6 +244,7 @@ class ChatController extends ChangeNotifier {
     _draft.clear();
     _madeFiles.clear();
     docCounts.clear();
+    loading = false;
     _clearing = false;
     _presets = const [];
     commandsNote = null;
@@ -254,16 +259,20 @@ class ChatController extends ChangeNotifier {
   /// Reads the workspaces and their chats, keeping the one on screen when it still exists.
   Future<void> load() async {
     if (_server == null) return;
+    final server = _server;
     loading = true;
     notifyListeners();
     await _try('Could not read the workspaces', () async {
-      workspaces = await _api.workspaces();
+      final read = await _api.workspaces();
+      if (_server != server) return;
+      workspaces = read;
       _threads
         ..clear()
         ..addAll({
           for (final w in workspaces) w.slug: [...w.threads],
         });
     });
+    if (_server != server) return;
     loading = false;
     if (active == null) {
       await select(_firstSlug);
@@ -295,9 +304,12 @@ class ChatController extends ChangeNotifier {
   /// Asks each workspace how many documents it holds, all at once. Best effort: a count that
   /// cannot be read is left out. Sources reports the active workspace's own count.
   Future<void> _countDocs() async {
+    final server = _server;
     Future<void> count(String slug) async {
       try {
-        docCounts[slug] = (await _api.workspace(slug)).documents.length;
+        final workspace = await _api.workspace(slug);
+        if (_server != server) return;
+        docCounts[slug] = workspace.documents.length;
       } on ApiException {
         return;
       }
@@ -308,6 +320,7 @@ class ChatController extends ChangeNotifier {
         if (w.slug != activeSlug && !docCounts.containsKey(w.slug))
           count(w.slug),
     ]);
+    if (_server != server) return;
     notifyListeners();
   }
 

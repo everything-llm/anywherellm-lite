@@ -138,6 +138,8 @@ class FilesController extends ChangeNotifier {
     _accepted = null;
     _tree = null;
     _loaded = false;
+    loading = false;
+    sending = null;
     selected = null;
     _settingsAsJson = false;
     _clearContent();
@@ -324,16 +326,20 @@ class FilesController extends ChangeNotifier {
   Future<void> upload(String folder, List<UploadFile> picked) async {
     if (picked.isEmpty) return;
     final server = _server;
+    var accepted = _accepted;
     try {
-      _accepted ??= await _api.acceptedExtensions();
+      accepted ??= await _api.acceptedExtensions();
+      if (_server == server) _accepted = accepted;
     } on ApiException {
       // The server decides each file then.
     }
+    if (_settings.connection?.withPassword(null) != server) return;
     final sent = await sendEach(
       _api,
       picked,
-      accepted: _accepted,
+      accepted: accepted,
       folder: folder,
+      shouldContinue: () => _settings.connection?.withPassword(null) == server,
       onSending: (name) {
         sending = name;
         notifyListeners();
@@ -486,8 +492,10 @@ class FilesController extends ChangeNotifier {
   /// Reads workspace [slug] again and tells Sources and the sidebar what changed. Returns why it
   /// could not, or null; the tree then keeps what it last read.
   Future<Notice?> _readWorkspace(String slug) async {
+    final server = _server;
     try {
       final w = await _api.workspace(slug);
+      if (_server != server) return null;
       _details[slug] = w;
       _tree = null;
       if (slug == _chat.activeSlug) {
@@ -503,8 +511,11 @@ class FilesController extends ChangeNotifier {
 
   /// Reads the library again. Returns why it could not, or null.
   Future<Notice?> _readLibrary() async {
+    final server = _server;
     try {
-      _library = await _api.libraryFolders();
+      final read = await _api.libraryFolders();
+      if (_server != server) return null;
+      _library = read;
       _tree = null;
       return null;
     } on ApiException catch (error) {
