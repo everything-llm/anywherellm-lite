@@ -127,15 +127,31 @@ class FilesController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Follows the workspaces: one made after [load] is read on its own too.
+  /// Follows the workspaces: one made after [load] is read on its own too, and a deleted one is
+  /// forgotten.
   void _chatChanged() {
     _tree = null;
+    final gone = _details.keys.followedBy(_asked).toSet().difference({
+      for (final w in _chat.workspaces) w.slug,
+    });
+    for (final slug in gone) {
+      _details.remove(slug);
+      _asked.remove(slug);
+      _expanded.removeWhere((path) => _under(path, slug));
+      if (selected != null && _under(selected!, slug)) {
+        selected = '/workspaces';
+        _clearContent();
+      }
+    }
     notifyListeners();
     if (!_loaded) return;
     for (final w in _chat.workspaces) {
       if (_asked.add(w.slug)) unawaited(_readAndShow(w.slug));
     }
   }
+
+  static bool _under(String path, String slug) =>
+      path == '/workspaces/$slug' || path.startsWith('/workspaces/$slug/');
 
   Future<void> _readAndShow(String slug) async {
     await _readWorkspace(slug);
@@ -361,6 +377,37 @@ class FilesController extends ChangeNotifier {
     if (selected == libraryPath(path)) {
       await select(libraryPath(docFolder(path)));
     }
+  }
+
+  /// Deletes library folder [name] with its documents, which takes them out of every workspace,
+  /// and forgets them wherever they were switched off in Sources.
+  Future<void> deleteFolder(String name) async {
+    final paths = [
+      for (final f in library)
+        if (f.name == name) ...[for (final d in f.files) d.path],
+    ];
+    final ok = await _change(
+      'Could not delete the folder',
+      () => _api.removeFolder(name),
+      slugs: [
+        ...{
+          for (final path in paths)
+            for (final w in usersOf(path)) w.slug,
+        },
+      ],
+      library: true,
+    );
+    if (!ok) return;
+    final active = _chat.activeSlug;
+    final shownOff =
+        active != null &&
+        _prefs.prefs.offIn(active).any((d) => paths.contains(d.path));
+    for (final path in paths) {
+      await _prefs.forgetDoc(path);
+    }
+    if (shownOff) unawaited(_sources.refresh());
+    _expanded.remove(libraryPath(name));
+    await select('/library');
   }
 
   /// Shows a failure that is not about one node, such as a file picker that would not open.

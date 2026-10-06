@@ -47,9 +47,12 @@ class Turn extends ChangeNotifier {
 /// The one answer running: the chat it belongs to, null while its draft's thread is being made,
 /// and the stream it reads.
 class _Running {
-  _Running(this.answer);
+  _Running(this.answer, this.slug);
 
   final Turn answer;
+
+  /// The workspace the answer runs in.
+  final String slug;
   String? thread;
   StreamSubscription<ChatEvent>? stream;
 }
@@ -128,6 +131,8 @@ class ChatController extends ChangeNotifier {
   bool get answeringHere => busy && turns.contains(_running!.answer);
 
   bool isAnswering(String thread) => _running?.thread == thread;
+
+  bool answeringIn(String slug) => _running?.slug == slug;
 
   @override
   void dispose() {
@@ -260,6 +265,61 @@ class ChatController extends ChangeNotifier {
     });
   }
 
+  /// Renames workspace [slug]. When the server answers with a new slug, the workspaces are read
+  /// again and the renamed one is shown.
+  Future<void> renameWorkspace(String slug, String name) async {
+    final clean = name.trim();
+    final old = workspaces.where((w) => w.slug == slug).firstOrNull;
+    if (old == null || clean.isEmpty || clean == old.name) return;
+    final server = _server;
+    await _try('Could not rename the workspace', () async {
+      final renamed = await _api.renameWorkspace(slug, clean);
+      if (_server != server) return;
+      if (renamed.slug != slug) {
+        final shown = activeSlug == slug;
+        await load();
+        if (shown) await select(renamed.slug);
+        return;
+      }
+      workspaces = [
+        for (final w in workspaces)
+          w.slug == slug
+              ? Workspace(
+                  slug: slug,
+                  name: renamed.name,
+                  threads: w.threads,
+                  documents: w.documents,
+                  prompt: w.prompt,
+                  settings: w.settings,
+                )
+              : w,
+      ];
+    });
+  }
+
+  /// Deletes workspace [slug] with its chats, unless an answer is running in it. Shows the first
+  /// workspace left when it was the one on screen.
+  Future<void> deleteWorkspace(String slug) async {
+    if (answeringIn(slug)) return;
+    final server = _server;
+    await _try('Could not delete the workspace', () async {
+      await _api.deleteWorkspace(slug);
+      if (_server != server) return;
+      for (final t in threadsOf(slug)) {
+        _turns.remove(t.slug);
+        _named.remove(t.slug);
+      }
+      _threads.remove(slug);
+      docCounts.remove(slug);
+      workspaces = [
+        for (final w in workspaces)
+          if (w.slug != slug) w,
+      ];
+      unawaited(_prefs.setOff(slug, const []));
+      if (activeSlug == slug) await select(workspaces.firstOrNull?.slug);
+    });
+  }
+
   Future<void> rename(String threadSlug, String name) async {
     final slug = activeSlug;
     final clean = name.trim();
@@ -311,7 +371,7 @@ class ChatController extends ChangeNotifier {
     final answer = Turn.answer();
     final turns = [...this.turns, user, answer];
     final first = this.turns.every((t) => t.role != Role.user);
-    final running = _running = _Running(answer)..thread = activeThread;
+    final running = _running = _Running(answer, slug)..thread = activeThread;
     final server = _server;
     _setTurns(turns);
     notifyListeners();

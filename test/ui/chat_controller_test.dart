@@ -269,6 +269,115 @@ void main() {
     expect(rig.chat.workspaces, isEmpty);
   });
 
+  group('workspaces', () {
+    test('a rename changes the name and keeps the chat on screen', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.chat.renameWorkspace('q3', ' Q4 planning ');
+      expect(llm.calls, contains('renameWorkspace:q3:Q4 planning'));
+      expect(rig.chat.active?.name, 'Q4 planning');
+      expect(rig.chat.activeThread, 'budget');
+      expect(rig.chat.threadsOf('q3'), hasLength(2));
+    });
+
+    test('a blank or unchanged name is not sent', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.chat.renameWorkspace('q3', '  ');
+      await rig.chat.renameWorkspace('q3', 'Q3 planning');
+      expect(llm.calls.where((c) => c.startsWith('renameWorkspace')), isEmpty);
+    });
+
+    test('a rename that changes the slug reads the workspaces again', () async {
+      final llm = planningServer()..renamedSlug = 'q4';
+      final rig = await started(llm);
+      await rig.chat.renameWorkspace('q3', 'Q4 planning');
+      expect(rig.chat.activeSlug, 'q4');
+      expect(rig.chat.active?.name, 'Q4 planning');
+      expect(rig.chat.threadsOf('q4'), hasLength(2));
+    });
+
+    test('a refused rename becomes a notice', () async {
+      final llm = planningServer()
+        ..errors['renameWorkspace'] = const ApiException('Name taken');
+      final rig = await started(llm);
+      await rig.chat.renameWorkspace('q3', 'Q4 planning');
+      expect(rig.chat.problem?.text, 'Name taken');
+      expect(rig.chat.active?.name, 'Q3 planning');
+    });
+
+    test(
+      'deleting the workspace on screen opens the first one left, then none',
+      () async {
+        final llm = planningServer();
+        final rig = await started(llm);
+        await rig.chat.deleteWorkspace('q3');
+        expect(llm.calls, contains('deleteWorkspace:q3'));
+        expect(rig.chat.workspaces.map((w) => w.slug), ['household']);
+        expect(rig.chat.activeSlug, 'household');
+        expect(rig.chat.threadsOf('q3'), isEmpty);
+        await rig.chat.deleteWorkspace('household');
+        expect(rig.chat.workspaces, isEmpty);
+        expect(rig.chat.activeSlug, isNull);
+      },
+    );
+
+    test('deleting another workspace leaves the screen alone', () async {
+      final rig = await started(planningServer());
+      await rig.chat.deleteWorkspace('household');
+      expect(rig.chat.activeSlug, 'q3');
+      expect(rig.chat.activeThread, 'budget');
+    });
+
+    test('a deleted workspace\'s switched-off files are forgotten', () async {
+      final rig = await started(
+        planningServer(),
+        prefs: const Prefs(
+          switchedOff: {
+            'household': [OffDoc(path: 'custom-documents/a.json', title: 'a')],
+          },
+        ),
+      );
+      await rig.chat.deleteWorkspace('household');
+      await pumpEventQueue();
+      expect(rig.prefs.prefs.offIn('household'), isEmpty);
+    });
+
+    test('a workspace with an answer running cannot be deleted', () async {
+      final llm = planningServer()..hold = true;
+      final rig = await started(llm);
+      await rig.chat.send('hi');
+      expect(rig.chat.answeringIn('q3'), isTrue);
+      await rig.chat.deleteWorkspace('q3');
+      expect(llm.calls, isNot(contains('deleteWorkspace:q3')));
+    });
+
+    test('a refused delete becomes a notice', () async {
+      final llm = planningServer()
+        ..errors['deleteWorkspace'] = const ApiException('No');
+      final rig = await started(llm);
+      await rig.chat.deleteWorkspace('q3');
+      expect(rig.chat.problem?.title, 'Could not delete the workspace');
+      expect(rig.chat.workspaces, hasLength(2));
+    });
+
+    test(
+      'a workspace delete that returns after a new server changes nothing',
+      () async {
+        final llm = planningServer();
+        final rig = await started(llm);
+        final gate = llm.gates['deleteWorkspace'] = Completer<void>();
+        final deleting = rig.chat.deleteWorkspace('q3');
+        await pumpEventQueue();
+        await rig.settings.clear();
+        gate.complete();
+        await deleting;
+        expect(rig.chat.workspaces, isEmpty);
+        expect(rig.chat.activeSlug, isNull);
+      },
+    );
+  });
+
   test('attachments go with the message and their names stay on it', () async {
     final llm = planningServer();
     final rig = await started(llm);
