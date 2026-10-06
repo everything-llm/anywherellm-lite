@@ -10,7 +10,6 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 | Export every chat | `GET /v1/system/export-chats`, saved to a file. |
 | Embed widgets, users and invites | `/v1/embed/*` and `/v1/admin/*`. Users and invites matter only in multi-user mode. |
 | Generate or edit an image | `POST /v1/openai/images/generations`, multipart with `prompt`, optional `size` and optional `image_references` to edit. It answers a base64 PNG, and only when the server has an image provider set up. |
-| Author, description and source on an upload or pasted text | `metadata` on `document/upload` and `document/raw-text`. `GET /v1/document/metadata-schema` lists the allowed keys. Today only pasted text sends a `title`. |
 | Files an agent makes | `GET /v1/document/generated-files/{storageFilename}`, named in the answer's `outputs`, which the stream parser ignores today. It waits on the agents check below. |
 | Chats that are in no chat thread | `GET /v1/workspace/{slug}/chats` with `limit`, `orderBy` and `apiSessionId`. A workspace's default chat in the web UI never shows in the sidebar. What it answers needs a check against a live server first. |
 | Large libraries a page at a time | `GET /v1/documents/folder/{name}` with `offset` and `limit`. The library is read in one call today. |

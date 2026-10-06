@@ -9,7 +9,7 @@ import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/confirm_box.dart';
-import '../widgets/drop_zone.dart';
+import '../widgets/upload_queue.dart';
 import '../widgets/fields.dart';
 import '../widgets/inline_input.dart';
 import '../widgets/tappable.dart';
@@ -51,8 +51,8 @@ class FolderView extends StatelessWidget {
         if (node.kind == NodeKind.libraryFolder) ...[
           _DeleteFolder(node),
           const SizedBox(height: 16),
-          DropZone(
-            onFiles: (picked) => files.upload(node.ref!, picked),
+          UploadQueue(
+            onSend: (picked) => files.upload(node.ref!, picked),
             onProblem: files.report,
           ),
           if (files.sending case final name?) ...[

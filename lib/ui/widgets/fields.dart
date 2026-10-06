@@ -13,6 +13,7 @@ class AppField extends StatelessWidget {
     required this.label,
     this.hint,
     this.onChanged,
+    this.onSubmitted,
     this.icon,
     this.suffix,
     this.obscure = false,
@@ -26,6 +27,9 @@ class AppField extends StatelessWidget {
 
   /// Called on an edit by the person, not when the controller's text is set in code.
   final ValueChanged<String>? onChanged;
+
+  /// Called when the person presses Enter.
+  final ValueChanged<String>? onSubmitted;
 
   /// The name of an icon drawn inside the field, before the text.
   final String? icon;
@@ -53,6 +57,7 @@ class AppField extends StatelessWidget {
         enableSuggestions: false,
         obscureText: obscure,
         onChanged: onChanged,
+        onSubmitted: onSubmitted,
         style: Type.sans(15).copyWith(color: t.ink),
         cursorColor: t.accent,
         decoration: InputDecoration(

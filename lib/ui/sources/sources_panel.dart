@@ -9,7 +9,7 @@ import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
-import '../widgets/drop_zone.dart';
+import '../widgets/upload_queue.dart';
 import '../widgets/rise.dart';
 import '../widgets/tappable.dart';
 import 'add_source.dart';
@@ -69,33 +69,57 @@ class SourcesPanel extends StatelessWidget {
                   style: Type.sans(13, color: t.muted),
                 ),
                 const SizedBox(height: 14),
-                DropZone(onFiles: sources.upload, onProblem: sources.report),
-                const SizedBox(height: 8),
-                const AddSource(),
-                if (sources.sending case final name?) ...[
-                  const SizedBox(height: 10),
-                  Text('Adding $name…', style: Type.sans(12.5, color: t.muted)),
-                ],
-                for (final problem in sources.problems) ...[
-                  const SizedBox(height: 10),
-                  AlertBox(AlertKind.bad, problem.title, text: problem.text),
-                ],
-                if (sources.removed case final file?) ...[
-                  const SizedBox(height: 10),
-                  _UndoToast(file),
-                ],
-                const SizedBox(height: 14),
+                // Everything below the heading scrolls together, so an open form or a long
+                // list of files waiting to be added never pushes past the panel.
                 Expanded(
-                  child: sources.files.isEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.only(top: 16),
-                          child: Text(
-                            sources.loading ? 'Loading…' : 'No files yet.',
-                            textAlign: TextAlign.center,
-                            style: Type.sans(13.5, color: t.muted),
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            UploadQueue(
+                              onSend: sources.upload,
+                              onProblem: sources.report,
+                            ),
+                            const SizedBox(height: 8),
+                            const AddSource(),
+                            if (sources.sending case final name?) ...[
+                              const SizedBox(height: 10),
+                              Text(
+                                'Adding $name…',
+                                style: Type.sans(12.5, color: t.muted),
+                              ),
+                            ],
+                            for (final problem in sources.problems) ...[
+                              const SizedBox(height: 10),
+                              AlertBox(
+                                AlertKind.bad,
+                                problem.title,
+                                text: problem.text,
+                              ),
+                            ],
+                            if (sources.removed case final file?) ...[
+                              const SizedBox(height: 10),
+                              _UndoToast(file),
+                            ],
+                            const SizedBox(height: 14),
+                          ],
+                        ),
+                      ),
+                      if (sources.files.isEmpty)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 16),
+                            child: Text(
+                              sources.loading ? 'Loading…' : 'No files yet.',
+                              textAlign: TextAlign.center,
+                              style: Type.sans(13.5, color: t.muted),
+                            ),
                           ),
                         )
-                      : ListView.separated(
+                      else
+                        SliverList.separated(
                           itemCount: sources.files.length,
                           separatorBuilder: (_, _) => const SizedBox(height: 6),
                           itemBuilder: (context, i) => Rise(
@@ -106,6 +130,8 @@ class SourcesPanel extends StatelessWidget {
                             ),
                           ),
                         ),
+                    ],
+                  ),
                 ),
               ],
             );

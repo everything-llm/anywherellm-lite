@@ -2,7 +2,10 @@ import 'dart:ui' show Size;
 
 import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/server_models.dart';
+import 'package:anywherellm/core/upload.dart';
+import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
+import 'package:anywherellm/ui/widgets/drop_zone.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter/widgets.dart' show EditableText;
 import 'package:flutter_test/flutter_test.dart';
@@ -105,10 +108,35 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsLabel('Paste text').last);
       await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Details').last);
+      await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      await tester.tap(find.bySemanticsLabel('Cancel').last);
+      final cancel = find.descendant(
+        of: find.byType(SourcesPanel),
+        matching: find.text('Cancel'),
+      );
+      await tester.ensureVisible(cancel);
+      await tester.pumpAndSettle();
+      await tester.tap(cancel);
       await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsLabel('Add a link').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Details').last);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('files waiting to be added fit at $at', (tester) async {
+      final h = await pumpApp(tester, llm: awkward(), size: size);
+      h.shell.openSources();
+      await tester.pumpAndSettle();
+      final zone = tester.widget<DropZone>(find.byType(DropZone).last);
+      await zone.onFiles([
+        for (final name in ['a-$longWord.pdf', 'b-$longWord.md'])
+          UploadFile(name: name, read: () async => [1]),
+      ]);
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Details of a-$longWord.pdf'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });

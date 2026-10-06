@@ -95,3 +95,42 @@ class IconBtn extends StatelessWidget {
     );
   }
 }
+
+/// A small text button with an icon before it.
+class TextAction extends StatelessWidget {
+  const TextAction(
+    this.icon,
+    this.label,
+    this.onTap, {
+    super.key,
+    this.semanticLabel,
+  });
+
+  final String icon;
+  final String label;
+  final VoidCallback onTap;
+
+  /// What a screen reader hears, when [label] alone is not enough, as in a list.
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Tappable(
+      label: semanticLabel ?? label,
+      onTap: onTap,
+      radius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppIcon(icon, size: IconSize.xs, color: t.accent),
+            const SizedBox(width: 6),
+            Text(label, style: Type.sans(13, color: t.accent)),
+          ],
+        ),
+      ),
+    );
+  }
+}
