@@ -3,13 +3,22 @@
 import 'ports.dart';
 import 'server_models.dart';
 
-/// A file to send. The UI wraps whatever the file picker or a drop gave it. [read] throws
-/// [UnreadableFile] for something that cannot be read, such as a folder.
+/// A file to send, with the [meta] to keep with it. The UI wraps whatever the file picker or a
+/// drop gave it. [read] throws [UnreadableFile] for something that cannot be read, such as a
+/// folder.
 class UploadFile {
-  const UploadFile({required this.name, required this.read});
+  const UploadFile({
+    required this.name,
+    required this.read,
+    this.meta = const DocMeta(),
+  });
 
   final String name;
   final Future<List<int>> Function() read;
+  final DocMeta meta;
+
+  UploadFile withMeta(DocMeta meta) =>
+      UploadFile(name: name, read: read, meta: meta);
 }
 
 /// Why a dropped or picked file could not be read, in the system's words.
@@ -68,7 +77,12 @@ Future<Sent> sendEach(
       final wrongType = extensionProblem(file.name, accepted);
       if (wrongType != null) throw ApiException(wrongType);
       made.addAll(
-        await api.upload(file.name, await file.read(), folder: folder),
+        await api.upload(
+          file.name,
+          await file.read(),
+          folder: folder,
+          meta: file.meta,
+        ),
       );
     } on Exception catch (error) {
       if (error is! ApiException && error is! UnreadableFile) rethrow;

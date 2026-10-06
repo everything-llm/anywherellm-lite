@@ -253,6 +253,35 @@ class WorkspaceDoc {
   }
 }
 
+/// The details the server keeps with a document, given when it is added. An empty field is left
+/// for the server to fill.
+class DocMeta {
+  const DocMeta({
+    this.title = '',
+    this.author = '',
+    this.description = '',
+    this.source = '',
+  });
+
+  final String title;
+  final String author;
+  final String description;
+  final String source;
+
+  bool get isEmpty => toJson().isEmpty;
+
+  /// The fields that are not blank, trimmed, under the server's `metadata` keys.
+  Map<String, String> toJson() => {
+    for (final (key, value) in [
+      ('title', title),
+      ('docAuthor', author),
+      ('description', description),
+      ('docSource', source),
+    ])
+      if (value.trim().isNotEmpty) key: value.trim(),
+  };
+}
+
 /// A document the server made of an upload.
 class DocEntry {
   const DocEntry({required this.folder, required this.name});

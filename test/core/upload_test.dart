@@ -1,5 +1,8 @@
+import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/upload.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../support/fake_api.dart';
 
 void main() {
   group('extensionProblem', () {
@@ -54,5 +57,37 @@ void main() {
     test('names an address with no site', () {
       expect(linkProblem('https://'), 'the link has no site in it');
     });
+  });
+
+  group('DocMeta', () {
+    test(
+      'keeps the fields that are not blank, trimmed, under the server keys',
+      () {
+        expect(
+          const DocMeta(
+            title: ' Plan ',
+            author: '',
+            description: '  ',
+            source: 'Ada',
+          ).toJson(),
+          {'title': 'Plan', 'docSource': 'Ada'},
+        );
+        expect(const DocMeta(description: ' ').isEmpty, isTrue);
+      },
+    );
+  });
+
+  test('sendEach hands each file its own details', () async {
+    final llm = FakeAnythingLlm();
+    await sendEach(llm, [
+      UploadFile(
+        name: 'a.md',
+        read: () async => [1],
+        meta: const DocMeta(author: 'Ada'),
+      ),
+      UploadFile(name: 'b.md', read: () async => [2]),
+    ], folder: 'notes');
+    expect(llm.metaOf['notes/a.md.json']?.author, 'Ada');
+    expect(llm.metaOf['notes/b.md.json']?.isEmpty, isTrue);
   });
 }

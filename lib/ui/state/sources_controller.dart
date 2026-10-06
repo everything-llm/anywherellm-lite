@@ -155,8 +155,9 @@ class SourcesController extends ChangeNotifier {
     ]);
   }
 
-  /// Has the server read in the web page at [url], then adds what it made.
-  Future<void> addLink(String url) async {
+  /// Has the server read in the web page at [url] with the details in [meta], then adds what it
+  /// made.
+  Future<void> addLink(String url, {DocMeta meta = const DocMeta()}) async {
     final slug = _slug;
     final link = url.trim();
     if (slug == null || link.isEmpty) return;
@@ -166,15 +167,19 @@ class SourcesController extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    await _readIn(slug, link, () => _api.uploadLink(link));
+    await _readIn(slug, link, () => _api.uploadLink(link, meta: meta));
   }
 
-  /// Saves [text] as a document called [title], then adds it.
-  Future<void> addText(String title, String text) async {
+  /// Saves [text] as a document called [title] with the details in [meta], then adds it.
+  Future<void> addText(
+    String title,
+    String text, {
+    DocMeta meta = const DocMeta(),
+  }) async {
     final slug = _slug;
     final name = title.trim();
     if (slug == null || name.isEmpty || text.trim().isEmpty) return;
-    await _readIn(slug, name, () => _api.uploadText(name, text));
+    await _readIn(slug, name, () => _api.uploadText(name, text, meta: meta));
   }
 
   /// Runs [read], which reads [name] in on the server, then adds what it made.

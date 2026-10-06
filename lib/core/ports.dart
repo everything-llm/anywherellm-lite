@@ -68,17 +68,29 @@ abstract interface class AnythingLlmApi {
   Future<Set<String>> acceptedExtensions();
 
   /// Sends [bytes] as the file [name] into library [folder], or the server's default folder
-  /// when it is null, and returns the documents the server made of it. Attaches them to no
-  /// workspace.
-  Future<List<DocEntry>> upload(String name, List<int> bytes, {String? folder});
+  /// when it is null, with the details in [meta], and returns the documents the server made of
+  /// it. Attaches them to no workspace.
+  Future<List<DocEntry>> upload(
+    String name,
+    List<int> bytes, {
+    String? folder,
+    DocMeta meta = const DocMeta(),
+  });
 
-  /// Has the server read in the web page at [url] and returns the documents it made. Attaches
-  /// them to no workspace.
-  Future<List<DocEntry>> uploadLink(String url);
+  /// Has the server read in the web page at [url], with the details in [meta], and returns the
+  /// documents it made. Attaches them to no workspace.
+  Future<List<DocEntry>> uploadLink(
+    String url, {
+    DocMeta meta = const DocMeta(),
+  });
 
-  /// Saves [text] as a document called [title] and returns the documents the server made.
-  /// Attaches them to no workspace.
-  Future<List<DocEntry>> uploadText(String title, String text);
+  /// Saves [text] as a document called [title], whatever title [meta] holds, with the rest of
+  /// [meta], and returns the documents the server made. Attaches them to no workspace.
+  Future<List<DocEntry>> uploadText(
+    String title,
+    String text, {
+    DocMeta meta = const DocMeta(),
+  });
 
   /// Writes the workspace columns in [fields], such as `openAiPrompt` or `topN`, and leaves the
   /// rest as they are.

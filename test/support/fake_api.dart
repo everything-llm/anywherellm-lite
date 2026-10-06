@@ -88,6 +88,9 @@ class FakeAnythingLlm implements AnythingLlmApi {
   /// The files sent with the last message asked.
   List<Attachment> lastAttachments = const [];
 
+  /// The details each added document was given, by path.
+  final Map<String, DocMeta> metaOf = {};
+
   /// The slug [renameWorkspace] gives the workspace, when set. The server keeps it otherwise.
   String? renamedSlug;
 
@@ -236,43 +239,59 @@ class FakeAnythingLlm implements AnythingLlmApi {
     String name,
     List<int> bytes, {
     String? folder,
+    DocMeta meta = const DocMeta(),
   }) => _run('upload', () {
     final doc = DocEntry(
       folder: folder ?? 'custom-documents',
       name: '$name.json',
     );
-    library[doc.path] = WorkspaceDoc(
-      path: doc.path,
-      title: name,
-      words: bytes.length,
-    );
+    _keep(doc, name, meta, words: bytes.length);
     return [doc];
   }, folder == null ? name : '$folder/$name');
 
   /// A page the server reads in as `custom-documents/url-<host>.json`.
   @override
-  Future<List<DocEntry>> uploadLink(String url) => _run('uploadLink', () {
-    final title = Uri.parse(url).host;
-    final doc = DocEntry(folder: 'custom-documents', name: 'url-$title.json');
-    library[doc.path] = WorkspaceDoc(path: doc.path, title: title, words: 1);
+  Future<List<DocEntry>> uploadLink(
+    String url, {
+    DocMeta meta = const DocMeta(),
+  }) => _run('uploadLink', () {
+    final host = Uri.parse(url).host;
+    final doc = DocEntry(folder: 'custom-documents', name: 'url-$host.json');
+    _keep(doc, host, meta, words: 1);
     return [doc];
   }, url);
 
   /// Text the server saves as `custom-documents/raw-<title>.json`.
   @override
-  Future<List<DocEntry>> uploadText(String title, String text) => _run(
-    'uploadText',
-    () {
-      final doc = DocEntry(folder: 'custom-documents', name: 'raw-$title.json');
-      library[doc.path] = WorkspaceDoc(
-        path: doc.path,
+  Future<List<DocEntry>> uploadText(
+    String title,
+    String text, {
+    DocMeta meta = const DocMeta(),
+  }) => _run('uploadText', () {
+    final doc = DocEntry(folder: 'custom-documents', name: 'raw-$title.json');
+    _keep(
+      doc,
+      title,
+      DocMeta(
         title: title,
-        words: text.split(' ').length,
-      );
-      return [doc];
-    },
-    title,
-  );
+        author: meta.author,
+        description: meta.description,
+        source: meta.source,
+      ),
+      words: text.split(' ').length,
+    );
+    return [doc];
+  }, title);
+
+  /// Puts [doc] in the library, titled by [meta] or else [title], and records [meta].
+  void _keep(DocEntry doc, String title, DocMeta meta, {required int words}) {
+    metaOf[doc.path] = meta;
+    library[doc.path] = WorkspaceDoc(
+      path: doc.path,
+      title: meta.title.trim().isEmpty ? title : meta.title.trim(),
+      words: words,
+    );
+  }
 
   @override
   Future<void> updateWorkspace(String slug, Map<String, Object?> fields) =>

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/upload.dart';
 import 'package:anywherellm/ui/state/sources_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -191,6 +192,28 @@ void main() {
         ]),
       );
       expect(rig.sources.files.last.title, 'Meeting notes');
+    });
+
+    test('the details of a link, text and a file reach the server', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      const meta = DocMeta(author: 'Ada', source: 'Finance');
+      await rig.sources.addLink('https://example.com/page', meta: meta);
+      await rig.sources.addText('Notes', 'Some text', meta: meta);
+      await rig.sources.upload([
+        UploadFile(
+          name: 'a.md',
+          read: () async => [1],
+          meta: const DocMeta(title: 'Plan'),
+        ),
+      ]);
+      expect(
+        llm.metaOf['custom-documents/url-example.com.json']?.author,
+        'Ada',
+      );
+      expect(llm.metaOf['custom-documents/raw-Notes.json']?.source, 'Finance');
+      expect(llm.metaOf['custom-documents/a.md.json']?.title, 'Plan');
+      expect(rig.sources.files.map((f) => f.title), contains('Plan'));
     });
 
     test('an address that is not a link never reaches the server', () async {

@@ -6,6 +6,7 @@ import 'package:anywherellm/adapters/anythingllm_client.dart';
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/server_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -350,6 +351,25 @@ void main() {
       expect(request.body, contains('name="file"; filename="notes.md"'));
       expect(request.body, contains('# hi'));
       expect(made.single.path, 'custom-documents/notes.md-1.json');
+      expect(request.body, isNot(contains('name="metadata"')));
+    });
+
+    test('details go as a metadata field of JSON', () async {
+      final seen = <http.Request>[];
+      await _answering({
+        'success': true,
+        'error': null,
+        'documents': [],
+      }, seen: seen).upload(
+        'notes.md',
+        utf8.encode('# hi'),
+        meta: const DocMeta(author: 'Ada', source: ' Finance '),
+      );
+      expect(seen.single.body, contains('name="metadata"'));
+      expect(
+        seen.single.body,
+        contains('{"docAuthor":"Ada","docSource":"Finance"}'),
+      );
     });
 
     test('a refusal gives the server\'s reason', () async {
@@ -958,6 +978,48 @@ void main() {
       expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
       expect(jsonDecode(seen.single.body), {'link': 'https://example.com'});
       expect(docs.single.path, 'custom-documents/url-example_com-1.json');
+    });
+
+    test('a link sends its details', () async {
+      final seen = <http.Request>[];
+      await _answering(made, seen: seen).uploadLink(
+        'https://example.com',
+        meta: const DocMeta(
+          title: ' Q3 report ',
+          author: 'Ada',
+          description: 'Numbers',
+          source: 'Finance',
+        ),
+      );
+      expect(jsonDecode(seen.single.body), {
+        'link': 'https://example.com',
+        'metadata': {
+          'title': 'Q3 report',
+          'docAuthor': 'Ada',
+          'description': 'Numbers',
+          'docSource': 'Finance',
+        },
+      });
+    });
+
+    test('text keeps its own title over the details', () async {
+      final seen = <http.Request>[];
+      await _answering(made, seen: seen).uploadText(
+        'Notes',
+        'Some text',
+        meta: const DocMeta(
+          title: ' Q3 report ',
+          author: 'Ada',
+          description: 'Numbers',
+          source: 'Finance',
+        ),
+      );
+      expect(jsonDecode(seen.single.body)['metadata'], {
+        'title': 'Notes',
+        'docAuthor': 'Ada',
+        'description': 'Numbers',
+        'docSource': 'Finance',
+      });
     });
 
     test('text posts the text with its title', () async {

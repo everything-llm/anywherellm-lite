@@ -202,6 +202,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     String name,
     List<int> bytes, {
     String? folder,
+    DocMeta meta = const DocMeta(),
   }) async {
     final connection = _current;
     final path = folder == null
@@ -214,6 +215,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
             ..files.add(
               http.MultipartFile.fromBytes('file', bytes, filename: name),
             );
+      if (!meta.isEmpty) request.fields['metadata'] = jsonEncode(meta.toJson());
       return http.Response.fromStream(await _client.send(request));
     }, refused: 'The server could not read $name in.');
     return [
@@ -223,19 +225,24 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   }
 
   @override
-  Future<List<DocEntry>> uploadLink(String url) => _readIn(
-    '/api/v1/document/upload-link',
-    {'link': url},
-    refused: 'The server could not read $url.',
-  );
+  Future<List<DocEntry>> uploadLink(
+    String url, {
+    DocMeta meta = const DocMeta(),
+  }) => _readIn('/api/v1/document/upload-link', {
+    'link': url,
+    if (!meta.isEmpty) 'metadata': meta.toJson(),
+  }, refused: 'The server could not read $url.');
 
   /// The server requires a `title` in the metadata.
   @override
-  Future<List<DocEntry>> uploadText(String title, String text) =>
-      _readIn('/api/v1/document/raw-text', {
-        'textContent': text,
-        'metadata': {'title': title},
-      }, refused: 'The server could not save $title.');
+  Future<List<DocEntry>> uploadText(
+    String title,
+    String text, {
+    DocMeta meta = const DocMeta(),
+  }) => _readIn('/api/v1/document/raw-text', {
+    'textContent': text,
+    'metadata': {...meta.toJson(), 'title': title},
+  }, refused: 'The server could not save $title.');
 
   /// Posts [body] to [path], which reads something in, and returns the documents it made.
   Future<List<DocEntry>> _readIn(
