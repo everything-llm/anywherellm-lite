@@ -135,4 +135,67 @@ void main() {
       'Finance',
     );
   });
+
+  testWidgets('a file or a delete waiting in one Files folder stays there', (
+    tester,
+  ) async {
+    final llm = planningServer()..folders.add('drafts');
+    final h = await pumpApp(tester, llm: llm);
+    h.shell.showPane(Pane.files);
+    await tester.pumpAndSettle();
+    await h.files.select('/library/custom-documents');
+    await tester.pumpAndSettle();
+    await drop(tester, FilesView, [file('a.md')]);
+    await tester.ensureVisible(control('Delete folder…'));
+    await tester.tap(control('Delete folder…'));
+    await tester.pumpAndSettle();
+    await h.files.select('/library/drafts');
+    await tester.pumpAndSettle();
+    expect(find.text('a.md'), findsNothing);
+    expect(control('Add 1 file'), findsNothing);
+    expect(control('Delete'), findsNothing);
+  });
+
+  testWidgets('what waits in Sources stays with its workspace', (
+    tester,
+  ) async {
+    final llm = planningServer();
+    final h = await pumpApp(tester, llm: llm);
+    await drop(tester, SourcesPanel, [file('a.md')]);
+    await tester.tap(control('Add a link'));
+    await tester.pumpAndSettle();
+    await h.chat.select('household');
+    await tester.pumpAndSettle();
+    expect(find.text('a.md'), findsNothing);
+    expect(control('Add 1 file'), findsNothing);
+    expect(field('Web page to add'), findsNothing);
+  });
+
+  testWidgets('a link that is not one keeps the form and its details', (
+    tester,
+  ) async {
+    final llm = planningServer();
+    final h = await pumpApp(tester, llm: llm);
+    await tester.tap(control('Add a link'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.descendant(
+        of: field('Web page to add'),
+        matching: find.byType(TextField),
+      ),
+      'example.com/x',
+    );
+    await tester.tap(control('Details'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.descendant(of: field('Source'), matching: find.byType(TextField)),
+      'Finance',
+    );
+    await tester.tap(control('Add'));
+    await tester.pumpAndSettle();
+    expect(llm.calls.where((c) => c.startsWith('uploadLink')), isEmpty);
+    expect(h.sources.problems.single.title, 'Could not add the link');
+    expect(find.text('example.com/x'), findsOneWidget);
+    expect(find.text('Finance'), findsOneWidget);
+  });
 }

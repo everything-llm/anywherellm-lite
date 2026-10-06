@@ -308,6 +308,14 @@ void main() {
       expect(rig.chat.threadsOf('q4'), hasLength(2));
     });
 
+    test('a rename whose new list cannot be read says so', () async {
+      final llm = planningServer()..renamedSlug = 'q4';
+      final rig = await started(llm);
+      llm.errors['workspaces'] = const ApiException('Down');
+      await rig.chat.renameWorkspace('q3', 'Q4 planning');
+      expect(rig.chat.problem?.title, 'Could not read the workspaces');
+    });
+
     test('a refused rename becomes a notice', () async {
       final llm = planningServer()
         ..errors['renameWorkspace'] = const ApiException('Name taken');
@@ -441,6 +449,21 @@ void main() {
         'Quarter priorities',
         'Budget questions',
       ]);
+    });
+
+    test('a message sent while the chat is clearing is not sent', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      final gate = llm.gates['resetChat'] = Completer<void>();
+      final clearing = rig.chat.send('/reset');
+      await pumpEventQueue();
+      expect(rig.chat.busy, isTrue);
+      await rig.chat.send('Hello');
+      expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
+      gate.complete();
+      await clearing;
+      expect(rig.chat.busy, isFalse);
+      expect(rig.chat.turns, isEmpty);
     });
 
     test('a preset whose prompt is /reset clears the chat too', () async {

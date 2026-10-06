@@ -79,6 +79,25 @@ void main() {
       expect(split.answer, 'A B');
     });
 
+    test('a tag written as code is answer, not reasoning', () {
+      for (final text in [
+        'DeepSeek wraps its reasoning in `<think>` and `</think>` tags, then answers.',
+        'Use the `<think>` tag to start. More text...',
+        'Write:\n```\n<think>plan</think>\n```\nDone.',
+      ]) {
+        final split = splitReasoning(text);
+        expect(split.answer, text, reason: text);
+        expect(split.reasoning, isEmpty, reason: text);
+        expect(split.thinking, isFalse, reason: text);
+      }
+    });
+
+    test('a block after code is still reasoning', () {
+      final split = splitReasoning('`a` <think>Hm.</think>b');
+      expect(split.reasoning, 'Hm.');
+      expect(split.answer, '`a` b');
+    });
+
     test('text without a block is all answer', () {
       final split = splitReasoning('Use `a < b` here.');
       expect(split.reasoning, isEmpty);

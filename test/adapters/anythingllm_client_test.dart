@@ -612,6 +612,37 @@ void main() {
       expect(body, {'message': 'Hi'});
     });
 
+    test('an empty whole answer keeps the text streamed so far', () async {
+      final events = await streaming([
+        data({
+          'id': 'a',
+          'type': 'textResponseChunk',
+          'textResponse': 'Looking it up.',
+          'sources': [],
+          'close': false,
+          'error': null,
+        }),
+        data({
+          'id': 'a',
+          'type': 'textResponse',
+          'textResponse': '',
+          'sources': [],
+          'close': true,
+          'error': null,
+        }),
+        data({
+          'uuid': 'a',
+          'type': 'finalizeResponseStream',
+          'textResponse': '',
+          'sources': [],
+          'close': true,
+          'error': false,
+        }),
+      ]).streamChat('w', 't', 'Hi').toList();
+      expect(events.whereType<WholeAnswer>(), isEmpty);
+      expect(events.whereType<TextChunk>().single.text, 'Looking it up.');
+    });
+
     test('an agent answer: status, then the whole answer, then its sources', () async {
       // As the server streamed one in agent mode, with the text shortened.
       final events = await streaming([

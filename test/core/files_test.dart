@@ -123,6 +123,15 @@ void main() {
     );
   });
 
+  test('a question keeps a think tag in chat Markdown', () {
+    expect(
+      chatMarkdown('Chat', const [
+        ChatMessage(role: Role.user, text: 'What does <think> do?'),
+      ]),
+      contains('What does <think> do?'),
+    );
+  });
+
   group('settings', () {
     test('round-trip unchanged to no changes', () {
       expect(parseSettings(settingsText(_settings), _settings), isEmpty);
@@ -141,6 +150,11 @@ void main() {
           'chatMode': mode,
         });
       }
+    });
+
+    test('a choice the server left null may stay null', () {
+      final unset = WorkspaceSettings({..._settings.values, 'chatMode': null});
+      expect(parseSettings(settingsText(unset), unset), isEmpty);
     });
 
     test('a key left out is left as it is', () {
@@ -162,6 +176,10 @@ void main() {
       (_edited('chatModel', 3), 'chatModel must be text or null'),
       (
         _edited('chatMode', 'agent'),
+        'chatMode must be one of automatic, chat, query',
+      ),
+      (
+        _edited('chatMode', null),
         'chatMode must be one of automatic, chat, query',
       ),
     ]) {

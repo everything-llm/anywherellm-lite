@@ -151,10 +151,13 @@ String? attachmentProblem(String name, int size) => size > maxAttachmentBytes
 /// An answer split into the model's reasoning and the answer itself.
 typedef Reasoned = ({String reasoning, String answer, bool thinking});
 
-final _thought = RegExp(r'<(think|thinking)>([\s\S]*?)(?:</\1>|$)');
+/// A code block or span, kept as it is, or a reasoning block, open until its closing tag.
+final _thought = RegExp(
+  r'(```[\s\S]*?(?:```|$)|`[^`\n]*`)|<(think|thinking)>([\s\S]*?)(?:</\2>|$)',
+);
 
 /// Splits [text] into the reasoning a model wrapped in `<think>` or `<thinking>` tags and the
-/// answer around it. [Reasoned.thinking] is true while a block is still open, as when the
+/// answer around it. A tag inside a code span or block is answer. [Reasoned.thinking] is true while a block is still open, as when the
 /// answer is streaming. Text with no such block is all answer, except the start of an opening
 /// tag that has not all arrived yet, which is held back.
 Reasoned splitReasoning(String text) {
@@ -167,8 +170,9 @@ Reasoned splitReasoning(String text) {
   final parts = <String>[];
   var thinking = false;
   final answer = text.replaceAllMapped(_thought, (match) {
-    parts.add(match[2]!.trim());
-    thinking = !match[0]!.endsWith('</${match[1]}>');
+    if (match[1] case final code?) return code;
+    parts.add(match[3]!.trim());
+    thinking = !match[0]!.endsWith('</${match[2]}>');
     return '';
   });
   return (

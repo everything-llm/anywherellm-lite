@@ -6,6 +6,7 @@ import 'app_scope.dart';
 import 'files/file_tree.dart';
 import 'icons.dart';
 import 'layout.dart';
+import 'state/chat_controller.dart';
 import 'state/shell_controller.dart';
 import 'tokens.dart';
 import 'type.dart';
@@ -168,13 +169,32 @@ class _WorkspaceRow extends StatefulWidget {
 class _WorkspaceRowState extends State<_WorkspaceRow> {
   TextEditingController? _rename;
   bool _confirming = false;
+  late final ChatController _chat;
 
   Workspace get workspace => widget.workspace;
 
   @override
+  void initState() {
+    super.initState();
+    _chat = AppScope.of(context).chat..addListener(_chatChanged);
+  }
+
+  @override
   void dispose() {
+    _chat.removeListener(_chatChanged);
     _rename?.dispose();
     super.dispose();
+  }
+
+  /// Closes the delete question once the workspace is no longer on screen or starts answering,
+  /// when Delete could no longer do what it asks.
+  void _chatChanged() {
+    final slug = workspace.slug;
+    if (!_confirming ||
+        (_chat.activeSlug == slug && !_chat.answeringIn(slug))) {
+      return;
+    }
+    setState(() => _confirming = false);
   }
 
   void _startRename() => setState(

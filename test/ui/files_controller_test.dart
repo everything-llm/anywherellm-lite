@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/prefs.dart';
@@ -285,5 +287,21 @@ void main() {
     llm.errors['exportChats'] = const ApiException('No');
     expect(await rig.files.exportChats(ChatExport.json), isNull);
     expect(rig.files.problems.single.title, 'Could not export the chats');
+  });
+
+  test('an export cut off by a new server leaves Export ready', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    final gate = llm.gates['exportChats'] = Completer<void>();
+    llm.errors['exportChats'] = const ApiException('No');
+    final exporting = rig.files.exportChats(ChatExport.csv);
+    await pumpEventQueue();
+    expect(rig.files.exporting, isTrue);
+    await rig.settings.save('https://other:3001', 'K2');
+    gate.complete();
+    expect(await exporting, isNull);
+    expect(rig.files.exporting, isFalse);
+    expect(rig.files.problems, isEmpty);
+    await pumpEventQueue();
   });
 }

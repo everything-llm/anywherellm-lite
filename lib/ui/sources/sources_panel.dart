@@ -80,14 +80,20 @@ class SourcesPanel extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            // Keyed by workspace, so what waits to be added stays with it.
                             UploadQueue(
+                              key: ValueKey(('queue', scope.chat.activeSlug)),
                               onSend: sources.upload,
                               onProblem: sources.report,
                             ),
                             const SizedBox(height: 8),
-                            const AddSource(),
+                            AddSource(
+                              key: ValueKey(('add', scope.chat.activeSlug)),
+                            ),
                             const SizedBox(height: 4),
-                            const TestQuestion(),
+                            TestQuestion(
+                              key: ValueKey(('test', scope.chat.activeSlug)),
+                            ),
                             if (sources.sending case final name?) ...[
                               const SizedBox(height: 10),
                               Text(

@@ -20,6 +20,7 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 | --- | --- |
 | Agent tools menu, skills and MCP servers | Agents run through `/v1` `stream-chat` in a workspace's Agent mode or with `@agent` (checked 2026-10-06). Turning skills and MCP servers on or off is not in `/v1`. |
 | A model picker | `/v1/openai/models` appears to list workspaces, not a provider's models. If so, the model stays a free-text field in `settings.json`. |
+| Telling a web page from an upload named `url-...` | `docType` reads the stored name alone, so an upload such as `URL-list.md`, stored as `url-list.md-<uuid>.json`, shows `WEB`. A web page's name can end in `.md` or `.html` too, so the name cannot settle it. The document's metadata `chunkSource` (`link://...`) can, but a switched-off file keeps only its path, title and word count in `prefs.json`. |
 
 ## Needs a new dependency
 
@@ -45,6 +46,12 @@ The web UI's own endpoints sign in with a session token, not the developer key, 
 | Make, edit or delete a slash-command preset | No `/v1` call writes presets. |
 | Server text-to-speech | Not in `/v1`. |
 | Text size and other UI preferences | The web UI keeps them in its own settings, not in `/v1`. |
+
+## Dropped, to revisit
+
+| Feature | Why it was dropped |
+| --- | --- |
+| An app-wide **Only answer from my documents** switch | The web UI has none: each workspace's `chatMode` decides, and the Chat mode chooser in Sources sets it. The switch sent `mode: query` with every message and was on by default. `prefs.json`'s `groundedOnly` is now ignored, so an install that had it on answers in each workspace's own mode after upgrading, often Agent, with no notice. Bringing it back means sending `mode` again, which overrides the workspace's mode. |
 
 ## Out of scope
 

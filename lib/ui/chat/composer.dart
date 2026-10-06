@@ -45,24 +45,51 @@ class _ComposerState extends State<Composer> {
   /// What the form follows besides the message, whose changes [_changed] handles.
   late final Listenable _shown;
 
+  late final AppScope _scope;
+
+  /// The server and the chat on screen, which [_attached] belongs to.
+  late Object _chatShown;
+
   String _typed = '';
 
   @override
   void initState() {
     super.initState();
-    final scope = AppScope.of(context);
+    final scope = _scope = AppScope.of(context);
     _shown = Listenable.merge([
       scope.settings,
       scope.chat,
       scope.sources.chatMode,
     ]);
+    _chatShown = _chatOnScreen();
+    _shown.addListener(_chatChanged);
     widget.draft.addListener(_changed);
   }
 
   @override
   void dispose() {
+    _shown.removeListener(_chatChanged);
     widget.draft.removeListener(_changed);
     super.dispose();
+  }
+
+  Object _chatOnScreen() => (
+    _scope.settings.connection,
+    _scope.chat.activeSlug,
+    _scope.chat.activeThread,
+  );
+
+  /// Drops the attachments when another chat, workspace or server is shown, so they never go
+  /// with a message they were not picked for.
+  void _chatChanged() {
+    final shown = _chatOnScreen();
+    if (shown == _chatShown) return;
+    _chatShown = shown;
+    if (_attached.isEmpty && _problem == null) return;
+    setState(() {
+      _attached = const [];
+      _problem = null;
+    });
   }
 
   void _changed() {
@@ -217,10 +244,11 @@ class _Form extends StatelessWidget {
     final chat = scope.chat;
     final t = Tokens.of(context);
     final here = chat.answeringHere;
-    final elsewhere = chat.busy && !here;
     final hint = here
         ? 'Answering…'
-        : elsewhere
+        : chat.clearing
+        ? 'Clearing the chat…'
+        : chat.busy
         ? 'Another chat is still answering…'
         : switch (scope.sources.chatMode.value) {
             ChatMode.automatic || ChatMode.chat => 'Ask anything…',

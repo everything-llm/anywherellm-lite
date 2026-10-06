@@ -133,6 +133,7 @@ class FilesController extends ChangeNotifier {
     selected = null;
     _clearContent();
     problems = const [];
+    exporting = false;
     notifyListeners();
   }
 
@@ -421,13 +422,14 @@ class FilesController extends ChangeNotifier {
     exporting = true;
     notifyListeners();
     List<int>? bytes;
+    Notice? failed;
     try {
       bytes = await _api.exportChats(format);
-      problems = const [];
     } on ApiException catch (error) {
-      problems = [Notice('Could not export the chats', error.message)];
+      failed = Notice('Could not export the chats', error.message);
     }
     if (_server != server) return null;
+    problems = [?failed];
     exporting = false;
     notifyListeners();
     return bytes;

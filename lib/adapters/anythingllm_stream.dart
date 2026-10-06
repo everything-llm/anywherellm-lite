@@ -43,7 +43,7 @@ Stream<ChatEvent> chatEvents(Stream<List<int>> bytes) async* {
           yield StatusChunk(agentStatus(thought));
         }
       case 'textResponse':
-        if (text is String) {
+        if (text is String && text.isNotEmpty) {
           whole = true;
           yield WholeAnswer(text);
         }

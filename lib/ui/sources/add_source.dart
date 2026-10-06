@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/upload.dart';
 import '../app_scope.dart';
 import '../widgets/buttons.dart';
 import '../widgets/doc_details.dart';
@@ -42,12 +43,18 @@ class _AddSourceState extends State<AddSource> {
     setState(() => _adding = _Adding.none);
   }
 
+  /// Adds the link, or keeps the form and says why when it is not one.
   void _addLink() {
     final url = _link.text;
     final meta = _details.meta;
     if (url.trim().isEmpty) return;
+    final sources = AppScope.of(context).sources;
+    if (linkProblem(url.trim()) case final wrong?) {
+      sources.report('Could not add the link', wrong);
+      return;
+    }
     _close();
-    AppScope.of(context).sources.addLink(url, meta: meta);
+    sources.addLink(url, meta: meta);
   }
 
   void _addText() {

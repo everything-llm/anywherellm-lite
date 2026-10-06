@@ -4,6 +4,7 @@ import 'package:anywherellm/ui/chat/chat_view.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
 import 'package:anywherellm/ui/sidebar.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
+import 'package:anywherellm/ui/widgets/confirm_box.dart';
 import 'package:anywherellm/ui/widgets/controls.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:anywherellm/core/server_models.dart';
@@ -221,6 +222,31 @@ void main() {
       await tester.pumpAndSettle();
       expect(control('Cancel'), findsNothing);
       expect(llm.calls, isNot(contains('deleteWorkspace:q3')));
+    });
+
+    testWidgets('the workspace delete question closes when another opens', (
+      tester,
+    ) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      await tester.tap(control('Delete workspace'));
+      await tester.pumpAndSettle();
+      await h.chat.select('household');
+      await tester.pumpAndSettle();
+      expect(find.byType(ConfirmBox), findsNothing);
+      await h.chat.select('q3');
+      await tester.pumpAndSettle();
+      expect(find.byType(ConfirmBox), findsNothing);
+    });
+
+    testWidgets('the workspace delete question closes when it starts answering', (
+      tester,
+    ) async {
+      final h = await pumpApp(tester, llm: planningServer()..hold = true);
+      await tester.tap(control('Delete workspace'));
+      await tester.pumpAndSettle();
+      await h.chat.send('Go');
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(ConfirmBox), findsNothing);
     });
 
     testWidgets('a workspace cannot be deleted while it answers', (

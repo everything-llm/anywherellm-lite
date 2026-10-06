@@ -76,7 +76,8 @@ class FilesView extends StatelessWidget {
         files.loading ? 'Loading…' : 'Pick a folder or a file on the left.',
       );
     }
-    if (node.kind.isFolder) return FolderView(node);
+    // Keyed by path, so a file waiting to be added or an open Delete stays with its folder.
+    if (node.kind.isFolder) return FolderView(node, key: ValueKey(node.path));
     if (files.contentLoading) return const Blank('Loading…');
     return switch (node.kind) {
       NodeKind.locked => const Blank(

@@ -126,6 +126,7 @@ class ChatController extends ChangeNotifier {
   /// The answer running. Only one runs at a time.
   _Running? _running;
 
+
   bool loading = false;
 
   /// Why the last load or change failed.
@@ -153,13 +154,19 @@ class ChatController extends ChangeNotifier {
   List<Turn> get turns =>
       activeThread == null ? _draft : (_turns[activeThread] ?? const []);
 
-  bool get busy => _running != null;
+  /// Whether the chat on screen is being cleared on the server.
+  bool get clearing => _clearing;
+  bool _clearing = false;
+
+  /// Whether an answer runs or a chat is being cleared, so no message can be sent.
+  bool get busy => _running != null || _clearing;
 
   /// Whether the chat on screen can take a message: a draft, or a chat whose history is read.
   bool get ready => activeThread == null || _turns.containsKey(activeThread);
 
   /// Whether the chat on screen is the one answering.
-  bool get answeringHere => busy && turns.contains(_running!.answer);
+  bool get answeringHere =>
+      _running != null && turns.contains(_running!.answer);
 
   bool isAnswering(String thread) => _running?.thread == thread;
 
@@ -311,20 +318,21 @@ class ChatController extends ChangeNotifier {
     final old = workspaces.where((w) => w.slug == slug).firstOrNull;
     if (old == null || clean.isEmpty || clean == old.name) return;
     final server = _server;
+    Workspace? renamed;
     await _try('Could not rename the workspace', () async {
-      final renamed = await _api.renameWorkspace(slug, clean);
-      if (_server != server) return;
-      if (renamed.slug != slug) {
-        final shown = activeSlug == slug;
-        await load();
-        if (shown) await select(renamed.slug);
-        return;
-      }
+      renamed = await _api.renameWorkspace(slug, clean);
+      if (_server != server || renamed!.slug != slug) return;
       workspaces = [
         for (final w in workspaces)
-          w.slug == slug ? w.withName(renamed.name) : w,
+          w.slug == slug ? w.withName(renamed!.name) : w,
       ];
     });
+    // Read again outside the rename's own notice, so a failed read stays shown.
+    if (renamed case final made? when _server == server && made.slug != slug) {
+      final shown = activeSlug == slug;
+      await load();
+      if (shown) await select(made.slug);
+    }
   }
 
   /// Deletes workspace [slug] with its chats, unless an answer is running in it. Shows the first
@@ -465,11 +473,18 @@ class ChatController extends ChangeNotifier {
       return;
     }
     final server = _server;
-    await _try('Could not clear the chat', () async {
-      await _api.resetChat(slug, thread);
-      if (_server != server) return;
-      _turns[thread] = [];
-    });
+    _clearing = true;
+    notifyListeners();
+    try {
+      await _try('Could not clear the chat', () async {
+        await _api.resetChat(slug, thread);
+        if (_server != server) return;
+        _turns[thread] = [];
+      });
+    } finally {
+      _clearing = false;
+      notifyListeners();
+    }
   }
 
   /// Stops the running answer, keeping what came so far.
