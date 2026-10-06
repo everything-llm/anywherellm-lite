@@ -318,6 +318,9 @@ void main() {
             .toList();
         expect(fields[0].keyboardType, TextInputType.url);
         expect(fields[0].autofillHints, [AutofillHints.url]);
+        // Without suggestions, Flutter on Android would mark it a visible password.
+        expect(fields[0].enableSuggestions, isTrue);
+        expect(fields[1].enableSuggestions, isFalse);
         expect(fields[1].keyboardType, TextInputType.visiblePassword);
         expect(fields[1].autofillHints, isNull);
         expect(fields[1].enableIMEPersonalizedLearning, isFalse);

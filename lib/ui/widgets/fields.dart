@@ -62,7 +62,10 @@ class AppField extends StatelessWidget {
       child: TextField(
         controller: controller,
         autocorrect: false,
-        enableSuggestions: false,
+        // Flutter on Android marks a field without suggestions as a visible password, which
+        // would replace a web-address keyboard and invite a saved login. A URL keyboard offers
+        // no word suggestions anyway.
+        enableSuggestions: keyboardType == TextInputType.url,
         obscureText: obscure,
         keyboardType: keyboardType,
         autofillHints: autofillHints,
