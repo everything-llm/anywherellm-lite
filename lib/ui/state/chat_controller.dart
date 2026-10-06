@@ -492,6 +492,28 @@ class ChatController extends ChangeNotifier {
         );
   }
 
+  /// Whether [retry] can ask the last question again: nothing runs, the chat's last turn is an
+  /// answer, and its question went without files, whose bytes are not kept.
+  bool get canRetry {
+    final turns = this.turns;
+    return !busy &&
+        ready &&
+        turns.length >= 2 &&
+        turns.last.role == Role.assistant &&
+        turns[turns.length - 2].role == Role.user &&
+        turns[turns.length - 2].attachments.isEmpty;
+  }
+
+  /// Asks the chat's last question again, in place of its answer. The server cannot drop one
+  /// exchange, so it keeps the old one too, and it shows again when the chat is next read.
+  Future<void> retry() async {
+    if (!canRetry) return;
+    final turns = this.turns;
+    final question = turns[turns.length - 2].text;
+    _setTurns(turns.sublist(0, turns.length - 2));
+    await send(question);
+  }
+
   /// Clears the history of the chat on screen, on the server and here. A draft has none, so it
   /// is only emptied.
   Future<void> _reset(String slug) async {

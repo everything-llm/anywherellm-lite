@@ -653,4 +653,43 @@ void main() {
       },
     );
   });
+
+  group('retry', () {
+    test('asks the last question again in place of its answer', () async {
+      final llm = planningServer()..answer = 'About 45k.';
+      final rig = await started(llm);
+      expect(rig.chat.canRetry, isTrue);
+      await rig.chat.retry();
+      await pumpEventQueue();
+      expect(llm.calls, contains('streamChat:budget:What is the budget?'));
+      expect(rig.chat.turns.map((t) => t.text), [
+        'What is the budget?',
+        'About 45k.',
+      ]);
+    });
+
+    test('is off while an answer runs', () async {
+      final llm = planningServer()..hold = true;
+      final rig = await started(llm);
+      await rig.chat.send('Summarise');
+      expect(rig.chat.canRetry, isFalse);
+      await rig.chat.retry();
+      expect(llm.calls.where((c) => c.startsWith('streamChat:')), hasLength(1));
+    });
+
+    test(
+      'is off for a question sent with files, and for an empty chat',
+      () async {
+        final rig = await started(planningServer());
+        await rig.chat.send(
+          'What is in this?',
+          attachments: [Attachment.of('notes.md', 'hi'.codeUnits)],
+        );
+        await pumpEventQueue();
+        expect(rig.chat.canRetry, isFalse);
+        await rig.chat.select('household');
+        expect(rig.chat.canRetry, isFalse);
+      },
+    );
+  });
 }

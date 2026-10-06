@@ -108,4 +108,34 @@ void main() {
     expect(control('Download cat.png'), findsOneWidget);
     expect(find.text('Could not get cat.png'), findsOneWidget);
   });
+
+  testWidgets('Edit puts a question back in the composer, sending nothing', (
+    tester,
+  ) async {
+    final llm = planningServer();
+    await pumpApp(tester, llm: llm);
+    await tester.tap(control('Edit'));
+    await tester.pump();
+    expect(
+      tester.widget<EditableText>(composerField).controller.text,
+      'What is the budget?',
+    );
+    expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
+  });
+
+  testWidgets('Retry shows on the last answer only, and asks again', (
+    tester,
+  ) async {
+    final llm = planningServer()..answer = 'About 45k.';
+    await pumpApp(tester, llm: llm);
+    await ask(tester, 'And next year?');
+    expect(control('Retry'), findsOneWidget);
+    await tester.tap(control('Retry'));
+    await tester.pumpAndSettle();
+    expect(llm.calls.where((c) => c.startsWith('streamChat')), [
+      'streamChat:budget:And next year?',
+      'streamChat:budget:And next year?',
+    ]);
+    expect(find.text('And next year?'), findsOneWidget);
+  });
 }

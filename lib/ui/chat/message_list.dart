@@ -10,6 +10,7 @@ import '../state/chat_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
+import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
 import '../widgets/rise.dart';
 import '../widgets/tappable.dart';
@@ -49,13 +50,14 @@ class MessageList extends StatelessWidget {
               scope.prefs.prefs.textSize.scale,
             ),
           ),
-          child: _turns(turns),
+          child: _turns(context, turns),
         );
       },
     );
   }
 
-  Widget _turns(List<Turn> turns) {
+  Widget _turns(BuildContext context, List<Turn> turns) {
+    final chat = AppScope.of(context).chat;
     return ListView.builder(
       reverse: true,
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
@@ -69,8 +71,12 @@ class MessageList extends StatelessWidget {
               padding: EdgeInsets.only(top: i == turns.length - 1 ? 0 : 26),
               child: Rise(
                 child: turn.role == Role.user
-                    ? _UserBubble(turn.text, attachments: turn.attachments)
-                    : _Answer(turn),
+                    ? _UserBubble(
+                        turn.text,
+                        attachments: turn.attachments,
+                        onEdit: () => onSuggest(turn.text),
+                      )
+                    : _Answer(turn, retry: i == 0 ? _retryOf(chat) : null),
               ),
             ),
           ),
@@ -198,16 +204,53 @@ class _SuggestionState extends State<_Suggestion> {
   }
 }
 
+/// Retry on the chat's last answer: [onPressed] is null while it cannot run, and [tooltip]
+/// says why when the question went with files.
+typedef _Retry = ({VoidCallback? onPressed, String tooltip});
+
+_Retry _retryOf(ChatController chat) {
+  final turns = chat.turns;
+  final files =
+      turns.length >= 2 && turns[turns.length - 2].attachments.isNotEmpty;
+  return (
+    onPressed: chat.canRetry ? chat.retry : null,
+    tooltip: files
+        ? 'Retry is off: the files sent with the question are not kept'
+        : 'Retry',
+  );
+}
+
 class _UserBubble extends StatelessWidget {
-  const _UserBubble(this.text, {this.attachments = const []});
+  const _UserBubble(
+    this.text, {
+    this.attachments = const [],
+    required this.onEdit,
+  });
 
   final String text;
 
   /// The names of the files sent with the question.
   final List<String> attachments;
 
+  /// Puts [text] back in the composer.
+  final VoidCallback onEdit;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.end,
+    children: [
+      _bubble(context),
+      IconBtn(
+        'pencil',
+        tooltip: 'Edit',
+        onPressed: onEdit,
+        box: 28,
+        size: IconSize.xs,
+      ),
+    ],
+  );
+
+  Widget _bubble(BuildContext context) {
     final t = Tokens.of(context);
     return Align(
       alignment: Alignment.centerRight,
@@ -260,9 +303,12 @@ class _UserBubble extends StatelessWidget {
 }
 
 class _Answer extends StatelessWidget {
-  const _Answer(this.turn);
+  const _Answer(this.turn, {this.retry});
 
   final Turn turn;
+
+  /// Retry, on the chat's last answer only.
+  final _Retry? retry;
 
   @override
   Widget build(BuildContext context) =>
@@ -294,13 +340,22 @@ class _Answer extends StatelessWidget {
           const SizedBox(height: 12),
           GeneratedFiles(turn.files),
         ],
-        if (!turn.streaming && split.answer.isNotEmpty) ...[
+        if (!turn.streaming && (split.answer.isNotEmpty || retry != null)) ...[
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              CopyButton(split.answer, tooltip: 'Copy answer'),
+              if (split.answer.isNotEmpty)
+                CopyButton(split.answer, tooltip: 'Copy answer'),
+              if (retry case final retry?)
+                IconBtn(
+                  'refresh',
+                  tooltip: retry.tooltip,
+                  onPressed: retry.onPressed,
+                  box: 30,
+                  size: IconSize.xs,
+                ),
               if (turn.metrics case final metrics?)
                 Text(
                   metrics.text,
