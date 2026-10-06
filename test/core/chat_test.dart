@@ -25,4 +25,26 @@ void main() {
       expect(defaultTitle('   '), newChatName);
     });
   });
+
+  group('attachments', () {
+    test('a picture is typed by its extension, in any case', () {
+      expect(attachmentMime('photo.JPG'), 'image/jpeg');
+      expect(attachmentMime('a.webp'), 'image/webp');
+      expect(Attachment.of('a.gif', const []).isImage, isTrue);
+    });
+
+    test('any other file, or none, is a document', () {
+      expect(attachmentMime('report.pdf'), documentMime);
+      expect(attachmentMime('Makefile'), documentMime);
+      expect(attachmentMime('.png'), documentMime);
+    });
+
+    test('a file over the cap is refused with its size', () {
+      expect(attachmentProblem('a.pdf', maxAttachmentBytes), isNull);
+      expect(
+        attachmentProblem('a.pdf', maxAttachmentBytes + 1),
+        startsWith('a.pdf is 20.0 MB'),
+      );
+    });
+  });
 }

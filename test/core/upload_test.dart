@@ -33,4 +33,26 @@ void main() {
       expect(sourceExt('.bashrc'), 'FILE');
     },
   );
+
+  group('linkProblem', () {
+    test('is null for a web address', () {
+      expect(linkProblem(' https://example.com/page '), isNull);
+      expect(linkProblem('http://intranet/wiki'), isNull);
+    });
+
+    test('names an address that is not http or https', () {
+      expect(
+        linkProblem('example.com'),
+        'a link starts with https:// or http://',
+      );
+      expect(
+        linkProblem('ftp://example.com'),
+        'a link starts with https:// or http://',
+      );
+    });
+
+    test('names an address with no site', () {
+      expect(linkProblem('https://'), 'the link has no site in it');
+    });
+  });
 }

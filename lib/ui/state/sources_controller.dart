@@ -149,16 +149,64 @@ class SourcesController extends ChangeNotifier {
         notifyListeners();
       },
     );
-    final refused = [
+    await _embedMade(slug, sent.made, [
       for (final (name, why) in sent.refused)
         Notice('Could not add $name', why),
-    ];
-    final made = [for (final d in sent.made) d.path];
+    ]);
+  }
+
+  /// Has the server read in the web page at [url], then adds what it made.
+  Future<void> addLink(String url) async {
+    final slug = _slug;
+    final link = url.trim();
+    if (slug == null || link.isEmpty) return;
+    final wrong = linkProblem(link);
+    if (wrong != null) {
+      problems = [Notice('Could not add the link', wrong)];
+      notifyListeners();
+      return;
+    }
+    await _readIn(slug, link, () => _api.uploadLink(link));
+  }
+
+  /// Saves [text] as a document called [title], then adds it.
+  Future<void> addText(String title, String text) async {
+    final slug = _slug;
+    final name = title.trim();
+    if (slug == null || name.isEmpty || text.trim().isEmpty) return;
+    await _readIn(slug, name, () => _api.uploadText(name, text));
+  }
+
+  /// Runs [read], which reads [name] in on the server, then adds what it made.
+  Future<void> _readIn(
+    String slug,
+    String name,
+    Future<List<DocEntry>> Function() read,
+  ) async {
+    sending = name;
+    notifyListeners();
+    try {
+      await _embedMade(slug, await read(), const []);
+    } on ApiException catch (error) {
+      await _embedMade(slug, const [], [
+        Notice('Could not add $name', error.message),
+      ]);
+    }
+  }
+
+  /// Embeds [made] in workspace [slug] and shows [refused], with one more notice if embedding
+  /// fails.
+  Future<void> _embedMade(
+    String slug,
+    List<DocEntry> made,
+    List<Notice> refused,
+  ) async {
+    final problems = [...refused];
     if (made.isNotEmpty) {
       try {
-        await _api.updateEmbeddings(slug, adds: made);
+        await _api.updateEmbeddings(slug, adds: [for (final d in made) d.path]);
       } on ApiException catch (error) {
-        refused.add(
+        problems.add(
           Notice('Could not add the files to this workspace', error.message),
         );
       }
@@ -166,7 +214,7 @@ class SourcesController extends ChangeNotifier {
     // The person moved to another workspace meanwhile: these notices are not about it.
     if (slug != _slug) return;
     sending = null;
-    problems = refused;
+    this.problems = problems;
     await refresh();
   }
 

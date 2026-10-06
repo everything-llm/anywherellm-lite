@@ -31,13 +31,14 @@ abstract interface class AnythingLlmApi {
   /// The chat's turns, oldest first.
   Future<List<ChatMessage>> history(String slug, String thread);
 
-  /// Asks [message] in the chat and streams the answer. The stream fails with [ApiException].
-  /// Cancelling the subscription stops the answer.
+  /// Asks [message] in the chat, with [attachments] for this message only, and streams the
+  /// answer. The stream fails with [ApiException]. Cancelling the subscription stops the answer.
   Stream<ChatEvent> streamChat(
     String slug,
     String thread,
     String message, {
     required ChatMode mode,
+    List<Attachment> attachments = const [],
   });
 
   /// Embeds the documents at [adds] in the workspace and drops those at [deletes], by
@@ -55,6 +56,14 @@ abstract interface class AnythingLlmApi {
   /// when it is null, and returns the documents the server made of it. Attaches them to no
   /// workspace.
   Future<List<DocEntry>> upload(String name, List<int> bytes, {String? folder});
+
+  /// Has the server read in the web page at [url] and returns the documents it made. Attaches
+  /// them to no workspace.
+  Future<List<DocEntry>> uploadLink(String url);
+
+  /// Saves [text] as a document called [title] and returns the documents the server made.
+  /// Attaches them to no workspace.
+  Future<List<DocEntry>> uploadText(String title, String text);
 
   /// Writes the workspace columns in [fields], such as `openAiPrompt` or `topN`, and leaves the
   /// rest as they are.

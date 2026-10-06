@@ -8,6 +8,7 @@ import '../core/chat.dart';
 import '../core/connection.dart';
 import '../core/ports.dart';
 import '../core/server_models.dart';
+import '../core/upload.dart';
 import 'anythingllm_stream.dart';
 
 /// [AnythingLlmApi] over the server's HTTP API, with the bearer key on every request.
@@ -108,17 +109,25 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     String thread,
     String message, {
     required ChatMode mode,
+    List<Attachment> attachments = const [],
   }) async* {
     final connection = _current;
     final request = _request(
       connection,
       'POST',
       '${_thread(slug, thread)}/stream-chat',
-      {'message': message, 'mode': mode.name},
+      {
+        'message': message,
+        'mode': mode.name,
+        if (attachments.isNotEmpty)
+          'attachments': [for (final a in attachments) attachmentJson(a)],
+      },
     )..headers['Accept'] = 'text/event-stream';
     final http.StreamedResponse response;
     try {
-      response = await _client.send(request).timeout(timeout);
+      response = await _client
+          .send(request)
+          .timeout(attachments.isEmpty ? timeout : uploadTimeout);
     } on Exception catch (error) {
       throw _unreachable(connection, error);
     }
@@ -179,6 +188,42 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     }, refused: 'The server could not read $name in.');
     return [
       for (final json in jsonObjects(_field(body, 'documents')))
+        DocEntry.fromJson(json),
+    ];
+  }
+
+  @override
+  Future<List<DocEntry>> uploadLink(String url) => _readIn(
+    '/api/v1/document/upload-link',
+    {'link': url},
+    refused: 'The server could not read $url.',
+  );
+
+  /// The server requires a `title` in the metadata.
+  @override
+  Future<List<DocEntry>> uploadText(String title, String text) =>
+      _readIn('/api/v1/document/raw-text', {
+        'textContent': text,
+        'metadata': {'title': title},
+      }, refused: 'The server could not save $title.');
+
+  /// Posts [body] to [path], which reads something in, and returns the documents it made.
+  Future<List<DocEntry>> _readIn(
+    String path,
+    Map<String, Object?> body, {
+    required String refused,
+  }) async {
+    final connection = _current;
+    final answer = await _call(
+      connection,
+      uploadTimeout,
+      () async => http.Response.fromStream(
+        await _client.send(_request(connection, 'POST', path, body)),
+      ),
+      refused: refused,
+    );
+    return [
+      for (final json in jsonObjects(_field(answer, 'documents')))
         DocEntry.fromJson(json),
     ];
   }
@@ -418,3 +463,31 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       ? '${limit.inSeconds} seconds'
       : '${limit.inMinutes} minutes';
 }
+
+/// [attachment] as the server takes it: the file as a base64 data URL. A document's URL carries
+/// its own type, or `application/octet-stream`, while [Attachment.mime] tells the server to read
+/// it in.
+Map<String, String> attachmentJson(Attachment attachment) {
+  final type = attachment.isImage
+      ? attachment.mime
+      : _documentTypes[extensionOf(attachment.name)] ??
+            'application/octet-stream';
+  return {
+    'name': attachment.name,
+    'mime': attachment.mime,
+    'contentString': 'data:$type;base64,${base64Encode(attachment.bytes)}',
+  };
+}
+
+const _documentTypes = {
+  '.pdf': 'application/pdf',
+  '.txt': 'text/plain',
+  '.md': 'text/markdown',
+  '.csv': 'text/csv',
+  '.html': 'text/html',
+  '.json': 'application/json',
+  '.docx':
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+};

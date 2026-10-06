@@ -77,3 +77,13 @@ Future<Sent> sendEach(
   }
   return (made: made, refused: refused);
 }
+
+/// Why [text] is not a web address the server can read in, or null.
+String? linkProblem(String text) {
+  final uri = Uri.tryParse(text.trim());
+  if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
+    return 'a link starts with https:// or http://';
+  }
+  if (uri.host.isEmpty) return 'the link has no site in it';
+  return null;
+}

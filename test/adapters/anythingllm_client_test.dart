@@ -431,7 +431,14 @@ void main() {
       final seen = <http.Request>[];
       final turns = await _answering({
         'history': [
-          {'role': 'user', 'content': 'What is due?', 'sentAt': 1},
+          {
+            'role': 'user',
+            'content': 'What is due?',
+            'sentAt': 1,
+            'attachments': [
+              {'name': 'photo.png', 'mime': 'image/png'},
+            ],
+          },
           {
             'role': 'assistant',
             'content': 'The roadmap.',
@@ -446,6 +453,8 @@ void main() {
       expect(seen.single.url.path, '/api/v1/workspace/w/thread/t/chats');
       expect(turns.map((t) => t.text), ['What is due?', 'The roadmap.']);
       expect(turns.last.citations, ['roadmap.pdf', 'notes.md']);
+      expect(turns.first.attachments, ['photo.png']);
+      expect(turns.last.attachments, isEmpty);
     });
 
     test('embedding changes post the adds and deletes', () async {
@@ -740,6 +749,129 @@ void main() {
       ]) {
         expect((await _failure(call())).message, isNot(contains('SECRET-KEY')));
       }
+    });
+  });
+
+  group('attachments', () {
+    test('go as base64 data URLs with the server\'s types', () async {
+      final seen = <http.BaseRequest>[];
+      final api = HttpAnythingLlmApi(
+        holder: ConnectionHolder(_connection),
+        client: MockClient.streaming((request, body) async {
+          seen.add(request);
+          await body.drain<void>();
+          return http.StreamedResponse(
+            Stream.value(
+              utf8.encode(
+                'data: ${jsonEncode({'type': 'textResponseChunk', 'textResponse': '', 'close': true})}\n\n',
+              ),
+            ),
+            200,
+          );
+        }),
+      );
+      await api
+          .streamChat(
+            'w',
+            't',
+            'What is this?',
+            mode: ChatMode.chat,
+            attachments: [
+              Attachment.of('photo.PNG', const [1, 2, 3]),
+              Attachment.of('report.pdf', utf8.encode('%PDF')),
+            ],
+          )
+          .toList();
+      final body = jsonDecode(
+        (seen.single as http.Request).body,
+      ) as Map<String, dynamic>;
+      expect(body['message'], 'What is this?');
+      expect(body['attachments'], [
+        {
+          'name': 'photo.PNG',
+          'mime': 'image/png',
+          'contentString': 'data:image/png;base64,AQID',
+        },
+        {
+          'name': 'report.pdf',
+          'mime': documentMime,
+          'contentString':
+              'data:application/pdf;base64,${base64Encode(utf8.encode('%PDF'))}',
+        },
+      ]);
+    });
+
+    test('a document of unknown type is sent as octet-stream', () {
+      expect(
+        attachmentJson(Attachment.of('notes.xyz', const [0]))['contentString'],
+        startsWith('data:application/octet-stream;base64,'),
+      );
+    });
+
+    test('no attachments leaves the field out', () async {
+      final seen = <http.BaseRequest>[];
+      final api = HttpAnythingLlmApi(
+        holder: ConnectionHolder(_connection),
+        client: MockClient.streaming((request, body) async {
+          seen.add(request);
+          await body.drain<void>();
+          return http.StreamedResponse(const Stream.empty(), 200);
+        }),
+      );
+      await api.streamChat('w', 't', 'Hi', mode: ChatMode.chat).toList();
+      final body = jsonDecode(
+        (seen.single as http.Request).body,
+      ) as Map<String, dynamic>;
+      expect(body.containsKey('attachments'), isFalse);
+    });
+  });
+
+  group('links and text', () {
+    final made = {
+      'success': true,
+      'error': null,
+      'documents': [
+        {
+          'location': 'custom-documents/url-example_com-1.json',
+          'title': 'example_com.html',
+        },
+      ],
+    };
+
+    test('a link posts the address and returns what was made', () async {
+      final seen = <http.Request>[];
+      final docs = await _answering(
+        made,
+        seen: seen,
+      ).uploadLink('https://example.com');
+      expect(seen.single.url.path, '/api/v1/document/upload-link');
+      expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
+      expect(jsonDecode(seen.single.body), {'link': 'https://example.com'});
+      expect(docs.single.path, 'custom-documents/url-example_com-1.json');
+    });
+
+    test('text posts the text with its title', () async {
+      final seen = <http.Request>[];
+      await _answering(made, seen: seen).uploadText('Notes', 'Some text');
+      expect(seen.single.url.path, '/api/v1/document/raw-text');
+      expect(jsonDecode(seen.single.body), {
+        'textContent': 'Some text',
+        'metadata': {'title': 'Notes'},
+      });
+    });
+
+    test('success false is a refusal that keeps the key out', () async {
+      final link = await _failure(
+        _answering({'success': false, 'error': null})
+            .uploadLink('https://example.com'),
+      );
+      expect(link.message, 'The server could not read https://example.com.');
+      final text = await _failure(
+        _answering({'success': false, 'error': 'Invalid request'})
+            .uploadText('Notes', 'x'),
+      );
+      expect(text.message, 'Invalid request');
+      expect('$link $text', isNot(contains('SECRET-KEY')));
     });
   });
 }

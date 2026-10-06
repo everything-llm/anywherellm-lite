@@ -161,4 +161,58 @@ void main() {
     await rig.sources.upload([file('b.md')]);
     expect(llm.calls.where((c) => c == 'acceptedExtensions'), hasLength(2));
   });
+
+  group('links and text', () {
+    test('a link is read in and embedded', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.sources.addLink(' https://example.com/page ');
+      expect(
+        llm.calls,
+        containsAllInOrder([
+          'uploadLink:https://example.com/page',
+          'updateEmbeddings:+custom-documents/url-example.com.json-',
+        ]),
+      );
+      expect(rig.sources.files.last.title, 'example.com');
+      expect(rig.sources.sending, isNull);
+      expect(rig.sources.problems, isEmpty);
+    });
+
+    test('pasted text is saved under its title and embedded', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.sources.addText('Meeting notes', 'We agreed on 40k.');
+      expect(
+        llm.calls,
+        containsAllInOrder([
+          'uploadText:Meeting notes',
+          'updateEmbeddings:+custom-documents/raw-Meeting notes.json-',
+        ]),
+      );
+      expect(rig.sources.files.last.title, 'Meeting notes');
+    });
+
+    test('an address that is not a link never reaches the server', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.sources.addLink('example.com');
+      expect(llm.calls.where((c) => c.startsWith('uploadLink')), isEmpty);
+      expect(rig.sources.problems.single.text, contains('https://'));
+    });
+
+    test('a refused link becomes a notice', () async {
+      final llm = planningServer()
+        ..errors['uploadLink'] = const ApiException('The page did not load.');
+      final rig = await started(llm);
+      await rig.sources.addLink('https://example.com');
+      expect(
+        rig.sources.problems.single.title,
+        'Could not add https://example.com',
+      );
+      expect(rig.sources.problems.single.text, 'The page did not load.');
+      expect(rig.sources.sending, isNull);
+      expect(llm.calls.where((c) => c.startsWith('updateEmbeddings')), isEmpty);
+    });
+  });
 }

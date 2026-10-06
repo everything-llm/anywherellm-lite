@@ -13,7 +13,9 @@ import 'settings_controller.dart';
 /// One turn on screen. An answer grows while it streams, and notifies only its own listeners
 /// as it does, so a chunk rebuilds the answer and nothing else.
 class Turn extends ChangeNotifier {
-  Turn.user(this.text) : role = Role.user, streaming = false;
+  Turn.user(this.text, {this.attachments = const []})
+    : role = Role.user,
+      streaming = false;
 
   Turn.answer() : role = Role.assistant, text = '', streaming = true;
 
@@ -21,10 +23,14 @@ class Turn extends ChangeNotifier {
     : role = message.role,
       text = message.text,
       citations = message.citations,
+      attachments = message.attachments,
       streaming = false;
 
   final Role role;
   String text;
+
+  /// The names of the files sent with a question.
+  List<String> attachments = const [];
   List<String> citations = const [];
   bool streaming;
 
@@ -265,12 +271,19 @@ class ChatController extends ChangeNotifier {
     });
   }
 
-  /// Asks [message] in the chat on screen, making its thread first when it is a draft.
-  Future<void> send(String message) async {
+  /// Asks [message], with [attachments], in the chat on screen, making its thread first when it
+  /// is a draft.
+  Future<void> send(
+    String message, {
+    List<Attachment> attachments = const [],
+  }) async {
     final slug = activeSlug;
     final text = message.trim();
     if (slug == null || text.isEmpty || busy || !ready) return;
-    final user = Turn.user(text);
+    final user = Turn.user(
+      text,
+      attachments: [for (final a in attachments) a.name],
+    );
     final answer = Turn.answer();
     final turns = [...this.turns, user, answer];
     final first = this.turns.every((t) => t.role != Role.user);
@@ -306,7 +319,7 @@ class ChatController extends ChangeNotifier {
     final mode = _prefs.prefs.groundedOnly ? ChatMode.query : ChatMode.chat;
     final thread = threadSlug;
     running.stream = _api
-        .streamChat(slug, thread, text, mode: mode)
+        .streamChat(slug, thread, text, mode: mode, attachments: attachments)
         .listen(
           (event) => switch (event) {
             TextChunk(:final text) => answer._grow(text),

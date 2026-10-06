@@ -171,6 +171,7 @@ class ChatMessage {
     required this.role,
     required this.text,
     this.citations = const [],
+    this.attachments = const [],
   });
 
   /// An entry of a chat's `history`.
@@ -181,10 +182,17 @@ class ChatMessage {
       _ => '',
     },
     citations: citationsOf(json['sources']),
+    attachments: [
+      for (final attachment in jsonObjects(json['attachments']))
+        ?_known(attachment, 'name'),
+    ],
   );
 
   final Role role;
   final String text;
+
+  /// The names of the files sent with the message.
+  final List<String> attachments;
 
   /// The titles of the documents the answer drew on, each once, in the server's order.
   final List<String> citations;

@@ -81,6 +81,9 @@ class FakeAnythingLlm implements AnythingLlmApi {
   /// The mode of every message asked, in order.
   final List<ChatMode> modes = [];
 
+  /// The files sent with the last message asked.
+  List<Attachment> lastAttachments = const [];
+
   final List<String> calls = [];
   final Map<String, Object> errors = {};
   final Map<String, Completer<void>> gates = {};
@@ -166,9 +169,11 @@ class FakeAnythingLlm implements AnythingLlmApi {
     String thread,
     String message, {
     required ChatMode mode,
+    List<Attachment> attachments = const [],
   }) {
     calls.add('streamChat:$thread:$message');
     modes.add(mode);
+    lastAttachments = attachments;
     final error = errors['streamChat'];
     if (error != null) return Stream.error(error);
     if (hold) {
@@ -213,6 +218,31 @@ class FakeAnythingLlm implements AnythingLlmApi {
     );
     return [doc];
   }, folder == null ? name : '$folder/$name');
+
+  /// A page the server reads in as `custom-documents/url-<host>.json`.
+  @override
+  Future<List<DocEntry>> uploadLink(String url) => _run('uploadLink', () {
+    final title = Uri.parse(url).host;
+    final doc = DocEntry(folder: 'custom-documents', name: 'url-$title.json');
+    library[doc.path] = WorkspaceDoc(path: doc.path, title: title, words: 1);
+    return [doc];
+  }, url);
+
+  /// Text the server saves as `custom-documents/raw-<title>.json`.
+  @override
+  Future<List<DocEntry>> uploadText(String title, String text) => _run(
+    'uploadText',
+    () {
+      final doc = DocEntry(folder: 'custom-documents', name: 'raw-$title.json');
+      library[doc.path] = WorkspaceDoc(
+        path: doc.path,
+        title: title,
+        words: text.split(' ').length,
+      );
+      return [doc];
+    },
+    title,
+  );
 
   @override
   Future<void> updateWorkspace(String slug, Map<String, Object?> fields) =>

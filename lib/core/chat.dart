@@ -33,3 +33,50 @@ String defaultTitle(String message) {
   if (points.length <= 42) return line;
   return '${String.fromCharCodes(points.take(41)).trimRight()}…';
 }
+
+/// A file sent with one message, read in for that message only.
+class Attachment {
+  const Attachment({
+    required this.name,
+    required this.mime,
+    required this.bytes,
+  });
+
+  /// An attachment of [bytes] named [name], typed by [attachmentMime].
+  Attachment.of(this.name, this.bytes) : mime = attachmentMime(name);
+
+  final String name;
+
+  /// `image/...` for a picture, or [documentMime] for any other file.
+  final String mime;
+  final List<int> bytes;
+
+  bool get isImage => mime.startsWith('image/');
+}
+
+/// The type the server takes for an attached document, which it reads in for that message.
+const documentMime = 'application/anythingllm-document';
+
+/// The largest file one message may carry.
+const maxAttachmentBytes = 20 * 1024 * 1024;
+
+const _imageTypes = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+};
+
+/// `image/png` for `photo.PNG`, or [documentMime] for any file that is not a picture.
+String attachmentMime(String name) {
+  final dot = name.lastIndexOf('.');
+  final extension = dot <= 0 ? '' : name.substring(dot).toLowerCase();
+  return _imageTypes[extension] ?? documentMime;
+}
+
+/// Why [name], of [size] bytes, cannot go with a message, or null.
+String? attachmentProblem(String name, int size) => size > maxAttachmentBytes
+    ? '$name is ${(size / (1024 * 1024)).toStringAsFixed(1)} MB; a message takes '
+          '${maxAttachmentBytes ~/ (1024 * 1024)} MB at most. Add it in Sources instead.'
+    : null;

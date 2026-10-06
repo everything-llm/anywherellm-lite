@@ -267,4 +267,23 @@ void main() {
     await deleting;
     expect(rig.chat.workspaces, isEmpty);
   });
+
+  test('attachments go with the message and their names stay on it', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    await rig.chat.send(
+      'What is in these?',
+      attachments: [
+        Attachment.of('photo.png', const [1]),
+        Attachment.of('report.pdf', const [2]),
+      ],
+    );
+    await pumpEventQueue();
+    expect(llm.lastAttachments.map((a) => (a.name, a.mime)), [
+      ('photo.png', 'image/png'),
+      ('report.pdf', documentMime),
+    ]);
+    final question = rig.chat.turns[rig.chat.turns.length - 2];
+    expect(question.attachments, ['photo.png', 'report.pdf']);
+  });
 }
