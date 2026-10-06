@@ -2,6 +2,7 @@ import 'dart:ui' show Size;
 
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/commands.dart';
+import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/upload.dart';
@@ -89,6 +90,36 @@ void main() {
       expect(tester.takeException(), isNull);
       h.shell.openSettings();
       await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the QR code and the scanner fit at $at', (tester) async {
+      final h = await pumpApp(
+        tester,
+        llm: awkward(),
+        size: size,
+        connection: const Connection(
+          baseUrl: 'http://localhost:3001/$longWord',
+          apiKey: 'K1',
+        ),
+        canScan: true,
+      );
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Show QR code'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Show QR code'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.ensureVisible(find.text('Replace'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Replace'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Scan QR code'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Scan QR code'));
+      await tester.pumpAndSettle();
+      expect(find.text('Fake scan'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

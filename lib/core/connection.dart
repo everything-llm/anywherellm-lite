@@ -76,3 +76,45 @@ String serverName(String host) {
   final ip = RegExp(r'^[\d.]+$').hasMatch(host) || host.contains(':');
   return ip ? host : host.split('.').first;
 }
+
+/// The text a QR code carries to hand [connection] to another device:
+/// `anywherellm://connect?url=...&key=...`, with both values percent-encoded.
+String pairingCode(Connection connection) => Uri(
+  scheme: 'anywherellm',
+  host: 'connect',
+  queryParameters: {'url': connection.baseUrl, 'key': connection.apiKey},
+).toString();
+
+/// The connection a [pairingCode] carries, checked as [Connection.parse] checks a typed one.
+/// Throws [ApiException] when [raw] is not a pairing code or what it carries cannot be used.
+Connection parsePairingCode(String raw) {
+  const notOurs = ApiException(
+    'This QR code is not an AnywhereLLM connection.',
+  );
+  final uri = Uri.tryParse(raw.trim());
+  if (uri == null || uri.scheme != 'anywherellm' || uri.host != 'connect') {
+    throw notOurs;
+  }
+  final url = uri.queryParameters['url'];
+  final key = uri.queryParameters['key'];
+  if (url == null || key == null) throw notOurs;
+  return Connection.parse(url, key);
+}
+
+/// Why a phone cannot use [connection]'s [pairingCode], or null when it can.
+String? pairingProblem(Connection connection) {
+  final host = connection.host;
+  final loopback =
+      host == 'localhost' ||
+      host.startsWith('127.') ||
+      host == '::1' ||
+      host == '0.0.0.0';
+  if (loopback) {
+    return 'On the phone, $host is the phone itself. Use an address the phone can reach, '
+        "such as the server's Tailscale name.";
+  }
+  if (connection.uri.scheme == 'http') {
+    return 'AnywhereLLM on Android connects only over https.';
+  }
+  return null;
+}

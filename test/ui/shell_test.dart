@@ -1,4 +1,5 @@
 import 'package:anywherellm/core/chat.dart';
+import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/ui/chat/chat_view.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
@@ -6,6 +7,8 @@ import 'package:anywherellm/ui/sidebar.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/widgets/confirm_box.dart';
 import 'package:anywherellm/ui/widgets/controls.dart';
+import 'package:anywherellm/ui/widgets/fields.dart';
+import 'package:anywherellm/ui/widgets/qr_mark.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:flutter/material.dart';
@@ -238,16 +241,17 @@ void main() {
       expect(find.byType(ConfirmBox), findsNothing);
     });
 
-    testWidgets('the workspace delete question closes when it starts answering', (
-      tester,
-    ) async {
-      final h = await pumpApp(tester, llm: planningServer()..hold = true);
-      await tester.tap(control('Delete workspace'));
-      await tester.pumpAndSettle();
-      await h.chat.send('Go');
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(find.byType(ConfirmBox), findsNothing);
-    });
+    testWidgets(
+      'the workspace delete question closes when it starts answering',
+      (tester) async {
+        final h = await pumpApp(tester, llm: planningServer()..hold = true);
+        await tester.tap(control('Delete workspace'));
+        await tester.pumpAndSettle();
+        await h.chat.send('Go');
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.byType(ConfirmBox), findsNothing);
+      },
+    );
 
     testWidgets('a workspace cannot be deleted while it answers', (
       tester,
@@ -526,6 +530,115 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(h.shell.settingsOpen, isFalse);
+    });
+
+    testWidgets('the QR code shows the connection only when asked', (
+      tester,
+    ) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      expect(find.byType(QrMark), findsNothing);
+      await tester.tap(control('Show QR code'));
+      await tester.pumpAndSettle();
+      final mark = tester.widget<QrMark>(find.byType(QrMark));
+      expect(mark.data, pairingCode(sampleConnection));
+      expect(find.text('Your phone cannot use this address'), findsNothing);
+      await tester.tap(control('Hide QR code'));
+      await tester.pumpAndSettle();
+      expect(find.byType(QrMark), findsNothing);
+    });
+
+    testWidgets('the QR code warns when the phone cannot use the address', (
+      tester,
+    ) async {
+      final h = await pumpApp(
+        tester,
+        llm: planningServer(),
+        connection: const Connection(
+          baseUrl: 'http://localhost:3001',
+          apiKey: 'K1',
+        ),
+      );
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.tap(control('Show QR code'));
+      await tester.pumpAndSettle();
+      expect(find.text('Your phone cannot use this address'), findsOneWidget);
+      expect(find.textContaining('is the phone itself'), findsOneWidget);
+    });
+
+    testWidgets('a scanned code connects as a typed key does', (tester) async {
+      final llm = planningServer();
+      final h = await pumpApp(tester, llm: llm, connection: null, canScan: true)
+        ..scanCode = pairingCode(
+          const Connection(
+            baseUrl: 'https://owen.example.ts.net',
+            apiKey: 'K9',
+          ),
+        );
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.tap(control('Scan QR code'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AppField), findsNothing);
+      await tester.tap(find.text('Fake scan'));
+      await tester.pumpAndSettle();
+      expect(find.text('Fake scan'), findsNothing);
+      expect(h.store.saved?.baseUrl, 'https://owen.example.ts.net');
+      expect(h.store.saved?.apiKey, 'K9');
+      expect(find.text('The key was saved.'), findsOneWidget);
+      expect(inSidebar('Q3 planning'), findsOneWidget);
+    });
+
+    testWidgets('a code that is not a connection saves nothing', (
+      tester,
+    ) async {
+      final h =
+          await pumpApp(
+              tester,
+              llm: planningServer(),
+              connection: null,
+              canScan: true,
+            )
+            ..scanCode = 'https://example.com';
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.tap(control('Scan QR code'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Fake scan'));
+      await tester.pumpAndSettle();
+      expect(h.store.saved, isNull);
+      expect(
+        find.text('This QR code is not an AnywhereLLM connection.'),
+        findsOneWidget,
+      );
+      expect(control('Save key'), findsOneWidget);
+    });
+
+    testWidgets('Cancel closes the scanner', (tester) async {
+      final h = await pumpApp(
+        tester,
+        llm: planningServer(),
+        connection: null,
+        canScan: true,
+      );
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.tap(control('Scan QR code'));
+      await tester.pumpAndSettle();
+      await tester.tap(control('Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.text('Fake scan'), findsNothing);
+      expect(control('Save key'), findsOneWidget);
+    });
+
+    testWidgets('without a camera there is no Scan button', (tester) async {
+      final h = await pumpApp(tester, llm: planningServer(), connection: null);
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      expect(control('Save key'), findsOneWidget);
+      expect(control('Scan QR code'), findsNothing);
     });
 
     testWidgets('Esc and Done close it', (tester) async {

@@ -19,6 +19,9 @@ typedef FileSaver = Future<String?> Function(
   Future<List<int>?> Function() bytes,
 );
 
+/// A camera view that reads QR codes and calls [onCode] with the first one's text.
+typedef CodeScanner = Widget Function(void Function(String code) onCode);
+
 /// The app's controllers, put in the tree once by `main.dart`. Controllers are listenable, so
 /// this never notifies: widgets listen to the controller they read.
 class AppScope extends InheritedWidget {
@@ -32,6 +35,7 @@ class AppScope extends InheritedWidget {
     required this.files,
     required this.launch,
     required this.save,
+    this.scanner,
     required super.child,
   });
 
@@ -43,6 +47,9 @@ class AppScope extends InheritedWidget {
   final FilesController files;
   final LinkOpener launch;
   final FileSaver save;
+
+  /// Reads a QR code in Settings, or null where the device has no camera to scan with.
+  final CodeScanner? scanner;
 
   static AppScope of(BuildContext context) {
     // Never notifies, so no dependency is needed. That also lets initState read it.

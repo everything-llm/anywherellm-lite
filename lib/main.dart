@@ -13,6 +13,7 @@ import 'ui/app.dart';
 import 'ui/app_scope.dart';
 import 'ui/boot_screen.dart';
 import 'ui/files/save_file.dart';
+import 'ui/settings/scan_code.dart';
 import 'ui/shell.dart';
 import 'ui/state/chat_controller.dart';
 import 'ui/state/files_controller.dart';
@@ -132,6 +133,7 @@ class _SessionHostState extends State<SessionHost> {
         files: _files,
         launch: widget.launch,
         save: saveWithDialog,
+        scanner: Platform.isAndroid ? cameraScanner : null,
         child: const AppShell(),
       );
     },

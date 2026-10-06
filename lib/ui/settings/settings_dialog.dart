@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/connection.dart';
+import '../../core/errors.dart';
 import '../app_scope.dart';
 import '../state/settings_controller.dart';
 import '../tokens.dart';
@@ -10,6 +12,7 @@ import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
 import '../widgets/fields.dart';
+import '../widgets/qr_mark.dart';
 
 /// The AnythingLLM address and key, and how answers are made. Drawn over the app by the shell.
 class SettingsDialog extends StatelessWidget {
@@ -118,8 +121,8 @@ class _Card extends StatelessWidget {
   }
 }
 
-/// The address and key: saved, replaced or forgotten. A key is saved only once the server takes
-/// it.
+/// The address and key: saved, replaced or forgotten, shown as a QR code for a phone, or read
+/// from one. A key is saved only once the server takes it.
 class _KeyCard extends StatefulWidget {
   const _KeyCard();
 
@@ -129,10 +132,16 @@ class _KeyCard extends StatefulWidget {
 
 class _KeyCardState extends State<_KeyCard> {
   late final SettingsController _settings = AppScope.of(context).settings;
+  late final CodeScanner? _scanner = AppScope.of(context).scanner;
   final _url = TextEditingController();
   final _key = TextEditingController();
   bool _replacing = false;
   bool _confirmForget = false;
+  bool _showCode = false;
+  bool _scanning = false;
+
+  /// Why the last scanned code could not be used.
+  String? _scanProblem;
   Timer? _forgetTimer;
 
   /// The address the field shows as an example, and starts with where http is allowed.
@@ -163,6 +172,27 @@ class _KeyCardState extends State<_KeyCard> {
         _replacing = false;
       });
     }
+  }
+
+  /// Uses a scanned [code] as if its address and key had been typed, and connects with them.
+  Future<void> _scanned(String code) async {
+    final Connection connection;
+    try {
+      connection = parsePairingCode(code);
+    } on ApiException catch (error) {
+      setState(() {
+        _scanning = false;
+        _scanProblem = error.message;
+      });
+      return;
+    }
+    setState(() {
+      _scanning = false;
+      _scanProblem = null;
+      _url.text = connection.baseUrl;
+      _key.text = connection.apiKey;
+    });
+    await _save();
   }
 
   Future<void> _forget() async {
@@ -230,15 +260,32 @@ class _KeyCardState extends State<_KeyCard> {
                     _replacing ? 'Cancel' : 'Replace',
                     onPressed: () => setState(() {
                       _replacing = !_replacing;
+                      _scanning = false;
                     }),
                   ),
+                  if (!_replacing)
+                    AppButton(
+                      _showCode ? 'Hide QR code' : 'Show QR code',
+                      onPressed: () => setState(() => _showCode = !_showCode),
+                    ),
                   AppButton(
                     _confirmForget ? 'Delete it?' : 'Forget',
                     onPressed: _forget,
                   ),
                 ],
               ),
-            if (editing) ...[
+            if (set && !_replacing && _showCode) _PairingCode(connection),
+            if (_scanner case final scan? when editing && _scanning) ...[
+              scan(_scanned),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: AppButton(
+                  'Cancel',
+                  onPressed: () => setState(() => _scanning = false),
+                ),
+              ),
+            ],
+            if (editing && !_scanning) ...[
               AppField(
                 controller: _url,
                 label: 'AnythingLLM server address',
@@ -255,15 +302,30 @@ class _KeyCardState extends State<_KeyCard> {
                 // offered for it.
                 keyboardType: TextInputType.visiblePassword,
               ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: AppButton(
-                  saving ? 'Checking…' : 'Save key',
-                  primary: true,
-                  onPressed: saving ? null : _save,
-                ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  AppButton(
+                    saving ? 'Checking…' : 'Save key',
+                    primary: true,
+                    onPressed: saving ? null : _save,
+                  ),
+                  if (_scanner != null)
+                    AppButton(
+                      'Scan QR code',
+                      onPressed: saving
+                          ? null
+                          : () => setState(() {
+                              _scanning = true;
+                              _scanProblem = null;
+                            }),
+                    ),
+                ],
               ),
             ],
+            if (_scanProblem case final problem?)
+              HelpText(problem, status: true),
             if (_settings.message case final message?)
               HelpText(message, status: true),
             if (_settings.keyringProblem case final problem?)
@@ -271,6 +333,48 @@ class _KeyCardState extends State<_KeyCard> {
           ],
         );
       },
+    );
+  }
+}
+
+/// [connection] as a QR code a phone scans in its own Settings, with why the phone cannot use it
+/// when it cannot.
+class _PairingCode extends StatelessWidget {
+  const _PairingCode(this.connection);
+
+  final Connection connection;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 10,
+      children: [
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 220),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: QrMark(
+                pairingCode(connection),
+                label: 'QR code with the server address and key',
+              ),
+            ),
+          ),
+        ),
+        Text(
+          'Anyone who sees this code can use your key. Scan it in AnywhereLLM on your phone: '
+          'Settings, Scan QR code.',
+          style: Type.sans(12.5, color: t.muted, height: 1.45),
+        ),
+        if (pairingProblem(connection) case final problem?)
+          AlertBox(
+            AlertKind.warn,
+            'Your phone cannot use this address',
+            text: problem,
+          ),
+      ],
     );
   }
 }

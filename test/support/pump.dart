@@ -18,6 +18,7 @@ class Harness extends Rig {
     super.prefsStore,
     super.connection,
     bool sourcesOpen = true,
+    this.canScan = false,
   }) : shell = ShellController(sourcesPinned: sourcesOpen);
 
   final ShellController shell;
@@ -30,6 +31,13 @@ class Harness extends Rig {
 
   /// What opening a link throws, when set.
   Object? openThrows;
+
+  /// Whether the device can scan a QR code. Its scanner is a Fake scan button that reads
+  /// [scanCode].
+  final bool canScan;
+
+  /// The text the fake scanner reads.
+  String scanCode = '';
 
   /// Every file the app saved, by the name it suggested, with its bytes.
   final Map<String, List<int>> saved = {};
@@ -61,13 +69,19 @@ class Harness extends Rig {
         saved[name] = data;
         return '/saved/$name';
       },
+      scanner: canScan
+          ? (onCode) => TextButton(
+              onPressed: () => onCode(scanCode),
+              child: const Text('Fake scan'),
+            )
+          : null,
       child: const AppShell(),
     ),
   );
 }
 
 /// Sizes the test window, builds the app on [llm] and lets the first loads finish. With no
-/// [connection], no server is set up.
+/// [connection], no server is set up. With [canScan], Settings offers a fake QR scanner.
 Future<Harness> pumpApp(
   WidgetTester tester, {
   FakeAnythingLlm? llm,
@@ -75,6 +89,7 @@ Future<Harness> pumpApp(
   Connection? connection = sampleConnection,
   Size size = const Size(1280, 800),
   bool sourcesOpen = true,
+  bool canScan = false,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -84,6 +99,7 @@ Future<Harness> pumpApp(
     prefsStore: prefsStore,
     connection: connection,
     sourcesOpen: sourcesOpen,
+    canScan: canScan,
   );
   addTearDown(harness.dispose);
   await harness.prefs.load();

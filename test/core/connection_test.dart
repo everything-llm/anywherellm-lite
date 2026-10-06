@@ -92,4 +92,78 @@ void main() {
       expect(serverName('100.89.16.22'), '100.89.16.22');
     },
   );
+
+  group('pairing code', () {
+    test('carries the address and key there and back', () {
+      const connection = Connection(
+        baseUrl: 'https://h.example.ts.net:3001/llm',
+        apiKey: 'AB&C=D+E/F?G#H',
+      );
+      final code = pairingCode(connection);
+      expect(code, startsWith('anywherellm://connect?'));
+      expect(code, isNot(contains('&C=D')));
+      expect(parsePairingCode(code), connection);
+    });
+
+    test('anything else is refused', () {
+      for (final bad in [
+        'https://h.example.ts.net:3001',
+        'just words',
+        'anywherellm://connect?url=https%3A%2F%2Fh',
+        'anywherellm://other?url=https%3A%2F%2Fh&key=k',
+      ]) {
+        expect(
+          () => parsePairingCode(bad),
+          throwsA(
+            isA<ApiException>().having(
+              (e) => e.message,
+              'message',
+              contains('not an AnywhereLLM connection'),
+            ),
+          ),
+          reason: bad,
+        );
+      }
+    });
+
+    test('an address it carries is checked as a typed one', () {
+      final code = pairingCode(
+        const Connection(baseUrl: 'ftp://h', apiKey: 'k'),
+      );
+      expect(() => parsePairingCode(code), throwsA(isA<ApiException>()));
+    });
+
+    test('says why a phone cannot use it', () {
+      for (final url in [
+        'https://localhost:3001',
+        'https://127.0.0.1:3001',
+        'https://[::1]:3001',
+        'https://0.0.0.0:3001',
+      ]) {
+        expect(
+          pairingProblem(Connection(baseUrl: url, apiKey: 'k')),
+          contains('is the phone itself'),
+          reason: url,
+        );
+      }
+      expect(
+        pairingProblem(
+          const Connection(
+            baseUrl: 'http://h.example.ts.net:3001',
+            apiKey: 'k',
+          ),
+        ),
+        contains('only over https'),
+      );
+      expect(
+        pairingProblem(
+          const Connection(
+            baseUrl: 'https://h.example.ts.net:3001',
+            apiKey: 'k',
+          ),
+        ),
+        isNull,
+      );
+    });
+  });
 }
