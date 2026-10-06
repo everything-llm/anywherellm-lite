@@ -49,10 +49,21 @@ class AppShell extends StatelessWidget {
             final sideDrawer = screen.sidebarDrawer && shell.sideOpen;
             final files = shell.pane == Pane.files;
             final sourcesDrawer = !sourcesInline && shell.sourcesOpen;
+            // With the keyboard up, Back only puts it away, as Android does elsewhere.
+            final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
             return PopScope(
-              canPop: !shell.settingsOpen && !shell.sideOpen && !sourcesDrawer,
+              canPop:
+                  !typing &&
+                  !shell.settingsOpen &&
+                  !shell.sideOpen &&
+                  !sourcesDrawer,
               onPopInvokedWithResult: (didPop, _) {
-                if (!didPop && !closeTop()) shell.closeSources();
+                if (didPop) return;
+                if (typing) {
+                  FocusManager.instance.primaryFocus?.unfocus();
+                } else if (!closeTop()) {
+                  shell.closeSources();
+                }
               },
               child: CallbackShortcuts(
                 bindings: {
@@ -65,76 +76,79 @@ class AppShell extends StatelessWidget {
                   // InkWell needs a Material above it, and the shell has no Scaffold.
                   child: Material(
                     color: t.bg,
-                    child: Stack(
-                      children: [
-                        Row(
-                          children: [
-                            if (screen.sidebarInline) const Sidebar(),
-                            Expanded(
-                              child: Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  // The chat stays built while Files is on screen, so a draft
-                                  // and a running answer survive the switch.
-                                  Offstage(
-                                    offstage: files,
-                                    child: TickerMode(
-                                      enabled: !files,
-                                      child: ExcludeFocus(
-                                        excluding: files,
-                                        child: ChatView(
-                                          showMenu: screen.sidebarDrawer,
+                    // Clear of the status and navigation bars on a phone; no inset on a desktop.
+                    child: SafeArea(
+                      child: Stack(
+                        children: [
+                          Row(
+                            children: [
+                              if (screen.sidebarInline) const Sidebar(),
+                              Expanded(
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    // The chat stays built while Files is on screen, so a draft
+                                    // and a running answer survive the switch.
+                                    Offstage(
+                                      offstage: files,
+                                      child: TickerMode(
+                                        enabled: !files,
+                                        child: ExcludeFocus(
+                                          excluding: files,
+                                          child: ChatView(
+                                            showMenu: screen.sidebarDrawer,
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  if (files)
-                                    FilesView(showMenu: screen.sidebarDrawer),
-                                ],
+                                    if (files)
+                                      FilesView(showMenu: screen.sidebarDrawer),
+                                  ],
+                                ),
                               ),
-                            ),
-                            if (sourcesInline)
-                              AnimatedContainer(
-                                duration: duration,
-                                curve: Curves.easeOut,
-                                width: shell.sourcesOpen ? Sizes.sources : 0,
-                                child: ClipRect(
-                                  child: OverflowBox(
-                                    alignment: Alignment.centerLeft,
-                                    minWidth: Sizes.sources,
-                                    maxWidth: Sizes.sources,
-                                    child: _Hidden(
-                                      hidden: !shell.sourcesOpen,
-                                      child: const SourcesPanel(),
+                              if (sourcesInline)
+                                AnimatedContainer(
+                                  duration: duration,
+                                  curve: Curves.easeOut,
+                                  width: shell.sourcesOpen ? Sizes.sources : 0,
+                                  child: ClipRect(
+                                    child: OverflowBox(
+                                      alignment: Alignment.centerLeft,
+                                      minWidth: Sizes.sources,
+                                      maxWidth: Sizes.sources,
+                                      child: _Hidden(
+                                        hidden: !shell.sourcesOpen,
+                                        child: const SourcesPanel(),
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
+                            ],
+                          ),
+                          if (sideDrawer || sourcesDrawer)
+                            _Scrim(onTap: shell.closeDrawers),
+                          if (screen.sidebarDrawer)
+                            _Drawer(
+                              open: sideDrawer,
+                              left: true,
+                              width: Sizes.sidebar,
+                              duration: duration,
+                              child: const Sidebar(),
+                            ),
+                          if (!sourcesInline)
+                            _Drawer(
+                              open: sourcesDrawer,
+                              left: false,
+                              width: Sizes.sources,
+                              duration: duration,
+                              child: const SourcesPanel(),
+                            ),
+                          if (shell.settingsOpen) ...[
+                            _Scrim(onTap: shell.closeSettings),
+                            const Center(child: SettingsDialog()),
                           ],
-                        ),
-                        if (sideDrawer || sourcesDrawer)
-                          _Scrim(onTap: shell.closeDrawers),
-                        if (screen.sidebarDrawer)
-                          _Drawer(
-                            open: sideDrawer,
-                            left: true,
-                            width: Sizes.sidebar,
-                            duration: duration,
-                            child: const Sidebar(),
-                          ),
-                        if (!sourcesInline)
-                          _Drawer(
-                            open: sourcesDrawer,
-                            left: false,
-                            width: Sizes.sources,
-                            duration: duration,
-                            child: const SourcesPanel(),
-                          ),
-                        if (shell.settingsOpen) ...[
-                          _Scrim(onTap: shell.closeSettings),
-                          const Center(child: SettingsDialog()),
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ),

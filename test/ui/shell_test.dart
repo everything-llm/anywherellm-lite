@@ -414,6 +414,32 @@ void main() {
       expect(find.text('The saved key was deleted.'), findsOneWidget);
     });
 
+    testWidgets('Back with the keyboard up only puts the keyboard away', (
+      tester,
+    ) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.tap(control('Replace'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(EditableText).first);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(h.shell.settingsOpen, isTrue);
+      expect(
+        FocusManager.instance.primaryFocus?.context?.widget,
+        isNot(isA<EditableText>()),
+      );
+      tester.view.resetViewInsets();
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(h.shell.settingsOpen, isFalse);
+    });
+
     testWidgets('Esc and Done close it', (tester) async {
       final h = await pumpApp(tester, llm: planningServer());
       h.shell.openSettings();

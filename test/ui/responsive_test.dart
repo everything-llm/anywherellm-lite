@@ -4,6 +4,7 @@ import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/upload.dart';
+import 'package:anywherellm/ui/sidebar.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/drop_zone.dart';
@@ -258,6 +259,23 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.bySemanticsLabel('Cancel'), findsWidgets);
       expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final size in const [Size(360, 640), Size(1000, 700)]) {
+    testWidgets('clear of a phone\'s bars at ${size.width.toInt()} wide', (
+      tester,
+    ) async {
+      tester.view.padding = const FakeViewPadding(top: 24, bottom: 24);
+      addTearDown(tester.view.resetPadding);
+      final h = await pumpApp(tester, llm: awkward(), size: size);
+      h.shell
+        ..toggleSide()
+        ..openSources();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      final top = tester.getTopLeft(find.byType(Sidebar)).dy;
+      expect(top, greaterThanOrEqualTo(24));
     });
   }
 
