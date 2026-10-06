@@ -228,24 +228,19 @@ class _EditorState extends State<_Editor> {
             // Only the buttons follow the draft, so typing rebuilds nothing else.
             ListenableBuilder(
               listenable: _draft,
-              builder: (context, _) => Wrap(
-                alignment: WrapAlignment.end,
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  AppButton(
-                    'Revert',
-                    onPressed: _dirty && !_saving
-                        ? () => _draft.text = _saved
-                        : null,
-                  ),
-                  AppButton(
-                    _saving ? 'Saving…' : 'Save',
-                    primary: true,
-                    onPressed: _dirty && !_saving ? _save : null,
-                  ),
-                ],
-              ),
+              builder: (context, _) => ActionRow([
+                AppButton(
+                  'Revert',
+                  onPressed: _dirty && !_saving
+                      ? () => _draft.text = _saved
+                      : null,
+                ),
+                AppButton(
+                  _saving ? 'Saving…' : 'Save',
+                  primary: true,
+                  onPressed: _dirty && !_saving ? _save : null,
+                ),
+              ]),
             ),
           ],
         ),

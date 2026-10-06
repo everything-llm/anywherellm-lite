@@ -39,9 +39,7 @@ class _UploadQueueState extends State<UploadQueue> {
 
   @override
   void dispose() {
-    for (final p in _pending) {
-      p.details.dispose();
-    }
+    _removeAll();
     super.dispose();
   }
 
@@ -95,19 +93,14 @@ class _UploadQueueState extends State<UploadQueue> {
             onRemove: () => setState(() => _remove(p.file.name)),
           ),
         const SizedBox(height: 4),
-        Wrap(
-          alignment: WrapAlignment.end,
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            AppButton('Cancel', onPressed: _clear),
-            AppButton(
-              'Add ${plural(_pending.length, 'file', 'files')}',
-              primary: true,
-              onPressed: _send,
-            ),
-          ],
-        ),
+        ActionRow([
+          AppButton('Cancel', onPressed: _clear),
+          AppButton(
+            'Add ${plural(_pending.length, 'file', 'files')}',
+            primary: true,
+            onPressed: _send,
+          ),
+        ]),
       ],
     ],
   );

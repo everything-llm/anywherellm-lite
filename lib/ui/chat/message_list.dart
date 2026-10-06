@@ -376,7 +376,6 @@ class _ReasoningState extends State<_Reasoning> {
   }
 }
 
-/// A numbered chip naming a document the answer drew on. Tapping it shows the file in Sources.
 /// The sources an answer drew on. An agent's can be dozens of web pages, so past the first few
 /// they fold behind a count.
 class _Citations extends StatefulWidget {

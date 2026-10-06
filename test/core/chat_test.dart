@@ -144,4 +144,36 @@ void main() {
       ],
     );
   });
+
+  group('loadableImage', () {
+    final server = Uri.parse('https://owen.example.ts.net:3001');
+    bool loads(String image, {Uri? from, bool allowHttp = true}) =>
+        loadableImage(Uri.parse(image), from, allowHttp: allowHttp);
+
+    test('the server\'s own host over https, on any port', () {
+      expect(
+        loads('https://owen.example.ts.net:3001/a.png', from: server),
+        isTrue,
+      );
+      expect(
+        loads('https://owen.example.ts.net:8445/card.png', from: server),
+        isTrue,
+      );
+    });
+
+    test('never another host, nor with no server', () {
+      expect(loads('https://example.com/a.png', from: server), isFalse);
+      expect(loads('https://owen.example.ts.net/a.png'), isFalse);
+    });
+
+    test('http only from an http server where http is allowed', () {
+      final plain = Uri.parse('http://box.local:3001');
+      expect(loads('http://owen.example.ts.net/a.png', from: server), isFalse);
+      expect(loads('http://box.local:8445/a.png', from: plain), isTrue);
+      expect(
+        loads('http://box.local:8445/a.png', from: plain, allowHttp: false),
+        isFalse,
+      );
+    });
+  });
 }

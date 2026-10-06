@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
-import '../tokens.dart';
-import '../type.dart';
 import '../widgets/buttons.dart';
 import '../widgets/doc_details.dart';
 import '../widgets/fields.dart';
@@ -81,6 +79,7 @@ class _AddSourceState extends State<AddSource> {
           controller: _link,
           label: 'Web page to add',
           hint: 'https://…',
+          keyboardType: TextInputType.url,
           onSubmitted: (_) => _addLink(),
         ),
         DocDetails(_details),
@@ -94,7 +93,12 @@ class _AddSourceState extends State<AddSource> {
       onCancel: _close,
       children: [
         AppField(controller: _title, label: 'Title', hint: 'Title'),
-        _TextBox(_text),
+        AppField(
+          controller: _text,
+          label: 'Text to add',
+          hint: 'Paste the text here',
+          maxLines: 5,
+        ),
         DocDetails(_details, title: false),
       ],
     ),
@@ -125,56 +129,11 @@ class _Form extends StatelessWidget {
       for (final child in children) ...[child, const SizedBox(height: 8)],
       ListenableBuilder(
         listenable: ready,
-        builder: (context, _) => Wrap(
-          alignment: WrapAlignment.end,
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            AppButton('Cancel', onPressed: onCancel),
-            AppButton('Add', primary: true, onPressed: canAdd() ? onAdd : null),
-          ],
-        ),
+        builder: (context, _) => ActionRow([
+          AppButton('Cancel', onPressed: onCancel),
+          AppButton('Add', primary: true, onPressed: canAdd() ? onAdd : null),
+        ]),
       ),
     ],
   );
-}
-
-/// The several lines of text to save.
-class _TextBox extends StatelessWidget {
-  const _TextBox(this.controller);
-
-  final TextEditingController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Semantics(
-      label: 'Text to add',
-      textField: true,
-      child: TextField(
-        controller: controller,
-        minLines: 3,
-        maxLines: 5,
-        keyboardType: TextInputType.multiline,
-        style: Type.sans(14, color: t.ink, height: 1.45),
-        cursorColor: t.accent,
-        decoration: InputDecoration(
-          isDense: true,
-          filled: true,
-          fillColor: t.bg,
-          hintText: 'Paste the text here',
-          hintStyle: Type.sans(14, color: t.fade),
-          contentPadding: const EdgeInsets.all(12),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: t.line),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: t.accent, width: 2),
-          ),
-        ),
-      ),
-    );
-  }
 }

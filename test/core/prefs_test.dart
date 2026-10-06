@@ -46,4 +46,16 @@ void main() {
     expect(prefs.switchedOff.keys, ['a', 'b']);
     expect(prefs.withOff('a', []).switchedOff.keys, ['b']);
   });
+
+  test(
+    'withoutDocs forgets the paths everywhere and drops emptied workspaces',
+    () {
+      const a = OffDoc(path: 'f/a.json', title: 'a');
+      const b = OffDoc(path: 'f/b.json', title: 'b');
+      final prefs = const Prefs().withOff('w', [a, b]).withOff('v', [a]);
+      final next = prefs.withoutDocs({'f/a.json', 'f/c.json'});
+      expect(next.switchedOff.keys, ['w']);
+      expect(next.offIn('w').single.path, 'f/b.json');
+    },
+  );
 }

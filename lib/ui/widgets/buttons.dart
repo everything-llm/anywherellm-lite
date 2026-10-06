@@ -96,6 +96,21 @@ class IconBtn extends StatelessWidget {
   }
 }
 
+/// A form's buttons, such as Cancel and Add, in a row at its end that wraps when narrow.
+class ActionRow extends StatelessWidget {
+  const ActionRow(this.children, {super.key});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    alignment: WrapAlignment.end,
+    spacing: 8,
+    runSpacing: 8,
+    children: children,
+  );
+}
+
 /// A small text button with an icon before it.
 class TextAction extends StatelessWidget {
   const TextAction(

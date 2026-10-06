@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
+import '../../core/chat.dart';
 import '../app_scope.dart';
 import '../links.dart';
 import '../tokens.dart';
@@ -32,8 +33,7 @@ class AnswerBody extends StatelessWidget {
         Type.sans(size, weight: FontWeight.w600, color: t.ink, height: 1.35);
     final border = BorderSide(color: t.line);
     final settings = AppScope.of(context).settings;
-    final base = settings.connection?.baseUrl;
-    final server = base == null ? null : Uri.parse(base);
+    final server = settings.connection?.uri;
     final allowHttp = settings.allowHttp;
     return MarkdownBody(
       data: text,
@@ -52,7 +52,7 @@ class AnswerBody extends StatelessWidget {
           decoration: TextDecoration.underline,
           decorationColor: t.accent,
         ),
-        code: code.copyWith(fontSize: 13.5, backgroundColor: t.panel2),
+        code: code.copyWith(backgroundColor: t.panel2),
         h1: heading(22),
         h2: heading(19),
         h3: heading(17),
@@ -120,13 +120,7 @@ class _Image extends StatelessWidget {
       '[${alt?.trim().isNotEmpty == true ? alt!.trim() : 'image'}: ${uri.host}]',
       style: Type.sans(14, color: t.muted),
     );
-    final server = this.server;
-    final ours =
-        server != null &&
-        uri.host == server.host &&
-        (uri.scheme == 'https' ||
-            (uri.scheme == 'http' && server.scheme == 'http' && allowHttp));
-    if (!ours) return described;
+    if (!loadableImage(uri, server, allowHttp: allowHttp)) return described;
     return ConstrainedBox(
       constraints: const BoxConstraints(maxHeight: 360),
       child: ClipRRect(

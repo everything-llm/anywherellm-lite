@@ -39,14 +39,23 @@ class _ComposerState extends State<Composer> {
   /// The command in the menu that Enter picks.
   int _highlight = 0;
 
-  /// The message as it was when Esc closed the menu. The menu stays closed until it changes.
-  String? _dismissed;
+  /// Whether Esc closed the menu. It stays closed until the message changes.
+  bool _menuClosed = false;
+
+  /// What the form follows besides the message, whose changes [_changed] handles.
+  late final Listenable _shown;
 
   String _typed = '';
 
   @override
   void initState() {
     super.initState();
+    final scope = AppScope.of(context);
+    _shown = Listenable.merge([
+      scope.settings,
+      scope.chat,
+      scope.sources.chatMode,
+    ]);
     widget.draft.addListener(_changed);
   }
 
@@ -61,7 +70,7 @@ class _ComposerState extends State<Composer> {
     setState(() {
       _typed = widget.draft.text;
       _highlight = 0;
-      if (_dismissed != _typed) _dismissed = null;
+      _menuClosed = false;
     });
   }
 
@@ -83,7 +92,7 @@ class _ComposerState extends State<Composer> {
         selection: TextSelection.collapsed(offset: 1),
       );
     }
-    setState(() => _dismissed = null);
+    setState(() => _menuClosed = false);
     widget.focus.requestFocus();
   }
 
@@ -138,15 +147,10 @@ class _ComposerState extends State<Composer> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: Sizes.column),
           child: ListenableBuilder(
-            listenable: Listenable.merge([
-              scope.settings,
-              scope.chat,
-              scope.sources.chatMode,
-              draft,
-            ]),
+            listenable: _shown,
             builder: (context, _) {
               if (!scope.settings.configured) return const _NoKey();
-              final matches = scope.chat.busy || _dismissed == draft.text
+              final matches = scope.chat.busy || _menuClosed
                   ? const <SlashCommand>[]
                   : commandsFor(draft.text, scope.chat.commands);
               return _Form(
@@ -160,7 +164,7 @@ class _ComposerState extends State<Composer> {
                     : _highlight.clamp(0, matches.length - 1),
                 onHighlight: (i) => setState(() => _highlight = i),
                 onPick: _pick,
-                onDismiss: () => setState(() => _dismissed = draft.text),
+                onDismiss: () => setState(() => _menuClosed = true),
                 onSlash: _slash,
                 onAttach: _attach,
                 onRemove: _remove,

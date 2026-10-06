@@ -17,8 +17,11 @@ class Connection {
   final String baseUrl;
   final String apiKey;
 
+  /// [baseUrl] parsed.
+  Uri get uri => Uri.parse(baseUrl);
+
   /// The server's host name, for messages.
-  String get host => Uri.parse(baseUrl).host;
+  String get host => uri.host;
 
   @override
   bool operator ==(Object other) =>

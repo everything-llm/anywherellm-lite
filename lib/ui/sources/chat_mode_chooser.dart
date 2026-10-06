@@ -17,7 +17,7 @@ class ChatModeChooser extends StatelessWidget {
     final sources = scope.sources;
     final chat = scope.chat;
     return ListenableBuilder(
-      listenable: Listenable.merge([sources, chat]),
+      listenable: Listenable.merge([sources.chatMode, chat]),
       builder: (context, _) {
         final mode = sources.chatMode.value;
         final slug = chat.activeSlug;

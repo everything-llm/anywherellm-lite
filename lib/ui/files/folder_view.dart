@@ -96,10 +96,7 @@ class _DeleteFolderState extends State<_DeleteFolder> {
   String _question() {
     final files = AppScope.of(context).files;
     final name = widget.node.ref!;
-    final docs = [
-      for (final f in files.library)
-        if (f.name == name) ...f.files,
-    ];
+    final docs = files.folderDocs(name);
     final users = {
       for (final d in docs)
         for (final w in files.usersOf(d.path)) w.name,

@@ -1,4 +1,5 @@
 import 'package:anywherellm/core/commands.dart';
+import 'package:anywherellm/core/errors.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _research = SlashCommand(
@@ -93,6 +94,24 @@ void main() {
     test('not a longer command, nor /reset later in the message', () {
       expect(resetsChat('/reset-all', const []), isFalse);
       expect(resetsChat('please /reset', const []), isFalse);
+    });
+  });
+
+  group('whyNoPresets', () {
+    test('a 401 or 403 means the server has a password', () {
+      for (final status in [401, 403]) {
+        expect(
+          whyNoPresets(ApiException('no', status: status)),
+          contains('has a password'),
+          reason: '$status',
+        );
+      }
+    });
+
+    test('any other failure says only that they could not be listed', () {
+      final note = whyNoPresets(const ApiException('down', status: 500));
+      expect(note, isNot(contains('password')));
+      expect(note, contains('could not be listed'));
     });
   });
 }

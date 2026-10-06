@@ -60,24 +60,19 @@ class _TestQuestionState extends State<TestQuestion> {
             onSubmitted: sources.search,
           ),
           const SizedBox(height: 8),
-          Wrap(
-            alignment: WrapAlignment.end,
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              AppButton('Done', onPressed: _close),
-              ListenableBuilder(
-                listenable: _question,
-                builder: (context, _) => AppButton(
-                  'Test',
-                  primary: true,
-                  onPressed: _question.text.trim().isEmpty || sources.searching
-                      ? null
-                      : () => sources.search(_question.text),
-                ),
+          ActionRow([
+            AppButton('Done', onPressed: _close),
+            ListenableBuilder(
+              listenable: _question,
+              builder: (context, _) => AppButton(
+                'Test',
+                primary: true,
+                onPressed: _question.text.trim().isEmpty || sources.searching
+                    ? null
+                    : () => sources.search(_question.text),
               ),
-            ],
-          ),
+            ),
+          ]),
           if (sources.searching) ...[
             const SizedBox(height: 8),
             const HelpText('Searching…', status: true),

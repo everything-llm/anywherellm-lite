@@ -131,31 +131,21 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     List<Attachment> attachments = const [],
   }) async* {
     // No `mode`: the server then answers in the workspace's own chat mode.
-    final response = await _openStream('${_thread(slug, thread)}/stream-chat', {
+    yield* _events('${_thread(slug, thread)}/stream-chat', {
       'message': message,
       if (attachments.isNotEmpty)
         'attachments': [for (final a in attachments) attachmentJson(a)],
     }, attachments.isEmpty ? timeout : uploadTimeout);
-    try {
-      yield* chatEvents(response.stream);
-    } on http.ClientException catch (error) {
-      throw ApiException('The answer was cut off: ${error.message}');
-    }
   }
 
   /// A `stream-chat` with `reset` and no message, which clears the history and answers with
   /// one closing chunk.
   @override
-  Future<void> resetChat(String slug, String thread) async {
-    final response = await _openStream('${_thread(slug, thread)}/stream-chat', {
-      'reset': true,
-    }, timeout);
-    try {
-      await chatEvents(response.stream).drain<void>();
-    } on http.ClientException catch (error) {
-      throw ApiException('The reply was cut off: ${error.message}');
-    }
-  }
+  Future<void> resetChat(String slug, String thread) => _events(
+    '${_thread(slug, thread)}/stream-chat',
+    {'reset': true},
+    timeout,
+  ).drain<void>();
 
   /// The presets live under `/api/system`, not `/api/v1`. That route takes the browser's login,
   /// not the API key, so it answers only while the server has no password.
@@ -217,20 +207,22 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       if (!meta.isEmpty) request.fields['metadata'] = jsonEncode(meta.toJson());
       return http.Response.fromStream(await _client.send(request));
     }, refused: 'The server could not read $name in.');
-    return [
-      for (final json in jsonObjects(_field(body, 'documents')))
-        DocEntry.fromJson(json),
-    ];
+    return _documents(body);
   }
 
   @override
   Future<List<DocEntry>> uploadLink(
     String url, {
     DocMeta meta = const DocMeta(),
-  }) => _readIn('/api/v1/document/upload-link', {
-    'link': url,
-    if (!meta.isEmpty) 'metadata': meta.toJson(),
-  }, refused: 'The server could not read $url.');
+  }) async => _documents(
+    await _send(
+      'POST',
+      '/api/v1/document/upload-link',
+      {'link': url, if (!meta.isEmpty) 'metadata': meta.toJson()},
+      limit: uploadTimeout,
+      refused: 'The server could not read $url.',
+    ),
+  );
 
   /// The server requires a `title` in the metadata.
   @override
@@ -238,31 +230,24 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     String title,
     String text, {
     DocMeta meta = const DocMeta(),
-  }) => _readIn('/api/v1/document/raw-text', {
-    'textContent': text,
-    'metadata': {...meta.toJson(), 'title': title},
-  }, refused: 'The server could not save $title.');
+  }) async => _documents(
+    await _send(
+      'POST',
+      '/api/v1/document/raw-text',
+      {
+        'textContent': text,
+        'metadata': {...meta.toJson(), 'title': title},
+      },
+      limit: uploadTimeout,
+      refused: 'The server could not save $title.',
+    ),
+  );
 
-  /// Posts [body] to [path], which reads something in, and returns the documents it made.
-  Future<List<DocEntry>> _readIn(
-    String path,
-    Map<String, Object?> body, {
-    required String refused,
-  }) async {
-    final connection = _current;
-    final answer = await _call(
-      connection,
-      uploadTimeout,
-      () async => http.Response.fromStream(
-        await _client.send(_request(connection, 'POST', path, body)),
-      ),
-      refused: refused,
-    );
-    return [
-      for (final json in jsonObjects(_field(answer, 'documents')))
-        DocEntry.fromJson(json),
-    ];
-  }
+  /// The documents an upload, a link or pasted text made, from the server's answer [body].
+  List<DocEntry> _documents(Object? body) => [
+    for (final json in jsonObjects(_field(body, 'documents')))
+      DocEntry.fromJson(json),
+  ];
 
   /// The server answers with the workspace it wrote, or a `message` saying why it did not.
   @override
@@ -298,19 +283,16 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   @override
   Future<List<int>> exportChats(ChatExport format) async {
     final connection = _current;
-    final http.Response response;
-    try {
-      response = await _client
-          .get(
-            Uri.parse(
-              '${connection.baseUrl}/api/v1/system/export-chats?type=${format.name}',
-            ),
-            headers: {'Authorization': 'Bearer ${connection.apiKey}'},
-          )
-          .timeout(uploadTimeout);
-    } on Exception catch (error) {
-      throw _unreachable(connection, error, uploadTimeout);
-    }
+    final request = _request(
+      connection,
+      'GET',
+      '/api/v1/system/export-chats?type=${format.name}',
+    )..headers['Accept'] = '*/*';
+    final response = await _fetch(
+      connection,
+      uploadTimeout,
+      () async => http.Response.fromStream(await _client.send(request)),
+    );
     final type = response.headers['content-type'] ?? '';
     final ok = response.statusCode >= 200 && response.statusCode < 300;
     if (!ok || type.startsWith('text/html')) {
@@ -384,7 +366,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
 
   /// [connection], or an [ApiException] when it is `http://` and [allowHttp] is false.
   Connection _secure(Connection connection) {
-    if (!allowHttp && Uri.parse(connection.baseUrl).scheme == 'http') {
+    if (!allowHttp && connection.uri.scheme == 'http') {
       throw const ApiException(
         'Use an https:// address. This device does not send the API key over plain http.',
       );
@@ -413,26 +395,29 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     ),
   );
 
-  /// The open response to a POST of [body] to [path], whose body streams server-sent events.
-  /// A failed status is an [ApiException] with the server's words.
-  Future<http.StreamedResponse> _openStream(
+  /// The events of a POST of [body] to [path], whose answer streams server-sent events. A
+  /// failed status is an [ApiException] with the server's words, as is a stream cut off.
+  Stream<ChatEvent> _events(
     String path,
     Map<String, Object?> body,
     Duration limit,
-  ) async {
+  ) async* {
     final connection = _current;
     final request = _request(connection, 'POST', path, body)
       ..headers['Accept'] = 'text/event-stream';
-    final http.StreamedResponse response;
-    try {
-      response = await _client.send(request).timeout(limit);
-    } on Exception catch (error) {
-      throw _unreachable(connection, error, limit);
-    }
+    final response = await _fetch(
+      connection,
+      limit,
+      () => _client.send(request),
+    );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       _decode(await http.Response.fromStream(response));
     }
-    return response;
+    try {
+      yield* chatEvents(response.stream);
+    } on http.ClientException catch (error) {
+      throw ApiException('The answer was cut off: ${error.message}');
+    }
   }
 
   /// A [method] to [path] on [connection] with the key, and [body] as JSON when given.
@@ -460,13 +445,14 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     String method,
     String path,
     Map<String, Object?>? body, {
+    Duration? limit,
     bool emptyOk = false,
     String refused = _refused,
   }) async {
     final connection = _current;
     return _call(
       connection,
-      timeout,
+      limit ?? timeout,
       () async => http.Response.fromStream(
         await _client.send(_request(connection, method, path, body)),
       ),
@@ -482,14 +468,24 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     Future<http.Response> Function() send, {
     bool emptyOk = false,
     String refused = _refused,
-  }) async {
-    final http.Response response;
+  }) async => _decode(
+    await _fetch(connection, limit, send),
+    emptyOk: emptyOk,
+    refused: refused,
+  );
+
+  /// The response [send] gets within [limit], or an [ApiException] in plain words when the
+  /// server cannot be reached.
+  Future<T> _fetch<T>(
+    Connection connection,
+    Duration limit,
+    Future<T> Function() send,
+  ) async {
     try {
-      response = await send().timeout(limit);
+      return await send().timeout(limit);
     } on Exception catch (error) {
       throw _unreachable(connection, error, limit);
     }
-    return _decode(response, emptyOk: emptyOk, refused: refused);
   }
 
   /// [error], from sending a request, in plain words.

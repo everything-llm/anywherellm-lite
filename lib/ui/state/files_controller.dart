@@ -98,6 +98,12 @@ class FilesController extends ChangeNotifier {
 
   List<LibraryFolder> get library => _library ?? const [];
 
+  /// The documents in library folder [name].
+  List<LibraryFile> folderDocs(String name) => [
+    for (final f in library)
+      if (f.name == name) ...f.files,
+  ];
+
   /// The workspaces, among those read, that use the library document at [path].
   List<Workspace> usersOf(String path) => [
     for (final w in _details.values)
@@ -375,7 +381,7 @@ class FilesController extends ChangeNotifier {
     final active = _chat.activeSlug;
     final shownOff =
         active != null && _prefs.prefs.offIn(active).any((d) => d.path == path);
-    await _prefs.forgetDoc(path);
+    await _prefs.forgetDocs([path]);
     if (shownOff) unawaited(_sources.refresh());
     if (selected == libraryPath(path)) {
       await select(libraryPath(docFolder(path)));
@@ -385,10 +391,7 @@ class FilesController extends ChangeNotifier {
   /// Deletes library folder [name] with its documents, which takes them out of every workspace,
   /// and forgets them wherever they were switched off in Sources.
   Future<void> deleteFolder(String name) async {
-    final paths = [
-      for (final f in library)
-        if (f.name == name) ...[for (final d in f.files) d.path],
-    ];
+    final paths = [for (final d in folderDocs(name)) d.path];
     final ok = await _change(
       'Could not delete the folder',
       () => _api.removeFolder(name),
@@ -405,9 +408,7 @@ class FilesController extends ChangeNotifier {
     final shownOff =
         active != null &&
         _prefs.prefs.offIn(active).any((d) => paths.contains(d.path));
-    for (final path in paths) {
-      await _prefs.forgetDoc(path);
-    }
+    await _prefs.forgetDocs(paths);
     if (shownOff) unawaited(_sources.refresh());
     _expanded.remove(libraryPath(name));
     await select('/library');

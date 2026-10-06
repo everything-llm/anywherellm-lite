@@ -308,7 +308,6 @@ class SourcesController extends ChangeNotifier {
     if (slug == null || mode == chatMode.value) return;
     final was = chatMode.value;
     chatMode.value = mode;
-    notifyListeners();
     try {
       await _api.updateWorkspace(slug, {'chatMode': mode.name});
       if (slug != _slug) return;

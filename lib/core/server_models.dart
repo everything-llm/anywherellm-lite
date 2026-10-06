@@ -74,6 +74,16 @@ class Workspace {
     );
   }
 
+  /// This workspace under the name [name].
+  Workspace withName(String name) => Workspace(
+    slug: slug,
+    name: name,
+    threads: threads,
+    documents: documents,
+    prompt: prompt,
+    settings: settings,
+  );
+
   final String slug;
   final String name;
 

@@ -107,14 +107,21 @@ class ChatController extends ChangeNotifier {
   /// The chats whose names the person chose, which the first message does not rename.
   final Set<String> _named = {};
 
-  /// The server's slash-command presets, or none when they cannot be read.
-  List<SlashCommand> _presets = const [];
+  /// The server's slash-command presets, or none when they cannot be read. Setting them sets
+  /// [commands].
+  List<SlashCommand> get _presets => _presetList;
+  set _presets(List<SlashCommand> presets) {
+    _presetList = presets;
+    commands = withBuiltIns(presets);
+  }
+
+  List<SlashCommand> _presetList = const [];
 
   /// Why the server's presets are missing from [commands], or null when they were read.
   String? commandsNote;
 
   /// The commands a message can start with: `/reset`, then the server's presets.
-  List<SlashCommand> get commands => withBuiltIns(_presets);
+  List<SlashCommand> commands = withBuiltIns(const []);
 
   /// The answer running. Only one runs at a time.
   _Running? _running;
@@ -222,9 +229,7 @@ class ChatController extends ChangeNotifier {
       commandsNote = null;
     } on ApiException catch (error) {
       if (_server != server) return;
-      commandsNote = error.status == 401 || error.status == 403
-          ? 'This server has a password, so its own commands can\'t be listed here. One typed in full still runs.'
-          : 'The server\'s own commands could not be listed. One typed in full still runs.';
+      commandsNote = whyNoPresets(error);
     }
     notifyListeners();
   }
@@ -317,16 +322,7 @@ class ChatController extends ChangeNotifier {
       }
       workspaces = [
         for (final w in workspaces)
-          w.slug == slug
-              ? Workspace(
-                  slug: slug,
-                  name: renamed.name,
-                  threads: w.threads,
-                  documents: w.documents,
-                  prompt: w.prompt,
-                  settings: w.settings,
-                )
-              : w,
+          w.slug == slug ? w.withName(renamed.name) : w,
       ];
     });
   }
