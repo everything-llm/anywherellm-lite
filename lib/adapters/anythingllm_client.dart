@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import '../core/chat.dart';
 import '../core/commands.dart';
 import '../core/connection.dart';
+import '../core/embeds.dart';
 import '../core/ports.dart';
 import '../core/server_models.dart';
 import '../core/upload.dart';
@@ -598,6 +599,73 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     final settings = _field(await _get(_current, '/api/v1/system'), 'settings');
     return settings is Map<String, dynamic> ? settings : const {};
   }
+
+  @override
+  Future<List<Embed>> embeds() async => [
+    for (final json in jsonObjects(
+      _field(await _get(_current, '/api/v1/embed'), 'embeds'),
+    ))
+      Embed.fromJson(json),
+  ];
+
+  /// The server answers the new embed, or null with an `error` when it made none.
+  @override
+  Future<String> createEmbed(NewEmbed embed) async {
+    final answer = await _send(
+      'POST',
+      '/api/v1/embed/new',
+      embed.toJson(),
+      refused: 'The server did not make the embed.',
+    );
+    if (_field(answer, 'error') case final String error
+        when error.trim().isNotEmpty) {
+      throw ApiException(error.trim());
+    }
+    return switch (_field(answer, 'embed')) {
+      {'uuid': final String uuid} => uuid,
+      _ => throw const ApiException('The server did not make the embed.'),
+    };
+  }
+
+  @override
+  Future<void> updateEmbed(
+    String uuid, {
+    bool? enabled,
+    EmbedMode? mode,
+  }) async {
+    final answer = await _send(
+      'POST',
+      '/api/v1/embed/${Uri.encodeComponent(uuid)}',
+      {'enabled': ?enabled, 'chat_mode': ?mode?.name},
+      refused: 'The server did not change the embed.',
+    );
+    if (_field(answer, 'error') case final String error
+        when error.trim().isNotEmpty) {
+      throw ApiException(error.trim());
+    }
+  }
+
+  @override
+  Future<void> deleteEmbed(String uuid) => _send(
+    'DELETE',
+    '/api/v1/embed/${Uri.encodeComponent(uuid)}',
+    null,
+    refused: 'The server did not delete the embed.',
+  );
+
+  @override
+  Future<List<EmbedChat>> embedChats(String uuid) async => [
+    for (final json in jsonObjects(
+      _field(
+        await _get(
+          _current,
+          '/api/v1/embed/${Uri.encodeComponent(uuid)}/chats',
+        ),
+        'chats',
+      ),
+    ))
+      EmbedChat.fromJson(json),
+  ];
 
   @override
   Future<int> vectorCount() async => switch (_field(

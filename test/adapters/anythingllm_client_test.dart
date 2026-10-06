@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:anywherellm/adapters/anythingllm_client.dart';
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/connection.dart';
+import 'package:anywherellm/core/embeds.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1375,6 +1376,55 @@ void main() {
         ).searchDocs('q3', ''),
       );
       expect(error.message, contains('Query parameter cannot be empty.'));
+    });
+
+    test('embeds are listed, made, changed and deleted by uuid', () async {
+      final seen = <http.Request>[];
+      final api = _api((request) async {
+        seen.add(request);
+        return http.Response(switch (request.url.path) {
+          '/api/v1/embed' => jsonEncode({
+            'embeds': [
+              {
+                'uuid': 'e-1',
+                'workspace': {'name': 'Q3'},
+                'chat_count': 2,
+              },
+            ],
+          }),
+          '/api/v1/embed/new' => jsonEncode({
+            'embed': {'uuid': 'e-2'},
+            'error': null,
+          }),
+          '/api/v1/embed/e-1/chats' => jsonEncode({
+            'chats': [
+              {'prompt': 'Hi', 'response': '{"text":"Hello"}'},
+            ],
+          }),
+          _ => jsonEncode({'success': true, 'error': null}),
+        }, 200);
+      });
+      expect((await api.embeds()).single.chats, 2);
+      expect(await api.createEmbed(const NewEmbed(workspaceSlug: 'q3')), 'e-2');
+      await api.updateEmbed('e-1', enabled: false);
+      await api.deleteEmbed('e-1');
+      expect((await api.embedChats('e-1')).single.answer, 'Hello');
+      expect(seen.map((r) => '${r.method} ${r.url.path}'), [
+        'GET /api/v1/embed',
+        'POST /api/v1/embed/new',
+        'POST /api/v1/embed/e-1',
+        'DELETE /api/v1/embed/e-1',
+        'GET /api/v1/embed/e-1/chats',
+      ]);
+      expect(jsonDecode(seen[2].body), {'enabled': false});
+    });
+
+    test('an embed the server would not make says why', () async {
+      final error = await _failure(
+        _answering({'embed': null, 'error': 'Workspace not found'})
+            .createEmbed(const NewEmbed(workspaceSlug: 'gone')),
+      );
+      expect(error.message, 'Workspace not found');
     });
 
     test('the vector count is the server\'s number', () async {

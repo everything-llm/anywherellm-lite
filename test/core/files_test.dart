@@ -52,6 +52,7 @@ void main() {
         '/library',
         '/settings',
         '/settings/models.json',
+        '/settings/embeds',
         '/.env',
         '/keys',
       ]);

@@ -1,6 +1,7 @@
 import 'chat.dart';
 import 'commands.dart';
 import 'connection.dart';
+import 'embeds.dart';
 import 'prefs.dart';
 import 'server_models.dart';
 
@@ -139,6 +140,20 @@ abstract interface class AnythingLlmApi {
 
   /// How many vectors the server's vector database holds, across every workspace.
   Future<int> vectorCount();
+
+  /// The server's chat embeds.
+  Future<List<Embed>> embeds();
+
+  /// Makes a chat embed, and returns its uuid.
+  Future<String> createEmbed(NewEmbed embed);
+
+  /// Changes embed [uuid]: whether it is on, and the mode it answers in.
+  Future<void> updateEmbed(String uuid, {bool? enabled, EmbedMode? mode});
+
+  Future<void> deleteEmbed(String uuid);
+
+  /// The chats embed [uuid] has held, in the server's order.
+  Future<List<EmbedChat>> embedChats(String uuid);
 }
 
 /// Where the connection is kept between runs.

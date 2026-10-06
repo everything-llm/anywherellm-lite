@@ -12,6 +12,7 @@ import '../widgets/controls.dart';
 import '../widgets/min_height.dart';
 import '../widgets/pane_header.dart';
 import 'doc_views.dart';
+import 'embeds_view.dart';
 import 'file_tree.dart';
 import 'folder_view.dart';
 import 'settings_form.dart';
@@ -101,6 +102,7 @@ class FilesView extends StatelessWidget {
       ),
       NodeKind.libraryDoc => LibraryDocView(node),
       NodeKind.docLink => DocLinkView(node),
+      NodeKind.embeds => const EmbedsView(),
       _ => TextPage(files.text ?? ''),
     };
   }

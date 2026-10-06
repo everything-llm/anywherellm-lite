@@ -35,6 +35,7 @@ enum NodeKind {
   libraryDoc,
   systemFolder,
   models,
+  embeds,
   locked;
 
   bool get isFolder => switch (this) {
@@ -162,6 +163,11 @@ FileNode buildTree({
           path: '/settings/models.json',
           name: 'models.json',
           kind: NodeKind.models,
+        ),
+        FileNode(
+          path: '/settings/embeds',
+          name: 'embeds',
+          kind: NodeKind.embeds,
         ),
       ],
     ),
