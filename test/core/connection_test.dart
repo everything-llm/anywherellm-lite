@@ -1,5 +1,5 @@
-import 'package:everything/core/connection.dart';
-import 'package:everything/core/ports.dart';
+import 'package:anywherellm/core/connection.dart';
+import 'package:anywherellm/core/ports.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -39,7 +39,7 @@ class Brand extends StatelessWidget {
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
             child: Text(
-              'Nilson',
+              'AnywhereLLM',
               style: Type.serif(
                 size,
                 color: t.ink,

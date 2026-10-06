@@ -1,6 +1,6 @@
-import 'package:everything/core/connection.dart';
-import 'package:everything/core/ports.dart';
-import 'package:everything/core/prefs.dart';
+import 'package:anywherellm/core/connection.dart';
+import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/prefs.dart';
 
 /// A [SettingsStore] that keeps its connection in memory. Set [loadError] or [saveError] to make
 /// the keyring fail.

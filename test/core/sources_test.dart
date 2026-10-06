@@ -1,6 +1,6 @@
-import 'package:everything/core/prefs.dart';
-import 'package:everything/core/server_models.dart';
-import 'package:everything/core/sources.dart';
+import 'package:anywherellm/core/prefs.dart';
+import 'package:anywherellm/core/server_models.dart';
+import 'package:anywherellm/core/sources.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

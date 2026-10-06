@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:everything/core/files.dart';
-import 'package:everything/core/ports.dart';
-import 'package:everything/core/server_models.dart';
+import 'package:anywherellm/core/files.dart';
+import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/server_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _settings = WorkspaceSettings({

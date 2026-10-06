@@ -1,4 +1,4 @@
-package local.nilson.nilson
+package local.anywherellm.anywherellm
 
 import io.flutter.embedding.android.FlutterActivity
 

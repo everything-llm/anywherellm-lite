@@ -1,7 +1,7 @@
 import 'dart:ui' show Size;
 
-import 'package:everything/core/server_models.dart';
-import 'package:everything/ui/state/shell_controller.dart';
+import 'package:anywherellm/core/server_models.dart';
+import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';

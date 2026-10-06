@@ -1,7 +1,7 @@
-import 'package:everything/core/files.dart';
-import 'package:everything/core/ports.dart';
-import 'package:everything/core/prefs.dart';
-import 'package:everything/core/upload.dart';
+import 'package:anywherellm/core/files.dart';
+import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/prefs.dart';
+import 'package:anywherellm/core/upload.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';

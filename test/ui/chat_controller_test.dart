@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:everything/core/chat.dart';
-import 'package:everything/core/ports.dart';
-import 'package:everything/core/prefs.dart';
+import 'package:anywherellm/core/chat.dart';
+import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/prefs.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';

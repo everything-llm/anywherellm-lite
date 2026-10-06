@@ -229,7 +229,7 @@ class _NoKey extends StatelessWidget {
                   ),
                   const TextSpan(
                     text:
-                        'Nilson talks to AnythingLLM and needs its developer API key. '
+                        'AnywhereLLM talks to AnythingLLM and needs its developer API key. '
                         'Add it in Settings to start asking.',
                   ),
                 ],

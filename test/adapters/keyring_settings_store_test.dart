@@ -1,6 +1,6 @@
-import 'package:everything/adapters/keyring_settings_store.dart';
-import 'package:everything/core/connection.dart';
-import 'package:everything/core/ports.dart';
+import 'package:anywherellm/adapters/keyring_settings_store.dart';
+import 'package:anywherellm/core/connection.dart';
+import 'package:anywherellm/core/ports.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 

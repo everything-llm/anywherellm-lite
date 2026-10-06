@@ -3,8 +3,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:everything/ui/theme.dart';
-import 'package:everything/ui/widgets/tappable.dart';
+import 'package:anywherellm/ui/theme.dart';
+import 'package:anywherellm/ui/widgets/tappable.dart';
 
 Tappable make({
   VoidCallback? onTap,

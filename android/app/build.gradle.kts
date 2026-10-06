@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "local.nilson.nilson"
+    namespace = "local.anywherellm.anywherellm"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -15,7 +15,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "local.nilson.nilson"
+        applicationId = "local.anywherellm.anywherellm"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

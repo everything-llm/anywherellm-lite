@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:everything/core/ports.dart';
-import 'package:everything/core/upload.dart';
-import 'package:everything/ui/state/sources_controller.dart';
+import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/upload.dart';
+import 'package:anywherellm/ui/state/sources_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';

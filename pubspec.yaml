@@ -1,4 +1,4 @@
-name: everything
+name: anywherellm
 description: "A lightweight Linux and Android front end for an AnythingLLM server."
 publish_to: 'none'
 version: 2.0.0+4

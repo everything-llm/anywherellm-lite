@@ -1,9 +1,9 @@
-import 'package:everything/core/connection.dart';
-import 'package:everything/ui/state/chat_controller.dart';
-import 'package:everything/ui/state/files_controller.dart';
-import 'package:everything/ui/state/prefs_controller.dart';
-import 'package:everything/ui/state/settings_controller.dart';
-import 'package:everything/ui/state/sources_controller.dart';
+import 'package:anywherellm/core/connection.dart';
+import 'package:anywherellm/ui/state/chat_controller.dart';
+import 'package:anywherellm/ui/state/files_controller.dart';
+import 'package:anywherellm/ui/state/prefs_controller.dart';
+import 'package:anywherellm/ui/state/settings_controller.dart';
+import 'package:anywherellm/ui/state/sources_controller.dart';
 
 import 'fake_api.dart';
 import 'fake_settings.dart';

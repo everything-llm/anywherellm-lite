@@ -284,7 +284,7 @@ Map<String, Object?> parseSettings(String text, WorkspaceSettings was) {
     if (value == was.values[key]) continue;
     if (!spec.writable) {
       throw ApiException(
-        '$key cannot be changed here. Nilson sends the answer mode with each message.',
+        '$key cannot be changed here. AnywhereLLM sends the answer mode with each message.',
       );
     }
     changed[key] = value;

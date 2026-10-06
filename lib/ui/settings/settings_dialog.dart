@@ -299,7 +299,7 @@ class _AnswersCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'Otherwise Nilson may answer from general knowledge.',
+                      'Otherwise AnywhereLLM may answer from general knowledge.',
                       style: Type.sans(12.5, color: t.muted),
                     ),
                   ],

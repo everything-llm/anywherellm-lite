@@ -1,8 +1,8 @@
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:everything/ui/oklch.dart';
-import 'package:everything/ui/tokens.dart';
+import 'package:anywherellm/ui/oklch.dart';
+import 'package:anywherellm/ui/tokens.dart';
 
 /// Each channel within [slack] of the expected 0..255 values.
 Matcher near(int r, int g, int b, {int slack = 2}) => predicate<Color>((c) {

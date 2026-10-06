@@ -78,7 +78,7 @@ class _Body extends StatelessWidget {
         if (chat.active != null) return MessageList(onSuggest: onSuggest);
         final (title, text) = !scope.settings.configured
             ? (
-                'Welcome to Nilson',
+                'Welcome to AnywhereLLM',
                 'Add your AnythingLLM key in Settings to begin.',
               )
             : chat.loading
@@ -137,7 +137,7 @@ class _Header extends StatelessWidget {
             TextSpan(
               style: title,
               children: workspace == null
-                  ? const [TextSpan(text: 'Nilson')]
+                  ? const [TextSpan(text: 'AnywhereLLM')]
                   : [
                       TextSpan(
                         text: workspace.name,

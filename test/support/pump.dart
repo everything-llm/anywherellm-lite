@@ -1,8 +1,8 @@
-import 'package:everything/core/connection.dart';
-import 'package:everything/ui/app.dart';
-import 'package:everything/ui/app_scope.dart';
-import 'package:everything/ui/shell.dart';
-import 'package:everything/ui/state/shell_controller.dart';
+import 'package:anywherellm/core/connection.dart';
+import 'package:anywherellm/ui/app.dart';
+import 'package:anywherellm/ui/app_scope.dart';
+import 'package:anywherellm/ui/shell.dart';
+import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

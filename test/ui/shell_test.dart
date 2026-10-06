@@ -1,10 +1,10 @@
-import 'package:everything/core/chat.dart';
-import 'package:everything/core/ports.dart';
-import 'package:everything/ui/settings/settings_dialog.dart';
-import 'package:everything/ui/sidebar.dart';
-import 'package:everything/ui/sources/sources_panel.dart';
-import 'package:everything/ui/widgets/controls.dart';
-import 'package:everything/ui/widgets/tappable.dart';
+import 'package:anywherellm/core/chat.dart';
+import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/ui/settings/settings_dialog.dart';
+import 'package:anywherellm/ui/sidebar.dart';
+import 'package:anywherellm/ui/sources/sources_panel.dart';
+import 'package:anywherellm/ui/widgets/controls.dart';
+import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -210,7 +210,7 @@ void main() {
       tester,
     ) async {
       final h = await pumpApp(tester, connection: null);
-      expect(find.text('Welcome to Nilson'), findsOneWidget);
+      expect(find.text('Welcome to AnywhereLLM'), findsOneWidget);
       expect(inSidebar('AnythingLLM · no key'), findsOneWidget);
       await tester.tap(control('Open Settings'));
       await tester.pumpAndSettle();

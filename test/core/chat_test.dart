@@ -1,4 +1,4 @@
-import 'package:everything/core/chat.dart';
+import 'package:anywherellm/core/chat.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

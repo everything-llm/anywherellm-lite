@@ -1,9 +1,9 @@
-import 'package:everything/ui/chat/chat_view.dart';
-import 'package:everything/ui/files/file_tree.dart';
-import 'package:everything/ui/files/files_view.dart';
-import 'package:everything/ui/sources/sources_panel.dart';
-import 'package:everything/ui/state/shell_controller.dart';
-import 'package:everything/ui/widgets/tappable.dart';
+import 'package:anywherellm/ui/chat/chat_view.dart';
+import 'package:anywherellm/ui/files/file_tree.dart';
+import 'package:anywherellm/ui/files/files_view.dart';
+import 'package:anywherellm/ui/sources/sources_panel.dart';
+import 'package:anywherellm/ui/state/shell_controller.dart';
+import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -101,7 +101,7 @@ void main() {
     expect(inPane(find.textContaining('About 40k.')), findsOneWidget);
     await tapTree(tester, '.env');
     expect(
-      inPane(find.textContaining('Nilson never reads this')),
+      inPane(find.textContaining('AnywhereLLM never reads this')),
       findsOneWidget,
     );
   });

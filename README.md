@@ -1,4 +1,4 @@
-# Nilson
+# AnywhereLLM
 
 A lightweight Linux chat client for an AnythingLLM server. Ask questions in a workspace and get answers drawn from the files you add to it.
 
@@ -24,7 +24,7 @@ Until a key is saved, the app opens with Settings showing, and the composer poin
 | What | Where |
 | --- | --- |
 | Server address and API key | One entry in the system keyring, through `flutter_secure_storage`. No error message shows the key. |
-| The Answers switch and the switched-off files | `~/.config/nilson/prefs.json`, or under `$XDG_CONFIG_HOME` when set. Nothing secret. |
+| The Answers switch and the switched-off files | `~/.config/anywherellm/prefs.json`, or under `$XDG_CONFIG_HOME` when set. Nothing secret. |
 | Workspaces, chats and files | The AnythingLLM server. |
 
 If the keyring cannot be read or written, the app still starts, uses what you entered for that run, and says so in Settings.

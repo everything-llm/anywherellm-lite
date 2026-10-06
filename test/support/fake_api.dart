@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:everything/core/chat.dart';
-import 'package:everything/core/connection.dart';
-import 'package:everything/core/ports.dart';
-import 'package:everything/core/server_models.dart';
+import 'package:anywherellm/core/chat.dart';
+import 'package:anywherellm/core/connection.dart';
+import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/server_models.dart';
 
 /// A connection for tests that need a server set up.
 const sampleConnection = Connection(baseUrl: 'https://h:3001', apiKey: 'K1');

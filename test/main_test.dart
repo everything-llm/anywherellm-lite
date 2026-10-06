@@ -1,13 +1,13 @@
 import 'dart:ui' show Size;
 
-import 'package:everything/core/ports.dart';
-import 'package:everything/core/connection.dart';
-import 'package:everything/main.dart';
-import 'package:everything/ui/app.dart';
-import 'package:everything/ui/settings/settings_dialog.dart';
-import 'package:everything/ui/state/prefs_controller.dart';
-import 'package:everything/ui/state/settings_controller.dart';
-import 'package:everything/ui/state/shell_controller.dart';
+import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/connection.dart';
+import 'package:anywherellm/main.dart';
+import 'package:anywherellm/ui/app.dart';
+import 'package:anywherellm/ui/settings/settings_dialog.dart';
+import 'package:anywherellm/ui/state/prefs_controller.dart';
+import 'package:anywherellm/ui/state/settings_controller.dart';
+import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/fake_api.dart';

@@ -1,8 +1,8 @@
 import 'dart:io';
 
-import 'package:everything/adapters/json_prefs_store.dart';
-import 'package:everything/core/ports.dart';
-import 'package:everything/core/prefs.dart';
+import 'package:anywherellm/adapters/json_prefs_store.dart';
+import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/prefs.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -18,7 +18,7 @@ void main() {
   });
 
   test('saves, making the folder, and loads what it saved', () async {
-    final file = File('${dir.path}/nilson/prefs.json');
+    final file = File('${dir.path}/anywherellm/prefs.json');
     await JsonPrefsStore(file).save(const Prefs(groundedOnly: false));
     expect(file.existsSync(), isTrue);
     expect(File('${file.path}.tmp').existsSync(), isFalse);
@@ -26,7 +26,7 @@ void main() {
   });
 
   test('saves at once land in order, the last one winning', () async {
-    final store = JsonPrefsStore(File('${dir.path}/nilson/prefs.json'));
+    final store = JsonPrefsStore(File('${dir.path}/anywherellm/prefs.json'));
     await Future.wait([
       store.save(const Prefs(groundedOnly: false)),
       store.save(const Prefs()),

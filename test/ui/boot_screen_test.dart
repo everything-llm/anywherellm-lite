@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:everything/ui/app.dart';
-import 'package:everything/ui/boot_screen.dart';
+import 'package:anywherellm/ui/app.dart';
+import 'package:anywherellm/ui/boot_screen.dart';
 
 void main() {
   testWidgets('a boot error says why and offers another try', (tester) async {

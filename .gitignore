@@ -1,5 +1,5 @@
 # ==============================================================================
-# everything — strict .gitignore
+# anywherellm — strict .gitignore
 # ------------------------------------------------------------------------------
 # Anything not committed on purpose stays out of history. When in doubt this file
 # ignores it; add a negation (!pattern) only for something that truly belongs in

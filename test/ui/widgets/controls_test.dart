@@ -1,6 +1,6 @@
-import 'package:everything/ui/icons.dart';
-import 'package:everything/ui/theme.dart';
-import 'package:everything/ui/widgets/controls.dart';
+import 'package:anywherellm/ui/icons.dart';
+import 'package:anywherellm/ui/theme.dart';
+import 'package:anywherellm/ui/widgets/controls.dart';
 import 'package:flutter/material.dart';
 
 import 'dart:ui' show Tristate;

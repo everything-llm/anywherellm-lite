@@ -1,6 +1,6 @@
-import 'package:everything/core/connection.dart';
-import 'package:everything/core/ports.dart';
-import 'package:everything/ui/state/settings_controller.dart';
+import 'package:anywherellm/core/connection.dart';
+import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/ui/state/settings_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';

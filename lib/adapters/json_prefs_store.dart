@@ -3,7 +3,7 @@ import 'dart:io';
 import '../core/ports.dart';
 import '../core/prefs.dart';
 
-/// [PrefsStore] in one JSON file, `nilson/prefs.json` under `$XDG_CONFIG_HOME` or `~/.config`.
+/// [PrefsStore] in one JSON file, `anywherellm/prefs.json` under `$XDG_CONFIG_HOME` or `~/.config`.
 /// Holds nothing secret: the key stays in the keyring.
 class JsonPrefsStore implements PrefsStore {
   JsonPrefsStore([File? file]) : _file = file ?? _defaultFile();
@@ -19,7 +19,7 @@ class JsonPrefsStore implements PrefsStore {
       final String dir when dir.isNotEmpty => dir,
       _ => '${env['HOME'] ?? '.'}/.config',
     };
-    return File('$config/nilson/prefs.json');
+    return File('$config/anywherellm/prefs.json');
   }
 
   @override

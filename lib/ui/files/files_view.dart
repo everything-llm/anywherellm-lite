@@ -80,7 +80,7 @@ class FilesView extends StatelessWidget {
     if (files.contentLoading) return const Blank('Loading…');
     return switch (node.kind) {
       NodeKind.locked => const Blank(
-        'Locked. Nilson never reads this: it holds keys and secrets.',
+        'Locked. AnywhereLLM never reads this: it holds keys and secrets.',
       ),
       NodeKind.prompt || NodeKind.settings => _Editor(
         key: ValueKey('${node.path}#${files.revision}'),
@@ -178,7 +178,7 @@ class _EditorState extends State<_Editor> {
             'A deploy that sets prompts from a repository overwrites this edit; put lasting changes in the repository too.',
           ]
         : [
-            'null means the system default. chatMode is shown but not saved: Nilson sends the answer mode with each message.',
+            'null means the system default. chatMode is shown but not saved: AnywhereLLM sends the answer mode with each message.',
           ];
     return CallbackShortcuts(
       bindings: {

@@ -1,4 +1,4 @@
-import 'package:everything/core/upload.dart';
+import 'package:anywherellm/core/upload.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
