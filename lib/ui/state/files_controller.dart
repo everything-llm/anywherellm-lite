@@ -18,8 +18,9 @@ import 'sources_controller.dart';
 /// a node allows.
 ///
 /// The workspaces and their chats come from [ChatController]; this reads each workspace's prompt,
-/// settings and documents, the library and the model settings itself. A new server starts it
-/// afresh. A change to a workspace's documents is shown in Sources when that workspace is active.
+/// settings and documents and the library itself; the server's own settings belong to
+/// `SystemController`. A new server starts it afresh. A change to a workspace's documents is
+/// shown in Sources when that workspace is active.
 class FilesController extends ChangeNotifier {
   FilesController(
     this._api,
@@ -174,7 +175,7 @@ class FilesController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Reads every workspace, the library and the model settings, unless already read.
+  /// Reads every workspace and the library, unless already read.
   Future<void> ensureLoaded() async {
     if (!_loaded && !loading) await load();
   }
@@ -263,7 +264,6 @@ class FilesController extends ChangeNotifier {
       ),
       NodeKind.libraryDoc ||
       NodeKind.docLink => (null, await _api.document(node.ref!)),
-      NodeKind.models => (modelsText(await _api.systemSettings()), null),
       _ => (null, null),
     };
   }

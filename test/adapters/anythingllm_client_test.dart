@@ -1378,6 +1378,32 @@ void main() {
       expect(error.message, contains('Query parameter cannot be empty.'));
     });
 
+    test(
+      'a settings change posts the keys, and every key must come back written',
+      () async {
+        final seen = <http.Request>[];
+        await _answering({
+          'newValues': {'GenericOpenAiModelPref': 'glm-5.3'},
+          'error': null,
+        }, seen: seen).updateSystem({'GenericOpenAiModelPref': 'glm-5.3'});
+        expect(seen.single.url.path, '/api/v1/system/update-env');
+        expect(jsonDecode(seen.single.body), {
+          'GenericOpenAiModelPref': 'glm-5.3',
+        });
+
+        final dropped = await _failure(
+          _answering({'newValues': {}, 'error': null})
+              .updateSystem({'MadeUpKey': '1'}),
+        );
+        expect(dropped.message, 'The server did not write MadeUpKey.');
+        final refused = await _failure(
+          _answering({'newValues': {}, 'error': 'Invalid base path'})
+              .updateSystem({'OllamaLLMBasePath': 'nope'}),
+        );
+        expect(refused.message, 'Invalid base path');
+      },
+    );
+
     test('embeds are listed, made, changed and deleted by uuid', () async {
       final seen = <http.Request>[];
       final api = _api((request) async {

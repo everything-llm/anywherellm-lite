@@ -138,6 +138,10 @@ abstract interface class AnythingLlmApi {
   /// The server's settings, with every secret replaced by whether it is set.
   Future<Map<String, Object?>> systemSettings();
 
+  /// Writes [changes] to the server's settings, each as text. Throws [ApiException] when the
+  /// server refuses one or leaves one unwritten; those before it may be written already.
+  Future<void> updateSystem(Map<String, String> changes);
+
   /// How many vectors the server's vector database holds, across every workspace.
   Future<int> vectorCount();
 

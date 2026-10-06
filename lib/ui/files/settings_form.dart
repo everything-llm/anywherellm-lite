@@ -9,6 +9,7 @@ import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/fields.dart';
+import '../widgets/setting_row.dart';
 import '../widgets/segmented.dart';
 
 /// The similarity thresholds the web UI offers, with the score each one stands for.
@@ -150,7 +151,7 @@ class _SettingsFormState extends State<SettingsForm> {
     TextInputType? keyboard,
     int maxLines = 1,
     String? problem,
-  }) => _Setting(
+  }) => SettingRow(
     label: label,
     help: help,
     problem: _checked ? problem : null,
@@ -198,7 +199,7 @@ class _SettingsFormState extends State<SettingsForm> {
                 const SizedBox(height: 18),
                 const SectionLabel('Answers'),
                 const SizedBox(height: 12),
-                _Setting(
+                SettingRow(
                   label: 'Chat mode',
                   help: _modeHelp[_mode] ?? 'The workspace has no chat mode.',
                   child: Segmented<String>(
@@ -266,7 +267,7 @@ class _SettingsFormState extends State<SettingsForm> {
                 const SizedBox(height: 6),
                 const SectionLabel('Documents'),
                 const SizedBox(height: 12),
-                _Setting(
+                SettingRow(
                   label: 'Search preference',
                   help: 'Accuracy optimized re-ranks the passages. It is slower but finds more relevant ones.',
                   child: Segmented<String>(
@@ -286,7 +287,7 @@ class _SettingsFormState extends State<SettingsForm> {
                   keyboard: TextInputType.number,
                   problem: problems['topN'],
                 ),
-                _Setting(
+                SettingRow(
                   label: 'Document similarity threshold',
                   help: preset != null
                       ? 'A passage needs a similarity score of at least ${preset.$1}.'
@@ -319,45 +320,6 @@ class _SettingsFormState extends State<SettingsForm> {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// A label, its control, and a line of help, or the problem with what was typed.
-class _Setting extends StatelessWidget {
-  const _Setting({
-    required this.label,
-    required this.help,
-    required this.child,
-    this.problem,
-  });
-
-  final String label;
-  final String help;
-  final String? problem;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            label,
-            style: Type.sans(14, weight: FontWeight.w600, color: t.ink),
-          ),
-          const SizedBox(height: 8),
-          child,
-          const SizedBox(height: 6),
-          if (problem case final text?)
-            Text(text, style: Type.sans(12.5, color: t.badfg, height: 1.45))
-          else
-            HelpText(help),
-        ],
-      ),
     );
   }
 }

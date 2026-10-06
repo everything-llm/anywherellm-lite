@@ -3,11 +3,12 @@ import 'package:flutter/foundation.dart';
 import '../../core/connection.dart';
 import '../../core/embeds.dart';
 import '../../core/ports.dart';
+import '../../core/system_settings.dart';
 import 'notice.dart';
 import 'settings_controller.dart';
 
-/// The server itself, apart from its workspaces: how many vectors its database holds, and its
-/// chat embeds. A new server starts it afresh.
+/// The server itself, apart from its workspaces: its settings, how many vectors its database
+/// holds, and its chat embeds. A new server starts it afresh.
 class SystemController extends ChangeNotifier {
   SystemController(this._api, this._settings) : _server = _settings.connection {
     _settings.addListener(_serverChanged);
@@ -24,6 +25,97 @@ class SystemController extends ChangeNotifier {
 
   /// The vector database the server uses, or null until read or when it does not say.
   String? vectorDb;
+
+  /// The server's settings, with every secret replaced by whether it is set, or null until read.
+  Map<String, Object?>? settings;
+
+  /// Why the last read or save of the settings failed.
+  Notice? settingsProblem;
+
+  /// Whether the settings are being saved.
+  bool saving = false;
+
+  /// Whether the settings show as JSON rather than as the form. It holds through a save.
+  bool settingsAsJson = false;
+
+  /// Counts each time [settings] is read afresh, so a form knows to drop its draft.
+  int settingsRevision = 0;
+
+  /// Reads the server's settings.
+  Future<void> readSettings() async {
+    final server = _server;
+    if (server == null) return;
+    try {
+      final read = await _api.systemSettings();
+      if (_server != server) return;
+      settings = read;
+      settingsProblem = null;
+    } on ApiException catch (error) {
+      if (_server != server) return;
+      settingsProblem = Notice('Could not read the settings', error.message);
+    }
+    settingsRevision++;
+    notifyListeners();
+  }
+
+  void showSettingsAsJson(bool json) {
+    if (settingsAsJson == json) return;
+    settingsAsJson = json;
+    notifyListeners();
+  }
+
+  /// The settings in [draft] whose change makes the server delete every vector, or none when the
+  /// draft cannot be read.
+  List<String> vectorResets(String draft) {
+    final was = settings;
+    if (was == null) return const [];
+    try {
+      return [
+        for (final key in parseSystemSettings(draft, was).keys)
+          if (resetsVectors.contains(key)) key,
+      ];
+    } on ApiException {
+      return const [];
+    }
+  }
+
+  /// Writes the settings in [draft] that changed, then reads them again whether that worked or
+  /// not, since the server may have written some before it refused one. Returns whether all were
+  /// written; why not shows as [settingsProblem].
+  Future<bool> saveSettings(String draft) async {
+    final server = _server;
+    final was = settings;
+    if (server == null || was == null || saving) return false;
+    final Map<String, String> changes;
+    try {
+      changes = parseSystemSettings(draft, was);
+    } on ApiException catch (error) {
+      settingsProblem = Notice('Could not save the settings', error.message);
+      notifyListeners();
+      return false;
+    }
+    if (changes.isEmpty) return true;
+    saving = true;
+    notifyListeners();
+    Notice? failed;
+    try {
+      await _api.updateSystem(changes);
+    } on ApiException catch (error) {
+      failed = Notice('Could not save the settings', error.message);
+    }
+    try {
+      final read = await _api.systemSettings();
+      if (_server == server) settings = read;
+    } on ApiException catch (error) {
+      failed ??= Notice('Could not read the settings again', error.message);
+    }
+    if (_server != server) return false;
+    saving = false;
+    settingsProblem = failed;
+    settingsRevision++;
+    notifyListeners();
+    return failed == null;
+  }
 
   /// Why the last read of the vectors failed.
   Notice? problem;
@@ -134,6 +226,9 @@ class SystemController extends ChangeNotifier {
     vectors = null;
     vectorDb = null;
     problem = null;
+    settings = null;
+    settingsProblem = null;
+    saving = false;
     embeds = null;
     embedProblem = null;
     changing = false;

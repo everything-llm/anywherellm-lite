@@ -312,7 +312,8 @@ void main() {
         '/library/custom-documents',
         '/library/custom-documents/file-$longWord.pdf.json',
         '/settings',
-        '/settings/models.json',
+        '/settings/system.json',
+        '/settings/embeds',
         '/keys',
       ]) {
         await h.files.select(path);

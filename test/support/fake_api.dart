@@ -450,6 +450,18 @@ class FakeAnythingLlm implements AnythingLlmApi {
   Future<List<int>> exportChats(ChatExport format) =>
       _run('exportChats', () => exported.codeUnits, format.name);
 
+  /// Writes each change into [system]; a secret, which the server reports only as set, becomes
+  /// true.
+  @override
+  Future<void> updateSystem(Map<String, String> changes) =>
+      _run('updateSystem', () {
+        system = {
+          ...system,
+          for (final MapEntry(:key, :value) in changes.entries)
+            key: system[key] is bool ? true : value,
+        };
+      }, changes.keys.join(','));
+
   @override
   Future<List<Embed>> embeds() => _run('embeds', () => [...embedList]);
 

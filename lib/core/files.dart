@@ -34,7 +34,7 @@ enum NodeKind {
   libraryFolder,
   libraryDoc,
   systemFolder,
-  models,
+  system,
   embeds,
   locked;
 
@@ -54,7 +54,7 @@ enum NodeKind {
   bool get editable => this == prompt || this == settings;
 
   NodeBadge get badge => switch (this) {
-    chatLog || models => NodeBadge.readOnly,
+    chatLog => NodeBadge.readOnly,
     locked => NodeBadge.locked,
     _ => NodeBadge.none,
   };
@@ -160,9 +160,9 @@ FileNode buildTree({
       kind: NodeKind.systemFolder,
       children: [
         FileNode(
-          path: '/settings/models.json',
-          name: 'models.json',
-          kind: NodeKind.models,
+          path: '/settings/system.json',
+          name: 'system.json',
+          kind: NodeKind.system,
         ),
         FileNode(
           path: '/settings/embeds',
@@ -286,8 +286,6 @@ String _linkText(String text) =>
 
 const _indented = JsonEncoder.withIndent('  ');
 
-final _secretKey = RegExp('key|secret|token|password', caseSensitive: false);
-
 /// [settings] as the JSON Files shows and edits.
 String settingsText(WorkspaceSettings settings) =>
     '${_indented.convert(settings.values)}\n';
@@ -342,21 +340,4 @@ void _check(String key, SettingSpec spec, Object? value) {
   throw ApiException(
     '$key must be ${whole ? 'a whole number' : 'a number'} $range.',
   );
-}
-
-/// The provider and model names in the server's [settings], as JSON. Only keys that name a
-/// provider, a model, an engine or the vector database are kept, and never one that names a key,
-/// secret, token or password, whatever its value.
-String modelsText(Map<String, Object?> settings) {
-  bool shown(String key) =>
-      !_secretKey.hasMatch(key) &&
-      (key == 'VectorDB' ||
-          key.endsWith('Provider') ||
-          key.endsWith('ModelPref') ||
-          key.endsWith('Engine'));
-  final kept = {
-    for (final key in settings.keys.toList()..sort())
-      if (shown(key) && settings[key] is String) key: settings[key],
-  };
-  return '${_indented.convert(kept)}\n';
 }

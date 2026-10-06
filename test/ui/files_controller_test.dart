@@ -65,8 +65,6 @@ void main() {
     await rig.files.select('/workspaces/q3/chats/budget');
     expect(rig.files.text, startsWith('# Budget questions\n'));
     expect(rig.files.text, contains('Sources: Q3 roadmap.pdf'));
-    await rig.files.select('/settings/models.json');
-    expect(rig.files.text, contains('"LLMProvider": "ollama"'));
     await rig.files.select('/library/$roadmap');
     expect(rig.files.doc!.text, 'The text of Q3 roadmap.pdf.');
     await rig.files.select('/.env');

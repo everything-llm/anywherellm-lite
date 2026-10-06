@@ -600,6 +600,30 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     return settings is Map<String, dynamic> ? settings : const {};
   }
 
+  /// The server answers the settings it wrote in `newValues` and the first refusal in `error`;
+  /// it drops a key it does not know without a word, so each key sent must come back.
+  @override
+  Future<void> updateSystem(Map<String, String> changes) async {
+    final answer = await _send(
+      'POST',
+      '/api/v1/system/update-env',
+      changes,
+      refused: 'The server did not change its settings.',
+    );
+    if (_field(answer, 'error') case final String error
+        when error.trim().isNotEmpty) {
+      throw ApiException(error.trim());
+    }
+    final written = _field(answer, 'newValues');
+    final missing = [
+      for (final key in changes.keys)
+        if (written is! Map || !written.containsKey(key)) key,
+    ];
+    if (missing.isNotEmpty) {
+      throw ApiException('The server did not write ${missing.join(', ')}.');
+    }
+  }
+
   @override
   Future<List<Embed>> embeds() async => [
     for (final json in jsonObjects(
