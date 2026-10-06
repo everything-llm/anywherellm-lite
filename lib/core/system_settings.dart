@@ -442,6 +442,10 @@ Map<String, String> parseSystemSettings(String text, Map<String, Object?> was) {
       );
     }
     final secret = _isSecret(key, was[key]);
+    if (value == null) {
+      if (was[key] == null) continue;
+      throw ApiException('$key cannot be emptied here; leave it as it was.');
+    }
     if (value is! String && value is! num && value is! bool) {
       throw ApiException('$key must be text, a number or true or false.');
     }

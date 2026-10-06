@@ -70,6 +70,14 @@ void main() {
   });
 
   group('a save', () {
+    test(
+      'the JSON as shown saves as no change, a provider not set included',
+      () {
+        expect(_server['ImageGenerationProvider'], isNull);
+        expect(parseSystemSettings(systemText(_server), _server), isEmpty);
+      },
+    );
+
     test('sends only what changed, as text', () {
       expect(
         parseSystemSettings(
@@ -123,8 +131,9 @@ void main() {
         contains('cannot be emptied'),
       );
       expect(why('{"GenericOpenAiModelPref": "***"}'), contains('asterisks'));
+      expect(why('{"LLMProvider": null}'), contains('cannot be emptied'));
       expect(
-        why('{"LLMProvider": null}'),
+        why('{"LLMProvider": [1]}'),
         contains('text, a number or true or false'),
       );
       expect(why('[1]'), 'The settings must be one JSON object.');
