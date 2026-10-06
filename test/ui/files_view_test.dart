@@ -79,6 +79,10 @@ void main() {
     await tester.pumpAndSettle();
     await tapTree(tester, 'Q3 planning');
     await tapTree(tester, 'settings.json');
+    expect(
+      inPane(find.textContaining('chatMode is the workspace\'s chat mode')),
+      findsOneWidget,
+    );
     await tester.enterText(inPane(find.byType(TextField)), '{"topN": 0}');
     await tester.pump();
     await tester.tap(inPane(control('Save')));

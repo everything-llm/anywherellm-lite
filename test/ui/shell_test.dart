@@ -243,6 +243,28 @@ void main() {
       expect(inSources(find.text(ChatMode.query.about)), findsOneWidget);
     });
 
+    testWidgets('an empty chat and the composer follow the chat mode', (
+      tester,
+    ) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      h.chat.newChat();
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Answers draw on the switched-on files, and on tools such as web search when they need them.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Ask anything…'), findsOneWidget);
+      await tester.tap(inSources(control('Query')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Answers come only from the switched-on files.'),
+        findsOneWidget,
+      );
+      expect(find.text('Ask about your files…'), findsOneWidget);
+    });
+
     testWidgets('the chat mode waits while an answer runs', (tester) async {
       final llm = planningServer()..hold = true;
       await pumpApp(tester, llm: llm);

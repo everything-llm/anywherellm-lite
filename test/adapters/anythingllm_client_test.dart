@@ -1207,6 +1207,30 @@ void main() {
   });
 
   group('search and export', () {
+    test('a hit drops the metadata block the server puts first', () async {
+      final hits = await _answering({
+        'results': [
+          {
+            'text': '<document_metadata>\nsourceDocument: notes.md\npublished: 10/3/2026\n</document_metadata>\n\nThe passage itself.',
+            'metadata': {'title': 'notes.md'},
+            'score': 0.3,
+          },
+          {
+            'text': 'No header. <document_metadata>kept</document_metadata>',
+            'metadata': {'title': 'b.md'},
+            'score': 0.2,
+          },
+        ],
+      }).searchDocs('q3', 'notes');
+      expect(
+        [for (final h in hits) h.text],
+        [
+          'The passage itself.',
+          'No header. <document_metadata>kept</document_metadata>',
+        ],
+      );
+    });
+
     test('a search posts the question and reads each hit', () async {
       final seen = <http.Request>[];
       final hits = await _answering({

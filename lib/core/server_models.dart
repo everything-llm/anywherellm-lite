@@ -428,6 +428,10 @@ class DocBody {
 }
 
 /// A passage of a workspace's documents that a question finds, as an answer would get it.
+final _metadataBlock = RegExp(
+  r'^\s*<document_metadata>[\s\S]*?</document_metadata>\s*',
+);
+
 class SearchHit {
   const SearchHit({
     required this.title,
@@ -435,7 +439,8 @@ class SearchHit {
     required this.score,
   });
 
-  /// The `metadata` holds the document's title; [score] is from 0 to 1, higher is closer.
+  /// The `metadata` holds the document's title; [score] is from 0 to 1, higher is closer. The
+  /// server starts each passage's `text` with a `<document_metadata>` block, which is dropped.
   factory SearchHit.fromJson(Map<String, dynamic> json) {
     final metadata = json['metadata'];
     final score = json['score'];
@@ -445,7 +450,9 @@ class SearchHit {
               ? _known(metadata, 'title')
               : null) ??
           'Untitled',
-      text: json['text'] is String ? json['text'] as String : '',
+      text: json['text'] is String
+          ? (json['text'] as String).replaceFirst(_metadataBlock, '')
+          : '',
       score: score is num ? score.toDouble() : 0,
     );
   }

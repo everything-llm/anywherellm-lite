@@ -137,7 +137,12 @@ class _ComposerState extends State<Composer> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: Sizes.column),
           child: ListenableBuilder(
-            listenable: Listenable.merge([scope.settings, scope.chat, draft]),
+            listenable: Listenable.merge([
+              scope.settings,
+              scope.chat,
+              scope.sources,
+              draft,
+            ]),
             builder: (context, _) {
               if (!scope.settings.configured) return const _NoKey();
               final matches = scope.chat.busy || _dismissed == draft.text
@@ -212,7 +217,9 @@ class _Form extends StatelessWidget {
         ? 'Answering…'
         : elsewhere
         ? 'Another chat is still answering…'
-        : 'Ask about your files…';
+        : scope.sources.chatMode == ChatMode.query
+        ? 'Ask about your files…'
+        : 'Ask anything…';
     final canSend =
         !chat.busy &&
         chat.ready &&
