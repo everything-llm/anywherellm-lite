@@ -210,13 +210,16 @@ class Citation {
   final Uri? url;
 }
 
-/// The sources in a `sources` list, one per title. A web page's address is its `chunkSource`
+/// The sources in a `sources` list, each once: a web page once per address, and a source with
+/// no address only when its title is not cited yet. A web page's address is its `chunkSource`
 /// after `link://`, as `link://https://example.com/page`; a document has none.
 List<Citation> citationsOf(Object? sources) {
-  final byTitle = <String, Citation>{};
+  final cited = <Citation>[];
+  final titles = <String>{};
+  final pages = <Uri>{};
   for (final source in jsonObjects(sources)) {
     final title = _known(source, 'title');
-    if (title == null || byTitle.containsKey(title)) continue;
+    if (title == null) continue;
     final chunk = source['chunkSource'];
     final page = chunk is String && chunk.startsWith('link://')
         ? Uri.tryParse(chunk.substring('link://'.length))
@@ -225,9 +228,11 @@ List<Citation> citationsOf(Object? sources) {
         page != null &&
         page.host.isNotEmpty &&
         (page.scheme == 'http' || page.scheme == 'https');
-    byTitle[title] = Citation(title, url: web ? page : null);
+    if (web ? !pages.add(page) : titles.contains(title)) continue;
+    titles.add(title);
+    cited.add(Citation(title, url: web ? page : null));
   }
-  return byTitle.values.toList();
+  return cited;
 }
 
 /// A document a workspace holds.

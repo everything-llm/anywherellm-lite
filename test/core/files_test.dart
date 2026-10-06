@@ -283,28 +283,56 @@ void main() {
     });
   });
 
-  test('a web source keeps its page, a document none, each title once', () {
-    final cited = citationsOf([
-      {'title': 'A story', 'chunkSource': 'link://https://news.test/a?b=1'},
-      {'title': 'A story', 'chunkSource': 'link://https://news.test/other'},
-      {'title': 'Q3 roadmap.pdf', 'chunkSource': ''},
-      {'title': 'Odd', 'chunkSource': 'link://javascript:alert(1)'},
-      {'title': 'Uploaded page', 'url': 'file://example.com_.html'},
+  test(
+    'a web source keeps its page, once per address; a document once per title',
+    () {
+      final cited = citationsOf([
+        {'title': 'A story', 'chunkSource': 'link://https://news.test/a?b=1'},
+        {'title': 'A story', 'chunkSource': 'link://https://news.test/a?b=1'},
+        {'title': 'A story', 'chunkSource': 'link://https://news.test/other'},
+        {'title': 'Q3 roadmap.pdf', 'chunkSource': ''},
+        {'title': 'Q3 roadmap.pdf', 'chunkSource': ''},
+        {'title': 'Odd', 'chunkSource': 'link://javascript:alert(1)'},
+        {'title': 'Uploaded page', 'url': 'file://example.com_.html'},
+      ]);
+      expect(
+        [for (final c in cited) (c.title, c.url?.toString())],
+        [
+          ('A story', 'https://news.test/a?b=1'),
+          ('A story', 'https://news.test/other'),
+          ('Q3 roadmap.pdf', null),
+          ('Odd', null),
+          ('Uploaded page', null),
+        ],
+      );
+      expect(
+        chatMarkdown('Chat', [
+          ChatMessage(role: Role.assistant, text: 'Hi', citations: cited),
+        ]),
+        contains(
+          'Sources: [A story](<https://news.test/a?b=1>), '
+          '[A story](<https://news.test/other>), Q3 roadmap.pdf',
+        ),
+      );
+    },
+  );
+
+  test('a web citation\'s title is escaped in chat Markdown', () {
+    final text = chatMarkdown('Chat', [
+      ChatMessage(
+        role: Role.assistant,
+        text: 'Hi',
+        citations: [
+          Citation(
+            r'Results ] [2026] \ end',
+            url: Uri.parse('https://x.test/a(b'),
+          ),
+        ],
+      ),
     ]);
     expect(
-      [for (final c in cited) (c.title, c.url?.toString())],
-      [
-        ('A story', 'https://news.test/a?b=1'),
-        ('Q3 roadmap.pdf', null),
-        ('Odd', null),
-        ('Uploaded page', null),
-      ],
-    );
-    expect(
-      chatMarkdown('Chat', [
-        ChatMessage(role: Role.assistant, text: 'Hi', citations: cited),
-      ]),
-      contains('Sources: [A story](https://news.test/a?b=1), Q3 roadmap.pdf'),
+      text,
+      contains(r'[Results \] \[2026\] \\ end](<https://x.test/a(b>)'),
     );
   });
 }

@@ -252,13 +252,17 @@ String chatMarkdown(String name, List<ChatMessage> turns) {
     if (turn.citations.isNotEmpty) {
       final sources = [
         for (final c in turn.citations)
-          c.url == null ? c.title : '[${c.title}](${c.url})',
+          c.url == null ? c.title : '[${_linkText(c.title)}](<${c.url}>)',
       ];
       out.write('\nSources: ${sources.join(', ')}\n');
     }
   }
   return out.toString();
 }
+
+/// [text] safe inside a Markdown link's brackets.
+String _linkText(String text) =>
+    text.replaceAllMapped(RegExp(r'[\\\[\]]'), (m) => '\\${m[0]}');
 
 const _indented = JsonEncoder.withIndent('  ');
 

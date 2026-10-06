@@ -28,6 +28,9 @@ class Harness extends Rig {
   /// Whether opening a link succeeds, as when the device has a browser.
   bool openSucceeds = true;
 
+  /// What opening a link throws, when set.
+  Object? openThrows;
+
   Widget get app => AnywhereLlmApp(
     home: AppScope(
       shell: shell,
@@ -36,8 +39,9 @@ class Harness extends Rig {
       chat: chat,
       sources: sources,
       files: files,
-      openLink: (url) async {
+      launch: (url) async {
         opened.add(url);
+        if (openThrows case final error?) throw error;
         return openSucceeds;
       },
       child: const AppShell(),

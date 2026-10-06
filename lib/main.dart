@@ -45,7 +45,7 @@ Future<void> main() async {
         ),
         prefs: PrefsController(JsonPrefsStore(prefsFile)),
         shell: ShellController(),
-        openLink: (url) => launchUrl(url, mode: LaunchMode.externalApplication),
+        launch: (url) => launchUrl(url, mode: LaunchMode.externalApplication),
       ),
     ),
   );
@@ -60,14 +60,14 @@ class SessionHost extends StatefulWidget {
     required this.settings,
     required this.prefs,
     required this.shell,
-    required this.openLink,
+    required this.launch,
   });
 
   final AnythingLlmApi llm;
   final SettingsController settings;
   final PrefsController prefs;
   final ShellController shell;
-  final LinkOpener openLink;
+  final LinkOpener launch;
 
   @override
   State<SessionHost> createState() => _SessionHostState();
@@ -129,7 +129,7 @@ class _SessionHostState extends State<SessionHost> {
         chat: _chat,
         sources: _sources,
         files: _files,
-        openLink: widget.openLink,
+        launch: widget.launch,
         child: const AppShell(),
       );
     },

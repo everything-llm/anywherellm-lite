@@ -21,7 +21,7 @@ class AppScope extends InheritedWidget {
     required this.chat,
     required this.sources,
     required this.files,
-    required this.openLink,
+    required this.launch,
     required super.child,
   });
 
@@ -31,7 +31,7 @@ class AppScope extends InheritedWidget {
   final ChatController chat;
   final SourcesController sources;
   final FilesController files;
-  final LinkOpener openLink;
+  final LinkOpener launch;
 
   static AppScope of(BuildContext context) {
     // Never notifies, so no dependency is needed. That also lets initState read it.

@@ -14,7 +14,8 @@ import '../icons.dart';
 
 /// An answer's text, drawn as Markdown and selectable. A code block and a table scroll sideways
 /// rather than widen the chat, and a code block has its own Copy button. A link opens outside
-/// the app. An image loads only from the AnythingLLM server's own host, as a tool's card does:
+/// the app. An image loads only from the AnythingLLM server's own host, on any port, as a tool's
+/// card does, and only over https or the server's own scheme where plain http is allowed:
 /// loading any other would send its address, which a model could have filled with what it read,
 /// to that site. Any other image shows as its description.
 class AnswerBody extends StatelessWidget {
@@ -30,7 +31,10 @@ class AnswerBody extends StatelessWidget {
     TextStyle heading(double size) =>
         Type.sans(size, weight: FontWeight.w600, color: t.ink, height: 1.35);
     final border = BorderSide(color: t.line);
-    final server = AppScope.of(context).settings.connection?.host;
+    final settings = AppScope.of(context).settings;
+    final base = settings.connection?.baseUrl;
+    final server = base == null ? null : Uri.parse(base);
+    final allowHttp = settings.allowHttp;
     return MarkdownBody(
       data: text,
       selectable: true,
@@ -38,7 +42,8 @@ class AnswerBody extends StatelessWidget {
       onTapLink: (_, href, _) {
         if (href != null) openLink(context, href);
       },
-      imageBuilder: (uri, _, alt) => _Image(uri, alt: alt, server: server),
+      imageBuilder: (uri, _, alt) =>
+          _Image(uri, alt: alt, server: server, allowHttp: allowHttp),
       builders: {'pre': _CodeBlockBuilder()},
       styleSheet: MarkdownStyleSheet(
         p: body,
@@ -93,13 +98,20 @@ class AnswerBody extends StatelessWidget {
   }
 }
 
-/// An image in an answer: loaded when it is on the [server]'s host, otherwise its description.
+/// An image in an answer: loaded when it is on the [server]'s host over https, or over http
+/// when the [server] itself is http and [allowHttp] holds; otherwise its description.
 class _Image extends StatelessWidget {
-  const _Image(this.uri, {required this.alt, required this.server});
+  const _Image(
+    this.uri, {
+    required this.alt,
+    required this.server,
+    required this.allowHttp,
+  });
 
   final Uri uri;
   final String? alt;
-  final String? server;
+  final Uri? server;
+  final bool allowHttp;
 
   @override
   Widget build(BuildContext context) {
@@ -108,10 +120,12 @@ class _Image extends StatelessWidget {
       '[${alt?.trim().isNotEmpty == true ? alt!.trim() : 'image'}: ${uri.host}]',
       style: Type.sans(14, color: t.muted),
     );
+    final server = this.server;
     final ours =
         server != null &&
-        uri.host == server &&
-        (uri.scheme == 'https' || uri.scheme == 'http');
+        uri.host == server.host &&
+        (uri.scheme == 'https' ||
+            (uri.scheme == 'http' && server.scheme == 'http' && allowHttp));
     if (!ours) return described;
     return ConstrainedBox(
       constraints: const BoxConstraints(maxHeight: 360),

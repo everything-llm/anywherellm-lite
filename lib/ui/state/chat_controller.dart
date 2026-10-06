@@ -121,6 +121,14 @@ class ChatController extends ChangeNotifier {
   /// Why the last load or change failed.
   Notice? problem;
 
+  /// Why a link in an answer did not open. It clears after [linkNoticeFor], or on the next
+  /// message or chat opened.
+  Notice? linkNotice;
+
+  Timer? _linkTimer;
+
+  static const linkNoticeFor = Duration(seconds: 6);
+
   Workspace? get active =>
       workspaces.where((w) => w.slug == activeSlug).firstOrNull;
 
@@ -151,6 +159,7 @@ class ChatController extends ChangeNotifier {
   void dispose() {
     _settings.removeListener(_serverChanged);
     _running?.stream?.cancel();
+    _linkTimer?.cancel();
     super.dispose();
   }
 
@@ -168,6 +177,7 @@ class ChatController extends ChangeNotifier {
     activeSlug = null;
     activeThread = null;
     problem = null;
+    _clearLinkNotice();
     notifyListeners();
     if (_server != null) unawaited(load());
   }
@@ -245,6 +255,7 @@ class ChatController extends ChangeNotifier {
   /// Shows chat [threadSlug] of the active workspace, reading its turns the first time.
   Future<void> open(String? threadSlug) async {
     activeThread = threadSlug;
+    _clearLinkNotice();
     notifyListeners();
     final slug = activeSlug;
     if (slug == null || threadSlug == null || _turns.containsKey(threadSlug)) {
@@ -376,6 +387,7 @@ class ChatController extends ChangeNotifier {
     final slug = activeSlug;
     final text = message.trim();
     if (slug == null || text.isEmpty || busy || !ready) return;
+    _clearLinkNotice();
     if (resetsChat(text, _presets)) return _reset(slug);
     final user = Turn.user(
       text,
@@ -505,10 +517,21 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Shows a failure that is not the server's, such as a link that would not open.
-  void report(String title, String text) {
-    problem = Notice(title, text);
+  /// Shows why a link in an answer did not open, for [linkNoticeFor].
+  void reportLink(String title, String text) {
+    linkNotice = Notice(title, text);
+    _linkTimer?.cancel();
+    _linkTimer = Timer(linkNoticeFor, () {
+      linkNotice = null;
+      notifyListeners();
+    });
     notifyListeners();
+  }
+
+  void _clearLinkNotice() {
+    _linkTimer?.cancel();
+    _linkTimer = null;
+    linkNotice = null;
   }
 
   Future<void> _try(String failTitle, Future<void> Function() op) async {
