@@ -78,6 +78,16 @@ void main() {
       },
     );
 
+    test('a null secret, set or not, is left as it is', () {
+      expect(
+        parseSystemSettings(
+          '{"OpenAiKey": null, "GenericOpenAiKey": null}',
+          _server,
+        ),
+        isEmpty,
+      );
+    });
+
     test('sends only what changed, as text', () {
       expect(
         parseSystemSettings(
