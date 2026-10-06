@@ -106,14 +106,14 @@ void main() {
     });
   });
 
-  test('a chat renders as Markdown with each turn and its sources', () {
+  test('a chat renders as Markdown with each turn and its sources, without reasoning', () {
     expect(
       chatMarkdown('Budget', const [
         ChatMessage(role: Role.user, text: 'What is the budget?'),
         ChatMessage(
           role: Role.assistant,
-          text: 'About 40k.\n',
-          citations: ['Q3 roadmap.pdf', 'Notes.md'],
+          text: '<think>Check the roadmap.</think>About 40k.\n',
+          citations: [Citation('Q3 roadmap.pdf'), Citation('Notes.md')],
         ),
       ]),
       '# Budget\n'
@@ -136,6 +136,11 @@ void main() {
       expect(parseSettings(_edited('openAiTemp', null), _settings), {
         'openAiTemp': null,
       });
+      for (final mode in ['chat', 'query']) {
+        expect(parseSettings(_edited('chatMode', mode), _settings), {
+          'chatMode': mode,
+        });
+      }
     });
 
     test('a key left out is left as it is', () {
@@ -155,7 +160,10 @@ void main() {
       (_edited('similarityThreshold', 1.5), 'from 0 to 1'),
       (_edited('openAiTemp', '0.7'), 'openAiTemp must be a number'),
       (_edited('chatModel', 3), 'chatModel must be text or null'),
-      (_edited('chatMode', 'query'), 'chatMode cannot be changed here'),
+      (
+        _edited('chatMode', 'agent'),
+        'chatMode must be one of automatic, chat, query',
+      ),
     ]) {
       test('refuses $text', () {
         expect(
@@ -273,5 +281,67 @@ void main() {
       });
       expect((doc.pinned, doc.watched), (true, false));
     });
+  });
+
+  test(
+    'a web source keeps its page, once per address; a document once per title',
+    () {
+      final cited = citationsOf([
+        {'title': 'A story', 'chunkSource': 'link://https://news.test/a?b=1'},
+        {'title': 'A story', 'chunkSource': 'link://https://news.test/a?b=1'},
+        {'title': 'A story', 'chunkSource': 'link://https://news.test/other'},
+        {'title': 'Q3 roadmap.pdf', 'chunkSource': ''},
+        {'title': 'Q3 roadmap.pdf', 'chunkSource': ''},
+        {'title': 'Odd', 'chunkSource': 'link://javascript:alert(1)'},
+        {'title': 'Uploaded page', 'url': 'file://example.com_.html'},
+      ]);
+      expect(
+        [for (final c in cited) (c.title, c.url?.toString())],
+        [
+          ('A story', 'https://news.test/a?b=1'),
+          ('A story', 'https://news.test/other'),
+          ('Q3 roadmap.pdf', null),
+          ('Odd', null),
+          ('Uploaded page', null),
+        ],
+      );
+      expect(
+        chatMarkdown('Chat', [
+          ChatMessage(role: Role.assistant, text: 'Hi', citations: cited),
+        ]),
+        contains(
+          'Sources: [A story](<https://news.test/a?b=1>), '
+          '[A story](<https://news.test/other>), Q3 roadmap.pdf',
+        ),
+      );
+    },
+  );
+
+  test('a web citation\'s title is escaped in chat Markdown', () {
+    final text = chatMarkdown('Chat', [
+      ChatMessage(
+        role: Role.assistant,
+        text: 'Hi',
+        citations: [
+          Citation(
+            r'Results ] [2026] \ end',
+            url: Uri.parse('https://x.test/a(b'),
+          ),
+        ],
+      ),
+    ]);
+    expect(
+      text,
+      contains(r'[Results \] \[2026\] \\ end](<https://x.test/a(b>)'),
+    );
+  });
+
+  test('a document\'s text is saved under its title, as a text file', () {
+    expect(textFileName('Q3 roadmap.pdf'), 'Q3 roadmap.pdf.txt');
+    expect(textFileName('notes.md'), 'notes.md');
+    expect(textFileName('meeting-notes.TXT'), 'meeting-notes.TXT');
+    expect(textFileName('Version 1.16'), 'Version 1.16.txt');
+    expect(textFileName('Q&A: what/why?'), 'Q&A- what-why-.txt');
+    expect(textFileName('  '), 'document.txt');
   });
 }

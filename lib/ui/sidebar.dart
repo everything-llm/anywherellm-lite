@@ -12,7 +12,9 @@ import 'type.dart';
 import 'widgets/basics.dart';
 import 'widgets/brand.dart';
 import 'widgets/buttons.dart';
+import 'widgets/confirm_box.dart';
 import 'widgets/inline_input.dart';
+import 'widgets/segmented.dart';
 import 'widgets/settings_button.dart';
 import 'widgets/tappable.dart';
 
@@ -67,46 +69,12 @@ class _PaneSwitch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final shell = AppScope.of(context).shell;
-    final t = Tokens.of(context);
     return ListenableBuilder(
       listenable: shell,
-      builder: (context, _) => Container(
-        padding: const EdgeInsets.all(3),
-        decoration: BoxDecoration(
-          color: t.hover,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: [
-            for (final (pane, label) in const [
-              (Pane.chats, 'Chats'),
-              (Pane.files, 'Files'),
-            ])
-              Expanded(
-                child: Tappable(
-                  label: label,
-                  selected: shell.pane == pane,
-                  onTap: () => shell.showPane(pane),
-                  radius: BorderRadius.circular(8),
-                  color: shell.pane == pane ? t.panel : null,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Text(
-                      label,
-                      textAlign: TextAlign.center,
-                      style: Type.sans(
-                        13.5,
-                        weight: shell.pane == pane
-                            ? FontWeight.w600
-                            : FontWeight.w400,
-                        color: t.ink,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
+      builder: (context, _) => Segmented(
+        options: const [(Pane.chats, 'Chats'), (Pane.files, 'Files')],
+        value: shell.pane,
+        onChanged: shell.showPane,
       ),
     );
   }
@@ -176,7 +144,10 @@ class _WorkspacesState extends State<_Workspaces> {
             ),
           Expanded(
             child: ListView(
-              children: [for (final w in chat.workspaces) _WorkspaceRow(w)],
+              children: [
+                for (final w in chat.workspaces)
+                  _WorkspaceRow(w, key: ValueKey(w.slug)),
+              ],
             ),
           ),
         ],
@@ -185,10 +156,154 @@ class _WorkspacesState extends State<_Workspaces> {
   }
 }
 
-class _WorkspaceRow extends StatelessWidget {
-  const _WorkspaceRow(this.workspace);
+class _WorkspaceRow extends StatefulWidget {
+  const _WorkspaceRow(this.workspace, {super.key});
 
   final Workspace workspace;
+
+  @override
+  State<_WorkspaceRow> createState() => _WorkspaceRowState();
+}
+
+class _WorkspaceRowState extends State<_WorkspaceRow> {
+  TextEditingController? _rename;
+  bool _confirming = false;
+
+  Workspace get workspace => widget.workspace;
+
+  @override
+  void dispose() {
+    _rename?.dispose();
+    super.dispose();
+  }
+
+  void _startRename() => setState(
+    () => _rename = TextEditingController(text: workspace.name)
+      ..selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: workspace.name.length,
+      ),
+  );
+
+  void _endRename() {
+    final controller = _rename;
+    setState(() => _rename = null);
+    controller?.dispose();
+  }
+
+  Future<void> _commit() async {
+    final name = _rename?.text.trim() ?? '';
+    _endRename();
+    if (name.isNotEmpty && name != workspace.name) {
+      await AppScope.of(context).chat.renameWorkspace(workspace.slug, name);
+    }
+  }
+
+  Widget _header(BuildContext context, {required bool active}) {
+    final chat = AppScope.of(context).chat;
+    final t = Tokens.of(context);
+    final rename = _rename;
+    if (rename != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: InlineInput(
+          controller: rename,
+          label: 'Workspace name',
+          height: 32,
+          maxLength: 80,
+          onSubmit: _commit,
+          onCancel: _endRename,
+          commitOnBlur: true,
+        ),
+      );
+    }
+    if (_confirming) {
+      final chats = chat.threadsOf(workspace.slug).length;
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: ConfirmBox(
+          text:
+              'Delete ${workspace.name} and its ${plural(chats, 'chat', 'chats')}? Its documents stay in the library.',
+          onCancel: () => setState(() => _confirming = false),
+          onConfirm: () {
+            setState(() => _confirming = false);
+            chat.deleteWorkspace(workspace.slug);
+          },
+        ),
+      );
+    }
+    final count = chat.docCounts[workspace.slug];
+    return Container(
+      decoration: BoxDecoration(
+        color: active ? t.sel : null,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Tappable(
+              label: workspace.name,
+              selected: active,
+              tooltip: active ? 'Double-click to rename' : null,
+              onTap: () {
+                if (!active) chat.select(workspace.slug);
+              },
+              onDoubleTap: active ? _startRename : null,
+              radius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 9,
+                ),
+                child: Row(
+                  children: [
+                    AppIcon('chat', size: IconSize.small, color: t.muted),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        workspace.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Type.sans(
+                          14.5,
+                          weight: active ? FontWeight.w600 : FontWeight.w400,
+                          color: t.ink,
+                        ),
+                      ),
+                    ),
+                    if (count != null && count > 0)
+                      Text(
+                        plural(count, 'doc', 'docs'),
+                        style: Type.sans(12, color: t.muted),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (active) ...[
+            IconBtn(
+              'pencil',
+              tooltip: 'Rename workspace',
+              box: 28,
+              size: IconSize.xs,
+              onPressed: _startRename,
+            ),
+            IconBtn(
+              'trash',
+              tooltip: 'Delete workspace',
+              box: 28,
+              size: IconSize.xs,
+              dangerHover: true,
+              onPressed: chat.answeringIn(workspace.slug)
+                  ? null
+                  : () => setState(() => _confirming = true),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -196,44 +311,10 @@ class _WorkspaceRow extends StatelessWidget {
     final chat = scope.chat;
     final t = Tokens.of(context);
     final active = chat.activeSlug == workspace.slug;
-    final count = chat.docCounts[workspace.slug];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Tappable(
-          label: workspace.name,
-          selected: active,
-          onTap: () {
-            if (!active) chat.select(workspace.slug);
-          },
-          radius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-            child: Row(
-              children: [
-                AppIcon('chat', size: IconSize.small, color: t.muted),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    workspace.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Type.sans(
-                      14.5,
-                      weight: active ? FontWeight.w600 : FontWeight.w400,
-                      color: t.ink,
-                    ),
-                  ),
-                ),
-                if (count != null && count > 0)
-                  Text(
-                    plural(count, 'doc', 'docs'),
-                    style: Type.sans(12, color: t.muted),
-                  ),
-              ],
-            ),
-          ),
-        ),
+        _header(context, active: active),
         if (active) ...[
           Tappable(
             label: 'New chat',

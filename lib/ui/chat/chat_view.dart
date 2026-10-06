@@ -47,11 +47,21 @@ class _ChatViewState extends State<ChatView> {
         ListenableBuilder(
           listenable: Listenable.merge([scope.chat, scope.prefs]),
           builder: (context, _) {
-            final problem = scope.chat.problem ?? scope.prefs.problem;
-            if (problem == null) return const SizedBox.shrink();
+            final notices = [
+              ?(scope.chat.problem ?? scope.prefs.problem),
+              ?scope.chat.linkNotice,
+            ];
+            if (notices.isEmpty) return const SizedBox.shrink();
             return Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              child: AlertBox(AlertKind.bad, problem.title, text: problem.text),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: 8,
+                children: [
+                  for (final n in notices)
+                    AlertBox(AlertKind.bad, n.title, text: n.text),
+                ],
+              ),
             );
           },
         ),

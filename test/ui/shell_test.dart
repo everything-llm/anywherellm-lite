@@ -1,10 +1,12 @@
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/ui/chat/chat_view.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
 import 'package:anywherellm/ui/sidebar.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/widgets/controls.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
+import 'package:anywherellm/core/server_models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -22,6 +24,9 @@ Finder inSidebar(String text) =>
 
 Finder inSources(Finder finder) =>
     find.descendant(of: find.byType(SourcesPanel), matching: finder);
+
+Finder inChat(Finder finder) =>
+    find.descendant(of: find.byType(ChatView), matching: finder);
 
 Finder get message => find.bySemanticsLabel('Message');
 
@@ -85,7 +90,7 @@ void main() {
         expect(control('Stop'), findsOneWidget);
 
         llm.chat!.add(const TextChunk('The roadmap.'));
-        llm.chat!.add(const ChatDone(['Q3 roadmap.pdf']));
+        llm.chat!.add(const ChatDone([Citation('Q3 roadmap.pdf')]));
         await llm.chat!.close();
         await tester.pumpAndSettle();
         expect(find.byType(Caret), findsNothing);
@@ -144,7 +149,11 @@ void main() {
       await tester.enterText(typingInto, 'x');
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
-      expect(find.byType(EditableText), findsOneWidget);
+      // Only the composer is left to type in; a selectable answer is read-only.
+      expect(
+        find.byWidgetPredicate((w) => w is EditableText && !w.readOnly),
+        findsOneWidget,
+      );
       expect(llm.calls, isNot(contains('createWorkspace:x')));
     });
 
@@ -167,6 +176,189 @@ void main() {
       expect(inSidebar('Budget questions'), findsNothing);
       expect(h.chat.activeThread, 'priorities');
     });
+
+    testWidgets('the pencil renames the workspace on Enter', (tester) async {
+      final llm = planningServer();
+      await pumpApp(tester, llm: llm);
+      await tester.tap(control('Rename workspace'));
+      await tester.pumpAndSettle();
+      await typeAndEnter(tester, 'Q4 planning');
+      expect(llm.calls, contains('renameWorkspace:q3:Q4 planning'));
+      expect(inSidebar('Q4 planning'), findsOneWidget);
+    });
+
+    testWidgets('the workspace trash asks first, and Cancel keeps it', (
+      tester,
+    ) async {
+      final llm = planningServer();
+      final h = await pumpApp(tester, llm: llm);
+      await tester.tap(control('Delete workspace'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Delete Q3 planning and its 2 chats? Its documents stay in the library.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(control('Cancel'));
+      await tester.pumpAndSettle();
+      expect(llm.calls, isNot(contains('deleteWorkspace:q3')));
+      await tester.tap(control('Delete workspace'));
+      await tester.pumpAndSettle();
+      await tester.tap(control('Delete'));
+      await tester.pumpAndSettle();
+      expect(llm.calls, contains('deleteWorkspace:q3'));
+      expect(inSidebar('Q3 planning'), findsNothing);
+      expect(h.chat.activeSlug, 'household');
+    });
+
+    testWidgets('Esc leaves the workspace delete question', (tester) async {
+      final llm = planningServer();
+      await pumpApp(tester, llm: llm);
+      await tester.tap(control('Delete workspace'));
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(control('Cancel'), findsNothing);
+      expect(llm.calls, isNot(contains('deleteWorkspace:q3')));
+    });
+
+    testWidgets('a workspace cannot be deleted while it answers', (
+      tester,
+    ) async {
+      final llm = planningServer()..hold = true;
+      await pumpApp(tester, llm: llm);
+      await typeAndEnter(tester, 'Go');
+      await tester.tap(control('Delete workspace'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(control('Cancel'), findsNothing);
+    });
+
+    testWidgets('the chat mode chooser shows and changes the workspace mode', (
+      tester,
+    ) async {
+      final llm = planningServer();
+      final h = await pumpApp(tester, llm: llm);
+      expect(inSources(find.text(ChatMode.automatic.about)), findsOneWidget);
+      await tester.tap(inSources(control('Query')));
+      await tester.pumpAndSettle();
+      expect(llm.spaces.first.settings['chatMode'], 'query');
+      expect(h.sources.chatMode.value, ChatMode.query);
+      expect(inSources(find.text(ChatMode.query.about)), findsOneWidget);
+    });
+
+    testWidgets('an empty chat and the composer follow the chat mode', (
+      tester,
+    ) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      h.chat.newChat();
+      await tester.pumpAndSettle();
+      expect(inChat(find.text(ChatMode.automatic.about)), findsOneWidget);
+      expect(find.text('Ask anything…'), findsOneWidget);
+      await tester.tap(inSources(control('Query')));
+      await tester.pumpAndSettle();
+      expect(inChat(find.text(ChatMode.query.about)), findsOneWidget);
+      expect(find.text('Ask about your files…'), findsOneWidget);
+    });
+
+    testWidgets('an unknown chat mode claims only what every mode does', (
+      tester,
+    ) async {
+      final llm = planningServer()
+        ..errors['workspace'] = const ApiException('down');
+      final h = await pumpApp(tester, llm: llm);
+      h.chat.newChat();
+      await tester.pumpAndSettle();
+      expect(h.sources.chatMode.value, isNull);
+      expect(inChat(find.text(everyModeDrawsOn)), findsOneWidget);
+      expect(find.text('Ask about your files…'), findsOneWidget);
+    });
+
+    testWidgets('the slash menu says why the server\'s commands are missing', (
+      tester,
+    ) async {
+      final llm = planningServer()
+        ..errors['slashCommands'] = const ApiException('no', status: 403);
+      await pumpApp(tester, llm: llm);
+      await tester.enterText(typingInto, '/');
+      await tester.pumpAndSettle();
+      expect(
+        control('/reset: Clear the chat history and begin a new chat'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('This server has a password'), findsOneWidget);
+    });
+
+    testWidgets('the composer names the server and opens Settings', (
+      tester,
+    ) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      await tester.tap(control('AnythingLLM settings, server h'));
+      await tester.pumpAndSettle();
+      expect(h.shell.settingsOpen, isTrue);
+    });
+
+    testWidgets(
+      'the server address is a web address and the key is left out of autofill',
+      (tester) async {
+        final h = await pumpApp(
+          tester,
+          llm: planningServer(),
+          connection: null,
+        );
+        h.shell.openSettings();
+        await tester.pumpAndSettle();
+        final fields = tester
+            .widgetList<TextField>(
+              find.descendant(
+                of: find.byType(SettingsDialog),
+                matching: find.byType(TextField),
+              ),
+            )
+            .toList();
+        expect(fields[0].keyboardType, TextInputType.url);
+        expect(fields[0].autofillHints, [AutofillHints.url]);
+        // Without suggestions, Flutter on Android would mark it a visible password.
+        expect(fields[0].enableSuggestions, isTrue);
+        expect(fields[1].enableSuggestions, isFalse);
+        expect(fields[1].keyboardType, TextInputType.visiblePassword);
+        expect(fields[1].autofillHints, isNull);
+        expect(fields[1].enableIMEPersonalizedLearning, isFalse);
+      },
+    );
+
+    testWidgets('the chat mode waits while an answer runs', (tester) async {
+      final llm = planningServer()..hold = true;
+      await pumpApp(tester, llm: llm);
+      await typeAndEnter(tester, 'Go');
+      await tester.tap(inSources(control('Chat')));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(llm.calls, isNot(contains('updateWorkspace:q3')));
+    });
+
+    testWidgets(
+      'an agent answer shows its status, then folds its many sources',
+      (tester) async {
+        final llm = planningServer()..hold = true;
+        final h = await pumpApp(tester, llm: llm);
+        await typeAndEnter(tester, 'News?');
+        llm.chat!.add(const StatusChunk('Running web-browsing'));
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.text('Running web-browsing'), findsOneWidget);
+        llm.chat!
+          ..add(const WholeAnswer('Headline'))
+          ..add(ChatDone([for (var i = 1; i <= 9; i++) Citation('Story $i')]));
+        await llm.chat!.close();
+        await tester.pumpAndSettle();
+        expect(find.text('Running web-browsing'), findsNothing);
+        expect(h.chat.turns.last.text, 'Headline');
+        expect(control('Source 5: Story 5'), findsOneWidget);
+        expect(control('Source 6: Story 6'), findsNothing);
+        await tester.tap(control('4 more sources'));
+        await tester.pumpAndSettle();
+        expect(control('Source 9: Story 9'), findsOneWidget);
+      },
+    );
 
     testWidgets('a file switched off is dimmed and counted out', (
       tester,
@@ -284,18 +476,30 @@ void main() {
       expect(find.text('The saved key was deleted.'), findsOneWidget);
     });
 
-    testWidgets('the Answers switch sets the mode', (tester) async {
+    testWidgets('Back with the keyboard up only puts the keyboard away', (
+      tester,
+    ) async {
       final h = await pumpApp(tester, llm: planningServer());
       h.shell.openSettings();
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.descendant(
-          of: find.byType(SettingsDialog),
-          matching: find.byType(AppSwitch),
-        ),
-      );
+      await tester.tap(control('Replace'));
       await tester.pumpAndSettle();
-      expect(h.prefsStore.saved.groundedOnly, isFalse);
+      await tester.tap(find.byType(EditableText).first);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(h.shell.settingsOpen, isTrue);
+      expect(
+        FocusManager.instance.primaryFocus?.context?.widget,
+        isNot(isA<EditableText>()),
+      );
+      tester.view.resetViewInsets();
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(h.shell.settingsOpen, isFalse);
     });
 
     testWidgets('Esc and Done close it', (tester) async {

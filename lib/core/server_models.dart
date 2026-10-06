@@ -94,19 +94,19 @@ class Workspace {
 /// How a setting's value is written: a whole number, any number, or text.
 enum SettingType { integer, number, text }
 
-/// One workspace setting: its type, the bounds of a number, and whether this app writes it.
+/// One workspace setting: its type, the bounds of a number, and the only values text may take,
+/// when it has a fixed set.
 class SettingSpec {
-  const SettingSpec(this.type, {this.min = 0, this.max, this.writable = true});
+  const SettingSpec(this.type, {this.min = 0, this.max, this.choices});
 
   final SettingType type;
   final num min;
   final num? max;
-  final bool writable;
+  final List<String>? choices;
 }
 
 /// The workspace settings Files shows, in the order it shows them. Each may be null on the
-/// server, which means the system default. `chatMode` is never written: the app sends the answer
-/// mode with each message.
+/// server, which means the system default.
 const workspaceSettingSpecs = {
   'openAiTemp': SettingSpec(SettingType.number),
   'openAiHistory': SettingSpec(SettingType.integer),
@@ -118,7 +118,10 @@ const workspaceSettingSpecs = {
   'agentModel': SettingSpec(SettingType.text),
   'vectorSearchMode': SettingSpec(SettingType.text),
   'queryRefusalResponse': SettingSpec(SettingType.text),
-  'chatMode': SettingSpec(SettingType.text, writable: false),
+  'chatMode': SettingSpec(
+    SettingType.text,
+    choices: ['automatic', 'chat', 'query'],
+  ),
 };
 
 /// A workspace's answer settings, by the server's column names in [workspaceSettingSpecs].
@@ -171,6 +174,7 @@ class ChatMessage {
     required this.role,
     required this.text,
     this.citations = const [],
+    this.attachments = const [],
   });
 
   /// An entry of a chat's `history`.
@@ -181,19 +185,55 @@ class ChatMessage {
       _ => '',
     },
     citations: citationsOf(json['sources']),
+    attachments: [
+      for (final attachment in jsonObjects(json['attachments']))
+        ?_known(attachment, 'name'),
+    ],
   );
 
   final Role role;
   final String text;
 
-  /// The titles of the documents the answer drew on, each once, in the server's order.
-  final List<String> citations;
+  /// The names of the files sent with the message.
+  final List<String> attachments;
+
+  /// What the answer drew on, each once, in the server's order.
+  final List<Citation> citations;
 }
 
-/// The document titles in a `sources` list, each once.
-List<String> citationsOf(Object? sources) =>
-    {for (final source in jsonObjects(sources)) ?_known(source, 'title')}
-        .toList();
+/// A source an answer drew on: a document by its [title], or a web page an agent read, which
+/// also has its [url].
+class Citation {
+  const Citation(this.title, {this.url});
+
+  final String title;
+  final Uri? url;
+}
+
+/// The sources in a `sources` list, each once: a web page once per address, and a source with
+/// no address only when its title is not cited yet. A web page's address is its `chunkSource`
+/// after `link://`, as `link://https://example.com/page`; a document has none.
+List<Citation> citationsOf(Object? sources) {
+  final cited = <Citation>[];
+  final titles = <String>{};
+  final pages = <Uri>{};
+  for (final source in jsonObjects(sources)) {
+    final title = _known(source, 'title');
+    if (title == null) continue;
+    final chunk = source['chunkSource'];
+    final page = chunk is String && chunk.startsWith('link://')
+        ? Uri.tryParse(chunk.substring('link://'.length))
+        : null;
+    final web =
+        page != null &&
+        page.host.isNotEmpty &&
+        (page.scheme == 'http' || page.scheme == 'https');
+    if (web ? !pages.add(page) : titles.contains(title)) continue;
+    titles.add(title);
+    cited.add(Citation(title, url: web ? page : null));
+  }
+  return cited;
+}
 
 /// A document a workspace holds.
 class WorkspaceDoc {
@@ -243,6 +283,35 @@ class WorkspaceDoc {
       return null;
     }
   }
+}
+
+/// The details the server keeps with a document, given when it is added. An empty field is left
+/// for the server to fill.
+class DocMeta {
+  const DocMeta({
+    this.title = '',
+    this.author = '',
+    this.description = '',
+    this.source = '',
+  });
+
+  final String title;
+  final String author;
+  final String description;
+  final String source;
+
+  bool get isEmpty => toJson().isEmpty;
+
+  /// The fields that are not blank, trimmed, under the server's `metadata` keys.
+  Map<String, String> toJson() => {
+    for (final (key, value) in [
+      ('title', title),
+      ('docAuthor', author),
+      ('description', description),
+      ('docSource', source),
+    ])
+      if (value.trim().isNotEmpty) key: value.trim(),
+  };
 }
 
 /// A document the server made of an upload.
@@ -356,4 +425,56 @@ class DocBody {
 
   /// The known keys of [docDetailLabels], in its order.
   final Map<String, String> details;
+}
+
+final _metadataBlock = RegExp(
+  r'^\s*<document_metadata>[\s\S]*?</document_metadata>\s*',
+);
+
+/// A passage of a workspace's documents that a question finds, as an answer would get it.
+class SearchHit {
+  const SearchHit({
+    required this.title,
+    required this.text,
+    required this.score,
+  });
+
+  /// The `metadata` holds the document's title; [score] is from 0 to 1, higher is closer. The
+  /// server starts each passage's `text` with a `<document_metadata>` block, which is dropped.
+  factory SearchHit.fromJson(Map<String, dynamic> json) {
+    final metadata = json['metadata'];
+    final score = json['score'];
+    return SearchHit(
+      title:
+          (metadata is Map<String, dynamic>
+              ? _known(metadata, 'title')
+              : null) ??
+          'Untitled',
+      text: json['text'] is String
+          ? (json['text'] as String).replaceFirst(_metadataBlock, '')
+          : '',
+      score: score is num ? score.toDouble() : 0,
+    );
+  }
+
+  final String title;
+  final String text;
+  final double score;
+}
+
+/// The formats the server exports every chat in, with the extension of each.
+enum ChatExport {
+  jsonl('JSON Lines', 'jsonl'),
+  json('JSON', 'json'),
+  csv('CSV', 'csv'),
+  jsonAlpaca('Alpaca JSON', 'json');
+
+  const ChatExport(this.label, this.extension);
+
+  final String label;
+  final String extension;
+
+  /// The name a saved export gets by default.
+  String get fileName =>
+      'anythingllm-chats${this == jsonAlpaca ? '-alpaca' : ''}.$extension';
 }

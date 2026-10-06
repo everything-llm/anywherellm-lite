@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../core/chat.dart';
+import '../../core/commands.dart';
 import '../../core/connection.dart';
 import '../../core/ports.dart';
 import '../../core/server_models.dart';
@@ -13,7 +14,9 @@ import 'settings_controller.dart';
 /// One turn on screen. An answer grows while it streams, and notifies only its own listeners
 /// as it does, so a chunk rebuilds the answer and nothing else.
 class Turn extends ChangeNotifier {
-  Turn.user(this.text) : role = Role.user, streaming = false;
+  Turn.user(this.text, {this.attachments = const []})
+    : role = Role.user,
+      streaming = false;
 
   Turn.answer() : role = Role.assistant, text = '', streaming = true;
 
@@ -21,18 +24,35 @@ class Turn extends ChangeNotifier {
     : role = message.role,
       text = message.text,
       citations = message.citations,
+      attachments = message.attachments,
       streaming = false;
 
   final Role role;
   String text;
-  List<String> citations = const [];
+
+  /// The names of the files sent with a question.
+  List<String> attachments = const [];
+  List<Citation> citations = const [];
   bool streaming;
 
   /// Why the answer failed, or null.
   String? error;
 
+  /// What an agent is doing while the answer runs, such as a tool it runs, or null.
+  String? status;
+
   void _grow(String more) {
     text += more;
+    notifyListeners();
+  }
+
+  void _setStatus(String line) {
+    status = line;
+    notifyListeners();
+  }
+
+  void _replace(String whole) {
+    text = whole;
     notifyListeners();
   }
 }
@@ -40,9 +60,12 @@ class Turn extends ChangeNotifier {
 /// The one answer running: the chat it belongs to, null while its draft's thread is being made,
 /// and the stream it reads.
 class _Running {
-  _Running(this.answer);
+  _Running(this.answer, this.slug);
 
   final Turn answer;
+
+  /// The workspace the answer runs in.
+  final String slug;
   String? thread;
   StreamSubscription<ChatEvent>? stream;
 }
@@ -84,6 +107,15 @@ class ChatController extends ChangeNotifier {
   /// The chats whose names the person chose, which the first message does not rename.
   final Set<String> _named = {};
 
+  /// The server's slash-command presets, or none when they cannot be read.
+  List<SlashCommand> _presets = const [];
+
+  /// Why the server's presets are missing from [commands], or null when they were read.
+  String? commandsNote;
+
+  /// The commands a message can start with: `/reset`, then the server's presets.
+  List<SlashCommand> get commands => withBuiltIns(_presets);
+
   /// The answer running. Only one runs at a time.
   _Running? _running;
 
@@ -91,6 +123,14 @@ class ChatController extends ChangeNotifier {
 
   /// Why the last load or change failed.
   Notice? problem;
+
+  /// Why a link in an answer did not open. It clears after [linkNoticeFor], or on the next
+  /// message or chat opened.
+  Notice? linkNotice;
+
+  Timer? _linkTimer;
+
+  static const linkNoticeFor = Duration(seconds: 6);
 
   Workspace? get active =>
       workspaces.where((w) => w.slug == activeSlug).firstOrNull;
@@ -116,10 +156,13 @@ class ChatController extends ChangeNotifier {
 
   bool isAnswering(String thread) => _running?.thread == thread;
 
+  bool answeringIn(String slug) => _running?.slug == slug;
+
   @override
   void dispose() {
     _settings.removeListener(_serverChanged);
     _running?.stream?.cancel();
+    _linkTimer?.cancel();
     super.dispose();
   }
 
@@ -133,9 +176,12 @@ class ChatController extends ChangeNotifier {
     _turns.clear();
     _draft.clear();
     docCounts.clear();
+    _presets = const [];
+    commandsNote = null;
     activeSlug = null;
     activeThread = null;
     problem = null;
+    _clearLinkNotice();
     notifyListeners();
     if (_server != null) unawaited(load());
   }
@@ -160,6 +206,27 @@ class ChatController extends ChangeNotifier {
       notifyListeners();
     }
     unawaited(_countDocs());
+    unawaited(_readCommands());
+  }
+
+  /// Reads the server's presets. Best effort: a server that will not list them leaves `/reset`
+  /// alone in the menu with [commandsNote] saying why, and a preset typed in full still runs,
+  /// since the server expands it. The list needs the web UI's session, which a server with a
+  /// password refuses.
+  Future<void> _readCommands() async {
+    final server = _server;
+    try {
+      final presets = await _api.slashCommands();
+      if (_server != server) return;
+      _presets = presets;
+      commandsNote = null;
+    } on ApiException catch (error) {
+      if (_server != server) return;
+      commandsNote = error.status == 401 || error.status == 403
+          ? 'This server has a password, so its own commands can\'t be listed here. One typed in full still runs.'
+          : 'The server\'s own commands could not be listed. One typed in full still runs.';
+    }
+    notifyListeners();
   }
 
   /// Asks each workspace how many documents it holds, all at once. Best effort: a count that
@@ -198,6 +265,7 @@ class ChatController extends ChangeNotifier {
   /// Shows chat [threadSlug] of the active workspace, reading its turns the first time.
   Future<void> open(String? threadSlug) async {
     activeThread = threadSlug;
+    _clearLinkNotice();
     notifyListeners();
     final slug = activeSlug;
     if (slug == null || threadSlug == null || _turns.containsKey(threadSlug)) {
@@ -228,6 +296,61 @@ class ChatController extends ChangeNotifier {
       _threads[made.slug] = [];
       docCounts[made.slug] = 0;
       await select(made.slug);
+    });
+  }
+
+  /// Renames workspace [slug]. When the server answers with a new slug, the workspaces are read
+  /// again and the renamed one is shown.
+  Future<void> renameWorkspace(String slug, String name) async {
+    final clean = name.trim();
+    final old = workspaces.where((w) => w.slug == slug).firstOrNull;
+    if (old == null || clean.isEmpty || clean == old.name) return;
+    final server = _server;
+    await _try('Could not rename the workspace', () async {
+      final renamed = await _api.renameWorkspace(slug, clean);
+      if (_server != server) return;
+      if (renamed.slug != slug) {
+        final shown = activeSlug == slug;
+        await load();
+        if (shown) await select(renamed.slug);
+        return;
+      }
+      workspaces = [
+        for (final w in workspaces)
+          w.slug == slug
+              ? Workspace(
+                  slug: slug,
+                  name: renamed.name,
+                  threads: w.threads,
+                  documents: w.documents,
+                  prompt: w.prompt,
+                  settings: w.settings,
+                )
+              : w,
+      ];
+    });
+  }
+
+  /// Deletes workspace [slug] with its chats, unless an answer is running in it. Shows the first
+  /// workspace left when it was the one on screen.
+  Future<void> deleteWorkspace(String slug) async {
+    if (answeringIn(slug)) return;
+    final server = _server;
+    await _try('Could not delete the workspace', () async {
+      await _api.deleteWorkspace(slug);
+      if (_server != server) return;
+      for (final t in threadsOf(slug)) {
+        _turns.remove(t.slug);
+        _named.remove(t.slug);
+      }
+      _threads.remove(slug);
+      docCounts.remove(slug);
+      workspaces = [
+        for (final w in workspaces)
+          if (w.slug != slug) w,
+      ];
+      unawaited(_prefs.setOff(slug, const []));
+      if (activeSlug == slug) await select(workspaces.firstOrNull?.slug);
     });
   }
 
@@ -265,16 +388,25 @@ class ChatController extends ChangeNotifier {
     });
   }
 
-  /// Asks [message] in the chat on screen, making its thread first when it is a draft.
-  Future<void> send(String message) async {
+  /// Asks [message], with [attachments], in the chat on screen, making its thread first when it
+  /// is a draft. A message that [resetsChat] clears the chat instead.
+  Future<void> send(
+    String message, {
+    List<Attachment> attachments = const [],
+  }) async {
     final slug = activeSlug;
     final text = message.trim();
     if (slug == null || text.isEmpty || busy || !ready) return;
-    final user = Turn.user(text);
+    _clearLinkNotice();
+    if (resetsChat(text, _presets)) return _reset(slug);
+    final user = Turn.user(
+      text,
+      attachments: [for (final a in attachments) a.name],
+    );
     final answer = Turn.answer();
     final turns = [...this.turns, user, answer];
     final first = this.turns.every((t) => t.role != Role.user);
-    final running = _running = _Running(answer)..thread = activeThread;
+    final running = _running = _Running(answer, slug)..thread = activeThread;
     final server = _server;
     _setTurns(turns);
     notifyListeners();
@@ -303,13 +435,14 @@ class ChatController extends ChangeNotifier {
         return;
       }
     }
-    final mode = _prefs.prefs.groundedOnly ? ChatMode.query : ChatMode.chat;
     final thread = threadSlug;
     running.stream = _api
-        .streamChat(slug, thread, text, mode: mode)
+        .streamChat(slug, thread, text, attachments: attachments)
         .listen(
           (event) => switch (event) {
             TextChunk(:final text) => answer._grow(text),
+            StatusChunk(:final text) => answer._setStatus(text),
+            WholeAnswer(:final text) => answer._replace(text),
             ChatDone(:final citations) => answer.citations = citations,
           },
           onError: (Object error) => _finish(
@@ -324,6 +457,23 @@ class ChatController extends ChangeNotifier {
           },
           cancelOnError: true,
         );
+  }
+
+  /// Clears the history of the chat on screen, on the server and here. A draft has none, so it
+  /// is only emptied.
+  Future<void> _reset(String slug) async {
+    final thread = activeThread;
+    if (thread == null) {
+      _draft.clear();
+      notifyListeners();
+      return;
+    }
+    final server = _server;
+    await _try('Could not clear the chat', () async {
+      await _api.resetChat(slug, thread);
+      if (_server != server) return;
+      _turns[thread] = [];
+    });
   }
 
   /// Stops the running answer, keeping what came so far.
@@ -341,6 +491,7 @@ class ChatController extends ChangeNotifier {
     _running = null;
     running.answer
       ..streaming = false
+      ..status = null
       ..error = error
       ..notifyListeners();
     notifyListeners();
@@ -374,6 +525,23 @@ class ChatController extends ChangeNotifier {
       for (final t in threadsOf(slug)) t.slug == thread.slug ? thread : t,
     ];
     notifyListeners();
+  }
+
+  /// Shows why a link in an answer did not open, for [linkNoticeFor].
+  void reportLink(String title, String text) {
+    linkNotice = Notice(title, text);
+    _linkTimer?.cancel();
+    _linkTimer = Timer(linkNoticeFor, () {
+      linkNotice = null;
+      notifyListeners();
+    });
+    notifyListeners();
+  }
+
+  void _clearLinkNotice() {
+    _linkTimer?.cancel();
+    _linkTimer = null;
+    linkNotice = null;
   }
 
   Future<void> _try(String failTitle, Future<void> Function() op) async {

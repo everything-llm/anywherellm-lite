@@ -1,6 +1,7 @@
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/prefs.dart';
+import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/upload.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -98,7 +99,7 @@ void main() {
       final llm = planningServer();
       final rig = await started(llm);
       await rig.files.select('/workspaces/q3/settings.json');
-      final draft = rig.files.text!.replaceFirst('"automatic"', '"query"');
+      final draft = rig.files.text!.replaceFirst('"automatic"', '"agent"');
       llm.calls.clear();
       expect(await rig.files.save(draft), isFalse);
       expect(llm.calls, isNot(contains('updateWorkspace:q3')));
@@ -212,6 +213,49 @@ void main() {
     });
   });
 
+  test(
+    'deleting a folder takes its files out of the library and the workspaces',
+    () async {
+      final llm = planningServer();
+      final rig = await started(
+        llm,
+        prefs: const Prefs(
+          switchedOff: {
+            'household': [OffDoc(path: roadmap, title: 'Q3 roadmap.pdf')],
+          },
+        ),
+      );
+      await rig.files.select('/library/$roadmap');
+      await rig.files.deleteFolder('custom-documents');
+      expect(llm.calls, contains('removeFolder:custom-documents'));
+      expect(llm.spaces.first.docs, isEmpty);
+      expect(rig.prefs.prefs.offIn('household'), isEmpty);
+      expect(rig.files.selected, '/library');
+      expect(nodeAt(rig.files.tree, '/library/custom-documents'), isNull);
+      expect(nodeAt(rig.files.tree, '/workspaces/q3/docs/$roadmap'), isNull);
+    },
+  );
+
+  test('a refused folder delete says why and keeps the folder', () async {
+    final llm = planningServer()
+      ..errors['removeFolder'] = const ApiException('Folder in use');
+    final rig = await started(llm);
+    await rig.files.deleteFolder('custom-documents');
+    expect(rig.files.problems.single.text, 'Folder in use');
+    expect(nodeAt(rig.files.tree, '/library/custom-documents'), isNotNull);
+  });
+
+  test('a deleted workspace leaves the tree and the users of a file', () async {
+    final rig = await started(planningServer());
+    await rig.files.select('/workspaces/q3/PROMPT.md');
+    expect(rig.files.usersOf(roadmap).map((w) => w.slug), ['q3']);
+    await rig.chat.deleteWorkspace('q3');
+    await pumpEventQueue();
+    expect(rig.files.usersOf(roadmap), isEmpty);
+    expect(nodeAt(rig.files.tree, '/workspaces/q3'), isNull);
+    expect(rig.files.selected, '/workspaces');
+  });
+
   test('a new server starts afresh', () async {
     final rig = await started(planningServer());
     await rig.files.select('/workspaces/q3/PROMPT.md');
@@ -227,5 +271,19 @@ void main() {
     await rig.chat.createWorkspace('Travel');
     await pumpEventQueue();
     expect(nodeAt(rig.files.tree, '/workspaces/travel/PROMPT.md'), isNotNull);
+  });
+
+  test('exporting gives the file and a refusal says why', () async {
+    final llm = planningServer()..exported = 'a,b';
+    final rig = await started(llm);
+    expect(
+      String.fromCharCodes((await rig.files.exportChats(ChatExport.csv))!),
+      'a,b',
+    );
+    expect(llm.calls, contains('exportChats:csv'));
+    expect(rig.files.exporting, isFalse);
+    llm.errors['exportChats'] = const ApiException('No');
+    expect(await rig.files.exportChats(ChatExport.json), isNull);
+    expect(rig.files.problems.single.title, 'Could not export the chats');
   });
 }

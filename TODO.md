@@ -1,0 +1,51 @@
+# TODO
+
+What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each row says what blocks it.
+
+## In the developer API, not built yet
+
+| Gap | What it needs |
+| --- | --- |
+| Embed widgets, users and invites | `/v1/embed/*` and `/v1/admin/*`. Users and invites matter only in multi-user mode. |
+| Generate or edit an image | `POST /v1/openai/images/generations`, multipart with `prompt`, optional `size` and optional `image_references` to edit. It answers a base64 PNG, and only when the server has an image provider set up. |
+| Files an agent makes | `GET /v1/document/generated-files/{storageFilename}`, named in the answer's `outputs`, which the stream parser ignores today. It waits on the agents check below. |
+| Chats that are in no chat thread | `GET /v1/workspace/{slug}/chats` answers `history`: the chats sent outside any thread, such as the web UI's default workspace chat. Every workspace on the server checked on 2026-10-06 answered an empty list, so this waits until someone uses the default chat. |
+| Large libraries a page at a time | `GET /v1/documents/folder/{name}` with `offset` and `limit`. The library is read in one call today. |
+| Vector count | `GET /v1/system/vector-count`, shown in the Files pane. |
+| Settings when a workspace is made | `POST /v1/workspace/new` takes `similarityThreshold`, `openAiTemp`, `openAiHistory`, `openAiPrompt`, `queryRefusalResponse` and `topN`. Today they are set afterwards in `settings.json`. |
+
+## Needs a check against a live server
+
+| Gap | What it needs |
+| --- | --- |
+| Agent tools menu, skills and MCP servers | Agents run through `/v1` `stream-chat` in a workspace's Agent mode or with `@agent` (checked 2026-10-06). Turning skills and MCP servers on or off is not in `/v1`. |
+| A model picker | `/v1/openai/models` appears to list workspaces, not a provider's models. If so, the model stays a free-text field in `settings.json`. |
+
+## Needs a new dependency
+
+| Gap | What it needs |
+| --- | --- |
+| A microphone in the composer | On-device speech recognition, such as `speech_to_text`. The web UI uses the browser's. |
+| Dropping files onto the chat to attach them | `desktop_drop` is already in use for Sources. Decide whether a drop on the chat attaches or adds a source. |
+
+## Needs the private session API
+
+The web UI's own endpoints sign in with a session token, not the developer key, and promise no compatibility. Using them adds a second way to sign in.
+
+| Gap | Why the developer API cannot do it |
+| --- | --- |
+| Regenerate | No call deletes the old answer, so a resend leaves both answers in the history. |
+| Edit a prompt or an answer | No call edits a stored chat. |
+| Thumbs up or down | No feedback call. |
+| Fork a chat from a message | No fork call. |
+| Delete one message | No call deletes a stored chat. |
+| Memories | Not in `/v1`. |
+| Suggested chat messages | Not in `/v1`. |
+| Slash-command presets on a server with a password | The list comes from `/api/system/slash-command-presets`, which answers without a session only while the server has no password. With one, the menu offers `/reset` alone and says why; a preset typed in full still runs. |
+| Make, edit or delete a slash-command preset | No `/v1` call writes presets. |
+| Server text-to-speech | Not in `/v1`. |
+| Text size and other UI preferences | The web UI keeps them in its own settings, not in `/v1`. |
+
+## Out of scope
+
+Instance administration stays in the web UI: `system/update-env` (it writes the server's `.env`), LLM, embedder and vector-database providers, Scheduled Jobs, Event Logs, Model Router, Telegram, Branding and the Community Hub.

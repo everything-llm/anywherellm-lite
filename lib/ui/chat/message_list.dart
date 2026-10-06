@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../core/chat.dart';
 import '../../core/server_models.dart';
 import '../app_scope.dart';
+import '../links.dart';
+import '../icons.dart';
 import '../layout.dart';
 import '../state/chat_controller.dart';
 import '../tokens.dart';
@@ -10,6 +13,7 @@ import '../widgets/basics.dart';
 import '../widgets/controls.dart';
 import '../widgets/rise.dart';
 import '../widgets/tappable.dart';
+import 'answer_body.dart';
 
 /// The chat on screen, newest at the bottom. Empty, it invites a first question.
 ///
@@ -44,7 +48,7 @@ class MessageList extends StatelessWidget {
               padding: EdgeInsets.only(top: i == turns.length - 1 ? 0 : 26),
               child: Rise(
                 child: turn.role == Role.user
-                    ? _UserBubble(turn.text)
+                    ? _UserBubble(turn.text, attachments: turn.attachments)
                     : _Answer(turn),
               ),
             ),
@@ -64,6 +68,7 @@ class _Empty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    final sources = AppScope.of(context).sources;
     final headline = Type.serif(
       40,
       color: t.ink,
@@ -96,30 +101,35 @@ class _Empty extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
-                child: Text(
-                  'Answers come from the files you’ve switched on in Sources.',
-                  textAlign: TextAlign.center,
-                  style: Type.sans(15.5, color: t.muted, height: 1.5),
-                ),
-              ),
-              const SizedBox(height: 22),
               ListenableBuilder(
-                listenable: AppScope.of(context).sources,
-                builder: (context, _) => Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
+                listenable: sources,
+                builder: (context, _) => Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    for (final s
-                        in AppScope.of(context).sources.files.isEmpty
-                            ? const ['What can I do here?']
-                            : const [
-                                'Summarise my files',
-                                'What are the key points?',
-                              ])
-                      _Suggestion(s, onTap: () => onSuggest(s)),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 480),
+                      child: Text(
+                        sources.chatMode.value?.about ?? everyModeDrawsOn,
+                        textAlign: TextAlign.center,
+                        style: Type.sans(15.5, color: t.muted, height: 1.5),
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final s
+                            in sources.files.isEmpty
+                                ? const ['What can I do here?']
+                                : const [
+                                    'Summarise my files',
+                                    'What are the key points?',
+                                  ])
+                          _Suggestion(s, onTap: () => onSuggest(s)),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -168,9 +178,12 @@ class _SuggestionState extends State<_Suggestion> {
 }
 
 class _UserBubble extends StatelessWidget {
-  const _UserBubble(this.text);
+  const _UserBubble(this.text, {this.attachments = const []});
 
   final String text;
+
+  /// The names of the files sent with the question.
+  final List<String> attachments;
 
   @override
   Widget build(BuildContext context) {
@@ -193,9 +206,30 @@ class _UserBubble extends StatelessWidget {
                 bottomRight: Radius.circular(4),
               ),
             ),
-            child: Text(
-              text,
-              style: Type.sans(15.5, color: t.ink, height: 1.5),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(text, style: Type.sans(15.5, color: t.ink, height: 1.5)),
+                for (final name in attachments)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AppIcon('attach', size: IconSize.xs, color: t.muted),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Type.sans(13, color: t.muted),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
@@ -214,54 +248,188 @@ class _Answer extends StatelessWidget {
       ListenableBuilder(listenable: turn, builder: _build);
 
   Widget _build(BuildContext context, Widget? _) {
-    final t = Tokens.of(context);
-    final style = Type.sans(15.5, color: t.ink, height: 1.65);
+    final split = splitReasoning(turn.text);
+    final thinking = turn.streaming && split.thinking;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (turn.text.isNotEmpty || turn.streaming)
-          Text.rich(
-            TextSpan(
-              style: style,
-              children: [
-                TextSpan(text: turn.text),
-                if (turn.streaming)
-                  const WidgetSpan(
-                    alignment: PlaceholderAlignment.middle,
-                    child: Padding(
-                      padding: EdgeInsets.only(left: 2),
-                      child: Caret(),
-                    ),
-                  ),
-              ],
-            ),
-          ),
+        if (thinking || split.reasoning.isNotEmpty) ...[
+          _Reasoning(split.reasoning, thinking: thinking),
+          if (split.answer.isNotEmpty) const SizedBox(height: 10),
+        ],
+        if (split.answer.isNotEmpty) AnswerBody(split.answer),
+        if (turn.streaming && turn.status != null) _Status(turn.status!),
+        if (turn.streaming && !thinking)
+          const Padding(padding: EdgeInsets.only(top: 6), child: Caret()),
         if (turn.error case final error?) ...[
           const SizedBox(height: 10),
           AlertBox(AlertKind.bad, 'The answer stopped', text: error),
         ],
         if (!turn.streaming && turn.citations.isNotEmpty) ...[
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final (i, title) in turn.citations.indexed)
-                _Citation(number: i + 1, title: title),
-            ],
-          ),
+          _Citations(turn.citations),
+        ],
+        if (!turn.streaming && split.answer.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          CopyButton(split.answer, tooltip: 'Copy answer'),
         ],
       ],
     );
   }
 }
 
+/// What the agent is doing while the answer runs, such as a tool it runs. It goes when the
+/// answer is done.
+class _Status extends StatelessWidget {
+  const _Status(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Semantics(
+        liveRegion: true,
+        child: Text(
+          text,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: Type.sans(
+            13,
+            color: t.muted,
+            height: 1.4,
+          ).copyWith(fontStyle: FontStyle.italic),
+        ),
+      ),
+    );
+  }
+}
+
+/// The model's reasoning before its answer, folded away. While the model is still reasoning it
+/// says so; afterwards a tap shows or hides what it wrote.
+class _Reasoning extends StatefulWidget {
+  const _Reasoning(this.text, {required this.thinking});
+
+  final String text;
+  final bool thinking;
+
+  @override
+  State<_Reasoning> createState() => _ReasoningState();
+}
+
+class _ReasoningState extends State<_Reasoning> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final label = widget.thinking
+        ? 'Thinking…'
+        : _open
+        ? 'Hide reasoning'
+        : 'Show reasoning';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Tappable(
+          label: label,
+          onTap: widget.text.isEmpty
+              ? null
+              : () => setState(() => _open = !_open),
+          radius: BorderRadius.circular(6),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedRotation(
+                  turns: _open ? 0.25 : 0,
+                  duration: const Duration(milliseconds: 150),
+                  child: AppIcon('chevron', size: IconSize.xs, color: t.muted),
+                ),
+                const SizedBox(width: 6),
+                Text(label, style: Type.sans(13.5, color: t.muted)),
+                if (widget.thinking) ...[
+                  const SizedBox(width: 8),
+                  const Caret(),
+                ],
+              ],
+            ),
+          ),
+        ),
+        if (_open && widget.text.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 6, left: 6),
+            padding: const EdgeInsets.only(left: 12),
+            decoration: BoxDecoration(
+              border: Border(left: BorderSide(color: t.line, width: 2)),
+            ),
+            child: SelectableText(
+              widget.text,
+              style: Type.sans(14, color: t.muted, height: 1.55),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 /// A numbered chip naming a document the answer drew on. Tapping it shows the file in Sources.
+/// The sources an answer drew on. An agent's can be dozens of web pages, so past the first few
+/// they fold behind a count.
+class _Citations extends StatefulWidget {
+  const _Citations(this.citations);
+
+  final List<Citation> citations;
+
+  static const shown = 5;
+
+  @override
+  State<_Citations> createState() => _CitationsState();
+}
+
+class _CitationsState extends State<_Citations> {
+  bool _all = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final citations = widget.citations;
+    final folded = !_all && citations.length > _Citations.shown + 1;
+    final count = folded ? _Citations.shown : citations.length;
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (final (i, citation) in citations.take(count).indexed)
+          _Citation(number: i + 1, citation: citation),
+        if (folded)
+          Tappable(
+            label: '${citations.length - count} more sources',
+            onTap: () => setState(() => _all = true),
+            radius: BorderRadius.circular(99),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              child: Text(
+                '${citations.length - count} more',
+                style: Type.sans(12.5, color: t.muted),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// One source. A file in Sources lights up there when tapped, and a web page an agent read opens
+/// in the browser; anything else, such as a file since removed, only shows its title.
 class _Citation extends StatelessWidget {
-  const _Citation({required this.number, required this.title});
+  const _Citation({required this.number, required this.citation});
 
   final int number;
-  final String title;
+  final Citation citation;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -272,19 +440,25 @@ class _Citation extends StatelessWidget {
   Widget _build(BuildContext context, Widget? _) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
+    final title = citation.title;
+    final url = citation.url;
     final present = scope.sources.byTitle(title) != null;
-    final name = present ? title : 'Removed file';
+    final live = present || url != null;
     return Tappable(
-      label: 'Source $number: $name',
-      tooltip: present ? 'Show in Sources' : null,
+      label: present || url == null
+          ? 'Source $number: $title'
+          : 'Source $number: $title, opens in the browser',
+      tooltip: present ? 'Show in Sources' : url?.toString(),
       onTap: present
           ? () {
               scope.shell.openSources();
               scope.sources.flash(title);
             }
-          : null,
+          : url == null
+          ? null
+          : () => openLink(context, url.toString()),
       radius: BorderRadius.circular(99),
-      color: t.accentbg,
+      color: live ? t.accentbg : t.hover,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(6, 4, 10, 4),
         child: Row(
@@ -295,7 +469,7 @@ class _Citation extends StatelessWidget {
               height: 16,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: t.accent,
+                color: live ? t.accent : t.muted,
                 shape: BoxShape.circle,
               ),
               child: Text(
@@ -312,10 +486,10 @@ class _Citation extends StatelessWidget {
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 240),
               child: Text(
-                name,
+                title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Type.sans(12.5, color: t.accent),
+                style: Type.sans(12.5, color: live ? t.accent : t.ink2),
               ),
             ),
           ],

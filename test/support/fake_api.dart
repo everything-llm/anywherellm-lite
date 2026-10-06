@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:anywherellm/core/chat.dart';
+import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
@@ -21,8 +22,8 @@ class FakeWorkspace {
        docs = docs ?? [],
        settings = settings ?? {...defaultSettings};
 
-  final String slug;
-  final String name;
+  String slug;
+  String name;
   final List<Thread> threads;
   final List<WorkspaceDoc> docs;
   String? prompt;
@@ -73,13 +74,25 @@ class FakeAnythingLlm implements AnythingLlmApi {
   };
   Set<String> acceptedValue = {'.md', '.txt', '.pdf'};
 
+  /// What [slashCommands] answers.
+  List<SlashCommand> presets = const [];
+
   String answer = 'Here is what your sources say.';
   List<String> cited = const [];
   bool hold = false;
   StreamController<ChatEvent>? chat;
 
-  /// The mode of every message asked, in order.
-  final List<ChatMode> modes = [];
+  /// The status lines [streamChat] sends before the answer, as an agent does.
+  List<String> agentStatus = const [];
+
+  /// The files sent with the last message asked.
+  List<Attachment> lastAttachments = const [];
+
+  /// The details each added document was given, by path.
+  final Map<String, DocMeta> metaOf = {};
+
+  /// The slug [renameWorkspace] gives the workspace, when set. The server keeps it otherwise.
+  String? renamedSlug;
 
   final List<String> calls = [];
   final Map<String, Object> errors = {};
@@ -135,6 +148,21 @@ class FakeAnythingLlm implements AnythingLlmApi {
   }, name);
 
   @override
+  Future<Workspace> renameWorkspace(String slug, String name) =>
+      _run('renameWorkspace', () {
+        final w = _space(slug)
+          ..name = name
+          ..slug = renamedSlug ?? slug;
+        return Workspace(slug: w.slug, name: w.name);
+      }, '$slug:$name');
+
+  @override
+  Future<void> deleteWorkspace(String slug) => _run('deleteWorkspace', () {
+    _space(slug);
+    spaces.removeWhere((w) => w.slug == slug);
+  }, slug);
+
+  @override
   Future<Thread> createThread(String slug) => _run('createThread', () {
     final made = Thread(slug: 'th-${++_made}', name: newChatName);
     _space(slug).threads.add(made);
@@ -165,18 +193,30 @@ class FakeAnythingLlm implements AnythingLlmApi {
     String slug,
     String thread,
     String message, {
-    required ChatMode mode,
+    List<Attachment> attachments = const [],
   }) {
     calls.add('streamChat:$thread:$message');
-    modes.add(mode);
+    lastAttachments = attachments;
     final error = errors['streamChat'];
     if (error != null) return Stream.error(error);
     if (hold) {
       chat = StreamController<ChatEvent>();
       return chat!.stream;
     }
-    return Stream.fromIterable([TextChunk(answer), ChatDone(cited)]);
+    return Stream.fromIterable([
+      for (final line in agentStatus) StatusChunk(line),
+      TextChunk(answer),
+      ChatDone([for (final title in cited) Citation(title)]),
+    ]);
   }
+
+  @override
+  Future<void> resetChat(String slug, String thread) =>
+      _run('resetChat', () => histories.remove(thread), thread);
+
+  @override
+  Future<List<SlashCommand>> slashCommands() =>
+      _run('slashCommands', () => presets);
 
   @override
   Future<void> updateEmbeddings(
@@ -201,18 +241,59 @@ class FakeAnythingLlm implements AnythingLlmApi {
     String name,
     List<int> bytes, {
     String? folder,
+    DocMeta meta = const DocMeta(),
   }) => _run('upload', () {
     final doc = DocEntry(
       folder: folder ?? 'custom-documents',
       name: '$name.json',
     );
-    library[doc.path] = WorkspaceDoc(
-      path: doc.path,
-      title: name,
-      words: bytes.length,
-    );
+    _keep(doc, name, meta, words: bytes.length);
     return [doc];
   }, folder == null ? name : '$folder/$name');
+
+  /// A page the server reads in as `custom-documents/url-<host>.json`.
+  @override
+  Future<List<DocEntry>> uploadLink(
+    String url, {
+    DocMeta meta = const DocMeta(),
+  }) => _run('uploadLink', () {
+    final host = Uri.parse(url).host;
+    final doc = DocEntry(folder: 'custom-documents', name: 'url-$host.json');
+    _keep(doc, host, meta, words: 1);
+    return [doc];
+  }, url);
+
+  /// Text the server saves as `custom-documents/raw-<title>.json`.
+  @override
+  Future<List<DocEntry>> uploadText(
+    String title,
+    String text, {
+    DocMeta meta = const DocMeta(),
+  }) => _run('uploadText', () {
+    final doc = DocEntry(folder: 'custom-documents', name: 'raw-$title.json');
+    _keep(
+      doc,
+      title,
+      DocMeta(
+        title: title,
+        author: meta.author,
+        description: meta.description,
+        source: meta.source,
+      ),
+      words: text.split(' ').length,
+    );
+    return [doc];
+  }, title);
+
+  /// Puts [doc] in the library, titled by [meta] or else [title], and records [meta].
+  void _keep(DocEntry doc, String title, DocMeta meta, {required int words}) {
+    metaOf[doc.path] = meta;
+    library[doc.path] = WorkspaceDoc(
+      path: doc.path,
+      title: meta.title.trim().isEmpty ? title : meta.title.trim(),
+      words: words,
+    );
+  }
 
   @override
   Future<void> updateWorkspace(String slug, Map<String, Object?> fields) =>
@@ -273,6 +354,21 @@ class FakeAnythingLlm implements AnythingLlmApi {
   Future<void> createFolder(String name) =>
       _run('createFolder', () => folders.add(name), name);
 
+  @override
+  Future<void> removeFolder(String name) => _run('removeFolder', () {
+    final paths = [
+      for (final path in library.keys)
+        if (docFolder(path) == name) path,
+    ];
+    for (final path in paths) {
+      library.remove(path);
+      for (final w in spaces) {
+        w.docs.removeWhere((d) => d.path == path);
+      }
+    }
+    folders.remove(name);
+  }, name);
+
   /// Moves documents that no workspace uses, as the server does, and leaves the others.
   @override
   Future<void> moveDocuments(List<(String, String)> moves) =>
@@ -298,6 +394,33 @@ class FakeAnythingLlm implements AnythingLlmApi {
           }
         }
       }, paths.join(','));
+
+  /// Finds a passage in each document of the workspace whose title shares a word with the
+  /// question, closest first.
+  @override
+  Future<List<SearchHit>> searchDocs(String slug, String query) => _run(
+    'searchDocs',
+    () {
+      final words = query.toLowerCase().split(' ').toSet();
+      return [
+        for (final (i, d) in _space(slug).docs.indexed)
+          if (d.title.toLowerCase().split(RegExp(r'[ .]')).any(words.contains))
+            SearchHit(
+              title: d.title,
+              text: 'A passage of ${d.title}.',
+              score: 0.9 - i / 10,
+            ),
+      ];
+    },
+    '$slug:$query',
+  );
+
+  /// What [exportChats] answers, for any format.
+  String exported = '{"prompt":"hi"}';
+
+  @override
+  Future<List<int>> exportChats(ChatExport format) =>
+      _run('exportChats', () => exported.codeUnits, format.name);
 
   @override
   Future<Map<String, Object?>> systemSettings() =>
@@ -339,7 +462,7 @@ FakeAnythingLlm planningServer() {
     ChatMessage(
       role: Role.assistant,
       text: 'About 40k.',
-      citations: ['Q3 roadmap.pdf'],
+      citations: [Citation('Q3 roadmap.pdf')],
     ),
   ];
   return llm;

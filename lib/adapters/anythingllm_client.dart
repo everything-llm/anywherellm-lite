@@ -5,9 +5,11 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import '../core/chat.dart';
+import '../core/commands.dart';
 import '../core/connection.dart';
 import '../core/ports.dart';
 import '../core/server_models.dart';
+import '../core/upload.dart';
 import 'anythingllm_stream.dart';
 
 /// [AnythingLlmApi] over the server's HTTP API, with the bearer key on every request.
@@ -73,6 +75,25 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     return Workspace.fromJson(json);
   }
 
+  /// The server answers with the workspace it wrote, or a `message` saying why it did not.
+  @override
+  Future<Workspace> renameWorkspace(String slug, String name) async {
+    final body = await _send('POST', '${_workspace(slug)}/update', {
+      'name': name,
+    });
+    final json = _field(body, 'workspace');
+    if (json is! Map<String, dynamic>) {
+      throw ApiException(_said(body) ?? 'The server did not rename $slug.');
+    }
+    return Workspace.fromJson(json);
+  }
+
+  /// The server answers a delete with no JSON. Deleting a workspace leaves its documents in the
+  /// library.
+  @override
+  Future<void> deleteWorkspace(String slug) =>
+      _send('DELETE', _workspace(slug), null, emptyOk: true);
+
   @override
   Future<Thread> createThread(String slug) async {
     final body = await _send('POST', '${_workspace(slug)}/thread/new', {
@@ -107,30 +128,47 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     String slug,
     String thread,
     String message, {
-    required ChatMode mode,
+    List<Attachment> attachments = const [],
   }) async* {
-    final connection = _current;
-    final request = _request(
-      connection,
-      'POST',
-      '${_thread(slug, thread)}/stream-chat',
-      {'message': message, 'mode': mode.name},
-    )..headers['Accept'] = 'text/event-stream';
-    final http.StreamedResponse response;
-    try {
-      response = await _client.send(request).timeout(timeout);
-    } on Exception catch (error) {
-      throw _unreachable(connection, error);
-    }
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      _decode(await http.Response.fromStream(response));
-    }
+    // No `mode`: the server then answers in the workspace's own chat mode.
+    final response = await _openStream('${_thread(slug, thread)}/stream-chat', {
+      'message': message,
+      if (attachments.isNotEmpty)
+        'attachments': [for (final a in attachments) attachmentJson(a)],
+    }, attachments.isEmpty ? timeout : uploadTimeout);
     try {
       yield* chatEvents(response.stream);
     } on http.ClientException catch (error) {
       throw ApiException('The answer was cut off: ${error.message}');
     }
   }
+
+  /// A `stream-chat` with `reset` and no message, which clears the history and answers with
+  /// one closing chunk.
+  @override
+  Future<void> resetChat(String slug, String thread) async {
+    final response = await _openStream('${_thread(slug, thread)}/stream-chat', {
+      'reset': true,
+    }, timeout);
+    try {
+      await chatEvents(response.stream).drain<void>();
+    } on http.ClientException catch (error) {
+      throw ApiException('The reply was cut off: ${error.message}');
+    }
+  }
+
+  /// The presets live under `/api/system`, not `/api/v1`. That route takes the browser's login,
+  /// not the API key, so it answers only while the server has no password.
+  @override
+  Future<List<SlashCommand>> slashCommands() async => [
+    for (final json in jsonObjects(
+      _field(
+        await _get(_current, '/api/system/slash-command-presets'),
+        'presets',
+      ),
+    ))
+      ?SlashCommand.fromJson(json),
+  ];
 
   @override
   Future<void> updateEmbeddings(
@@ -163,6 +201,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     String name,
     List<int> bytes, {
     String? folder,
+    DocMeta meta = const DocMeta(),
   }) async {
     final connection = _current;
     final path = folder == null
@@ -175,10 +214,52 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
             ..files.add(
               http.MultipartFile.fromBytes('file', bytes, filename: name),
             );
+      if (!meta.isEmpty) request.fields['metadata'] = jsonEncode(meta.toJson());
       return http.Response.fromStream(await _client.send(request));
     }, refused: 'The server could not read $name in.');
     return [
       for (final json in jsonObjects(_field(body, 'documents')))
+        DocEntry.fromJson(json),
+    ];
+  }
+
+  @override
+  Future<List<DocEntry>> uploadLink(
+    String url, {
+    DocMeta meta = const DocMeta(),
+  }) => _readIn('/api/v1/document/upload-link', {
+    'link': url,
+    if (!meta.isEmpty) 'metadata': meta.toJson(),
+  }, refused: 'The server could not read $url.');
+
+  /// The server requires a `title` in the metadata.
+  @override
+  Future<List<DocEntry>> uploadText(
+    String title,
+    String text, {
+    DocMeta meta = const DocMeta(),
+  }) => _readIn('/api/v1/document/raw-text', {
+    'textContent': text,
+    'metadata': {...meta.toJson(), 'title': title},
+  }, refused: 'The server could not save $title.');
+
+  /// Posts [body] to [path], which reads something in, and returns the documents it made.
+  Future<List<DocEntry>> _readIn(
+    String path,
+    Map<String, Object?> body, {
+    required String refused,
+  }) async {
+    final connection = _current;
+    final answer = await _call(
+      connection,
+      uploadTimeout,
+      () async => http.Response.fromStream(
+        await _client.send(_request(connection, 'POST', path, body)),
+      ),
+      refused: refused,
+    );
+    return [
+      for (final json in jsonObjects(_field(answer, 'documents')))
         DocEntry.fromJson(json),
     ];
   }
@@ -198,6 +279,46 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
         'docPath': path,
         'pinStatus': pinned,
       });
+
+  @override
+  Future<List<SearchHit>> searchDocs(String slug, String query) async => [
+    for (final json in jsonObjects(
+      _field(
+        await _send('POST', '${_workspace(slug)}/vector-search', {
+          'query': query,
+        }),
+        'results',
+      ),
+    ))
+      SearchHit.fromJson(json),
+  ];
+
+  /// The server answers with the file itself, which is not always JSON; a failure is decoded as
+  /// any other.
+  @override
+  Future<List<int>> exportChats(ChatExport format) async {
+    final connection = _current;
+    final http.Response response;
+    try {
+      response = await _client
+          .get(
+            Uri.parse(
+              '${connection.baseUrl}/api/v1/system/export-chats?type=${format.name}',
+            ),
+            headers: {'Authorization': 'Bearer ${connection.apiKey}'},
+          )
+          .timeout(uploadTimeout);
+    } on Exception catch (error) {
+      throw _unreachable(connection, error, uploadTimeout);
+    }
+    final type = response.headers['content-type'] ?? '';
+    final ok = response.statusCode >= 200 && response.statusCode < 300;
+    if (!ok || type.startsWith('text/html')) {
+      _decode(response);
+      throw const ApiException(_refused);
+    }
+    return response.bodyBytes;
+  }
 
   /// The server answers with its `documents` folder, whose items are the library's folders.
   @override
@@ -225,6 +346,14 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     '/api/v1/document/create-folder',
     {'name': name},
     refused: 'The server did not make the folder $name.',
+  );
+
+  @override
+  Future<void> removeFolder(String name) => _send(
+    'DELETE',
+    '/api/v1/document/remove-folder',
+    {'name': name},
+    refused: 'The server did not delete the folder $name.',
   );
 
   @override
@@ -283,6 +412,28 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       headers: _headers(connection),
     ),
   );
+
+  /// The open response to a POST of [body] to [path], whose body streams server-sent events.
+  /// A failed status is an [ApiException] with the server's words.
+  Future<http.StreamedResponse> _openStream(
+    String path,
+    Map<String, Object?> body,
+    Duration limit,
+  ) async {
+    final connection = _current;
+    final request = _request(connection, 'POST', path, body)
+      ..headers['Accept'] = 'text/event-stream';
+    final http.StreamedResponse response;
+    try {
+      response = await _client.send(request).timeout(limit);
+    } on Exception catch (error) {
+      throw _unreachable(connection, error, limit);
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      _decode(await http.Response.fromStream(response));
+    }
+    return response;
+  }
 
   /// A [method] to [path] on [connection] with the key, and [body] as JSON when given.
   http.Request _request(
@@ -364,8 +515,8 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
 
   static const _refused = 'The server refused the request.';
 
-  /// The decoded JSON of [response], or null for an empty success when [emptyOk], as a delete
-  /// answers. An answer with `success: false` fails, even with HTTP 200, with the server's reason
+  /// The decoded JSON of [response], or null for a success that is empty or the bare status
+  /// text `OK` when [emptyOk], as a delete answers. An answer with `success: false` fails, even with HTTP 200, with the server's reason
   /// or else [refused].
   Object? _decode(
     http.Response response, {
@@ -383,7 +534,9 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
         status: status,
       );
     }
-    if (body == null && !(emptyOk && response.bodyBytes.isEmpty)) {
+    if (body == null &&
+        !(emptyOk &&
+            (response.bodyBytes.isEmpty || response.body.trim() == 'OK'))) {
       throw ApiException(
         'The address did not answer like an AnythingLLM server.',
         status: status,
@@ -418,3 +571,31 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       ? '${limit.inSeconds} seconds'
       : '${limit.inMinutes} minutes';
 }
+
+/// [attachment] as the server takes it: the file as a base64 data URL. A document's URL carries
+/// its own type, or `application/octet-stream`, while [Attachment.mime] tells the server to read
+/// it in.
+Map<String, String> attachmentJson(Attachment attachment) {
+  final type = attachment.isImage
+      ? attachment.mime
+      : _documentTypes[extensionOf(attachment.name)] ??
+            'application/octet-stream';
+  return {
+    'name': attachment.name,
+    'mime': attachment.mime,
+    'contentString': 'data:$type;base64,${base64Encode(attachment.bytes)}',
+  };
+}
+
+const _documentTypes = {
+  '.pdf': 'application/pdf',
+  '.txt': 'text/plain',
+  '.md': 'text/markdown',
+  '.csv': 'text/csv',
+  '.html': 'text/html',
+  '.json': 'application/json',
+  '.docx':
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+};

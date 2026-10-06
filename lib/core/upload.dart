@@ -3,13 +3,22 @@
 import 'ports.dart';
 import 'server_models.dart';
 
-/// A file to send. The UI wraps whatever the file picker or a drop gave it. [read] throws
-/// [UnreadableFile] for something that cannot be read, such as a folder.
+/// A file to send, with the [meta] to keep with it. The UI wraps whatever the file picker or a
+/// drop gave it. [read] throws [UnreadableFile] for something that cannot be read, such as a
+/// folder.
 class UploadFile {
-  const UploadFile({required this.name, required this.read});
+  const UploadFile({
+    required this.name,
+    required this.read,
+    this.meta = const DocMeta(),
+  });
 
   final String name;
   final Future<List<int>> Function() read;
+  final DocMeta meta;
+
+  UploadFile withMeta(DocMeta meta) =>
+      UploadFile(name: name, read: read, meta: meta);
 }
 
 /// Why a dropped or picked file could not be read, in the system's words.
@@ -28,10 +37,13 @@ String extensionOf(String name) {
   return dot <= 0 ? '' : name.substring(dot).toLowerCase();
 }
 
-/// The file type on a file's tile: its extension in capitals, four letters at most, or `FILE`.
+final _extension = RegExp(r'^\.[A-Z0-9]+$');
+
+/// The file type on a file's tile: the extension of [name] in capitals, four letters at most, or
+/// `FILE` when it has none or what follows the last dot is not one, as in `notes.v2-final`.
 String sourceExt(String name) {
   final extension = extensionOf(name).toUpperCase();
-  if (extension.isEmpty) return 'FILE';
+  if (!_extension.hasMatch(extension)) return 'FILE';
   return extension.length > 5
       ? extension.substring(1, 5)
       : extension.substring(1);
@@ -68,7 +80,12 @@ Future<Sent> sendEach(
       final wrongType = extensionProblem(file.name, accepted);
       if (wrongType != null) throw ApiException(wrongType);
       made.addAll(
-        await api.upload(file.name, await file.read(), folder: folder),
+        await api.upload(
+          file.name,
+          await file.read(),
+          folder: folder,
+          meta: file.meta,
+        ),
       );
     } on Exception catch (error) {
       if (error is! ApiException && error is! UnreadableFile) rethrow;
@@ -76,4 +93,14 @@ Future<Sent> sendEach(
     }
   }
   return (made: made, refused: refused);
+}
+
+/// Why [text] is not a web address the server can read in, or null.
+String? linkProblem(String text) {
+  final uri = Uri.tryParse(text.trim());
+  if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
+    return 'a link starts with https:// or http://';
+  }
+  if (uri.host.isEmpty) return 'the link has no site in it';
+  return null;
 }

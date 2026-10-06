@@ -1,4 +1,5 @@
 import 'chat.dart';
+import 'commands.dart';
 import 'connection.dart';
 import 'prefs.dart';
 import 'server_models.dart';
@@ -21,6 +22,12 @@ abstract interface class AnythingLlmApi {
 
   Future<Workspace> createWorkspace(String name);
 
+  /// Renames the workspace and returns it as the server now has it.
+  Future<Workspace> renameWorkspace(String slug, String name);
+
+  /// Deletes the workspace with its chats. Its documents stay in the library.
+  Future<void> deleteWorkspace(String slug);
+
   /// A new chat named [newChatName].
   Future<Thread> createThread(String slug);
 
@@ -31,14 +38,23 @@ abstract interface class AnythingLlmApi {
   /// The chat's turns, oldest first.
   Future<List<ChatMessage>> history(String slug, String thread);
 
-  /// Asks [message] in the chat and streams the answer. The stream fails with [ApiException].
-  /// Cancelling the subscription stops the answer.
+  /// Asks [message] in the chat, with [attachments] for this message only, and streams the
+  /// answer in the workspace's own chat mode. The stream fails with [ApiException]. Cancelling
+  /// the subscription stops the answer.
   Stream<ChatEvent> streamChat(
     String slug,
     String thread,
     String message, {
-    required ChatMode mode,
+    List<Attachment> attachments = const [],
   });
+
+  /// Clears the chat's history, so the model no longer sees its turns and history no longer
+  /// lists them.
+  Future<void> resetChat(String slug, String thread);
+
+  /// The server's slash-command presets. They are read outside the developer API, which
+  /// answers only while the server has no password; otherwise this fails.
+  Future<List<SlashCommand>> slashCommands();
 
   /// Embeds the documents at [adds] in the workspace and drops those at [deletes], by
   /// `folder/name.json` path.
@@ -52,9 +68,29 @@ abstract interface class AnythingLlmApi {
   Future<Set<String>> acceptedExtensions();
 
   /// Sends [bytes] as the file [name] into library [folder], or the server's default folder
-  /// when it is null, and returns the documents the server made of it. Attaches them to no
-  /// workspace.
-  Future<List<DocEntry>> upload(String name, List<int> bytes, {String? folder});
+  /// when it is null, with the details in [meta], and returns the documents the server made of
+  /// it. Attaches them to no workspace.
+  Future<List<DocEntry>> upload(
+    String name,
+    List<int> bytes, {
+    String? folder,
+    DocMeta meta = const DocMeta(),
+  });
+
+  /// Has the server read in the web page at [url], with the details in [meta], and returns the
+  /// documents it made. Attaches them to no workspace.
+  Future<List<DocEntry>> uploadLink(
+    String url, {
+    DocMeta meta = const DocMeta(),
+  });
+
+  /// Saves [text] as a document called [title], whatever title [meta] holds, with the rest of
+  /// [meta], and returns the documents the server made. Attaches them to no workspace.
+  Future<List<DocEntry>> uploadText(
+    String title,
+    String text, {
+    DocMeta meta = const DocMeta(),
+  });
 
   /// Writes the workspace columns in [fields], such as `openAiPrompt` or `topN`, and leaves the
   /// rest as they are.
@@ -72,11 +108,22 @@ abstract interface class AnythingLlmApi {
 
   Future<void> createFolder(String name);
 
+  /// Deletes the library folder [name] and the documents in it, which takes them out of every
+  /// workspace too.
+  Future<void> removeFolder(String name);
+
   /// Moves each library document from its first path to its second.
   Future<void> moveDocuments(List<(String from, String to)> moves);
 
   /// Deletes the library documents at [paths], which takes them out of every workspace too.
   Future<void> removeDocuments(List<String> paths);
+
+  /// The passages of workspace [slug]'s documents that [query] finds, closest first, with the
+  /// workspace's own number and threshold, as an answer would get them.
+  Future<List<SearchHit>> searchDocs(String slug, String query);
+
+  /// Every chat on the server, in [format], as the file's bytes.
+  Future<List<int>> exportChats(ChatExport format);
 
   /// The server's settings, with every secret replaced by whether it is set.
   Future<Map<String, Object?>> systemSettings();

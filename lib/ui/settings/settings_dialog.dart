@@ -67,8 +67,6 @@ class SettingsDialog extends StatelessWidget {
                 ),
                 const _Section('AnythingLLM API'),
                 const _KeyCard(),
-                const _Section('Answers'),
-                const _AnswersCard(),
                 const SizedBox(height: 22),
                 Text(
                   'Your questions and the relevant passages from your files are sent to '
@@ -245,12 +243,17 @@ class _KeyCardState extends State<_KeyCard> {
                 controller: _url,
                 label: 'AnythingLLM server address',
                 hint: _example,
+                keyboardType: TextInputType.url,
+                autofillHints: const [AutofillHints.url],
               ),
               AppField(
                 controller: _key,
                 label: 'AnythingLLM developer API key',
                 hint: 'Paste the AnythingLLM API key',
                 obscure: true,
+                // Not a password: AppField leaves it out of autofill, so no saved login is
+                // offered for it.
+                keyboardType: TextInputType.visiblePassword,
               ),
               Align(
                 alignment: Alignment.centerLeft,
@@ -268,53 +271,6 @@ class _KeyCardState extends State<_KeyCard> {
           ],
         );
       },
-    );
-  }
-}
-
-class _AnswersCard extends StatelessWidget {
-  const _AnswersCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final prefs = AppScope.of(context).prefs;
-    final t = Tokens.of(context);
-    return ListenableBuilder(
-      listenable: prefs,
-      builder: (context, _) => _Card(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  spacing: 2,
-                  children: [
-                    Text(
-                      'Only answer from my documents',
-                      style: Type.sans(
-                        14.5,
-                        weight: FontWeight.w500,
-                        color: t.ink,
-                      ),
-                    ),
-                    Text(
-                      'Otherwise AnywhereLLM may answer from general knowledge.',
-                      style: Type.sans(12.5, color: t.muted),
-                    ),
-                  ],
-                ),
-              ),
-              AppSwitch(
-                value: prefs.prefs.groundedOnly,
-                label: 'Only answer from my documents',
-                large: true,
-                onChanged: prefs.setGroundedOnly,
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }

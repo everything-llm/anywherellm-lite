@@ -178,7 +178,7 @@ class _EditorState extends State<_Editor> {
             'A deploy that sets prompts from a repository overwrites this edit; put lasting changes in the repository too.',
           ]
         : [
-            'null means the system default. chatMode is shown but not saved: AnywhereLLM sends the answer mode with each message.',
+            'null means the system default. chatMode is the workspace\'s chat mode: automatic (Agent), chat or query.',
           ];
     return CallbackShortcuts(
       bindings: {

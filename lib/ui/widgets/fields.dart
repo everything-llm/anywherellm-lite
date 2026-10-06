@@ -13,9 +13,12 @@ class AppField extends StatelessWidget {
     required this.label,
     this.hint,
     this.onChanged,
+    this.onSubmitted,
     this.icon,
     this.suffix,
     this.obscure = false,
+    this.keyboardType,
+    this.autofillHints,
   });
 
   final TextEditingController controller;
@@ -27,14 +30,23 @@ class AppField extends StatelessWidget {
   /// Called on an edit by the person, not when the controller's text is set in code.
   final ValueChanged<String>? onChanged;
 
+  /// Called when the person presses Enter.
+  final ValueChanged<String>? onSubmitted;
+
   /// The name of an icon drawn inside the field, before the text.
   final String? icon;
 
   /// A widget drawn inside the field, after the text.
   final Widget? suffix;
 
-  /// Hides the text, as for a key.
+  /// Hides the text, as for a key. It also keeps the keyboard from learning it.
   final bool obscure;
+
+  final TextInputType? keyboardType;
+
+  /// What the system may fill in, such as a web address. Null, the default, leaves the field
+  /// out of autofill, so a key is never offered a saved password.
+  final Iterable<String>? autofillHints;
 
   @override
   Widget build(BuildContext context) {
@@ -50,9 +62,16 @@ class AppField extends StatelessWidget {
       child: TextField(
         controller: controller,
         autocorrect: false,
-        enableSuggestions: false,
+        // Flutter on Android marks a field without suggestions as a visible password, which
+        // would replace a web-address keyboard and invite a saved login. A URL keyboard offers
+        // no word suggestions anyway.
+        enableSuggestions: keyboardType == TextInputType.url,
         obscureText: obscure,
+        keyboardType: keyboardType,
+        autofillHints: autofillHints,
+        enableIMEPersonalizedLearning: !obscure,
         onChanged: onChanged,
+        onSubmitted: onSubmitted,
         style: Type.sans(15).copyWith(color: t.ink),
         cursorColor: t.accent,
         decoration: InputDecoration(

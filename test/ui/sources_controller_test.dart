@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/upload.dart';
 import 'package:anywherellm/ui/state/sources_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -160,5 +162,163 @@ void main() {
     await pumpEventQueue();
     await rig.sources.upload([file('b.md')]);
     expect(llm.calls.where((c) => c == 'acceptedExtensions'), hasLength(2));
+  });
+
+  group('links and text', () {
+    test('a link is read in and embedded', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.sources.addLink(' https://example.com/page ');
+      expect(
+        llm.calls,
+        containsAllInOrder([
+          'uploadLink:https://example.com/page',
+          'updateEmbeddings:+custom-documents/url-example.com.json-',
+        ]),
+      );
+      expect(rig.sources.files.last.title, 'example.com');
+      expect(rig.sources.sending, isNull);
+      expect(rig.sources.problems, isEmpty);
+    });
+
+    test('pasted text is saved under its title and embedded', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.sources.addText('Meeting notes', 'We agreed on 40k.');
+      expect(
+        llm.calls,
+        containsAllInOrder([
+          'uploadText:Meeting notes',
+          'updateEmbeddings:+custom-documents/raw-Meeting notes.json-',
+        ]),
+      );
+      expect(rig.sources.files.last.title, 'Meeting notes');
+    });
+
+    test('the details of a link, text and a file reach the server', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      const meta = DocMeta(author: 'Ada', source: 'Finance');
+      await rig.sources.addLink('https://example.com/page', meta: meta);
+      await rig.sources.addText('Notes', 'Some text', meta: meta);
+      await rig.sources.upload([
+        UploadFile(
+          name: 'a.md',
+          read: () async => [1],
+          meta: const DocMeta(title: 'Plan'),
+        ),
+      ]);
+      expect(
+        llm.metaOf['custom-documents/url-example.com.json']?.author,
+        'Ada',
+      );
+      expect(llm.metaOf['custom-documents/raw-Notes.json']?.source, 'Finance');
+      expect(llm.metaOf['custom-documents/a.md.json']?.title, 'Plan');
+      expect(rig.sources.files.map((f) => f.title), contains('Plan'));
+    });
+
+    test('an address that is not a link never reaches the server', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.sources.addLink('example.com');
+      expect(llm.calls.where((c) => c.startsWith('uploadLink')), isEmpty);
+      expect(rig.sources.problems.single.text, contains('https://'));
+    });
+
+    test('a refused link becomes a notice', () async {
+      final llm = planningServer()
+        ..errors['uploadLink'] = const ApiException('The page did not load.');
+      final rig = await started(llm);
+      await rig.sources.addLink('https://example.com');
+      expect(
+        rig.sources.problems.single.title,
+        'Could not add https://example.com',
+      );
+      expect(rig.sources.problems.single.text, 'The page did not load.');
+      expect(rig.sources.sending, isNull);
+      expect(llm.calls.where((c) => c.startsWith('updateEmbeddings')), isEmpty);
+    });
+  });
+
+  group('testing a question', () {
+    test('finds passages of the workspace\'s files, closest first', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.sources.search(' roadmap ');
+      expect(llm.calls, contains('searchDocs:q3:roadmap'));
+      expect(rig.sources.searched, 'roadmap');
+      expect(rig.sources.hits?.map((h) => h.title), ['Q3 roadmap.pdf']);
+      expect(rig.sources.searching, isFalse);
+    });
+
+    test('a blank question is not sent', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.sources.search('  ');
+      expect(llm.calls.where((c) => c.startsWith('searchDocs')), isEmpty);
+      expect(rig.sources.hits, isNull);
+    });
+
+    test('a refused question becomes a notice', () async {
+      final llm = planningServer()
+        ..errors['searchDocs'] = const ApiException('No vectors');
+      final rig = await started(llm);
+      await rig.sources.search('roadmap');
+      expect(rig.sources.problems.single.text, 'No vectors');
+      expect(rig.sources.hits, isNull);
+    });
+
+    test('another workspace puts the question away', () async {
+      final rig = await started(planningServer());
+      await rig.sources.search('roadmap');
+      await rig.chat.select('household');
+      expect(rig.sources.searched, isNull);
+      expect(rig.sources.hits, isNull);
+    });
+
+    test('an answer for an older question is dropped', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      final gate = llm.gates['searchDocs'] = Completer<void>();
+      final first = rig.sources.search('roadmap');
+      await pumpEventQueue();
+      rig.sources.clearSearch();
+      gate.complete();
+      await first;
+      expect(rig.sources.hits, isNull);
+    });
+  });
+
+  group('chat mode', () {
+    test('is read with the workspace and changed on the server', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      expect(rig.sources.chatMode.value, ChatMode.automatic);
+      await rig.sources.setChatMode(ChatMode.query);
+      expect(llm.calls, contains('updateWorkspace:q3'));
+      expect(llm.spaces.first.settings['chatMode'], 'query');
+      expect(rig.sources.chatMode.value, ChatMode.query);
+    });
+
+    test('a refused change goes back and says why', () async {
+      final llm = planningServer()
+        ..errors['updateWorkspace'] = const ApiException('No');
+      final rig = await started(llm);
+      await rig.sources.setChatMode(ChatMode.chat);
+      expect(rig.sources.chatMode.value, ChatMode.automatic);
+      expect(
+        rig.sources.problems.single.title,
+        'Could not change the chat mode',
+      );
+    });
+
+    test('another workspace shows its own mode', () async {
+      final llm = planningServer();
+      llm.spaces.last.settings['chatMode'] = 'chat';
+      final rig = await started(llm);
+      await rig.chat.select('household');
+      await pumpEventQueue();
+      expect(rig.sources.chatMode.value, ChatMode.chat);
+    });
   });
 }

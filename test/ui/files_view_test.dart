@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:anywherellm/ui/chat/chat_view.dart';
 import 'package:anywherellm/ui/files/file_tree.dart';
 import 'package:anywherellm/ui/files/files_view.dart';
@@ -79,6 +81,10 @@ void main() {
     await tester.pumpAndSettle();
     await tapTree(tester, 'Q3 planning');
     await tapTree(tester, 'settings.json');
+    expect(
+      inPane(find.textContaining('chatMode is the workspace\'s chat mode')),
+      findsOneWidget,
+    );
     await tester.enterText(inPane(find.byType(TextField)), '{"topN": 0}');
     await tester.pump();
     await tester.tap(inPane(control('Save')));
@@ -130,5 +136,90 @@ void main() {
       isNot(contains(startsWith('custom-documents/Q3'))),
     );
     expect(inTree('Q3 roadmap.pdf'), findsNothing);
+  });
+
+  testWidgets('a document\'s text downloads under its title', (tester) async {
+    final h = await pumpApp(tester, llm: planningServer());
+    h.shell.showPane(Pane.files);
+    await tester.pumpAndSettle();
+    await tapTree(tester, 'custom-documents');
+    await tapTree(tester, 'Q3 roadmap.pdf');
+    await tester.tap(inPane(control('Download text')));
+    await tester.pumpAndSettle();
+    expect(
+      utf8.decode(h.saved['Q3 roadmap.pdf.txt']!),
+      'The text of Q3 roadmap.pdf.',
+    );
+    expect(
+      inPane(find.text('Saved to /saved/Q3 roadmap.pdf.txt')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a download that cannot be saved says why', (tester) async {
+    final h = await pumpApp(tester, llm: planningServer());
+    h.saveThrows = Exception('This device cannot save a file this way.');
+    h.shell.showPane(Pane.files);
+    await tester.pumpAndSettle();
+    await tapTree(tester, 'custom-documents');
+    await tapTree(tester, 'Q3 roadmap.pdf');
+    await tester.tap(inPane(control('Download text')));
+    await tester.pumpAndSettle();
+    expect(h.saved, isEmpty);
+    expect(find.text('Could not save Q3 roadmap.pdf'), findsOneWidget);
+    expect(
+      find.text('This device cannot save a file this way.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('chats export only once a place to save is chosen', (
+    tester,
+  ) async {
+    final llm = planningServer();
+    final h = await pumpApp(tester, llm: llm);
+    h.saveChosen = false;
+    h.shell.showPane(Pane.files);
+    await tester.pumpAndSettle();
+    await tapTree(tester, 'settings');
+    await tester.tap(inPane(control('JSON')));
+    await tester.pumpAndSettle();
+    expect(llm.calls, isNot(contains(startsWith('exportChats'))));
+    h.saveChosen = true;
+    await tester.tap(inPane(control('JSON')));
+    await tester.pumpAndSettle();
+    expect(
+      String.fromCharCodes(h.saved['anythingllm-chats.json']!),
+      llm.exported,
+    );
+    expect(
+      inPane(find.text('Saved to /saved/anythingllm-chats.json')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('deleting a folder asks first and names the workspaces', (
+    tester,
+  ) async {
+    final llm = planningServer();
+    final h = await pumpApp(tester, llm: llm);
+    h.shell.showPane(Pane.files);
+    await tester.pumpAndSettle();
+    await tapTree(tester, 'custom-documents');
+    await tester.tap(inPane(control('Delete folder…')));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining(
+        RegExp(
+          r'^Delete the folder custom-documents and its \d+ documents\? They also leave Q3 planning\.$',
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(llm.calls, isNot(contains('removeFolder:custom-documents')));
+    await tester.tap(inPane(control('Delete')));
+    await tester.pumpAndSettle();
+    expect(llm.calls, contains('removeFolder:custom-documents'));
+    expect(inTree('custom-documents'), findsNothing);
   });
 }

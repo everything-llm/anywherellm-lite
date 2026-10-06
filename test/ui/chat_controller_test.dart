@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:anywherellm/core/chat.dart';
+import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/prefs.dart';
+import 'package:anywherellm/core/server_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
@@ -32,7 +34,9 @@ void main() {
         'What is the budget?',
         'About 40k.',
       ]);
-      expect(rig.chat.turns.last.citations, ['Q3 roadmap.pdf']);
+      expect(rig.chat.turns.last.citations.map((c) => c.title), [
+        'Q3 roadmap.pdf',
+      ]);
     },
   );
 
@@ -103,11 +107,11 @@ void main() {
     await rig.chat.send('another');
     expect(llm.calls.where((c) => c.startsWith('streamChat')), hasLength(1));
 
-    llm.chat!.add(const ChatDone(['Q3 roadmap.pdf']));
+    llm.chat!.add(const ChatDone([Citation('Q3 roadmap.pdf')]));
     await llm.chat!.close();
     await pumpEventQueue();
     expect(answer.streaming, isFalse);
-    expect(answer.citations, ['Q3 roadmap.pdf']);
+    expect(answer.citations.map((c) => c.title), ['Q3 roadmap.pdf']);
     expect(rig.chat.busy, isFalse);
   });
 
@@ -136,19 +140,27 @@ void main() {
     expect(rig.chat.busy, isFalse);
   });
 
-  test(
-    'answers only from documents unless general answers are allowed',
-    () async {
-      final llm = planningServer();
-      final rig = await started(llm);
-      await rig.chat.send('a');
-      await pumpEventQueue();
-      await rig.prefs.setGroundedOnly(false);
-      await rig.chat.send('b');
-      await pumpEventQueue();
-      expect(llm.modes, [ChatMode.query, ChatMode.chat]);
-    },
-  );
+  test('an agent answer shows its status, then its whole answer', () async {
+    final llm = planningServer()..hold = true;
+    final rig = await started(llm);
+    await rig.chat.send('News?');
+    final answer = rig.chat.turns.last;
+    llm.chat!
+      ..add(const TextChunk('<think>Plan</think>'))
+      ..add(const StatusChunk('Running web-browsing'));
+    await pumpEventQueue();
+    expect(answer.status, 'Running web-browsing');
+    llm.chat!
+      ..add(const TextChunk('Draft'))
+      ..add(const WholeAnswer('<think>Pick</think>Headline'))
+      ..add(const ChatDone([Citation('A story')]));
+    await llm.chat!.close();
+    await pumpEventQueue();
+    expect(answer.text, '<think>Pick</think>Headline');
+    expect(answer.status, isNull);
+    expect(answer.citations.map((c) => c.title), ['A story']);
+    expect(answer.streaming, isFalse);
+  });
 
   test('new chat starts a draft, unless the chat is already empty', () async {
     final rig = await started(planningServer());
@@ -266,5 +278,241 @@ void main() {
     gate.complete();
     await deleting;
     expect(rig.chat.workspaces, isEmpty);
+  });
+
+  group('workspaces', () {
+    test('a rename changes the name and keeps the chat on screen', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.chat.renameWorkspace('q3', ' Q4 planning ');
+      expect(llm.calls, contains('renameWorkspace:q3:Q4 planning'));
+      expect(rig.chat.active?.name, 'Q4 planning');
+      expect(rig.chat.activeThread, 'budget');
+      expect(rig.chat.threadsOf('q3'), hasLength(2));
+    });
+
+    test('a blank or unchanged name is not sent', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.chat.renameWorkspace('q3', '  ');
+      await rig.chat.renameWorkspace('q3', 'Q3 planning');
+      expect(llm.calls.where((c) => c.startsWith('renameWorkspace')), isEmpty);
+    });
+
+    test('a rename that changes the slug reads the workspaces again', () async {
+      final llm = planningServer()..renamedSlug = 'q4';
+      final rig = await started(llm);
+      await rig.chat.renameWorkspace('q3', 'Q4 planning');
+      expect(rig.chat.activeSlug, 'q4');
+      expect(rig.chat.active?.name, 'Q4 planning');
+      expect(rig.chat.threadsOf('q4'), hasLength(2));
+    });
+
+    test('a refused rename becomes a notice', () async {
+      final llm = planningServer()
+        ..errors['renameWorkspace'] = const ApiException('Name taken');
+      final rig = await started(llm);
+      await rig.chat.renameWorkspace('q3', 'Q4 planning');
+      expect(rig.chat.problem?.text, 'Name taken');
+      expect(rig.chat.active?.name, 'Q3 planning');
+    });
+
+    test(
+      'deleting the workspace on screen opens the first one left, then none',
+      () async {
+        final llm = planningServer();
+        final rig = await started(llm);
+        await rig.chat.deleteWorkspace('q3');
+        expect(llm.calls, contains('deleteWorkspace:q3'));
+        expect(rig.chat.workspaces.map((w) => w.slug), ['household']);
+        expect(rig.chat.activeSlug, 'household');
+        expect(rig.chat.threadsOf('q3'), isEmpty);
+        await rig.chat.deleteWorkspace('household');
+        expect(rig.chat.workspaces, isEmpty);
+        expect(rig.chat.activeSlug, isNull);
+      },
+    );
+
+    test('deleting another workspace leaves the screen alone', () async {
+      final rig = await started(planningServer());
+      await rig.chat.deleteWorkspace('household');
+      expect(rig.chat.activeSlug, 'q3');
+      expect(rig.chat.activeThread, 'budget');
+    });
+
+    test('a deleted workspace\'s switched-off files are forgotten', () async {
+      final rig = await started(
+        planningServer(),
+        prefs: const Prefs(
+          switchedOff: {
+            'household': [OffDoc(path: 'custom-documents/a.json', title: 'a')],
+          },
+        ),
+      );
+      await rig.chat.deleteWorkspace('household');
+      await pumpEventQueue();
+      expect(rig.prefs.prefs.offIn('household'), isEmpty);
+    });
+
+    test('a workspace with an answer running cannot be deleted', () async {
+      final llm = planningServer()..hold = true;
+      final rig = await started(llm);
+      await rig.chat.send('hi');
+      expect(rig.chat.answeringIn('q3'), isTrue);
+      await rig.chat.deleteWorkspace('q3');
+      expect(llm.calls, isNot(contains('deleteWorkspace:q3')));
+    });
+
+    test('a refused delete becomes a notice', () async {
+      final llm = planningServer()
+        ..errors['deleteWorkspace'] = const ApiException('No');
+      final rig = await started(llm);
+      await rig.chat.deleteWorkspace('q3');
+      expect(rig.chat.problem?.title, 'Could not delete the workspace');
+      expect(rig.chat.workspaces, hasLength(2));
+    });
+
+    test(
+      'a workspace delete that returns after a new server changes nothing',
+      () async {
+        final llm = planningServer();
+        final rig = await started(llm);
+        final gate = llm.gates['deleteWorkspace'] = Completer<void>();
+        final deleting = rig.chat.deleteWorkspace('q3');
+        await pumpEventQueue();
+        await rig.settings.clear();
+        gate.complete();
+        await deleting;
+        expect(rig.chat.workspaces, isEmpty);
+        expect(rig.chat.activeSlug, isNull);
+      },
+    );
+  });
+
+  test('attachments go with the message and their names stay on it', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    await rig.chat.send(
+      'What is in these?',
+      attachments: [
+        Attachment.of('photo.png', const [1]),
+        Attachment.of('report.pdf', const [2]),
+      ],
+    );
+    await pumpEventQueue();
+    expect(llm.lastAttachments.map((a) => (a.name, a.mime)), [
+      ('photo.png', 'image/png'),
+      ('report.pdf', documentMime),
+    ]);
+    final question = rig.chat.turns[rig.chat.turns.length - 2];
+    expect(question.attachments, ['photo.png', 'report.pdf']);
+  });
+
+  group('slash commands', () {
+    const clear = SlashCommand(command: '/clear', prompt: '/reset');
+
+    test('offers /reset, then the server\'s presets', () async {
+      final llm = planningServer()..presets = const [clear];
+      final rig = await started(llm);
+      await pumpEventQueue();
+      expect(
+        [for (final c in rig.chat.commands) c.command],
+        ['/reset', '/clear'],
+      );
+    });
+
+    test('presets that cannot be read leave /reset alone', () async {
+      final llm = planningServer()
+        ..errors['slashCommands'] = const ApiException('No login');
+      final rig = await started(llm);
+      await pumpEventQueue();
+      expect(rig.chat.problem, isNull);
+      expect([for (final c in rig.chat.commands) c.command], ['/reset']);
+    });
+
+    test('/reset clears the chat on the server and on screen', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.chat.send('/reset');
+      expect(llm.calls, contains('resetChat:budget'));
+      expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
+      expect(rig.chat.turns, isEmpty);
+      expect(rig.chat.threadsOf('q3').map((t) => t.name), [
+        'Quarter priorities',
+        'Budget questions',
+      ]);
+    });
+
+    test('a preset whose prompt is /reset clears the chat too', () async {
+      final llm = planningServer()..presets = const [clear];
+      final rig = await started(llm);
+      await pumpEventQueue();
+      await rig.chat.send('/clear');
+      expect(llm.calls, contains('resetChat:budget'));
+      expect(rig.chat.turns, isEmpty);
+    });
+
+    test('a failed reset keeps the turns and says why', () async {
+      final llm = planningServer()
+        ..errors['resetChat'] = const ApiException('Refused');
+      final rig = await started(llm);
+      await rig.chat.send('/reset');
+      expect(rig.chat.turns, hasLength(2));
+      expect(rig.chat.problem?.title, 'Could not clear the chat');
+    });
+
+    test('/reset in a draft only empties it, making no thread', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.chat.select('household');
+      await rig.chat.send('/reset');
+      expect(llm.calls, isNot(contains('createThread:household')));
+      expect(llm.calls.where((c) => c.startsWith('resetChat')), isEmpty);
+      expect(rig.chat.turns, isEmpty);
+    });
+
+    test('any other preset goes to the server as typed', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.chat.send('/deep-research tides');
+      await pumpEventQueue();
+      expect(llm.calls, contains('streamChat:budget:/deep-research tides'));
+    });
+  });
+
+  group('slash command note', () {
+    test(
+      'a password on the server says why its commands are missing',
+      () async {
+        final llm = planningServer()
+          ..errors['slashCommands'] = const ApiException('no', status: 401);
+        final rig = await started(llm);
+        await pumpEventQueue();
+        expect(rig.chat.commandsNote, contains('has a password'));
+        expect(rig.chat.commands.map((c) => c.command), ['/reset']);
+      },
+    );
+
+    test('another failure says only that they could not be listed', () async {
+      final llm = planningServer()
+        ..errors['slashCommands'] = const ApiException('down', status: 500);
+      final rig = await started(llm);
+      await pumpEventQueue();
+      expect(rig.chat.commandsNote, contains('could not be listed'));
+    });
+
+    test(
+      'a server that lists them has no note, and a new server clears it',
+      () async {
+        final llm = planningServer()
+          ..errors['slashCommands'] = const ApiException('no', status: 401);
+        final rig = await started(llm);
+        await pumpEventQueue();
+        llm.errors.remove('slashCommands');
+        await rig.settings.save('https://other:3001', 'K2');
+        await pumpEventQueue();
+        expect(rig.chat.commandsNote, isNull);
+      },
+    );
   });
 }

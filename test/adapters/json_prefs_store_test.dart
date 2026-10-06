@@ -14,24 +14,36 @@ void main() {
   test('with no file, the defaults', () async {
     final prefs = await JsonPrefsStore(File('${dir.path}/none/prefs.json'))
         .load();
-    expect(prefs.groundedOnly, isTrue);
+    expect(prefs.switchedOff, isEmpty);
   });
 
   test('saves, making the folder, and loads what it saved', () async {
     final file = File('${dir.path}/anywherellm/prefs.json');
-    await JsonPrefsStore(file).save(const Prefs(groundedOnly: false));
+    await JsonPrefsStore(file).save(
+      const Prefs(
+        switchedOff: {
+          'w': [OffDoc(path: 'f/a.json', title: 'a')],
+        },
+      ),
+    );
     expect(file.existsSync(), isTrue);
     expect(File('${file.path}.tmp').existsSync(), isFalse);
-    expect((await JsonPrefsStore(file).load()).groundedOnly, isFalse);
+    expect((await JsonPrefsStore(file).load()).offIn('w').single.title, 'a');
   });
 
   test('saves at once land in order, the last one winning', () async {
     final store = JsonPrefsStore(File('${dir.path}/anywherellm/prefs.json'));
     await Future.wait([
-      store.save(const Prefs(groundedOnly: false)),
+      store.save(
+        const Prefs(
+          switchedOff: {
+            'w': [OffDoc(path: 'f/a.json', title: 'a')],
+          },
+        ),
+      ),
       store.save(const Prefs()),
     ]);
-    expect((await store.load()).groundedOnly, isTrue);
+    expect((await store.load()).switchedOff, isEmpty);
   });
 
   test('a file it cannot write is an ApiException naming the path', () async {

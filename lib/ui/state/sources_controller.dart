@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../core/chat.dart';
 import '../../core/ports.dart';
 import '../../core/server_models.dart';
 import '../../core/sources.dart';
@@ -30,6 +31,10 @@ class SourcesController extends ChangeNotifier {
   List<SourceFile> files = const [];
   bool loading = false;
 
+  /// The workspace's chat mode on the server, which every message answers in, or null before it
+  /// is read or when the server names one this app does not know.
+  final chatMode = ValueNotifier<ChatMode?>(null);
+
   /// The extensions the server reads, or null when it has not said. Then the server decides.
   /// Asked again for each workspace, so a new server is asked afresh.
   Set<String>? _accepted;
@@ -48,6 +53,11 @@ class SourcesController extends ChangeNotifier {
   String? flashed;
   Timer? _flashTimer;
 
+  /// The question last tested, and what it found, or null before one is tested.
+  String? searched;
+  List<SearchHit>? hits;
+  bool searching = false;
+
   static const undoFor = Duration(seconds: 6);
   static const flashFor = Duration(milliseconds: 1800);
 
@@ -60,6 +70,7 @@ class SourcesController extends ChangeNotifier {
   @override
   void dispose() {
     _chat.removeListener(_chatChanged);
+    chatMode.dispose();
     _removedTimer?.cancel();
     _flashTimer?.cancel();
     super.dispose();
@@ -69,10 +80,14 @@ class SourcesController extends ChangeNotifier {
     if (_chat.activeSlug == _slug) return;
     _slug = _chat.activeSlug;
     files = const [];
+    chatMode.value = null;
     problems = const [];
     loading = false;
     sending = null;
     _accepted = null;
+    searched = null;
+    hits = null;
+    searching = false;
     _clearRemoved();
     notifyListeners();
     if (_slug != null) unawaited(refresh());
@@ -113,6 +128,9 @@ class SourcesController extends ChangeNotifier {
       workspace.documents,
       _prefs.prefs.offIn(workspace.slug),
     );
+    chatMode.value = ChatMode.fromServer(
+      workspace.settings?.values['chatMode'],
+    );
     _chat.setDocCount(workspace.slug, workspace.documents.length);
   }
 
@@ -149,16 +167,69 @@ class SourcesController extends ChangeNotifier {
         notifyListeners();
       },
     );
-    final refused = [
+    await _embedMade(slug, sent.made, [
       for (final (name, why) in sent.refused)
         Notice('Could not add $name', why),
-    ];
-    final made = [for (final d in sent.made) d.path];
+    ]);
+  }
+
+  /// Has the server read in the web page at [url] with the details in [meta], then adds what it
+  /// made.
+  Future<void> addLink(String url, {DocMeta meta = const DocMeta()}) async {
+    final slug = _slug;
+    final link = url.trim();
+    if (slug == null || link.isEmpty) return;
+    final wrong = linkProblem(link);
+    if (wrong != null) {
+      problems = [Notice('Could not add the link', wrong)];
+      notifyListeners();
+      return;
+    }
+    await _readIn(slug, link, () => _api.uploadLink(link, meta: meta));
+  }
+
+  /// Saves [text] as a document called [title] with the details in [meta], then adds it.
+  Future<void> addText(
+    String title,
+    String text, {
+    DocMeta meta = const DocMeta(),
+  }) async {
+    final slug = _slug;
+    final name = title.trim();
+    if (slug == null || name.isEmpty || text.trim().isEmpty) return;
+    await _readIn(slug, name, () => _api.uploadText(name, text, meta: meta));
+  }
+
+  /// Runs [read], which reads [name] in on the server, then adds what it made.
+  Future<void> _readIn(
+    String slug,
+    String name,
+    Future<List<DocEntry>> Function() read,
+  ) async {
+    sending = name;
+    notifyListeners();
+    try {
+      await _embedMade(slug, await read(), const []);
+    } on ApiException catch (error) {
+      await _embedMade(slug, const [], [
+        Notice('Could not add $name', error.message),
+      ]);
+    }
+  }
+
+  /// Embeds [made] in workspace [slug] and shows [refused], with one more notice if embedding
+  /// fails.
+  Future<void> _embedMade(
+    String slug,
+    List<DocEntry> made,
+    List<Notice> refused,
+  ) async {
+    final problems = [...refused];
     if (made.isNotEmpty) {
       try {
-        await _api.updateEmbeddings(slug, adds: made);
+        await _api.updateEmbeddings(slug, adds: [for (final d in made) d.path]);
       } on ApiException catch (error) {
-        refused.add(
+        problems.add(
           Notice('Could not add the files to this workspace', error.message),
         );
       }
@@ -166,7 +237,7 @@ class SourcesController extends ChangeNotifier {
     // The person moved to another workspace meanwhile: these notices are not about it.
     if (slug != _slug) return;
     sending = null;
-    problems = refused;
+    this.problems = problems;
     await refresh();
   }
 
@@ -197,6 +268,59 @@ class SourcesController extends ChangeNotifier {
         await _remember(slug, file, off: true);
       }
     });
+  }
+
+  /// Finds the passages of the switched-on files that [query] would give an answer, as the
+  /// workspace's own settings choose them.
+  Future<void> search(String query) async {
+    final slug = _slug;
+    final question = query.trim();
+    if (slug == null || question.isEmpty) return;
+    searched = question;
+    searching = true;
+    notifyListeners();
+    try {
+      final found = await _api.searchDocs(slug, question);
+      if (slug != _slug || searched != question) return;
+      hits = found;
+      problems = const [];
+    } on ApiException catch (error) {
+      if (slug != _slug || searched != question) return;
+      hits = null;
+      problems = [Notice('Could not test the question', error.message)];
+    }
+    searching = false;
+    notifyListeners();
+  }
+
+  /// Puts the tested question and what it found away.
+  void clearSearch() {
+    searched = null;
+    hits = null;
+    searching = false;
+    notifyListeners();
+  }
+
+  /// Sets the workspace's chat mode on the server, as its settings in the web UI do, then reads
+  /// the workspace again.
+  Future<void> setChatMode(ChatMode mode) async {
+    final slug = _slug;
+    if (slug == null || mode == chatMode.value) return;
+    final was = chatMode.value;
+    chatMode.value = mode;
+    notifyListeners();
+    try {
+      await _api.updateWorkspace(slug, {'chatMode': mode.name});
+      if (slug != _slug) return;
+      problems = const [];
+    } on ApiException catch (error) {
+      if (slug != _slug) return;
+      chatMode.value = was;
+      problems = [Notice('Could not change the chat mode', error.message)];
+      notifyListeners();
+      return;
+    }
+    await refresh();
   }
 
   /// Lights up the file titled [title] for a moment.

@@ -4,6 +4,7 @@
 
 import 'dart:convert';
 
+import 'chat.dart';
 import 'errors.dart';
 import 'server_models.dart';
 
@@ -247,13 +248,34 @@ String chatMarkdown(String name, List<ChatMessage> turns) {
   for (final turn in turns) {
     out
       ..write('\n**${turn.role == Role.user ? 'You' : 'Answer'}**\n\n')
-      ..write('${turn.text.trim()}\n');
+      ..write('${splitReasoning(turn.text).answer}\n');
     if (turn.citations.isNotEmpty) {
-      out.write('\nSources: ${turn.citations.join(', ')}\n');
+      final sources = [
+        for (final c in turn.citations)
+          c.url == null ? c.title : '[${_linkText(c.title)}](<${c.url}>)',
+      ];
+      out.write('\nSources: ${sources.join(', ')}\n');
     }
   }
   return out.toString();
 }
+
+final _notInFileName = RegExp(r'[\x00-\x1f/\\:*?"<>|]');
+
+final _plainText = RegExp(r'\.(txt|md|markdown)$', caseSensitive: false);
+
+/// The name a document called [title] is saved under by default: the title with any character a
+/// file name cannot hold made `-`, ending in `.txt` unless it already names a plain-text file.
+/// The saved file holds the text the server read, so `report.pdf` becomes `report.pdf.txt`.
+String textFileName(String title) {
+  final name = title.replaceAll(_notInFileName, '-').trim();
+  if (name.isEmpty) return 'document.txt';
+  return _plainText.hasMatch(name) ? name : '$name.txt';
+}
+
+/// [text] safe inside a Markdown link's brackets.
+String _linkText(String text) =>
+    text.replaceAllMapped(RegExp(r'[\\\[\]]'), (m) => '\\${m[0]}');
 
 const _indented = JsonEncoder.withIndent('  ');
 
@@ -282,11 +304,6 @@ Map<String, Object?> parseSettings(String text, WorkspaceSettings was) {
     if (spec == null) throw ApiException('$key is not a workspace setting.');
     _check(key, spec, value);
     if (value == was.values[key]) continue;
-    if (!spec.writable) {
-      throw ApiException(
-        '$key cannot be changed here. AnywhereLLM sends the answer mode with each message.',
-      );
-    }
     changed[key] = value;
   }
   return changed;
@@ -295,8 +312,15 @@ Map<String, Object?> parseSettings(String text, WorkspaceSettings was) {
 void _check(String key, SettingSpec spec, Object? value) {
   if (value == null) return;
   if (spec.type == SettingType.text) {
-    if (value is String) return;
-    throw ApiException('$key must be text or null.');
+    final choices = spec.choices;
+    if (value is String && (choices == null || choices.contains(value))) {
+      return;
+    }
+    throw ApiException(
+      choices == null
+          ? '$key must be text or null.'
+          : '$key must be one of ${choices.join(', ')}.',
+    );
   }
   final whole = spec.type == SettingType.integer;
   final max = spec.max;

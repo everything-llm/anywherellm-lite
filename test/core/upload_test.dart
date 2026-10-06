@@ -1,5 +1,8 @@
+import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/upload.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../support/fake_api.dart';
 
 void main() {
   group('extensionProblem', () {
@@ -31,6 +34,62 @@ void main() {
       expect(sourceExt('note.markdown'), 'MARK');
       expect(sourceExt('README'), 'FILE');
       expect(sourceExt('.bashrc'), 'FILE');
+      expect(sourceExt('Q3 roadmap.pdf'), 'PDF');
+      expect(sourceExt('notes.v2-final'), 'FILE');
     },
   );
+
+  group('linkProblem', () {
+    test('is null for a web address', () {
+      expect(linkProblem(' https://example.com/page '), isNull);
+      expect(linkProblem('http://intranet/wiki'), isNull);
+    });
+
+    test('names an address that is not http or https', () {
+      expect(
+        linkProblem('example.com'),
+        'a link starts with https:// or http://',
+      );
+      expect(
+        linkProblem('ftp://example.com'),
+        'a link starts with https:// or http://',
+      );
+    });
+
+    test('names an address with no site', () {
+      expect(linkProblem('https://'), 'the link has no site in it');
+    });
+  });
+
+  group('DocMeta', () {
+    test(
+      'keeps the fields that are not blank, trimmed, under the server keys',
+      () {
+        expect(
+          const DocMeta(
+            title: ' Plan ',
+            author: '',
+            description: '  ',
+            source: 'Ada',
+          ).toJson(),
+          {'title': 'Plan', 'docSource': 'Ada'},
+        );
+        expect(const DocMeta(description: ' ').isEmpty, isTrue);
+      },
+    );
+  });
+
+  test('sendEach hands each file its own details', () async {
+    final llm = FakeAnythingLlm();
+    await sendEach(llm, [
+      UploadFile(
+        name: 'a.md',
+        read: () async => [1],
+        meta: const DocMeta(author: 'Ada'),
+      ),
+      UploadFile(name: 'b.md', read: () async => [2]),
+    ], folder: 'notes');
+    expect(llm.metaOf['notes/a.md.json']?.author, 'Ada');
+    expect(llm.metaOf['notes/b.md.json']?.isEmpty, isTrue);
+  });
 }

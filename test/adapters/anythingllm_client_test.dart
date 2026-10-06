@@ -6,6 +6,7 @@ import 'package:anywherellm/adapters/anythingllm_client.dart';
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/server_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -167,7 +168,7 @@ void main() {
       await expectLater(api.workspaces(), throwsA(isA<NotConfigured>()));
       await expectLater(api.history('w', 't'), throwsA(isA<NotConfigured>()));
       await expectLater(
-        api.streamChat('w', 't', 'hi', mode: ChatMode.query).toList(),
+        api.streamChat('w', 't', 'hi').toList(),
         throwsA(isA<NotConfigured>()),
       );
       await expectLater(
@@ -218,7 +219,7 @@ void main() {
       await expectLater(api.verify(plain), throwsA(https));
       await expectLater(api.workspaces(), throwsA(https));
       await expectLater(
-        api.streamChat('w', 't', 'hi', mode: ChatMode.chat).toList(),
+        api.streamChat('w', 't', 'hi').toList(),
         throwsA(https),
       );
       expect(sent, 0);
@@ -350,6 +351,25 @@ void main() {
       expect(request.body, contains('name="file"; filename="notes.md"'));
       expect(request.body, contains('# hi'));
       expect(made.single.path, 'custom-documents/notes.md-1.json');
+      expect(request.body, isNot(contains('name="metadata"')));
+    });
+
+    test('details go as a metadata field of JSON', () async {
+      final seen = <http.Request>[];
+      await _answering({
+        'success': true,
+        'error': null,
+        'documents': [],
+      }, seen: seen).upload(
+        'notes.md',
+        utf8.encode('# hi'),
+        meta: const DocMeta(author: 'Ada', source: ' Finance '),
+      );
+      expect(seen.single.body, contains('name="metadata"'));
+      expect(
+        seen.single.body,
+        contains('{"docAuthor":"Ada","docSource":"Finance"}'),
+      );
     });
 
     test('a refusal gives the server\'s reason', () async {
@@ -427,11 +447,61 @@ void main() {
       expect(seen.single.url.path, '/api/v1/workspace/w/thread/t');
     });
 
+    test('deleting a workspace sends DELETE and takes a bare OK', () async {
+      final seen = <http.Request>[];
+      await _api((request) async {
+        seen.add(request);
+        return http.Response('OK', 200);
+      }).deleteWorkspace('scratch');
+      expect(seen.single.method, 'DELETE');
+      expect(seen.single.url.path, '/api/v1/workspace/scratch');
+    });
+
+    test(
+      'renaming a workspace posts the name and returns the workspace',
+      () async {
+        final seen = <http.Request>[];
+        final renamed = await _answering({
+          'workspace': {'slug': 'scratch', 'name': 'Renamed'},
+          'message': null,
+        }, seen: seen).renameWorkspace('scratch', 'Renamed');
+        expect(seen.single.url.path, '/api/v1/workspace/scratch/update');
+        expect(jsonDecode(seen.single.body), {'name': 'Renamed'});
+        expect((renamed.slug, renamed.name), ('scratch', 'Renamed'));
+      },
+    );
+
+    test('a rename the server refuses says why', () async {
+      final error = await _failure(
+        _answering({'workspace': null, 'message': 'Name taken'})
+            .renameWorkspace('scratch', 'Renamed'),
+      );
+      expect(error.message, 'Name taken');
+    });
+
+    test('a delete answered with a web page is not a success', () async {
+      final error = await _failure(
+        _api((_) async => http.Response('<html>login</html>', 200))
+            .deleteWorkspace('scratch'),
+      );
+      expect(
+        error.message,
+        'The address did not answer like an AnythingLLM server.',
+      );
+    });
+
     test('a history is each turn with its cited titles', () async {
       final seen = <http.Request>[];
       final turns = await _answering({
         'history': [
-          {'role': 'user', 'content': 'What is due?', 'sentAt': 1},
+          {
+            'role': 'user',
+            'content': 'What is due?',
+            'sentAt': 1,
+            'attachments': [
+              {'name': 'photo.png', 'mime': 'image/png'},
+            ],
+          },
           {
             'role': 'assistant',
             'content': 'The roadmap.',
@@ -445,7 +515,12 @@ void main() {
       }, seen: seen).history('w', 't');
       expect(seen.single.url.path, '/api/v1/workspace/w/thread/t/chats');
       expect(turns.map((t) => t.text), ['What is due?', 'The roadmap.']);
-      expect(turns.last.citations, ['roadmap.pdf', 'notes.md']);
+      expect(turns.last.citations.map((c) => c.title), [
+        'roadmap.pdf',
+        'notes.md',
+      ]);
+      expect(turns.first.attachments, ['photo.png']);
+      expect(turns.last.attachments, isEmpty);
     });
 
     test('embedding changes post the adds and deletes', () async {
@@ -481,46 +556,203 @@ void main() {
 
     String data(Map<String, Object?> chunk) => 'data: ${jsonEncode(chunk)}\n\n';
 
+    test('posts the message, and yields the text then the sources', () async {
+      final seen = <http.BaseRequest>[];
+      final events = await streaming([
+        data({
+          'type': 'textResponseChunk',
+          'textResponse': 'Hel',
+          'close': false,
+        }),
+        data({
+          'type': 'textResponseChunk',
+          'textResponse': 'lo',
+          'close': false,
+        }),
+        data({
+          'type': 'textResponseChunk',
+          'textResponse': '',
+          'close': true,
+          'sources': [
+            {'title': 'roadmap.pdf'},
+          ],
+        }),
+      ], seen: seen).streamChat('w', 't', 'Hi').toList();
+      expect(seen.single.url.path, '/api/v1/workspace/w/thread/t/stream-chat');
+      expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
+      expect(
+        [
+          for (final e in events)
+            e is TextChunk
+                ? e.text
+                : [for (final c in (e as ChatDone).citations) c.title],
+        ],
+        [
+          'Hel',
+          'lo',
+          ['roadmap.pdf'],
+        ],
+      );
+    });
+
+    test('sends no mode, so the workspace\'s own chat mode applies', () async {
+      late Map<String, dynamic> body;
+      await HttpAnythingLlmApi(
+        holder: ConnectionHolder(_connection),
+        client: MockClient.streaming((request, bytes) async {
+          body = jsonDecode(
+            await utf8.decodeStream(bytes),
+          ) as Map<String, dynamic>;
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(data({'close': true}))),
+            200,
+          );
+        }),
+      ).streamChat('w', 't', 'Hi').toList();
+      expect(body, {'message': 'Hi'});
+    });
+
+    test('an agent answer: status, then the whole answer, then its sources', () async {
+      // As the server streamed one in agent mode, with the text shortened.
+      final events = await streaming([
+        data({
+          'id': 'a',
+          'type': 'textResponseChunk',
+          'textResponse': '<think>Plan',
+          'sources': [],
+          'close': false,
+          'error': null,
+        }),
+        data({
+          'id': 'a',
+          'type': 'textResponseChunk',
+          'textResponse': '.</think>',
+          'sources': [],
+          'close': false,
+          'error': null,
+        }),
+        data({
+          'id': 'a',
+          'type': 'agentThought',
+          'thought':
+              '@agent is executing `web-browsing` tool {\n  "query": "news"\n}',
+          'sources': [],
+          'close': false,
+          'error': null,
+          'animate': true,
+        }),
+        data({
+          'id': 'a',
+          'type': 'agentThought',
+          'thought': '@agent: Using SearXNG to search for "news"',
+          'sources': [],
+          'close': false,
+          'error': null,
+          'animate': true,
+        }),
+        data({
+          'id': 'a',
+          'type': 'textResponseChunk',
+          'textResponse': 'Head',
+          'sources': [],
+          'close': false,
+          'error': null,
+        }),
+        data({
+          'id': 'a',
+          'type': 'usageMetrics',
+          'metrics': {'total_tokens': 9},
+          'close': false,
+          'error': null,
+        }),
+        data({
+          'id': 'a',
+          'type': 'textResponse',
+          'textResponse': '<think>Pick.</think>Headline: [x](https://x.test)',
+          'sources': [],
+          'close': true,
+          'error': null,
+        }),
+        data({
+          'uuid': 'a',
+          'type': 'finalizeResponseStream',
+          'textResponse': '<think>Pick.</think>Headline: [x](https://x.test)',
+          'thoughts': [],
+          'outputs': [],
+          'sources': [
+            {
+              'title': 'A story',
+              'chunkSource': 'link://https://x.test/story',
+              'score': 0.5,
+            },
+            {'title': 'A story'},
+            {'title': 'Another'},
+          ],
+          'close': true,
+          'error': false,
+        }),
+      ]).streamChat('w', 't', 'Hi').toList();
+      expect(
+        [
+          for (final e in events)
+            switch (e) {
+              TextChunk(:final text) => 'text $text',
+              StatusChunk(:final text) => 'status $text',
+              WholeAnswer(:final text) => 'whole $text',
+              ChatDone(:final citations) =>
+                'done ${[for (final c in citations) '${c.title} ${c.url}']}',
+            },
+        ],
+        [
+          'text <think>Plan',
+          'text .</think>',
+          'status Running web-browsing',
+          'status Using SearXNG to search for "news"',
+          'text Head',
+          'whole <think>Pick.</think>Headline: [x](https://x.test)',
+          'done [A story https://x.test/story, Another null]',
+        ],
+      );
+    });
+
     test(
-      'posts the message and mode, and yields the text then the sources',
+      'a chat answer\'s sources come with its close, before the finalize',
       () async {
-        final seen = <http.BaseRequest>[];
         final events = await streaming([
           data({
+            'uuid': 'c',
             'type': 'textResponseChunk',
-            'textResponse': 'Hel',
+            'textResponse': 'Hi',
+            'sources': [],
             'close': false,
+            'error': false,
           }),
           data({
-            'type': 'textResponseChunk',
-            'textResponse': 'lo',
-            'close': false,
-          }),
-          data({
+            'uuid': 'c',
             'type': 'textResponseChunk',
             'textResponse': '',
-            'close': true,
             'sources': [
               {'title': 'roadmap.pdf'},
             ],
+            'close': true,
+            'error': false,
           }),
-        ], seen: seen).streamChat('w', 't', 'Hi', mode: ChatMode.chat).toList();
+          data({
+            'uuid': 'c',
+            'type': 'finalizeResponseStream',
+            'close': true,
+            'error': false,
+            'chatId': 7,
+            'sources': [],
+          }),
+        ]).streamChat('w', 't', 'Hi').toList();
+        expect((events.first as TextChunk).text, 'Hi');
+        expect(events.whereType<WholeAnswer>(), isEmpty);
         expect(
-          seen.single.url.path,
-          '/api/v1/workspace/w/thread/t/stream-chat',
+          (events.last as ChatDone).citations.map((c) => (c.title, c.url)),
+          [('roadmap.pdf', null)],
         );
-        expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
-        expect(
-          [
-            for (final e in events)
-              e is TextChunk ? e.text : (e as ChatDone).citations,
-          ],
-          [
-            'Hel',
-            'lo',
-            ['roadmap.pdf'],
-          ],
-        );
+        expect(events.length, 2);
       },
     );
 
@@ -529,7 +761,7 @@ void main() {
       final events = await streaming([
         line.substring(0, 12),
         line.substring(12),
-      ]).streamChat('w', 't', 'Hi', mode: ChatMode.query).toList();
+      ]).streamChat('w', 't', 'Hi').toList();
       expect((events.first as TextChunk).text, 'whole');
       expect(events.last, isA<ChatDone>());
     });
@@ -539,7 +771,7 @@ void main() {
         data({'textResponse': 'part'}),
         ': keep-alive\n\n',
         'data: not json\n\n',
-      ]).streamChat('w', 't', 'Hi', mode: ChatMode.query).toList();
+      ]).streamChat('w', 't', 'Hi').toList();
       expect(events.length, 2);
       expect(events.last, isA<ChatDone>());
     });
@@ -552,7 +784,7 @@ void main() {
           'error': 'No LLM set',
           'close': true,
         }),
-      ]).streamChat('w', 't', 'Hi', mode: ChatMode.query);
+      ]).streamChat('w', 't', 'Hi');
       await expectLater(
         stream.toList(),
         throwsA(
@@ -564,11 +796,74 @@ void main() {
     test('a refused request is decoded like any other', () async {
       final stream = streaming([
         '{"error":"Invalid API Key"}',
-      ], status: 403).streamChat('w', 't', 'Hi', mode: ChatMode.query);
+      ], status: 403).streamChat('w', 't', 'Hi');
       await expectLater(
         stream.toList(),
         throwsA(isA<ApiException>().having((e) => e.status, 'status', 403)),
       );
+    });
+
+    test('reset posts only the reset flag and reads the reply', () async {
+      Object? sent;
+      final api = HttpAnythingLlmApi(
+        holder: ConnectionHolder(_connection),
+        client: MockClient.streaming((request, body) async {
+          expect(request.url.path, '/api/v1/workspace/w/thread/t/stream-chat');
+          sent = jsonDecode(utf8.decode(await body.expand((b) => b).toList()));
+          return http.StreamedResponse(
+            Stream.value(
+              utf8.encode(
+                data({
+                  'textResponse': 'Chat history was reset!',
+                  'close': true,
+                }),
+              ),
+            ),
+            200,
+          );
+        }),
+      );
+      await api.resetChat('w', 't');
+      expect(sent, {'reset': true});
+    });
+
+    test('a reset the server fails says why', () async {
+      final error = await _failure(
+        streaming([
+          data({'type': 'abort', 'error': 'Thread t not found.'}),
+        ]).resetChat('w', 't'),
+      );
+      expect(error.message, 'Thread t not found.');
+    });
+  });
+
+  group('slash commands', () {
+    test('reads the presets from the system route, with the key', () async {
+      final seen = <http.Request>[];
+      final presets = await _answering({
+        'presets': [
+          {
+            'id': 1,
+            'command': '/deep-research',
+            'prompt': '@agent Research:',
+            'description': 'Research in depth',
+          },
+          {'id': 2, 'command': 'broken'},
+        ],
+      }, seen: seen).slashCommands();
+      expect(seen.single.url.path, '/api/system/slash-command-presets');
+      expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
+      expect([for (final p in presets) p.command], ['/deep-research']);
+      expect(presets.single.description, 'Research in depth');
+    });
+
+    test('a server with a password refuses them', () async {
+      final error = await _failure(
+        _answering({
+          'error': 'No auth token found.',
+        }, status: 401).slashCommands(),
+      );
+      expect(error.status, 401);
     });
   });
 
@@ -674,12 +969,14 @@ void main() {
       await api.createFolder('notes');
       await api.moveDocuments([('claude/a.json', 'notes/a.json')]);
       await api.removeDocuments(['notes/a.json']);
+      await api.removeFolder('notes');
       expect(
         [for (final r in seen) '${r.method} ${r.url.path}'],
         [
           'POST /api/v1/document/create-folder',
           'POST /api/v1/document/move-files',
           'DELETE /api/v1/system/remove-documents',
+          'DELETE /api/v1/document/remove-folder',
         ],
       );
       expect(
@@ -694,6 +991,7 @@ void main() {
           {
             'names': ['notes/a.json'],
           },
+          {'name': 'notes'},
         ],
       );
     });
@@ -701,6 +999,7 @@ void main() {
     test('success false with status 200 is a refusal', () async {
       final api = _answering({'success': false, 'message': 'Folder exists'});
       expect((await _failure(api.createFolder('x'))).message, 'Folder exists');
+      expect((await _failure(api.removeFolder('x'))).message, 'Folder exists');
       final quiet = _answering({'success': false});
       expect(
         (await _failure(quiet.removeDocuments(['x']))).message,
@@ -740,6 +1039,275 @@ void main() {
       ]) {
         expect((await _failure(call())).message, isNot(contains('SECRET-KEY')));
       }
+    });
+  });
+
+  group('attachments', () {
+    test('go as base64 data URLs with the server\'s types', () async {
+      final seen = <http.BaseRequest>[];
+      final api = HttpAnythingLlmApi(
+        holder: ConnectionHolder(_connection),
+        client: MockClient.streaming((request, body) async {
+          seen.add(request);
+          await body.drain<void>();
+          return http.StreamedResponse(
+            Stream.value(
+              utf8.encode(
+                'data: ${jsonEncode({'type': 'textResponseChunk', 'textResponse': '', 'close': true})}\n\n',
+              ),
+            ),
+            200,
+          );
+        }),
+      );
+      await api
+          .streamChat(
+            'w',
+            't',
+            'What is this?',
+            attachments: [
+              Attachment.of('photo.PNG', const [1, 2, 3]),
+              Attachment.of('report.pdf', utf8.encode('%PDF')),
+            ],
+          )
+          .toList();
+      final body = jsonDecode(
+        (seen.single as http.Request).body,
+      ) as Map<String, dynamic>;
+      expect(body['message'], 'What is this?');
+      expect(body['attachments'], [
+        {
+          'name': 'photo.PNG',
+          'mime': 'image/png',
+          'contentString': 'data:image/png;base64,AQID',
+        },
+        {
+          'name': 'report.pdf',
+          'mime': documentMime,
+          'contentString':
+              'data:application/pdf;base64,${base64Encode(utf8.encode('%PDF'))}',
+        },
+      ]);
+    });
+
+    test('a document of unknown type is sent as octet-stream', () {
+      expect(
+        attachmentJson(Attachment.of('notes.xyz', const [0]))['contentString'],
+        startsWith('data:application/octet-stream;base64,'),
+      );
+    });
+
+    test('no attachments leaves the field out', () async {
+      final seen = <http.BaseRequest>[];
+      final api = HttpAnythingLlmApi(
+        holder: ConnectionHolder(_connection),
+        client: MockClient.streaming((request, body) async {
+          seen.add(request);
+          await body.drain<void>();
+          return http.StreamedResponse(const Stream.empty(), 200);
+        }),
+      );
+      await api.streamChat('w', 't', 'Hi').toList();
+      final body = jsonDecode(
+        (seen.single as http.Request).body,
+      ) as Map<String, dynamic>;
+      expect(body.containsKey('attachments'), isFalse);
+    });
+  });
+
+  group('links and text', () {
+    final made = {
+      'success': true,
+      'error': null,
+      'documents': [
+        {
+          'location': 'custom-documents/url-example_com-1.json',
+          'title': 'example_com.html',
+        },
+      ],
+    };
+
+    test('a link posts the address and returns what was made', () async {
+      final seen = <http.Request>[];
+      final docs = await _answering(
+        made,
+        seen: seen,
+      ).uploadLink('https://example.com');
+      expect(seen.single.url.path, '/api/v1/document/upload-link');
+      expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
+      expect(jsonDecode(seen.single.body), {'link': 'https://example.com'});
+      expect(docs.single.path, 'custom-documents/url-example_com-1.json');
+    });
+
+    test('a link sends its details', () async {
+      final seen = <http.Request>[];
+      await _answering(made, seen: seen).uploadLink(
+        'https://example.com',
+        meta: const DocMeta(
+          title: ' Q3 report ',
+          author: 'Ada',
+          description: 'Numbers',
+          source: 'Finance',
+        ),
+      );
+      expect(jsonDecode(seen.single.body), {
+        'link': 'https://example.com',
+        'metadata': {
+          'title': 'Q3 report',
+          'docAuthor': 'Ada',
+          'description': 'Numbers',
+          'docSource': 'Finance',
+        },
+      });
+    });
+
+    test('text keeps its own title over the details', () async {
+      final seen = <http.Request>[];
+      await _answering(made, seen: seen).uploadText(
+        'Notes',
+        'Some text',
+        meta: const DocMeta(
+          title: ' Q3 report ',
+          author: 'Ada',
+          description: 'Numbers',
+          source: 'Finance',
+        ),
+      );
+      expect(jsonDecode(seen.single.body)['metadata'], {
+        'title': 'Notes',
+        'docAuthor': 'Ada',
+        'description': 'Numbers',
+        'docSource': 'Finance',
+      });
+    });
+
+    test('text posts the text with its title', () async {
+      final seen = <http.Request>[];
+      await _answering(made, seen: seen).uploadText('Notes', 'Some text');
+      expect(seen.single.url.path, '/api/v1/document/raw-text');
+      expect(jsonDecode(seen.single.body), {
+        'textContent': 'Some text',
+        'metadata': {'title': 'Notes'},
+      });
+    });
+
+    test('success false is a refusal that keeps the key out', () async {
+      final link = await _failure(
+        _answering({'success': false, 'error': null})
+            .uploadLink('https://example.com'),
+      );
+      expect(link.message, 'The server could not read https://example.com.');
+      final text = await _failure(
+        _answering({'success': false, 'error': 'Invalid request'})
+            .uploadText('Notes', 'x'),
+      );
+      expect(text.message, 'Invalid request');
+      expect('$link $text', isNot(contains('SECRET-KEY')));
+    });
+  });
+
+  group('search and export', () {
+    test('a hit drops the metadata block the server puts first', () async {
+      final hits = await _answering({
+        'results': [
+          {
+            'text': '<document_metadata>\nsourceDocument: notes.md\npublished: 10/3/2026\n</document_metadata>\n\nThe passage itself.',
+            'metadata': {'title': 'notes.md'},
+            'score': 0.3,
+          },
+          {
+            'text': 'No header. <document_metadata>kept</document_metadata>',
+            'metadata': {'title': 'b.md'},
+            'score': 0.2,
+          },
+        ],
+      }).searchDocs('q3', 'notes');
+      expect(
+        [for (final h in hits) h.text],
+        [
+          'The passage itself.',
+          'No header. <document_metadata>kept</document_metadata>',
+        ],
+      );
+    });
+
+    test('a search posts the question and reads each hit', () async {
+      final seen = <http.Request>[];
+      final hits = await _answering({
+        'results': [
+          {
+            'id': '1',
+            'text': 'A passage.',
+            'metadata': {'title': 'Q3 roadmap.pdf', 'author': 'Unknown'},
+            'distance': 0.35,
+            'score': 0.65,
+          },
+          {'id': '2', 'metadata': {}, 'score': 0.4},
+        ],
+      }, seen: seen).searchDocs('q3', 'budget');
+      expect(seen.single.url.path, '/api/v1/workspace/q3/vector-search');
+      expect(jsonDecode(seen.single.body), {'query': 'budget'});
+      expect(
+        [for (final h in hits) (h.title, h.text, h.score)],
+        [('Q3 roadmap.pdf', 'A passage.', 0.65), ('Untitled', '', 0.4)],
+      );
+    });
+
+    test('a search the server refuses says why', () async {
+      final error = await _failure(
+        _api(
+          (_) async => http.Response(
+            '{"message":"Query parameter cannot be empty."}',
+            400,
+          ),
+        ).searchDocs('q3', ''),
+      );
+      expect(error.message, contains('Query parameter cannot be empty.'));
+    });
+
+    test('an export is the file as the server sends it', () async {
+      final seen = <http.Request>[];
+      final bytes = await _api((request) async {
+        seen.add(request);
+        return http.Response(
+          'id,prompt\n1,hi\n',
+          200,
+          headers: {'content-type': 'text/csv; charset=utf-8'},
+        );
+      }).exportChats(ChatExport.csv);
+      expect(seen.single.url.path, '/api/v1/system/export-chats');
+      expect(seen.single.url.queryParameters, {'type': 'csv'});
+      expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
+      expect(utf8.decode(bytes), 'id,prompt\n1,hi\n');
+    });
+
+    test('an export answered with a web page or a bad key fails', () async {
+      final page = await _failure(
+        _api(
+          (_) async => http.Response(
+            '<html>login</html>',
+            200,
+            headers: {'content-type': 'text/html'},
+          ),
+        ).exportChats(ChatExport.json),
+      );
+      expect(page.message, isNot(contains('SECRET-KEY')));
+      final key = await _failure(
+        _api((_) async => http.Response('', 403)).exportChats(ChatExport.json),
+      );
+      expect(key.message, 'The server rejected the key.');
+    });
+
+    test('each format names its file', () {
+      expect(
+        [for (final f in ChatExport.values) f.fileName],
+        [
+          'anythingllm-chats.jsonl',
+          'anythingllm-chats.json',
+          'anythingllm-chats.csv',
+          'anythingllm-chats-alpaca.json',
+        ],
+      );
     });
   });
 }
