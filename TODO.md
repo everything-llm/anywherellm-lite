@@ -18,7 +18,7 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 
 | Gap | What it needs |
 | --- | --- |
-| Agents (`@agent`) | Send `@agent` through `/v1` stream-chat and see whether the server runs the agent or refuses it. Only then decide on the Tools menu, agent skills and MCP servers. |
+| Agent tools menu, skills and MCP servers | Agents run through `/v1` `stream-chat` in a workspace's Agent mode or with `@agent` (checked 2026-10-06). Turning skills and MCP servers on or off is not in `/v1`. |
 | A model picker | `/v1/openai/models` appears to list workspaces, not a provider's models. If so, the model stays a free-text field in `settings.json`. |
 
 ## Needs a new dependency
