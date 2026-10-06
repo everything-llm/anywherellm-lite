@@ -3,8 +3,12 @@ import 'package:anywherellm/ui/app.dart';
 import 'package:anywherellm/ui/app_scope.dart';
 import 'package:anywherellm/ui/chat/composer.dart';
 import 'package:anywherellm/ui/chat/dictation.dart';
+import 'package:anywherellm/ui/chat/speaker.dart';
 import 'package:anywherellm/ui/shell.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
+
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -49,6 +53,37 @@ class FakeDictation implements Dictation {
   }
 }
 
+/// A [Speaker] a test drives: it records what it was asked to read, and a reading lasts until
+/// [finish] or [stop]. With [fails] set, reading throws it.
+class FakeSpeaker implements Speaker {
+  final List<String> spoken = [];
+  int stopped = 0;
+  Exception? fails;
+  Completer<void>? _reading;
+
+  @override
+  Future<void> speak(String text) async {
+    await stop();
+    if (fails case final error?) throw error;
+    spoken.add(text);
+    final reading = _reading = Completer<void>();
+    return reading.future;
+  }
+
+  @override
+  Future<void> stop() async {
+    stopped++;
+    finish();
+  }
+
+  /// Ends the reading as the engine does when it reaches the end.
+  void finish() {
+    final reading = _reading;
+    _reading = null;
+    if (reading != null && !reading.isCompleted) reading.complete();
+  }
+}
+
 /// The controllers a test can read and drive, and the app built on them.
 class Harness extends Rig {
   Harness({
@@ -59,13 +94,29 @@ class Harness extends Rig {
     bool sourcesOpen = true,
     this.canScan = false,
     bool canDictate = false,
+    bool canSpeak = false,
   }) : dictation = canDictate ? FakeDictation() : null,
+       speaker = canSpeak ? FakeSpeaker() : null,
        shell = ShellController(sourcesPinned: sourcesOpen);
 
   final ShellController shell;
 
   /// What the microphone does, or null when the device cannot listen.
   final FakeDictation? dictation;
+
+  /// What reads answers aloud, or null when the device cannot speak.
+  final FakeSpeaker? speaker;
+
+  late final ReadAloud? readAloud = switch (speaker) {
+    final speaker? => ReadAloud(speaker, chat),
+    null => null,
+  };
+
+  @override
+  void dispose() {
+    readAloud?.dispose();
+    super.dispose();
+  }
 
   /// Every address the app asked to open, in order.
   final List<Uri> opened = [];
@@ -115,6 +166,7 @@ class Harness extends Rig {
         return '/saved/$name';
       },
       dictation: dictation,
+      readAloud: readAloud,
       scanner: canScan
           ? (onCode) => TextButton(
               onPressed: () => onCode(scanCode),
@@ -127,8 +179,8 @@ class Harness extends Rig {
 }
 
 /// Sizes the test window, builds the app on [llm] and lets the first loads finish. With no
-/// [connection], no server is set up. With [canScan], Settings offers a fake QR scanner, and with [canDictate] the composer a
-/// microphone.
+/// [connection], no server is set up. With [canScan], Settings offers a fake QR scanner, with
+/// [canDictate] the composer a microphone, and with [canSpeak] each answer Read aloud.
 Future<Harness> pumpApp(
   WidgetTester tester, {
   FakeAnythingLlm? llm,
@@ -138,6 +190,7 @@ Future<Harness> pumpApp(
   bool sourcesOpen = true,
   bool canScan = false,
   bool canDictate = false,
+  bool canSpeak = false,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -149,6 +202,7 @@ Future<Harness> pumpApp(
     sourcesOpen: sourcesOpen,
     canScan: canScan,
     canDictate: canDictate,
+    canSpeak: canSpeak,
   );
   addTearDown(harness.dispose);
   await harness.prefs.load();

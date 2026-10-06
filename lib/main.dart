@@ -12,7 +12,9 @@ import 'core/ports.dart';
 import 'ui/app.dart';
 import 'ui/app_scope.dart';
 import 'ui/boot_screen.dart';
+import 'ui/chat/device_speaker.dart';
 import 'ui/chat/dictation.dart';
+import 'ui/chat/speaker.dart';
 import 'ui/chat/speech_dictation.dart';
 import 'ui/files/save_file.dart';
 import 'ui/settings/scan_code.dart';
@@ -85,6 +87,9 @@ class _SessionHostState extends State<SessionHost> {
   late final SourcesController _sources;
   late final FilesController _files;
 
+  /// Reads answers aloud on Android, and is null where the device has no such engine to use.
+  ReadAloud? _readAloud;
+
   /// Listens for speech on Android, and is null where the device has no such service to use.
   final Dictation? _dictation = Platform.isAndroid ? SpeechDictation() : null;
 
@@ -102,11 +107,13 @@ class _SessionHostState extends State<SessionHost> {
       widget.prefs,
       _sources,
     );
+    if (Platform.isAndroid) _readAloud = ReadAloud(DeviceSpeaker(), _chat);
     _loaded = _load();
   }
 
   @override
   void dispose() {
+    _readAloud?.dispose();
     _files.dispose();
     _sources.dispose();
     _chat.dispose();
@@ -142,6 +149,7 @@ class _SessionHostState extends State<SessionHost> {
         save: saveWithDialog,
         scanner: Platform.isAndroid ? cameraScanner : null,
         dictation: _dictation,
+        readAloud: _readAloud,
         child: const AppShell(),
       );
     },

@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import 'chat/dictation.dart';
+import 'chat/speaker.dart';
 import 'state/chat_controller.dart';
 import 'state/files_controller.dart';
 import 'state/prefs_controller.dart';
@@ -38,6 +39,7 @@ class AppScope extends InheritedWidget {
     required this.save,
     this.scanner,
     this.dictation,
+    this.readAloud,
     required super.child,
   });
 
@@ -55,6 +57,9 @@ class AppScope extends InheritedWidget {
 
   /// Writes what the person says in the composer, or null where the device cannot listen.
   final Dictation? dictation;
+
+  /// Reads an answer aloud, or null where the device has no speech to read with.
+  final ReadAloud? readAloud;
 
   static AppScope of(BuildContext context) {
     // Never notifies, so no dependency is needed. That also lets initState read it.

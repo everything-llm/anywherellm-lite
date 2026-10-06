@@ -16,6 +16,7 @@ import '../widgets/rise.dart';
 import '../widgets/tappable.dart';
 import 'answer_body.dart';
 import 'generated_files.dart';
+import 'speaker.dart';
 
 /// The chat on screen, newest at the bottom. Empty, it invites a first question.
 ///
@@ -348,6 +349,9 @@ class _Answer extends StatelessWidget {
             children: [
               if (split.answer.isNotEmpty)
                 CopyButton(split.answer, tooltip: 'Copy answer'),
+              if (AppScope.of(context).readAloud case final aloud?
+                  when split.answer.isNotEmpty)
+                _ReadAloudButton(aloud, turn),
               if (retry case final retry?)
                 IconBtn(
                   'refresh',
@@ -367,6 +371,29 @@ class _Answer extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Reads [turn] aloud, or stops it while it is being read.
+class _ReadAloudButton extends StatelessWidget {
+  const _ReadAloudButton(this.aloud, this.turn);
+
+  final ReadAloud aloud;
+  final Turn turn;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: aloud,
+    builder: (context, _) {
+      final reading = identical(aloud.reading, turn);
+      return IconBtn(
+        reading ? 'stop' : 'speaker',
+        tooltip: reading ? 'Stop reading' : 'Read aloud',
+        onPressed: () => aloud.toggle(turn),
+        box: 30,
+        size: IconSize.xs,
+      );
+    },
+  );
 }
 
 /// What the agent is doing while the answer runs, such as a tool it runs. It goes when the
