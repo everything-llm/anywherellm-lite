@@ -17,6 +17,8 @@ class AppField extends StatelessWidget {
     this.icon,
     this.suffix,
     this.obscure = false,
+    this.keyboardType,
+    this.autofillHints,
   });
 
   final TextEditingController controller;
@@ -37,8 +39,14 @@ class AppField extends StatelessWidget {
   /// A widget drawn inside the field, after the text.
   final Widget? suffix;
 
-  /// Hides the text, as for a key.
+  /// Hides the text, as for a key. It also keeps the keyboard from learning it.
   final bool obscure;
+
+  final TextInputType? keyboardType;
+
+  /// What the system may fill in, such as a web address. Null, the default, leaves the field
+  /// out of autofill, so a key is never offered a saved password.
+  final Iterable<String>? autofillHints;
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +64,9 @@ class AppField extends StatelessWidget {
         autocorrect: false,
         enableSuggestions: false,
         obscureText: obscure,
+        keyboardType: keyboardType,
+        autofillHints: autofillHints,
+        enableIMEPersonalizedLearning: !obscure,
         onChanged: onChanged,
         onSubmitted: onSubmitted,
         style: Type.sans(15).copyWith(color: t.ink),

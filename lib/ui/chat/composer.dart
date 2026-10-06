@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/chat.dart';
+import '../../core/connection.dart';
 import '../../core/commands.dart';
 import '../app_scope.dart';
 import '../icons.dart';
@@ -290,7 +291,12 @@ class _Form extends StatelessWidget {
             const SizedBox(height: 8),
           ],
           if (menu) ...[
-            SlashMenu(commands: matches, highlight: highlight, onPick: onPick),
+            SlashMenu(
+              commands: matches,
+              highlight: highlight,
+              onPick: onPick,
+              note: chat.commandsNote,
+            ),
             Divider(height: 13, thickness: 1, color: t.line),
           ],
           if (attached.isNotEmpty) ...[
@@ -349,21 +355,41 @@ class _Form extends StatelessWidget {
                 size: IconSize.small,
               ),
               const SizedBox(width: 4),
-              Tappable(
-                label: 'AnythingLLM settings',
-                onTap: scope.shell.openSettings,
-                radius: BorderRadius.circular(6),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 4,
-                  ),
-                  child: Text(
-                    'AnythingLLM',
-                    style: Type.sans(13, color: t.muted),
+              if (scope.settings.connection case final server?)
+                Flexible(
+                  child: Tappable(
+                    label:
+                        'AnythingLLM settings, server ${serverName(server.host)}',
+                    tooltip: 'AnythingLLM settings: ${server.baseUrl}',
+                    onTap: scope.shell.openSettings,
+                    radius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 4,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AppIcon(
+                            'settings',
+                            size: IconSize.xs,
+                            color: t.muted,
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              serverName(server.host),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Type.sans(13, color: t.muted),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
               const Spacer(),
               if (here)
                 _RoundButton(

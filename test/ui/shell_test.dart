@@ -274,6 +274,56 @@ void main() {
       expect(find.text('Ask about your files…'), findsOneWidget);
     });
 
+    testWidgets('the slash menu says why the server\'s commands are missing', (
+      tester,
+    ) async {
+      final llm = planningServer()
+        ..errors['slashCommands'] = const ApiException('no', status: 403);
+      await pumpApp(tester, llm: llm);
+      await tester.enterText(typingInto, '/');
+      await tester.pumpAndSettle();
+      expect(
+        control('/reset: Clear the chat history and begin a new chat'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('This server has a password'), findsOneWidget);
+    });
+
+    testWidgets('the composer names the server and opens Settings', (
+      tester,
+    ) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      await tester.tap(control('AnythingLLM settings, server h'));
+      await tester.pumpAndSettle();
+      expect(h.shell.settingsOpen, isTrue);
+    });
+
+    testWidgets(
+      'the server address is a web address and the key is left out of autofill',
+      (tester) async {
+        final h = await pumpApp(
+          tester,
+          llm: planningServer(),
+          connection: null,
+        );
+        h.shell.openSettings();
+        await tester.pumpAndSettle();
+        final fields = tester
+            .widgetList<TextField>(
+              find.descendant(
+                of: find.byType(SettingsDialog),
+                matching: find.byType(TextField),
+              ),
+            )
+            .toList();
+        expect(fields[0].keyboardType, TextInputType.url);
+        expect(fields[0].autofillHints, [AutofillHints.url]);
+        expect(fields[1].keyboardType, TextInputType.visiblePassword);
+        expect(fields[1].autofillHints, isNull);
+        expect(fields[1].enableIMEPersonalizedLearning, isFalse);
+      },
+    );
+
     testWidgets('the chat mode waits while an answer runs', (tester) async {
       final llm = planningServer()..hold = true;
       await pumpApp(tester, llm: llm);

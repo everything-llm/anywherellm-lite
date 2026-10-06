@@ -243,12 +243,17 @@ class _KeyCardState extends State<_KeyCard> {
                 controller: _url,
                 label: 'AnythingLLM server address',
                 hint: _example,
+                keyboardType: TextInputType.url,
+                autofillHints: const [AutofillHints.url],
               ),
               AppField(
                 controller: _key,
                 label: 'AnythingLLM developer API key',
                 hint: 'Paste the AnythingLLM API key',
                 obscure: true,
+                // Not a password: AppField leaves it out of autofill, so no saved login is
+                // offered for it.
+                keyboardType: TextInputType.visiblePassword,
               ),
               Align(
                 alignment: Alignment.centerLeft,

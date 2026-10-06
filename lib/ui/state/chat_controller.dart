@@ -110,6 +110,9 @@ class ChatController extends ChangeNotifier {
   /// The server's slash-command presets, or none when they cannot be read.
   List<SlashCommand> _presets = const [];
 
+  /// Why the server's presets are missing from [commands], or null when they were read.
+  String? commandsNote;
+
   /// The commands a message can start with: `/reset`, then the server's presets.
   List<SlashCommand> get commands => withBuiltIns(_presets);
 
@@ -174,6 +177,7 @@ class ChatController extends ChangeNotifier {
     _draft.clear();
     docCounts.clear();
     _presets = const [];
+    commandsNote = null;
     activeSlug = null;
     activeThread = null;
     problem = null;
@@ -206,17 +210,23 @@ class ChatController extends ChangeNotifier {
   }
 
   /// Reads the server's presets. Best effort: a server that will not list them leaves `/reset`
-  /// alone in the menu, and a preset typed in full still runs, since the server expands it.
+  /// alone in the menu with [commandsNote] saying why, and a preset typed in full still runs,
+  /// since the server expands it. The list needs the web UI's session, which a server with a
+  /// password refuses.
   Future<void> _readCommands() async {
     final server = _server;
     try {
       final presets = await _api.slashCommands();
       if (_server != server) return;
       _presets = presets;
-      notifyListeners();
-    } on ApiException {
-      return;
+      commandsNote = null;
+    } on ApiException catch (error) {
+      if (_server != server) return;
+      commandsNote = error.status == 401 || error.status == 403
+          ? 'This server has a password, so its own commands can\'t be listed here. One typed in full still runs.'
+          : 'The server\'s own commands could not be listed. One typed in full still runs.';
     }
+    notifyListeners();
   }
 
   /// Asks each workspace how many documents it holds, all at once. Best effort: a count that

@@ -2,6 +2,7 @@ import 'dart:ui' show Size;
 
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/commands.dart';
+import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/upload.dart';
 import 'package:anywherellm/ui/sidebar.dart';
@@ -107,6 +108,19 @@ void main() {
         '/',
       );
       await tester.pump();
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the slash menu with its note fits at $at', (tester) async {
+      final llm = awkward()
+        ..errors['slashCommands'] = const ApiException('no', status: 401);
+      await pumpApp(tester, llm: llm, size: size);
+      await tester.enterText(
+        find.byWidgetPredicate((w) => w is EditableText && !w.readOnly).last,
+        '/',
+      );
+      await tester.pump();
+      expect(find.textContaining('has a password'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

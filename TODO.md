@@ -41,7 +41,7 @@ The web UI's own endpoints sign in with a session token, not the developer key, 
 | Delete one message | No call deletes a stored chat. |
 | Memories | Not in `/v1`. |
 | Suggested chat messages | Not in `/v1`. |
-| Slash-command presets on a server with a password | The list comes from `/api/system/slash-command-presets`, which answers without a session only while the server has no password. With one, the menu offers `/reset` alone; a preset typed in full still runs. |
+| Slash-command presets on a server with a password | The list comes from `/api/system/slash-command-presets`, which answers without a session only while the server has no password. With one, the menu offers `/reset` alone and says why; a preset typed in full still runs. |
 | Make, edit or delete a slash-command preset | No `/v1` call writes presets. |
 | Server text-to-speech | Not in `/v1`. |
 | Text size and other UI preferences | The web UI keeps them in its own settings, not in `/v1`. |

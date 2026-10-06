@@ -479,4 +479,40 @@ void main() {
       expect(llm.calls, contains('streamChat:budget:/deep-research tides'));
     });
   });
+
+  group('slash command note', () {
+    test(
+      'a password on the server says why its commands are missing',
+      () async {
+        final llm = planningServer()
+          ..errors['slashCommands'] = const ApiException('no', status: 401);
+        final rig = await started(llm);
+        await pumpEventQueue();
+        expect(rig.chat.commandsNote, contains('has a password'));
+        expect(rig.chat.commands.map((c) => c.command), ['/reset']);
+      },
+    );
+
+    test('another failure says only that they could not be listed', () async {
+      final llm = planningServer()
+        ..errors['slashCommands'] = const ApiException('down', status: 500);
+      final rig = await started(llm);
+      await pumpEventQueue();
+      expect(rig.chat.commandsNote, contains('could not be listed'));
+    });
+
+    test(
+      'a server that lists them has no note, and a new server clears it',
+      () async {
+        final llm = planningServer()
+          ..errors['slashCommands'] = const ApiException('no', status: 401);
+        final rig = await started(llm);
+        await pumpEventQueue();
+        llm.errors.remove('slashCommands');
+        await rig.settings.save('https://other:3001', 'K2');
+        await pumpEventQueue();
+        expect(rig.chat.commandsNote, isNull);
+      },
+    );
+  });
 }

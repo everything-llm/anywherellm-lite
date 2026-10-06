@@ -13,9 +13,13 @@ class SlashMenu extends StatelessWidget {
     required this.commands,
     required this.highlight,
     required this.onPick,
+    this.note,
   });
 
   final List<SlashCommand> commands;
+
+  /// Why some commands are missing, shown under them.
+  final String? note;
   final int highlight;
   final ValueChanged<SlashCommand> onPick;
 
@@ -65,6 +69,11 @@ class SlashMenu extends StatelessWidget {
                   ],
                 ),
               ),
+            ),
+          if (note case final note?)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
+              child: Text(note, style: Type.sans(12.5, color: t.muted)),
             ),
         ],
       ),
