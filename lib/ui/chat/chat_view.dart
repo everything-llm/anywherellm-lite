@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
@@ -41,7 +43,8 @@ class _ChatViewState extends State<ChatView> {
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
-    return Column(
+    final top = Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         _Header(showMenu: widget.showMenu),
         ListenableBuilder(
@@ -65,11 +68,55 @@ class _ChatViewState extends State<ChatView> {
             );
           },
         ),
-        Expanded(child: _Body(onSuggest: _suggest)),
-        Composer(draft: _draft, focus: _focus),
       ],
     );
+    return ClipRect(
+      child: CustomMultiChildLayout(
+        delegate: _chatLayout,
+        children: [
+          LayoutId(id: _Slot.top, child: top),
+          LayoutId(
+            id: _Slot.body,
+            child: _Body(onSuggest: _suggest),
+          ),
+          // Last, so it paints over the header when there is no room for both.
+          LayoutId(
+            id: _Slot.composer,
+            child: Composer(draft: _draft, focus: _focus),
+          ),
+        ],
+      ),
+    );
   }
+}
+
+enum _Slot { top, body, composer }
+
+/// One layout for every build; it has no settings to change. Flutter's delegate base class has
+/// no const constructor.
+final _chatLayout = _ChatLayout();
+
+/// The composer at its own height at the bottom, the header and notices at theirs at the top,
+/// and the turns in whatever is left, down to nothing. With the keyboard up on a short screen
+/// the header and the turns give way, never the field being typed in.
+class _ChatLayout extends MultiChildLayoutDelegate {
+  @override
+  void performLayout(Size size) {
+    final width = BoxConstraints.tightFor(width: size.width);
+    final composer = layoutChild(_Slot.composer, width);
+    final top = layoutChild(_Slot.top, width);
+    final body = math.max(0.0, size.height - top.height - composer.height);
+    layoutChild(
+      _Slot.body,
+      BoxConstraints.tightFor(width: size.width, height: body),
+    );
+    positionChild(_Slot.top, Offset.zero);
+    positionChild(_Slot.body, Offset(0, top.height));
+    positionChild(_Slot.composer, Offset(0, size.height - composer.height));
+  }
+
+  @override
+  bool shouldRelayout(_ChatLayout oldDelegate) => false;
 }
 
 class _Body extends StatelessWidget {

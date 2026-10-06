@@ -1,5 +1,4 @@
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -39,10 +38,7 @@ void main() {
     await h.chat.select('household');
     await tester.pumpAndSettle();
     expect(find.text('contract.pdf'), findsNothing);
-    await tester.enterText(
-      find.byWidgetPredicate((w) => w is EditableText && !w.readOnly).last,
-      'Hi',
-    );
+    await tester.enterText(typingField().last, 'Hi');
     await tester.pump();
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump(const Duration(milliseconds: 500));

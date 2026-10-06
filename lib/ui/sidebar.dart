@@ -15,6 +15,7 @@ import 'widgets/brand.dart';
 import 'widgets/buttons.dart';
 import 'widgets/confirm_box.dart';
 import 'widgets/inline_input.dart';
+import 'widgets/min_height.dart';
 import 'widgets/segmented.dart';
 import 'widgets/settings_button.dart';
 import 'widgets/tappable.dart';
@@ -29,34 +30,37 @@ class Sidebar extends StatelessWidget {
     return Semantics(
       container: true,
       label: 'Workspaces',
-      child: Container(
-        width: Sizes.sidebar,
-        padding: const EdgeInsets.fromLTRB(12, 18, 12, 12),
-        decoration: BoxDecoration(
-          color: t.side,
-          border: Border(right: BorderSide(color: t.line)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(8, 2, 8, 16),
-              child: Align(alignment: Alignment.centerLeft, child: Brand()),
-            ),
-            const _PaneSwitch(),
-            const SizedBox(height: 12),
-            Expanded(
-              child: ListenableBuilder(
-                listenable: AppScope.of(context).shell,
-                builder: (context, _) =>
-                    AppScope.of(context).shell.pane == Pane.files
-                    ? const FileTree()
-                    : const _Workspaces(),
+      child: MinHeight(
+        min: Sizes.panelMin,
+        child: Container(
+          width: Sizes.sidebar,
+          padding: const EdgeInsets.fromLTRB(12, 18, 12, 12),
+          decoration: BoxDecoration(
+            color: t.side,
+            border: Border(right: BorderSide(color: t.line)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(8, 2, 8, 16),
+                child: Align(alignment: Alignment.centerLeft, child: Brand()),
               ),
-            ),
-            const SizedBox(height: 8),
-            const SidebarSettingsButton(),
-          ],
+              const _PaneSwitch(),
+              const SizedBox(height: 12),
+              Expanded(
+                child: ListenableBuilder(
+                  listenable: AppScope.of(context).shell,
+                  builder: (context, _) =>
+                      AppScope.of(context).shell.pane == Pane.files
+                      ? const FileTree()
+                      : const _Workspaces(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const SidebarSettingsButton(),
+            ],
+          ),
         ),
       ),
     );

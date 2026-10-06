@@ -108,3 +108,16 @@ Future<Harness> pumpApp(
   await tester.pumpAndSettle();
   return harness;
 }
+
+/// The fields a person types in, under [of] when given: an answer is a read-only one.
+Finder typingField([Finder? of]) {
+  final field = find.byWidgetPredicate((w) => w is EditableText && !w.readOnly);
+  return of == null ? field : find.descendant(of: of, matching: field);
+}
+
+/// Raises an on-screen keyboard [height] pixels tall as Android does: the window keeps its
+/// size and reports the keyboard as a bottom view inset.
+void raiseKeyboard(WidgetTester tester, double height) {
+  tester.view.viewInsets = FakeViewPadding(bottom: height);
+  addTearDown(tester.view.resetViewInsets);
+}

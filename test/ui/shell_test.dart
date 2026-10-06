@@ -39,7 +39,7 @@ Finder get typingInto {
   final focused = find.byWidgetPredicate(
     (widget) => widget is EditableText && widget.focusNode.hasFocus,
   );
-  return focused.evaluate().isEmpty ? find.byType(EditableText).last : focused;
+  return focused.evaluate().isEmpty ? typingField().last : focused;
 }
 
 /// Types [text] where the focus is and presses Enter. Pumps a fixed time rather than settling,
@@ -154,10 +154,7 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
       // Only the composer is left to type in; a selectable answer is read-only.
-      expect(
-        find.byWidgetPredicate((w) => w is EditableText && !w.readOnly),
-        findsOneWidget,
-      );
+      expect(typingField(), findsOneWidget);
       expect(llm.calls, isNot(contains('createWorkspace:x')));
     });
 
@@ -515,8 +512,7 @@ void main() {
       await tester.tap(control('Replace'));
       await tester.pumpAndSettle();
       await tester.tap(find.byType(EditableText).first);
-      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
-      addTearDown(tester.view.resetViewInsets);
+      raiseKeyboard(tester, 300);
       await tester.pumpAndSettle();
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
