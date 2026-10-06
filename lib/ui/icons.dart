@@ -43,8 +43,8 @@ enum IconSize {
   final double px;
 }
 
-class NilsIcon extends StatelessWidget {
-  const NilsIcon(
+class AppIcon extends StatelessWidget {
+  const AppIcon(
     this.name, {
     super.key,
     this.size = IconSize.normal,

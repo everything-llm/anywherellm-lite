@@ -22,7 +22,7 @@ class Harness extends Rig {
 
   final ShellController shell;
 
-  Widget get app => NilsApp(
+  Widget get app => AnywhereLlmApp(
     home: AppScope(
       shell: shell,
       settings: settings,

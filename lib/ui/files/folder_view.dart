@@ -89,7 +89,7 @@ class _ChildRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
         child: Row(
           children: [
-            NilsIcon(
+            AppIcon(
               node.kind.isFolder ? 'folder' : 'doc',
               size: IconSize.xs,
               color: t.muted,
@@ -150,7 +150,7 @@ class _NewFolderState extends State<_NewFolder> {
         )
       : Align(
           alignment: Alignment.centerLeft,
-          child: NilsButton(
+          child: AppButton(
             'New folder',
             onPressed: () => setState(() => _adding = true),
           ),

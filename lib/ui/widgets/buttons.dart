@@ -7,8 +7,8 @@ import '../type.dart';
 import 'tappable.dart';
 
 /// The button: bordered, with a filled `primary` form.
-class NilsButton extends StatelessWidget {
-  const NilsButton(
+class AppButton extends StatelessWidget {
+  const AppButton(
     this.label, {
     super.key,
     required this.onPressed,
@@ -89,7 +89,7 @@ class IconBtn extends StatelessWidget {
       child: SizedBox.square(
         dimension: box,
         child: Center(
-          child: NilsIcon(icon, size: size, color: t.ink2),
+          child: AppIcon(icon, size: size, color: t.ink2),
         ),
       ),
     );

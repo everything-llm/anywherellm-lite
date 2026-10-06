@@ -47,7 +47,7 @@ class BootError extends StatelessWidget {
     children: [
       AlertBox(AlertKind.bad, 'The app could not start', text: message),
       const SizedBox(height: 16),
-      NilsButton('Try again', primary: true, onPressed: onRetry),
+      AppButton('Try again', primary: true, onPressed: onRetry),
     ],
   );
 }

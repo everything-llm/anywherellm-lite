@@ -173,7 +173,7 @@ void main() {
     ) async {
       final llm = planningServer();
       final h = await pumpApp(tester, llm: llm);
-      await tester.tap(find.byType(NilsSwitch).first);
+      await tester.tap(find.byType(AppSwitch).first);
       await tester.pumpAndSettle();
       expect(h.sources.onCount, 1);
       expect(
@@ -291,7 +291,7 @@ void main() {
       await tester.tap(
         find.descendant(
           of: find.byType(SettingsDialog),
-          matching: find.byType(NilsSwitch),
+          matching: find.byType(AppSwitch),
         ),
       );
       await tester.pumpAndSettle();

@@ -8,13 +8,8 @@ import 'rise.dart';
 enum BadgeKind { ok, warn, accent }
 
 /// A small rounded label: a status, or a count.
-class NilsBadge extends StatelessWidget {
-  const NilsBadge(
-    this.text, {
-    super.key,
-    required this.kind,
-    this.pill = false,
-  });
+class AppBadge extends StatelessWidget {
+  const AppBadge(this.text, {super.key, required this.kind, this.pill = false});
 
   final String text;
   final BadgeKind kind;
@@ -45,8 +40,8 @@ class NilsBadge extends StatelessWidget {
 }
 
 /// An on and off switch: a track with a knob, the accent when on.
-class NilsSwitch extends StatelessWidget {
-  const NilsSwitch({
+class AppSwitch extends StatelessWidget {
+  const AppSwitch({
     super.key,
     required this.value,
     required this.onChanged,

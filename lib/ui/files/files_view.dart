@@ -44,7 +44,7 @@ class FilesView extends StatelessWidget {
               actions: switch (node == null ? null : badgeText(node.badge)) {
                 final text? => (_) => [
                   const SizedBox(width: 12),
-                  NilsBadge(text, kind: BadgeKind.warn),
+                  AppBadge(text, kind: BadgeKind.warn),
                 ],
                 null => null,
               },
@@ -233,13 +233,13 @@ class _EditorState extends State<_Editor> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  NilsButton(
+                  AppButton(
                     'Revert',
                     onPressed: _dirty && !_saving
                         ? () => _draft.text = _saved
                         : null,
                   ),
-                  NilsButton(
+                  AppButton(
                     _saving ? 'Saving…' : 'Save',
                     primary: true,
                     onPressed: _dirty && !_saving ? _save : null,

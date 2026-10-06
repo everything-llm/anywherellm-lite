@@ -58,7 +58,7 @@ class SettingsDialog extends StatelessWidget {
                         ),
                       ),
                     ),
-                    NilsButton(
+                    AppButton(
                       'Done',
                       primary: true,
                       onPressed: scope.shell.closeSettings,
@@ -216,7 +216,7 @@ class _KeyCardState extends State<_KeyCard> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                NilsBadge(
+                AppBadge(
                   set ? 'Set' : 'Missing',
                   kind: set ? BadgeKind.ok : BadgeKind.warn,
                 ),
@@ -228,25 +228,25 @@ class _KeyCardState extends State<_KeyCard> {
               Wrap(
                 spacing: 8,
                 children: [
-                  NilsButton(
+                  AppButton(
                     _replacing ? 'Cancel' : 'Replace',
                     onPressed: () => setState(() {
                       _replacing = !_replacing;
                     }),
                   ),
-                  NilsButton(
+                  AppButton(
                     _confirmForget ? 'Delete it?' : 'Forget',
                     onPressed: _forget,
                   ),
                 ],
               ),
             if (editing) ...[
-              NilsField(
+              AppField(
                 controller: _url,
                 label: 'AnythingLLM server address',
                 hint: _example,
               ),
-              NilsField(
+              AppField(
                 controller: _key,
                 label: 'AnythingLLM developer API key',
                 hint: 'Paste the AnythingLLM API key',
@@ -254,7 +254,7 @@ class _KeyCardState extends State<_KeyCard> {
               ),
               Align(
                 alignment: Alignment.centerLeft,
-                child: NilsButton(
+                child: AppButton(
                   saving ? 'Checking…' : 'Save key',
                   primary: true,
                   onPressed: saving ? null : _save,
@@ -305,7 +305,7 @@ class _AnswersCard extends StatelessWidget {
                   ],
                 ),
               ),
-              NilsSwitch(
+              AppSwitch(
                 value: prefs.prefs.groundedOnly,
                 label: 'Only answer from my documents',
                 large: true,

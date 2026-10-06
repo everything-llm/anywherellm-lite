@@ -211,7 +211,7 @@ class _WorkspaceRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
             child: Row(
               children: [
-                NilsIcon('chat', size: IconSize.small, color: t.muted),
+                AppIcon('chat', size: IconSize.small, color: t.muted),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -246,7 +246,7 @@ class _WorkspaceRow extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(32, 6, 10, 6),
               child: Row(
                 children: [
-                  NilsIcon('plus', size: IconSize.xs, color: t.accent),
+                  AppIcon('plus', size: IconSize.xs, color: t.accent),
                   const SizedBox(width: 6),
                   Text('New chat', style: Type.sans(13.5, color: t.accent)),
                 ],

@@ -62,11 +62,11 @@ class _LibraryDocViewState extends State<LibraryDocView> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               for (final name in others)
-                NilsButton(
+                AppButton(
                   'Move to $name',
                   onPressed: () => files.move(path, name),
                 ),
-              NilsButton(
+              AppButton(
                 'Delete…',
                 onPressed: () => setState(() => _confirming = true),
               ),
@@ -104,7 +104,7 @@ class DocLinkView extends StatelessWidget {
         if (link != null) ...[
           Row(
             children: [
-              NilsSwitch(
+              AppSwitch(
                 value: link.pinned,
                 label: 'Pin ${node.name}',
                 onChanged: (on) => files.pin(slug, path, pinned: on),
@@ -131,11 +131,11 @@ class DocLinkView extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            NilsButton(
+            AppButton(
               'Open in library',
               onPressed: () => files.reveal(libraryPath(path)),
             ),
-            NilsButton('Detach', onPressed: () => files.detach(slug, path)),
+            AppButton('Detach', onPressed: () => files.detach(slug, path)),
           ],
         ),
         const SizedBox(height: 20),
@@ -216,8 +216,8 @@ class _Confirm extends StatelessWidget {
         spacing: 8,
         runSpacing: 8,
         children: [
-          NilsButton('Cancel', onPressed: onCancel),
-          NilsButton('Delete', primary: true, onPressed: onConfirm),
+          AppButton('Cancel', onPressed: onCancel),
+          AppButton('Delete', primary: true, onPressed: onConfirm),
         ],
       ),
     ],

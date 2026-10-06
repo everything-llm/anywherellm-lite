@@ -6,8 +6,8 @@ import '../tokens.dart';
 import '../type.dart';
 
 /// The single-line input: 44px tall, rounded, a ring in the accent on focus.
-class NilsField extends StatelessWidget {
-  const NilsField({
+class AppField extends StatelessWidget {
+  const AppField({
     super.key,
     required this.controller,
     required this.label,
@@ -68,7 +68,7 @@ class NilsField extends StatelessWidget {
                   heightFactor: 1,
                   child: Padding(
                     padding: const EdgeInsets.only(left: 14, right: 8),
-                    child: NilsIcon(icon!, size: IconSize.sm, color: t.muted),
+                    child: AppIcon(icon!, size: IconSize.sm, color: t.muted),
                   ),
                 ),
           suffixIcon: suffix == null

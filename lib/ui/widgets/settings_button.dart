@@ -55,7 +55,7 @@ class SidebarSettingsButton extends StatelessWidget {
                     ],
                   ),
                 ),
-                NilsIcon('settings', size: IconSize.sm, color: t.muted),
+                AppIcon('settings', size: IconSize.sm, color: t.muted),
               ],
             ),
           ),

@@ -19,7 +19,7 @@ Future<void> _boot(WidgetTester tester, FakeSettingsStore store) async {
   addTearDown(tester.view.reset);
   final llm = planningServer();
   await tester.pumpWidget(
-    NilsApp(
+    AnywhereLlmApp(
       home: SessionHost(
         llm: llm,
         settings: SettingsController(llm, store, ConnectionHolder()),

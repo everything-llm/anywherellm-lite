@@ -7,7 +7,7 @@ void main() {
   testWidgets('a boot error says why and offers another try', (tester) async {
     var retried = false;
     await tester.pumpWidget(
-      NilsApp(
+      AnywhereLlmApp(
         home: BootError(message: 'nope', onRetry: () => retried = true),
       ),
     );
@@ -24,7 +24,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
-      NilsApp(
+      AnywhereLlmApp(
         home: BootError(message: 'nope ' * 40, onRetry: () {}),
       ),
     );

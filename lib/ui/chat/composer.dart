@@ -159,7 +159,7 @@ class _Form extends StatelessWidget {
                   label: 'Send',
                   color: canSend ? t.accent : t.off,
                   onTap: canSend ? send : null,
-                  child: NilsIcon(
+                  child: AppIcon(
                     'send',
                     size: IconSize.small,
                     color: t.onaccent,
@@ -236,7 +236,7 @@ class _NoKey extends StatelessWidget {
               ),
             ),
           ),
-          NilsButton(
+          AppButton(
             'Open Settings',
             primary: true,
             onPressed: scope.shell.openSettings,

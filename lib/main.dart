@@ -33,7 +33,7 @@ Future<void> main() async {
   final holder = ConnectionHolder();
   final llm = HttpAnythingLlmApi(holder: holder, allowHttp: !android);
   runApp(
-    NilsApp(
+    AnywhereLlmApp(
       home: SessionHost(
         llm: llm,
         settings: SettingsController(

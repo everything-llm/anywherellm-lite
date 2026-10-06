@@ -177,7 +177,7 @@ class _FileRow extends StatelessWidget {
               ),
             ),
           ),
-          NilsSwitch(
+          AppSwitch(
             value: file.on,
             label: 'Use ${file.title} in answers',
             tooltip: 'Use in answers',

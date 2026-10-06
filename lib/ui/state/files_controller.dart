@@ -79,9 +79,6 @@ class FilesController extends ChangeNotifier {
   /// Why the last load or change failed.
   List<Notice> problems = const [];
 
-  /// Whether [load] has run for this server.
-  bool get loaded => _loaded;
-
   /// The folders shown open, by path.
   Set<String> get expanded => UnmodifiableSetView(_expanded);
 

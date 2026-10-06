@@ -23,7 +23,7 @@ void main() {
     bool? changed;
     await show(
       tester,
-      NilsSwitch(
+      AppSwitch(
         value: true,
         label: 'Use a.md in answers',
         onChanged: (v) => changed = v,
@@ -36,12 +36,12 @@ void main() {
         .getSemanticsData();
     expect(data.flagsCollection.isButton, isTrue);
     expect(data.flagsCollection.isToggled, Tristate.isTrue);
-    await tester.tap(find.byType(NilsSwitch));
+    await tester.tap(find.byType(AppSwitch));
     expect(changed, isFalse);
   });
 
   testWidgets('a badge shows its text', (tester) async {
-    await show(tester, const NilsBadge('Set', kind: BadgeKind.ok));
+    await show(tester, const AppBadge('Set', kind: BadgeKind.ok));
     expect(find.text('Set'), findsOneWidget);
   });
 
@@ -59,9 +59,9 @@ void main() {
     ];
     await show(
       tester,
-      Wrap(children: [for (final name in names) NilsIcon(name)]),
+      Wrap(children: [for (final name in names) AppIcon(name)]),
     );
-    expect(find.byType(NilsIcon), findsNWidgets(names.length));
+    expect(find.byType(AppIcon), findsNWidgets(names.length));
     expect(tester.takeException(), isNull);
   });
 }

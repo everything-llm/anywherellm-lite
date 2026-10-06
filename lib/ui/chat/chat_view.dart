@@ -170,7 +170,7 @@ class _Header extends StatelessWidget {
                     compact: compact,
                     pressed: scope.shell.sourcesOpen,
                     onTap: scope.shell.toggleSources,
-                    trailing: NilsBadge(
+                    trailing: AppBadge(
                       '${scope.sources.onCount}',
                       kind: BadgeKind.accent,
                       pill: true,
@@ -220,7 +220,7 @@ class _HeaderButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              NilsIcon(icon, size: IconSize.xs, color: t.ink),
+              AppIcon(icon, size: IconSize.xs, color: t.ink),
               if (!compact) ...[
                 const SizedBox(width: 7),
                 Text(

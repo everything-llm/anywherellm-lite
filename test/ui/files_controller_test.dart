@@ -217,7 +217,6 @@ void main() {
     await rig.files.select('/workspaces/q3/PROMPT.md');
     await rig.settings.save('https://other:3001', 'K2');
     await pumpEventQueue();
-    expect(rig.files.loaded, isFalse);
     expect(rig.files.selected, isNull);
     expect(nodeAt(rig.files.tree, '/workspaces/q3/PROMPT.md'), isNull);
   });

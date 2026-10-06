@@ -118,7 +118,7 @@ class _Row extends StatelessWidget {
                   ? AnimatedRotation(
                       turns: open ? 0.25 : 0,
                       duration: const Duration(milliseconds: 120),
-                      child: NilsIcon(
+                      child: AppIcon(
                         'chevron',
                         size: IconSize.xs,
                         color: t.muted,
@@ -127,7 +127,7 @@ class _Row extends StatelessWidget {
                   : null,
             ),
             const SizedBox(width: 4),
-            NilsIcon(
+            AppIcon(
               switch (node.kind) {
                 NodeKind.locked => 'lock',
                 NodeKind.chatLog => 'chat',
@@ -152,11 +152,11 @@ class _Row extends StatelessWidget {
             ),
             if (node.pinned) ...[
               const SizedBox(width: 6),
-              const NilsBadge('pinned', kind: BadgeKind.accent),
+              const AppBadge('pinned', kind: BadgeKind.accent),
             ],
             if (badgeText(node.badge) case final text?) ...[
               const SizedBox(width: 6),
-              NilsBadge(text, kind: BadgeKind.warn),
+              AppBadge(text, kind: BadgeKind.warn),
             ],
           ],
         ),

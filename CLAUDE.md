@@ -25,7 +25,6 @@ The Android build is a debug APK only, with no release signing. It needs the And
 ## Naming
 
 - The product is **AnywhereLLM**: window title, wordmark, binary `anywherellm`, application ID `local.anywherellm.anywherellm` on Linux and Android (`applicationId` and `namespace` in `android/app/build.gradle.kts`). The Dart package is `anywherellm`, so imports are `package:anywherellm/...`. The repository folder is still `everything`.
-- The `Nils*` UI-kit classes (`NilsApp`, `NilsButton`, `NilsSwitch`, `NilsBadge`, ...) are names left from an earlier version. They are not a backend reference.
 - `flutter_secure_storage` keys its keyring entry by the application ID (`<APPLICATION_ID>.secureStorage`). Changing `APPLICATION_ID` in `linux/CMakeLists.txt`, or `applicationId` on Android, orphans any saved key.
 
 ## Architecture
