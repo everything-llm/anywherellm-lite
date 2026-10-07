@@ -40,7 +40,7 @@ class _TestQuestionState extends State<TestQuestion> {
       return Align(
         alignment: Alignment.centerLeft,
         child: TextAction(
-          'chat',
+          'search',
           'Test a question',
           () => setState(() => _open = true),
         ),

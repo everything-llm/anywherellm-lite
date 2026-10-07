@@ -27,13 +27,14 @@ class PaneHeader extends StatelessWidget {
   final List<Widget> Function(bool compact)? actions;
 
   static TextStyle titleStyle(BuildContext context) =>
-      Type.serif(26, color: Tokens.of(context).ink, height: 1.2);
+      Type.serif(20, color: Tokens.of(context).ink, height: 1.2);
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return Container(
-      height: 60,
+      // As tall as the phone header when the sidebar is a drawer, shorter beside it.
+      height: showMenu ? 60 : 52,
       padding: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: t.line2)),

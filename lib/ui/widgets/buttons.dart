@@ -88,7 +88,7 @@ class IconBtn extends StatelessWidget {
       tooltip: tooltip,
       onTap: onPressed,
       toggled: active,
-      radius: BorderRadius.circular(box < 30 ? 6 : 8),
+      radius: BorderRadius.circular(box <= 32 ? 6 : 8),
       color: active == true ? t.accentbg : null,
       hoverColor: dangerHover ? t.badbg : null,
       dimWhenDisabled: 0.4,

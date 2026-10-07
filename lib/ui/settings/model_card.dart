@@ -121,28 +121,26 @@ class _ModelFormState extends State<_ModelForm> {
     final modelKey = chatModelKeys[_provider];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 10,
       children: [
         SettingRow(
+          gap: 0,
           label: 'Provider',
           help: _provider == _savedProvider
               ? 'Every workspace uses it unless its own settings name another.'
               : 'Its key or address, if it needs one, is set in Files under /settings/system.json.',
           child: Semantics(
             label: 'Provider',
-            child: DropdownButton<String>(
-              isExpanded: true,
-              value: choices.contains(_provider) ? _provider : null,
-              hint: const Text('Not set'),
-              items: [
-                for (final choice in choices)
-                  DropdownMenuItem(value: choice, child: Text(choice)),
-              ],
+            child: AppSelect(
+              value: _provider,
+              choices: choices,
               onChanged: saving ? null : _choose,
             ),
           ),
         ),
         if (modelKey != null)
           SettingRow(
+            gap: 0,
             label: 'Model',
             help: 'The provider\'s own name for it. Saved as $modelKey.',
             child: AppField(
@@ -155,10 +153,7 @@ class _ModelFormState extends State<_ModelForm> {
             ),
           )
         else if (_provider.isNotEmpty)
-          const Padding(
-            padding: EdgeInsets.only(bottom: 18),
-            child: HelpText('This provider picks its own model.'),
-          ),
+          const HelpText('This provider picks its own model.'),
         ActionRow([
           AppButton('Revert', onPressed: dirty && !saving ? _revert : null),
           AppButton(

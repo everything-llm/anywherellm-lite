@@ -41,7 +41,8 @@ class SettingsDialog extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color: t.shadow.withValues(alpha: 0.35),
-                blurRadius: 60,
+                // Flutter blurs a radius more than CSS does; 51 here is CSS's 60.
+                blurRadius: 51,
                 spreadRadius: -12,
                 offset: const Offset(0, 24),
               ),
@@ -77,7 +78,7 @@ class SettingsDialog extends StatelessWidget {
                 const _ModelSection(),
                 const _Section('Appearance'),
                 const _AppearanceCard(),
-                const SizedBox(height: 22),
+                const SizedBox(height: 18),
                 Text(
                   'Your questions and the relevant passages from your files are sent to '
                   'AnythingLLM. Search and storage are handled there.',
@@ -336,7 +337,6 @@ class _KeyCardState extends State<_KeyCard> {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    spacing: 2,
                     children: [
                       Text(
                         'AnythingLLM server',
@@ -367,37 +367,33 @@ class _KeyCardState extends State<_KeyCard> {
             if (set && !_replacing)
               Text(connection.baseUrl, style: Type.mono(12.5, color: t.muted)),
             if (set)
-              Wrap(
-                spacing: 8,
-                children: [
+              ActionRow([
+                AppButton(
+                  _replacing ? 'Cancel' : 'Replace',
+                  onPressed: () => setState(() {
+                    _replacing = !_replacing;
+                    _scanning = false;
+                  }),
+                ),
+                if (!_replacing)
                   AppButton(
-                    _replacing ? 'Cancel' : 'Replace',
-                    onPressed: () => setState(() {
-                      _replacing = !_replacing;
-                      _scanning = false;
-                    }),
+                    _showCode ? 'Hide QR code' : 'Show QR code',
+                    onPressed: () => setState(() => _showCode = !_showCode),
                   ),
-                  if (!_replacing)
-                    AppButton(
-                      _showCode ? 'Hide QR code' : 'Show QR code',
-                      onPressed: () => setState(() => _showCode = !_showCode),
-                    ),
-                  AppButton(
-                    _confirmForget ? 'Delete it?' : 'Forget',
-                    onPressed: _forget,
-                  ),
-                ],
-              ),
+                AppButton(
+                  _confirmForget ? 'Delete it?' : 'Forget',
+                  onPressed: _forget,
+                ),
+              ]),
             if (set && !_replacing && _showCode) _PairingCode(connection),
             if (_scanner case final scan? when editing && _scanning) ...[
               scan(_scanned),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: AppButton(
+              ActionRow([
+                AppButton(
                   'Cancel',
                   onPressed: () => setState(() => _scanning = false),
                 ),
-              ),
+              ]),
             ],
             if (editing && !_scanning) ...[
               AppField(
@@ -426,41 +422,37 @@ class _KeyCardState extends State<_KeyCard> {
                   keyboardType: TextInputType.visiblePassword,
                   onSubmitted: (_) => saving ? null : _signIn(),
                 ),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
+              ActionRow([
+                AppButton(
+                  saving
+                      ? 'Checking…'
+                      : _pasteKey
+                      ? 'Save key'
+                      : 'Sign in',
+                  primary: true,
+                  onPressed: saving
+                      ? null
+                      : _pasteKey
+                      ? _save
+                      : _signIn,
+                ),
+                AppButton(
+                  _pasteKey ? 'Use password' : 'Paste a key',
+                  onPressed: saving
+                      ? null
+                      : () => setState(() => _pasteKey = !_pasteKey),
+                ),
+                if (_scanner != null)
                   AppButton(
-                    saving
-                        ? 'Checking…'
-                        : _pasteKey
-                        ? 'Save key'
-                        : 'Sign in',
-                    primary: true,
+                    'Scan QR code',
                     onPressed: saving
                         ? null
-                        : _pasteKey
-                        ? _save
-                        : _signIn,
+                        : () => setState(() {
+                            _scanning = true;
+                            _scanProblem = null;
+                          }),
                   ),
-                  AppButton(
-                    _pasteKey ? 'Use password' : 'Paste a key',
-                    onPressed: saving
-                        ? null
-                        : () => setState(() => _pasteKey = !_pasteKey),
-                  ),
-                  if (_scanner != null)
-                    AppButton(
-                      'Scan QR code',
-                      onPressed: saving
-                          ? null
-                          : () => setState(() {
-                              _scanning = true;
-                              _scanProblem = null;
-                            }),
-                    ),
-                ],
-              ),
+              ]),
             ],
             if (_scanProblem case final problem?)
               HelpText(problem, status: true),
@@ -531,7 +523,6 @@ class _PasswordCardState extends State<_PasswordCard> {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    spacing: 2,
                     children: [
                       Text(
                         'Server password',
@@ -562,16 +553,13 @@ class _PasswordCardState extends State<_PasswordCard> {
               ],
             ),
             if (set)
-              Wrap(
-                spacing: 8,
-                children: [
-                  AppButton(
-                    _replacing ? 'Cancel' : 'Replace',
-                    onPressed: () => setState(() => _replacing = !_replacing),
-                  ),
-                  AppButton('Forget', onPressed: _settings.forgetPassword),
-                ],
-              ),
+              ActionRow([
+                AppButton(
+                  _replacing ? 'Cancel' : 'Replace',
+                  onPressed: () => setState(() => _replacing = !_replacing),
+                ),
+                AppButton('Forget', onPressed: _settings.forgetPassword),
+              ]),
             if (editing && auth != ServerAuth.multiUser) ...[
               AppField(
                 controller: _password,
@@ -581,14 +569,13 @@ class _PasswordCardState extends State<_PasswordCard> {
                 keyboardType: TextInputType.visiblePassword,
                 onSubmitted: (_) => checking ? null : _save(),
               ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: AppButton(
+              ActionRow([
+                AppButton(
                   checking ? 'Checking…' : 'Save password',
                   primary: true,
                   onPressed: checking ? null : _save,
                 ),
-              ),
+              ]),
             ],
             if (_settings.passwordMessage case final message?)
               HelpText(message, status: true),

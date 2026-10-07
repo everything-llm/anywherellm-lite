@@ -12,6 +12,7 @@ class SettingRow extends StatelessWidget {
     required this.help,
     required this.child,
     this.problem,
+    this.gap = 18,
   });
 
   final String label;
@@ -19,19 +20,22 @@ class SettingRow extends StatelessWidget {
   final String? problem;
   final Widget child;
 
+  /// The space after the help, before whatever follows.
+  final double gap;
+
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
+      padding: EdgeInsets.only(bottom: gap),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             label,
-            style: Type.sans(14, weight: FontWeight.w600, color: t.ink),
+            style: Type.sans(14.5, weight: FontWeight.w500, color: t.ink),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           child,
           const SizedBox(height: 6),
           if (problem case final text?)

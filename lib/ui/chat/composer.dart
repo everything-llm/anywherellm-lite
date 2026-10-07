@@ -379,13 +379,9 @@ class _Form extends StatelessWidget {
         border: Border.all(color: t.line),
         boxShadow: [
           BoxShadow(
-            color: t.shadow.withValues(alpha: 0.05),
-            blurRadius: 2,
-            offset: const Offset(0, 1),
-          ),
-          BoxShadow(
             color: t.shadow,
-            blurRadius: 24,
+            // Flutter blurs a radius more than CSS does; 20 here is CSS's 24.
+            blurRadius: 20,
             spreadRadius: -12,
             offset: const Offset(0, 8),
           ),

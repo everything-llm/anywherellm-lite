@@ -222,12 +222,14 @@ class _FileRow extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(width: 10),
           AppSwitch(
             value: file.on,
             label: 'Use ${file.title} in answers',
             tooltip: 'Use in answers',
             onChanged: (_) => scope.sources.toggle(file),
           ),
+          const SizedBox(width: 10),
           IconBtn(
             'trash',
             tooltip: 'Remove ${file.title}',

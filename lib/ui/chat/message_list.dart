@@ -66,11 +66,23 @@ class MessageList extends StatelessWidget {
       itemCount: turns.length,
       itemBuilder: (context, i) {
         final turn = turns[turns.length - 1 - i];
+        final first = i == turns.length - 1;
+        // An answer sits closer to its own question than a question to the answer before it.
+        final answering =
+            !first &&
+            turn.role != Role.user &&
+            turns[turns.length - 2 - i].role == Role.user;
         return Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: Sizes.column),
             child: Padding(
-              padding: EdgeInsets.only(top: i == turns.length - 1 ? 0 : 26),
+              padding: EdgeInsets.only(
+                top: first
+                    ? 0
+                    : answering
+                    ? 16
+                    : 26,
+              ),
               child: Rise(
                 child: turn.role == Role.user
                     ? _UserBubble(
@@ -240,68 +252,68 @@ class _UserBubble extends StatelessWidget {
   /// Puts [text] back in the composer, to replace the question when the app is signed in.
   final VoidCallback onEdit;
 
+  /// Edit sits beside the bubble, at its foot, so nothing stands between it and the answer.
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.end,
-    children: [
-      _bubble(context),
-      IconBtn(
-        'pencil',
-        tooltip: 'Edit',
-        onPressed: onEdit,
-        box: 28,
-        size: IconSize.xs,
-      ),
-    ],
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) => Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        IconBtn(
+          'pencil',
+          tooltip: 'Edit',
+          onPressed: onEdit,
+          box: 28,
+          size: IconSize.xs,
+        ),
+        const SizedBox(width: 4),
+        Flexible(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: box.maxWidth * 0.8),
+            child: _bubble(context),
+          ),
+        ),
+      ],
+    ),
   );
 
   Widget _bubble(BuildContext context) {
     final t = Tokens.of(context);
-    return Align(
-      alignment: Alignment.centerRight,
-      child: FractionallySizedBox(
-        widthFactor: 0.8,
-        alignment: Alignment.centerRight,
-        child: Align(
-          alignment: Alignment.centerRight,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-            decoration: BoxDecoration(
-              color: t.bubble,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(Sizes.card),
-                topRight: Radius.circular(Sizes.card),
-                bottomLeft: Radius.circular(Sizes.card),
-                bottomRight: Radius.circular(4),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(text, style: Type.sans(15.5, color: t.ink, height: 1.5)),
-                for (final name in attachments)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AppIcon('attach', size: IconSize.xs, color: t.muted),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Type.sans(13, color: t.muted),
-                          ),
-                        ),
-                      ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+      decoration: BoxDecoration(
+        color: t.bubble,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(Sizes.card),
+          topRight: Radius.circular(Sizes.card),
+          bottomLeft: Radius.circular(Sizes.card),
+          bottomRight: Radius.circular(4),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(text, style: Type.sans(15.5, color: t.ink, height: 1.5)),
+          for (final name in attachments)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppIcon('attach', size: IconSize.xs, color: t.muted),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Type.sans(13, color: t.muted),
                     ),
                   ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ),
+        ],
       ),
     );
   }
@@ -411,7 +423,7 @@ class _MetricsState extends State<_Metrics> {
         if (shown.isNotEmpty) Flexible(child: Text(shown, style: style)),
         if (more)
           Tappable(
-            label: _open ? hide : 'Answer details: tokens and speed',
+            label: _open ? hide : 'Answer details: tokens, speed and cost',
             expanded: _open,
             onTap: () => setState(() => _open = !_open),
             radius: BorderRadius.circular(6),

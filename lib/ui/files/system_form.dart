@@ -159,14 +159,9 @@ class _SystemFormState extends State<_SystemForm> with _Saving {
     }
     if (f.choices case final choices?) {
       final value = _chosen[f.key];
-      return DropdownButton<String>(
-        isExpanded: true,
-        value: choices.contains(value) ? value : null,
-        hint: const Text('Not set'),
-        items: [
-          for (final choice in choices)
-            DropdownMenuItem(value: choice, child: Text(choice)),
-        ],
+      return AppSelect(
+        value: value,
+        choices: choices,
         onChanged: (choice) => setState(() => _chosen[f.key] = choice ?? ''),
       );
     }

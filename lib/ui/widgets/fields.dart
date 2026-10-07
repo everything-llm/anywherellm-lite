@@ -59,6 +59,7 @@ class AppField extends StatelessWidget {
         OutlineInputBorder(
           borderRadius: BorderRadius.circular(Sizes.control),
           borderSide: BorderSide(color: color, width: width),
+          gapPadding: 0,
         );
     return Semantics(
       label: label,
@@ -93,7 +94,7 @@ class AppField extends StatelessWidget {
                   widthFactor: 1,
                   heightFactor: 1,
                   child: Padding(
-                    padding: const EdgeInsets.only(left: 14, right: 8),
+                    padding: const EdgeInsets.only(left: 15, right: 4),
                     child: AppIcon(icon!, size: IconSize.sm, color: t.muted),
                   ),
                 ),
@@ -105,12 +106,62 @@ class AppField extends StatelessWidget {
                 ),
           prefixIconConstraints: const BoxConstraints(minHeight: 44),
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
+            horizontal: 13,
             vertical: 13,
           ),
           constraints: const BoxConstraints(minHeight: 44),
           enabledBorder: border(t.line),
           focusedBorder: border(t.accent, 2),
+        ),
+      ),
+    );
+  }
+}
+
+/// A choice among [choices], drawn as a field: 44px tall and rounded, with [hint] while
+/// [value] is none of them. A null [onChanged] turns it off.
+class AppSelect extends StatelessWidget {
+  const AppSelect({
+    super.key,
+    required this.value,
+    required this.choices,
+    required this.onChanged,
+    this.hint = 'Not set',
+  });
+
+  final String? value;
+  final List<String> choices;
+  final ValueChanged<String?>? onChanged;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: t.bg,
+        border: Border.all(color: t.line),
+        borderRadius: BorderRadius.circular(Sizes.control),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          isExpanded: true,
+          value: choices.contains(value) ? value : null,
+          hint: Text(hint, style: Type.sans(15, color: t.fade)),
+          style: Type.sans(15, color: t.ink),
+          dropdownColor: t.panel,
+          borderRadius: BorderRadius.circular(Sizes.control),
+          icon: RotatedBox(
+            quarterTurns: 1,
+            child: AppIcon('chevron', size: IconSize.xs, color: t.muted),
+          ),
+          items: [
+            for (final choice in choices)
+              DropdownMenuItem(value: choice, child: Text(choice)),
+          ],
+          onChanged: onChanged,
         ),
       ),
     );
