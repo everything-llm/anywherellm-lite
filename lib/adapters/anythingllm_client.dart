@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -589,9 +590,9 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   /// by [imageFrames]. The response is let go of at once when the subscription was cancelled
   /// while it waited for the headers, as an `async*` body would only notice at its next `yield`.
   @override
-  Stream<List<int>> answerImage(Uri url) {
-    late final StreamController<List<int>> out;
-    StreamSubscription<List<int>>? reading;
+  Stream<Uint8List> answerImage(Uri url) {
+    late final StreamController<Uint8List> out;
+    StreamSubscription<Uint8List>? reading;
     var cancelled = false;
     Future<void> start() async {
       try {
@@ -606,11 +607,12 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
           timeout,
           () => _client.send(http.Request('GET', url)),
         );
-        if (cancelled ||
-            response.statusCode < 200 ||
-            response.statusCode >= 300) {
+        final ok = response.statusCode >= 200 && response.statusCode < 300;
+        if (cancelled || !ok) {
           unawaited(response.stream.listen(null).cancel());
-          if (cancelled) return;
+        }
+        if (cancelled) return;
+        if (!ok) {
           throw ApiException(
             'The image could not be read: the server answered ${response.statusCode}.',
           );

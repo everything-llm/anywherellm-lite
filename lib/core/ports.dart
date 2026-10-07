@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'chat.dart';
 import 'commands.dart';
 import 'connection.dart';
@@ -158,7 +160,7 @@ abstract interface class AnythingLlmApi {
   /// The image at [url], from an answer, as it is drawn: one frame for a plain image, and each
   /// new frame of a live one, which the server keeps pushing until it ends the response. Sent
   /// without the key, the password or a login token. Cancelling closes the connection.
-  Stream<List<int>> answerImage(Uri url);
+  Stream<Uint8List> answerImage(Uri url);
 
   /// The server's settings, with every secret replaced by whether it is set.
   Future<Map<String, Object?>> systemSettings();

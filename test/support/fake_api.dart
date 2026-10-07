@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/commands.dart';
@@ -114,7 +115,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
 
   /// What [answerImage] answers for a live image, by address: a broadcast stream the test adds
   /// frames to, whose `hasListener` says whether the app is following it.
-  final Map<Uri, StreamController<List<int>>> liveImages = {};
+  final Map<Uri, StreamController<Uint8List>> liveImages = {};
   bool hold = false;
   StreamController<ChatEvent>? chat;
 
@@ -559,13 +560,15 @@ class FakeAnythingLlm implements AnythingLlmApi {
   Future<int> vectorCount() => _run('vectorCount', () => vectors);
 
   @override
-  Stream<List<int>> answerImage(Uri url) {
+  Stream<Uint8List> answerImage(Uri url) {
     calls.add('answerImage:$url');
     if (errors['answerImage'] case final Object error) {
       return Stream.error(error);
     }
     if (liveImages[url] case final live?) return live.stream;
-    if (images[url] case final frames?) return Stream.fromIterable(frames);
+    if (images[url] case final frames?) {
+      return Stream.fromIterable(frames.map(Uint8List.fromList));
+    }
     return Stream.error(
       const ApiException(
         'The image could not be read: the server answered 404.',
@@ -599,6 +602,16 @@ WorkspaceDoc libraryDoc(FakeAnythingLlm llm, String title, {int? words = 120}) {
 
 /// A server with the mockup's workspaces: Q3 planning with two chats and two files, and an empty
 /// Household.
+/// [planningServer] with [answer] as the last answer in the chat it opens on.
+FakeAnythingLlm answering(String answer, {List<Citation> cited = const []}) {
+  final llm = planningServer();
+  llm.histories['budget'] = [
+    const ChatMessage(role: Role.user, text: 'Where?'),
+    ChatMessage(role: Role.assistant, text: answer, citations: cited),
+  ];
+  return llm;
+}
+
 FakeAnythingLlm planningServer() {
   final llm = FakeAnythingLlm();
   llm.spaces = [

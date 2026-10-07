@@ -804,20 +804,16 @@ class ChatController extends ChangeNotifier {
     return _api
         .answerImage(url)
         .transform(
-          StreamTransformer<List<int>, Uint8List>.fromHandlers(
-            handleData: (bytes, sink) {
+          StreamTransformer.fromHandlers(
+            handleData: (frame, sink) {
               if (_server != server) return;
-              final frame = bytes is Uint8List
-                  ? bytes
-                  : Uint8List.fromList(bytes);
               frames++;
               _images[url] = (frame: frame, whole: false);
               sink.add(frame);
             },
             handleDone: (sink) {
-              final last = _images[url];
-              if (_server == server && frames == 1 && last != null) {
-                _images[url] = (frame: last.frame, whole: true);
+              if (_server == server && frames == 1) {
+                _images[url] = (frame: _images[url]!.frame, whole: true);
               }
               sink.close();
             },

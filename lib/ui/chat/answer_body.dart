@@ -101,8 +101,9 @@ class AnswerBody extends StatelessWidget {
 /// An image in an answer: loaded when it is on the [server]'s host over https, or over http
 /// when the [server] itself is http and [allowHttp] holds; otherwise its description. A live
 /// image, such as a run's progress card, shows each new frame as it comes, and is followed only
-/// while it can be seen: not while the chat is offstage behind Files or the app is hidden, since
-/// a watched card keeps the host's browser from being stopped.
+/// while it can be seen: not while the chat is offstage behind Files ([TickerMode]) or the app
+/// is hidden, since a watched card keeps the host's browser from being stopped. Hiding is heard
+/// here, not through [TickerMode], because a hidden app draws no frames to pass it down.
 class _Image extends StatefulWidget {
   const _Image(
     this.uri, {
@@ -124,22 +125,19 @@ class _Image extends StatefulWidget {
 
 class _ImageState extends State<_Image> {
   Uint8List? _frame;
-  bool _failed = false;
 
-  /// Whether the read ended, so there is nothing more to follow.
+  /// Whether the read ended, by finishing or failing, so there is nothing more to follow.
   bool _ended = false;
 
-  bool _appShown = true;
   bool _onstage = true;
+  bool _appShown = true;
   StreamSubscription<Uint8List>? _reading;
   late final AppLifecycleListener _lifecycle;
 
   @override
   void initState() {
     super.initState();
-    if (widget.loadable) {
-      _frame = AppScope.of(context).chat.lastFrame(widget.uri);
-    }
+    _reset();
     _lifecycle = AppLifecycleListener(
       onHide: () => _setAppShown(false),
       onShow: () => _setAppShown(true),
@@ -158,11 +156,7 @@ class _ImageState extends State<_Image> {
     super.didUpdateWidget(old);
     if (old.uri == widget.uri && old.loadable == widget.loadable) return;
     _stop();
-    _frame = widget.loadable
-        ? AppScope.of(context).chat.lastFrame(widget.uri)
-        : null;
-    _failed = false;
-    _ended = false;
+    _reset();
     _follow();
   }
 
@@ -174,37 +168,48 @@ class _ImageState extends State<_Image> {
   }
 
   void _setAppShown(bool shown) {
-    if (!mounted) return;
     _appShown = shown;
     _follow();
   }
 
+  /// Starts from the frame last read for this image, if any.
+  void _reset() {
+    _frame = widget.loadable
+        ? AppScope.of(context).chat.lastFrame(widget.uri)
+        : null;
+    _ended = false;
+  }
+
   /// Reads the image while it can be seen and has more to give, and lets go of it otherwise.
   void _follow() {
-    final watch = widget.loadable && _appShown && _onstage && !_ended;
-    if (!watch) {
+    if (!widget.loadable || !_onstage || !_appShown || _ended) {
       _stop();
       return;
     }
     _reading ??= AppScope.of(context).chat
         .imageFrames(widget.uri)
         .listen(
-          (frame) => setState(() {
-            _frame = frame;
-            _failed = false;
-          }),
-          onError: (Object _) => setState(() {
-            _failed = true;
-            _ended = true;
-            _reading = null;
-          }),
-          onDone: () {
-            _ended = true;
-            _reading = null;
-          },
+          _show,
+          onError: (Object _) => _end(),
+          onDone: _end,
           cancelOnError: true,
         );
   }
+
+  /// Shows [frame] in place of the last, whose decoded image would otherwise stay in the image
+  /// cache: each frame is its own [MemoryImage].
+  void _show(Uint8List frame) {
+    final last = _frame;
+    if (last != null && !identical(last, frame)) {
+      unawaited(MemoryImage(last).evict());
+    }
+    setState(() => _frame = frame);
+  }
+
+  void _end() => setState(() {
+    _ended = true;
+    _reading = null;
+  });
 
   void _stop() {
     unawaited(_reading?.cancel());
@@ -220,7 +225,7 @@ class _ImageState extends State<_Image> {
       style: Type.sans(14, color: t.muted),
     );
     final frame = _frame;
-    if (!widget.loadable || (frame == null && _failed)) return described;
+    if (!widget.loadable || (frame == null && _ended)) return described;
     if (frame == null) return const SizedBox.shrink();
     return ConstrainedBox(
       constraints: const BoxConstraints(maxHeight: 360),

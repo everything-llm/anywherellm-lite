@@ -39,21 +39,11 @@ Future<void> tapLink(WidgetTester tester, String text) async {
   fail('no link "$text"');
 }
 
-/// The planning server with [answer] as the last answer in the open chat.
-FakeAnythingLlm _answering(String answer, {List<Citation> cited = const []}) {
-  final llm = planningServer();
-  llm.histories['budget'] = [
-    const ChatMessage(role: Role.user, text: 'Where?'),
-    ChatMessage(role: Role.assistant, text: answer, citations: cited),
-  ];
-  return llm;
-}
-
 void main() {
   testWidgets('a link in an answer opens in the browser', (tester) async {
     final h = await pumpApp(
       tester,
-      llm: _answering('Read [the report](https://example.com/report) today.'),
+      llm: answering('Read [the report](https://example.com/report) today.'),
     );
     await tapLink(tester, 'the report');
     expect(h.opened, [Uri.parse('https://example.com/report')]);
@@ -63,7 +53,7 @@ void main() {
   testWidgets('a link the app will not open says so', (tester) async {
     final h = await pumpApp(
       tester,
-      llm: _answering('Click [here](javascript:alert(1)) now.'),
+      llm: answering('Click [here](javascript:alert(1)) now.'),
     );
     await tapLink(tester, 'here');
     expect(h.opened, isEmpty);
@@ -81,7 +71,7 @@ void main() {
   ) async {
     final h = await pumpApp(
       tester,
-      llm: _answering('Click [here](javascript:alert(1)) now.'),
+      llm: answering('Click [here](javascript:alert(1)) now.'),
     );
     h.chat.problem = const Notice('Could not read the workspaces', 'Down.');
     await tapLink(tester, 'here');
@@ -96,7 +86,7 @@ void main() {
   ) async {
     final h = await pumpApp(
       tester,
-      llm: _answering('Read [the report](https://example.com/report).'),
+      llm: answering('Read [the report](https://example.com/report).'),
     );
     h.openThrows = ArgumentError('unsupported');
     await tapLink(tester, 'the report');
@@ -107,7 +97,7 @@ void main() {
   testWidgets('a link nothing on the device opens says so', (tester) async {
     final h = await pumpApp(
       tester,
-      llm: _answering('Mail [me](mailto:ada@example.com).'),
+      llm: answering('Mail [me](mailto:ada@example.com).'),
     );
     h.openSucceeds = false;
     await tapLink(tester, 'me');
@@ -121,7 +111,7 @@ void main() {
     (tester) async {
       final h = await pumpApp(
         tester,
-        llm: _answering(
+        llm: answering(
           'Done.',
           cited: [
             Citation('A story', url: Uri.parse('https://news.test/story')),
@@ -143,7 +133,7 @@ void main() {
   testWidgets('an image loads only from the server\'s own host', (
     tester,
   ) async {
-    final llm = _answering(
+    final llm = answering(
       'Card:\n\n[![Report](https://h:8445/card.png)](https://h:8445/r)\n\n'
       'Elsewhere: ![tracker](https://evil.test/p.png?d=secret)\n\n'
       'Plain: ![plain](http://h:80/p.png?d=secret)',

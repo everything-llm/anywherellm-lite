@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,33 +12,25 @@ import '../support/pump.dart';
 final _card = Uri.parse('https://h:8445/_live/run/r-1.png');
 final _page = Uri.parse('https://h:8445/_live/run/r-1');
 
-/// The planning server with a card for [_card] linking to [_page] as the open chat's answer.
-FakeAnythingLlm _withCard() {
-  final llm = planningServer();
-  llm.histories['budget'] = [
-    const ChatMessage(role: Role.user, text: 'How is the run going?'),
-    ChatMessage(
-      role: Role.assistant,
-      text: 'Here:\n\n[![Run]($_card)]($_page)',
-    ),
-  ];
-  return llm;
-}
+FakeAnythingLlm _withCard() => answering('Here:\n\n[![Run]($_card)]($_page)');
 
 /// The bytes of the answer image on screen.
 Uint8List _shown(WidgetTester tester) =>
     (tester.widget<Image>(find.byType(Image)).image as MemoryImage).bytes;
 
-/// Pumps until a frame [live] was given reaches the screen: it comes through microtasks after
-/// the first pump has drawn.
+/// Gives [frame] to [live] and pumps until it is on screen.
 Future<void> _arrives(
   WidgetTester tester,
-  StreamController<List<int>> live,
-  List<int> frame,
+  StreamController<Uint8List> live,
+  Uint8List frame,
 ) async {
   live.add(frame);
-  await tester.pump();
-  await tester.pump();
+  for (var i = 0; i < 5; i++) {
+    await tester.pump();
+    final images = find.byType(Image).evaluate();
+    if (images.isNotEmpty && identical(_shown(tester), frame)) return;
+  }
+  fail('the frame did not show');
 }
 
 int _reads(FakeAnythingLlm llm) =>
@@ -49,7 +40,7 @@ void main() {
   testWidgets('a live card shows each new frame and opens its page', (
     tester,
   ) async {
-    final live = StreamController<List<int>>.broadcast();
+    final live = StreamController<Uint8List>.broadcast();
     addTearDown(live.close);
     final llm = _withCard()..liveImages[_card] = live;
     final h = await pumpApp(tester, llm: llm);
@@ -107,7 +98,7 @@ void main() {
   testWidgets(
     'a live card is let go of while Files shows, and read again after',
     (tester) async {
-      final live = StreamController<List<int>>.broadcast();
+      final live = StreamController<Uint8List>.broadcast();
       addTearDown(live.close);
       final llm = _withCard()..liveImages[_card] = live;
       final h = await pumpApp(tester, llm: llm);
@@ -131,7 +122,7 @@ void main() {
   testWidgets('a live card is let go of while the app is hidden', (
     tester,
   ) async {
-    final live = StreamController<List<int>>.broadcast();
+    final live = StreamController<Uint8List>.broadcast();
     addTearDown(live.close);
     await pumpApp(tester, llm: _withCard()..liveImages[_card] = live);
     await tester.pump();

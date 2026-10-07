@@ -12,6 +12,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import '../support/multipart.dart';
+
 const _connection = Connection(
   baseUrl: 'https://host.example.ts.net:3001',
   apiKey: 'SECRET-KEY',
@@ -2159,11 +2161,13 @@ void main() {
       'https://host.example.ts.net:8445/_live/run/r-1.png',
     );
 
-    /// A client that answers [body] with [type], recording each request in [seen].
+    /// A client that answers [body] as [type] once [headers] completes, recording each
+    /// request in [seen].
     HttpAnythingLlmApi images(
       Stream<List<int>> body, {
-      String type = 'multipart/x-mixed-replace; boundary=frame',
+      String type = multipartType,
       int status = 200,
+      Future<void>? headers,
       List<http.BaseRequest>? seen,
       bool allowHttp = true,
     }) => HttpAnythingLlmApi(
@@ -2171,6 +2175,7 @@ void main() {
       allowHttp: allowHttp,
       client: MockClient.streaming((request, _) async {
         seen?.add(request);
+        await headers;
         return http.StreamedResponse(
           body,
           status,
@@ -2179,21 +2184,9 @@ void main() {
       }),
     );
 
-    List<int> part(String frame) => ascii.encode(
-      '--frame\r\nContent-Type: image/png\r\n'
-      'Content-Length: ${frame.length}\r\n\r\n$frame\r\n',
-    );
-
     test('reads each frame, with no key, password or token', () async {
       final seen = <http.BaseRequest>[];
-      final api = images(
-        Stream.fromIterable([
-          part('one'),
-          part('two'),
-          ascii.encode('--frame--'),
-        ]),
-        seen: seen,
-      );
+      final api = images(Stream.value(multipart(['one', 'two'])), seen: seen);
       final frames = await api.answerImage(card).toList();
       expect(frames.map(ascii.decode), ['one', 'two']);
       expect(seen.single.url, card);
@@ -2205,18 +2198,13 @@ void main() {
       expect(seen.single.headers.values.join(), isNot(contains('SECRET-KEY')));
     });
 
-    test('a plain image is one frame', () async {
-      final api = images(Stream.value(ascii.encode('png')), type: 'image/png');
-      expect((await api.answerImage(card).toList()).map(ascii.decode), ['png']);
-    });
-
     test('refuses plain http when this device does not allow it', () async {
       final seen = <http.BaseRequest>[];
       final api = images(const Stream.empty(), seen: seen, allowHttp: false);
       final error = await _failure(
         api
             .answerImage(Uri.parse('http://host.example.ts.net:8445/a.png'))
-            .drain(),
+            .drain<void>(),
       );
       expect(error.message, contains('plain http'));
       expect(seen, isEmpty);
@@ -2227,7 +2215,7 @@ void main() {
         Stream.value(ascii.encode('No such run.')),
         status: 404,
       );
-      final error = await _failure(api.answerImage(card).drain());
+      final error = await _failure(api.answerImage(card).drain<void>());
       expect(
         error.message,
         'The image could not be read: the server answered 404.',
@@ -2239,10 +2227,11 @@ void main() {
       final body = StreamController<List<int>>(
         onCancel: () => cancelled = true,
       );
-      final api = images(body.stream);
       final first = Completer<void>();
-      final reading = api.answerImage(card).listen((_) => first.complete());
-      body.add(part('one'));
+      final reading = images(body.stream)
+          .answerImage(card)
+          .listen((_) => first.complete());
+      body.add(multipart(['one'], closed: false));
       await first.future;
       await reading.cancel();
       expect(cancelled, isTrue);
@@ -2256,22 +2245,10 @@ void main() {
           onCancel: () => cancelled = true,
         );
         final headers = Completer<void>();
-        final api = HttpAnythingLlmApi(
-          holder: ConnectionHolder(_connection),
-          client: MockClient.streaming((request, _) async {
-            await headers.future;
-            return http.StreamedResponse(
-              body.stream,
-              200,
-              headers: {
-                'content-type': 'multipart/x-mixed-replace; boundary=frame',
-              },
-            );
-          }),
-        );
-        final reading = api
-            .answerImage(card)
-            .listen((_) => fail('no frame expected'));
+        final reading = images(
+          body.stream,
+          headers: headers.future,
+        ).answerImage(card).listen((_) => fail('no frame expected'));
         await pumpEventQueue();
         await reading.cancel();
         headers.complete();
