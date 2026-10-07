@@ -10,20 +10,35 @@ enum ChatMode {
   automatic(
     'Agent',
     'Answers from general knowledge, the switched-on files and tools such as web search.',
+    'Files, knowledge and tools',
+    'Can also search the web and use skills.',
   ),
   chat(
     'Chat',
     'Answers from general knowledge and the switched-on files, without tools.',
+    'Files and general knowledge',
+    'No tools: no web search or skills.',
   ),
   query(
     'Query',
     'Answers only from the switched-on files, and says so when they do not cover it.',
+    'Files only',
+    'Says so when the files do not cover it.',
   );
 
-  const ChatMode(this.label, this.about);
+  const ChatMode(this.label, this.about, this.title, this.detail);
 
+  /// The server's own name for the mode, as AnythingLLM's web UI shows it.
   final String label;
+
+  /// What the mode answers from, in one sentence.
   final String about;
+
+  /// What the mode answers from, as a choice in Sources.
+  final String title;
+
+  /// The line under [title].
+  final String detail;
 
   /// The mode the server calls [value], or null for none it knows.
   static ChatMode? fromServer(Object? value) =>

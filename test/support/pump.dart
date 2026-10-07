@@ -228,3 +228,10 @@ void raiseKeyboard(WidgetTester tester, double height) {
   tester.view.viewInsets = FakeViewPadding(bottom: height);
   addTearDown(tester.view.resetViewInsets);
 }
+
+/// Scrolls [finder] into view, then taps it, as a person scrolls to a control below the fold.
+Future<void> tapVisible(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.tap(finder);
+}

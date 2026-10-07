@@ -19,7 +19,7 @@ void main() {
   ) async {
     final llm = planningServer();
     final h = await pumpApp(tester, llm: llm);
-    await tester.tap(control('Test a question'));
+    await tapVisible(tester, control('Test a question'));
     await tester.pumpAndSettle();
     await tester.enterText(inSources(find.byType(TextField)).first, 'roadmap');
     await tester.testTextInput.receiveAction(TextInputAction.done);
@@ -30,11 +30,11 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('A passage of Q3 roadmap.pdf.'), findsOneWidget);
-    await tester.tap(control('Q3 roadmap.pdf, 90% close'));
+    await tapVisible(tester, control('Q3 roadmap.pdf, 90% close'));
     await tester.pump();
     expect(h.sources.flashed, isNotNull);
     await tester.pumpAndSettle(const Duration(seconds: 2));
-    await tester.tap(control('Done'));
+    await tapVisible(tester, control('Done'));
     await tester.pumpAndSettle();
     expect(h.sources.hits, isNull);
     expect(control('Test a question'), findsOneWidget);
@@ -43,11 +43,11 @@ void main() {
   testWidgets('a question that finds nothing says so', (tester) async {
     final llm = planningServer();
     await pumpApp(tester, llm: llm);
-    await tester.tap(control('Test a question'));
+    await tapVisible(tester, control('Test a question'));
     await tester.pumpAndSettle();
     await tester.enterText(inSources(find.byType(TextField)).first, 'zebras');
     await tester.pump();
-    await tester.tap(control('Test'));
+    await tapVisible(tester, control('Test'));
     await tester.pumpAndSettle();
     expect(llm.calls, contains('searchDocs:q3:zebras'));
     expect(

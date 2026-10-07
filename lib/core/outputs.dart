@@ -86,9 +86,18 @@ class AnswerMetrics {
     ?model,
     if (tokens case final tokens?) '${_grouped(tokens)} tokens',
     if (speed case final speed?) '${speed.round()} tok/s',
-    if (seconds case final seconds?) '${seconds.toStringAsFixed(1)} s',
+    ?_seconds,
     if (cost case final cost?) '\$${cost.toStringAsFixed(cost < 1 ? 4 : 2)}',
   ].join(' · ');
+
+  /// The model and the time alone, such as `glm-5.3 · 73.9 s`.
+  String get brief => [?model, ?_seconds].join(' · ');
+
+  /// Whether [text] says more than [brief].
+  bool get hasMore => tokens != null || speed != null || cost != null;
+
+  String? get _seconds =>
+      seconds == null ? null : '${seconds!.toStringAsFixed(1)} s';
 }
 
 /// The `metrics` of an answer, or null when it has none: the server sends `{}` for an answer it

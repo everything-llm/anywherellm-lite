@@ -27,6 +27,18 @@ void main() {
       );
     });
 
+    test('the brief line is the model and the time alone', () {
+      const metrics = AnswerMetrics(
+        model: 'glm-5.3',
+        tokens: 1642,
+        speed: 22.2,
+        seconds: 73.852,
+        cost: 0.0049,
+      );
+      expect(metrics.brief, 'glm-5.3 · 73.9 s');
+      expect(const AnswerMetrics(tokens: 12).brief, '');
+    });
+
     test('an unmeasured answer has none', () {
       expect(metricsOf({}), isNull);
       expect(metricsOf(null), isNull);

@@ -41,10 +41,10 @@ void main() {
     expect(find.text('a.md'), findsOneWidget);
     expect(llm.calls.where((c) => c.startsWith('upload')), isEmpty);
     expect(control('Add 2 files'), findsOneWidget);
-    await tester.tap(control('Remove b.md'));
+    await tapVisible(tester, control('Remove b.md'));
     await tester.pumpAndSettle();
     expect(find.text('b.md'), findsNothing);
-    await tester.tap(control('Add 1 file'));
+    await tapVisible(tester, control('Add 1 file'));
     await tester.pumpAndSettle();
     expect(llm.calls, contains('upload:a.md'));
     expect(llm.calls, isNot(contains('upload:b.md')));
@@ -57,7 +57,7 @@ void main() {
     final llm = planningServer();
     await pumpApp(tester, llm: llm);
     await drop(tester, SourcesPanel, [file('a.md'), file('b.md')]);
-    await tester.tap(control('Details of a.md'));
+    await tapVisible(tester, control('Details of a.md'));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.descendant(
@@ -73,7 +73,7 @@ void main() {
       ),
       'Plan',
     );
-    await tester.tap(control('Add 2 files'));
+    await tapVisible(tester, control('Add 2 files'));
     await tester.pumpAndSettle();
     expect(llm.metaOf['custom-documents/a.md.json']?.author, 'Ada');
     expect(llm.metaOf['custom-documents/a.md.json']?.title, 'Plan');
@@ -88,7 +88,7 @@ void main() {
     await drop(tester, SourcesPanel, [file('a.md')]);
     await drop(tester, SourcesPanel, [file('a.md')]);
     expect(find.text('a.md'), findsOneWidget);
-    await tester.tap(control('Cancel'));
+    await tapVisible(tester, control('Cancel'));
     await tester.pumpAndSettle();
     expect(find.text('a.md'), findsNothing);
     expect(llm.calls.where((c) => c.startsWith('upload')), isEmpty);
@@ -103,8 +103,7 @@ void main() {
     await tester.pumpAndSettle();
     await drop(tester, FilesView, [file('a.md')]);
     expect(llm.calls.where((c) => c.startsWith('upload')), isEmpty);
-    await tester.ensureVisible(control('Add 1 file'));
-    await tester.tap(control('Add 1 file'));
+    await tapVisible(tester, control('Add 1 file'));
     await tester.pumpAndSettle();
     expect(llm.calls, contains('upload:custom-documents/a.md'));
   });
@@ -112,7 +111,7 @@ void main() {
   testWidgets('a link goes with its details', (tester) async {
     final llm = planningServer();
     await pumpApp(tester, llm: llm);
-    await tester.tap(control('Add a link'));
+    await tapVisible(tester, control('Add a link'));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.descendant(
@@ -121,13 +120,13 @@ void main() {
       ),
       'https://example.com',
     );
-    await tester.tap(control('Details'));
+    await tapVisible(tester, control('Details'));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.descendant(of: field('Source'), matching: find.byType(TextField)),
       'Finance',
     );
-    await tester.tap(control('Add'));
+    await tapVisible(tester, control('Add'));
     await tester.pumpAndSettle();
     expect(llm.calls, contains('uploadLink:https://example.com'));
     expect(
@@ -146,8 +145,7 @@ void main() {
     await h.files.select('/library/custom-documents');
     await tester.pumpAndSettle();
     await drop(tester, FilesView, [file('a.md')]);
-    await tester.ensureVisible(control('Delete folder…'));
-    await tester.tap(control('Delete folder…'));
+    await tapVisible(tester, control('Delete folder…'));
     await tester.pumpAndSettle();
     await h.files.select('/library/drafts');
     await tester.pumpAndSettle();
@@ -160,7 +158,7 @@ void main() {
     final llm = planningServer();
     final h = await pumpApp(tester, llm: llm);
     await drop(tester, SourcesPanel, [file('a.md')]);
-    await tester.tap(control('Add a link'));
+    await tapVisible(tester, control('Add a link'));
     await tester.pumpAndSettle();
     await h.chat.select('household');
     await tester.pumpAndSettle();
@@ -174,7 +172,7 @@ void main() {
   ) async {
     final llm = planningServer();
     final h = await pumpApp(tester, llm: llm);
-    await tester.tap(control('Add a link'));
+    await tapVisible(tester, control('Add a link'));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.descendant(
@@ -183,19 +181,20 @@ void main() {
       ),
       'example.com/x',
     );
-    await tester.tap(control('Details'));
+    await tapVisible(tester, control('Details'));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.descendant(of: field('Source'), matching: find.byType(TextField)),
       'Finance',
     );
-    await tester.tap(control('Add'));
+    await tapVisible(tester, control('Add'));
     await tester.pumpAndSettle();
     expect(llm.calls.where((c) => c.startsWith('uploadLink')), isEmpty);
     expect(h.sources.problems.single.title, 'Could not add the link');
     expect(find.text('example.com/x'), findsOneWidget);
     expect(find.text('Finance'), findsOneWidget);
-    await tester.tap(control('Add'));
+    // Two taps with no frame between, as a quick double tap.
+    await tapVisible(tester, control('Add'));
     await tester.tap(control('Add'));
     await tester.pumpAndSettle();
     expect(h.sources.problems, hasLength(1));

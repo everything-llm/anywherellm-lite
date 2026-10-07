@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/chat.dart';
+import '../../core/outputs.dart';
 import '../../core/server_models.dart';
 import '../app_scope.dart';
 import '../links.dart';
@@ -374,14 +375,59 @@ class _Answer extends StatelessWidget {
                     size: IconSize.xs,
                   ),
               ],
-              if (turn.metrics case final metrics?)
-                Text(
-                  metrics.text,
-                  style: Type.sans(12, color: Tokens.of(context).muted),
-                ),
+              if (turn.metrics case final metrics?) _Metrics(metrics),
             ],
           ),
         ],
+      ],
+    );
+  }
+}
+
+/// How an answer ran: the model and the time, and Details for the rest when there is more.
+class _Metrics extends StatefulWidget {
+  const _Metrics(this.metrics);
+
+  final AnswerMetrics metrics;
+
+  @override
+  State<_Metrics> createState() => _MetricsState();
+}
+
+class _MetricsState extends State<_Metrics> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final metrics = widget.metrics;
+    final more = metrics.hasMore;
+    final shown = _open || !more ? metrics.text : metrics.brief;
+    final style = Type.sans(12, color: t.muted);
+    const hide = 'Hide details';
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (shown.isNotEmpty) Flexible(child: Text(shown, style: style)),
+        if (more)
+          Tappable(
+            label: _open ? hide : 'Answer details: tokens and speed',
+            expanded: _open,
+            onTap: () => setState(() => _open = !_open),
+            radius: BorderRadius.circular(6),
+            child: Container(
+              height: 30,
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Text(
+                _open ? hide : 'Details',
+                style: style.copyWith(
+                  decoration: TextDecoration.underline,
+                  decorationColor: t.muted,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

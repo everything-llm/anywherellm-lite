@@ -183,9 +183,9 @@ void main() {
       final h = await pumpApp(tester, llm: awkward(), size: size);
       h.shell.openSources();
       await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsLabel('Paste text').last);
+      await tapVisible(tester, find.bySemanticsLabel('Paste text').last);
       await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsLabel('Details').last);
+      await tapVisible(tester, find.bySemanticsLabel('Details').last);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       final cancel = find.descendant(
@@ -196,9 +196,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(cancel);
       await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsLabel('Add a link').last);
+      await tapVisible(tester, find.bySemanticsLabel('Add a link').last);
       await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsLabel('Details').last);
+      await tapVisible(tester, find.bySemanticsLabel('Details').last);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });

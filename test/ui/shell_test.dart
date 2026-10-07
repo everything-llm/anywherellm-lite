@@ -64,7 +64,7 @@ void main() {
       expect(inSidebar('2 docs'), findsOneWidget);
       expect(inSidebar('Budget questions'), findsOneWidget);
       expect(inSidebar('Quarter priorities'), findsOneWidget);
-      expect(inSidebar('AnythingLLM · key set'), findsOneWidget);
+      expect(inSidebar('Connected to AnythingLLM'), findsOneWidget);
       expect(find.text('About 40k.'), findsOneWidget);
       expect(inSources(find.text('Q3 roadmap.pdf')), findsOneWidget);
       expect(find.byTooltip('Workspaces'), findsNothing);
@@ -267,12 +267,19 @@ void main() {
     ) async {
       final llm = planningServer();
       final h = await pumpApp(tester, llm: llm);
-      expect(inSources(find.text(ChatMode.automatic.about)), findsOneWidget);
+      bool chosen(ChatMode mode) =>
+          tester.widget<Tappable>(inSources(control(mode.label))).selected!;
+      for (final mode in ChatMode.values) {
+        expect(inSources(find.text(mode.title)), findsOneWidget);
+        expect(inSources(find.text(mode.detail)), findsOneWidget);
+      }
+      expect(chosen(ChatMode.automatic), isTrue);
       await tester.tap(inSources(control('Query')));
       await tester.pumpAndSettle();
       expect(llm.spaces.first.settings['chatMode'], 'query');
       expect(h.sources.chatMode.value, ChatMode.query);
-      expect(inSources(find.text(ChatMode.query.about)), findsOneWidget);
+      expect(chosen(ChatMode.query), isTrue);
+      expect(chosen(ChatMode.automatic), isFalse);
     });
 
     testWidgets('an empty chat and the composer follow the chat mode', (
@@ -453,7 +460,7 @@ void main() {
     ) async {
       final h = await pumpApp(tester, connection: null);
       expect(find.text('Welcome to AnywhereLLM'), findsOneWidget);
-      expect(inSidebar('AnythingLLM · no key'), findsOneWidget);
+      expect(inSidebar('Not connected'), findsOneWidget);
       await tester.tap(control('Open Settings'));
       await tester.pumpAndSettle();
       expect(h.shell.settingsOpen, isTrue);

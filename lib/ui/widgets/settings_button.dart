@@ -49,7 +49,7 @@ class SidebarSettingsButton extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        set ? 'AnythingLLM · key set' : 'AnythingLLM · no key',
+                        set ? 'Connected to AnythingLLM' : 'Not connected',
                         style: Type.sans(12, color: t.muted),
                       ),
                     ],

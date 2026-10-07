@@ -43,16 +43,32 @@ void main() {
     expect(oklch(0.2, 0.02, 60).a, 1);
   });
 
-  test(
-    'the accent is a dark green in light mode and a light green in dark mode',
-    () {
-      final light = Tokens.light.accent;
-      final dark = Tokens.dark.accent;
-      expect(light.g, greaterThan(light.r));
-      expect(dark.g, greaterThan(dark.r));
-      expect(dark.g, greaterThan(light.g));
-    },
-  );
+  test('the accent is darker in light mode than in dark mode', () {
+    expect(
+      Tokens.dark.accent.computeLuminance(),
+      greaterThan(Tokens.light.accent.computeLuminance()),
+    );
+  });
+
+  test('text on its surfaces reads at 4.5:1 or more in both themes', () {
+    double ratio(Color a, Color b) {
+      final [lo, hi] = [a.computeLuminance(), b.computeLuminance()]..sort();
+      return (hi + 0.05) / (lo + 0.05);
+    }
+
+    for (final t in [Tokens.light, Tokens.dark]) {
+      for (final (text, ground) in [
+        (t.ink, t.bg),
+        (t.muted, t.bg),
+        (t.muted, t.panel2),
+        (t.accent, t.bg),
+        (t.accent, t.accentbg),
+        (t.onaccent, t.accent),
+      ]) {
+        expect(ratio(text, ground), greaterThanOrEqualTo(4.5));
+      }
+    }
+  });
 
   test('light and dark disagree on the page background', () {
     expect(Tokens.light.bg.g, greaterThan(0.9));

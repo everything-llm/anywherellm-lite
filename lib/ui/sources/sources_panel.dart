@@ -71,11 +71,9 @@ class SourcesPanel extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(everyModeDrawsOn, style: Type.sans(13, color: t.muted)),
-                  const SizedBox(height: 12),
-                  const ChatModeChooser(),
                   const SizedBox(height: 14),
-                  // Everything below the heading scrolls together, so an open form or a long
-                  // list of files waiting to be added never pushes past the panel.
+                  // Everything below the heading scrolls together, so the chat mode, an open
+                  // form or a long list of files waiting to be added never pushes past the panel.
                   Expanded(
                     child: CustomScrollView(
                       slivers: [
@@ -83,6 +81,8 @@ class SourcesPanel extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
+                              const ChatModeChooser(),
+                              const SizedBox(height: 14),
                               // Keyed by workspace, so what waits to be added stays with it.
                               UploadQueue(
                                 key: ValueKey(('queue', scope.chat.activeSlug)),
