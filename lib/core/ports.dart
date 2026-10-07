@@ -29,6 +29,11 @@ abstract interface class AnythingLlmApi {
   /// the first call that needs it. A refused password is an [ApiException] with status 403.
   Future<void> signIn(Connection connection);
 
+  /// The developer key named `AnywhereLLM` on the server at [baseUrl], made when it has none,
+  /// signed in with [password] when the server has one. A server with several users refuses it
+  /// with 401, as does a server with a password when [password] is null.
+  Future<String> issueKey(String baseUrl, {String? password});
+
   /// Every workspace with its named threads, without its documents.
   Future<List<Workspace>> workspaces();
 

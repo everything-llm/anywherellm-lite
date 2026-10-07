@@ -343,7 +343,7 @@ void main() {
     });
 
     testWidgets(
-      'the server address is a web address and the key is left out of autofill',
+      'the server address is a web address, and the password and the key are left out of autofill',
       (tester) async {
         final h = await pumpApp(
           tester,
@@ -352,7 +352,7 @@ void main() {
         );
         h.shell.openSettings();
         await tester.pumpAndSettle();
-        final fields = tester
+        List<TextField> fields() => tester
             .widgetList<TextField>(
               find.descendant(
                 of: find.byType(SettingsDialog),
@@ -360,14 +360,20 @@ void main() {
               ),
             )
             .toList();
-        expect(fields[0].keyboardType, TextInputType.url);
-        expect(fields[0].autofillHints, [AutofillHints.url]);
+        final [address, password] = fields();
+        expect(address.keyboardType, TextInputType.url);
+        expect(address.autofillHints, [AutofillHints.url]);
         // Without suggestions, Flutter on Android would mark it a visible password.
-        expect(fields[0].enableSuggestions, isTrue);
-        expect(fields[1].enableSuggestions, isFalse);
-        expect(fields[1].keyboardType, TextInputType.visiblePassword);
-        expect(fields[1].autofillHints, isNull);
-        expect(fields[1].enableIMEPersonalizedLearning, isFalse);
+        expect(address.enableSuggestions, isTrue);
+        await tester.tap(control('Paste a key'));
+        await tester.pumpAndSettle();
+        final [_, key] = fields();
+        for (final secret in [password, key]) {
+          expect(secret.enableSuggestions, isFalse);
+          expect(secret.keyboardType, TextInputType.visiblePassword);
+          expect(secret.autofillHints, isNull);
+          expect(secret.enableIMEPersonalizedLearning, isFalse);
+        }
       },
     );
 
@@ -461,6 +467,8 @@ void main() {
       final h = await pumpApp(tester, llm: llm, connection: null);
       h.shell.openSettings();
       await tester.pumpAndSettle();
+      await tester.tap(control('Paste a key'));
+      await tester.pumpAndSettle();
       await tester.enterText(
         find.bySemanticsLabel('AnythingLLM developer API key').last,
         'K9',
@@ -473,9 +481,77 @@ void main() {
       expect(inSidebar('Q3 planning'), findsOneWidget);
     });
 
+    Future<Harness> signedIn(
+      WidgetTester tester,
+      FakeAnythingLlm llm,
+      String password,
+    ) async {
+      final h = await pumpApp(tester, llm: llm, connection: null);
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.bySemanticsLabel('AnythingLLM server address').last,
+        'https://owen.example.ts.net:3001',
+      );
+      await tester.enterText(
+        find.bySemanticsLabel('Server password').last,
+        password,
+      );
+      await tester.tap(control('Sign in'));
+      await tester.pumpAndSettle();
+      return h;
+    }
+
+    testWidgets('the address and password sign in and the workspaces load', (
+      tester,
+    ) async {
+      final llm = planningServer()..auth = ServerAuth.password;
+      final h = await signedIn(tester, llm, 'PASS-WORD');
+      expect(h.store.saved?.baseUrl, 'https://owen.example.ts.net:3001');
+      expect(h.store.saved?.apiKey, 'MADE-KEY');
+      expect(h.store.saved?.password, 'PASS-WORD');
+      expect(find.text('Signed in to owen.example.ts.net.'), findsOneWidget);
+      expect(control('Sign in'), findsNothing);
+      expect(inSidebar('Q3 planning'), findsOneWidget);
+    });
+
+    testWidgets('a wrong password says so and saves nothing', (tester) async {
+      final llm = planningServer()..auth = ServerAuth.password;
+      final h = await signedIn(tester, llm, 'WRONG');
+      expect(h.store.saved, isNull);
+      expect(
+        find.text('The server did not accept the password.'),
+        findsOneWidget,
+      );
+      expect(control('Sign in'), findsOneWidget);
+    });
+
+    testWidgets('an open server signs in with the address alone', (
+      tester,
+    ) async {
+      final h = await signedIn(tester, planningServer(), '');
+      expect(h.store.saved?.apiKey, 'MADE-KEY');
+      expect(h.store.saved?.password, isNull);
+    });
+
+    testWidgets('a server with several users asks for a key', (tester) async {
+      final llm = planningServer()..auth = ServerAuth.multiUser;
+      final h = await signedIn(tester, llm, 'PASS-WORD');
+      expect(h.store.saved, isNull);
+      expect(find.textContaining('several users'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('AnythingLLM developer API key'),
+        findsWidgets,
+      );
+      expect(control('Save key'), findsOneWidget);
+      expect(control('Use password'), findsNothing);
+    });
+
     Future<Harness> connected(WidgetTester tester, FakeAnythingLlm llm) async {
       final h = await pumpApp(tester, llm: llm, connection: null);
       h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.tap(control('Paste a key'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.bySemanticsLabel('AnythingLLM developer API key').last,
@@ -548,6 +624,8 @@ void main() {
       final h = await pumpApp(tester, llm: llm, connection: null);
       h.shell.openSettings();
       await tester.pumpAndSettle();
+      await tester.tap(control('Paste a key'));
+      await tester.pumpAndSettle();
       await tester.enterText(
         find.bySemanticsLabel('AnythingLLM developer API key').last,
         'WRONG',
@@ -564,6 +642,8 @@ void main() {
       h.shell.openSettings();
       await tester.pumpAndSettle();
       await tester.tap(control('Replace'));
+      await tester.pumpAndSettle();
+      await tester.tap(control('Paste a key'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.bySemanticsLabel('AnythingLLM developer API key').last,
@@ -708,7 +788,7 @@ void main() {
         find.text('This QR code is not an AnywhereLLM connection.'),
         findsOneWidget,
       );
-      expect(control('Save key'), findsOneWidget);
+      expect(control('Sign in'), findsOneWidget);
     });
 
     testWidgets('Cancel closes the scanner', (tester) async {
@@ -725,14 +805,14 @@ void main() {
       await tester.tap(control('Cancel'));
       await tester.pumpAndSettle();
       expect(find.text('Fake scan'), findsNothing);
-      expect(control('Save key'), findsOneWidget);
+      expect(control('Sign in'), findsOneWidget);
     });
 
     testWidgets('without a camera there is no Scan button', (tester) async {
       final h = await pumpApp(tester, llm: planningServer(), connection: null);
       h.shell.openSettings();
       await tester.pumpAndSettle();
-      expect(control('Save key'), findsOneWidget);
+      expect(control('Sign in'), findsOneWidget);
       expect(control('Scan QR code'), findsNothing);
     });
 

@@ -8,8 +8,9 @@ import 'notice.dart';
 
 enum ConnectionCheck { idle, testing, ok, failed }
 
-/// The AnythingLLM address and key: the one in use, testing a candidate, saving and removing;
-/// and the server's password, for the web UI's own routes, when the server has one. Listeners
+/// The AnythingLLM address and key: the one in use, testing a candidate, signing in to get one,
+/// saving and removing; and the server's password, for the web UI's own routes, when the server
+/// has one. Listeners
 /// hear of a new connection as soon as the client uses it, before the keyring has written it.
 class SettingsController extends ChangeNotifier {
   /// Keeps the connection in use in [holder], where the client reads it.
@@ -50,6 +51,10 @@ class SettingsController extends ChangeNotifier {
 
   /// What the last password save or removal said.
   String? passwordMessage;
+
+  /// Whether the last [signIn] found a server that gives no key that way, so Settings asks for
+  /// one.
+  bool needsKey = false;
 
   /// Reads the saved connection, then asks its server how it signs in. A keyring that cannot be
   /// read is a notice, not a failure to start.
@@ -94,9 +99,72 @@ class SettingsController extends ChangeNotifier {
     final parsed = _parse(url, key);
     if (parsed == null) return;
     final kept = connection;
-    final candidate = kept != null && kept.baseUrl == parsed.baseUrl
-        ? parsed.withPassword(kept.password)
-        : parsed;
+    await _use(
+      kept != null && kept.baseUrl == parsed.baseUrl
+          ? parsed.withPassword(kept.password)
+          : parsed,
+      'The key was saved.',
+    );
+  }
+
+  /// Connects to the server at [url] with its [password], ignored when the server has none.
+  /// The server gives the app its developer key, which is saved with the password once it opens
+  /// the server. True when it was. A server with several users gives no key, and [needsKey] then
+  /// says to paste one.
+  Future<bool> signIn(String url, String password) async {
+    final String baseUrl;
+    try {
+      baseUrl = normalizeBaseUrl(url);
+    } on ApiException catch (error) {
+      check = ConnectionCheck.failed;
+      message = error.message;
+      notifyListeners();
+      return false;
+    }
+    check = ConnectionCheck.testing;
+    message = null;
+    needsKey = false;
+    notifyListeners();
+    final Connection candidate;
+    try {
+      final found = await _api.serverAuth(
+        Connection(baseUrl: baseUrl, apiKey: ''),
+      );
+      if (found == ServerAuth.multiUser) {
+        needsKey = true;
+        throw const ApiException(
+          'This server has several users, so it gives no key this way. Use a developer key '
+          'its admin made.',
+        );
+      }
+      final signsIn = found == ServerAuth.password;
+      if (signsIn && password.isEmpty) {
+        throw const ApiException('Enter the server password.');
+      }
+      final key = await _api.issueKey(
+        baseUrl,
+        password: signsIn ? password : null,
+      );
+      candidate = Connection.parse(
+        baseUrl,
+        key,
+        password: signsIn ? password : null,
+      );
+      await _api.verify(candidate);
+    } on ApiException catch (error) {
+      check = ConnectionCheck.failed;
+      message = error.message;
+      notifyListeners();
+      return false;
+    }
+    await _use(candidate, 'Signed in to ${candidate.host}.');
+    return true;
+  }
+
+  /// Uses [candidate] from now on and keeps it in the keyring, saying [saved] once it is there.
+  /// If the keyring refuses, it is still used for this run and the refusal is shown.
+  Future<void> _use(Connection candidate, String saved) async {
+    final kept = connection;
     if (kept?.baseUrl != candidate.baseUrl) auth = null;
     passwordMessage = null;
     _holder.current = candidate;
@@ -106,7 +174,7 @@ class SettingsController extends ChangeNotifier {
       'Could not save the connection',
       () => _store.save(candidate),
     );
-    message = keyringProblem == null ? 'The key was saved.' : null;
+    message = keyringProblem == null ? saved : null;
     notifyListeners();
     unawaited(_readAuth());
   }
@@ -183,6 +251,7 @@ class SettingsController extends ChangeNotifier {
   Future<void> clear() async {
     _holder.current = null;
     auth = null;
+    needsKey = false;
     passwordMessage = null;
     check = ConnectionCheck.idle;
     notifyListeners();

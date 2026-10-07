@@ -121,6 +121,40 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     await _token(secure);
   }
 
+  /// The name of the developer key [issueKey] reuses or makes, as the web UI lists it.
+  static const keyName = 'AnywhereLLM';
+
+  /// Lists the keys with `GET /api/system/api-keys` and makes one with
+  /// `POST /api/system/generate-api-key` only when none is named [keyName], so every device and
+  /// every sign-in shares one key.
+  @override
+  Future<String> issueKey(String baseUrl, {String? password}) async {
+    final server = _secure(
+      Connection(baseUrl: baseUrl, apiKey: '').withPassword(password),
+    );
+    final listed = await _session('GET', '/api/system/api-keys', on: server);
+    for (final key in jsonObjects(_field(listed, 'apiKeys'))) {
+      if (_secret(key) case final secret? when key['name'] == keyName) {
+        return secret;
+      }
+    }
+    final made = await _session(
+      'POST',
+      '/api/system/generate-api-key',
+      body: {'name': keyName},
+      on: server,
+    );
+    final key = _field(made, 'apiKey');
+    return (key is Map ? _secret(key) : null) ??
+        (throw ApiException(_said(made) ?? 'The server did not make a key.'));
+  }
+
+  /// The secret of a developer key the server listed, or null when it has none.
+  static String? _secret(Map<dynamic, dynamic> key) => switch (key['secret']) {
+    final String secret when secret.isNotEmpty => secret,
+    _ => null,
+  };
+
   @override
   Future<List<Workspace>> workspaces() async => [
     for (final json in jsonObjects(
@@ -848,16 +882,18 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   };
 
   /// The decoded JSON of a [method] to [path], one of the web UI's own routes, with [body] as
-  /// JSON, signed in with the connection's password in place of the key, or without credentials
-  /// when no password is saved. A refused token is forgotten and the call made once more with
-  /// a new one. A server that requires credentials says so with 401 or 403.
+  /// JSON, on the connection in use or [on], signed in with the connection's password in place
+  /// of the key, or without credentials when no password is saved. A refused token is forgotten
+  /// and the call made once more with a new one. A server that requires credentials says so
+  /// with 401 or 403.
   Future<Object?> _session(
     String method,
     String path, {
     Map<String, Object?>? body,
     bool emptyOk = false,
+    Connection? on,
   }) async {
-    final connection = _current;
+    final connection = on ?? _current;
     final signsIn = connection.password != null;
     for (var again = false; ; again = true) {
       final token = signsIn ? await _token(connection) : null;
