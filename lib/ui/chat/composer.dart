@@ -478,41 +478,46 @@ class _Form extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               if (scope.settings.connection case final server?)
-                Flexible(
-                  child: Tappable(
-                    label:
-                        'AnythingLLM settings, server ${serverName(server.host)}',
-                    tooltip: 'AnythingLLM settings: ${server.baseUrl}',
-                    onTap: scope.shell.openSettings,
-                    radius: BorderRadius.circular(6),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 4,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AppIcon(
-                            'settings',
-                            size: IconSize.xs,
-                            color: t.muted,
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              serverName(server.host),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Type.sans(13, color: t.muted),
+                // Takes all the room left, so Send sits at the right edge.
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Tappable(
+                      label:
+                          'AnythingLLM settings, server ${serverName(server.host)}',
+                      tooltip: 'AnythingLLM settings: ${server.baseUrl}',
+                      onTap: scope.shell.openSettings,
+                      radius: BorderRadius.circular(6),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 4,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            AppIcon(
+                              'settings',
+                              size: IconSize.xs,
+                              color: t.muted,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                serverName(server.host),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Type.sans(13, color: t.muted),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              const Spacer(),
+                )
+              else
+                const Spacer(),
               if (onDictate != null)
                 Padding(
                   padding: const EdgeInsets.only(right: 4),
