@@ -1,9 +1,9 @@
 import 'package:markdown/markdown.dart' as md;
 
-/// GitHub-flavoured Markdown as an answer is read. A bare address stops at a `]`, as on
-/// GitHub, which links bare addresses only after links and images are read: so a card whose
-/// description holds an address, `[![Browser: https://...](card.jpg)](page)`, stays an image
-/// inside a link.
+/// GitHub-flavoured Markdown as an answer is read. A bare address stops at a `]` it did not
+/// open, as on GitHub, which links bare addresses only after links and images are read: so a
+/// card whose description holds an address, `[![Browser: https://...](card.jpg)](page)`, stays
+/// an image inside a link, and `https://x.example/?ids[]=1` stays one address.
 final answerMarkdown = md.ExtensionSet(
   md.ExtensionSet.gitHubFlavored.blockSyntaxes,
   [
@@ -12,13 +12,14 @@ final answerMarkdown = md.ExtensionSet(
   ],
 );
 
-/// `package:markdown`'s bare address, which ends before a `]`.
+/// `package:markdown`'s bare address, which ends before a `]` that closes no `[` of its own.
 class _BoundedAutolink extends md.AutolinkExtensionSyntax {
   static final _pattern = RegExp(
-    // The scheme or `www.`, a domain, then a path of anything but a space, `<` or `]` that
-    // does not end in trailing punctuation.
+    // The scheme or `www.`, a domain, then a path of bracketed groups and of anything but a
+    // space, `<` or `]`, that does not end in trailing punctuation. A group is tried first, so
+    // `[]` in `?ids[]=1` is read as a pair rather than as an `[` alone.
     r'((?:(?:https?|ftp):\/\/|www\.)(?:[-_a-z0-9]+\.)*(?:[-a-z0-9]+\.[-a-z0-9]+)'
-    r'[^\s<\]]*[^\s<?!.,:*_~\]])'
+    r'(?:\[[^\s<\]]*\]|[^\s<\]])*(?:\[[^\s<\]]*\]|[^\s<?!.,:*_~\]]))'
     // Or an email address.
     r'|([-_.+a-z0-9]+@(?:[-_a-z0-9]+\.)+[-_a-z0-9]*[a-z0-9])',
     multiLine: true,
@@ -47,7 +48,12 @@ String plainText(String markdown) {
     }
   }
 
-  walk(md.Document(extensionSet: answerMarkdown).parse(markdown));
+  walk(
+    md.Document(
+      extensionSet: answerMarkdown,
+      encodeHtml: false,
+    ).parse(markdown),
+  );
   return lines.join('\n');
 }
 

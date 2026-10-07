@@ -142,8 +142,11 @@ Set<Uri> linkedImages(String text) {
     }
   }
 
+  // Parsed as [AnswerBody] parses it, math included, so an image is linked here exactly when
+  // it is linked on screen.
   final document = md.Document(
     extensionSet: answerMarkdown,
+    inlineSyntaxes: mathSyntaxes,
     encodeHtml: false,
   );
   for (final node in document.parse(text)) {

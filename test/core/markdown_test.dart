@@ -56,4 +56,21 @@ void main() {
       ['https://x.example/a_(b)', 'http://www.y.example'],
     );
   });
+
+  test('an answer is read with its characters, not their HTML escapes', () {
+    expect(plainText('Tom & Jerry <3 "cheese"'), 'Tom & Jerry <3 "cheese"');
+  });
+
+  test('a bare address keeps the brackets it opens and closes', () {
+    final p = md.Document(extensionSet: answerMarkdown, encodeHtml: false)
+        .parse(
+          'See https://x.example/?ids[]=1&f[name]=a [see https://y.example/b].',
+        )
+        .single;
+    final links = (p as md.Element).children!.whereType<md.Element>();
+    expect(
+      [for (final a in links) a.textContent],
+      ['https://x.example/?ids[]=1&f[name]=a', 'https://y.example/b'],
+    );
+  });
 }
