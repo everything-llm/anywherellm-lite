@@ -13,6 +13,7 @@ import '../core/ports.dart';
 import '../core/server_models.dart';
 import '../core/upload.dart';
 import 'anythingllm_stream.dart';
+import 'image_frames.dart';
 
 /// [AnythingLlmApi] over the server's HTTP API, with the bearer key on every request.
 ///
@@ -583,6 +584,63 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   Future<List<int>> generatedFile(String storageName) => _file(
     '/api/v1/document/generated-files/${Uri.encodeComponent(storageName)}',
   );
+
+  /// A bare `GET` of [url], on any port of the server's host as [loadableImage] allows, read
+  /// by [imageFrames]. The response is let go of at once when the subscription was cancelled
+  /// while it waited for the headers, as an `async*` body would only notice at its next `yield`.
+  @override
+  Stream<List<int>> answerImage(Uri url) {
+    late final StreamController<List<int>> out;
+    StreamSubscription<List<int>>? reading;
+    var cancelled = false;
+    Future<void> start() async {
+      try {
+        final connection = _current;
+        if (!allowHttp && url.scheme == 'http') {
+          throw const ApiException(
+            'This device does not load images over plain http.',
+          );
+        }
+        final response = await _fetch(
+          connection,
+          timeout,
+          () => _client.send(http.Request('GET', url)),
+        );
+        if (cancelled ||
+            response.statusCode < 200 ||
+            response.statusCode >= 300) {
+          unawaited(response.stream.listen(null).cancel());
+          if (cancelled) return;
+          throw ApiException(
+            'The image could not be read: the server answered ${response.statusCode}.',
+          );
+        }
+        reading = imageFrames(response.stream, response.headers['content-type'])
+            .listen(
+              out.add,
+              onError: (Object error) => out.addError(
+                error is http.ClientException
+                    ? ApiException('The image was cut off: ${error.message}')
+                    : error,
+              ),
+              onDone: out.close,
+            );
+      } on ApiException catch (error) {
+        if (cancelled) return;
+        out.addError(error);
+        await out.close();
+      }
+    }
+
+    out = StreamController(
+      onListen: () => unawaited(start()),
+      onCancel: () {
+        cancelled = true;
+        return reading?.cancel();
+      },
+    );
+    return out.stream;
+  }
 
   /// The bytes of the file the server answers [path] with, which is not always JSON; a failure
   /// is decoded as any other.

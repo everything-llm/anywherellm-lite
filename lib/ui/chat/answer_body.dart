@@ -99,8 +99,11 @@ class AnswerBody extends StatelessWidget {
 }
 
 /// An image in an answer: loaded when it is on the [server]'s host over https, or over http
-/// when the [server] itself is http and [allowHttp] holds; otherwise its description.
-class _Image extends StatelessWidget {
+/// when the [server] itself is http and [allowHttp] holds; otherwise its description. A live
+/// image, such as a run's progress card, shows each new frame as it comes, and is followed only
+/// while it can be seen: not while the chat is offstage behind Files or the app is hidden, since
+/// a watched card keeps the host's browser from being stopped.
+class _Image extends StatefulWidget {
   const _Image(
     this.uri, {
     required this.alt,
@@ -113,22 +116,121 @@ class _Image extends StatelessWidget {
   final Uri? server;
   final bool allowHttp;
 
+  bool get loadable => loadableImage(uri, server, allowHttp: allowHttp);
+
+  @override
+  State<_Image> createState() => _ImageState();
+}
+
+class _ImageState extends State<_Image> {
+  Uint8List? _frame;
+  bool _failed = false;
+
+  /// Whether the read ended, so there is nothing more to follow.
+  bool _ended = false;
+
+  bool _appShown = true;
+  bool _onstage = true;
+  StreamSubscription<Uint8List>? _reading;
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.loadable) {
+      _frame = AppScope.of(context).chat.lastFrame(widget.uri);
+    }
+    _lifecycle = AppLifecycleListener(
+      onHide: () => _setAppShown(false),
+      onShow: () => _setAppShown(true),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _onstage = TickerMode.valuesOf(context).enabled;
+    _follow();
+  }
+
+  @override
+  void didUpdateWidget(_Image old) {
+    super.didUpdateWidget(old);
+    if (old.uri == widget.uri && old.loadable == widget.loadable) return;
+    _stop();
+    _frame = widget.loadable
+        ? AppScope.of(context).chat.lastFrame(widget.uri)
+        : null;
+    _failed = false;
+    _ended = false;
+    _follow();
+  }
+
+  @override
+  void dispose() {
+    _stop();
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  void _setAppShown(bool shown) {
+    if (!mounted) return;
+    _appShown = shown;
+    _follow();
+  }
+
+  /// Reads the image while it can be seen and has more to give, and lets go of it otherwise.
+  void _follow() {
+    final watch = widget.loadable && _appShown && _onstage && !_ended;
+    if (!watch) {
+      _stop();
+      return;
+    }
+    _reading ??= AppScope.of(context).chat
+        .imageFrames(widget.uri)
+        .listen(
+          (frame) => setState(() {
+            _frame = frame;
+            _failed = false;
+          }),
+          onError: (Object _) => setState(() {
+            _failed = true;
+            _ended = true;
+            _reading = null;
+          }),
+          onDone: () {
+            _ended = true;
+            _reading = null;
+          },
+          cancelOnError: true,
+        );
+  }
+
+  void _stop() {
+    unawaited(_reading?.cancel());
+    _reading = null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    final alt = widget.alt?.trim();
     final described = Text(
-      '[${alt?.trim().isNotEmpty == true ? alt!.trim() : 'image'}: ${uri.host}]',
+      '[${alt != null && alt.isNotEmpty ? alt : 'image'}: ${widget.uri.host}]',
       style: Type.sans(14, color: t.muted),
     );
-    if (!loadableImage(uri, server, allowHttp: allowHttp)) return described;
+    final frame = _frame;
+    if (!widget.loadable || (frame == null && _failed)) return described;
+    if (frame == null) return const SizedBox.shrink();
     return ConstrainedBox(
       constraints: const BoxConstraints(maxHeight: 360),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(10),
-        child: Image.network(
-          uri.toString(),
+        child: Image.memory(
+          frame,
           fit: BoxFit.contain,
-          semanticLabel: alt,
+          gaplessPlayback: true,
+          semanticLabel: widget.alt,
           errorBuilder: (_, _, _) => described,
         ),
       ),

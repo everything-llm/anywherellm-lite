@@ -108,6 +108,13 @@ class FakeAnythingLlm implements AnythingLlmApi {
 
   /// What [generatedFile] answers, by storage name. Any other name is not found.
   final Map<String, List<int>> generated = {};
+
+  /// What [answerImage] answers for a plain image, by address: its frames, then done.
+  final Map<Uri, List<List<int>>> images = {};
+
+  /// What [answerImage] answers for a live image, by address: a broadcast stream the test adds
+  /// frames to, whose `hasListener` says whether the app is following it.
+  final Map<Uri, StreamController<List<int>>> liveImages = {};
   bool hold = false;
   StreamController<ChatEvent>? chat;
 
@@ -550,6 +557,21 @@ class FakeAnythingLlm implements AnythingLlmApi {
 
   @override
   Future<int> vectorCount() => _run('vectorCount', () => vectors);
+
+  @override
+  Stream<List<int>> answerImage(Uri url) {
+    calls.add('answerImage:$url');
+    if (errors['answerImage'] case final Object error) {
+      return Stream.error(error);
+    }
+    if (liveImages[url] case final live?) return live.stream;
+    if (images[url] case final frames?) return Stream.fromIterable(frames);
+    return Stream.error(
+      const ApiException(
+        'The image could not be read: the server answered 404.',
+      ),
+    );
+  }
 
   @override
   Future<List<int>> generatedFile(String storageName) =>

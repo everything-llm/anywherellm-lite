@@ -1,11 +1,10 @@
-import 'dart:convert';
-
 import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
+import '../support/pixels.dart';
 import '../support/pump.dart';
 
 Finder control(String label) => find.byWidgetPredicate(
@@ -23,11 +22,6 @@ const _cat = GeneratedFile(
   type: 'imageGenerationCard',
   name: 'cat.png',
   storageName: 'img-1.png',
-);
-
-/// A one-pixel PNG.
-final _pixel = base64Decode(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==',
 );
 
 Future<void> ask(WidgetTester tester, String text) async {
@@ -83,7 +77,7 @@ void main() {
   ) async {
     final llm = planningServer()
       ..made = const [_cat]
-      ..generated['img-1.png'] = _pixel;
+      ..generated['img-1.png'] = pixel;
     final h = await pumpApp(tester, llm: llm);
     await ask(tester, 'Draw a cat');
     expect(
@@ -92,7 +86,7 @@ void main() {
     );
     await tester.tap(find.byTooltip('Download cat.png'));
     await tester.pumpAndSettle();
-    expect(h.saved['cat.png'], _pixel);
+    expect(h.saved['cat.png'], pixel);
     expect(
       llm.calls.where((c) => c == 'generatedFile:img-1.png'),
       hasLength(1),

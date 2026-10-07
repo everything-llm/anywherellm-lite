@@ -178,6 +178,10 @@ class ChatController extends ChangeNotifier {
   /// The bytes of each file an agent made, by storage name, read once per server.
   final Map<String, Future<List<int>?>> _madeFiles = {};
 
+  /// The last frame of each image in an answer, by address, and whether that read gave one
+  /// frame and ended, so the image will not change.
+  final Map<Uri, ({Uint8List frame, bool whole})> _images = {};
+
   static const linkNoticeFor = Duration(seconds: 6);
 
   Workspace? get active =>
@@ -242,6 +246,7 @@ class ChatController extends ChangeNotifier {
     _turns.clear();
     _draft.clear();
     _madeFiles.clear();
+    _images.clear();
     docCounts.clear();
     loading = false;
     _clearing = false;
@@ -782,6 +787,42 @@ class ChatController extends ChangeNotifier {
       }
       return null;
     }
+  }
+
+  /// The last frame of the image at [url] in an answer, read from this server, or null.
+  Uint8List? lastFrame(Uri url) => _images[url]?.frame;
+
+  /// The frames of the image at [url] in an answer, each kept as its [lastFrame]. An image
+  /// whose last read gave one frame and ended is given again without asking: a card's address
+  /// changes with what it shows, and a finished run's card no longer changes. A live one is
+  /// read again, so it shows its newest frame. Fails with [ApiException].
+  Stream<Uint8List> imageFrames(Uri url) {
+    final known = _images[url];
+    if (known != null && known.whole) return Stream.value(known.frame);
+    final server = _server;
+    var frames = 0;
+    return _api
+        .answerImage(url)
+        .transform(
+          StreamTransformer<List<int>, Uint8List>.fromHandlers(
+            handleData: (bytes, sink) {
+              if (_server != server) return;
+              final frame = bytes is Uint8List
+                  ? bytes
+                  : Uint8List.fromList(bytes);
+              frames++;
+              _images[url] = (frame: frame, whole: false);
+              sink.add(frame);
+            },
+            handleDone: (sink) {
+              final last = _images[url];
+              if (_server == server && frames == 1 && last != null) {
+                _images[url] = (frame: last.frame, whole: true);
+              }
+              sink.close();
+            },
+          ),
+        );
   }
 
   /// Shows [text] as [problem], titled [title].

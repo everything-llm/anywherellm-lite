@@ -2153,6 +2153,133 @@ void main() {
       expect(seen.where((r) => r.url.path.endsWith('/cancel')), isEmpty);
     });
   });
+
+  group('answerImage', () {
+    final card = Uri.parse(
+      'https://host.example.ts.net:8445/_live/run/r-1.png',
+    );
+
+    /// A client that answers [body] with [type], recording each request in [seen].
+    HttpAnythingLlmApi images(
+      Stream<List<int>> body, {
+      String type = 'multipart/x-mixed-replace; boundary=frame',
+      int status = 200,
+      List<http.BaseRequest>? seen,
+      bool allowHttp = true,
+    }) => HttpAnythingLlmApi(
+      holder: ConnectionHolder(_connection.withPassword('PASS-WORD')),
+      allowHttp: allowHttp,
+      client: MockClient.streaming((request, _) async {
+        seen?.add(request);
+        return http.StreamedResponse(
+          body,
+          status,
+          headers: {'content-type': type},
+        );
+      }),
+    );
+
+    List<int> part(String frame) => ascii.encode(
+      '--frame\r\nContent-Type: image/png\r\n'
+      'Content-Length: ${frame.length}\r\n\r\n$frame\r\n',
+    );
+
+    test('reads each frame, with no key, password or token', () async {
+      final seen = <http.BaseRequest>[];
+      final api = images(
+        Stream.fromIterable([
+          part('one'),
+          part('two'),
+          ascii.encode('--frame--'),
+        ]),
+        seen: seen,
+      );
+      final frames = await api.answerImage(card).toList();
+      expect(frames.map(ascii.decode), ['one', 'two']);
+      expect(seen.single.url, card);
+      expect(seen.single.method, 'GET');
+      expect(
+        seen.single.headers.keys.map((k) => k.toLowerCase()),
+        isNot(contains('authorization')),
+      );
+      expect(seen.single.headers.values.join(), isNot(contains('SECRET-KEY')));
+    });
+
+    test('a plain image is one frame', () async {
+      final api = images(Stream.value(ascii.encode('png')), type: 'image/png');
+      expect((await api.answerImage(card).toList()).map(ascii.decode), ['png']);
+    });
+
+    test('refuses plain http when this device does not allow it', () async {
+      final seen = <http.BaseRequest>[];
+      final api = images(const Stream.empty(), seen: seen, allowHttp: false);
+      final error = await _failure(
+        api
+            .answerImage(Uri.parse('http://host.example.ts.net:8445/a.png'))
+            .drain(),
+      );
+      expect(error.message, contains('plain http'));
+      expect(seen, isEmpty);
+    });
+
+    test('a missing image fails in plain words', () async {
+      final api = images(
+        Stream.value(ascii.encode('No such run.')),
+        status: 404,
+      );
+      final error = await _failure(api.answerImage(card).drain());
+      expect(
+        error.message,
+        'The image could not be read: the server answered 404.',
+      );
+    });
+
+    test('cancelling lets go of the response', () async {
+      var cancelled = false;
+      final body = StreamController<List<int>>(
+        onCancel: () => cancelled = true,
+      );
+      final api = images(body.stream);
+      final first = Completer<void>();
+      final reading = api.answerImage(card).listen((_) => first.complete());
+      body.add(part('one'));
+      await first.future;
+      await reading.cancel();
+      expect(cancelled, isTrue);
+    });
+
+    test(
+      'cancelling before the headers come lets go of them when they do',
+      () async {
+        var cancelled = false;
+        final body = StreamController<List<int>>(
+          onCancel: () => cancelled = true,
+        );
+        final headers = Completer<void>();
+        final api = HttpAnythingLlmApi(
+          holder: ConnectionHolder(_connection),
+          client: MockClient.streaming((request, _) async {
+            await headers.future;
+            return http.StreamedResponse(
+              body.stream,
+              200,
+              headers: {
+                'content-type': 'multipart/x-mixed-replace; boundary=frame',
+              },
+            );
+          }),
+        );
+        final reading = api
+            .answerImage(card)
+            .listen((_) => fail('no frame expected'));
+        await pumpEventQueue();
+        await reading.cancel();
+        headers.complete();
+        await pumpEventQueue();
+        expect(cancelled, isTrue);
+      },
+    );
+  });
 }
 
 /// AnythingLLM's web-UI login: `request-token` takes `PASS-WORD` and hands out `TOKEN-1`,
