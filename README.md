@@ -46,6 +46,52 @@ In Chrome the server must allow requests from the page's origin; AnythingLLM doe
 
 Settings opens on the first run. Enter the server address (for example `https://host.example.ts.net:3001`) and the key, then press Save key.
 
+## Install on Linux
+
+A release build installs into your home folder, so it needs no `sudo`. It keeps the saved server and preferences that `flutter run -d linux` uses, since both have the application ID `local.anywherellm.anywherellm`.
+
+The build takes the working tree as it is, uncommitted changes included. To build the last commit alone, build it in a separate worktree:
+
+```bash
+git worktree add ../anywherellm-release HEAD   # or a tag
+cd ../anywherellm-release
+flutter pub get
+```
+
+Then, from the folder you build in, build the app and copy it into place:
+
+```bash
+flutter build linux --release
+rm -rf ~/.local/opt/anywherellm
+mkdir -p ~/.local/opt ~/.local/bin ~/.local/share/applications
+cp -r build/linux/x64/release/bundle ~/.local/opt/anywherellm
+cp assets/icon/icon.png ~/.local/opt/anywherellm/icon.png
+ln -sf ~/.local/opt/anywherellm/anywherellm ~/.local/bin/anywherellm
+cat > ~/.local/share/applications/local.anywherellm.anywherellm.desktop <<EOF
+[Desktop Entry]
+Type=Application
+Name=AnywhereLLM
+Comment=Chat with an AnythingLLM server
+Exec=$HOME/.local/opt/anywherellm/anywherellm
+Icon=$HOME/.local/opt/anywherellm/icon.png
+Terminal=false
+Categories=Network;Chat;
+StartupWMClass=local.anywherellm.anywherellm
+EOF
+```
+
+AnywhereLLM then shows in the app launcher, and `anywherellm` starts it from a terminal. The desktop file is named after the application ID so the open window groups under its launcher icon. Run the same commands again to update it.
+
+Remove the worktree once the app is installed, if you made one: `git worktree remove ../anywherellm-release`.
+
+To uninstall:
+
+```bash
+rm -rf ~/.local/opt/anywherellm ~/.local/bin/anywherellm ~/.local/share/applications/local.anywherellm.anywherellm.desktop
+```
+
+Uninstalling leaves the saved server in the keyring and the preferences in `~/.config/anywherellm`.
+
 ## Check
 
 ```bash
