@@ -71,6 +71,13 @@ void main() {
     );
   });
 
+  test('a list item with markup in it is read as one line', () {
+    expect(
+      plainText('- pay **rent** first\n- then food\n  - nested *item*'),
+      'pay rent first\nthen food\nnested item',
+    );
+  });
+
   test('a long answer is read in pieces cut between sentences', () {
     final sentence = 'This is one sentence. ';
     final parts = speechParts(sentence * 300, most: 1000);

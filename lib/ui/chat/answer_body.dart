@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -13,6 +14,9 @@ import '../tokens.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';
 import '../widgets/tappable.dart';
+import 'highlight.dart';
+import 'math.dart';
+import 'speaker.dart';
 import '../icons.dart';
 
 /// An answer's text, drawn as Markdown and selectable. A code block and a table scroll sideways
@@ -27,6 +31,12 @@ class AnswerBody extends StatelessWidget {
 
   final String text;
 
+  /// Whether the answer carries its words as a semantics label. A browser's semantics tree
+  /// leaves out selectable text, so a screen reader there would find no answer at all; on
+  /// other platforms the text is already there.
+  @visibleForTesting
+  static bool labelled = kIsWeb;
+
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
@@ -39,10 +49,11 @@ class AnswerBody extends StatelessWidget {
     final server = settings.connection?.uri;
     final allowHttp = settings.allowHttp;
     final linked = linkedImages(text);
-    return MarkdownBody(
+    final markdown = MarkdownBody(
       data: text,
       selectable: true,
       extensionSet: md.ExtensionSet.gitHubFlavored,
+      inlineSyntaxes: [MathSyntax()],
       onTapLink: (_, href, _) {
         if (href != null) openLink(context, href);
       },
@@ -53,7 +64,10 @@ class AnswerBody extends StatelessWidget {
         allowHttp: allowHttp,
         linked: linked.contains(uri),
       ),
-      builders: {'pre': _CodeBlockBuilder()},
+      builders: {
+        'pre': _CodeBlockBuilder(),
+        'math': MathBuilder(style: body, fallback: code),
+      },
       styleSheet: MarkdownStyleSheet(
         p: body,
         a: body.copyWith(
@@ -103,6 +117,14 @@ class AnswerBody extends StatelessWidget {
         tableHeadCellsDecoration: BoxDecoration(color: t.panel2),
         horizontalRuleDecoration: BoxDecoration(border: Border(top: border)),
       ),
+    );
+    if (!labelled) return markdown;
+    // Explicit child nodes keep a link or a Copy code button from merging into the label.
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: plainText(text),
+      child: markdown,
     );
   }
 }
@@ -335,19 +357,29 @@ class _CodeBlockBuilder extends MarkdownElementBuilder {
   ) {
     var code = element.textContent;
     if (code.endsWith('\n')) code = code.substring(0, code.length - 1);
-    return _CodeBlock(code);
+    final fence = element.children?.whereType<md.Element>().firstOrNull;
+    final language = switch (fence?.attributes['class']) {
+      final String c when c.startsWith('language-') => c.substring(9),
+      _ => null,
+    };
+    return _CodeBlock(code, language: language);
   }
 }
 
-/// A code block: monospaced, scrolling sideways, with a Copy button in its corner.
+/// A code block: monospaced, scrolling sideways, with a Copy button in its corner. Code in a
+/// [language] [highlighted] knows is coloured; Copy takes the plain code either way.
 class _CodeBlock extends StatelessWidget {
-  const _CodeBlock(this.code);
+  const _CodeBlock(this.code, {this.language});
 
   final String code;
+
+  /// The language the Markdown fence names, or null.
+  final String? language;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    final style = Type.mono(13.5, color: t.ink, height: 1.5);
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -360,9 +392,14 @@ class _CodeBlock extends StatelessWidget {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.fromLTRB(14, 12, 44, 12),
-            child: Text(
-              code,
-              style: Type.mono(13.5, color: t.ink, height: 1.5),
+            child: Text.rich(
+              highlighted(
+                    code,
+                    language,
+                    base: style,
+                    dark: Theme.of(context).brightness == Brightness.dark,
+                  ) ??
+                  TextSpan(text: code, style: style),
             ),
           ),
           Positioned(

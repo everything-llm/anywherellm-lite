@@ -1,6 +1,9 @@
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/server_models.dart';
+import 'package:anywherellm/ui/chat/answer_body.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
@@ -78,6 +81,100 @@ void main() {
     await tester.pump();
     expect(copied, ["print('hi');"]);
     await tester.pump(const Duration(seconds: 2));
+  });
+
+  group('math', () {
+    testWidgets('TeX in dollars and brackets is drawn as math', (tester) async {
+      await pumpApp(
+        tester,
+        llm: answering(r'''
+Inline $x^2$ and \(y\).
+
+$$\frac{a}{b}$$
+
+\[ z = 1 \]'''),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(Math), findsNWidgets(4));
+    });
+
+    testWidgets('prices stay text', (tester) async {
+      await pumpApp(tester, llm: answering(r'It costs $5 and $10 a month.'));
+      await tester.pumpAndSettle();
+      expect(find.byType(Math), findsNothing);
+      expect(
+        find.textContaining(
+          r'It costs $5 and $10 a month.',
+          findRichText: true,
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a dollar sign in code is not math', (tester) async {
+      await pumpApp(tester, llm: answering(r'Run `echo $HOME$` now.'));
+      await tester.pumpAndSettle();
+      expect(find.byType(Math), findsNothing);
+    });
+
+    testWidgets('TeX that does not parse shows its source', (tester) async {
+      await pumpApp(tester, llm: answering(r'Broken: $\frac{a$ here.'));
+      await tester.pumpAndSettle();
+      expect(find.text(r'$\frac{a$'), findsOneWidget);
+    });
+  });
+
+  group('code', () {
+    Set<Color?> colours(WidgetTester tester) {
+      final rich = tester
+          .widgetList<RichText>(find.byType(RichText))
+          .firstWhere((r) => r.text.toPlainText().contains('def add'));
+      final found = <Color?>{};
+      rich.text.visitChildren((span) {
+        if (span is TextSpan && (span.text?.trim().isNotEmpty ?? false)) {
+          found.add(span.style?.color);
+        }
+        return true;
+      });
+      return found;
+    }
+
+    testWidgets('a block in a named language is coloured, and Copy takes it '
+        'plain', (tester) async {
+      final copied = _clipboard(tester);
+      const code = 'def add(a, b):\n    return a + b  # sum';
+      await pumpApp(tester, llm: answering('```python\n$code\n```'));
+      await tester.pumpAndSettle();
+      expect(colours(tester).length, greaterThan(1));
+      await tester.tap(find.bySemanticsLabel('Copy code'));
+      await tester.pump();
+      expect(copied, [code]);
+      await tester.pump(const Duration(seconds: 2));
+    });
+
+    testWidgets('a block with no language stays plain', (tester) async {
+      await pumpApp(tester, llm: answering('```\ndef add(a, b): pass\n```'));
+      await tester.pumpAndSettle();
+      expect(colours(tester), hasLength(1));
+    });
+  });
+
+  testWidgets('in a browser an answer carries its words for a screen reader', (
+    tester,
+  ) async {
+    AnswerBody.labelled = true;
+    addTearDown(() => AnswerBody.labelled = false);
+    final semantics = tester.ensureSemantics();
+    await pumpApp(tester, llm: _server());
+    expect(
+      find.bySemanticsLabel(RegExp(r'^The plan\nFirst step\nSecond step')),
+      findsOneWidget,
+    );
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Copy code')),
+      isSemantics(label: 'Copy code', isButton: true),
+    );
+    semantics.dispose();
   });
 
   testWidgets('a streaming answer has no Copy until it ends', (tester) async {
