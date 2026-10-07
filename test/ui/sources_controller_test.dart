@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:anywherellm/core/chat.dart';
+import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/upload.dart';
@@ -25,7 +26,56 @@ Future<Rig> started(FakeAnythingLlm llm) async {
 UploadFile file(String name) =>
     UploadFile(name: name, read: () async => [1, 2, 3]);
 
+class _SlowSettingsStore extends FakeSettingsStore {
+  final gate = Completer<void>();
+
+  @override
+  Future<void> save(Connection connection) async {
+    await gate.future;
+    await super.save(connection);
+  }
+}
+
 void main() {
+  test(
+    'an upload stops before the new keyring entry finishes saving',
+    () async {
+      final llm = planningServer();
+      final store = _SlowSettingsStore();
+      final rig = Rig(llm: llm, store: store, connection: sampleConnection);
+      addTearDown(rig.dispose);
+      await rig.start();
+      final bytes = Completer<List<int>>();
+      final uploading = rig.sources.upload([
+        UploadFile(name: 'private.md', read: () => bytes.future),
+      ]);
+      await pumpEventQueue();
+      final saving = rig.settings.save('https://other:3001', 'K2');
+      bytes.complete([1]);
+      await uploading;
+      expect(llm.calls, isNot(contains('upload:private.md')));
+      store.gate.complete();
+      await saving;
+      await pumpEventQueue();
+    },
+  );
+
+  test('a new server is in use before the keyring has it', () async {
+    final store = _SlowSettingsStore();
+    final rig = Rig(
+      llm: planningServer(),
+      store: store,
+      connection: sampleConnection,
+    );
+    addTearDown(rig.dispose);
+    await rig.start();
+    final saving = rig.settings.save('https://other:3001', 'K2');
+    expect(rig.chat.server?.baseUrl, 'https://other:3001');
+    expect(rig.chat.workspaces, isEmpty);
+    store.gate.complete();
+    await saving;
+  });
+
   test('lists the workspace\'s files, on', () async {
     final rig = await started(planningServer());
     expect(rig.sources.files.map((f) => (f.title, f.on)), [
@@ -124,6 +174,58 @@ void main() {
     expect(rig.sources.files, isEmpty);
   });
 
+  test('a late removal offers no undo in another workspace', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    final gate = llm.gates['updateEmbeddings'] = Completer<void>();
+    final removing = rig.sources.remove(rig.sources.files.first);
+    await rig.chat.select('household');
+    gate.complete();
+    await removing;
+    expect(rig.sources.removed, isNull);
+    await rig.sources.undo();
+    expect(llm.spaces.last.docs, isEmpty);
+    expect(llm.spaces.first.docs, hasLength(1));
+  });
+
+  test(
+    'a server switch stops an upload before the next file or embedding',
+    () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      final gate = llm.gates['upload'] = Completer<void>();
+      final uploading = rig.sources.upload([file('a.md'), file('b.md')]);
+      await pumpEventQueue();
+      await rig.settings.save('https://other:3001', 'K2');
+      await pumpEventQueue();
+      gate.complete();
+      await uploading;
+      expect(llm.calls, contains('upload:a.md'));
+      expect(llm.calls, isNot(contains('upload:b.md')));
+      expect(
+        llm.calls.where((call) => call.startsWith('updateEmbeddings')),
+        isEmpty,
+      );
+      expect(rig.sources.sending, isNull);
+    },
+  );
+
+  test(
+    'renaming an unordered workspace keeps its switched-off sources',
+    () async {
+      final llm = planningServer()..renamedSlug = 'q4';
+      final rig = await started(llm);
+      await rig.sources.toggle(rig.sources.files.first);
+      await rig.chat.renameWorkspace('q3', 'Q4');
+      await pumpEventQueue();
+      expect(rig.prefs.prefs.offIn('q3'), isEmpty);
+      expect(rig.prefs.prefs.offIn('q4'), hasLength(1));
+      expect(rig.sources.files.where((file) => !file.on), hasLength(1));
+      await rig.sources.toggle(rig.sources.files.last);
+      expect(llm.spaces.first.docs, hasLength(2));
+    },
+  );
+
   test('a refresh cut short by forgetting the server stops loading', () async {
     final llm = planningServer();
     final rig = await started(llm);
@@ -168,7 +270,8 @@ void main() {
     test('a link is read in and embedded', () async {
       final llm = planningServer();
       final rig = await started(llm);
-      await rig.sources.addLink(' https://example.com/page ');
+      expect(rig.sources.addLink(' https://example.com/page '), isTrue);
+      await pumpEventQueue();
       expect(
         llm.calls,
         containsAllInOrder([
@@ -199,7 +302,8 @@ void main() {
       final llm = planningServer();
       final rig = await started(llm);
       const meta = DocMeta(author: 'Ada', source: 'Finance');
-      await rig.sources.addLink('https://example.com/page', meta: meta);
+      rig.sources.addLink('https://example.com/page', meta: meta);
+      await pumpEventQueue();
       await rig.sources.addText('Notes', 'Some text', meta: meta);
       await rig.sources.upload([
         UploadFile(
@@ -220,7 +324,7 @@ void main() {
     test('an address that is not a link never reaches the server', () async {
       final llm = planningServer();
       final rig = await started(llm);
-      await rig.sources.addLink('example.com');
+      expect(rig.sources.addLink('example.com'), isFalse);
       expect(llm.calls.where((c) => c.startsWith('uploadLink')), isEmpty);
       expect(rig.sources.problems.single.text, contains('https://'));
     });
@@ -229,7 +333,8 @@ void main() {
       final llm = planningServer()
         ..errors['uploadLink'] = const ApiException('The page did not load.');
       final rig = await started(llm);
-      await rig.sources.addLink('https://example.com');
+      rig.sources.addLink('https://example.com');
+      await pumpEventQueue();
       expect(
         rig.sources.problems.single.title,
         'Could not add https://example.com',

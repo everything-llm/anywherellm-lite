@@ -34,7 +34,8 @@ enum NodeKind {
   libraryFolder,
   libraryDoc,
   systemFolder,
-  models,
+  system,
+  embeds,
   locked;
 
   bool get isFolder => switch (this) {
@@ -53,7 +54,7 @@ enum NodeKind {
   bool get editable => this == prompt || this == settings;
 
   NodeBadge get badge => switch (this) {
-    chatLog || models => NodeBadge.readOnly,
+    chatLog => NodeBadge.readOnly,
     locked => NodeBadge.locked,
     _ => NodeBadge.none,
   };
@@ -159,9 +160,14 @@ FileNode buildTree({
       kind: NodeKind.systemFolder,
       children: [
         FileNode(
-          path: '/settings/models.json',
-          name: 'models.json',
-          kind: NodeKind.models,
+          path: '/settings/system.json',
+          name: 'system.json',
+          kind: NodeKind.system,
+        ),
+        FileNode(
+          path: '/settings/embeds',
+          name: 'embeds',
+          kind: NodeKind.embeds,
         ),
       ],
     ),
@@ -246,9 +252,10 @@ FileNode? nodeAt(FileNode root, String path) {
 String chatMarkdown(String name, List<ChatMessage> turns) {
   final out = StringBuffer('# $name\n');
   for (final turn in turns) {
+    final user = turn.role == Role.user;
     out
-      ..write('\n**${turn.role == Role.user ? 'You' : 'Answer'}**\n\n')
-      ..write('${splitReasoning(turn.text).answer}\n');
+      ..write('\n**${user ? 'You' : 'Answer'}**\n\n')
+      ..write('${user ? turn.text : splitReasoning(turn.text).answer}\n');
     if (turn.citations.isNotEmpty) {
       final sources = [
         for (final c in turn.citations)
@@ -279,8 +286,6 @@ String _linkText(String text) =>
 
 const _indented = JsonEncoder.withIndent('  ');
 
-final _secretKey = RegExp('key|secret|token|password', caseSensitive: false);
-
 /// [settings] as the JSON Files shows and edits.
 String settingsText(WorkspaceSettings settings) =>
     '${_indented.convert(settings.values)}\n';
@@ -302,17 +307,17 @@ Map<String, Object?> parseSettings(String text, WorkspaceSettings was) {
   for (final MapEntry(:key, :value) in json.entries) {
     final spec = workspaceSettingSpecs[key];
     if (spec == null) throw ApiException('$key is not a workspace setting.');
-    _check(key, spec, value);
     if (value == was.values[key]) continue;
+    _check(key, spec, value);
     changed[key] = value;
   }
   return changed;
 }
 
 void _check(String key, SettingSpec spec, Object? value) {
-  if (value == null) return;
+  final choices = spec.choices;
+  if (value == null && choices == null) return;
   if (spec.type == SettingType.text) {
-    final choices = spec.choices;
     if (value is String && (choices == null || choices.contains(value))) {
       return;
     }
@@ -335,21 +340,4 @@ void _check(String key, SettingSpec spec, Object? value) {
   throw ApiException(
     '$key must be ${whole ? 'a whole number' : 'a number'} $range.',
   );
-}
-
-/// The provider and model names in the server's [settings], as JSON. Only keys that name a
-/// provider, a model, an engine or the vector database are kept, and never one that names a key,
-/// secret, token or password, whatever its value.
-String modelsText(Map<String, Object?> settings) {
-  bool shown(String key) =>
-      !_secretKey.hasMatch(key) &&
-      (key == 'VectorDB' ||
-          key.endsWith('Provider') ||
-          key.endsWith('ModelPref') ||
-          key.endsWith('Engine'));
-  final kept = {
-    for (final key in settings.keys.toList()..sort())
-      if (shown(key) && settings[key] is String) key: settings[key],
-  };
-  return '${_indented.convert(kept)}\n';
 }

@@ -63,11 +63,15 @@ class IconBtn extends StatelessWidget {
     this.box = 34,
     this.size = IconSize.normal,
     this.dangerHover = false,
+    this.active,
   });
 
   final String icon;
   final String tooltip;
   final VoidCallback? onPressed;
+
+  /// Whether a button that toggles something is on. Null for one that does not toggle.
+  final bool? active;
 
   /// The side of the square.
   final double box;
@@ -83,17 +87,38 @@ class IconBtn extends StatelessWidget {
       label: tooltip,
       tooltip: tooltip,
       onTap: onPressed,
+      toggled: active,
       radius: BorderRadius.circular(box < 30 ? 6 : 8),
+      color: active == true ? t.accentbg : null,
       hoverColor: dangerHover ? t.badbg : null,
       dimWhenDisabled: 0.4,
       child: SizedBox.square(
         dimension: box,
         child: Center(
-          child: AppIcon(icon, size: size, color: t.ink2),
+          child: AppIcon(
+            icon,
+            size: size,
+            color: active == true ? t.accent : t.ink2,
+          ),
         ),
       ),
     );
   }
+}
+
+/// A form's buttons, such as Cancel and Add, in a row at its end that wraps when narrow.
+class ActionRow extends StatelessWidget {
+  const ActionRow(this.children, {super.key});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    alignment: WrapAlignment.end,
+    spacing: 8,
+    runSpacing: 8,
+    children: children,
+  );
 }
 
 /// A small text button with an icon before it.

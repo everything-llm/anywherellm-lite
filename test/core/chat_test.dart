@@ -79,6 +79,25 @@ void main() {
       expect(split.answer, 'A B');
     });
 
+    test('a tag written as code is answer, not reasoning', () {
+      for (final text in [
+        'DeepSeek wraps its reasoning in `<think>` and `</think>` tags, then answers.',
+        'Use the `<think>` tag to start. More text...',
+        'Write:\n```\n<think>plan</think>\n```\nDone.',
+      ]) {
+        final split = splitReasoning(text);
+        expect(split.answer, text, reason: text);
+        expect(split.reasoning, isEmpty, reason: text);
+        expect(split.thinking, isFalse, reason: text);
+      }
+    });
+
+    test('a block after code is still reasoning', () {
+      final split = splitReasoning('`a` <think>Hm.</think>b');
+      expect(split.reasoning, 'Hm.');
+      expect(split.answer, '`a` b');
+    });
+
     test('text without a block is all answer', () {
       final split = splitReasoning('Use `a < b` here.');
       expect(split.reasoning, isEmpty);
@@ -143,5 +162,37 @@ void main() {
         null,
       ],
     );
+  });
+
+  group('loadableImage', () {
+    final server = Uri.parse('https://owen.example.ts.net:3001');
+    bool loads(String image, {Uri? from, bool allowHttp = true}) =>
+        loadableImage(Uri.parse(image), from, allowHttp: allowHttp);
+
+    test('the server\'s own host over https, on any port', () {
+      expect(
+        loads('https://owen.example.ts.net:3001/a.png', from: server),
+        isTrue,
+      );
+      expect(
+        loads('https://owen.example.ts.net:8445/card.png', from: server),
+        isTrue,
+      );
+    });
+
+    test('never another host, nor with no server', () {
+      expect(loads('https://example.com/a.png', from: server), isFalse);
+      expect(loads('https://owen.example.ts.net/a.png'), isFalse);
+    });
+
+    test('http only from an http server where http is allowed', () {
+      final plain = Uri.parse('http://box.local:3001');
+      expect(loads('http://owen.example.ts.net/a.png', from: server), isFalse);
+      expect(loads('http://box.local:8445/a.png', from: plain), isTrue);
+      expect(
+        loads('http://box.local:8445/a.png', from: plain, allowHttp: false),
+        isFalse,
+      );
+    });
   });
 }

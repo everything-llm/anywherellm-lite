@@ -18,8 +18,9 @@ import 'sources_controller.dart';
 /// a node allows.
 ///
 /// The workspaces and their chats come from [ChatController]; this reads each workspace's prompt,
-/// settings and documents, the library and the model settings itself. A new server starts it
-/// afresh. A change to a workspace's documents is shown in Sources when that workspace is active.
+/// settings and documents and the library itself; the server's own settings belong to
+/// `SystemController`. A new server starts it afresh. A change to a workspace's documents is
+/// shown in Sources when that workspace is active.
 class FilesController extends ChangeNotifier {
   FilesController(
     this._api,
@@ -27,7 +28,7 @@ class FilesController extends ChangeNotifier {
     this._chat,
     this._prefs,
     this._sources,
-  ) : _server = _settings.connection {
+  ) : _server = _settings.connection?.withPassword(null) {
     _settings.addListener(_serverChanged);
     _chat.addListener(_chatChanged);
   }
@@ -73,6 +74,11 @@ class FilesController extends ChangeNotifier {
 
   bool contentLoading = false;
 
+  /// Whether a workspace's `settings.json` shows as JSON rather than the form. It holds while
+  /// the same file is read afresh, as after a save.
+  bool get settingsAsJson => _settingsAsJson;
+  bool _settingsAsJson = false;
+
   /// The file being sent now, or null.
   String? sending;
 
@@ -98,6 +104,12 @@ class FilesController extends ChangeNotifier {
 
   List<LibraryFolder> get library => _library ?? const [];
 
+  /// The documents in library folder [name].
+  List<LibraryFile> folderDocs(String name) => [
+    for (final f in library)
+      if (f.name == name) ...f.files,
+  ];
+
   /// The workspaces, among those read, that use the library document at [path].
   List<Workspace> usersOf(String path) => [
     for (final w in _details.values)
@@ -116,17 +128,23 @@ class FilesController extends ChangeNotifier {
   }
 
   void _serverChanged() {
-    if (_settings.connection == _server) return;
-    _server = _settings.connection;
+    // A password saved or forgotten is the same server.
+    final now = _settings.connection?.withPassword(null);
+    if (now == _server) return;
+    _server = now;
     _details.clear();
     _asked.clear();
     _library = null;
     _accepted = null;
     _tree = null;
     _loaded = false;
+    loading = false;
+    sending = null;
     selected = null;
+    _settingsAsJson = false;
     _clearContent();
     problems = const [];
+    exporting = false;
     notifyListeners();
   }
 
@@ -161,7 +179,7 @@ class FilesController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Reads every workspace, the library and the model settings, unless already read.
+  /// Reads every workspace and the library, unless already read.
   Future<void> ensureLoaded() async {
     if (!_loaded && !loading) await load();
   }
@@ -199,6 +217,7 @@ class FilesController extends ChangeNotifier {
 
   /// Shows the node at [path], reading its text or document.
   Future<void> select(String path) async {
+    if (path != selected) _settingsAsJson = false;
     selected = path;
     _clearContent();
     final node = this.node;
@@ -224,6 +243,12 @@ class FilesController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void showSettingsAsJson(bool json) {
+    if (_settingsAsJson == json) return;
+    _settingsAsJson = json;
+    notifyListeners();
+  }
+
   Future<(String?, DocBody?)> _content(FileNode node) async {
     final detail = node.slug == null ? null : _details[node.slug];
     return switch (node.kind) {
@@ -243,7 +268,6 @@ class FilesController extends ChangeNotifier {
       ),
       NodeKind.libraryDoc ||
       NodeKind.docLink => (null, await _api.document(node.ref!)),
-      NodeKind.models => (modelsText(await _api.systemSettings()), null),
       _ => (null, null),
     };
   }
@@ -302,16 +326,20 @@ class FilesController extends ChangeNotifier {
   Future<void> upload(String folder, List<UploadFile> picked) async {
     if (picked.isEmpty) return;
     final server = _server;
+    var accepted = _accepted;
     try {
-      _accepted ??= await _api.acceptedExtensions();
+      accepted ??= await _api.acceptedExtensions();
+      if (_server == server) _accepted = accepted;
     } on ApiException {
       // The server decides each file then.
     }
+    if (_server != server) return;
     final sent = await sendEach(
       _api,
       picked,
-      accepted: _accepted,
+      accepted: accepted,
       folder: folder,
+      shouldContinue: () => _server == server,
       onSending: (name) {
         sending = name;
         notifyListeners();
@@ -375,7 +403,7 @@ class FilesController extends ChangeNotifier {
     final active = _chat.activeSlug;
     final shownOff =
         active != null && _prefs.prefs.offIn(active).any((d) => d.path == path);
-    await _prefs.forgetDoc(path);
+    await _prefs.forgetDocs([path]);
     if (shownOff) unawaited(_sources.refresh());
     if (selected == libraryPath(path)) {
       await select(libraryPath(docFolder(path)));
@@ -385,10 +413,7 @@ class FilesController extends ChangeNotifier {
   /// Deletes library folder [name] with its documents, which takes them out of every workspace,
   /// and forgets them wherever they were switched off in Sources.
   Future<void> deleteFolder(String name) async {
-    final paths = [
-      for (final f in library)
-        if (f.name == name) ...[for (final d in f.files) d.path],
-    ];
+    final paths = [for (final d in folderDocs(name)) d.path];
     final ok = await _change(
       'Could not delete the folder',
       () => _api.removeFolder(name),
@@ -405,9 +430,7 @@ class FilesController extends ChangeNotifier {
     final shownOff =
         active != null &&
         _prefs.prefs.offIn(active).any((d) => paths.contains(d.path));
-    for (final path in paths) {
-      await _prefs.forgetDoc(path);
-    }
+    await _prefs.forgetDocs(paths);
     if (shownOff) unawaited(_sources.refresh());
     _expanded.remove(libraryPath(name));
     await select('/library');
@@ -420,13 +443,14 @@ class FilesController extends ChangeNotifier {
     exporting = true;
     notifyListeners();
     List<int>? bytes;
+    Notice? failed;
     try {
       bytes = await _api.exportChats(format);
-      problems = const [];
     } on ApiException catch (error) {
-      problems = [Notice('Could not export the chats', error.message)];
+      failed = Notice('Could not export the chats', error.message);
     }
     if (_server != server) return null;
+    problems = [?failed];
     exporting = false;
     notifyListeners();
     return bytes;
@@ -448,28 +472,29 @@ class FilesController extends ChangeNotifier {
     bool library = false,
   }) async {
     final server = _server;
-    var ok = true;
+    Notice? failed;
     try {
       await op();
-      problems = const [];
     } on ApiException catch (error) {
-      problems = [Notice(failTitle, error.message)];
-      ok = false;
+      failed = Notice(failTitle, error.message);
     }
     if (_server != server) return false;
+    problems = [?failed];
     await Future.wait([
       for (final s in {?slug, ...slugs}) _readWorkspace(s),
       if (library) _readLibrary(),
     ]);
     notifyListeners();
-    return ok;
+    return failed == null;
   }
 
   /// Reads workspace [slug] again and tells Sources and the sidebar what changed. Returns why it
   /// could not, or null; the tree then keeps what it last read.
   Future<Notice?> _readWorkspace(String slug) async {
+    final server = _server;
     try {
       final w = await _api.workspace(slug);
+      if (_server != server) return null;
       _details[slug] = w;
       _tree = null;
       if (slug == _chat.activeSlug) {
@@ -485,8 +510,11 @@ class FilesController extends ChangeNotifier {
 
   /// Reads the library again. Returns why it could not, or null.
   Future<Notice?> _readLibrary() async {
+    final server = _server;
     try {
-      _library = await _api.libraryFolders();
+      final read = await _api.libraryFolders();
+      if (_server != server) return null;
+      _library = read;
       _tree = null;
       return null;
     } on ApiException catch (error) {

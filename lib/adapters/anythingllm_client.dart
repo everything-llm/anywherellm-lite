@@ -1,22 +1,32 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
 import '../core/chat.dart';
 import '../core/commands.dart';
 import '../core/connection.dart';
+import '../core/embeds.dart';
 import '../core/ports.dart';
 import '../core/server_models.dart';
 import '../core/upload.dart';
 import 'anythingllm_stream.dart';
+import 'image_frames.dart';
 
 /// [AnythingLlmApi] over the server's HTTP API, with the bearer key on every request.
 ///
 /// Every call but [verify] reads the connection from the holder when it is made. An error message
 /// never contains the key. Unless [allowHttp], a call to an `http://` address fails before the key
 /// is sent.
+///
+/// The everythingllm relay may sit beside AnythingLLM at [relayPath] on the same address and take
+/// the same key: it keeps an answer going after the app lets go of it, as a run. A server has the
+/// relay when its `GET /everythingllm/health` answers the relay's JSON, asked once per connection.
+/// With the relay, [streamChat] starts a run and follows its events, rejoining after the last one
+/// it saw when the connection drops.
 class HttpAnythingLlmApi implements AnythingLlmApi {
   HttpAnythingLlmApi({
     required this._holder,
@@ -24,6 +34,14 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     http.Client? client,
     this.timeout = const Duration(seconds: 15),
     this.uploadTimeout = const Duration(minutes: 5),
+    this.quiet = const Duration(seconds: 45),
+    this.rejoinDelays = const [
+      Duration(seconds: 1),
+      Duration(seconds: 2),
+      Duration(seconds: 4),
+      Duration(seconds: 8),
+      Duration(seconds: 16),
+    ],
   }) : _client = client ?? http.Client();
 
   final ConnectionHolder _holder;
@@ -37,12 +55,70 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   /// The server reads an upload in before it answers, which takes a while for a long PDF.
   final Duration uploadTimeout;
 
+  /// How long a relay's run may send nothing before its connection counts as dropped. The relay
+  /// pings every 15 s.
+  final Duration quiet;
+
+  /// The waits before each try at rejoining a run whose connection dropped. A run fails once
+  /// they are used up without an event coming in between.
+  final List<Duration> rejoinDelays;
+
+  /// Whether each connection asked so far is a relay.
+  final _relays = <Connection, bool>{};
+
+  /// The run [streamChat] is following in each chat, by workspace and thread: its id once the
+  /// relay answers the start, or null when it did not start it.
+  final _runs = <(String, String), (Connection, Future<String?>)>{};
+
+  final _random = Random.secure();
+
+  /// The web UI's login token for each connection signed in so far, kept only while the app
+  /// runs. The password is what is saved; a token lapses after 30 days or a new password.
+  final _tokens = <Connection, String>{};
+
+  /// Where the relay sits on AnythingLLM's address.
+  static const relayPath = '/everythingllm';
+
   @override
   Future<void> verify(Connection connection) async {
     final body = await _get(_secure(connection), '/api/v1/auth');
     if (body is! Map || body['authenticated'] != true) {
       throw const ApiException('The server did not accept the key.');
     }
+  }
+
+  /// `GET /api/setup-complete` answers without a key or a login, as the web UI asks it before
+  /// it shows its sign-in.
+  @override
+  Future<ServerAuth> serverAuth(Connection connection) async {
+    final secure = _secure(connection);
+    final results = _field(
+      await _call(
+        secure,
+        timeout,
+        () => _client.get(
+          Uri.parse('${secure.baseUrl}/api/setup-complete'),
+          headers: {'Accept': 'application/json'},
+        ),
+      ),
+      'results',
+    );
+    if (results is! Map) {
+      throw const ApiException(
+        'The address did not answer like an AnythingLLM server.',
+      );
+    }
+    if (results['MultiUserMode'] == true) return ServerAuth.multiUser;
+    return results['RequiresAuth'] == true
+        ? ServerAuth.password
+        : ServerAuth.none;
+  }
+
+  @override
+  Future<void> signIn(Connection connection) async {
+    final secure = _secure(connection);
+    _tokens.remove(secure);
+    await _token(secure);
   }
 
   @override
@@ -130,45 +206,258 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     String message, {
     List<Attachment> attachments = const [],
   }) async* {
+    final connection = _current;
     // No `mode`: the server then answers in the workspace's own chat mode.
-    final response = await _openStream('${_thread(slug, thread)}/stream-chat', {
+    final body = {
       'message': message,
       if (attachments.isNotEmpty)
         'attachments': [for (final a in attachments) attachmentJson(a)],
-    }, attachments.isEmpty ? timeout : uploadTimeout);
-    try {
-      yield* chatEvents(response.stream);
-    } on http.ClientException catch (error) {
-      throw ApiException('The answer was cut off: ${error.message}');
+    };
+    final limit = attachments.isEmpty ? timeout : uploadTimeout;
+    if (await _isRelay(connection)) {
+      yield* _run(connection, slug, thread, body, limit);
+    } else {
+      yield* _events('${_thread(slug, thread)}/stream-chat', body, limit);
     }
   }
+
+  /// Cancels the chat's run on the relay, once the relay has said which run it is. The run is
+  /// forgotten before the call is sent, so the subscription can be cancelled at once.
+  @override
+  Future<void> stopChat(String slug, String thread) async {
+    final run = _runs.remove((slug, thread));
+    if (run == null) return;
+    final (connection, started) = run;
+    final id = await started;
+    if (id == null) return;
+    await _call(
+      connection,
+      timeout,
+      () async => http.Response.fromStream(
+        await _client.send(
+          _request(
+            connection,
+            'POST',
+            '$relayPath/v1/runs/${Uri.encodeComponent(id)}/cancel',
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Whether the server at [connection] has the relay: its `GET /everythingllm/health` answers
+  /// JSON naming the `everythingllm` service with `runs` among its features. The route is open, so
+  /// the key is not sent. AnythingLLM answers a path it does not know with its web page and a 200,
+  /// so the body decides. A 5xx is not remembered, so a relay failing for a moment is asked again
+  /// on the next message.
+  Future<bool> _isRelay(Connection connection) async {
+    final server = connection.withPassword(null);
+    if (_relays[server] case final known?) return known;
+    final response = await _fetch(
+      connection,
+      timeout,
+      () => _client.get(Uri.parse('${connection.baseUrl}$relayPath/health')),
+    );
+    if (response.statusCode >= 500) return false;
+    final health = response.statusCode == 200 ? _json(response) : null;
+    return _relays[server] =
+        health is Map &&
+        health['service'] == 'everythingllm' &&
+        health['features'] is List &&
+        (health['features'] as List).contains('runs');
+  }
+
+  /// The answer to [body] as a run on the relay at [connection]. Cancelling it closes the
+  /// connection that follows the run at once, which an `async*` body waiting for the next event
+  /// would not do; the run itself goes on.
+  Stream<ChatEvent> _run(
+    Connection connection,
+    String slug,
+    String thread,
+    Map<String, Object?> body,
+    Duration limit,
+  ) {
+    final gone = Completer<void>();
+    StreamSubscription<ChatEvent>? answer;
+    late final StreamController<ChatEvent> out;
+    out = StreamController<ChatEvent>(
+      onListen: () => answer = _startRun(
+        connection,
+        slug,
+        thread,
+        body,
+        limit,
+        gone.future,
+      ).listen(out.add, onError: out.addError, onDone: out.close),
+      onPause: () => answer?.pause(),
+      onResume: () => answer?.resume(),
+      onCancel: () {
+        if (!gone.isCompleted) gone.complete();
+        return answer?.cancel();
+      },
+    );
+    return out.stream;
+  }
+
+  /// Starts the run of [body] and follows it until it ends or [gone] completes. The chat's run
+  /// is known before the relay answers, so a stop sent meanwhile cancels it once it has an id.
+  /// The relay answers a chat that already has a run going with 409 and says so.
+  Stream<ChatEvent> _startRun(
+    Connection connection,
+    String slug,
+    String thread,
+    Map<String, Object?> body,
+    Duration limit,
+    Future<void> gone,
+  ) async* {
+    final chat = (slug, thread);
+    final id = _beginRun(connection, slug, thread, body, limit);
+    final started = id.then<String?>((id) => id, onError: (_) => null);
+    _runs[chat] = (connection, started);
+    try {
+      yield* chatEventsOf(_runChunks(connection, await id, gone));
+    } finally {
+      if (identical(_runs[chat]?.$2, started)) _runs.remove(chat);
+    }
+  }
+
+  /// Asks the relay to run [body], and gives the run's id.
+  Future<String> _beginRun(
+    Connection connection,
+    String slug,
+    String thread,
+    Map<String, Object?> body,
+    Duration limit,
+  ) async {
+    final run = await _call(
+      connection,
+      limit,
+      () async => http.Response.fromStream(
+        await _client.send(
+          _request(connection, 'POST', '$relayPath/v1/runs', {
+            'workspace': slug,
+            'thread': thread,
+            'clientId': _clientId(),
+            'body': body,
+          }),
+        ),
+      ),
+      refused: 'The relay did not start the answer.',
+    );
+    final id = _field(run, 'id');
+    if (id is! String) {
+      throw const ApiException('The relay did not start the answer.');
+    }
+    return id;
+  }
+
+  /// The `stream-chat` chunks of run [id], as the relay hands them back, until the run ends or
+  /// [gone] completes. A connection that drops, or stays [quiet] too long, is opened again after
+  /// the last event seen, after each of [rejoinDelays] in turn; an event coming in starts them
+  /// over. So is one the relay answers with a 5xx.
+  Stream<Map<String, dynamic>> _runChunks(
+    Connection connection,
+    String id,
+    Future<void> gone,
+  ) async* {
+    var left = false;
+    unawaited(gone.then((_) => left = true));
+    var after = 0;
+    var misses = 0;
+    while (!left) {
+      final request = _request(
+        connection,
+        'GET',
+        '$relayPath/v1/runs/${Uri.encodeComponent(id)}/events',
+      )..headers['Accept'] = 'text/event-stream';
+      if (after > 0) request.headers['Last-Event-ID'] = '$after';
+      try {
+        final response = await _client.send(request).timeout(timeout);
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          _decode(await http.Response.fromStream(response));
+        }
+        await for (final event in serverSentEvents(
+          _until(response.stream.timeout(quiet), gone),
+        )) {
+          if (event.id case final seen?) after = seen;
+          misses = 0;
+          switch (event.name) {
+            case 'chunk':
+              if (jsonOrNull(event.data) case final Map<String, dynamic> c) {
+                yield c;
+              }
+            case 'failed':
+              final data = jsonOrNull(event.data);
+              final plain = event.data.trim();
+              throw ApiException(
+                _said(data) ??
+                    (data == null && plain.isNotEmpty
+                        ? plain
+                        : 'The relay could not finish the answer.'),
+              );
+            case 'done' || 'cancelled':
+              return;
+          }
+        }
+      } on ApiException catch (error) {
+        if ((error.status ?? 0) < 500) rethrow;
+        // The relay failed for a moment: rejoin below.
+      } on Exception {
+        // Dropped or silent: rejoin below.
+      }
+      if (left) return;
+      if (misses == rejoinDelays.length) {
+        throw const ApiException(
+          'Lost the connection to the relay. The answer is still being written there and will '
+          'be in the chat when it is done.',
+        );
+      }
+      await Future.any([Future<void>.delayed(rejoinDelays[misses++]), gone]);
+    }
+  }
+
+  /// A new id for one message's run, so a request sent twice starts it once.
+  String _clientId() =>
+      'c_${List.generate(16, (_) => _random.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
 
   /// A `stream-chat` with `reset` and no message, which clears the history and answers with
   /// one closing chunk.
   @override
-  Future<void> resetChat(String slug, String thread) async {
-    final response = await _openStream('${_thread(slug, thread)}/stream-chat', {
-      'reset': true,
-    }, timeout);
-    try {
-      await chatEvents(response.stream).drain<void>();
-    } on http.ClientException catch (error) {
-      throw ApiException('The reply was cut off: ${error.message}');
-    }
-  }
+  Future<void> resetChat(String slug, String thread) => _events(
+    '${_thread(slug, thread)}/stream-chat',
+    {'reset': true},
+    timeout,
+  ).drain<void>();
 
-  /// The presets live under `/api/system`, not `/api/v1`. That route takes the browser's login,
-  /// not the API key, so it answers only while the server has no password.
+  /// The presets live under `/api/system`, not `/api/v1`, and take the web UI's login, so they
+  /// answer with the server's password, or on a server that has none.
   @override
   Future<List<SlashCommand>> slashCommands() async => [
     for (final json in jsonObjects(
       _field(
-        await _get(_current, '/api/system/slash-command-presets'),
+        await _session('GET', '/api/system/slash-command-presets'),
         'presets',
       ),
     ))
       ?SlashCommand.fromJson(json),
   ];
+
+  /// The server answers a bare `OK`.
+  @override
+  Future<void> dropFrom(String slug, String thread, int chatId) => _session(
+    'DELETE',
+    '/api/workspace/${Uri.encodeComponent(slug)}/thread/'
+        '${Uri.encodeComponent(thread)}/delete-edited-chats',
+    body: {'startingId': chatId},
+    emptyOk: true,
+  );
+
+  @override
+  Future<void> setFeedback(String slug, int chatId, bool? good) => _session(
+    'POST',
+    '/api/workspace/${Uri.encodeComponent(slug)}/chat-feedback/$chatId',
+    body: {'feedback': good},
+  );
 
   @override
   Future<void> updateEmbeddings(
@@ -217,20 +506,22 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       if (!meta.isEmpty) request.fields['metadata'] = jsonEncode(meta.toJson());
       return http.Response.fromStream(await _client.send(request));
     }, refused: 'The server could not read $name in.');
-    return [
-      for (final json in jsonObjects(_field(body, 'documents')))
-        DocEntry.fromJson(json),
-    ];
+    return _documents(body);
   }
 
   @override
   Future<List<DocEntry>> uploadLink(
     String url, {
     DocMeta meta = const DocMeta(),
-  }) => _readIn('/api/v1/document/upload-link', {
-    'link': url,
-    if (!meta.isEmpty) 'metadata': meta.toJson(),
-  }, refused: 'The server could not read $url.');
+  }) async => _documents(
+    await _send(
+      'POST',
+      '/api/v1/document/upload-link',
+      {'link': url, if (!meta.isEmpty) 'metadata': meta.toJson()},
+      limit: uploadTimeout,
+      refused: 'The server could not read $url.',
+    ),
+  );
 
   /// The server requires a `title` in the metadata.
   @override
@@ -238,31 +529,24 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     String title,
     String text, {
     DocMeta meta = const DocMeta(),
-  }) => _readIn('/api/v1/document/raw-text', {
-    'textContent': text,
-    'metadata': {...meta.toJson(), 'title': title},
-  }, refused: 'The server could not save $title.');
+  }) async => _documents(
+    await _send(
+      'POST',
+      '/api/v1/document/raw-text',
+      {
+        'textContent': text,
+        'metadata': {...meta.toJson(), 'title': title},
+      },
+      limit: uploadTimeout,
+      refused: 'The server could not save $title.',
+    ),
+  );
 
-  /// Posts [body] to [path], which reads something in, and returns the documents it made.
-  Future<List<DocEntry>> _readIn(
-    String path,
-    Map<String, Object?> body, {
-    required String refused,
-  }) async {
-    final connection = _current;
-    final answer = await _call(
-      connection,
-      uploadTimeout,
-      () async => http.Response.fromStream(
-        await _client.send(_request(connection, 'POST', path, body)),
-      ),
-      refused: refused,
-    );
-    return [
-      for (final json in jsonObjects(_field(answer, 'documents')))
-        DocEntry.fromJson(json),
-    ];
-  }
+  /// The documents an upload, a link or pasted text made, from the server's answer [body].
+  List<DocEntry> _documents(Object? body) => [
+    for (final json in jsonObjects(_field(body, 'documents')))
+      DocEntry.fromJson(json),
+  ];
 
   /// The server answers with the workspace it wrote, or a `message` saying why it did not.
   @override
@@ -293,24 +577,84 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       SearchHit.fromJson(json),
   ];
 
-  /// The server answers with the file itself, which is not always JSON; a failure is decoded as
-  /// any other.
   @override
-  Future<List<int>> exportChats(ChatExport format) async {
-    final connection = _current;
-    final http.Response response;
-    try {
-      response = await _client
-          .get(
-            Uri.parse(
-              '${connection.baseUrl}/api/v1/system/export-chats?type=${format.name}',
-            ),
-            headers: {'Authorization': 'Bearer ${connection.apiKey}'},
-          )
-          .timeout(uploadTimeout);
-    } on Exception catch (error) {
-      throw _unreachable(connection, error, uploadTimeout);
+  Future<List<int>> exportChats(ChatExport format) =>
+      _file('/api/v1/system/export-chats?type=${format.name}');
+
+  @override
+  Future<List<int>> generatedFile(String storageName) => _file(
+    '/api/v1/document/generated-files/${Uri.encodeComponent(storageName)}',
+  );
+
+  /// A bare `GET` of [url], on any port of the server's host as [loadableImage] allows, read
+  /// by [imageFrames]. The response is let go of at once when the subscription was cancelled
+  /// while it waited for the headers, as an `async*` body would only notice at its next `yield`.
+  @override
+  Stream<Uint8List> answerImage(Uri url) {
+    late final StreamController<Uint8List> out;
+    StreamSubscription<Uint8List>? reading;
+    var cancelled = false;
+    Future<void> start() async {
+      try {
+        final connection = _current;
+        if (!allowHttp && url.scheme == 'http') {
+          throw const ApiException(
+            'This device does not load images over plain http.',
+          );
+        }
+        final response = await _fetch(
+          connection,
+          timeout,
+          () => _client.send(http.Request('GET', url)),
+        );
+        final ok = response.statusCode >= 200 && response.statusCode < 300;
+        if (cancelled || !ok) {
+          unawaited(response.stream.listen(null).cancel());
+        }
+        if (cancelled) return;
+        if (!ok) {
+          throw ApiException(
+            'The image could not be read: the server answered ${response.statusCode}.',
+          );
+        }
+        reading = imageFrames(response.stream, response.headers['content-type'])
+            .listen(
+              out.add,
+              onError: (Object error) => out.addError(
+                error is http.ClientException
+                    ? ApiException('The image was cut off: ${error.message}')
+                    : error,
+              ),
+              onDone: out.close,
+            );
+      } on ApiException catch (error) {
+        if (cancelled) return;
+        out.addError(error);
+        await out.close();
+      }
     }
+
+    out = StreamController(
+      onListen: () => unawaited(start()),
+      onCancel: () {
+        cancelled = true;
+        return reading?.cancel();
+      },
+    );
+    return out.stream;
+  }
+
+  /// The bytes of the file the server answers [path] with, which is not always JSON; a failure
+  /// is decoded as any other.
+  Future<List<int>> _file(String path) async {
+    final connection = _current;
+    final request = _request(connection, 'GET', path)
+      ..headers['Accept'] = '*/*';
+    final response = await _fetch(
+      connection,
+      uploadTimeout,
+      () async => http.Response.fromStream(await _client.send(request)),
+    );
     final type = response.headers['content-type'] ?? '';
     final ok = response.statusCode >= 200 && response.statusCode < 300;
     if (!ok || type.startsWith('text/html')) {
@@ -378,13 +722,113 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     return settings is Map<String, dynamic> ? settings : const {};
   }
 
+  /// The server answers the settings it wrote in `newValues` and the first refusal in `error`;
+  /// it drops a key it does not know without a word, so each key sent must come back.
+  @override
+  Future<void> updateSystem(Map<String, String> changes) async {
+    final answer = await _send(
+      'POST',
+      '/api/v1/system/update-env',
+      changes,
+      refused: 'The server did not change its settings.',
+    );
+    if (_field(answer, 'error') case final String error
+        when error.trim().isNotEmpty) {
+      throw ApiException(error.trim());
+    }
+    final written = _field(answer, 'newValues');
+    final missing = [
+      for (final key in changes.keys)
+        if (written is! Map || !written.containsKey(key)) key,
+    ];
+    if (missing.isNotEmpty) {
+      throw ApiException('The server did not write ${missing.join(', ')}.');
+    }
+  }
+
+  @override
+  Future<List<Embed>> embeds() async => [
+    for (final json in jsonObjects(
+      _field(await _get(_current, '/api/v1/embed'), 'embeds'),
+    ))
+      Embed.fromJson(json),
+  ];
+
+  /// The server answers the new embed, or null with an `error` when it made none.
+  @override
+  Future<String> createEmbed(NewEmbed embed) async {
+    final answer = await _send(
+      'POST',
+      '/api/v1/embed/new',
+      embed.toJson(),
+      refused: 'The server did not make the embed.',
+    );
+    if (_field(answer, 'error') case final String error
+        when error.trim().isNotEmpty) {
+      throw ApiException(error.trim());
+    }
+    return switch (_field(answer, 'embed')) {
+      {'uuid': final String uuid} => uuid,
+      _ => throw const ApiException('The server did not make the embed.'),
+    };
+  }
+
+  @override
+  Future<void> updateEmbed(
+    String uuid, {
+    bool? enabled,
+    EmbedMode? mode,
+  }) async {
+    final answer = await _send(
+      'POST',
+      '/api/v1/embed/${Uri.encodeComponent(uuid)}',
+      {'enabled': ?enabled, 'chat_mode': ?mode?.name},
+      refused: 'The server did not change the embed.',
+    );
+    if (_field(answer, 'error') case final String error
+        when error.trim().isNotEmpty) {
+      throw ApiException(error.trim());
+    }
+  }
+
+  @override
+  Future<void> deleteEmbed(String uuid) => _send(
+    'DELETE',
+    '/api/v1/embed/${Uri.encodeComponent(uuid)}',
+    null,
+    refused: 'The server did not delete the embed.',
+  );
+
+  @override
+  Future<List<EmbedChat>> embedChats(String uuid) async => [
+    for (final json in jsonObjects(
+      _field(
+        await _get(
+          _current,
+          '/api/v1/embed/${Uri.encodeComponent(uuid)}/chats',
+        ),
+        'chats',
+      ),
+    ))
+      EmbedChat.fromJson(json),
+  ];
+
+  @override
+  Future<int> vectorCount() async => switch (_field(
+    await _get(_current, '/api/v1/system/vector-count'),
+    'vectorCount',
+  )) {
+    final num count => count.toInt(),
+    _ => throw const ApiException(_refused),
+  };
+
   /// The connection in use.
   Connection get _current =>
       _secure(_holder.current ?? (throw const NotConfigured()));
 
   /// [connection], or an [ApiException] when it is `http://` and [allowHttp] is false.
   Connection _secure(Connection connection) {
-    if (!allowHttp && Uri.parse(connection.baseUrl).scheme == 'http') {
+    if (!allowHttp && connection.uri.scheme == 'http') {
       throw const ApiException(
         'Use an https:// address. This device does not send the API key over plain http.',
       );
@@ -403,6 +847,74 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     'Accept': 'application/json',
   };
 
+  /// The decoded JSON of a [method] to [path], one of the web UI's own routes, with [body] as
+  /// JSON, signed in with the connection's password in place of the key, or without credentials
+  /// when no password is saved. A refused token is forgotten and the call made once more with
+  /// a new one. A server that requires credentials says so with 401 or 403.
+  Future<Object?> _session(
+    String method,
+    String path, {
+    Map<String, Object?>? body,
+    bool emptyOk = false,
+  }) async {
+    final connection = _current;
+    final signsIn = connection.password != null;
+    for (var again = false; ; again = true) {
+      final token = signsIn ? await _token(connection) : null;
+      try {
+        return await _call(
+          connection,
+          timeout,
+          () async {
+            final request = _request(connection, method, path, body);
+            if (token == null) {
+              request.headers.remove('Authorization');
+            } else {
+              request.headers['Authorization'] = 'Bearer $token';
+            }
+            return http.Response.fromStream(await _client.send(request));
+          },
+          emptyOk: emptyOk,
+          rejected: signsIn ? _passwordRefused : _needsPassword,
+        );
+      } on ApiException catch (error) {
+        final refused = error.status == 401 || error.status == 403;
+        if (!signsIn || again || !refused) rethrow;
+        _tokens.remove(connection);
+      }
+    }
+  }
+
+  /// The web UI's login token for [connection], signing in with its password when there is none
+  /// yet. Without a password this fails with status 401, and with a refused one with 403.
+  Future<String> _token(Connection connection) async {
+    if (_tokens[connection] case final token?) return token;
+    final password =
+        connection.password ??
+        (throw const ApiException(_needsPassword, status: 401));
+    final body = await _call(
+      connection,
+      timeout,
+      () => _client.post(
+        Uri.parse('${connection.baseUrl}/api/request-token'),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'password': password}),
+      ),
+      rejected: _passwordRefused,
+    );
+    if (body is! Map || body['valid'] != true) {
+      throw const ApiException(_passwordRefused, status: 403);
+    }
+    final token = body['token'];
+    if (token is! String || token.isEmpty) {
+      throw const ApiException(_passwordRefused, status: 403);
+    }
+    return _tokens[connection] = token;
+  }
+
   /// The decoded JSON of a GET to [path] on [connection].
   Future<Object?> _get(Connection connection, String path) => _call(
     connection,
@@ -413,26 +925,29 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     ),
   );
 
-  /// The open response to a POST of [body] to [path], whose body streams server-sent events.
-  /// A failed status is an [ApiException] with the server's words.
-  Future<http.StreamedResponse> _openStream(
+  /// The events of a POST of [body] to [path], whose answer streams server-sent events. A
+  /// failed status is an [ApiException] with the server's words, as is a stream cut off.
+  Stream<ChatEvent> _events(
     String path,
     Map<String, Object?> body,
     Duration limit,
-  ) async {
+  ) async* {
     final connection = _current;
     final request = _request(connection, 'POST', path, body)
       ..headers['Accept'] = 'text/event-stream';
-    final http.StreamedResponse response;
-    try {
-      response = await _client.send(request).timeout(limit);
-    } on Exception catch (error) {
-      throw _unreachable(connection, error, limit);
-    }
+    final response = await _fetch(
+      connection,
+      limit,
+      () => _client.send(request),
+    );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       _decode(await http.Response.fromStream(response));
     }
-    return response;
+    try {
+      yield* chatEvents(response.stream);
+    } on http.ClientException catch (error) {
+      throw ApiException('The answer was cut off: ${error.message}');
+    }
   }
 
   /// A [method] to [path] on [connection] with the key, and [body] as JSON when given.
@@ -460,13 +975,14 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     String method,
     String path,
     Map<String, Object?>? body, {
+    Duration? limit,
     bool emptyOk = false,
     String refused = _refused,
   }) async {
     final connection = _current;
     return _call(
       connection,
-      timeout,
+      limit ?? timeout,
       () async => http.Response.fromStream(
         await _client.send(_request(connection, method, path, body)),
       ),
@@ -475,21 +991,34 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     );
   }
 
-  /// The decoded JSON of the response [send] gets, with failures in plain words.
+  /// The decoded JSON of the response [send] gets, with failures in plain words. [emptyOk],
+  /// [refused] and [rejected] are as for [_decode].
   Future<Object?> _call(
     Connection connection,
     Duration limit,
     Future<http.Response> Function() send, {
     bool emptyOk = false,
     String refused = _refused,
-  }) async {
-    final http.Response response;
+    String rejected = _keyRejected,
+  }) async => _decode(
+    await _fetch(connection, limit, send),
+    emptyOk: emptyOk,
+    refused: refused,
+    rejected: rejected,
+  );
+
+  /// The response [send] gets within [limit], or an [ApiException] in plain words when the
+  /// server cannot be reached.
+  Future<T> _fetch<T>(
+    Connection connection,
+    Duration limit,
+    Future<T> Function() send,
+  ) async {
     try {
-      response = await send().timeout(limit);
+      return await send().timeout(limit);
     } on Exception catch (error) {
       throw _unreachable(connection, error, limit);
     }
-    return _decode(response, emptyOk: emptyOk, refused: refused);
   }
 
   /// [error], from sending a request, in plain words.
@@ -514,19 +1043,24 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   };
 
   static const _refused = 'The server refused the request.';
+  static const _keyRejected = 'The server rejected the key.';
+  static const _needsPassword =
+      'This needs the server password. Add it in Settings.';
+  static const _passwordRefused = 'The server did not accept the password.';
 
   /// The decoded JSON of [response], or null for a success that is empty or the bare status
   /// text `OK` when [emptyOk], as a delete answers. An answer with `success: false` fails, even with HTTP 200, with the server's reason
-  /// or else [refused].
+  /// or else [refused]. A 401 or 403 fails with [rejected], whatever the server said.
   Object? _decode(
     http.Response response, {
     bool emptyOk = false,
     String refused = _refused,
+    String rejected = _keyRejected,
   }) {
     final status = response.statusCode;
     final body = _json(response);
     if (status == 401 || status == 403) {
-      throw ApiException('The server rejected the key.', status: status);
+      throw ApiException(rejected, status: status);
     }
     if (status < 200 || status >= 300) {
       throw ApiException(
@@ -551,7 +1085,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   /// The decoded JSON of [response], or null when it is not JSON.
   Object? _json(http.Response response) {
     try {
-      return jsonDecode(utf8.decode(response.bodyBytes));
+      return jsonOrNull(utf8.decode(response.bodyBytes));
     } on FormatException {
       return null;
     }
@@ -599,3 +1133,24 @@ const _documentTypes = {
   '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 };
+
+/// [source] until [gone] completes, when it is cancelled and the stream ends.
+Stream<T> _until<T>(Stream<T> source, Future<void> gone) {
+  StreamSubscription<T>? from;
+  late final StreamController<T> out;
+  out = StreamController<T>(
+    onListen: () {
+      from = source.listen(out.add, onError: out.addError, onDone: out.close);
+      unawaited(
+        gone.then((_) async {
+          await from?.cancel();
+          await out.close();
+        }),
+      );
+    },
+    onPause: () => from?.pause(),
+    onResume: () => from?.resume(),
+    onCancel: () => from?.cancel(),
+  );
+  return out.stream;
+}

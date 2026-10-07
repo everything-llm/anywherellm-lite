@@ -10,10 +10,13 @@ import '../state/chat_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
+import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
 import '../widgets/rise.dart';
 import '../widgets/tappable.dart';
 import 'answer_body.dart';
+import 'generated_files.dart';
+import 'speaker.dart';
 
 /// The chat on screen, newest at the bottom. Empty, it invites a first question.
 ///
@@ -28,13 +31,34 @@ class MessageList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final chat = AppScope.of(context).chat;
+    final scope = AppScope.of(context);
+    final chat = scope.chat;
     final workspace = chat.active;
     final turns = chat.turns;
     if (workspace == null) return const SizedBox.shrink();
     if (turns.isEmpty) {
       return _Empty(workspace: workspace.name, onSuggest: onSuggest);
     }
+    // The person's text size scales the turns, not the controls around them.
+    return ListenableBuilder(
+      listenable: scope.prefs,
+      builder: (context, _) {
+        final media = MediaQuery.of(context);
+        return MediaQuery(
+          data: media.copyWith(
+            textScaler: _TimesScaler(
+              media.textScaler,
+              scope.prefs.prefs.textSize.scale,
+            ),
+          ),
+          child: _turns(context, turns),
+        );
+      },
+    );
+  }
+
+  Widget _turns(BuildContext context, List<Turn> turns) {
+    final chat = AppScope.of(context).chat;
     return ListView.builder(
       reverse: true,
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
@@ -48,8 +72,15 @@ class MessageList extends StatelessWidget {
               padding: EdgeInsets.only(top: i == turns.length - 1 ? 0 : 26),
               child: Rise(
                 child: turn.role == Role.user
-                    ? _UserBubble(turn.text, attachments: turn.attachments)
-                    : _Answer(turn),
+                    ? _UserBubble(
+                        turn.text,
+                        attachments: turn.attachments,
+                        onEdit: () {
+                          chat.edit(turn);
+                          onSuggest(turn.text);
+                        },
+                      )
+                    : _Answer(turn, retry: i == 0 ? _retryOf(chat) : null),
               ),
             ),
           ),
@@ -102,7 +133,7 @@ class _Empty extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               ListenableBuilder(
-                listenable: sources,
+                listenable: Listenable.merge([sources, sources.chatMode]),
                 builder: (context, _) => Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -177,16 +208,53 @@ class _SuggestionState extends State<_Suggestion> {
   }
 }
 
+/// Retry on the chat's last answer: [onPressed] is null while it cannot run, and [tooltip]
+/// says why when the question went with files.
+typedef _Retry = ({VoidCallback? onPressed, String tooltip});
+
+_Retry _retryOf(ChatController chat) {
+  final turns = chat.turns;
+  final files =
+      turns.length >= 2 && turns[turns.length - 2].attachments.isNotEmpty;
+  return (
+    onPressed: chat.canRetry ? chat.retry : null,
+    tooltip: files
+        ? 'Retry is off: the files sent with the question are not kept'
+        : 'Retry',
+  );
+}
+
 class _UserBubble extends StatelessWidget {
-  const _UserBubble(this.text, {this.attachments = const []});
+  const _UserBubble(
+    this.text, {
+    this.attachments = const [],
+    required this.onEdit,
+  });
 
   final String text;
 
   /// The names of the files sent with the question.
   final List<String> attachments;
 
+  /// Puts [text] back in the composer, to replace the question when the app is signed in.
+  final VoidCallback onEdit;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.end,
+    children: [
+      _bubble(context),
+      IconBtn(
+        'pencil',
+        tooltip: 'Edit',
+        onPressed: onEdit,
+        box: 28,
+        size: IconSize.xs,
+      ),
+    ],
+  );
+
+  Widget _bubble(BuildContext context) {
     final t = Tokens.of(context);
     return Align(
       alignment: Alignment.centerRight,
@@ -239,9 +307,12 @@ class _UserBubble extends StatelessWidget {
 }
 
 class _Answer extends StatelessWidget {
-  const _Answer(this.turn);
+  const _Answer(this.turn, {this.retry});
 
   final Turn turn;
+
+  /// Retry, on the chat's last answer only.
+  final _Retry? retry;
 
   @override
   Widget build(BuildContext context) =>
@@ -269,13 +340,81 @@ class _Answer extends StatelessWidget {
           const SizedBox(height: 12),
           _Citations(turn.citations),
         ],
-        if (!turn.streaming && split.answer.isNotEmpty) ...[
+        if (!turn.streaming && turn.files.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          GeneratedFiles(turn.files),
+        ],
+        if (!turn.streaming && (split.answer.isNotEmpty || retry != null)) ...[
           const SizedBox(height: 6),
-          CopyButton(split.answer, tooltip: 'Copy answer'),
+          Wrap(
+            spacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (split.answer.isNotEmpty)
+                CopyButton(split.answer, tooltip: 'Copy answer'),
+              if (AppScope.of(context).readAloud case final aloud?
+                  when split.answer.isNotEmpty)
+                _ReadAloudButton(aloud, turn),
+              if (retry case final retry?)
+                IconBtn(
+                  'refresh',
+                  tooltip: retry.tooltip,
+                  onPressed: retry.onPressed,
+                  box: 30,
+                  size: IconSize.xs,
+                ),
+              if (_feedbackOf(context, turn) case final chat?) ...[
+                for (final good in const [true, false])
+                  IconBtn(
+                    good ? 'thumb-up' : 'thumb-down',
+                    tooltip: good ? 'Good answer' : 'Bad answer',
+                    active: turn.feedback == good,
+                    onPressed: () => chat.mark(turn, good),
+                    box: 30,
+                    size: IconSize.xs,
+                  ),
+              ],
+              if (turn.metrics case final metrics?)
+                Text(
+                  metrics.text,
+                  style: Type.sans(12, color: Tokens.of(context).muted),
+                ),
+            ],
+          ),
         ],
       ],
     );
   }
+}
+
+/// The chat that can mark [turn] good or bad, or null when it cannot: the app is not signed in
+/// to the server, or the server has not said the answer's id.
+ChatController? _feedbackOf(BuildContext context, Turn turn) {
+  final chat = AppScope.of(context).chat;
+  return chat.signedIn && turn.chatId != null ? chat : null;
+}
+
+/// Reads [turn] aloud, or stops it while it is being read.
+class _ReadAloudButton extends StatelessWidget {
+  const _ReadAloudButton(this.aloud, this.turn);
+
+  final ReadAloud aloud;
+  final Turn turn;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: aloud,
+    builder: (context, _) {
+      final reading = identical(aloud.reading, turn);
+      return IconBtn(
+        reading ? 'stop' : 'speaker',
+        tooltip: reading ? 'Stop reading' : 'Read aloud',
+        onPressed: () => aloud.toggle(turn),
+        box: 30,
+        size: IconSize.xs,
+      );
+    },
+  );
 }
 
 /// What the agent is doing while the answer runs, such as a tool it runs. It goes when the
@@ -376,7 +515,6 @@ class _ReasoningState extends State<_Reasoning> {
   }
 }
 
-/// A numbered chip naming a document the answer drew on. Tapping it shows the file in Sources.
 /// The sources an answer drew on. An agent's can be dozens of web pages, so past the first few
 /// they fold behind a count.
 class _Citations extends StatefulWidget {
@@ -497,4 +635,26 @@ class _Citation extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The system's text scaling, which may be non-linear, times the person's chat text size.
+class _TimesScaler extends TextScaler {
+  const _TimesScaler(this.base, this.factor);
+
+  final TextScaler base;
+  final double factor;
+
+  @override
+  double scale(double fontSize) => base.scale(fontSize) * factor;
+
+  @Deprecated('Use scale instead.')
+  @override
+  double get textScaleFactor => scale(14) / 14;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _TimesScaler && other.base == base && other.factor == factor;
+
+  @override
+  int get hashCode => Object.hash(base, factor);
 }

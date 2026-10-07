@@ -30,16 +30,110 @@ class OffDoc {
   }
 }
 
+/// The workspace and chat last on screen, which the app opens at start when they still exist.
+class LastChat {
+  const LastChat(this.slug, [this.thread]);
+
+  final String slug;
+
+  /// The chat, or null when the workspace was left on a draft.
+  final String? thread;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LastChat && other.slug == slug && other.thread == thread;
+
+  @override
+  int get hashCode => Object.hash(slug, thread);
+
+  Map<String, Object?> toJson() => {
+    'slug': slug,
+    if (thread != null) 'thread': thread,
+  };
+
+  static LastChat? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final slug = json['slug'];
+    final thread = json['thread'];
+    if (slug is! String || slug.isEmpty) return null;
+    return LastChat(
+      slug,
+      thread is String && thread.isNotEmpty ? thread : null,
+    );
+  }
+}
+
+/// Which colours the app uses: the system's light or dark, or one of them always.
+enum ThemePref { system, light, dark }
+
+/// How large the text of a chat is drawn.
+enum TextSize {
+  small(0.9),
+  normal(1),
+  large(1.2);
+
+  const TextSize(this.scale);
+
+  /// What the chat's text size is multiplied by.
+  final double scale;
+}
+
 class Prefs {
-  const Prefs({this.switchedOff = const {}});
+  const Prefs({
+    this.switchedOff = const {},
+    this.workspaceOrder = const [],
+    this.theme = ThemePref.system,
+    this.textSize = TextSize.normal,
+    this.lastChat,
+  });
 
   /// The documents switched off in each workspace, by its slug.
   final Map<String, List<OffDoc>> switchedOff;
 
+  /// The slugs of the workspaces in the order the person arranged them. A workspace not listed
+  /// follows the listed ones.
+  final List<String> workspaceOrder;
+
+  final ThemePref theme;
+  final TextSize textSize;
+
+  /// The workspace and chat last on screen, or null before any was opened.
+  final LastChat? lastChat;
+
   List<OffDoc> offIn(String slug) => switchedOff[slug] ?? const [];
 
+  /// [items] with those named in [workspaceOrder] first, in that order, and the rest after them
+  /// in their own order. [slugOf] names an item's workspace.
+  List<T> inOrder<T>(Iterable<T> items, String Function(T) slugOf) {
+    final rank = {for (final (i, slug) in workspaceOrder.indexed) slug: i};
+    final unlisted = rank.length;
+    final list = items.toList();
+    final keyed = [for (final (i, item) in list.indexed) (i, item)];
+    keyed.sort((a, b) {
+      final byRank = (rank[slugOf(a.$2)] ?? unlisted).compareTo(
+        rank[slugOf(b.$2)] ?? unlisted,
+      );
+      return byRank != 0 ? byRank : a.$1.compareTo(b.$1);
+    });
+    return [for (final (_, item) in keyed) item];
+  }
+
+  Prefs _copy({
+    Map<String, List<OffDoc>>? switchedOff,
+    List<String>? workspaceOrder,
+    ThemePref? theme,
+    TextSize? textSize,
+    LastChat? Function()? lastChat,
+  }) => Prefs(
+    switchedOff: switchedOff ?? this.switchedOff,
+    workspaceOrder: workspaceOrder ?? this.workspaceOrder,
+    theme: theme ?? this.theme,
+    textSize: textSize ?? this.textSize,
+    lastChat: lastChat == null ? this.lastChat : lastChat(),
+  );
+
   /// These prefs with [slug]'s switched-off documents set to [docs].
-  Prefs withOff(String slug, List<OffDoc> docs) => Prefs(
+  Prefs withOff(String slug, List<OffDoc> docs) => _copy(
     switchedOff: {
       for (final entry in switchedOff.entries)
         if (entry.key != slug) entry.key: entry.value,
@@ -47,21 +141,73 @@ class Prefs {
     },
   );
 
-  /// These prefs with the document at [path] forgotten in every workspace.
-  Prefs withoutDoc(String path) => Prefs(
+  /// These prefs with the documents at [paths] forgotten in every workspace.
+  Prefs withoutDocs(Set<String> paths) => _copy(
     switchedOff: {
       for (final MapEntry(:key, :value) in switchedOff.entries)
-        if (value.where((d) => d.path != path).toList() case final kept
+        if (value.where((d) => !paths.contains(d.path)).toList() case final kept
             when kept.isNotEmpty)
           key: kept,
     },
   );
+
+  /// These prefs with the workspaces arranged as [slugs], and every other slug in the order
+  /// kept after them, as another server's workspaces are.
+  Prefs withOrder(List<String> slugs) => _copy(
+    workspaceOrder: [
+      ...slugs,
+      ...workspaceOrder.where((s) => !slugs.contains(s)),
+    ],
+  );
+
+  /// These prefs with [from]'s order, switched-off documents and last chat moved to [to], as
+  /// when a workspace's slug changes.
+  Prefs withRenamedWorkspace(String from, String to) => from == to
+      ? this
+      : _copy(
+          switchedOff: {
+            for (final entry in switchedOff.entries)
+              if (entry.key != from && entry.key != to) entry.key: entry.value,
+            if (switchedOff.containsKey(from) || switchedOff.containsKey(to))
+              to: {
+                for (final doc in offIn(to)) doc.path: doc,
+                for (final doc in offIn(from)) doc.path: doc,
+              }.values.toList(),
+          },
+          workspaceOrder: [
+            for (final s in workspaceOrder)
+              if (s == from) to else if (s != to) s,
+          ],
+          lastChat: () => lastChat?.slug == from
+              ? LastChat(to, lastChat!.thread)
+              : lastChat,
+        );
+
+  /// These prefs with [slug] dropped from the order and the last chat, as when the workspace
+  /// is deleted.
+  Prefs withoutWorkspace(String slug) => _copy(
+    workspaceOrder: [...workspaceOrder.where((s) => s != slug)],
+    lastChat: () => lastChat?.slug == slug ? null : lastChat,
+  );
+
+  /// These prefs with chat [thread] of workspace [slug] as the last on screen; a null [thread]
+  /// is a draft.
+  Prefs withLastChat(String slug, String? thread) =>
+      _copy(lastChat: () => LastChat(slug, thread));
+
+  Prefs withTheme(ThemePref theme) => _copy(theme: theme);
+
+  Prefs withTextSize(TextSize size) => _copy(textSize: size);
 
   String encode() => jsonEncode({
     'switchedOff': {
       for (final entry in switchedOff.entries)
         entry.key: [for (final doc in entry.value) doc.toJson()],
     },
+    'workspaceOrder': workspaceOrder,
+    'theme': theme.name,
+    'textSize': textSize.name,
+    if (lastChat != null) 'lastChat': lastChat!.toJson(),
   });
 
   /// Reads what [encode] wrote. Anything it cannot read falls back to the default, and keys it
@@ -75,6 +221,7 @@ class Prefs {
     }
     if (json is! Map) return const Prefs();
     final off = json['switchedOff'];
+    final order = json['workspaceOrder'];
     return Prefs(
       switchedOff: {
         if (off is Map)
@@ -84,6 +231,15 @@ class Prefs {
                 for (final doc in entry.value as List) ?OffDoc.fromJson(doc),
               ],
       },
+      workspaceOrder: [
+        if (order is List)
+          for (final slug in order)
+            if (slug is String) slug,
+      ],
+      theme: ThemePref.values.asNameMap()[json['theme']] ?? ThemePref.system,
+      textSize:
+          TextSize.values.asNameMap()[json['textSize']] ?? TextSize.normal,
+      lastChat: LastChat.fromJson(json['lastChat']),
     );
   }
 }

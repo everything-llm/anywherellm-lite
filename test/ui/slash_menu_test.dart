@@ -14,8 +14,7 @@ const _research = SlashCommand(
   description: 'Research a question in depth',
 );
 
-Finder get _composer =>
-    find.byWidgetPredicate((w) => w is EditableText && !w.readOnly);
+Finder get _composer => composerField;
 
 String _draft(WidgetTester tester) =>
     tester.widget<EditableText>(_composer.last).controller.text;

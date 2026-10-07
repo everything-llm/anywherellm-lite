@@ -22,6 +22,26 @@ void main() {
     expect(await store.load(), _connection);
   });
 
+  test('a saved password loads back with the connection', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final store = KeyringSettingsStore();
+    await store.save(_connection.withPassword('PASS'));
+    expect((await store.load())!.password, 'PASS');
+  });
+
+  test('an entry saved before passwords loads with none', () async {
+    FlutterSecureStorage.setMockInitialValues({
+      'anythingllm-connection':
+          '{"baseUrl":"https://h:3001","apiKey":"K","password":""}',
+    });
+    final loaded = await KeyringSettingsStore().load();
+    expect(loaded!.password, isNull);
+    FlutterSecureStorage.setMockInitialValues({
+      'anythingllm-connection': '{"baseUrl":"https://h:3001","apiKey":"K"}',
+    });
+    expect((await KeyringSettingsStore().load())!.password, isNull);
+  });
+
   test('clear removes it', () async {
     FlutterSecureStorage.setMockInitialValues({});
     final store = KeyringSettingsStore();

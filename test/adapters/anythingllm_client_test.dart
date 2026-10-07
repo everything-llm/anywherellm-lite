@@ -5,11 +5,14 @@ import 'dart:io';
 import 'package:anywherellm/adapters/anythingllm_client.dart';
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/connection.dart';
+import 'package:anywherellm/core/embeds.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+
+import '../support/multipart.dart';
 
 const _connection = Connection(
   baseUrl: 'https://host.example.ts.net:3001',
@@ -35,6 +38,20 @@ HttpAnythingLlmApi _answering(
   seen?.add(request);
   return http.Response(jsonEncode(body), status);
 });
+
+/// [handler] behind AnythingLLM itself, which has no relay: it answers the relay's health check
+/// with its web page, and that request never reaches [handler].
+MockClient _notRelay(MockClientStreamHandler handler) =>
+    MockClient.streaming((request, body) async {
+      if (request.url.path == '/everythingllm/health') {
+        return http.StreamedResponse(
+          Stream.value(utf8.encode('<!doctype html><html></html>')),
+          200,
+          headers: {'content-type': 'text/html'},
+        );
+      }
+      return handler(request, body);
+    });
 
 Future<ApiException> _failure(Future<void> call) async {
   try {
@@ -523,6 +540,63 @@ void main() {
       expect(turns.last.attachments, isEmpty);
     });
 
+    test('a history turn keeps its exchange id and feedback', () async {
+      final turns = await _answering({
+        'history': [
+          {'role': 'user', 'content': 'Q', 'chatId': 7},
+          {
+            'role': 'assistant',
+            'content': 'A',
+            'chatId': 7,
+            'feedbackScore': true,
+          },
+          {'role': 'user', 'content': 'Old'},
+        ],
+      }).history('w', 't');
+      expect(turns.map((t) => t.chatId), [7, 7, null]);
+      expect(turns.map((t) => t.feedback), [null, true, null]);
+    });
+
+    test('a history answer keeps the files an agent made', () async {
+      final turns = await _answering({
+        'history': [
+          {
+            'role': 'assistant',
+            'content': 'Here is your report.',
+            'metrics': {'model': 'glm-5.3', 'outputTps': 41.8},
+            'outputs': [
+              {
+                'type': 'PdfFileDownload',
+                'payload': {
+                  'filename': 'report.pdf',
+                  'storageFilename': 'pdf-1f2e.pdf',
+                  'fileSize': 2048,
+                },
+              },
+              {
+                'type': 'imageGenerationCard',
+                'payload': {'storageFilename': 'img-9a.png', 'prompt': 'a cat'},
+              },
+              {
+                'type': 'PdfFileDownload',
+                'payload': {'filename': 'x', 'storageFilename': '../../.env'},
+              },
+              {
+                'type': 'rechartVisualize',
+                'payload': {'data': []},
+              },
+            ],
+          },
+        ],
+      }).history('w', 't');
+      expect(turns.single.metrics?.text, 'glm-5.3 · 42 tok/s');
+      final files = turns.single.files;
+      expect(files.map((f) => (f.name, f.storageName, f.size, f.isImage)), [
+        ('report.pdf', 'pdf-1f2e.pdf', 2048, false),
+        ('img-9a.png', 'img-9a.png', null, true),
+      ]);
+    });
+
     test('embedding changes post the adds and deletes', () async {
       final seen = <http.Request>[];
       await _answering({
@@ -544,7 +618,7 @@ void main() {
       int status = 200,
     }) => HttpAnythingLlmApi(
       holder: ConnectionHolder(_connection),
-      client: MockClient.streaming((request, body) async {
+      client: _notRelay((request, body) async {
         seen?.add(request);
         await body.drain<void>();
         return http.StreamedResponse(
@@ -599,7 +673,7 @@ void main() {
       late Map<String, dynamic> body;
       await HttpAnythingLlmApi(
         holder: ConnectionHolder(_connection),
-        client: MockClient.streaming((request, bytes) async {
+        client: _notRelay((request, bytes) async {
           body = jsonDecode(
             await utf8.decodeStream(bytes),
           ) as Map<String, dynamic>;
@@ -610,6 +684,79 @@ void main() {
         }),
       ).streamChat('w', 't', 'Hi').toList();
       expect(body, {'message': 'Hi'});
+    });
+
+    test('an empty whole answer keeps the text streamed so far', () async {
+      final events = await streaming([
+        data({
+          'id': 'a',
+          'type': 'textResponseChunk',
+          'textResponse': 'Looking it up.',
+          'sources': [],
+          'close': false,
+          'error': null,
+        }),
+        data({
+          'id': 'a',
+          'type': 'textResponse',
+          'textResponse': '',
+          'sources': [],
+          'close': true,
+          'error': null,
+        }),
+        data({
+          'uuid': 'a',
+          'type': 'finalizeResponseStream',
+          'textResponse': '',
+          'sources': [],
+          'close': true,
+          'error': false,
+        }),
+      ]).streamChat('w', 't', 'Hi').toList();
+      expect(events.whereType<WholeAnswer>(), isEmpty);
+      expect(events.whereType<TextChunk>().single.text, 'Looking it up.');
+    });
+
+    test('the closing chunk gives the exchange\'s id', () async {
+      final events = await streaming([
+        data({'type': 'textResponseChunk', 'textResponse': 'Hi'}),
+        data({
+          'type': 'finalizeResponseStream',
+          'close': true,
+          'error': false,
+          'chatId': 42,
+        }),
+      ]).streamChat('w', 't', 'Hi').toList();
+      expect((events.last as ChatDone).chatId, 42);
+    });
+
+    test('an agent\'s closing chunk hands on the files it made', () async {
+      final events = await streaming([
+        data({'type': 'textResponse', 'textResponse': 'Made it.'}),
+        data({
+          'type': 'finalizeResponseStream',
+          'textResponse': 'Made it.',
+          'sources': [],
+          'close': true,
+          'error': false,
+          'metrics': {'model': 'glm-5.3', 'completion_tokens': 12},
+          'outputs': [
+            {
+              'type': 'imageGenerationCard',
+              'payload': {
+                'filename': 'cat.png',
+                'storageFilename': 'img-1.png',
+                'fileSize': 900,
+                'url': '/v1/document/generated-files/img-1.png',
+              },
+            },
+          ],
+        }),
+      ]).streamChat('w', 't', 'Draw a cat').toList();
+      final done = events.last as ChatDone;
+      expect(done.metrics?.text, 'glm-5.3 · 12 tokens');
+      expect(done.files.single.name, 'cat.png');
+      expect(done.files.single.isImage, isTrue);
     });
 
     test('an agent answer: status, then the whole answer, then its sources', () async {
@@ -838,32 +985,145 @@ void main() {
   });
 
   group('slash commands', () {
-    test('reads the presets from the system route, with the key', () async {
-      final seen = <http.Request>[];
-      final presets = await _answering({
-        'presets': [
-          {
-            'id': 1,
-            'command': '/deep-research',
-            'prompt': '@agent Research:',
-            'description': 'Research in depth',
-          },
-          {'id': 2, 'command': 'broken'},
-        ],
-      }, seen: seen).slashCommands();
-      expect(seen.single.url.path, '/api/system/slash-command-presets');
-      expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
+    test('reads the presets from the system route, signed in', () async {
+      final server = _SignInServer()
+        ..routes['/api/system/slash-command-presets'] = {
+          'presets': [
+            {
+              'id': 1,
+              'command': '/deep-research',
+              'prompt': '@agent Research:',
+              'description': 'Research in depth',
+            },
+            {'id': 2, 'command': 'broken'},
+          ],
+        };
+      final presets = await server.api().slashCommands();
+      expect(server.seen.map((r) => r.url.path), [
+        '/api/request-token',
+        '/api/system/slash-command-presets',
+      ]);
+      expect(jsonDecode(server.seen.first.body), {'password': 'PASS-WORD'});
+      expect(server.seen.last.headers['Authorization'], 'Bearer TOKEN-1');
       expect([for (final p in presets) p.command], ['/deep-research']);
       expect(presets.single.description, 'Research in depth');
     });
 
-    test('a server with a password refuses them', () async {
-      final error = await _failure(
-        _answering({
-          'error': 'No auth token found.',
-        }, status: 401).slashCommands(),
-      );
+    test('a protected server without a saved password asks for one', () async {
+      final server = _SignInServer();
+      final error = await _failure(server.api(password: null).slashCommands());
       expect(error.status, 401);
+      expect(error.message, contains('Add it in Settings'));
+      expect(server.seen.single.url.path, '/api/system/slash-command-presets');
+      expect(server.seen.single.headers.containsKey('Authorization'), isFalse);
+    });
+
+    test(
+      'a password-free server lists its presets without signing in',
+      () async {
+        final api = _api((request) async {
+          expect(request.url.path, '/api/system/slash-command-presets');
+          expect(request.headers.containsKey('Authorization'), isFalse);
+          return http.Response(
+            jsonEncode({
+              'presets': [
+                {'id': 1, 'command': '/brief', 'prompt': 'Be brief:'},
+              ],
+            }),
+            200,
+          );
+        }, current: _connection.withPassword(null));
+        expect((await api.slashCommands()).single.command, '/brief');
+      },
+    );
+  });
+
+  group('signed in', () {
+    test('signs in once and keeps the token for later calls', () async {
+      final server = _SignInServer()
+        ..routes['/api/system/slash-command-presets'] = {'presets': []};
+      final api = server.api();
+      await api.slashCommands();
+      await api.slashCommands();
+      expect(
+        server.seen.where((r) => r.url.path == '/api/request-token'),
+        hasLength(1),
+      );
+    });
+
+    test('a token the server refuses is replaced once', () async {
+      final server = _SignInServer()
+        ..routes['/api/system/slash-command-presets'] = {'presets': []};
+      final api = server.api();
+      await api.slashCommands();
+      server.valid = 'none';
+      await api.slashCommands();
+      expect(server.seen.map((r) => r.url.path).toList(), [
+        '/api/request-token',
+        '/api/system/slash-command-presets',
+        '/api/system/slash-command-presets',
+        '/api/request-token',
+        '/api/system/slash-command-presets',
+      ]);
+      expect(server.seen.last.headers['Authorization'], 'Bearer TOKEN-2');
+    });
+
+    test('a wrong password is refused in plain words', () async {
+      final server = _SignInServer();
+      final error = await _failure(
+        server.api().signIn(_connection.withPassword('WRONG')),
+      );
+      expect(error.status, 403);
+      expect(error.message, 'The server did not accept the password.');
+    });
+
+    test('a call that takes the login never sends the key', () async {
+      final server = _SignInServer()
+        ..routes['/api/workspace/w/thread/t/delete-edited-chats'] = 'OK'
+        ..routes['/api/workspace/w/chat-feedback/7'] = {'success': true};
+      final api = server.api();
+      await api.dropFrom('w', 't', 7);
+      await api.setFeedback('w', 7, true);
+      for (final request in server.seen) {
+        expect(request.headers['Authorization'], isNot(contains('SECRET-KEY')));
+      }
+      final drop = server.seen.firstWhere(
+        (r) => r.url.path.endsWith('delete-edited-chats'),
+      );
+      expect(drop.method, 'DELETE');
+      expect(jsonDecode(drop.body), {'startingId': 7});
+      expect(jsonDecode(server.seen.last.body), {'feedback': true});
+    });
+
+    test('no error message carries the password or the token', () async {
+      final server = _SignInServer()
+        ..routes['/api/system/slash-command-presets'] = {'error': 'boom'}
+        ..status = 500;
+      final api = server.api();
+      final error = await _failure(api.slashCommands());
+      expect(error.message, isNot(contains('PASS-WORD')));
+      expect(error.message, isNot(contains('TOKEN')));
+      final refused = await _failure(
+        api.signIn(_connection.withPassword('PASS-WRONG')),
+      );
+      expect(refused.message, isNot(contains('PASS-WRONG')));
+    });
+
+    test('asks how the server signs in without the key', () async {
+      final seen = <http.Request>[];
+      Future<ServerAuth> ask(Map<String, Object?> results) =>
+          _answering({'results': results}, seen: seen).serverAuth(_connection);
+      expect(
+        await ask({'RequiresAuth': true, 'MultiUserMode': false}),
+        ServerAuth.password,
+      );
+      expect(await ask({'RequiresAuth': false}), ServerAuth.none);
+      expect(
+        await ask({'RequiresAuth': true, 'MultiUserMode': true}),
+        ServerAuth.multiUser,
+      );
+      expect(seen.first.url.path, '/api/setup-complete');
+      expect(seen.first.headers.containsKey('Authorization'), isFalse);
     });
   });
 
@@ -1047,7 +1307,7 @@ void main() {
       final seen = <http.BaseRequest>[];
       final api = HttpAnythingLlmApi(
         holder: ConnectionHolder(_connection),
-        client: MockClient.streaming((request, body) async {
+        client: _notRelay((request, body) async {
           seen.add(request);
           await body.drain<void>();
           return http.StreamedResponse(
@@ -1101,7 +1361,7 @@ void main() {
       final seen = <http.BaseRequest>[];
       final api = HttpAnythingLlmApi(
         holder: ConnectionHolder(_connection),
-        client: MockClient.streaming((request, body) async {
+        client: _notRelay((request, body) async {
           seen.add(request);
           await body.drain<void>();
           return http.StreamedResponse(const Stream.empty(), 200);
@@ -1265,6 +1525,115 @@ void main() {
       expect(error.message, contains('Query parameter cannot be empty.'));
     });
 
+    test(
+      'a settings change posts the keys, and every key must come back written',
+      () async {
+        final seen = <http.Request>[];
+        await _answering({
+          'newValues': {'GenericOpenAiModelPref': 'glm-5.3'},
+          'error': null,
+        }, seen: seen).updateSystem({'GenericOpenAiModelPref': 'glm-5.3'});
+        expect(seen.single.url.path, '/api/v1/system/update-env');
+        expect(jsonDecode(seen.single.body), {
+          'GenericOpenAiModelPref': 'glm-5.3',
+        });
+
+        final dropped = await _failure(
+          _answering({'newValues': {}, 'error': null})
+              .updateSystem({'MadeUpKey': '1'}),
+        );
+        expect(dropped.message, 'The server did not write MadeUpKey.');
+        final refused = await _failure(
+          _answering({'newValues': {}, 'error': 'Invalid base path'})
+              .updateSystem({'OllamaLLMBasePath': 'nope'}),
+        );
+        expect(refused.message, 'Invalid base path');
+      },
+    );
+
+    test('embeds are listed, made, changed and deleted by uuid', () async {
+      final seen = <http.Request>[];
+      final api = _api((request) async {
+        seen.add(request);
+        return http.Response(switch (request.url.path) {
+          '/api/v1/embed' => jsonEncode({
+            'embeds': [
+              {
+                'uuid': 'e-1',
+                'workspace': {'name': 'Q3'},
+                'chat_count': 2,
+              },
+            ],
+          }),
+          '/api/v1/embed/new' => jsonEncode({
+            'embed': {'uuid': 'e-2'},
+            'error': null,
+          }),
+          '/api/v1/embed/e-1/chats' => jsonEncode({
+            'chats': [
+              {'prompt': 'Hi', 'response': '{"text":"Hello"}'},
+            ],
+          }),
+          _ => jsonEncode({'success': true, 'error': null}),
+        }, 200);
+      });
+      expect((await api.embeds()).single.chats, 2);
+      expect(await api.createEmbed(const NewEmbed(workspaceSlug: 'q3')), 'e-2');
+      await api.updateEmbed('e-1', enabled: false);
+      await api.deleteEmbed('e-1');
+      expect((await api.embedChats('e-1')).single.answer, 'Hello');
+      expect(seen.map((r) => '${r.method} ${r.url.path}'), [
+        'GET /api/v1/embed',
+        'POST /api/v1/embed/new',
+        'POST /api/v1/embed/e-1',
+        'DELETE /api/v1/embed/e-1',
+        'GET /api/v1/embed/e-1/chats',
+      ]);
+      expect(jsonDecode(seen[2].body), {'enabled': false});
+    });
+
+    test('an embed the server would not make says why', () async {
+      final error = await _failure(
+        _answering({'embed': null, 'error': 'Workspace not found'})
+            .createEmbed(const NewEmbed(workspaceSlug: 'gone')),
+      );
+      expect(error.message, 'Workspace not found');
+    });
+
+    test('the vector count is the server\'s number', () async {
+      final seen = <http.Request>[];
+      expect(
+        await _answering({'vectorCount': 796}, seen: seen).vectorCount(),
+        796,
+      );
+      expect(seen.single.url.path, '/api/v1/system/vector-count');
+      await _failure(_answering({'vectorCount': 'many'}).vectorCount());
+    });
+
+    test('a generated file is its bytes, by its storage name', () async {
+      final seen = <http.Request>[];
+      final bytes = await _api((request) async {
+        seen.add(request);
+        return http.Response.bytes(
+          [37, 80, 68, 70],
+          200,
+          headers: {'content-type': 'application/pdf'},
+        );
+      }).generatedFile('pdf-1f2e.pdf');
+      expect(
+        seen.single.url.path,
+        '/api/v1/document/generated-files/pdf-1f2e.pdf',
+      );
+      expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
+      expect(bytes, [37, 80, 68, 70]);
+      final gone = await _failure(
+        _answering({
+          'error': 'File not found',
+        }, status: 404).generatedFile('pdf-0.pdf'),
+      );
+      expect(gone.message, contains('File not found'));
+    });
+
     test('an export is the file as the server sends it', () async {
       final seen = <http.Request>[];
       final bytes = await _api((request) async {
@@ -1310,4 +1679,616 @@ void main() {
       );
     });
   });
+
+  group('on a relay', () {
+    String event(int id, String name, Object data) =>
+        'id: $id\nevent: $name\ndata: ${jsonEncode(data)}\n\n';
+
+    String chunk(int id, Map<String, Object?> data) => event(id, 'chunk', data);
+
+    /// A relay that starts run `r_1` and answers its events with what [follow] gives for each
+    /// try, counting from 0. Every request goes into [seen]. The start waits for [started], the
+    /// health check answers [probeStatus] for each ask with [health], and a try at the events
+    /// answers [eventsStatus].
+    HttpAnythingLlmApi relay(
+      Stream<List<int>> Function(int attempt) follow, {
+      List<http.Request>? seen,
+      int startStatus = 201,
+      Object? start,
+      Future<void>? started,
+      int Function(int probe)? probeStatus,
+      Object? health,
+      int Function(int attempt)? eventsStatus,
+      List<Duration> rejoinDelays = const [Duration.zero],
+      Duration quiet = const Duration(seconds: 5),
+    }) {
+      var attempt = 0;
+      var probe = 0;
+      return HttpAnythingLlmApi(
+        holder: ConnectionHolder(_connection),
+        quiet: quiet,
+        rejoinDelays: rejoinDelays,
+        client: MockClient.streaming((request, body) async {
+          final bytes = await body.toBytes();
+          seen?.add(
+            http.Request(request.method, request.url)
+              ..headers.addAll(request.headers)
+              ..bodyBytes = bytes,
+          );
+          final path = request.url.path;
+          if (path == '/everythingllm/health') {
+            final status = probeStatus?.call(probe++) ?? 200;
+            return http.StreamedResponse(
+              Stream.value(
+                utf8.encode(
+                  status == 200
+                      ? jsonEncode(
+                          health ??
+                              {
+                                'ok': true,
+                                'service': 'everythingllm',
+                                'features': ['runs'],
+                              },
+                        )
+                      : 'Bad Gateway',
+                ),
+              ),
+              status,
+            );
+          }
+          if (path == '/everythingllm/v1/runs') {
+            await started;
+            return http.StreamedResponse(
+              Stream.value(
+                utf8.encode(
+                  jsonEncode(start ?? {'id': 'r_1', 'status': 'running'}),
+                ),
+              ),
+              startStatus,
+            );
+          }
+          if (path == '/everythingllm/v1/runs/r_1/events') {
+            final n = attempt++;
+            final status = eventsStatus?.call(n) ?? 200;
+            if (status != 200) {
+              return http.StreamedResponse(
+                Stream.value(utf8.encode('{"error":"Store busy."}')),
+                status,
+              );
+            }
+            return http.StreamedResponse(follow(n), 200);
+          }
+          if (path == '/everythingllm/v1/runs/r_1/cancel') {
+            return http.StreamedResponse(
+              Stream.value(utf8.encode('{"id":"r_1","status":"cancelled"}')),
+              200,
+            );
+          }
+          return http.StreamedResponse(
+            Stream.value(utf8.encode('Not Found')),
+            404,
+          );
+        }),
+      );
+    }
+
+    Stream<List<int>> lines(List<String> events) =>
+        Stream.fromIterable([for (final e in events) utf8.encode(e)]);
+
+    /// [events], then the connection breaking.
+    Stream<List<int>> broken(List<String> events) async* {
+      yield* lines(events);
+      throw http.ClientException('Connection reset');
+    }
+
+    test('starts a run of the stream-chat body and reads its chunks', () async {
+      final seen = <http.Request>[];
+      final events = await relay(
+        (_) => lines([
+          chunk(1, {
+            'type': 'agentThought',
+            'thought': '@agent: Using SearXNG to search for news',
+          }),
+          ': ping\n\n',
+          chunk(2, {'type': 'textResponseChunk', 'textResponse': 'Hel'}),
+          chunk(3, {
+            'type': 'textResponse',
+            'textResponse': 'Hello',
+            'close': true,
+          }),
+          chunk(4, {
+            'type': 'finalizeResponseStream',
+            'sources': [
+              {'title': 'News', 'chunkSource': 'link://https://news.example/a'},
+            ],
+          }),
+          event(5, 'done', {}),
+        ]),
+        seen: seen,
+      ).streamChat('w', 't', 'Hi').toList();
+
+      expect(seen.map((r) => '${r.method} ${r.url.path}'), [
+        'GET /everythingllm/health',
+        'POST /everythingllm/v1/runs',
+        'GET /everythingllm/v1/runs/r_1/events',
+      ]);
+      expect(seen.first.headers.containsKey('Authorization'), isFalse);
+      final start = jsonDecode(seen[1].body) as Map<String, dynamic>;
+      expect(start['workspace'], 'w');
+      expect(start['thread'], 't');
+      expect(start['clientId'], matches(RegExp(r'^c_[0-9a-f]{32}$')));
+      expect(start['body'], {'message': 'Hi'});
+      expect(seen[2].headers['Authorization'], 'Bearer SECRET-KEY');
+      expect(seen[2].headers.containsKey('Last-Event-ID'), isFalse);
+
+      expect(events, hasLength(4));
+      expect((events[0] as StatusChunk).text, isNotEmpty);
+      expect((events[1] as TextChunk).text, 'Hel');
+      expect((events[2] as WholeAnswer).text, 'Hello');
+      final done = events[3] as ChatDone;
+      expect(done.citations.single.url, Uri.parse('https://news.example/a'));
+    });
+
+    test('a chat answer ends at done after its closing chunk', () async {
+      final events = await relay(
+        (_) => lines([
+          chunk(1, {'type': 'textResponseChunk', 'textResponse': 'Hi'}),
+          chunk(2, {
+            'type': 'textResponseChunk',
+            'textResponse': '',
+            'close': true,
+            'sources': [
+              {'title': 'notes.md'},
+            ],
+          }),
+          event(3, 'done', {}),
+        ]),
+      ).streamChat('w', 't', 'Hi').toList();
+      expect((events.first as TextChunk).text, 'Hi');
+      expect((events.last as ChatDone).citations.single.title, 'notes.md');
+    });
+
+    test('attachments go in the run\'s body', () async {
+      final seen = <http.Request>[];
+      await relay((_) => lines([event(1, 'done', {})]), seen: seen)
+          .streamChat(
+            'w',
+            't',
+            'Look',
+            attachments: [
+              Attachment.of('photo.png', const [1, 2, 3]),
+            ],
+          )
+          .toList();
+      final start = jsonDecode(seen[1].body) as Map<String, dynamic>;
+      expect((start['body'] as Map)['attachments'], [
+        {
+          'name': 'photo.png',
+          'mime': 'image/png',
+          'contentString': 'data:image/png;base64,AQID',
+        },
+      ]);
+    });
+
+    test('asks whether the server is a relay once per connection', () async {
+      final seen = <http.Request>[];
+      final api = relay((_) => lines([event(1, 'done', {})]), seen: seen);
+      await api.streamChat('w', 't', 'One').toList();
+      await api.streamChat('w', 't', 'Two').toList();
+      expect(
+        seen.where((r) => r.url.path == '/everythingllm/health'),
+        hasLength(1),
+      );
+    });
+
+    test('a relay failing when asked is asked again next time', () async {
+      final seen = <http.Request>[];
+      final api = relay(
+        (_) => lines([event(1, 'done', {})]),
+        seen: seen,
+        probeStatus: (probe) => probe == 0 ? 503 : 200,
+      );
+      api.streamChat('w', 't', 'One').listen((_) {}, onError: (_) {});
+      await pumpEventQueue();
+      await api.streamChat('w', 't', 'Two').toList();
+      expect(
+        seen.where((r) => r.url.path == '/everythingllm/health'),
+        hasLength(2),
+      );
+      expect(
+        seen.where((r) => r.url.path == '/everythingllm/v1/runs'),
+        hasLength(1),
+      );
+    });
+
+    test(
+      'a web page at the relay\'s health check is AnythingLLM itself',
+      () async {
+        final paths = <String>[];
+        final api = HttpAnythingLlmApi(
+          holder: ConnectionHolder(_connection),
+          client: MockClient.streaming((request, body) async {
+            await body.drain<void>();
+            paths.add(request.url.path);
+            if (request.url.path == '/everythingllm/health') {
+              return http.StreamedResponse(
+                Stream.value(utf8.encode('<!doctype html><html></html>')),
+                200,
+                headers: {'content-type': 'text/html'},
+              );
+            }
+            return http.StreamedResponse(
+              Stream.value(utf8.encode('data: {"close":true}\n\n')),
+              200,
+            );
+          }),
+        );
+        await api.streamChat('w', 't', 'Hi').toList();
+        await api.streamChat('w', 't', 'Again').toList();
+        expect(paths, [
+          '/everythingllm/health',
+          '/api/v1/workspace/w/thread/t/stream-chat',
+          '/api/v1/workspace/w/thread/t/stream-chat',
+        ]);
+      },
+    );
+
+    for (final (what, health) in [
+      (
+        'another service',
+        {
+          'ok': true,
+          'service': 'other',
+          'features': ['runs'],
+        },
+      ),
+      ('no runs', {'ok': true, 'service': 'everythingllm', 'features': []}),
+    ]) {
+      test('a health answer naming $what is no relay', () async {
+        final seen = <http.Request>[];
+        final api = relay(
+          (_) => lines([event(1, 'done', {})]),
+          seen: seen,
+          health: health,
+        );
+        // The fake has no stream-chat, so the direct answer fails.
+        await _failure(api.streamChat('w', 't', 'Hi').drain<void>());
+        expect(seen.map((r) => r.url.path), [
+          '/everythingllm/health',
+          '/api/v1/workspace/w/thread/t/stream-chat',
+        ]);
+      });
+    }
+
+    test('a key the relay refuses fails the answer in its words', () async {
+      final error = await _failure(
+        relay(
+          (_) => lines([]),
+          startStatus: 403,
+          start: {'error': 'No valid api key found.'},
+        ).streamChat('w', 't', 'Hi').drain<void>(),
+      );
+      expect(error.status, 403);
+    });
+
+    test('a dropped connection rejoins after the last event seen', () async {
+      final seen = <http.Request>[];
+      final events = await relay(
+        (attempt) => attempt == 0
+            ? broken([
+                chunk(1, {'type': 'textResponseChunk', 'textResponse': 'Hel'}),
+              ])
+            : lines([
+                chunk(2, {'type': 'textResponseChunk', 'textResponse': 'lo'}),
+                event(3, 'done', {}),
+              ]),
+        seen: seen,
+      ).streamChat('w', 't', 'Hi').toList();
+      expect(
+        [for (final e in events.whereType<TextChunk>()) e.text].join(),
+        'Hello',
+      );
+      final follows = seen
+          .where((r) => r.url.path == '/everythingllm/v1/runs/r_1/events')
+          .toList();
+      expect(follows, hasLength(2));
+      expect(follows.last.headers['Last-Event-ID'], '1');
+    });
+
+    test('a quiet connection is rejoined too', () async {
+      final events = await relay(
+        (attempt) => attempt == 0
+            ? StreamController<List<int>>().stream
+            : lines([
+                chunk(1, {'type': 'textResponseChunk', 'textResponse': 'Hi'}),
+                event(2, 'done', {}),
+              ]),
+        quiet: const Duration(milliseconds: 50),
+      ).streamChat('w', 't', 'Hi').toList();
+      expect((events.first as TextChunk).text, 'Hi');
+    });
+
+    test('a relay failing for a moment while rejoining is rejoined', () async {
+      final events = await relay(
+        (_) => lines([
+          chunk(2, {'type': 'textResponseChunk', 'textResponse': 'Hi'}),
+          event(3, 'done', {}),
+        ]),
+        eventsStatus: (attempt) => attempt == 0 ? 503 : 200,
+      ).streamChat('w', 't', 'Hi').toList();
+      expect((events.first as TextChunk).text, 'Hi');
+    });
+
+    test('an end that carries no JSON still ends the answer', () async {
+      for (final end in [
+        'id: 1\nevent: done\ndata:\n\n',
+        'id: 1\nevent: done\ndata: ok\n\n',
+      ]) {
+        final seen = <http.Request>[];
+        await relay(
+          (_) => lines([end]),
+          seen: seen,
+          rejoinDelays: const [Duration.zero, Duration.zero],
+        ).streamChat('w', 't', 'Hi').toList();
+        expect(
+          seen.where((r) => r.url.path == '/everythingllm/v1/runs/r_1/events'),
+          hasLength(1),
+        );
+      }
+    });
+
+    test('a failed run in plain words gives those words', () async {
+      final error = await _failure(
+        relay(
+          (_) => lines(['id: 1\nevent: failed\ndata: The model crashed.\n\n']),
+        ).streamChat('w', 't', 'Hi').toList(),
+      );
+      expect(error.message, 'The model crashed.');
+    });
+
+    test('a run that cannot be rejoined says the answer goes on', () async {
+      final error = await _failure(
+        relay(
+          (_) => lines([]),
+          rejoinDelays: const [Duration.zero, Duration.zero],
+        ).streamChat('w', 't', 'Hi').toList(),
+      );
+      expect(error.message, startsWith('Lost the connection to the relay.'));
+    });
+
+    test('a failed run gives the relay\'s words', () async {
+      final error = await _failure(
+        relay(
+          (_) => lines([
+            event(1, 'failed', {
+              'error': 'The relay restarted during the answer.',
+            }),
+          ]),
+        ).streamChat('w', 't', 'Hi').toList(),
+      );
+      expect(error.message, 'The relay restarted during the answer.');
+    });
+
+    test('a chat with a run going says so', () async {
+      final error = await _failure(
+        relay(
+          (_) => lines([]),
+          startStatus: 409,
+          start: {'error': 'That thread already has an answer running.'},
+        ).streamChat('w', 't', 'Hi').toList(),
+      );
+      expect(error.message, 'That thread already has an answer running.');
+      expect(error.status, 409);
+    });
+
+    test('stop cancels the run on the relay', () async {
+      final seen = <http.Request>[];
+      final held = StreamController<List<int>>();
+      final api = relay((_) => held.stream, seen: seen);
+      final first = Completer<void>();
+      final subscription = api.streamChat('w', 't', 'Hi').listen((_) {
+        if (!first.isCompleted) first.complete();
+      });
+      held.add(
+        utf8.encode(
+          chunk(1, {'type': 'textResponseChunk', 'textResponse': 'H'}),
+        ),
+      );
+      await first.future;
+      await api.stopChat('w', 't');
+      await subscription.cancel();
+      expect(held.hasListener, isFalse);
+      expect(seen.last.method, 'POST');
+      expect(seen.last.url.path, '/everythingllm/v1/runs/r_1/cancel');
+    });
+
+    test(
+      'stop before the relay has started the run cancels it once it has',
+      () async {
+        final seen = <http.Request>[];
+        final started = Completer<void>();
+        final api = relay(
+          (_) => StreamController<List<int>>().stream,
+          seen: seen,
+          started: started.future,
+        );
+        final subscription = api.streamChat('w', 't', 'Hi').listen((_) {});
+        await pumpEventQueue();
+        expect(seen.last.url.path, '/everythingllm/v1/runs');
+        final stopped = api.stopChat('w', 't');
+        final cancelled = subscription.cancel();
+        started.complete();
+        await stopped;
+        await cancelled;
+        expect(seen.last.method, 'POST');
+        expect(seen.last.url.path, '/everythingllm/v1/runs/r_1/cancel');
+        expect(
+          seen.where((r) => r.url.path == '/everythingllm/v1/runs/r_1/events'),
+          isEmpty,
+        );
+      },
+    );
+
+    test('stop with no run going sends nothing', () async {
+      final seen = <http.Request>[];
+      await relay((_) => lines([]), seen: seen).stopChat('w', 't');
+      expect(seen, isEmpty);
+    });
+
+    test('letting go of the answer leaves the run going', () async {
+      final seen = <http.Request>[];
+      final held = StreamController<List<int>>();
+      final api = relay((_) => held.stream, seen: seen);
+      final first = Completer<void>();
+      final subscription = api.streamChat('w', 't', 'Hi').listen((_) {
+        if (!first.isCompleted) first.complete();
+      });
+      held.add(
+        utf8.encode(
+          chunk(1, {'type': 'textResponseChunk', 'textResponse': 'H'}),
+        ),
+      );
+      await first.future;
+      await subscription.cancel();
+      expect(held.hasListener, isFalse);
+      await api.stopChat('w', 't');
+      expect(seen.where((r) => r.url.path.endsWith('/cancel')), isEmpty);
+    });
+  });
+
+  group('answerImage', () {
+    final card = Uri.parse(
+      'https://host.example.ts.net:8445/_live/run/r-1.png',
+    );
+
+    /// A client that answers [body] as [type] once [headers] completes, recording each
+    /// request in [seen].
+    HttpAnythingLlmApi images(
+      Stream<List<int>> body, {
+      String type = multipartType,
+      int status = 200,
+      Future<void>? headers,
+      List<http.BaseRequest>? seen,
+      bool allowHttp = true,
+    }) => HttpAnythingLlmApi(
+      holder: ConnectionHolder(_connection.withPassword('PASS-WORD')),
+      allowHttp: allowHttp,
+      client: MockClient.streaming((request, _) async {
+        seen?.add(request);
+        await headers;
+        return http.StreamedResponse(
+          body,
+          status,
+          headers: {'content-type': type},
+        );
+      }),
+    );
+
+    test('reads each frame, with no key, password or token', () async {
+      final seen = <http.BaseRequest>[];
+      final api = images(Stream.value(multipart(['one', 'two'])), seen: seen);
+      final frames = await api.answerImage(card).toList();
+      expect(frames.map(ascii.decode), ['one', 'two']);
+      expect(seen.single.url, card);
+      expect(seen.single.method, 'GET');
+      expect(
+        seen.single.headers.keys.map((k) => k.toLowerCase()),
+        isNot(contains('authorization')),
+      );
+      expect(seen.single.headers.values.join(), isNot(contains('SECRET-KEY')));
+    });
+
+    test('refuses plain http when this device does not allow it', () async {
+      final seen = <http.BaseRequest>[];
+      final api = images(const Stream.empty(), seen: seen, allowHttp: false);
+      final error = await _failure(
+        api
+            .answerImage(Uri.parse('http://host.example.ts.net:8445/a.png'))
+            .drain<void>(),
+      );
+      expect(error.message, contains('plain http'));
+      expect(seen, isEmpty);
+    });
+
+    test('a missing image fails in plain words', () async {
+      final api = images(
+        Stream.value(ascii.encode('No such run.')),
+        status: 404,
+      );
+      final error = await _failure(api.answerImage(card).drain<void>());
+      expect(
+        error.message,
+        'The image could not be read: the server answered 404.',
+      );
+    });
+
+    test('cancelling lets go of the response', () async {
+      var cancelled = false;
+      final body = StreamController<List<int>>(
+        onCancel: () => cancelled = true,
+      );
+      final first = Completer<void>();
+      final reading = images(body.stream)
+          .answerImage(card)
+          .listen((_) => first.complete());
+      body.add(multipart(['one'], closed: false));
+      await first.future;
+      await reading.cancel();
+      expect(cancelled, isTrue);
+    });
+
+    test(
+      'cancelling before the headers come lets go of them when they do',
+      () async {
+        var cancelled = false;
+        final body = StreamController<List<int>>(
+          onCancel: () => cancelled = true,
+        );
+        final headers = Completer<void>();
+        final reading = images(
+          body.stream,
+          headers: headers.future,
+        ).answerImage(card).listen((_) => fail('no frame expected'));
+        await pumpEventQueue();
+        await reading.cancel();
+        headers.complete();
+        await pumpEventQueue();
+        expect(cancelled, isTrue);
+      },
+    );
+  });
+}
+
+/// AnythingLLM's web-UI login: `request-token` takes `PASS-WORD` and hands out `TOKEN-1`,
+/// `TOKEN-2` and so on, and each route in [routes] answers its body to the token in [valid]
+/// alone, and 401 to anything else. Every request goes into [seen].
+class _SignInServer {
+  final Map<String, Object> routes = {};
+  final List<http.Request> seen = [];
+  int status = 200;
+  String valid = '';
+  var _made = 0;
+
+  HttpAnythingLlmApi api({String? password = 'PASS-WORD'}) => _api((
+    request,
+  ) async {
+    seen.add(request);
+    if (request.url.path == '/api/request-token') {
+      final given = (jsonDecode(request.body) as Map)['password'];
+      if (given != 'PASS-WORD') {
+        return http.Response(
+          jsonEncode({'valid': false, 'token': null, 'message': 'no'}),
+          200,
+        );
+      }
+      valid = 'TOKEN-${++_made}';
+      return http.Response(jsonEncode({'valid': true, 'token': valid}), 200);
+    }
+    if (request.headers['Authorization'] != 'Bearer $valid') {
+      return http.Response(jsonEncode({'error': 'Invalid auth'}), 401);
+    }
+    final body = routes[request.url.path];
+    if (body == null) return http.Response('Not Found', 404);
+    return http.Response(body is String ? body : jsonEncode(body), status);
+  }, current: _connection.withPassword(password));
 }

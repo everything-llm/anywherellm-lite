@@ -11,10 +11,14 @@ import '../support/fake_api.dart';
 import '../support/fake_settings.dart';
 import '../support/rig.dart';
 
-Future<Rig> started(FakeAnythingLlm llm, {Prefs prefs = const Prefs()}) async {
+Future<Rig> started(
+  FakeAnythingLlm llm, {
+  Prefs prefs = const Prefs(),
+  String? password,
+}) async {
   final rig = Rig(
     llm: llm,
-    connection: sampleConnection,
+    connection: sampleConnection.withPassword(password),
     prefsStore: FakePrefsStore(prefs),
   );
   addTearDown(rig.dispose);
@@ -130,6 +134,29 @@ void main() {
     expect(rig.chat.turns.last.text, 'Half');
   });
 
+  test('stop stops the answer on the server too', () async {
+    final llm = planningServer()..hold = true;
+    final rig = await started(llm);
+    await rig.chat.send('one');
+    final thread = rig.chat.activeThread;
+    rig.chat.stop();
+    await pumpEventQueue();
+    expect(llm.calls, contains('stopChat:$thread'));
+    expect(rig.chat.problem, isNull);
+  });
+
+  test('a stop the server refuses says the answer goes on there', () async {
+    final llm = planningServer()
+      ..hold = true
+      ..errors['stopChat'] = const ApiException('Could not reach the relay.');
+    final rig = await started(llm);
+    await rig.chat.send('one');
+    rig.chat.stop();
+    await pumpEventQueue();
+    expect(rig.chat.problem?.title, 'Could not stop the answer on the server');
+    expect(rig.chat.busy, isFalse);
+  });
+
   test('a failed answer says why and frees the chat', () async {
     final llm = planningServer()
       ..errors['streamChat'] = const ApiException('No LLM set');
@@ -138,6 +165,34 @@ void main() {
     await pumpEventQueue();
     expect(rig.chat.turns.last.error, 'No LLM set');
     expect(rig.chat.busy, isFalse);
+  });
+
+  test('a failed answer\'s chat is read again when it is opened', () async {
+    final llm = planningServer()..hold = true;
+    final rig = await started(llm);
+    await rig.chat.send('And next quarter?');
+    llm.chat!.addError(const ApiException('Lost the connection to the relay.'));
+    await pumpEventQueue();
+    llm.histories['budget'] = [
+      ...llm.histories['budget']!,
+      const ChatMessage(role: Role.user, text: 'And next quarter?'),
+      const ChatMessage(role: Role.assistant, text: 'About 45k.'),
+    ];
+    await rig.chat.open('priorities');
+    await rig.chat.open('budget');
+    expect(rig.chat.turns.last.text, 'About 45k.');
+    expect(rig.chat.turns.last.error, isNull);
+  });
+
+  test('a finished answer\'s chat is not read again', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    await rig.chat.send('And next quarter?');
+    await pumpEventQueue();
+    await rig.chat.open('priorities');
+    llm.calls.clear();
+    await rig.chat.open('budget');
+    expect(llm.calls.where((c) => c.startsWith('history')), isEmpty);
   });
 
   test('an agent answer shows its status, then its whole answer', () async {
@@ -210,12 +265,110 @@ void main() {
     expect(rig.chat.title, 'Budget questions');
   });
 
+  test('opens the first workspace in the person\'s order', () async {
+    final rig = await started(
+      planningServer(),
+      prefs: const Prefs(workspaceOrder: ['household', 'q3']),
+    );
+    expect(rig.chat.activeSlug, 'household');
+  });
+
+  group('the last chat', () {
+    test('opens at start, ahead of the person\'s order', () async {
+      final rig = await started(
+        planningServer(),
+        prefs: const Prefs(
+          workspaceOrder: ['household', 'q3'],
+          lastChat: LastChat('q3', 'priorities'),
+        ),
+      );
+      expect(rig.chat.activeSlug, 'q3');
+      expect(rig.chat.activeThread, 'priorities');
+    });
+
+    test('opens its workspace\'s newest chat once it is gone', () async {
+      final rig = await started(
+        planningServer(),
+        prefs: const Prefs(lastChat: LastChat('q3', 'deleted')),
+      );
+      expect(rig.chat.activeSlug, 'q3');
+      expect(rig.chat.activeThread, 'budget');
+    });
+
+    test(
+      'gives way to the person\'s order once its workspace is gone',
+      () async {
+        final rig = await started(
+          planningServer(),
+          prefs: const Prefs(
+            workspaceOrder: ['household', 'q3'],
+            lastChat: LastChat('deleted', 'priorities'),
+          ),
+        );
+        expect(rig.chat.activeSlug, 'household');
+      },
+    );
+
+    test('is saved on opening a chat, a draft and its first message', () async {
+      final rig = await started(planningServer());
+      expect(rig.prefsStore.saved.lastChat, const LastChat('q3', 'budget'));
+      await rig.chat.select('q3', thread: 'priorities');
+      expect(rig.prefsStore.saved.lastChat, const LastChat('q3', 'priorities'));
+      await rig.chat.select('q3', thread: 'budget');
+      rig.chat.newChat();
+      await pumpEventQueue();
+      expect(rig.prefsStore.saved.lastChat, const LastChat('q3'));
+      await rig.chat.send('hello');
+      expect(
+        rig.prefsStore.saved.lastChat,
+        LastChat('q3', rig.chat.activeThread),
+      );
+      expect(rig.chat.activeThread, isNotNull);
+    });
+
+    test('follows a workspace whose slug changes', () async {
+      final llm = planningServer()..renamedSlug = 'q4';
+      final rig = await started(llm);
+      await rig.chat.renameWorkspace('q3', 'Q4 planning');
+      expect(rig.prefsStore.saved.lastChat?.slug, 'q4');
+    });
+  });
+
+  test('select can open a chat other than the newest', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    await rig.chat.select('household');
+    llm.calls.clear();
+    await rig.chat.select('q3', thread: 'priorities');
+    expect(rig.chat.activeThread, 'priorities');
+    expect(llm.calls.where((c) => c.startsWith('history')), [
+      'history:priorities',
+    ]);
+  });
+
   test('a new server starts afresh', () async {
     final llm = planningServer();
     final rig = await started(llm);
     await rig.settings.clear();
     expect(rig.chat.workspaces, isEmpty);
     expect(rig.chat.activeSlug, isNull);
+  });
+
+  test('a late workspace list does not restore a forgotten server', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    await pumpEventQueue();
+    final gate = llm.gates['workspaces'] = Completer<void>();
+    final loading = rig.chat.load();
+    await rig.settings.clear();
+    gate.complete();
+    await loading;
+    await pumpEventQueue();
+    expect(rig.chat.workspaces, isEmpty);
+    expect(rig.chat.threadsOf('q3'), isEmpty);
+    expect(rig.chat.activeSlug, isNull);
+    expect(rig.chat.loading, isFalse);
+    expect(rig.chat.docCounts, isEmpty);
   });
 
   test(
@@ -231,6 +384,7 @@ void main() {
       gate.complete();
       await sending;
       expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
+      expect(llm.calls.where((c) => c.startsWith('stopChat')), isEmpty);
       expect(rig.chat.busy, isFalse);
       expect(rig.chat.threadsOf('household'), hasLength(1));
       expect(rig.chat.turns.last.text, 'Stopped.');
@@ -299,6 +453,33 @@ void main() {
       expect(llm.calls.where((c) => c.startsWith('renameWorkspace')), isEmpty);
     });
 
+    test(
+      'a rename that changes the slug keeps its place in the order',
+      () async {
+        final llm = planningServer()..renamedSlug = 'q4';
+        final rig = await started(
+          llm,
+          prefs: const Prefs(workspaceOrder: ['q3', 'household']),
+        );
+        await rig.chat.renameWorkspace('q3', 'Q4 planning');
+        expect(rig.prefs.prefs.workspaceOrder, ['q4', 'household']);
+      },
+    );
+
+    test(
+      'deleting the open workspace opens the first left in the order',
+      () async {
+        final llm = planningServer()
+          ..spaces.add(FakeWorkspace('garden', 'Garden'));
+        final rig = await started(
+          llm,
+          prefs: const Prefs(workspaceOrder: ['q3', 'garden', 'household']),
+        );
+        await rig.chat.deleteWorkspace('q3');
+        expect(rig.chat.activeSlug, 'garden');
+      },
+    );
+
     test('a rename that changes the slug reads the workspaces again', () async {
       final llm = planningServer()..renamedSlug = 'q4';
       final rig = await started(llm);
@@ -306,6 +487,14 @@ void main() {
       expect(rig.chat.activeSlug, 'q4');
       expect(rig.chat.active?.name, 'Q4 planning');
       expect(rig.chat.threadsOf('q4'), hasLength(2));
+    });
+
+    test('a rename whose new list cannot be read says so', () async {
+      final llm = planningServer()..renamedSlug = 'q4';
+      final rig = await started(llm);
+      llm.errors['workspaces'] = const ApiException('Down');
+      await rig.chat.renameWorkspace('q3', 'Q4 planning');
+      expect(rig.chat.problem?.title, 'Could not read the workspaces');
     });
 
     test('a refused rename becomes a notice', () async {
@@ -443,6 +632,37 @@ void main() {
       ]);
     });
 
+    test('a message sent while the chat is clearing is not sent', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      final gate = llm.gates['resetChat'] = Completer<void>();
+      final clearing = rig.chat.send('/reset');
+      await pumpEventQueue();
+      expect(rig.chat.busy, isTrue);
+      await rig.chat.send('Hello');
+      expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
+      gate.complete();
+      await clearing;
+      expect(rig.chat.busy, isFalse);
+      expect(rig.chat.turns, isEmpty);
+    });
+
+    test('a new server while a chat clears leaves nothing busy', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      final gate = llm.gates['resetChat'] = Completer<void>();
+      final clearing = rig.chat.send('/reset');
+      await pumpEventQueue();
+      expect(rig.chat.busy, isTrue);
+      await rig.settings.clear();
+      expect(rig.chat.busy, isFalse);
+      llm.errors['resetChat'] = const ApiException('Gone');
+      gate.complete();
+      await clearing;
+      expect(rig.chat.busy, isFalse);
+      expect(rig.chat.problem, isNull);
+    });
+
     test('a preset whose prompt is /reset clears the chat too', () async {
       final llm = planningServer()..presets = const [clear];
       final rig = await started(llm);
@@ -514,5 +734,167 @@ void main() {
         expect(rig.chat.commandsNote, isNull);
       },
     );
+  });
+
+  group('retry', () {
+    test('asks the last question again in place of its answer', () async {
+      final llm = planningServer()..answer = 'About 45k.';
+      final rig = await started(llm);
+      expect(rig.chat.canRetry, isTrue);
+      await rig.chat.retry();
+      await pumpEventQueue();
+      expect(llm.calls, contains('streamChat:budget:What is the budget?'));
+      expect(rig.chat.turns.map((t) => t.text), [
+        'What is the budget?',
+        'About 45k.',
+      ]);
+    });
+
+    test('is off while an answer runs', () async {
+      final llm = planningServer()..hold = true;
+      final rig = await started(llm);
+      await rig.chat.send('Summarise');
+      expect(rig.chat.canRetry, isFalse);
+      await rig.chat.retry();
+      expect(llm.calls.where((c) => c.startsWith('streamChat:')), hasLength(1));
+    });
+
+    test(
+      'is off for a question sent with files, and for an empty chat',
+      () async {
+        final rig = await started(planningServer());
+        await rig.chat.send(
+          'What is in this?',
+          attachments: [Attachment.of('notes.md', 'hi'.codeUnits)],
+        );
+        await pumpEventQueue();
+        expect(rig.chat.canRetry, isFalse);
+        await rig.chat.select('household');
+        expect(rig.chat.canRetry, isFalse);
+      },
+    );
+  });
+
+  group('signed in', () {
+    /// The planning server, with the budget chat's one exchange given id 5.
+    FakeAnythingLlm withIds() {
+      final llm = planningServer();
+      llm.histories['budget'] = [
+        const ChatMessage(
+          role: Role.user,
+          text: 'What is the budget?',
+          chatId: 5,
+        ),
+        const ChatMessage(role: Role.assistant, text: 'About 40k.', chatId: 5),
+      ];
+      return llm;
+    }
+
+    test('retry deletes the old exchange before asking again', () async {
+      final llm = withIds()..answer = 'About 45k.';
+      final rig = await started(llm, password: 'PASS-WORD');
+      await rig.chat.retry();
+      await pumpEventQueue();
+      final asked = llm.calls.indexOf('streamChat:budget:What is the budget?');
+      expect(
+        llm.calls.indexOf('dropFrom:budget:5'),
+        inInclusiveRange(0, asked),
+      );
+      expect(llm.histories['budget'], isEmpty);
+      expect(rig.chat.turns.map((t) => t.text), [
+        'What is the budget?',
+        'About 45k.',
+      ]);
+      expect(rig.chat.turns.last.chatId, 100);
+    });
+
+    test('a delete that fails asks nothing again', () async {
+      final llm = withIds()
+        ..errors['dropFrom'] = const ApiException('no', status: 500);
+      final rig = await started(llm, password: 'PASS-WORD');
+      await rig.chat.retry();
+      expect(llm.calls.where((c) => c.startsWith('streamChat:')), isEmpty);
+      expect(rig.chat.problem?.title, 'Could not replace the old exchange');
+      expect(rig.chat.turns, hasLength(2));
+      expect(rig.chat.busy, isFalse);
+    });
+
+    test('signed out, retry deletes nothing', () async {
+      final llm = withIds();
+      final rig = await started(llm);
+      await rig.chat.retry();
+      expect(llm.calls.where((c) => c.startsWith('dropFrom')), isEmpty);
+    });
+
+    test('an edited question replaces it and what came after', () async {
+      final llm = withIds()..answer = 'About 50k.';
+      final rig = await started(llm, password: 'PASS-WORD');
+      rig.chat.edit(rig.chat.turns.first);
+      expect(rig.chat.editing, same(rig.chat.turns.first));
+      await rig.chat.send('What is the Q3 budget?');
+      await pumpEventQueue();
+      expect(llm.calls, contains('dropFrom:budget:5'));
+      expect(rig.chat.editing, isNull);
+      expect(rig.chat.turns.map((t) => t.text), [
+        'What is the Q3 budget?',
+        'About 50k.',
+      ]);
+    });
+
+    test('signed out, editing only fills the composer', () async {
+      final rig = await started(withIds());
+      rig.chat.edit(rig.chat.turns.first);
+      expect(rig.chat.editing, isNull);
+    });
+
+    test('marks an answer, and a second tap clears it', () async {
+      final llm = withIds();
+      final rig = await started(llm, password: 'PASS-WORD');
+      final answer = rig.chat.turns.last;
+      await rig.chat.mark(answer, true);
+      expect(answer.feedback, isTrue);
+      await rig.chat.mark(answer, true);
+      expect(answer.feedback, isNull);
+      expect(llm.calls.where((c) => c.startsWith('setFeedback')), [
+        'setFeedback:5:true',
+        'setFeedback:5:null',
+      ]);
+    });
+
+    test('a mark the server refuses goes back', () async {
+      final llm = withIds()
+        ..errors['setFeedback'] = const ApiException('no', status: 500);
+      final rig = await started(llm, password: 'PASS-WORD');
+      final answer = rig.chat.turns.last;
+      await rig.chat.mark(answer, false);
+      expect(answer.feedback, isNull);
+      expect(rig.chat.problem?.title, 'Could not mark the answer');
+    });
+
+    test(
+      'saving a password keeps the chat and lists the commands again',
+      () async {
+        final llm = withIds()
+          ..errors['slashCommands'] = const ApiException('no', status: 401);
+        final rig = await started(llm);
+        await pumpEventQueue();
+        final turns = rig.chat.turns;
+        llm.errors.remove('slashCommands');
+        await rig.settings.savePassword('PASS-WORD');
+        await pumpEventQueue();
+        expect(rig.chat.signedIn, isTrue);
+        expect(rig.chat.turns, same(turns));
+        expect(rig.chat.commandsNote, isNull);
+        expect(llm.calls.where((c) => c == 'workspaces'), hasLength(1));
+      },
+    );
+
+    test('a refused saved password says to replace it', () async {
+      final llm = withIds()
+        ..errors['slashCommands'] = const ApiException('no', status: 403);
+      final rig = await started(llm, password: 'PASS-WORD');
+      await pumpEventQueue();
+      expect(rig.chat.commandsNote, contains('Replace it in Settings'));
+    });
   });
 }

@@ -5,7 +5,7 @@ import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 
-/// The single-line input: 44px tall, rounded, a ring in the accent on focus.
+/// The input: one line 44px tall, or [maxLines] lines, rounded, a ring in the accent on focus.
 class AppField extends StatelessWidget {
   const AppField({
     super.key,
@@ -19,6 +19,7 @@ class AppField extends StatelessWidget {
     this.obscure = false,
     this.keyboardType,
     this.autofillHints,
+    this.maxLines = 1,
   });
 
   final TextEditingController controller;
@@ -48,6 +49,9 @@ class AppField extends StatelessWidget {
   /// out of autofill, so a key is never offered a saved password.
   final Iterable<String>? autofillHints;
 
+  /// More than 1 makes a box of text that starts 3 lines tall and grows to this many.
+  final int maxLines;
+
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
@@ -63,11 +67,14 @@ class AppField extends StatelessWidget {
         controller: controller,
         autocorrect: false,
         // Flutter on Android marks a field without suggestions as a visible password, which
-        // would replace a web-address keyboard and invite a saved login. A URL keyboard offers
-        // no word suggestions anyway.
-        enableSuggestions: keyboardType == TextInputType.url,
+        // would replace a web-address or multiline keyboard and invite a saved login. A URL
+        // keyboard offers no word suggestions anyway.
+        enableSuggestions: keyboardType == TextInputType.url || maxLines > 1,
         obscureText: obscure,
-        keyboardType: keyboardType,
+        keyboardType:
+            keyboardType ?? (maxLines > 1 ? TextInputType.multiline : null),
+        minLines: maxLines > 1 ? 3 : null,
+        maxLines: maxLines,
         autofillHints: autofillHints,
         enableIMEPersonalizedLearning: !obscure,
         onChanged: onChanged,

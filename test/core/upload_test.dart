@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/upload.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -91,5 +93,19 @@ void main() {
     ], folder: 'notes');
     expect(llm.metaOf['notes/a.md.json']?.author, 'Ada');
     expect(llm.metaOf['notes/b.md.json']?.isEmpty, isTrue);
+  });
+
+  test('sendEach stops when cancelled while file bytes are read', () async {
+    final llm = FakeAnythingLlm();
+    final bytes = Completer<List<int>>();
+    var running = true;
+    final sending = sendEach(llm, [
+      UploadFile(name: 'a.md', read: () => bytes.future),
+      UploadFile(name: 'b.md', read: () async => [2]),
+    ], shouldContinue: () => running);
+    running = false;
+    bytes.complete([1]);
+    await sending;
+    expect(llm.calls, isEmpty);
   });
 }

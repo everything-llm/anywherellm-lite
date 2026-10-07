@@ -49,21 +49,10 @@ class AppShell extends StatelessWidget {
             final sideDrawer = screen.sidebarDrawer && shell.sideOpen;
             final files = shell.pane == Pane.files;
             final sourcesDrawer = !sourcesInline && shell.sourcesOpen;
-            // With the keyboard up, Back only puts it away, as Android does elsewhere.
-            final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
-            return PopScope(
-              canPop:
-                  !typing &&
-                  !shell.settingsOpen &&
-                  !shell.sideOpen &&
-                  !sourcesDrawer,
-              onPopInvokedWithResult: (didPop, _) {
-                if (didPop) return;
-                if (typing) {
-                  FocusManager.instance.primaryFocus?.unfocus();
-                } else if (!closeTop()) {
-                  shell.closeSources();
-                }
+            return _BackGuard(
+              open: shell.settingsOpen || shell.sideOpen || sourcesDrawer,
+              onBack: () {
+                if (!closeTop()) shell.closeSources();
               },
               child: CallbackShortcuts(
                 bindings: {
@@ -76,78 +65,85 @@ class AppShell extends StatelessWidget {
                   // InkWell needs a Material above it, and the shell has no Scaffold.
                   child: Material(
                     color: t.bg,
-                    // Clear of the status and navigation bars on a phone; no inset on a desktop.
-                    child: SafeArea(
-                      child: Stack(
-                        children: [
-                          Row(
-                            children: [
-                              if (screen.sidebarInline) const Sidebar(),
-                              Expanded(
-                                child: Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    // The chat stays built while Files is on screen, so a draft
-                                    // and a running answer survive the switch.
-                                    Offstage(
-                                      offstage: files,
-                                      child: TickerMode(
-                                        enabled: !files,
-                                        child: ExcludeFocus(
-                                          excluding: files,
-                                          child: ChatView(
-                                            showMenu: screen.sidebarDrawer,
+                    child: _AboveKeyboard(
+                      // Clear of the status and navigation bars on a phone; no inset on a
+                      // desktop.
+                      child: SafeArea(
+                        child: Stack(
+                          children: [
+                            Row(
+                              children: [
+                                if (screen.sidebarInline) const Sidebar(),
+                                Expanded(
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      // The chat stays built while Files is on screen, so a draft
+                                      // and a running answer survive the switch.
+                                      Offstage(
+                                        offstage: files,
+                                        child: TickerMode(
+                                          enabled: !files,
+                                          child: ExcludeFocus(
+                                            excluding: files,
+                                            child: ChatView(
+                                              showMenu: screen.sidebarDrawer,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                    if (files)
-                                      FilesView(showMenu: screen.sidebarDrawer),
-                                  ],
+                                      if (files)
+                                        FilesView(
+                                          showMenu: screen.sidebarDrawer,
+                                        ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              if (sourcesInline)
-                                AnimatedContainer(
-                                  duration: duration,
-                                  curve: Curves.easeOut,
-                                  width: shell.sourcesOpen ? Sizes.sources : 0,
-                                  child: ClipRect(
-                                    child: OverflowBox(
-                                      alignment: Alignment.centerLeft,
-                                      minWidth: Sizes.sources,
-                                      maxWidth: Sizes.sources,
-                                      child: _Hidden(
-                                        hidden: !shell.sourcesOpen,
-                                        child: const SourcesPanel(),
+                                if (sourcesInline)
+                                  AnimatedContainer(
+                                    duration: duration,
+                                    curve: Curves.easeOut,
+                                    width: shell.sourcesOpen
+                                        ? Sizes.sources
+                                        : 0,
+                                    child: ClipRect(
+                                      child: OverflowBox(
+                                        alignment: Alignment.centerLeft,
+                                        minWidth: Sizes.sources,
+                                        maxWidth: Sizes.sources,
+                                        child: _Hidden(
+                                          hidden: !shell.sourcesOpen,
+                                          child: const SourcesPanel(),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
+                              ],
+                            ),
+                            if (sideDrawer || sourcesDrawer)
+                              _Scrim(onTap: shell.closeDrawers),
+                            if (screen.sidebarDrawer)
+                              _Drawer(
+                                open: sideDrawer,
+                                left: true,
+                                width: Sizes.sidebar,
+                                duration: duration,
+                                child: const Sidebar(),
+                              ),
+                            if (!sourcesInline)
+                              _Drawer(
+                                open: sourcesDrawer,
+                                left: false,
+                                width: Sizes.sources,
+                                duration: duration,
+                                child: const SourcesPanel(),
+                              ),
+                            if (shell.settingsOpen) ...[
+                              _Scrim(onTap: shell.closeSettings),
+                              const Center(child: SettingsDialog()),
                             ],
-                          ),
-                          if (sideDrawer || sourcesDrawer)
-                            _Scrim(onTap: shell.closeDrawers),
-                          if (screen.sidebarDrawer)
-                            _Drawer(
-                              open: sideDrawer,
-                              left: true,
-                              width: Sizes.sidebar,
-                              duration: duration,
-                              child: const Sidebar(),
-                            ),
-                          if (!sourcesInline)
-                            _Drawer(
-                              open: sourcesDrawer,
-                              left: false,
-                              width: Sizes.sources,
-                              duration: duration,
-                              child: const SourcesPanel(),
-                            ),
-                          if (shell.settingsOpen) ...[
-                            _Scrim(onTap: shell.closeSettings),
-                            const Center(child: SettingsDialog()),
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
@@ -225,6 +221,58 @@ class _Drawer extends StatelessWidget {
         offset: Offset(open ? 0 : (left ? -1.05 : 1.05), 0),
         child: child,
       ),
+    ),
+  );
+}
+
+/// Back closes the topmost thing [open] through [onBack], and leaves the app when nothing is.
+/// With the keyboard up it only puts the keyboard away, as Android does elsewhere. It reads the
+/// keyboard itself, so the keyboard's animation rebuilds this and not [child].
+class _BackGuard extends StatelessWidget {
+  const _BackGuard({
+    required this.open,
+    required this.onBack,
+    required this.child,
+  });
+
+  final bool open;
+  final VoidCallback onBack;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
+    return PopScope(
+      canPop: !typing && !open,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (typing) {
+          FocusManager.instance.primaryFocus?.unfocus();
+        } else {
+          onBack();
+        }
+      },
+      child: child,
+    );
+  }
+}
+
+/// [child] above the on-screen keyboard. Android keeps the window full height under the
+/// keyboard and reports it as a bottom view inset, which a Scaffold would stand clear of; the
+/// shell has none. The inset is taken out below, so nothing applies it twice, and the
+/// keyboard's animation rebuilds this and not [child].
+class _AboveKeyboard extends StatelessWidget {
+  const _AboveKeyboard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+    child: MediaQuery.removeViewInsets(
+      context: context,
+      removeBottom: true,
+      child: child,
     ),
   );
 }

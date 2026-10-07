@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/connection.dart';
+import 'package:anywherellm/core/embeds.dart';
+import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
 
@@ -56,6 +59,15 @@ class FakeAnythingLlm implements AnythingLlmApi {
   final List<Connection> verified = [];
   Object? verifyError;
 
+  /// How [serverAuth] says the server signs in.
+  ServerAuth auth = ServerAuth.none;
+
+  /// The password [signIn] takes; any other is refused.
+  String serverPassword = 'PASS-WORD';
+
+  /// The id [streamChat]'s next answer is given, counting up.
+  int nextChatId = 100;
+
   List<FakeWorkspace> spaces = [];
   final Map<String, List<ChatMessage>> histories = {};
 
@@ -72,6 +84,15 @@ class FakeAnythingLlm implements AnythingLlmApi {
     'EmbeddingEngine': 'native',
     'VectorDB': 'lancedb',
   };
+
+  /// The server's chat embeds.
+  List<Embed> embedList = [];
+
+  /// The chats each embed has held, by uuid.
+  final Map<String, List<EmbedChat>> embedChatsOf = {};
+
+  /// What [vectorCount] answers.
+  int vectors = 796;
   Set<String> acceptedValue = {'.md', '.txt', '.pdf'};
 
   /// What [slashCommands] answers.
@@ -79,6 +100,22 @@ class FakeAnythingLlm implements AnythingLlmApi {
 
   String answer = 'Here is what your sources say.';
   List<String> cited = const [];
+
+  /// The files an agent made, which [streamChat] sends with the answer.
+  List<GeneratedFile> made = const [];
+
+  /// How [streamChat]'s answer ran.
+  AnswerMetrics? measured;
+
+  /// What [generatedFile] answers, by storage name. Any other name is not found.
+  final Map<String, List<int>> generated = {};
+
+  /// What [answerImage] answers for a plain image, by address: its frames, then done.
+  final Map<Uri, List<List<int>>> images = {};
+
+  /// What [answerImage] answers for a live image, by address: a broadcast stream the test adds
+  /// frames to, whose `hasListener` says whether the app is following it.
+  final Map<Uri, StreamController<Uint8List>> liveImages = {};
   bool hold = false;
   StreamController<ChatEvent>? chat;
 
@@ -118,6 +155,20 @@ class FakeAnythingLlm implements AnythingLlmApi {
     verified.add(connection);
     if (verifyError != null) throw verifyError!;
   }
+
+  @override
+  Future<ServerAuth> serverAuth(Connection connection) =>
+      _run('serverAuth', () => auth);
+
+  @override
+  Future<void> signIn(Connection connection) => _run('signIn', () {
+    if (connection.password != serverPassword) {
+      throw const ApiException(
+        'The server did not accept the password.',
+        status: 403,
+      );
+    }
+  });
 
   @override
   Future<List<Workspace>> workspaces() => _run(
@@ -206,9 +257,18 @@ class FakeAnythingLlm implements AnythingLlmApi {
     return Stream.fromIterable([
       for (final line in agentStatus) StatusChunk(line),
       TextChunk(answer),
-      ChatDone([for (final title in cited) Citation(title)]),
+      ChatDone(
+        [for (final title in cited) Citation(title)],
+        files: made,
+        metrics: measured,
+        chatId: nextChatId++,
+      ),
     ]);
   }
+
+  @override
+  Future<void> stopChat(String slug, String thread) =>
+      _run('stopChat', () {}, thread);
 
   @override
   Future<void> resetChat(String slug, String thread) =>
@@ -217,6 +277,20 @@ class FakeAnythingLlm implements AnythingLlmApi {
   @override
   Future<List<SlashCommand>> slashCommands() =>
       _run('slashCommands', () => presets);
+
+  /// Drops the history's entries from the one with [chatId] on.
+  @override
+  Future<void> dropFrom(String slug, String thread, int chatId) =>
+      _run('dropFrom', () {
+        final kept = histories[thread];
+        if (kept == null) return;
+        final at = kept.indexWhere((m) => m.chatId == chatId);
+        if (at >= 0) histories[thread] = kept.sublist(0, at);
+      }, '$thread:$chatId');
+
+  @override
+  Future<void> setFeedback(String slug, int chatId, bool? good) =>
+      _run('setFeedback', () {}, '$chatId:$good');
 
   @override
   Future<void> updateEmbeddings(
@@ -422,6 +496,94 @@ class FakeAnythingLlm implements AnythingLlmApi {
   Future<List<int>> exportChats(ChatExport format) =>
       _run('exportChats', () => exported.codeUnits, format.name);
 
+  /// Writes each change into [system]; a secret, which the server reports only as set, becomes
+  /// true.
+  @override
+  Future<void> updateSystem(Map<String, String> changes) =>
+      _run('updateSystem', () {
+        system = {
+          ...system,
+          for (final MapEntry(:key, :value) in changes.entries)
+            key: system[key] is bool ? true : value,
+        };
+      }, changes.keys.join(','));
+
+  @override
+  Future<List<Embed>> embeds() => _run('embeds', () => [...embedList]);
+
+  /// Makes the embed with a uuid counting up, for the workspace whose slug it was given.
+  @override
+  Future<String> createEmbed(NewEmbed embed) => _run('createEmbed', () {
+    final uuid = 'embed-${embedList.length + 1}';
+    embedList = [
+      ...embedList,
+      Embed(
+        uuid: uuid,
+        workspace: spaces.firstWhere((w) => w.slug == embed.workspaceSlug).name,
+        mode: embed.mode,
+        enabled: true,
+      ),
+    ];
+    return uuid;
+  }, embed.workspaceSlug);
+
+  @override
+  Future<void> updateEmbed(String uuid, {bool? enabled, EmbedMode? mode}) =>
+      _run('updateEmbed', () {
+        embedList = [
+          for (final e in embedList)
+            e.uuid == uuid
+                ? Embed(
+                    uuid: uuid,
+                    workspace: e.workspace,
+                    mode: mode ?? e.mode,
+                    enabled: enabled ?? e.enabled,
+                    chats: e.chats,
+                  )
+                : e,
+        ];
+      }, uuid);
+
+  @override
+  Future<void> deleteEmbed(String uuid) => _run('deleteEmbed', () {
+    embedList = [
+      for (final e in embedList)
+        if (e.uuid != uuid) e,
+    ];
+  }, uuid);
+
+  @override
+  Future<List<EmbedChat>> embedChats(String uuid) =>
+      _run('embedChats', () => embedChatsOf[uuid] ?? const [], uuid);
+
+  @override
+  Future<int> vectorCount() => _run('vectorCount', () => vectors);
+
+  @override
+  Stream<Uint8List> answerImage(Uri url) {
+    calls.add('answerImage:$url');
+    if (errors['answerImage'] case final Object error) {
+      return Stream.error(error);
+    }
+    if (liveImages[url] case final live?) return live.stream;
+    if (images[url] case final frames?) {
+      return Stream.fromIterable(frames.map(Uint8List.fromList));
+    }
+    return Stream.error(
+      const ApiException(
+        'The image could not be read: the server answered 404.',
+      ),
+    );
+  }
+
+  @override
+  Future<List<int>> generatedFile(String storageName) =>
+      _run('generatedFile', () {
+        final bytes = generated[storageName];
+        if (bytes == null) throw const ApiException('File not found');
+        return bytes;
+      }, storageName);
+
   @override
   Future<Map<String, Object?>> systemSettings() =>
       _run('systemSettings', () => system);
@@ -440,6 +602,16 @@ WorkspaceDoc libraryDoc(FakeAnythingLlm llm, String title, {int? words = 120}) {
 
 /// A server with the mockup's workspaces: Q3 planning with two chats and two files, and an empty
 /// Household.
+/// [planningServer] with [answer] as the last answer in the chat it opens on.
+FakeAnythingLlm answering(String answer, {List<Citation> cited = const []}) {
+  final llm = planningServer();
+  llm.histories['budget'] = [
+    const ChatMessage(role: Role.user, text: 'Where?'),
+    ChatMessage(role: Role.assistant, text: answer, citations: cited),
+  ];
+  return llm;
+}
+
 FakeAnythingLlm planningServer() {
   final llm = FakeAnythingLlm();
   llm.spaces = [

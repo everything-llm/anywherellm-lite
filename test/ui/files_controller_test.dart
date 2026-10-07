@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/prefs.dart';
@@ -63,8 +65,6 @@ void main() {
     await rig.files.select('/workspaces/q3/chats/budget');
     expect(rig.files.text, startsWith('# Budget questions\n'));
     expect(rig.files.text, contains('Sources: Q3 roadmap.pdf'));
-    await rig.files.select('/settings/models.json');
-    expect(rig.files.text, contains('"LLMProvider": "ollama"'));
     await rig.files.select('/library/$roadmap');
     expect(rig.files.doc!.text, 'The text of Q3 roadmap.pdf.');
     await rig.files.select('/.env');
@@ -273,6 +273,37 @@ void main() {
     expect(nodeAt(rig.files.tree, '/workspaces/travel/PROMPT.md'), isNotNull);
   });
 
+  test('a late failure on a forgotten server shows no problem', () async {
+    final llm = planningServer()
+      ..errors['createFolder'] = const ApiException('No');
+    final rig = await started(llm);
+    final gate = llm.gates['createFolder'] = Completer<void>();
+    final making = rig.files.createFolder('drafts');
+    await rig.settings.save('https://other:3001', 'K2');
+    gate.complete();
+    await making;
+    expect(rig.files.problems, isEmpty);
+  });
+
+  test('a late Files load neither restores old data nor stays busy', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    final gate = llm.gates['libraryFolders'] = Completer<void>();
+    final loading = rig.files.load();
+    await rig.settings.clear();
+    gate.complete();
+    await loading;
+    expect(rig.files.loading, isFalse);
+    expect(rig.files.library, isEmpty);
+    expect(rig.files.detail('q3'), isNull);
+    llm.gates.remove('libraryFolders');
+    await rig.settings.save(sampleConnection.baseUrl, sampleConnection.apiKey);
+    await pumpEventQueue();
+    await rig.files.ensureLoaded();
+    expect(rig.files.library, isNotEmpty);
+    expect(rig.files.detail('q3'), isNotNull);
+  });
+
   test('exporting gives the file and a refusal says why', () async {
     final llm = planningServer()..exported = 'a,b';
     final rig = await started(llm);
@@ -285,5 +316,21 @@ void main() {
     llm.errors['exportChats'] = const ApiException('No');
     expect(await rig.files.exportChats(ChatExport.json), isNull);
     expect(rig.files.problems.single.title, 'Could not export the chats');
+  });
+
+  test('an export cut off by a new server leaves Export ready', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    final gate = llm.gates['exportChats'] = Completer<void>();
+    llm.errors['exportChats'] = const ApiException('No');
+    final exporting = rig.files.exportChats(ChatExport.csv);
+    await pumpEventQueue();
+    expect(rig.files.exporting, isTrue);
+    await rig.settings.save('https://other:3001', 'K2');
+    gate.complete();
+    expect(await exporting, isNull);
+    expect(rig.files.exporting, isFalse);
+    expect(rig.files.problems, isEmpty);
+    await pumpEventQueue();
   });
 }

@@ -1,0 +1,158 @@
+import 'package:anywherellm/core/commands.dart';
+import 'package:anywherellm/ui/chat/composer.dart';
+import 'package:anywherellm/ui/files/files_view.dart';
+import 'package:anywherellm/ui/settings/settings_dialog.dart';
+import 'package:anywherellm/ui/sources/sources_panel.dart';
+import 'package:anywherellm/ui/state/shell_controller.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import '../support/fake_api.dart';
+import '../support/pump.dart';
+
+/// A phone in portrait, and the on-screen keyboard's height on it.
+const phone = Size(360, 640);
+const keyboard = 300.0;
+
+/// A phone on its side, and the keyboard's height on it: 160 of its 360 pixels are left.
+const side = Size(640, 360);
+const sideKeyboard = 200.0;
+
+/// The composer's text field.
+Finder get composerField => typingField(find.byType(Composer));
+
+/// Whether the field [field] finds is still the one being typed in.
+bool focused(WidgetTester tester, Finder field) =>
+    tester.widget<EditableText>(field).focusNode.hasFocus;
+
+/// Expects what [finder] finds to lie wholly in the part of [screen] a keyboard [height]
+/// pixels tall leaves.
+void expectAboveKeyboard(
+  WidgetTester tester,
+  Finder finder,
+  Size screen,
+  double height,
+) {
+  final rect = tester.getRect(finder);
+  expect(rect.bottom, lessThanOrEqualTo(screen.height - height));
+  expect(rect.top, greaterThanOrEqualTo(0));
+}
+
+void main() {
+  testWidgets('the composer sits above the keyboard', (tester) async {
+    await pumpApp(tester, llm: planningServer(), size: phone);
+    await tester.tap(composerField);
+    raiseKeyboard(tester, keyboard);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(focused(tester, composerField), isTrue);
+    expectAboveKeyboard(tester, find.byType(Composer), phone, keyboard);
+  });
+
+  testWidgets('a Settings field in use sits above the keyboard', (
+    tester,
+  ) async {
+    final h = await pumpApp(
+      tester,
+      llm: planningServer(),
+      size: phone,
+      connection: null,
+    );
+    h.shell.openSettings();
+    await tester.pumpAndSettle();
+    final key = typingField(find.byType(SettingsDialog)).last;
+    await tester.tap(key);
+    raiseKeyboard(tester, keyboard);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(focused(tester, key), isTrue);
+    expectAboveKeyboard(tester, key, phone, keyboard);
+  });
+
+  testWidgets('a phone on its side keeps the composer above the keyboard', (
+    tester,
+  ) async {
+    await pumpApp(tester, llm: planningServer(), size: side);
+    await tester.tap(composerField);
+    raiseKeyboard(tester, sideKeyboard);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expectAboveKeyboard(tester, composerField, side, sideKeyboard);
+  });
+
+  testWidgets('the slash menu above the keyboard does not overflow', (
+    tester,
+  ) async {
+    final llm = planningServer()
+      ..presets = [
+        for (var i = 0; i < 8; i++)
+          SlashCommand(command: '/cmd$i', prompt: 'p', description: 'd$i'),
+      ];
+    await pumpApp(tester, llm: llm, size: phone);
+    raiseKeyboard(tester, keyboard);
+    await tester.enterText(composerField, '/');
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expectAboveKeyboard(tester, composerField, phone, keyboard);
+  });
+
+  testWidgets(
+    'a Sources field in use on a phone on its side is above the keyboard',
+    (tester) async {
+      final h = await pumpApp(tester, llm: planningServer(), size: side);
+      h.shell.openSources();
+      await tester.pumpAndSettle();
+      final add = find.bySemanticsLabel('Add a link').last;
+      await tester.ensureVisible(add);
+      await tester.pumpAndSettle();
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      final field = typingField(find.byType(SourcesPanel)).first;
+      await tester.tap(field, warnIfMissed: false);
+      raiseKeyboard(tester, sideKeyboard);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(focused(tester, field), isTrue);
+      expectAboveKeyboard(tester, field, side, sideKeyboard);
+    },
+  );
+
+  testWidgets('the sidebar on a phone on its side scrolls above the keyboard', (
+    tester,
+  ) async {
+    final h = await pumpApp(tester, llm: planningServer(), size: side);
+    h.shell.toggleSide();
+    raiseKeyboard(tester, sideKeyboard);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'a workspace prompt being edited on a phone on its side is above the keyboard',
+    (tester) async {
+      final h = await pumpApp(tester, llm: planningServer(), size: side);
+      h.shell.showPane(Pane.files);
+      await tester.pumpAndSettle();
+      await h.files.select('/workspaces/q3/PROMPT.md');
+      await tester.pumpAndSettle();
+      final field = typingField(find.byType(FilesView)).first;
+      await tester.tap(field, warnIfMissed: false);
+      raiseKeyboard(tester, sideKeyboard);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(focused(tester, field), isTrue);
+      // The prompt is taller than what the keyboard leaves, so only its top need show.
+      expect(tester.getRect(field).top, lessThan(side.height - sideKeyboard));
+    },
+  );
+
+  testWidgets('with the keyboard down, the composer is at the bottom', (
+    tester,
+  ) async {
+    await pumpApp(tester, llm: planningServer(), size: phone);
+    expect(
+      tester.getRect(find.byType(Composer)).bottom,
+      greaterThan(phone.height - keyboard),
+    );
+  });
+}

@@ -3,6 +3,8 @@
 
 import 'dart:convert';
 
+import 'outputs.dart';
+
 /// A string or number field as text, trimmed, or empty when it is missing.
 String _text(Map<String, dynamic> json, String key) => switch (json[key]) {
   final String value => value.trim(),
@@ -73,6 +75,16 @@ class Workspace {
       ],
     );
   }
+
+  /// This workspace under the name [name].
+  Workspace withName(String name) => Workspace(
+    slug: slug,
+    name: name,
+    threads: threads,
+    documents: documents,
+    prompt: prompt,
+    settings: settings,
+  );
 
   final String slug;
   final String name;
@@ -175,6 +187,10 @@ class ChatMessage {
     required this.text,
     this.citations = const [],
     this.attachments = const [],
+    this.files = const [],
+    this.metrics,
+    this.chatId,
+    this.feedback,
   });
 
   /// An entry of a chat's `history`.
@@ -189,6 +205,16 @@ class ChatMessage {
       for (final attachment in jsonObjects(json['attachments']))
         ?_known(attachment, 'name'),
     ],
+    files: generatedFilesOf(json['outputs']),
+    metrics: metricsOf(json['metrics']),
+    chatId: switch (json['chatId']) {
+      final int id => id,
+      _ => null,
+    },
+    feedback: switch (json['feedbackScore']) {
+      final bool good => good,
+      _ => null,
+    },
   );
 
   final Role role;
@@ -199,6 +225,18 @@ class ChatMessage {
 
   /// What the answer drew on, each once, in the server's order.
   final List<Citation> citations;
+
+  /// What an agent made with the answer.
+  final List<GeneratedFile> files;
+
+  /// How the answer ran, when the server measured it.
+  final AnswerMetrics? metrics;
+
+  /// The server's id for the exchange; a question and its answer share it.
+  final int? chatId;
+
+  /// Whether the answer was marked good or bad, or null when neither.
+  final bool? feedback;
 }
 
 /// A source an answer drew on: a document by its [title], or a web page an agent read, which

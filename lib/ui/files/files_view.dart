@@ -3,15 +3,20 @@ import 'package:flutter/services.dart';
 
 import '../../core/files.dart';
 import '../app_scope.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
+import '../widgets/min_height.dart';
 import '../widgets/pane_header.dart';
 import 'doc_views.dart';
+import 'embeds_view.dart';
 import 'file_tree.dart';
 import 'folder_view.dart';
+import 'settings_form.dart';
+import 'system_form.dart';
 
 /// The node picked in the file tree: a folder's contents and actions, a file's text, an editor
 /// for a workspace's prompt and settings, or a document.
@@ -29,37 +34,42 @@ class FilesView extends StatelessWidget {
       listenable: Listenable.merge([files, scope.settings]),
       builder: (context, _) {
         final node = files.node;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            PaneHeader(
-              showMenu: showMenu,
-              onMenu: scope.shell.toggleSide,
-              title: Text(
-                node == null ? 'Files' : node.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: PaneHeader.titleStyle(context),
-              ),
-              actions: switch (node == null ? null : badgeText(node.badge)) {
-                final text? => (_) => [
-                  const SizedBox(width: 12),
-                  AppBadge(text, kind: BadgeKind.warn),
-                ],
-                null => null,
-              },
-            ),
-            for (final problem in files.problems)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                child: AlertBox(
-                  AlertKind.bad,
-                  problem.title,
-                  text: problem.text,
+        // Short, as with the keyboard up, the whole pane scrolls: the header and problems
+        // as well as the open file.
+        return MinHeight(
+          min: Sizes.panelMin,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              PaneHeader(
+                showMenu: showMenu,
+                onMenu: scope.shell.toggleSide,
+                title: Text(
+                  node == null ? 'Files' : node.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: PaneHeader.titleStyle(context),
                 ),
+                actions: switch (node == null ? null : badgeText(node.badge)) {
+                  final text? => (_) => [
+                    const SizedBox(width: 12),
+                    AppBadge(text, kind: BadgeKind.warn),
+                  ],
+                  null => null,
+                },
               ),
-            Expanded(child: _body(context, node)),
-          ],
+              for (final problem in files.problems)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                  child: AlertBox(
+                    AlertKind.bad,
+                    problem.title,
+                    text: problem.text,
+                  ),
+                ),
+              Expanded(child: _body(context, node)),
+            ],
+          ),
         );
       },
     );
@@ -76,18 +86,25 @@ class FilesView extends StatelessWidget {
         files.loading ? 'Loading…' : 'Pick a folder or a file on the left.',
       );
     }
-    if (node.kind.isFolder) return FolderView(node);
+    // Keyed by path, so a file waiting to be added or an open Delete stays with its folder.
+    if (node.kind.isFolder) return FolderView(node, key: ValueKey(node.path));
     if (files.contentLoading) return const Blank('Loading…');
     return switch (node.kind) {
       NodeKind.locked => const Blank(
         'Locked. AnywhereLLM never reads this: it holds keys and secrets.',
       ),
-      NodeKind.prompt || NodeKind.settings => _Editor(
+      NodeKind.prompt => _Editor(
+        key: ValueKey('${node.path}#${files.revision}'),
+        node: node,
+      ),
+      NodeKind.settings => _SettingsPage(
         key: ValueKey('${node.path}#${files.revision}'),
         node: node,
       ),
       NodeKind.libraryDoc => LibraryDocView(node),
       NodeKind.docLink => DocLinkView(node),
+      NodeKind.embeds => const EmbedsView(),
+      NodeKind.system => const SystemPage(),
       _ => TextPage(files.text ?? ''),
     };
   }
@@ -128,12 +145,34 @@ class TextPage extends StatelessWidget {
   );
 }
 
-/// The editor for a workspace's `PROMPT.md` or `settings.json`. Its key changes each time the
-/// text is read afresh, which drops the draft.
-class _Editor extends StatefulWidget {
-  const _Editor({super.key, required this.node});
+/// A workspace's `settings.json`: the form, or the JSON itself when asked for. Its key changes
+/// each time the settings are read afresh, which drops the draft.
+class _SettingsPage extends StatelessWidget {
+  const _SettingsPage({super.key, required this.node});
 
   final FileNode node;
+
+  @override
+  Widget build(BuildContext context) {
+    final files = AppScope.of(context).files;
+    return files.settingsAsJson
+        ? _Editor(node: node, onForm: () => files.showSettingsAsJson(false))
+        : SettingsForm(
+            slug: node.slug!,
+            onJson: () => files.showSettingsAsJson(true),
+          );
+  }
+}
+
+/// The editor for a workspace's `PROMPT.md`, or for its `settings.json` as raw JSON. Its key
+/// changes each time the text is read afresh, which drops the draft.
+class _Editor extends StatefulWidget {
+  const _Editor({super.key, required this.node, this.onForm});
+
+  final FileNode node;
+
+  /// Switches back to the form, for settings.
+  final VoidCallback? onForm;
 
   @override
   State<_Editor> createState() => _EditorState();
@@ -189,6 +228,11 @@ class _EditorState extends State<_Editor> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (widget.onForm case final onForm?)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextAction('settings', 'Edit as a form', onForm),
+              ),
             for (final note in notes)
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
@@ -228,24 +272,19 @@ class _EditorState extends State<_Editor> {
             // Only the buttons follow the draft, so typing rebuilds nothing else.
             ListenableBuilder(
               listenable: _draft,
-              builder: (context, _) => Wrap(
-                alignment: WrapAlignment.end,
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  AppButton(
-                    'Revert',
-                    onPressed: _dirty && !_saving
-                        ? () => _draft.text = _saved
-                        : null,
-                  ),
-                  AppButton(
-                    _saving ? 'Saving…' : 'Save',
-                    primary: true,
-                    onPressed: _dirty && !_saving ? _save : null,
-                  ),
-                ],
-              ),
+              builder: (context, _) => ActionRow([
+                AppButton(
+                  'Revert',
+                  onPressed: _dirty && !_saving
+                      ? () => _draft.text = _saved
+                      : null,
+                ),
+                AppButton(
+                  _saving ? 'Saving…' : 'Save',
+                  primary: true,
+                  onPressed: _dirty && !_saving ? _save : null,
+                ),
+              ]),
             ),
           ],
         ),

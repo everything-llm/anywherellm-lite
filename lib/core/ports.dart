@@ -1,10 +1,17 @@
+import 'dart:typed_data';
+
 import 'chat.dart';
 import 'commands.dart';
 import 'connection.dart';
+import 'embeds.dart';
 import 'prefs.dart';
 import 'server_models.dart';
 
 export 'errors.dart';
+
+/// How a server signs in to its web UI: not at all, with one password, or with a user name and
+/// password, which the app does not do.
+enum ServerAuth { none, password, multiUser }
 
 /// The AnythingLLM server, as the UI sees it. Every method throws [ApiException] on failure.
 /// Every method but [verify] uses the connection in use, and throws [NotConfigured] when there
@@ -13,6 +20,14 @@ abstract interface class AnythingLlmApi {
   /// Asks the server whether [connection] opens it. Takes the connection as an argument so
   /// Settings can test one before it is saved.
   Future<void> verify(Connection connection);
+
+  /// How the server at [connection] signs in to its web UI, which its own routes outside the
+  /// developer API take instead of the key.
+  Future<ServerAuth> serverAuth(Connection connection);
+
+  /// Signs in to the server with [connection]'s password, so a wrong one fails here and not on
+  /// the first call that needs it. A refused password is an [ApiException] with status 403.
+  Future<void> signIn(Connection connection);
 
   /// Every workspace with its named threads, without its documents.
   Future<List<Workspace>> workspaces();
@@ -40,7 +55,8 @@ abstract interface class AnythingLlmApi {
 
   /// Asks [message] in the chat, with [attachments] for this message only, and streams the
   /// answer in the workspace's own chat mode. The stream fails with [ApiException]. Cancelling
-  /// the subscription stops the answer.
+  /// the subscription lets go of the answer: a server that keeps answers going without the app
+  /// finishes it and saves it to the chat, and any other stops it.
   Stream<ChatEvent> streamChat(
     String slug,
     String thread,
@@ -48,13 +64,26 @@ abstract interface class AnythingLlmApi {
     List<Attachment> attachments = const [],
   });
 
+  /// Stops the answer [streamChat] is running in the chat, on a server that keeps answers going
+  /// without the app. Does nothing when there is none. Call it before cancelling the
+  /// subscription.
+  Future<void> stopChat(String slug, String thread);
+
   /// Clears the chat's history, so the model no longer sees its turns and history no longer
   /// lists them.
   Future<void> resetChat(String slug, String thread);
 
-  /// The server's slash-command presets. They are read outside the developer API, which
-  /// answers only while the server has no password; otherwise this fails.
+  /// The server's slash-command presets. They are read outside the developer API, with the
+  /// server's password when it has one; without it this fails with status 401.
   Future<List<SlashCommand>> slashCommands();
+
+  /// Deletes the chat's exchanges from [chatId] on, that one included, so a question asked again
+  /// replaces them. Needs the server's password when it has one.
+  Future<void> dropFrom(String slug, String thread, int chatId);
+
+  /// Marks the answer [chatId] good or bad, or neither when [good] is null. Needs the server's
+  /// password when it has one.
+  Future<void> setFeedback(String slug, int chatId, bool? good);
 
   /// Embeds the documents at [adds] in the workspace and drops those at [deletes], by
   /// `folder/name.json` path.
@@ -125,8 +154,37 @@ abstract interface class AnythingLlmApi {
   /// Every chat on the server, in [format], as the file's bytes.
   Future<List<int>> exportChats(ChatExport format);
 
+  /// The bytes of a file or image an agent made, by the [storageName] the server gave it.
+  Future<List<int>> generatedFile(String storageName);
+
+  /// The image at [url], from an answer, as it is drawn: one frame for a plain image, and each
+  /// new frame of a live one, which the server keeps pushing until it ends the response. Sent
+  /// without the key, the password or a login token. Cancelling closes the connection.
+  Stream<Uint8List> answerImage(Uri url);
+
   /// The server's settings, with every secret replaced by whether it is set.
   Future<Map<String, Object?>> systemSettings();
+
+  /// Writes [changes] to the server's settings, each as text. Throws [ApiException] when the
+  /// server refuses one or leaves one unwritten; those before it may be written already.
+  Future<void> updateSystem(Map<String, String> changes);
+
+  /// How many vectors the server's vector database holds, across every workspace.
+  Future<int> vectorCount();
+
+  /// The server's chat embeds.
+  Future<List<Embed>> embeds();
+
+  /// Makes a chat embed, and returns its uuid.
+  Future<String> createEmbed(NewEmbed embed);
+
+  /// Changes embed [uuid]: whether it is on, and the mode it answers in.
+  Future<void> updateEmbed(String uuid, {bool? enabled, EmbedMode? mode});
+
+  Future<void> deleteEmbed(String uuid);
+
+  /// The chats embed [uuid] has held, in the server's order.
+  Future<List<EmbedChat>> embedChats(String uuid);
 }
 
 /// Where the connection is kept between runs.

@@ -1,6 +1,8 @@
 // Asking a workspace: what a streamed answer is made of, and how a chat gets its name.
 
+import 'outputs.dart';
 import 'server_models.dart';
+import 'upload.dart';
 
 /// A workspace's chat mode on the server, which every message in it answers in. Its [name] is
 /// the server's value.
@@ -62,16 +64,30 @@ class WholeAnswer extends ChatEvent {
 /// `@agent is executing `web-browsing` tool {…}` becomes `Running web-browsing`.
 String agentStatus(String thought) {
   final line = thought.trim();
-  final tool = RegExp(r'^@agent is executing `([^`]+)`').firstMatch(line);
+  final tool = _runningTool.firstMatch(line);
   if (tool != null) return 'Running ${tool.group(1)}';
-  final text = line.replaceFirst(RegExp(r'^@agent:?\s*'), '');
+  final text = line.replaceFirst(_agentPrefix, '');
   return text.split('\n').first.trim();
 }
 
-/// The answer is complete. [citations] are what it drew on.
+final _runningTool = RegExp(r'^@agent is executing `([^`]+)`');
+final _agentPrefix = RegExp(r'^@agent:?\s*');
+
+/// The answer is complete. [citations] are what it drew on, [files] what an agent made with
+/// it, and [metrics] how it ran.
 class ChatDone extends ChatEvent {
-  const ChatDone(this.citations);
+  const ChatDone(
+    this.citations, {
+    this.files = const [],
+    this.metrics,
+    this.chatId,
+  });
   final List<Citation> citations;
+  final List<GeneratedFile> files;
+  final AnswerMetrics? metrics;
+
+  /// The server's id for the exchange, when it said.
+  final int? chatId;
 }
 
 /// The address a link in an answer opens, or null for one the app will not open. Only web
@@ -86,6 +102,15 @@ Uri? openableLink(String href) {
   };
 }
 
+/// Whether an image at [uri] in an answer may load: only from [server]'s own host, on any port,
+/// over https, or over http where the server itself is http and [allowHttp] lets it be. So an
+/// answer cannot make the app fetch an address off that host.
+bool loadableImage(Uri uri, Uri? server, {required bool allowHttp}) =>
+    server != null &&
+    uri.host == server.host &&
+    (uri.scheme == 'https' ||
+        (uri.scheme == 'http' && server.scheme == 'http' && allowHttp));
+
 /// The name a chat takes from its first [message]: its first line, cut to 42 code points so an
 /// emoji is never split.
 String defaultTitle(String message) {
@@ -98,12 +123,6 @@ String defaultTitle(String message) {
 
 /// A file sent with one message, read in for that message only.
 class Attachment {
-  const Attachment({
-    required this.name,
-    required this.mime,
-    required this.bytes,
-  });
-
   /// An attachment of [bytes] named [name], typed by [attachmentMime].
   Attachment.of(this.name, this.bytes) : mime = attachmentMime(name);
 
@@ -132,9 +151,7 @@ const _imageTypes = {
 
 /// `image/png` for `photo.PNG`, or [documentMime] for any file that is not a picture.
 String attachmentMime(String name) {
-  final dot = name.lastIndexOf('.');
-  final extension = dot <= 0 ? '' : name.substring(dot).toLowerCase();
-  return _imageTypes[extension] ?? documentMime;
+  return _imageTypes[extensionOf(name)] ?? documentMime;
 }
 
 /// Why [name], of [size] bytes, cannot go with a message, or null.
@@ -146,10 +163,13 @@ String? attachmentProblem(String name, int size) => size > maxAttachmentBytes
 /// An answer split into the model's reasoning and the answer itself.
 typedef Reasoned = ({String reasoning, String answer, bool thinking});
 
-final _thought = RegExp(r'<(think|thinking)>([\s\S]*?)(?:</\1>|$)');
+/// A code block or span, kept as it is, or a reasoning block, open until its closing tag.
+final _thought = RegExp(
+  r'(```[\s\S]*?(?:```|$)|`[^`\n]*`)|<(think|thinking)>([\s\S]*?)(?:</\2>|$)',
+);
 
 /// Splits [text] into the reasoning a model wrapped in `<think>` or `<thinking>` tags and the
-/// answer around it. [Reasoned.thinking] is true while a block is still open, as when the
+/// answer around it. A tag inside a code span or block is answer. [Reasoned.thinking] is true while a block is still open, as when the
 /// answer is streaming. Text with no such block is all answer, except the start of an opening
 /// tag that has not all arrived yet, which is held back.
 Reasoned splitReasoning(String text) {
@@ -162,8 +182,9 @@ Reasoned splitReasoning(String text) {
   final parts = <String>[];
   var thinking = false;
   final answer = text.replaceAllMapped(_thought, (match) {
-    parts.add(match[2]!.trim());
-    thinking = !match[0]!.endsWith('</${match[1]}>');
+    if (match[1] case final code?) return code;
+    parts.add(match[3]!.trim());
+    thinking = !match[0]!.endsWith('</${match[2]}>');
     return '';
   });
   return (

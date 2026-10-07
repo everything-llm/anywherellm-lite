@@ -23,9 +23,41 @@ class PrefsController extends ChangeNotifier {
   Future<void> setOff(String slug, List<OffDoc> docs) =>
       _change(prefs.withOff(slug, docs));
 
-  /// Forgets the document at [path] wherever it was switched off, as when it is deleted.
-  Future<void> forgetDoc(String path) async {
-    final next = prefs.withoutDoc(path);
+  /// Arranges the workspaces as [slugs].
+  Future<void> setWorkspaceOrder(List<String> slugs) =>
+      _change(prefs.withOrder(slugs));
+
+  /// Remembers chat [thread] of workspace [slug] as the one to open at start; a null [thread]
+  /// is a draft.
+  Future<void> setLastChat(String slug, String? thread) async {
+    if (prefs.lastChat != LastChat(slug, thread)) {
+      await _change(prefs.withLastChat(slug, thread));
+    }
+  }
+
+  /// Drops a deleted workspace from the arrangement and the last chat.
+  Future<void> forgetWorkspace(String slug) async {
+    if (prefs.workspaceOrder.contains(slug) || prefs.lastChat?.slug == slug) {
+      await _change(prefs.withoutWorkspace(slug));
+    }
+  }
+
+  /// Keeps a workspace's order, switched-off files and last chat when its slug changes.
+  Future<void> renameWorkspace(String from, String to) async {
+    if (prefs.workspaceOrder.contains(from) ||
+        prefs.switchedOff.containsKey(from) ||
+        prefs.lastChat?.slug == from) {
+      await _change(prefs.withRenamedWorkspace(from, to));
+    }
+  }
+
+  Future<void> setTheme(ThemePref theme) => _change(prefs.withTheme(theme));
+
+  Future<void> setTextSize(TextSize size) => _change(prefs.withTextSize(size));
+
+  /// Forgets the documents at [paths] wherever they were switched off, as when they are deleted.
+  Future<void> forgetDocs(Iterable<String> paths) async {
+    final next = prefs.withoutDocs(paths.toSet());
     if (next.encode() != prefs.encode()) await _change(next);
   }
 

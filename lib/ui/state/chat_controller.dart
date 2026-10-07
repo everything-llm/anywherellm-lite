@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/chat.dart';
 import '../../core/commands.dart';
 import '../../core/connection.dart';
+import '../../core/outputs.dart';
 import '../../core/ports.dart';
 import '../../core/server_models.dart';
 import 'notice.dart';
@@ -25,6 +26,10 @@ class Turn extends ChangeNotifier {
       text = message.text,
       citations = message.citations,
       attachments = message.attachments,
+      files = message.files,
+      metrics = message.metrics,
+      chatId = message.chatId,
+      feedback = message.feedback,
       streaming = false;
 
   final Role role;
@@ -33,10 +38,29 @@ class Turn extends ChangeNotifier {
   /// The names of the files sent with a question.
   List<String> attachments = const [];
   List<Citation> citations = const [];
+
+  /// What an agent made with the answer.
+  List<GeneratedFile> files = const [];
+
+  /// How the answer ran, when the server measured it.
+  AnswerMetrics? metrics;
+
+  /// The server's id for the exchange, once it has said; a question and its answer share it.
+  int? chatId;
+
+  /// Whether the answer was marked good or bad, or null when neither.
+  bool? feedback;
   bool streaming;
 
   /// Why the answer failed, or null.
   String? error;
+
+  /// Whether the person stopped the answer.
+  bool stopped = false;
+
+  /// Whether the server may finish this answer after the app let go of it: it failed or was
+  /// stopped.
+  bool get unfinished => role == Role.assistant && (error != null || stopped);
 
   /// What an agent is doing while the answer runs, such as a tool it runs, or null.
   String? status;
@@ -53,6 +77,11 @@ class Turn extends ChangeNotifier {
 
   void _replace(String whole) {
     text = whole;
+    notifyListeners();
+  }
+
+  void _mark(bool? good) {
+    feedback = good;
     notifyListeners();
   }
 }
@@ -77,7 +106,8 @@ class _Running {
 /// server starts it afresh.
 class ChatController extends ChangeNotifier {
   ChatController(this._api, this._settings, this._prefs)
-    : _server = _settings.connection {
+    : _server = _settings.connection?.withPassword(null),
+      _password = _settings.connection?.password {
     _settings.addListener(_serverChanged);
   }
 
@@ -85,8 +115,23 @@ class ChatController extends ChangeNotifier {
   final SettingsController _settings;
   final PrefsController _prefs;
 
-  /// The connection the fields below describe.
+  /// The server the fields below describe: its address and key, without the password, so
+  /// saving or forgetting one does not start afresh.
   Connection? _server;
+
+  /// The server the workspaces and chats are about, without its optional web UI password.
+  Connection? get server => _server;
+
+  /// The server's saved password, which signs in to the web UI's own routes.
+  String? _password;
+
+  /// Whether a password for the server is saved, so Retry and Edit replace the old exchange on
+  /// the server and an answer can be marked good or bad.
+  bool get signedIn => _password != null;
+
+  /// The question being edited: sending replaces it and everything after it. Only while
+  /// [signedIn].
+  Turn? editing;
 
   List<Workspace> workspaces = const [];
 
@@ -130,6 +175,13 @@ class ChatController extends ChangeNotifier {
 
   Timer? _linkTimer;
 
+  /// The bytes of each file an agent made, by storage name, read once per server.
+  final Map<String, Future<List<int>?>> _madeFiles = {};
+
+  /// The last frame of each image in an answer, by address, and whether that read gave one
+  /// frame and ended, so the image will not change.
+  final Map<Uri, ({Uint8List frame, bool whole})> _images = {};
+
   static const linkNoticeFor = Duration(seconds: 6);
 
   Workspace? get active =>
@@ -146,13 +198,21 @@ class ChatController extends ChangeNotifier {
   List<Turn> get turns =>
       activeThread == null ? _draft : (_turns[activeThread] ?? const []);
 
-  bool get busy => _running != null;
+  /// Whether the chat on screen is being cleared on the server.
+  bool get clearing => _clearing;
+  bool _clearing = false;
+
+  /// Whether an answer runs, a chat is being cleared or exchanges are being dropped, so no
+  /// message can be sent.
+  bool get busy => _running != null || _clearing || _dropping;
+  bool _dropping = false;
 
   /// Whether the chat on screen can take a message: a draft, or a chat whose history is read.
   bool get ready => activeThread == null || _turns.containsKey(activeThread);
 
   /// Whether the chat on screen is the one answering.
-  bool get answeringHere => busy && turns.contains(_running!.answer);
+  bool get answeringHere =>
+      _running != null && turns.contains(_running!.answer);
 
   bool isAnswering(String thread) => _running?.thread == thread;
 
@@ -167,15 +227,29 @@ class ChatController extends ChangeNotifier {
   }
 
   void _serverChanged() {
-    if (_settings.connection == _server) return;
-    _server = _settings.connection;
+    final now = _settings.connection;
+    if (now?.withPassword(null) == _server) {
+      if (now?.password == _password) return;
+      _password = now?.password;
+      if (!signedIn) editing = null;
+      notifyListeners();
+      if (_server != null) unawaited(_readCommands());
+      return;
+    }
+    _server = now?.withPassword(null);
+    _password = now?.password;
+    editing = null;
     _running?.stream?.cancel();
     _running = null;
     workspaces = const [];
     _threads.clear();
     _turns.clear();
     _draft.clear();
+    _madeFiles.clear();
+    _images.clear();
     docCounts.clear();
+    loading = false;
+    _clearing = false;
     _presets = const [];
     commandsNote = null;
     activeSlug = null;
@@ -189,19 +263,24 @@ class ChatController extends ChangeNotifier {
   /// Reads the workspaces and their chats, keeping the one on screen when it still exists.
   Future<void> load() async {
     if (_server == null) return;
+    final server = _server;
     loading = true;
     notifyListeners();
     await _try('Could not read the workspaces', () async {
-      workspaces = await _api.workspaces();
+      final read = await _api.workspaces();
+      if (_server != server) return;
+      workspaces = read;
       _threads
         ..clear()
         ..addAll({
           for (final w in workspaces) w.slug: [...w.threads],
         });
     });
+    if (_server != server) return;
     loading = false;
     if (active == null) {
-      await select(workspaces.firstOrNull?.slug);
+      final (slug, thread) = _startChat;
+      await select(slug, thread: thread);
     } else {
       notifyListeners();
     }
@@ -222,9 +301,7 @@ class ChatController extends ChangeNotifier {
       commandsNote = null;
     } on ApiException catch (error) {
       if (_server != server) return;
-      commandsNote = error.status == 401 || error.status == 403
-          ? 'This server has a password, so its own commands can\'t be listed here. One typed in full still runs.'
-          : 'The server\'s own commands could not be listed. One typed in full still runs.';
+      commandsNote = whyNoPresets(error, signedIn: signedIn);
     }
     notifyListeners();
   }
@@ -232,9 +309,12 @@ class ChatController extends ChangeNotifier {
   /// Asks each workspace how many documents it holds, all at once. Best effort: a count that
   /// cannot be read is left out. Sources reports the active workspace's own count.
   Future<void> _countDocs() async {
+    final server = _server;
     Future<void> count(String slug) async {
       try {
-        docCounts[slug] = (await _api.workspace(slug)).documents.length;
+        final workspace = await _api.workspace(slug);
+        if (_server != server) return;
+        docCounts[slug] = workspace.documents.length;
       } on ApiException {
         return;
       }
@@ -245,7 +325,30 @@ class ChatController extends ChangeNotifier {
         if (w.slug != activeSlug && !docCounts.containsKey(w.slug))
           count(w.slug),
     ]);
+    if (_server != server) return;
     notifyListeners();
+  }
+
+  /// The first workspace in the order the person arranged, or null when there is none.
+  String? get _firstSlug =>
+      _prefs.prefs.inOrder(workspaces, (w) => w.slug).firstOrNull?.slug;
+
+  /// The workspace and chat to open first: the last on screen while the workspace exists, on
+  /// its newest chat when that chat is gone; otherwise [_firstSlug] on its newest chat.
+  (String?, String?) get _startChat {
+    final last = _prefs.prefs.lastChat;
+    if (last == null || !workspaces.any((w) => w.slug == last.slug)) {
+      return (_firstSlug, null);
+    }
+    final kept = threadsOf(last.slug).any((t) => t.slug == last.thread);
+    return (last.slug, kept ? last.thread : null);
+  }
+
+  /// Remembers the chat on screen as the one to open at start.
+  void _rememberChat() {
+    if (activeSlug case final slug?) {
+      unawaited(_prefs.setLastChat(slug, activeThread));
+    }
   }
 
   void setDocCount(String slug, int count) {
@@ -254,27 +357,36 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Shows workspace [slug] on its newest chat, or a draft when it has none.
-  Future<void> select(String? slug) async {
+  /// Shows workspace [slug] on chat [thread], or on its newest chat, or a draft when it has
+  /// none.
+  Future<void> select(String? slug, {String? thread}) async {
     activeSlug = slug;
+    editing = null;
     _draft.clear();
-    final last = slug == null ? null : threadsOf(slug).lastOrNull;
-    await open(last?.slug);
+    await open(
+      thread ?? (slug == null ? null : threadsOf(slug).lastOrNull?.slug),
+    );
   }
 
-  /// Shows chat [threadSlug] of the active workspace, reading its turns the first time.
+  /// Shows chat [threadSlug] of the active workspace, reading its turns the first time, and
+  /// again when its last answer is [Turn.unfinished], so what the server saved since shows.
   Future<void> open(String? threadSlug) async {
     activeThread = threadSlug;
+    editing = null;
     _clearLinkNotice();
+    _rememberChat();
     notifyListeners();
     final slug = activeSlug;
-    if (slug == null || threadSlug == null || _turns.containsKey(threadSlug)) {
+    if (slug == null || threadSlug == null) return;
+    final known = _turns[threadSlug];
+    if (known != null &&
+        (known.lastOrNull?.unfinished != true || isAnswering(threadSlug))) {
       return;
     }
     final server = _server;
     await _try('Could not read the chat', () async {
       final history = await _api.history(slug, threadSlug);
-      if (_server != server) return;
+      if (_server != server || isAnswering(threadSlug)) return;
       _turns[threadSlug] = [for (final m in history) Turn.saved(m)];
     });
   }
@@ -284,6 +396,7 @@ class ChatController extends ChangeNotifier {
     if (turns.isEmpty) return;
     _draft.clear();
     activeThread = null;
+    _rememberChat();
     notifyListeners();
   }
 
@@ -306,33 +419,26 @@ class ChatController extends ChangeNotifier {
     final old = workspaces.where((w) => w.slug == slug).firstOrNull;
     if (old == null || clean.isEmpty || clean == old.name) return;
     final server = _server;
+    Workspace? renamed;
     await _try('Could not rename the workspace', () async {
-      final renamed = await _api.renameWorkspace(slug, clean);
-      if (_server != server) return;
-      if (renamed.slug != slug) {
-        final shown = activeSlug == slug;
-        await load();
-        if (shown) await select(renamed.slug);
-        return;
-      }
+      renamed = await _api.renameWorkspace(slug, clean);
+      if (_server != server || renamed!.slug != slug) return;
       workspaces = [
         for (final w in workspaces)
-          w.slug == slug
-              ? Workspace(
-                  slug: slug,
-                  name: renamed.name,
-                  threads: w.threads,
-                  documents: w.documents,
-                  prompt: w.prompt,
-                  settings: w.settings,
-                )
-              : w,
+          w.slug == slug ? w.withName(renamed!.name) : w,
       ];
     });
+    // Read again outside the rename's own notice, so a failed read stays shown.
+    if (renamed case final made? when _server == server && made.slug != slug) {
+      final shown = activeSlug == slug;
+      unawaited(_prefs.renameWorkspace(slug, made.slug));
+      await load();
+      if (shown) await select(made.slug);
+    }
   }
 
   /// Deletes workspace [slug] with its chats, unless an answer is running in it. Shows the first
-  /// workspace left when it was the one on screen.
+  /// workspace left, in the person's order, when it was the one on screen.
   Future<void> deleteWorkspace(String slug) async {
     if (answeringIn(slug)) return;
     final server = _server;
@@ -350,7 +456,8 @@ class ChatController extends ChangeNotifier {
           if (w.slug != slug) w,
       ];
       unawaited(_prefs.setOff(slug, const []));
-      if (activeSlug == slug) await select(workspaces.firstOrNull?.slug);
+      unawaited(_prefs.forgetWorkspace(slug));
+      if (activeSlug == slug) await select(_firstSlug);
     });
   }
 
@@ -399,6 +506,14 @@ class ChatController extends ChangeNotifier {
     if (slug == null || text.isEmpty || busy || !ready) return;
     _clearLinkNotice();
     if (resetsChat(text, _presets)) return _reset(slug);
+    if (editing case final edited?) {
+      editing = null;
+      final at = this.turns.indexOf(edited);
+      if (at >= 0) {
+        if (!await _dropFrom(edited.chatId)) return;
+        _setTurns(this.turns.sublist(0, at));
+      }
+    }
     final user = Turn.user(
       text,
       attachments: [for (final a in attachments) a.name],
@@ -423,6 +538,7 @@ class ChatController extends ChangeNotifier {
         if (activeSlug == slug && activeThread == null) {
           _draft.clear();
           activeThread = made.slug;
+          _rememberChat();
         }
         running.thread = made.slug;
       } on ApiException catch (error) {
@@ -443,7 +559,17 @@ class ChatController extends ChangeNotifier {
             TextChunk(:final text) => answer._grow(text),
             StatusChunk(:final text) => answer._setStatus(text),
             WholeAnswer(:final text) => answer._replace(text),
-            ChatDone(:final citations) => answer.citations = citations,
+            ChatDone(
+              :final citations,
+              :final files,
+              :final metrics,
+              :final chatId,
+            ) =>
+              answer
+                ..citations = citations
+                ..files = files
+                ..metrics = metrics
+                ..chatId = user.chatId = chatId,
           },
           onError: (Object error) => _finish(
             running,
@@ -459,6 +585,94 @@ class ChatController extends ChangeNotifier {
         );
   }
 
+  /// Whether [retry] can ask the last question again: nothing runs, the chat's last turn is an
+  /// answer, and its question went without files, whose bytes are not kept.
+  bool get canRetry {
+    final turns = this.turns;
+    return !busy &&
+        ready &&
+        turns.length >= 2 &&
+        turns.last.role == Role.assistant &&
+        turns[turns.length - 2].role == Role.user &&
+        turns[turns.length - 2].attachments.isEmpty;
+  }
+
+  /// Asks the chat's last question again, in place of its answer. While [signedIn] the old
+  /// exchange is deleted on the server first; otherwise the server keeps it too, and it shows
+  /// again when the chat is next read.
+  Future<void> retry() async {
+    if (!canRetry) return;
+    final turns = this.turns;
+    final question = turns[turns.length - 2];
+    if (!await _dropFrom(question.chatId ?? turns.last.chatId)) return;
+    if (!identical(this.turns, turns)) return;
+    _setTurns(turns.sublist(0, turns.length - 2));
+    await send(question.text);
+  }
+
+  /// Starts editing [question]: sending then replaces it and everything after it on the server.
+  /// Does nothing unless [signedIn] and the server has said the question's id; the composer
+  /// takes its text either way.
+  void edit(Turn question) {
+    if (!signedIn || question.chatId == null || !turns.contains(question)) {
+      return;
+    }
+    editing = question;
+    notifyListeners();
+  }
+
+  void cancelEdit() {
+    if (editing == null) return;
+    editing = null;
+    notifyListeners();
+  }
+
+  /// Marks [answer] good or bad on the server, or neither when it is marked so already. Shows at
+  /// once, and goes back with a [problem] when the server refuses.
+  Future<void> mark(Turn answer, bool good) async {
+    final slug = activeSlug;
+    final id = answer.chatId;
+    if (!signedIn || slug == null || id == null) return;
+    final was = answer.feedback;
+    final now = was == good ? null : good;
+    answer._mark(now);
+    final server = _server;
+    try {
+      await _api.setFeedback(slug, id, now);
+    } on ApiException catch (error) {
+      if (_server != server) return;
+      if (answer.feedback == now) answer._mark(was);
+      problem = Notice('Could not mark the answer', error.message);
+      notifyListeners();
+    }
+  }
+
+  /// Deletes the chat on screen's exchanges from [chatId] on, while [signedIn] and the id is
+  /// known. True when the question may then be asked: they were deleted, or there was nothing to
+  /// delete with. A failure shows as [problem].
+  Future<bool> _dropFrom(int? chatId) async {
+    final slug = activeSlug;
+    final thread = activeThread;
+    if (!signedIn || chatId == null || slug == null || thread == null) {
+      return true;
+    }
+    final server = _server;
+    _dropping = true;
+    notifyListeners();
+    try {
+      await _api.dropFrom(slug, thread, chatId);
+      return _server == server && activeSlug == slug && activeThread == thread;
+    } on ApiException catch (error) {
+      if (_server == server) {
+        problem = Notice('Could not replace the old exchange', error.message);
+      }
+      return false;
+    } finally {
+      _dropping = false;
+      notifyListeners();
+    }
+  }
+
   /// Clears the history of the chat on screen, on the server and here. A draft has none, so it
   /// is only emptied.
   Future<void> _reset(String slug) async {
@@ -469,20 +683,50 @@ class ChatController extends ChangeNotifier {
       return;
     }
     final server = _server;
-    await _try('Could not clear the chat', () async {
-      await _api.resetChat(slug, thread);
-      if (_server != server) return;
-      _turns[thread] = [];
-    });
+    _clearing = true;
+    notifyListeners();
+    try {
+      await _try('Could not clear the chat', () async {
+        await _api.resetChat(slug, thread);
+        if (_server != server) return;
+        _turns[thread] = [];
+      });
+    } finally {
+      // A new server has started afresh, clearing included.
+      if (_server == server) {
+        _clearing = false;
+        notifyListeners();
+      }
+    }
   }
 
-  /// Stops the running answer, keeping what came so far.
+  /// Stops the running answer, on the server too, keeping what came so far.
   void stop() {
     final running = _running;
     if (running == null) return;
+    if (running.thread case final thread? when running.stream != null) {
+      unawaited(_stopOnServer(running.slug, thread));
+    }
     running.stream?.cancel();
+    running.answer.stopped = true;
     if (running.answer.text.isEmpty) running.answer.text = 'Stopped.';
     _finish(running);
+  }
+
+  /// Stops the chat's answer on the server, and says so when that fails: the answer then goes
+  /// on there and is saved to the chat.
+  Future<void> _stopOnServer(String slug, String thread) async {
+    final server = _server;
+    try {
+      await _api.stopChat(slug, thread);
+    } on ApiException catch (error) {
+      if (_server != server) return;
+      problem = Notice(
+        'Could not stop the answer on the server',
+        error.message,
+      );
+      notifyListeners();
+    }
   }
 
   /// Ends [running], with [error] when it failed, unless it was already stopped or dropped.
@@ -527,6 +771,62 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The bytes of [file], which an agent made with an answer, read once; null when they could
+  /// not be read, and why shows as [problem]. A failed read is tried again next time.
+  Future<List<int>?> fileBytes(GeneratedFile file) =>
+      _madeFiles[file.storageName] ??= _readFile(file);
+
+  Future<List<int>?> _readFile(GeneratedFile file) async {
+    final server = _server;
+    try {
+      return await _api.generatedFile(file.storageName);
+    } on ApiException catch (error) {
+      _madeFiles.remove(file.storageName);
+      if (_server == server) {
+        report('Could not get ${file.name}', error.message);
+      }
+      return null;
+    }
+  }
+
+  /// The last frame of the image at [url] in an answer, read from this server, or null.
+  Uint8List? lastFrame(Uri url) => _images[url]?.frame;
+
+  /// The frames of the image at [url] in an answer, each kept as its [lastFrame]. An image
+  /// whose last read gave one frame and ended is given again without asking: a card's address
+  /// changes with what it shows, and a finished run's card no longer changes. A live one is
+  /// read again, so it shows its newest frame. Fails with [ApiException].
+  Stream<Uint8List> imageFrames(Uri url) {
+    final known = _images[url];
+    if (known != null && known.whole) return Stream.value(known.frame);
+    final server = _server;
+    var frames = 0;
+    return _api
+        .answerImage(url)
+        .transform(
+          StreamTransformer.fromHandlers(
+            handleData: (frame, sink) {
+              if (_server != server) return;
+              frames++;
+              _images[url] = (frame: frame, whole: false);
+              sink.add(frame);
+            },
+            handleDone: (sink) {
+              if (_server == server && frames == 1) {
+                _images[url] = (frame: _images[url]!.frame, whole: true);
+              }
+              sink.close();
+            },
+          ),
+        );
+  }
+
+  /// Shows [text] as [problem], titled [title].
+  void report(String title, String text) {
+    problem = Notice(title, text);
+    notifyListeners();
+  }
+
   /// Shows why a link in an answer did not open, for [linkNoticeFor].
   void reportLink(String title, String text) {
     linkNotice = Notice(title, text);
@@ -544,11 +844,16 @@ class ChatController extends ChangeNotifier {
     linkNotice = null;
   }
 
+  /// Runs [op], showing its failure as a [Notice] titled [failTitle]. A new server meanwhile has
+  /// started afresh, so neither its success nor its failure is shown.
   Future<void> _try(String failTitle, Future<void> Function() op) async {
+    final server = _server;
     try {
       await op();
+      if (_server != server) return;
       problem = null;
     } on ApiException catch (error) {
+      if (_server != server) return;
       problem = Notice(failTitle, error.message);
     }
     notifyListeners();

@@ -1,10 +1,16 @@
+import 'dart:async';
+
 import 'package:anywherellm/core/chat.dart';
+import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/ui/chat/chat_view.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
 import 'package:anywherellm/ui/sidebar.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
+import 'package:anywherellm/ui/widgets/confirm_box.dart';
 import 'package:anywherellm/ui/widgets/controls.dart';
+import 'package:anywherellm/ui/widgets/fields.dart';
+import 'package:anywherellm/ui/widgets/qr_mark.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:flutter/material.dart';
@@ -35,7 +41,7 @@ Finder get typingInto {
   final focused = find.byWidgetPredicate(
     (widget) => widget is EditableText && widget.focusNode.hasFocus,
   );
-  return focused.evaluate().isEmpty ? find.byType(EditableText).last : focused;
+  return focused.evaluate().isEmpty ? composerField : focused;
 }
 
 /// Types [text] where the focus is and presses Enter. Pumps a fixed time rather than settling,
@@ -149,11 +155,7 @@ void main() {
       await tester.enterText(typingInto, 'x');
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
-      // Only the composer is left to type in; a selectable answer is read-only.
-      expect(
-        find.byWidgetPredicate((w) => w is EditableText && !w.readOnly),
-        findsOneWidget,
-      );
+      expect(find.bySemanticsLabel('New workspace name'), findsNothing);
       expect(llm.calls, isNot(contains('createWorkspace:x')));
     });
 
@@ -223,6 +225,32 @@ void main() {
       expect(llm.calls, isNot(contains('deleteWorkspace:q3')));
     });
 
+    testWidgets('the workspace delete question closes when another opens', (
+      tester,
+    ) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      await tester.tap(control('Delete workspace'));
+      await tester.pumpAndSettle();
+      await h.chat.select('household');
+      await tester.pumpAndSettle();
+      expect(find.byType(ConfirmBox), findsNothing);
+      await h.chat.select('q3');
+      await tester.pumpAndSettle();
+      expect(find.byType(ConfirmBox), findsNothing);
+    });
+
+    testWidgets(
+      'the workspace delete question closes when it starts answering',
+      (tester) async {
+        final h = await pumpApp(tester, llm: planningServer()..hold = true);
+        await tester.tap(control('Delete workspace'));
+        await tester.pumpAndSettle();
+        await h.chat.send('Go');
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.byType(ConfirmBox), findsNothing);
+      },
+    );
+
     testWidgets('a workspace cannot be deleted while it answers', (
       tester,
     ) async {
@@ -260,6 +288,22 @@ void main() {
       expect(inChat(find.text(ChatMode.query.about)), findsOneWidget);
       expect(find.text('Ask about your files…'), findsOneWidget);
     });
+
+    testWidgets(
+      'an empty chat follows the chat mode before the server answers',
+      (tester) async {
+        final llm = planningServer();
+        final h = await pumpApp(tester, llm: llm);
+        h.chat.newChat();
+        await tester.pumpAndSettle();
+        final gate = llm.gates['updateWorkspace'] = Completer<void>();
+        await tester.tap(inSources(control('Query')));
+        await tester.pump();
+        expect(inChat(find.text(ChatMode.query.about)), findsOneWidget);
+        gate.complete();
+        await tester.pumpAndSettle();
+      },
+    );
 
     testWidgets('an unknown chat mode claims only what every mode does', (
       tester,
@@ -429,6 +473,75 @@ void main() {
       expect(inSidebar('Q3 planning'), findsOneWidget);
     });
 
+    Future<Harness> connected(WidgetTester tester, FakeAnythingLlm llm) async {
+      final h = await pumpApp(tester, llm: llm, connection: null);
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.bySemanticsLabel('AnythingLLM developer API key').last,
+        'K9',
+      );
+      await tester.tap(control('Save key'));
+      await tester.pumpAndSettle();
+      return h;
+    }
+
+    testWidgets(
+      'a server with a password asks for it, and saves one it takes',
+      (tester) async {
+        final h = await connected(
+          tester,
+          planningServer()..auth = ServerAuth.password,
+        );
+        expect(find.text('Server password'), findsWidgets);
+        await tester.enterText(
+          find.bySemanticsLabel('Server password').last,
+          'WRONG',
+        );
+        await tester.tap(control('Save password'));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('The server did not accept the password.'),
+          findsOneWidget,
+        );
+        expect(h.store.saved?.password, isNull);
+        await tester.enterText(
+          find.bySemanticsLabel('Server password').last,
+          'PASS-WORD',
+        );
+        await tester.tap(control('Save password'));
+        await tester.pumpAndSettle();
+        expect(h.store.saved?.password, 'PASS-WORD');
+        expect(find.text('The password was saved.'), findsOneWidget);
+        expect(control('Save password'), findsNothing);
+        await tester.tap(control('Forget').last);
+        await tester.pumpAndSettle();
+        expect(h.store.saved?.password, isNull);
+        expect(h.store.saved?.apiKey, 'K9');
+      },
+    );
+
+    testWidgets('the password card fits the smallest window', (tester) async {
+      final h = await pumpApp(
+        tester,
+        llm: planningServer()..auth = ServerAuth.password,
+        size: const Size(360, 480),
+      );
+      await h.settings.connect('https://h:3001', 'K1');
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      final field = find.bySemanticsLabel('Server password').last;
+      await tester.ensureVisible(field);
+      await tester.pumpAndSettle();
+      expect(field, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('an open server asks for no password', (tester) async {
+      await connected(tester, planningServer());
+      expect(find.text('Server password'), findsNothing);
+    });
+
     testWidgets('a key the server refuses is not saved', (tester) async {
       final llm = planningServer()
         ..verifyError = const ApiException('The server rejected the key.');
@@ -484,9 +597,15 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(control('Replace'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(EditableText).first);
-      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
-      addTearDown(tester.view.resetViewInsets);
+      await tester.tap(
+        find
+            .descendant(
+              of: find.byType(SettingsDialog),
+              matching: find.byType(EditableText),
+            )
+            .first,
+      );
+      raiseKeyboard(tester, 300);
       await tester.pumpAndSettle();
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
@@ -500,6 +619,121 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(h.shell.settingsOpen, isFalse);
+    });
+
+    testWidgets('the QR code shows the connection only when asked', (
+      tester,
+    ) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      expect(find.byType(QrMark), findsNothing);
+      await tester.tap(control('Show QR code'));
+      await tester.pumpAndSettle();
+      final mark = tester.widget<QrMark>(find.byType(QrMark));
+      expect(mark.data, pairingCode(sampleConnection));
+      expect(find.text('Your phone cannot use this address'), findsNothing);
+      await tester.tap(control('Hide QR code'));
+      await tester.pumpAndSettle();
+      expect(find.byType(QrMark), findsNothing);
+    });
+
+    testWidgets('the QR code warns when the phone cannot use the address', (
+      tester,
+    ) async {
+      final h = await pumpApp(
+        tester,
+        llm: planningServer(),
+        connection: const Connection(
+          baseUrl: 'http://localhost:3001',
+          apiKey: 'K1',
+        ),
+      );
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.tap(control('Show QR code'));
+      await tester.pumpAndSettle();
+      expect(find.text('Your phone cannot use this address'), findsOneWidget);
+      expect(find.textContaining('is the phone itself'), findsOneWidget);
+    });
+
+    testWidgets('a scanned code connects as a typed key does', (tester) async {
+      final llm = planningServer();
+      final h = await pumpApp(tester, llm: llm, connection: null, canScan: true)
+        ..scanCode = pairingCode(
+          const Connection(
+            baseUrl: 'https://owen.example.ts.net',
+            apiKey: 'K9',
+          ),
+        );
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.tap(control('Scan QR code'));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byType(SettingsDialog),
+          matching: find.byType(AppField),
+        ),
+        findsNothing,
+      );
+      await tester.tap(find.text('Fake scan'));
+      await tester.pumpAndSettle();
+      expect(find.text('Fake scan'), findsNothing);
+      expect(h.store.saved?.baseUrl, 'https://owen.example.ts.net');
+      expect(h.store.saved?.apiKey, 'K9');
+      expect(find.text('The key was saved.'), findsOneWidget);
+      expect(inSidebar('Q3 planning'), findsOneWidget);
+    });
+
+    testWidgets('a code that is not a connection saves nothing', (
+      tester,
+    ) async {
+      final h =
+          await pumpApp(
+              tester,
+              llm: planningServer(),
+              connection: null,
+              canScan: true,
+            )
+            ..scanCode = 'https://example.com';
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.tap(control('Scan QR code'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Fake scan'));
+      await tester.pumpAndSettle();
+      expect(h.store.saved, isNull);
+      expect(
+        find.text('This QR code is not an AnywhereLLM connection.'),
+        findsOneWidget,
+      );
+      expect(control('Save key'), findsOneWidget);
+    });
+
+    testWidgets('Cancel closes the scanner', (tester) async {
+      final h = await pumpApp(
+        tester,
+        llm: planningServer(),
+        connection: null,
+        canScan: true,
+      );
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.tap(control('Scan QR code'));
+      await tester.pumpAndSettle();
+      await tester.tap(control('Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.text('Fake scan'), findsNothing);
+      expect(control('Save key'), findsOneWidget);
+    });
+
+    testWidgets('without a camera there is no Scan button', (tester) async {
+      final h = await pumpApp(tester, llm: planningServer(), connection: null);
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      expect(control('Save key'), findsOneWidget);
+      expect(control('Scan QR code'), findsNothing);
     });
 
     testWidgets('Esc and Done close it', (tester) async {

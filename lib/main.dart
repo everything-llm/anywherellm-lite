@@ -12,7 +12,12 @@ import 'core/ports.dart';
 import 'ui/app.dart';
 import 'ui/app_scope.dart';
 import 'ui/boot_screen.dart';
+import 'ui/chat/device_speaker.dart';
+import 'ui/chat/dictation.dart';
+import 'ui/chat/speaker.dart';
+import 'ui/chat/speech_dictation.dart';
 import 'ui/files/save_file.dart';
+import 'ui/settings/scan_code.dart';
 import 'ui/shell.dart';
 import 'ui/state/chat_controller.dart';
 import 'ui/state/files_controller.dart';
@@ -20,6 +25,7 @@ import 'ui/state/prefs_controller.dart';
 import 'ui/state/settings_controller.dart';
 import 'ui/state/shell_controller.dart';
 import 'ui/state/sources_controller.dart';
+import 'ui/state/system_controller.dart';
 
 /// The composition root: the one place that knows the adapters and the UI.
 ///
@@ -34,8 +40,10 @@ Future<void> main() async {
       : null;
   final holder = ConnectionHolder();
   final llm = HttpAnythingLlmApi(holder: holder, allowHttp: !android);
+  final prefs = PrefsController(JsonPrefsStore(prefsFile));
   runApp(
     AnywhereLlmApp(
+      prefs: prefs,
       home: SessionHost(
         llm: llm,
         settings: SettingsController(
@@ -44,9 +52,9 @@ Future<void> main() async {
           holder,
           allowHttp: !android,
         ),
-        prefs: PrefsController(JsonPrefsStore(prefsFile)),
+        prefs: prefs,
         shell: ShellController(),
-        launch: (url) => launchUrl(url, mode: LaunchMode.externalApplication),
+        launch: (url) => launchUrl(url, mode: _launchMode(url, android)),
       ),
     ),
   );
@@ -54,6 +62,14 @@ Future<void> main() async {
 
 /// Reads the saved connection and preferences, then shows the app, with Settings open when no
 /// server is set up.
+/// How [url] opens: a web page in the in-app browser on Android, which Back closes, and
+/// anything else, or anything on Linux, in the app the system picks. The in-app browser takes
+/// only http and https.
+LaunchMode _launchMode(Uri url, bool android) =>
+    android && (url.scheme == 'http' || url.scheme == 'https')
+    ? LaunchMode.inAppBrowserView
+    : LaunchMode.externalApplication;
+
 class SessionHost extends StatefulWidget {
   const SessionHost({
     super.key,
@@ -79,6 +95,13 @@ class _SessionHostState extends State<SessionHost> {
   late final ChatController _chat;
   late final SourcesController _sources;
   late final FilesController _files;
+  late final SystemController _system;
+
+  /// Reads answers aloud on Android, and is null where the device has no such engine to use.
+  ReadAloud? _readAloud;
+
+  /// Listens for speech on Android, and is null where the device has no such service to use.
+  final Dictation? _dictation = Platform.isAndroid ? SpeechDictation() : null;
 
   /// The controllers listen before the keyring is read, so reading a saved connection is what
   /// loads the workspaces.
@@ -94,19 +117,26 @@ class _SessionHostState extends State<SessionHost> {
       widget.prefs,
       _sources,
     );
+    _system = SystemController(widget.llm, widget.settings);
+    if (Platform.isAndroid) _readAloud = ReadAloud(DeviceSpeaker(), _chat);
     _loaded = _load();
   }
 
   @override
   void dispose() {
+    _readAloud?.dispose();
+    _system.dispose();
     _files.dispose();
     _sources.dispose();
     _chat.dispose();
     super.dispose();
   }
 
+  /// Reads the prefs before the connection, so the workspace order and the last chat are known
+  /// when the workspaces load.
   Future<void> _load() async {
-    await Future.wait([widget.settings.load(), widget.prefs.load()]);
+    await widget.prefs.load();
+    await widget.settings.load();
     if (!widget.settings.configured) widget.shell.openSettings();
   }
 
@@ -130,8 +160,12 @@ class _SessionHostState extends State<SessionHost> {
         chat: _chat,
         sources: _sources,
         files: _files,
+        system: _system,
         launch: widget.launch,
         save: saveWithDialog,
+        scanner: Platform.isAndroid ? cameraScanner : null,
+        dictation: _dictation,
+        readAloud: _readAloud,
         child: const AppShell(),
       );
     },

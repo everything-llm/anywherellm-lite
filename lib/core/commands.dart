@@ -1,5 +1,7 @@
 // Slash commands: the server's presets, which it expands itself, and the one built-in, /reset.
 
+import 'errors.dart';
+
 /// A command a message can start with. The server swaps [command] for [prompt] when the message
 /// is asked.
 class SlashCommand {
@@ -48,13 +50,25 @@ List<SlashCommand> withBuiltIns(List<SlashCommand> presets) => [
 /// The commands to offer while [draft] is being typed: those that start with it, when it is a
 /// slash and the start of one word. Empty otherwise.
 List<SlashCommand> commandsFor(String draft, List<SlashCommand> commands) {
-  if (!draft.startsWith('/') || draft.contains(RegExp(r'\s'))) return const [];
+  if (!draft.startsWith('/') || draft.contains(_space)) return const [];
   final typed = draft.toLowerCase();
   return [
     for (final c in commands)
       if (c.command.toLowerCase().startsWith(typed)) c,
   ];
 }
+
+final _space = RegExp(r'\s');
+
+/// Why the server's presets could not be listed, from the [error] reading them failed with. A
+/// 401 or 403 means the list, which takes the web UI's login, refused the app: it has no
+/// password for the server, or the one [signedIn] with was refused.
+String whyNoPresets(ApiException error, {bool signedIn = false}) =>
+    error.status == 401 || error.status == 403
+    ? signedIn
+          ? 'The server did not accept the saved password, so its own commands can\'t be listed. Replace it in Settings. One typed in full still runs.'
+          : 'This server has a password. Add it in Settings to list its own commands. One typed in full still runs.'
+    : 'The server\'s own commands could not be listed. One typed in full still runs.';
 
 /// [message] with each preset swapped for its prompt where it starts the message or follows a
 /// space and is not the start of a longer command, as the server does.

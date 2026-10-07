@@ -51,7 +51,8 @@ void main() {
         '/workspaces/q3/chats/budget',
         '/library',
         '/settings',
-        '/settings/models.json',
+        '/settings/system.json',
+        '/settings/embeds',
         '/.env',
         '/keys',
       ]);
@@ -88,14 +89,14 @@ void main() {
       expect((doc.kind, doc.ref), (NodeKind.libraryDoc, 'custom/a.json'));
     });
 
-    test('badges mark chats and models read only, secrets locked', () {
+    test('badges mark chats read only, secrets locked', () {
       final tree = _tree();
       expect(
         nodeAt(tree, '/workspaces/q3/chats/budget')!.badge,
         NodeBadge.readOnly,
       );
       expect(nodeAt(tree, '/workspaces/q3/chats/budget')!.name, 'Budget.md');
-      expect(nodeAt(tree, '/settings/models.json')!.badge, NodeBadge.readOnly);
+      expect(nodeAt(tree, '/settings/system.json')!.badge, NodeBadge.none);
       expect(nodeAt(tree, '/.env')!.badge, NodeBadge.locked);
       expect(nodeAt(tree, '/keys')!.badge, NodeBadge.locked);
     });
@@ -123,6 +124,15 @@ void main() {
     );
   });
 
+  test('a question keeps a think tag in chat Markdown', () {
+    expect(
+      chatMarkdown('Chat', const [
+        ChatMessage(role: Role.user, text: 'What does <think> do?'),
+      ]),
+      contains('What does <think> do?'),
+    );
+  });
+
   group('settings', () {
     test('round-trip unchanged to no changes', () {
       expect(parseSettings(settingsText(_settings), _settings), isEmpty);
@@ -141,6 +151,11 @@ void main() {
           'chatMode': mode,
         });
       }
+    });
+
+    test('a choice the server left null may stay null', () {
+      final unset = WorkspaceSettings({..._settings.values, 'chatMode': null});
+      expect(parseSettings(settingsText(unset), unset), isEmpty);
     });
 
     test('a key left out is left as it is', () {
@@ -162,6 +177,10 @@ void main() {
       (_edited('chatModel', 3), 'chatModel must be text or null'),
       (
         _edited('chatMode', 'agent'),
+        'chatMode must be one of automatic, chat, query',
+      ),
+      (
+        _edited('chatMode', null),
         'chatMode must be one of automatic, chat, query',
       ),
     ]) {
@@ -193,38 +212,6 @@ void main() {
 
     test('a workspace JSON without settings has none', () {
       expect(WorkspaceSettings.fromJson({'slug': 'q3'}), isNull);
-    });
-  });
-
-  group('models.json', () {
-    test('keeps provider, model, engine and vector database names', () {
-      final text = modelsText({
-        'LLMProvider': 'ollama',
-        'OllamaLLMModelPref': 'qwen3:8b',
-        'EmbeddingEngine': 'native',
-        'VectorDB': 'lancedb',
-        'MultiUserMode': false,
-      });
-      expect(jsonDecode(text), {
-        'EmbeddingEngine': 'native',
-        'LLMProvider': 'ollama',
-        'OllamaLLMModelPref': 'qwen3:8b',
-        'VectorDB': 'lancedb',
-      });
-    });
-
-    test('never shows a secret, whatever its key is called', () {
-      const secret = 'sk-live-0123456789';
-      final text = modelsText({
-        'OpenAiKey': secret,
-        'AnthropicApiKeyProvider': secret,
-        'GenericOpenAiSecretModelPref': secret,
-        'AuthTokenEngine': secret,
-        'PasswordProvider': secret,
-        'LLMProvider': 'openai',
-      });
-      expect(text, isNot(contains(secret)));
-      expect(jsonDecode(text), {'LLMProvider': 'openai'});
     });
   });
 

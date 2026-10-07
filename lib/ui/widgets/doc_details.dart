@@ -18,14 +18,16 @@ class DocDetailsController {
     source: source.text,
   );
 
+  List<TextEditingController> get _all => [title, author, description, source];
+
   void clear() {
-    for (final c in [title, author, description, source]) {
+    for (final c in _all) {
       c.clear();
     }
   }
 
   void dispose() {
-    for (final c in [title, author, description, source]) {
+    for (final c in _all) {
       c.dispose();
     }
   }

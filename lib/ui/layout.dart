@@ -33,6 +33,9 @@ abstract final class Sizes {
   static const sidebar = 264.0;
   static const sources = 312.0;
   static const column = 720.0;
+
+  /// The least height a pane in `MinHeight` is laid out at; shorter, it scrolls whole.
+  static const panelMin = 360.0;
   static const card = 16.0;
   static const control = 10.0;
 }

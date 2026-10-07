@@ -1,11 +1,14 @@
 import 'package:flutter/widgets.dart';
 
+import 'chat/dictation.dart';
+import 'chat/speaker.dart';
 import 'state/chat_controller.dart';
 import 'state/files_controller.dart';
 import 'state/prefs_controller.dart';
 import 'state/settings_controller.dart';
 import 'state/shell_controller.dart';
 import 'state/sources_controller.dart';
+import 'state/system_controller.dart';
 
 /// Opens [url] outside the app, in the browser or the mail app. Says whether something did.
 typedef LinkOpener = Future<bool> Function(Uri url);
@@ -19,6 +22,9 @@ typedef FileSaver = Future<String?> Function(
   Future<List<int>?> Function() bytes,
 );
 
+/// A camera view that reads QR codes and calls [onCode] with the first one's text.
+typedef CodeScanner = Widget Function(void Function(String code) onCode);
+
 /// The app's controllers, put in the tree once by `main.dart`. Controllers are listenable, so
 /// this never notifies: widgets listen to the controller they read.
 class AppScope extends InheritedWidget {
@@ -30,8 +36,12 @@ class AppScope extends InheritedWidget {
     required this.chat,
     required this.sources,
     required this.files,
+    required this.system,
     required this.launch,
     required this.save,
+    this.scanner,
+    this.dictation,
+    this.readAloud,
     required super.child,
   });
 
@@ -41,8 +51,18 @@ class AppScope extends InheritedWidget {
   final ChatController chat;
   final SourcesController sources;
   final FilesController files;
+  final SystemController system;
   final LinkOpener launch;
   final FileSaver save;
+
+  /// Reads a QR code in Settings, or null where the device has no camera to scan with.
+  final CodeScanner? scanner;
+
+  /// Writes what the person says in the composer, or null where the device cannot listen.
+  final Dictation? dictation;
+
+  /// Reads an answer aloud, or null where the device has no speech to read with.
+  final ReadAloud? readAloud;
 
   static AppScope of(BuildContext context) {
     // Never notifies, so no dependency is needed. That also lets initState read it.

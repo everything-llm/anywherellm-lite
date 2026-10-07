@@ -2,6 +2,7 @@ import 'dart:ui' show Size;
 
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/commands.dart';
+import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/upload.dart';
@@ -9,8 +10,8 @@ import 'package:anywherellm/ui/sidebar.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/drop_zone.dart';
+import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
-import 'package:flutter/widgets.dart' show EditableText;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
@@ -92,6 +93,36 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('the QR code and the scanner fit at $at', (tester) async {
+      final h = await pumpApp(
+        tester,
+        llm: awkward(),
+        size: size,
+        connection: const Connection(
+          baseUrl: 'http://localhost:3001/$longWord',
+          apiKey: 'K1',
+        ),
+        canScan: true,
+      );
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Show QR code'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Show QR code'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.ensureVisible(find.text('Replace'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Replace'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Scan QR code'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Scan QR code'));
+      await tester.pumpAndSettle();
+      expect(find.text('Fake scan'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('the slash menu fits at $at', (tester) async {
       final llm = awkward()
         ..presets = [
@@ -103,11 +134,38 @@ void main() {
             ),
         ];
       await pumpApp(tester, llm: llm, size: size);
-      await tester.enterText(
-        find.byWidgetPredicate((w) => w is EditableText && !w.readOnly).last,
-        '/',
+      await tester.enterText(composerField, '/');
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the microphone and a dictation problem fit at $at', (
+      tester,
+    ) async {
+      final h = await pumpApp(
+        tester,
+        llm: awkward(),
+        size: size,
+        canDictate: true,
+      );
+      h.dictation!.available = false;
+      await tester.tap(
+        find.byWidgetPredicate((w) => w is Tappable && w.label == 'Dictate'),
       );
       await tester.pump();
+      expect(find.text('Could not listen'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a search with long names fits at $at', (tester) async {
+      final h = await pumpApp(tester, llm: awkward(), size: size);
+      h.shell.toggleSide();
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.bySemanticsLabel('Search workspaces and chats').last,
+        longWord.substring(0, 5),
+      );
+      await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });
 
@@ -115,10 +173,7 @@ void main() {
       final llm = awkward()
         ..errors['slashCommands'] = const ApiException('no', status: 401);
       await pumpApp(tester, llm: llm, size: size);
-      await tester.enterText(
-        find.byWidgetPredicate((w) => w is EditableText && !w.readOnly).last,
-        '/',
-      );
+      await tester.enterText(composerField, '/');
       await tester.pump();
       expect(find.textContaining('has a password'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -257,7 +312,8 @@ void main() {
         '/library/custom-documents',
         '/library/custom-documents/file-$longWord.pdf.json',
         '/settings',
-        '/settings/models.json',
+        '/settings/system.json',
+        '/settings/embeds',
         '/keys',
       ]) {
         await h.files.select(path);

@@ -39,21 +39,111 @@ class _ComposerState extends State<Composer> {
   /// The command in the menu that Enter picks.
   int _highlight = 0;
 
-  /// The message as it was when Esc closed the menu. The menu stays closed until it changes.
-  String? _dismissed;
+  /// Whether Esc closed the menu. It stays closed until the message changes.
+  bool _menuClosed = false;
+
+  /// What the form follows besides the message, whose changes [_changed] handles.
+  late final Listenable _shown;
+
+  late final AppScope _scope;
+
+  /// The server and the chat on screen, which [_attached] belongs to.
+  late Object _chatShown;
 
   String _typed = '';
+
+  /// Whether the microphone is listening, and what the message held when it began, which what
+  /// is heard follows.
+  bool _listening = false;
+  String _before = '';
+
+  /// Counts the goes, so words that arrive after a message was sent are not put in the next.
+  int _go = 0;
+
+  /// Why dictation could not start, or null.
+  String? _micProblem;
 
   @override
   void initState() {
     super.initState();
+    final scope = _scope = AppScope.of(context);
+    _shown = Listenable.merge([
+      scope.settings,
+      scope.chat,
+      scope.sources.chatMode,
+    ]);
+    _chatShown = _chatOnScreen();
+    _shown.addListener(_chatChanged);
     widget.draft.addListener(_changed);
   }
 
   @override
   void dispose() {
+    _shown.removeListener(_chatChanged);
     widget.draft.removeListener(_changed);
+    _go++;
+    if (_listening) _scope.dictation?.stop();
     super.dispose();
+  }
+
+  /// Starts or ends listening. What is heard follows the message as it stood, and the person
+  /// can still edit it.
+  Future<void> _dictate() async {
+    final dictation = _scope.dictation;
+    if (dictation == null) return;
+    if (_listening) {
+      await dictation.stop();
+      return;
+    }
+    final draft = widget.draft.text;
+    _before = draft.isEmpty || draft.endsWith(' ') || draft.endsWith('\n')
+        ? draft
+        : '$draft ';
+    final go = ++_go;
+    setState(() {
+      _listening = true;
+      _micProblem = null;
+    });
+    final started = await dictation.start(
+      onWords: (words) {
+        if (go != _go) return;
+        final text = '$_before$words';
+        widget.draft.value = TextEditingValue(
+          text: text,
+          selection: TextSelection.collapsed(offset: text.length),
+        );
+      },
+      onDone: () {
+        if (mounted) setState(() => _listening = false);
+      },
+    );
+    if (!started && mounted) {
+      setState(() {
+        _listening = false;
+        _micProblem =
+            'Speech recognition is not available, or the microphone is not allowed. '
+            "Allow it in Android's settings for the app.";
+      });
+    }
+  }
+
+  Object _chatOnScreen() => (
+    _scope.settings.connection,
+    _scope.chat.activeSlug,
+    _scope.chat.activeThread,
+  );
+
+  /// Drops the attachments when another chat, workspace or server is shown, so they never go
+  /// with a message they were not picked for.
+  void _chatChanged() {
+    final shown = _chatOnScreen();
+    if (shown == _chatShown) return;
+    _chatShown = shown;
+    if (_attached.isEmpty && _problem == null) return;
+    setState(() {
+      _attached = const [];
+      _problem = null;
+    });
   }
 
   void _changed() {
@@ -61,7 +151,7 @@ class _ComposerState extends State<Composer> {
     setState(() {
       _typed = widget.draft.text;
       _highlight = 0;
-      if (_dismissed != _typed) _dismissed = null;
+      _menuClosed = false;
     });
   }
 
@@ -83,11 +173,13 @@ class _ComposerState extends State<Composer> {
         selection: TextSelection.collapsed(offset: 1),
       );
     }
-    setState(() => _dismissed = null);
+    setState(() => _menuClosed = false);
     widget.focus.requestFocus();
   }
 
+  /// Attaches the files picked, unless another chat was shown while the picker was open.
   Future<void> _attach() async {
+    final shown = _chatShown;
     final List<XFile> picked;
     try {
       picked = await openFiles();
@@ -109,7 +201,7 @@ class _ComposerState extends State<Composer> {
         problems.add('${file.name} could not be read.');
       }
     }
-    if (!mounted) return;
+    if (!mounted || _chatShown != shown) return;
     setState(() {
       _attached = [..._attached, ...added];
       _problem = problems.isEmpty ? null : problems.join(' ');
@@ -123,10 +215,15 @@ class _ComposerState extends State<Composer> {
     ];
   });
 
-  void _sent() => setState(() {
-    _attached = const [];
-    _problem = null;
-  });
+  void _sent() {
+    _go++;
+    if (_listening) _scope.dictation?.stop();
+    setState(() {
+      _attached = const [];
+      _problem = null;
+      _listening = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -138,15 +235,10 @@ class _ComposerState extends State<Composer> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: Sizes.column),
           child: ListenableBuilder(
-            listenable: Listenable.merge([
-              scope.settings,
-              scope.chat,
-              scope.sources.chatMode,
-              draft,
-            ]),
+            listenable: _shown,
             builder: (context, _) {
               if (!scope.settings.configured) return const _NoKey();
-              final matches = scope.chat.busy || _dismissed == draft.text
+              final matches = scope.chat.busy || _menuClosed
                   ? const <SlashCommand>[]
                   : commandsFor(draft.text, scope.chat.commands);
               return _Form(
@@ -160,11 +252,14 @@ class _ComposerState extends State<Composer> {
                     : _highlight.clamp(0, matches.length - 1),
                 onHighlight: (i) => setState(() => _highlight = i),
                 onPick: _pick,
-                onDismiss: () => setState(() => _dismissed = draft.text),
+                onDismiss: () => setState(() => _menuClosed = true),
                 onSlash: _slash,
                 onAttach: _attach,
                 onRemove: _remove,
                 onSent: _sent,
+                onDictate: scope.dictation == null ? null : _dictate,
+                listening: _listening,
+                micProblem: _micProblem,
               );
             },
           ),
@@ -189,6 +284,9 @@ class _Form extends StatelessWidget {
     required this.onAttach,
     required this.onRemove,
     required this.onSent,
+    required this.onDictate,
+    required this.listening,
+    required this.micProblem,
   });
 
   final TextEditingController draft;
@@ -207,16 +305,24 @@ class _Form extends StatelessWidget {
   final ValueChanged<Attachment> onRemove;
   final VoidCallback onSent;
 
+  /// Starts or ends dictation, or null where the device cannot listen.
+  final VoidCallback? onDictate;
+  final bool listening;
+
+  /// Why dictation could not start, or null.
+  final String? micProblem;
+
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final chat = scope.chat;
     final t = Tokens.of(context);
     final here = chat.answeringHere;
-    final elsewhere = chat.busy && !here;
     final hint = here
         ? 'Answering…'
-        : elsewhere
+        : chat.clearing
+        ? 'Clearing the chat…'
+        : chat.busy
         ? 'Another chat is still answering…'
         : switch (scope.sources.chatMode.value) {
             ChatMode.automatic || ChatMode.chat => 'Ask anything…',
@@ -288,6 +394,24 @@ class _Form extends StatelessWidget {
         children: [
           if (problem case final problem?) ...[
             AlertBox(AlertKind.bad, 'Could not attach', text: problem),
+            const SizedBox(height: 8),
+          ],
+          if (micProblem case final problem?) ...[
+            AlertBox(AlertKind.bad, 'Could not listen', text: problem),
+            const SizedBox(height: 8),
+          ],
+          if (chat.editing != null) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Editing a sent message: sending replaces it and everything after it.',
+                    style: Type.sans(12, color: t.muted),
+                  ),
+                ),
+                TextAction('close', 'Send as new', chat.cancelEdit),
+              ],
+            ),
             const SizedBox(height: 8),
           ],
           if (menu) ...[
@@ -391,6 +515,18 @@ class _Form extends StatelessWidget {
                   ),
                 ),
               const Spacer(),
+              if (onDictate != null)
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: IconBtn(
+                    'mic',
+                    tooltip: listening ? 'Stop dictating' : 'Dictate',
+                    active: listening,
+                    onPressed: chat.busy ? null : onDictate,
+                    box: 34,
+                    size: IconSize.small,
+                  ),
+                ),
               if (here)
                 _RoundButton(
                   label: 'Stop',

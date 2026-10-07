@@ -1,7 +1,7 @@
 name: anywherellm
 description: "A lightweight Linux and Android front end for an AnythingLLM server."
 publish_to: 'none'
-version: 2.0.0+4
+version: 2.4.0+9
 
 # Pinned by series. Rolling forward is a deliberate edit to this file.
 environment:
@@ -15,16 +15,22 @@ dependencies:
   desktop_drop: ">=0.8.4 <0.9.0"
   path_drawing: ">=1.0.1 <1.1.0"
   http: ">=1.6.0 <1.7.0"
+  http_parser: ">=4.1.2 <4.2.0"
   flutter_secure_storage: ">=11.2.0 <11.3.0"
   path_provider: ">=2.1.0 <2.2.0"
   flutter_markdown_plus: ">=1.0.12 <1.1.0"
   markdown: ">=7.3.1 <7.4.0"
   url_launcher: ">=6.3.2 <6.4.0"
+  qr: ">=4.0.0 <4.1.0"
+  mobile_scanner: ">=7.4.2 <7.5.0"
+  speech_to_text: ">=7.5.0 <7.6.0"
+  flutter_tts: ">=4.2.5 <4.3.0"
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ">=6.0.0 <6.1.0"
+  file_selector_platform_interface: ">=2.7.0 <2.8.0"
   flutter_launcher_icons: ">=0.14.4 <0.15.0"
   flutter_native_splash: ">=2.4.8 <2.5.0"
 

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../core/chat.dart';
+import '../../core/connection.dart';
 import '../../core/ports.dart';
 import '../../core/server_models.dart';
 import '../../core/sources.dart';
@@ -96,20 +97,21 @@ class SourcesController extends ChangeNotifier {
   /// Reads the active workspace's documents again.
   Future<void> refresh() async {
     final slug = _slug;
+    final server = _chat.server;
     if (slug == null) return;
     loading = true;
     notifyListeners();
     try {
       final workspace = await _api.workspace(slug);
-      if (slug != _slug) return;
+      if (server != _chat.server || slug != _slug) return;
       _apply(workspace);
     } on ApiException catch (error) {
-      if (slug != _slug) return;
+      if (server != _chat.server || slug != _slug) return;
       problems = [
         Notice('Could not read this workspace\'s files', error.message),
       ];
     } finally {
-      if (slug == _slug) {
+      if (server == _chat.server && slug == _slug) {
         loading = false;
         notifyListeners();
       }
@@ -149,43 +151,46 @@ class SourcesController extends ChangeNotifier {
   /// cannot be added says why, and the rest still go.
   Future<void> upload(List<UploadFile> picked) async {
     final slug = _slug;
+    final server = _chat.server;
     if (slug == null || picked.isEmpty) return;
     var accepted = _accepted;
     try {
       accepted ??= await _api.acceptedExtensions();
-      if (slug == _slug) _accepted = accepted;
+      if (server == _chat.server && slug == _slug) _accepted = accepted;
     } on ApiException {
       // The server decides each file then.
     }
+    if (server != _chat.server) return;
     final sent = await sendEach(
       _api,
       picked,
       accepted: accepted,
+      shouldContinue: () => server == _chat.server,
       onSending: (name) {
         if (slug != _slug) return;
         sending = name;
         notifyListeners();
       },
     );
-    await _embedMade(slug, sent.made, [
+    await _embedMade(server, slug, sent.made, [
       for (final (name, why) in sent.refused)
         Notice('Could not add $name', why),
     ]);
   }
 
   /// Has the server read in the web page at [url] with the details in [meta], then adds what it
-  /// made.
-  Future<void> addLink(String url, {DocMeta meta = const DocMeta()}) async {
+  /// made. Answers at once whether it took [url]: one that is not a link is refused and says why.
+  bool addLink(String url, {DocMeta meta = const DocMeta()}) {
     final slug = _slug;
     final link = url.trim();
-    if (slug == null || link.isEmpty) return;
-    final wrong = linkProblem(link);
-    if (wrong != null) {
+    if (slug == null || link.isEmpty) return false;
+    if (linkProblem(link) case final wrong?) {
       problems = [Notice('Could not add the link', wrong)];
       notifyListeners();
-      return;
+      return false;
     }
-    await _readIn(slug, link, () => _api.uploadLink(link, meta: meta));
+    unawaited(_readIn(slug, link, () => _api.uploadLink(link, meta: meta)));
+    return true;
   }
 
   /// Saves [text] as a document called [title] with the details in [meta], then adds it.
@@ -206,12 +211,13 @@ class SourcesController extends ChangeNotifier {
     String name,
     Future<List<DocEntry>> Function() read,
   ) async {
+    final server = _chat.server;
     sending = name;
     notifyListeners();
     try {
-      await _embedMade(slug, await read(), const []);
+      await _embedMade(server, slug, await read(), const []);
     } on ApiException catch (error) {
-      await _embedMade(slug, const [], [
+      await _embedMade(server, slug, const [], [
         Notice('Could not add $name', error.message),
       ]);
     }
@@ -220,10 +226,12 @@ class SourcesController extends ChangeNotifier {
   /// Embeds [made] in workspace [slug] and shows [refused], with one more notice if embedding
   /// fails.
   Future<void> _embedMade(
+    Connection? server,
     String slug,
     List<DocEntry> made,
     List<Notice> refused,
   ) async {
+    if (server != _chat.server) return;
     final problems = [...refused];
     if (made.isNotEmpty) {
       try {
@@ -235,27 +243,30 @@ class SourcesController extends ChangeNotifier {
       }
     }
     // The person moved to another workspace meanwhile: these notices are not about it.
-    if (slug != _slug) return;
+    if (server != _chat.server || slug != _slug) return;
     sending = null;
     this.problems = problems;
     await refresh();
   }
 
   /// Takes [file] out of Sources. [undo] puts it back for a few seconds after.
-  Future<void> remove(SourceFile file) =>
-      _change('Could not remove ${file.title}', (slug) async {
-        if (file.on) {
-          await _embed(slug, file, on: false);
-        } else {
-          await _remember(slug, file, off: false);
-        }
-        _clearRemoved();
-        removed = file;
-        _removedTimer = Timer(undoFor, () {
-          removed = null;
-          notifyListeners();
-        });
+  Future<void> remove(SourceFile file) {
+    final server = _chat.server;
+    return _change('Could not remove ${file.title}', (slug) async {
+      if (file.on) {
+        await _embed(slug, file, on: false);
+      } else {
+        await _remember(slug, file, off: false);
+      }
+      if (server != _chat.server || slug != _slug) return;
+      _clearRemoved();
+      removed = file;
+      _removedTimer = Timer(undoFor, () {
+        removed = null;
+        notifyListeners();
       });
+    });
+  }
 
   Future<void> undo() async {
     final file = removed;
@@ -274,6 +285,7 @@ class SourcesController extends ChangeNotifier {
   /// workspace's own settings choose them.
   Future<void> search(String query) async {
     final slug = _slug;
+    final server = _chat.server;
     final question = query.trim();
     if (slug == null || question.isEmpty) return;
     searched = question;
@@ -281,11 +293,15 @@ class SourcesController extends ChangeNotifier {
     notifyListeners();
     try {
       final found = await _api.searchDocs(slug, question);
-      if (slug != _slug || searched != question) return;
+      if (server != _chat.server || slug != _slug || searched != question) {
+        return;
+      }
       hits = found;
       problems = const [];
     } on ApiException catch (error) {
-      if (slug != _slug || searched != question) return;
+      if (server != _chat.server || slug != _slug || searched != question) {
+        return;
+      }
       hits = null;
       problems = [Notice('Could not test the question', error.message)];
     }
@@ -305,16 +321,16 @@ class SourcesController extends ChangeNotifier {
   /// the workspace again.
   Future<void> setChatMode(ChatMode mode) async {
     final slug = _slug;
+    final server = _chat.server;
     if (slug == null || mode == chatMode.value) return;
     final was = chatMode.value;
     chatMode.value = mode;
-    notifyListeners();
     try {
       await _api.updateWorkspace(slug, {'chatMode': mode.name});
-      if (slug != _slug) return;
+      if (server != _chat.server || slug != _slug) return;
       problems = const [];
     } on ApiException catch (error) {
-      if (slug != _slug) return;
+      if (server != _chat.server || slug != _slug) return;
       chatMode.value = was;
       problems = [Notice('Could not change the chat mode', error.message)];
       notifyListeners();
@@ -368,12 +384,15 @@ class SourcesController extends ChangeNotifier {
     Future<void> Function(String) op,
   ) async {
     final slug = _slug;
+    final server = _chat.server;
     if (slug == null) return;
     try {
       await op(slug);
-      if (slug == _slug) problems = const [];
+      if (server == _chat.server && slug == _slug) problems = const [];
     } on ApiException catch (error) {
-      if (slug == _slug) problems = [Notice(failTitle, error.message)];
+      if (server == _chat.server && slug == _slug) {
+        problems = [Notice(failTitle, error.message)];
+      }
     }
     await refresh();
   }
