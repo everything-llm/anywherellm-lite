@@ -35,33 +35,33 @@ void main() {
     expect(chatModelKeys.values, everyElement(isIn(systemKeys)));
   });
 
-  group('the form', () {
-    test('shows writable settings with a value, providers always, set secrets only', () {
-      final fields = systemFields(_server);
-      expect(
-        [for (final f in fields) (f.section.label, f.key, f.value, f.secret)],
-        [
-          ('Chat model', 'LLMProvider', 'generic-openai', false),
-          ('Chat model', 'GenericOpenAiKey', '', true),
-          ('Chat model', 'GenericOpenAiModelPref', 'glm-5.3-flash', false),
-          ('Chat model', 'GenericOpenAiTokenLimit', '128000', false),
-          ('Embedder', 'EmbeddingEngine', 'native', false),
-          ('Vector database', 'VectorDB', 'lancedb', false),
-          (
-            'Agent',
-            'AgentSearXNGApiUrl',
-            'https://search.example/search',
-            false,
-          ),
-          ('Agent', 'AgentSkillRerankerEnabled', 'true', false),
-          ('Image generation', 'ImageGenerationProvider', '', false),
-        ],
-      );
-      expect(fields.firstWhere((f) => f.key == 'VectorDB').readOnly, isTrue);
-      expect(
-        fields.firstWhere((f) => f.key == 'EmbeddingEngine').resetsVectors,
-        isTrue,
-      );
+  group('the settings', () {
+    test(
+      'are writable ones with a value, providers always, set secrets only',
+      () {
+        final fields = systemFields(_server);
+        expect(
+          [for (final f in fields) (f.key, f.value, f.secret)],
+          [
+            ('AgentSearXNGApiUrl', 'https://search.example/search', false),
+            ('AgentSkillRerankerEnabled', 'true', false),
+            ('EmbeddingEngine', 'native', false),
+            ('GenericOpenAiKey', '', true),
+            ('GenericOpenAiModelPref', 'glm-5.3-flash', false),
+            ('GenericOpenAiTokenLimit', '128000', false),
+            ('ImageGenerationProvider', '', false),
+            ('LLMProvider', 'generic-openai', false),
+            ('VectorDB', 'lancedb', false),
+          ],
+        );
+      },
+    );
+
+    test('a setting reads as text, and a secret as empty', () {
+      expect(settingText(_server, 'LLMProvider'), 'generic-openai');
+      expect(settingText(_server, 'GenericOpenAiKey'), '');
+      expect(settingText(_server, 'Nope'), '');
+      expect(settingText(null, 'LLMProvider'), '');
     });
 
     test('the server\'s password and signing secret are never written', () {

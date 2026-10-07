@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/prefs.dart';
-import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/upload.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -344,35 +343,5 @@ void main() {
     final file = rig.sources.files.firstWhere((f) => f.path == roadmap);
     await rig.sources.toggle(file);
     expect(rig.files.usersOf(roadmap), isEmpty);
-  });
-
-  test('exporting gives the file and a refusal says why', () async {
-    final llm = planningServer()..exported = 'a,b';
-    final rig = await started(llm);
-    expect(
-      String.fromCharCodes((await rig.files.exportChats(ChatExport.csv))!),
-      'a,b',
-    );
-    expect(llm.calls, contains('exportChats:csv'));
-    expect(rig.files.exporting, isFalse);
-    llm.errors['exportChats'] = const ApiException('No');
-    expect(await rig.files.exportChats(ChatExport.json), isNull);
-    expect(rig.files.problems.single.title, 'Could not export the chats');
-  });
-
-  test('an export cut off by a new server leaves Export ready', () async {
-    final llm = planningServer();
-    final rig = await started(llm);
-    final gate = llm.gates['exportChats'] = Completer<void>();
-    llm.errors['exportChats'] = const ApiException('No');
-    final exporting = rig.files.exportChats(ChatExport.csv);
-    await pumpEventQueue();
-    expect(rig.files.exporting, isTrue);
-    await rig.settings.save('https://other:3001', 'K2');
-    gate.complete();
-    expect(await exporting, isNull);
-    expect(rig.files.exporting, isFalse);
-    expect(rig.files.problems, isEmpty);
-    await pumpEventQueue();
   });
 }

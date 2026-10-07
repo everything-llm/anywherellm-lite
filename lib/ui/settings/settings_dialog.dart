@@ -1,29 +1,50 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
-import '../../core/connection.dart';
-import '../../core/ports.dart';
-import '../../core/prefs.dart';
+import '../../core/providers.dart';
 import '../app_scope.dart';
-import '../state/settings_controller.dart';
+import '../icons.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
-import '../widgets/controls.dart';
-import '../widgets/fields.dart';
 import '../widgets/segmented.dart';
-import '../widgets/qr_mark.dart';
-import 'model_card.dart';
+import '../widgets/tappable.dart';
+import 'chats_page.dart';
+import 'connection_page.dart';
+import 'device_pages.dart';
+import 'embeds_page.dart';
+import 'json_page.dart';
+import 'privacy_page.dart';
+import 'provider_page.dart';
+import 'rows.dart';
+import 'settings_pages.dart';
 
-/// The AnythingLLM address and key, and how answers are made. Drawn over the app by the shell.
-class SettingsDialog extends StatelessWidget {
-  const SettingsDialog({super.key});
+/// Settings, drawn over the app by the shell: a list of pages beside the page chosen, or, where
+/// they do not fit side by side, the list and then the page with a way back.
+class SettingsDialog extends StatefulWidget {
+  const SettingsDialog({super.key, required this.sideBySide});
+
+  /// Whether the list of pages sits beside the page, as the shell lays it out.
+  final bool sideBySide;
+
+  @override
+  State<SettingsDialog> createState() => _SettingsDialogState();
+}
+
+class _SettingsDialogState extends State<SettingsDialog> {
+  /// Reads the server's settings afresh each time Settings opens; its pages then share them.
+  @override
+  void initState() {
+    super.initState();
+    final scope = AppScope.of(context);
+    if (scope.settings.configured) scope.system.readSettings();
+  }
 
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
+    final sideBySide = widget.sideBySide;
     final t = Tokens.of(context);
     return Semantics(
       scopesRoute: true,
@@ -33,8 +54,9 @@ class SettingsDialog extends StatelessWidget {
       child: FocusScope(
         autofocus: true,
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 480),
-          margin: const EdgeInsets.all(20),
+          constraints: const BoxConstraints(maxWidth: 980, maxHeight: 780),
+          margin: EdgeInsets.all(sideBySide ? 20 : 12),
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: t.panel2,
             borderRadius: BorderRadius.circular(18),
@@ -48,44 +70,9 @@ class SettingsDialog extends StatelessWidget {
               ),
             ],
           ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(26),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Semantics(
-                        header: true,
-                        child: Text(
-                          'Settings',
-                          style: Type.serif(30, color: t.ink),
-                        ),
-                      ),
-                    ),
-                    AppButton(
-                      'Done',
-                      primary: true,
-                      onPressed: scope.shell.closeSettings,
-                    ),
-                  ],
-                ),
-                const _Section('AnythingLLM API'),
-                const _KeyCard(),
-                const _PasswordCard(),
-                const _ModelSection(),
-                const _Section('Appearance'),
-                const _AppearanceCard(),
-                const SizedBox(height: 18),
-                Text(
-                  'Your questions and the relevant passages from your files are sent to '
-                  'AnythingLLM. Search and storage are handled there.',
-                  style: Type.sans(12.5, color: t.muted, height: 1.45),
-                ),
-              ],
-            ),
+          child: ListenableBuilder(
+            listenable: Listenable.merge([scope.shell, scope.settings]),
+            builder: (context, _) => _Frame(wide: sideBySide),
           ),
         ),
       ),
@@ -93,537 +80,299 @@ class SettingsDialog extends StatelessWidget {
   }
 }
 
-class _Section extends StatelessWidget {
-  const _Section(this.title);
+class _Frame extends StatelessWidget {
+  const _Frame({required this.wide});
 
-  final String title;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 22, bottom: 8),
-    child: SectionLabel(title),
-  );
-}
-
-class _Card extends StatelessWidget {
-  const _Card({required this.children});
-
-  final List<Widget> children;
+  final bool wide;
 
   @override
   Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final shell = scope.shell;
+    final configured = scope.settings.configured;
+    final all = shell.allSettings && configured;
+    final pages = [
+      for (final page in SettingsPage.values)
+        if ((configured || !page.needsServer) && (all || page.essential)) page,
+    ];
+    var page = shell.settingsPage;
+    if (page != null && !pages.contains(page)) page = SettingsPage.connection;
+    if (wide) page ??= SettingsPage.connection;
+    final nav = _Nav(
+      pages: pages,
+      current: page,
+      all: all,
+      canShowAll: configured,
+      wide: wide,
+    );
     final t = Tokens.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: t.panel,
-        borderRadius: BorderRadius.circular(11),
-        border: Border.all(color: t.line),
-      ),
-      child: Column(
+    final rule = Divider(height: 1, thickness: 1, color: t.line);
+    if (wide) {
+      return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: 10,
-        children: children,
-      ),
-    );
-  }
-}
-
-/// The server's chat provider and model, once a server is saved.
-class _ModelSection extends StatelessWidget {
-  const _ModelSection();
-
-  @override
-  Widget build(BuildContext context) {
-    final settings = AppScope.of(context).settings;
-    return ListenableBuilder(
-      listenable: settings,
-      builder: (context, _) {
-        // A password saved or forgotten is the same server, so the card keeps its draft.
-        final server = settings.connection?.withPassword(null);
-        if (server == null) return const SizedBox.shrink();
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const _Section('Chat model'),
-            _Card(children: [ModelCard(key: ValueKey(server))]),
-          ],
-        );
-      },
-    );
-  }
-}
-
-/// The theme, and the size of a chat's text.
-class _AppearanceCard extends StatelessWidget {
-  const _AppearanceCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    final prefs = AppScope.of(context).prefs;
-    Widget row(String label, Widget control) => Column(
+        children: [
+          const _Header(),
+          rule,
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(width: Sizes.settingsNav, child: nav),
+                VerticalDivider(width: 1, thickness: 1, color: t.line),
+                Expanded(child: _PageView(page!, wide: true)),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 8,
       children: [
-        Text(
-          label,
-          style: Type.sans(14.5, weight: FontWeight.w500, color: t.ink),
-        ),
-        control,
+        _Header(page: page),
+        rule,
+        Expanded(child: page == null ? nav : _PageView(page, wide: false)),
       ],
     );
-    return ListenableBuilder(
-      listenable: prefs,
-      builder: (context, _) => _Card(
+  }
+}
+
+/// Settings' title and Done, or, over a page where the list is not beside it, a way back to the
+/// list and the page's name.
+class _Header extends StatelessWidget {
+  const _Header({this.page});
+
+  final SettingsPage? page;
+
+  @override
+  Widget build(BuildContext context) {
+    final shell = AppScope.of(context).shell;
+    final t = Tokens.of(context);
+    final page = this.page;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(page == null ? 24 : 10, 12, 16, 12),
+      child: Row(
         children: [
-          row(
-            'Theme',
-            Segmented<ThemePref>(
-              options: const [
-                (ThemePref.system, 'System'),
-                (ThemePref.light, 'Light'),
-                (ThemePref.dark, 'Dark'),
-              ],
-              value: prefs.prefs.theme,
-              onChanged: prefs.setTheme,
+          if (page != null) ...[
+            IconBtn(
+              'back',
+              tooltip: 'All settings',
+              onPressed: () => shell.showSettingsPage(null),
+            ),
+            const SizedBox(width: 6),
+          ],
+          Expanded(
+            child: Semantics(
+              header: true,
+              child: Text(
+                page?.label ?? 'Settings',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: page == null
+                    ? Type.serif(30, color: t.ink)
+                    : Type.sans(17, weight: FontWeight.w600, color: t.ink),
+              ),
             ),
           ),
-          row(
-            'Chat text size',
-            Segmented<TextSize>(
-              options: const [
-                (TextSize.small, 'Small'),
-                (TextSize.normal, 'Normal'),
-                (TextSize.large, 'Large'),
-              ],
-              value: prefs.prefs.textSize,
-              onChanged: prefs.setTextSize,
-            ),
-          ),
-          if (prefs.problem case final problem?)
-            HelpText('${problem.title}. ${problem.text}', status: true),
+          const SizedBox(width: 12),
+          AppButton('Done', primary: true, onPressed: shell.closeSettings),
         ],
       ),
     );
   }
 }
 
-/// The address and key: saved, replaced or forgotten, shown as a QR code for a phone, or read
-/// from one. A key is saved only once the server takes it.
-class _KeyCard extends StatefulWidget {
-  const _KeyCard();
+/// The pages, under their groups, with the switch between the essentials and every page.
+class _Nav extends StatelessWidget {
+  const _Nav({
+    required this.pages,
+    required this.current,
+    required this.all,
+    required this.canShowAll,
+    required this.wide,
+  });
 
-  @override
-  State<_KeyCard> createState() => _KeyCardState();
-}
-
-class _KeyCardState extends State<_KeyCard> {
-  late final SettingsController _settings = AppScope.of(context).settings;
-  late final CodeScanner? _scanner = AppScope.of(context).scanner;
-  final _url = TextEditingController();
-  final _key = TextEditingController();
-  final _password = TextEditingController();
-  bool _replacing = false;
-
-  /// Whether the form takes a pasted developer key instead of the server's password.
-  bool _pasteKey = false;
-  bool _confirmForget = false;
-  bool _showCode = false;
-  bool _scanning = false;
-
-  /// Why the last scanned code could not be used.
-  String? _scanProblem;
-  Timer? _forgetTimer;
-
-  /// The address the field shows as an example, and starts with where http is allowed.
-  String get _example => _settings.allowHttp
-      ? 'http://localhost:3001'
-      : 'https://host.example.ts.net:3001';
-
-  @override
-  void initState() {
-    super.initState();
-    _url.text =
-        _settings.connection?.baseUrl ?? (_settings.allowHttp ? _example : '');
-    // The server may have been out of reach when the app started.
-    if (_settings.connection != null && _settings.auth == null) {
-      unawaited(_settings.readAuth());
-    }
-  }
-
-  @override
-  void dispose() {
-    _forgetTimer?.cancel();
-    _url.dispose();
-    _key.dispose();
-    _password.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    final saved = await _settings.connect(_url.text, _key.text);
-    if (mounted && saved) {
-      setState(() {
-        _key.clear();
-        _replacing = false;
-      });
-    }
-  }
-
-  Future<void> _signIn() async {
-    final saved = await _settings.signIn(_url.text, _password.text);
-    // A server with several users gives no key this way, so the form takes one.
-    if (mounted && _settings.needsKey) setState(() => _pasteKey = true);
-    if (mounted && saved) {
-      setState(() {
-        _password.clear();
-        _replacing = false;
-      });
-    }
-  }
-
-  /// Uses a scanned [code] as if its address and key had been typed, and connects with them.
-  Future<void> _scanned(String code) async {
-    final Connection connection;
-    try {
-      connection = parsePairingCode(code);
-    } on ApiException catch (error) {
-      setState(() {
-        _scanning = false;
-        _scanProblem = error.message;
-      });
-      return;
-    }
-    setState(() {
-      _scanning = false;
-      _scanProblem = null;
-      // A key the server refuses then shows in its field, under why.
-      _pasteKey = true;
-      _url.text = connection.baseUrl;
-      _key.text = connection.apiKey;
-    });
-    await _save();
-  }
-
-  Future<void> _forget() async {
-    if (!_confirmForget) {
-      setState(() => _confirmForget = true);
-      _forgetTimer = Timer(const Duration(seconds: 4), () {
-        if (mounted) setState(() => _confirmForget = false);
-      });
-      return;
-    }
-    _forgetTimer?.cancel();
-    await _settings.clear();
-    if (mounted) setState(() => _confirmForget = false);
-  }
+  final List<SettingsPage> pages;
+  final SettingsPage? current;
+  final bool all;
+  final bool canShowAll;
+  final bool wide;
 
   @override
   Widget build(BuildContext context) {
+    final shell = AppScope.of(context).shell;
     final t = Tokens.of(context);
-    return ListenableBuilder(
-      listenable: _settings,
-      builder: (context, _) {
-        final connection = _settings.connection;
-        final set = connection != null;
-        final editing = !set || _replacing;
-        final saving = _settings.check == ConnectionCheck.testing;
-        return _Card(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'AnythingLLM server',
-                        style: Type.sans(
-                          14.5,
-                          weight: FontWeight.w500,
-                          color: t.ink,
-                        ),
-                      ),
-                      Text(
-                        set
-                            ? 'Saved in your system keyring. Never shown.'
-                            : _pasteKey
-                            ? 'Create a key in AnythingLLM under Settings → Developer API, then paste it here.'
-                            : 'Sign in with the password AnythingLLM\'s web page asks for. The app makes its own developer key.',
-                        style: Type.sans(12.5, color: t.muted, height: 1.45),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                AppBadge(
-                  set ? 'Set' : 'Missing',
-                  kind: set ? BadgeKind.ok : BadgeKind.warn,
-                ),
-              ],
-            ),
-            if (set && !_replacing)
-              Text(connection.baseUrl, style: Type.mono(12.5, color: t.muted)),
-            if (set)
-              ActionRow([
-                AppButton(
-                  _replacing ? 'Cancel' : 'Replace',
-                  onPressed: () => setState(() {
-                    _replacing = !_replacing;
-                    _scanning = false;
-                  }),
-                ),
-                if (!_replacing)
-                  AppButton(
-                    _showCode ? 'Hide QR code' : 'Show QR code',
-                    onPressed: () => setState(() => _showCode = !_showCode),
-                  ),
-                AppButton(
-                  _confirmForget ? 'Delete it?' : 'Forget',
-                  onPressed: _forget,
-                ),
-              ]),
-            if (set && !_replacing && _showCode) _PairingCode(connection),
-            if (_scanner case final scan? when editing && _scanning) ...[
-              scan(_scanned),
-              ActionRow([
-                AppButton(
-                  'Cancel',
-                  onPressed: () => setState(() => _scanning = false),
-                ),
-              ]),
-            ],
-            if (editing && !_scanning) ...[
-              AppField(
-                controller: _url,
-                label: 'AnythingLLM server address',
-                hint: _example,
-                keyboardType: TextInputType.url,
-                autofillHints: const [AutofillHints.url],
+    final more = SettingsPage.values.where((p) => !p.essential).length;
+    SettingsGroup? group;
+    return ColoredBox(
+      color: wide ? t.side : t.panel2,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(10, 14, 10, 14),
+        children: [
+          if (canShowAll)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Segmented<bool>(
+                options: const [(false, 'Essentials'), (true, 'All settings')],
+                value: all,
+                onChanged: shell.showAllSettings,
               ),
-              if (_pasteKey)
-                AppField(
-                  controller: _key,
-                  label: 'AnythingLLM developer API key',
-                  hint: 'Paste the AnythingLLM API key',
-                  obscure: true,
-                  // Not a password: AppField leaves it out of autofill, so no saved login is
-                  // offered for it.
-                  keyboardType: TextInputType.visiblePassword,
-                )
-              else
-                AppField(
-                  controller: _password,
-                  label: 'Server password',
-                  hint: 'Leave it empty if the server has none',
-                  obscure: true,
-                  keyboardType: TextInputType.visiblePassword,
-                  onSubmitted: (_) => saving ? null : _signIn(),
-                ),
-              ActionRow([
-                AppButton(
-                  saving
-                      ? 'Checking…'
-                      : _pasteKey
-                      ? 'Save key'
-                      : 'Sign in',
-                  primary: true,
-                  onPressed: saving
-                      ? null
-                      : _pasteKey
-                      ? _save
-                      : _signIn,
-                ),
-                AppButton(
-                  _pasteKey ? 'Use password' : 'Paste a key',
-                  onPressed: saving
-                      ? null
-                      : () => setState(() => _pasteKey = !_pasteKey),
-                ),
-                if (_scanner != null)
-                  AppButton(
-                    'Scan QR code',
-                    onPressed: saving
-                        ? null
-                        : () => setState(() {
-                            _scanning = true;
-                            _scanProblem = null;
-                          }),
-                  ),
-              ]),
-            ],
-            if (_scanProblem case final problem?)
-              HelpText(problem, status: true),
-            if (_settings.message case final message?)
-              HelpText(message, status: true),
-            if (_settings.keyringProblem case final problem?)
-              AlertBox(AlertKind.warn, problem.title, text: problem.text),
+            ),
+          for (final page in pages) ...[
+            if (page.group != group)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 16, 10, 4),
+                child: SectionLabel((group = page.group).label),
+              ),
+            _NavItem(page, current: page == current, wide: wide),
           ],
-        );
-      },
+          if (canShowAll && !all)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Tappable(
+                label: 'All settings ($more more)',
+                onTap: () => shell.showAllSettings(true),
+                radius: BorderRadius.circular(8),
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 36),
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Text(
+                    'All settings ($more more)',
+                    style: Type.sans(13.5, color: t.accent),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
 
-/// The server's password, under the key, once the server has said it has one or a password is
-/// saved. It signs in to the web UI's own routes, which the key does not open.
-class _PasswordCard extends StatefulWidget {
-  const _PasswordCard();
+class _NavItem extends StatelessWidget {
+  const _NavItem(this.page, {required this.current, required this.wide});
 
-  @override
-  State<_PasswordCard> createState() => _PasswordCardState();
-}
-
-class _PasswordCardState extends State<_PasswordCard> {
-  late final SettingsController _settings = AppScope.of(context).settings;
-  final _password = TextEditingController();
-  bool _replacing = false;
-
-  @override
-  void dispose() {
-    _password.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    final saved = await _settings.savePassword(_password.text);
-    if (mounted && saved) {
-      setState(() {
-        _password.clear();
-        _replacing = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: _settings,
-    builder: (context, _) {
-      final connection = _settings.connection;
-      final auth = _settings.auth;
-      final set = connection?.password != null;
-      if (connection == null ||
-          (!set &&
-              auth != ServerAuth.password &&
-              auth != ServerAuth.multiUser)) {
-        return const SizedBox.shrink();
-      }
-      final t = Tokens.of(context);
-      final checking = _settings.checkingPassword;
-      final editing = !set || _replacing;
-      return Padding(
-        padding: const EdgeInsets.only(top: 10),
-        child: _Card(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Server password',
-                        style: Type.sans(
-                          14.5,
-                          weight: FontWeight.w500,
-                          color: t.ink,
-                        ),
-                      ),
-                      Text(
-                        auth == ServerAuth.multiUser && !set
-                            ? 'This server has several users. Signing in with a user name is not supported, so its own commands, feedback, and Retry and Edit that replace the old exchange stay off.'
-                            : set
-                            ? 'Saved in your system keyring. Never shown.'
-                            : 'Optional. This server has a password. With it, the app lists the server\'s own commands, marks answers good or bad, and Retry and Edit replace the old exchange.',
-                        style: Type.sans(12.5, color: t.muted, height: 1.45),
-                      ),
-                    ],
-                  ),
-                ),
-                if (auth != ServerAuth.multiUser || set) ...[
-                  const SizedBox(width: 10),
-                  AppBadge(
-                    set ? 'Set' : 'Not set',
-                    kind: set ? BadgeKind.ok : BadgeKind.accent,
-                  ),
-                ],
-              ],
-            ),
-            if (set)
-              ActionRow([
-                AppButton(
-                  _replacing ? 'Cancel' : 'Replace',
-                  onPressed: () => setState(() => _replacing = !_replacing),
-                ),
-                AppButton('Forget', onPressed: _settings.forgetPassword),
-              ]),
-            if (editing && auth != ServerAuth.multiUser) ...[
-              AppField(
-                controller: _password,
-                label: 'Server password',
-                hint: 'The password AnythingLLM\'s web page asks for',
-                obscure: true,
-                keyboardType: TextInputType.visiblePassword,
-                onSubmitted: (_) => checking ? null : _save(),
-              ),
-              ActionRow([
-                AppButton(
-                  checking ? 'Checking…' : 'Save password',
-                  primary: true,
-                  onPressed: checking ? null : _save,
-                ),
-              ]),
-            ],
-            if (_settings.passwordMessage case final message?)
-              HelpText(message, status: true),
-          ],
-        ),
-      );
-    },
-  );
-}
-
-/// [connection] as a QR code a phone scans in its own Settings, with why the phone cannot use it
-/// when it cannot.
-class _PairingCode extends StatelessWidget {
-  const _PairingCode(this.connection);
-
-  final Connection connection;
+  final SettingsPage page;
+  final bool current;
+  final bool wide;
 
   @override
   Widget build(BuildContext context) {
+    final shell = AppScope.of(context).shell;
     final t = Tokens.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 10,
-      children: [
-        Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 220),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: QrMark(
-                pairingCode(connection),
-                label: 'QR code with the server address and key',
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Tappable(
+        label: page.label,
+        selected: current,
+        onTap: () => shell.showSettingsPage(page),
+        radius: BorderRadius.circular(8),
+        color: current ? t.sel : null,
+        child: Container(
+          constraints: BoxConstraints(minHeight: wide ? 36 : 48),
+          padding: const EdgeInsets.fromLTRB(10, 0, 8, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  page.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Type.sans(
+                    14,
+                    weight: current ? FontWeight.w600 : FontWeight.w400,
+                    color: t.ink,
+                  ),
+                ),
               ),
-            ),
+              if (!wide) AppIcon('chevron', size: IconSize.xs, color: t.muted),
+            ],
           ),
         ),
-        Text(
-          'Anyone who sees this code can use your key. Scan it in AnywhereLLM on your phone: '
-          'Settings, Scan QR code.',
-          style: Type.sans(12.5, color: t.muted, height: 1.45),
-        ),
-        if (pairingProblem(connection) case final problem?)
-          AlertBox(
-            AlertKind.warn,
-            'Your phone cannot use this address',
-            text: problem,
+      ),
+    );
+  }
+}
+
+/// [page]'s title, what it is for, and its settings, scrolling. A new server builds it afresh.
+class _PageView extends StatelessWidget {
+  const _PageView(this.page, {required this.wide});
+
+  final SettingsPage page;
+  final bool wide;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final t = Tokens.of(context);
+    final server = scope.settings.connection?.withPassword(null);
+    return SingleChildScrollView(
+      key: ValueKey(page),
+      padding: wide
+          ? const EdgeInsets.fromLTRB(32, 24, 32, 40)
+          : const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      child: Align(
+        alignment: Alignment.topLeft,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 680),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (wide)
+                Semantics(
+                  header: true,
+                  child: Text(
+                    page.label,
+                    style: Type.serif(34, color: t.ink, height: 1.15),
+                  ),
+                ),
+              const SizedBox(height: 6),
+              Text(
+                page.about,
+                style: Type.sans(15, color: t.ink2, height: 1.5),
+              ),
+              const SizedBox(height: 20),
+              KeyedSubtree(key: ValueKey((page, server)), child: _body(page)),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  static Widget _body(SettingsPage page) => switch (page) {
+    SettingsPage.connection => const ConnectionPage(),
+    SettingsPage.appearance => const AppearancePage(),
+    SettingsPage.chat => const ChatPage(),
+    SettingsPage.chatModel => const ProviderPage([chatProviders]),
+    SettingsPage.searchModel => const ProviderPage(
+      [embedderProviders],
+      before: [
+        PageWarning(
+          'Changing the provider or model clears the searchable copy of every document. '
+          'Each document has to be prepared again before answers can use it.',
+        ),
       ],
-    );
-  }
+    ),
+    SettingsPage.storage => const ProviderPage(
+      [vectorProviders],
+      before: [StoredPassages()],
+    ),
+    SettingsPage.images => const ProviderPage([imageProviders]),
+    SettingsPage.voice => const ProviderPage(
+      [textToSpeechProviders, speechToTextProviders],
+      after: [
+        PageNote(
+          'Read aloud and dictation in AnywhereLLM use the device\'s own engines, whatever '
+          'is set here.',
+        ),
+      ],
+    ),
+    SettingsPage.transcription => const ProviderPage([transcriptionProviders]),
+    SettingsPage.chats => const ChatsPage(),
+    SettingsPage.embeds => const EmbedsPage(),
+    SettingsPage.privacy => const PrivacyPage(),
+    SettingsPage.json => const JsonPage(),
+  };
 }

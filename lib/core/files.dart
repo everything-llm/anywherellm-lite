@@ -33,9 +33,6 @@ enum NodeKind {
   library,
   libraryFolder,
   libraryDoc,
-  systemFolder,
-  system,
-  embeds,
   locked;
 
   bool get isFolder => switch (this) {
@@ -45,8 +42,7 @@ enum NodeKind {
     docs ||
     chats ||
     library ||
-    libraryFolder ||
-    systemFolder => true,
+    libraryFolder => true,
     _ => false,
   };
 
@@ -152,23 +148,6 @@ FileNode buildTree({
                 ),
             ],
           ),
-      ],
-    ),
-    const FileNode(
-      path: '/settings',
-      name: 'settings',
-      kind: NodeKind.systemFolder,
-      children: [
-        FileNode(
-          path: '/settings/system.json',
-          name: 'system.json',
-          kind: NodeKind.system,
-        ),
-        FileNode(
-          path: '/settings/embeds',
-          name: 'embeds',
-          kind: NodeKind.embeds,
-        ),
       ],
     ),
     const FileNode(path: '/.env', name: '.env', kind: NodeKind.locked),

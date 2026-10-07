@@ -22,6 +22,7 @@ import 'ui/chat/speech_dictation.dart';
 import 'ui/files/save_android.dart';
 import 'ui/files/save_file.dart';
 import 'ui/settings/scan_code.dart';
+import 'ui/settings/settings_pages.dart';
 import 'ui/shell.dart';
 import 'ui/state/chat_controller.dart';
 import 'ui/state/files_controller.dart';
@@ -146,7 +147,9 @@ class _SessionHostState extends State<SessionHost> {
       _sources,
     );
     _system = SystemController(widget.llm, widget.settings);
-    if (_android) _readAloud = ReadAloud(DeviceSpeaker(), _chat);
+    if (_android) {
+      _readAloud = ReadAloud(DeviceSpeaker(), _chat, widget.prefs);
+    }
     _loaded = _load();
   }
 
@@ -165,7 +168,9 @@ class _SessionHostState extends State<SessionHost> {
   Future<void> _load() async {
     await widget.prefs.load();
     await widget.settings.load();
-    if (!widget.settings.configured) widget.shell.openSettings();
+    if (!widget.settings.configured) {
+      widget.shell.openSettings(SettingsPage.connection);
+    }
   }
 
   @override
@@ -195,6 +200,10 @@ class _SessionHostState extends State<SessionHost> {
         dictation: _dictation,
         readAloud: _readAloud,
         labelAnswers: kIsWeb,
+        canSpellcheck: WidgetsBinding
+            .instance
+            .platformDispatcher
+            .nativeSpellCheckServiceDefined,
         child: const AppShell(),
       );
     },

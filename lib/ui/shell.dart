@@ -27,8 +27,14 @@ class AppShell extends StatelessWidget {
     final t = Tokens.of(context);
     final duration = motion(context, const Duration(milliseconds: 250));
 
-    bool closeTop() {
-      if (shell.settingsOpen) {
+    /// Closes what is on top; where Settings shows one page at a time, a page goes back to the
+    /// list first.
+    bool closeTop({required bool settingsSideBySide}) {
+      if (shell.settingsOpen &&
+          !settingsSideBySide &&
+          shell.settingsPage != null) {
+        shell.showSettingsPage(null);
+      } else if (shell.settingsOpen) {
         shell.closeSettings();
       } else if (shell.sideOpen) {
         shell.closeSide();
@@ -42,6 +48,7 @@ class AppShell extends StatelessWidget {
       builder: (context, box) {
         final screen = ScreenClass.of(box.maxWidth);
         final sourcesInline = ScreenClass.sourcesInline(box.maxWidth);
+        final settingsSideBySide = ScreenClass.settingsSideBySide(box.maxWidth);
         shell.fit(sourcesInline: sourcesInline);
         return ListenableBuilder(
           listenable: shell,
@@ -52,12 +59,17 @@ class AppShell extends StatelessWidget {
             return _BackGuard(
               open: shell.settingsOpen || shell.sideOpen || sourcesDrawer,
               onBack: () {
-                if (!closeTop()) shell.closeSources();
+                if (!closeTop(settingsSideBySide: settingsSideBySide)) {
+                  shell.closeSources();
+                }
               },
               child: CallbackShortcuts(
                 bindings: {
                   const SingleActivator(LogicalKeyboardKey.escape): () {
-                    if (!closeTop() && sourcesDrawer) shell.closeSources();
+                    if (!closeTop(settingsSideBySide: settingsSideBySide) &&
+                        sourcesDrawer) {
+                      shell.closeSources();
+                    }
                   },
                 },
                 child: Focus(
@@ -140,7 +152,11 @@ class AppShell extends StatelessWidget {
                               ),
                             if (shell.settingsOpen) ...[
                               _Scrim(onTap: shell.closeSettings),
-                              const Center(child: SettingsDialog()),
+                              Center(
+                                child: SettingsDialog(
+                                  sideBySide: settingsSideBySide,
+                                ),
+                              ),
                             ],
                           ],
                         ),

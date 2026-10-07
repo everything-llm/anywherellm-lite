@@ -1,4 +1,5 @@
 import 'package:anywherellm/core/prefs.dart';
+import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,7 +22,7 @@ void main() {
     final store = FakePrefsStore();
     final h = await pumpApp(tester, llm: planningServer(), prefsStore: store);
     expect(themeMode(tester), ThemeMode.system);
-    h.shell.openSettings();
+    h.shell.openSettings(SettingsPage.appearance);
     await tester.pumpAndSettle();
     await tester.ensureVisible(control('Dark'));
     await tester.pumpAndSettle();
@@ -52,7 +53,7 @@ void main() {
         MediaQuery.textScalerOf(tester.element(find.text('About 40k.')))
             .scale(10);
     expect(answerScale(), 10);
-    h.shell.openSettings();
+    h.shell.openSettings(SettingsPage.appearance);
     await tester.pumpAndSettle();
     await tester.ensureVisible(control('Large'));
     await tester.pumpAndSettle();

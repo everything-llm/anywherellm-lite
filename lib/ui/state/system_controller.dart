@@ -1,14 +1,16 @@
 import 'package:flutter/foundation.dart';
 
+import '../../core/chat_log.dart';
 import '../../core/connection.dart';
 import '../../core/embeds.dart';
 import '../../core/ports.dart';
+import '../../core/server_models.dart';
 import '../../core/system_settings.dart';
 import 'notice.dart';
 import 'settings_controller.dart';
 
 /// The server itself, apart from its workspaces: its settings, how many vectors its database
-/// holds, and its chat embeds. A new server starts it afresh.
+/// holds, its chat embeds and the chats it recorded. A new server starts it afresh.
 class SystemController extends ChangeNotifier {
   SystemController(this._api, this._settings)
     : _server = _settings.connection?.withPassword(null) {
@@ -24,9 +26,6 @@ class SystemController extends ChangeNotifier {
   /// How many vectors the server holds, or null until read.
   int? vectors;
 
-  /// The vector database the server uses, or null until read or when it does not say.
-  String? vectorDb;
-
   /// The server's settings, with every secret replaced by whether it is set, or null until read.
   Map<String, Object?>? settings;
 
@@ -36,14 +35,22 @@ class SystemController extends ChangeNotifier {
   /// Whether the settings are being saved.
   bool saving = false;
 
-  /// Whether the settings show as JSON rather than as the form. It holds through a save.
-  bool settingsAsJson = false;
-
   /// Counts each time [settings] is read afresh, so a form knows to drop its draft.
   int settingsRevision = 0;
 
-  /// Reads the server's settings.
-  Future<void> readSettings() async {
+  /// The read of the settings under way, which a second ask joins.
+  Future<void>? _reading;
+
+  /// Reads the server's settings afresh, or joins the read under way.
+  Future<void> readSettings() =>
+      _reading ??= _readSettings().whenComplete(() => _reading = null);
+
+  /// Reads the server's settings unless they are read already.
+  Future<void> wantSettings() async {
+    if (settings == null) await readSettings();
+  }
+
+  Future<void> _readSettings() async {
     final server = _server;
     if (server == null) return;
     try {
@@ -56,12 +63,6 @@ class SystemController extends ChangeNotifier {
       settingsProblem = Notice('Could not read the settings', error.message);
     }
     settingsRevision++;
-    notifyListeners();
-  }
-
-  void showSettingsAsJson(bool json) {
-    if (settingsAsJson == json) return;
-    settingsAsJson = json;
     notifyListeners();
   }
 
@@ -205,24 +206,92 @@ class SystemController extends ChangeNotifier {
     return failed == null;
   }
 
-  /// Reads how many vectors the server holds, and in which database.
+  /// Reads how many vectors the server holds.
   Future<void> readVectors() async {
     final server = _server;
     if (server == null) return;
     try {
       final count = await _api.vectorCount();
-      final settings = await _api.systemSettings();
       if (_server != server) return;
       vectors = count;
-      vectorDb = switch (settings['VectorDB']) {
-        final String db when db.isNotEmpty => db,
-        _ => null,
-      };
       problem = null;
     } on ApiException catch (error) {
       if (_server != server) return;
       problem = Notice('Could not count the vectors', error.message);
     }
+    notifyListeners();
+  }
+
+  /// The chats the server recorded, newest first, as far as they have been read, or null until
+  /// read.
+  List<LoggedChat>? chats;
+
+  /// Whether the server has more chats than [chats].
+  bool chatsMore = false;
+
+  /// Whether a page of chats is being read.
+  bool readingChats = false;
+
+  /// Why the last read of the chats failed.
+  Notice? chatsProblem;
+
+  /// Whether the chats are being exported.
+  bool exporting = false;
+
+  /// Why the last export failed.
+  Notice? exportProblem;
+
+  /// Reads the newest page of the server's chats.
+  Future<void> readChats() => _readChats(0);
+
+  /// Reads the page of chats after those in [chats].
+  Future<void> moreChats() =>
+      _readChats((chats?.length ?? 0) ~/ ChatLog.pageSize);
+
+  Future<void> _readChats(int page) async {
+    final server = _server;
+    if (server == null || readingChats) return;
+    readingChats = true;
+    notifyListeners();
+    try {
+      final log = await _api.workspaceChats(page: page);
+      if (_server != server) return;
+      chats = [if (page > 0) ...?chats, ...log.chats];
+      chatsMore = log.more;
+      chatsProblem = null;
+    } on ApiException catch (error) {
+      if (_server != server) return;
+      chatsProblem = Notice('Could not read the chats', error.message);
+    }
+    readingChats = false;
+    notifyListeners();
+  }
+
+  /// Every chat on the server in [format], or null when the server would not give them, which
+  /// [exportProblem] then says.
+  Future<List<int>?> exportChats(ChatExport format) async {
+    final server = _server;
+    if (server == null) return null;
+    exporting = true;
+    exportProblem = null;
+    notifyListeners();
+    List<int>? bytes;
+    try {
+      bytes = await _api.exportChats(format);
+    } on ApiException catch (error) {
+      if (_server == server) {
+        exportProblem = Notice('Could not export the chats', error.message);
+      }
+    }
+    if (_server != server) return null;
+    exporting = false;
+    notifyListeners();
+    return bytes;
+  }
+
+  /// Shows why saving an export failed.
+  void reportExport(String title, String text) {
+    exportProblem = Notice(title, text);
     notifyListeners();
   }
 
@@ -232,7 +301,6 @@ class SystemController extends ChangeNotifier {
     if (now == _server) return;
     _server = now;
     vectors = null;
-    vectorDb = null;
     problem = null;
     settings = null;
     settingsProblem = null;
@@ -240,6 +308,12 @@ class SystemController extends ChangeNotifier {
     embeds = null;
     embedProblem = null;
     changing = false;
+    chats = null;
+    chatsMore = false;
+    readingChats = false;
+    chatsProblem = null;
+    exporting = false;
+    exportProblem = null;
     notifyListeners();
   }
 

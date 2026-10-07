@@ -12,11 +12,9 @@ import '../widgets/controls.dart';
 import '../widgets/min_height.dart';
 import '../widgets/pane_header.dart';
 import 'doc_views.dart';
-import 'embeds_view.dart';
 import 'file_tree.dart';
 import 'folder_view.dart';
 import 'settings_form.dart';
-import 'system_form.dart';
 
 /// The node picked in the file tree: a folder's contents and actions, a file's text, an editor
 /// for a workspace's prompt and settings, or a document.
@@ -105,8 +103,6 @@ class FilesView extends StatelessWidget {
       ),
       NodeKind.libraryDoc => LibraryDocView(node),
       NodeKind.docLink => DocLinkView(node),
-      NodeKind.embeds => const EmbedsView(),
-      NodeKind.system => const SystemPage(),
       _ => TextPage(files.text ?? ''),
     };
   }

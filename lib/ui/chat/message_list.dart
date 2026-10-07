@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/chat.dart';
 import '../../core/outputs.dart';
+import '../../core/prefs.dart';
 import '../../core/server_models.dart';
 import '../app_scope.dart';
 import '../links.dart';
@@ -44,10 +45,52 @@ class _MessageListState extends State<MessageList> {
   /// [ChatController.sends] when the list was last built.
   int? _sends;
 
+  /// The newest turn, while it is an answer that streams, and how tall it was last drawn.
+  Turn? _growing;
+  double _height = 0;
+  final _newest = GlobalKey(debugLabel: 'newest turn');
+
   @override
   void dispose() {
+    _growing?.removeListener(_grew);
     _scroll.dispose();
     super.dispose();
+  }
+
+  /// Watches [turn] grow while it streams, so the list can keep its start in view.
+  void _watch(Turn? turn) {
+    if (identical(turn, _growing)) return;
+    _growing?.removeListener(_grew);
+    _growing = turn;
+    _height = 0;
+    turn?.addListener(_grew);
+  }
+
+  /// Whether a measure of the growing answer waits for the end of this frame.
+  bool _measuring = false;
+
+  /// With [ChatSwitch.followAnswer] off, scrolls up by as much as the streaming answer grew,
+  /// so what was in view stays put and the newest text arrives below it. Measures once a frame,
+  /// however many pieces arrived in it.
+  void _grew() {
+    if (_measuring ||
+        AppScope.of(context).prefs.prefs.isOn(ChatSwitch.followAnswer)) {
+      return;
+    }
+    _measuring = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _measuring = false;
+      final box = _newest.currentContext?.findRenderObject();
+      if (!mounted || box is! RenderBox || !_scroll.hasClients) return;
+      final height = box.size.height;
+      final grown = _height == 0 ? 0.0 : height - _height;
+      _height = height;
+      if (grown <= 0) return;
+      final position = _scroll.position;
+      _scroll.jumpTo(
+        (position.pixels + grown).clamp(0, position.maxScrollExtent),
+      );
+    });
   }
 
   /// Scrolls to the newest turn after this frame when a message was sent since the last build.
@@ -75,6 +118,8 @@ class _MessageListState extends State<MessageList> {
     final turns = chat.turns;
     if (workspace == null) return const SizedBox.shrink();
     _follow(chat);
+    final newest = turns.lastOrNull;
+    _watch(newest != null && newest.streaming ? newest : null);
     if (turns.isEmpty) {
       return _Empty(workspace: workspace.name, onSuggest: widget.onSuggest);
     }
@@ -114,6 +159,8 @@ class _MessageListState extends State<MessageList> {
             turn.role != Role.user &&
             turns[turns.length - 2 - i].role == Role.user;
         return Center(
+          // Always on the newest, so the key never comes off a turn and rebuilds it.
+          key: i == 0 ? _newest : null,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: Sizes.column),
             child: Padding(
@@ -607,7 +654,8 @@ class _Reasoning extends StatefulWidget {
 }
 
 class _ReasoningState extends State<_Reasoning> {
-  bool _open = false;
+  late bool _open = AppScope.of(context).prefs.prefs
+      .isOn(ChatSwitch.reasoningOpen);
 
   @override
   Widget build(BuildContext context) {

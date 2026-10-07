@@ -6,29 +6,35 @@ import 'dictation.dart';
 /// recognised by the service the device provides, which may send the audio to its maker.
 class SpeechDictation implements Dictation {
   final _speech = SpeechToText();
-  void Function()? _onDone;
+  void Function(DictationEnd how)? _onDone;
+
+  /// Whether [stop] was asked for in the running go.
+  bool _stopping = false;
 
   /// Calls the running go's [onDone], once.
-  void _finish() {
+  void _finish(DictationEnd how) {
     final done = _onDone;
     _onDone = null;
-    done?.call();
+    done?.call(how);
   }
 
   @override
   Future<bool> start({
     required void Function(String words) onWords,
-    required void Function() onDone,
+    required void Function(DictationEnd how) onDone,
   }) async {
     _onDone = onDone;
+    _stopping = false;
     var listening = false;
     try {
       final ready = await _speech.initialize(
         onStatus: (status) {
           // Done comes after the last words, which notListening does not wait for.
-          if (status == SpeechToText.doneStatus) _finish();
+          if (status == SpeechToText.doneStatus) {
+            _finish(_stopping ? DictationEnd.stopped : DictationEnd.paused);
+          }
         },
-        onError: (_) => _finish(),
+        onError: (_) => _finish(DictationEnd.failed),
       );
       if (ready) {
         await _speech.listen(
@@ -49,5 +55,8 @@ class SpeechDictation implements Dictation {
   }
 
   @override
-  Future<void> stop() => _speech.stop();
+  Future<void> stop() {
+    _stopping = true;
+    return _speech.stop();
+  }
 }

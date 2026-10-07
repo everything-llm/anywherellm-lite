@@ -127,12 +127,16 @@ class AppSelect extends StatelessWidget {
     required this.choices,
     required this.onChanged,
     this.hint = 'Not set',
+    this.labelOf,
   });
 
   final String? value;
   final List<String> choices;
   final ValueChanged<String?>? onChanged;
   final String hint;
+
+  /// What a choice is called, when that is not the choice itself.
+  final String Function(String choice)? labelOf;
 
   @override
   Widget build(BuildContext context) {
@@ -159,7 +163,10 @@ class AppSelect extends StatelessWidget {
           ),
           items: [
             for (final choice in choices)
-              DropdownMenuItem(value: choice, child: Text(choice)),
+              DropdownMenuItem(
+                value: choice,
+                child: Text(labelOf?.call(choice) ?? choice),
+              ),
           ],
           onChanged: onChanged,
         ),

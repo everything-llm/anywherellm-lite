@@ -21,6 +21,7 @@ const _small = {
   'hamburger': 'M2 4h12M2 8h12M2 12h12',
   'folder': 'M2 4h4l1.5 1.5H14v7.5H2z',
   'chevron': 'M6 4l4 4-4 4',
+  'back': 'M10 4 6 8l4 4',
   'lock': 'M4.5 7.5h7v6h-7z M6 7.5V5.5a2 2 0 0 1 4 0v2',
   'refresh': 'M13 8a5 5 0 1 1-1.5-3.5 M13 2.5v3h-3',
   'copy': 'M5.5 5.5h7v7h-7z M3.5 10.5v-7h7',

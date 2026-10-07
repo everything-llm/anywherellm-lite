@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../settings/settings_pages.dart';
+
 /// What the main pane shows: the chat, or the server's data as files.
 enum Pane { chats, files }
 
@@ -18,6 +20,8 @@ class ShellController extends ChangeNotifier {
   bool _sourcesDrawer = false;
   bool _settingsOpen = false;
   Pane _pane = Pane.chats;
+  SettingsPage? _settingsPage;
+  bool _allSettings = false;
 
   /// Whether Sources sits in the layout, as the shell last laid it out.
   bool _inline = true;
@@ -28,6 +32,13 @@ class ShellController extends ChangeNotifier {
   bool get sourcesOpen =>
       _pane == Pane.chats && (_inline ? _sourcesPinned : _sourcesDrawer);
   bool get settingsOpen => _settingsOpen;
+
+  /// The page Settings shows, or null for its list where the list and a page do not fit side by
+  /// side; side by side, null is [SettingsPage.connection].
+  SettingsPage? get settingsPage => _settingsPage;
+
+  /// Whether Settings lists every page rather than the essentials alone.
+  bool get allSettings => _allSettings;
   Pane get pane => _pane;
 
   /// Tells which layout Sources is in. The shell calls it as it lays out, so it does not notify.
@@ -38,8 +49,35 @@ class ShellController extends ChangeNotifier {
   void toggleSources() => _setSources(!sourcesOpen);
   void openSources() => _setSources(true);
   void closeSources() => _setSources(false);
-  void openSettings() => _set(settings: true, side: false);
+
+  /// Opens Settings on [page], or on its list.
+  void openSettings([SettingsPage? page]) {
+    _settingsPage = page;
+    _allSettings |= !(page?.essential ?? true);
+    _settingsOpen = true;
+    _sideOpen = false;
+    notifyListeners();
+  }
+
   void closeSettings() => _set(settings: false);
+
+  void showSettingsPage(SettingsPage? page) {
+    if (page == _settingsPage) return;
+    _settingsPage = page;
+    _allSettings |= !(page?.essential ?? true);
+    notifyListeners();
+  }
+
+  /// Lists every page of Settings, or only the essentials, which leaves a page that is not one.
+  void showAllSettings(bool all) {
+    if (all == allSettings) return;
+    _allSettings = all;
+    if (!all && !(_settingsPage?.essential ?? true)) {
+      _settingsPage = SettingsPage.connection;
+    }
+    notifyListeners();
+  }
+
   void closeDrawers() => _set(side: false, drawer: false);
 
   void showPane(Pane pane) {

@@ -43,6 +43,7 @@ class AppScope extends InheritedWidget {
     this.dictation,
     this.readAloud,
     this.labelAnswers = false,
+    this.canSpellcheck = false,
     required super.child,
   });
 
@@ -68,6 +69,9 @@ class AppScope extends InheritedWidget {
   /// Whether a finished answer carries its words as a semantics label, as in a browser, whose
   /// semantics tree leaves out selectable text; elsewhere the text is already there.
   final bool labelAnswers;
+
+  /// Whether the platform has a spell checker the message box can use.
+  final bool canSpellcheck;
 
   static AppScope of(BuildContext context) {
     // Never notifies, so no dependency is needed. That also lets initState read it.

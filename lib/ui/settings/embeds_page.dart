@@ -12,17 +12,18 @@ import '../widgets/controls.dart';
 import '../widgets/fields.dart';
 import '../widgets/segmented.dart';
 import '../widgets/tappable.dart';
+import 'rows.dart';
 
 /// The server's chat embeds: a chat box for one workspace that a web page carries. Each can be
 /// turned off, answer in another mode, give its HTML, show its chats or be deleted.
-class EmbedsView extends StatefulWidget {
-  const EmbedsView({super.key});
+class EmbedsPage extends StatefulWidget {
+  const EmbedsPage({super.key});
 
   @override
-  State<EmbedsView> createState() => _EmbedsViewState();
+  State<EmbedsPage> createState() => _EmbedsPageState();
 }
 
-class _EmbedsViewState extends State<EmbedsView> {
+class _EmbedsPageState extends State<EmbedsPage> {
   @override
   void initState() {
     super.initState();
@@ -32,18 +33,16 @@ class _EmbedsViewState extends State<EmbedsView> {
   @override
   Widget build(BuildContext context) {
     final system = AppScope.of(context).system;
-    final t = Tokens.of(context);
     return ListenableBuilder(
       listenable: system,
       builder: (context, _) {
         final embeds = system.embeds;
-        return ListView(
-          padding: const EdgeInsets.all(20),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'A chat box for one workspace that a web page carries. Visitors ask in it without '
-              'a key, so an embed answers only in Chat or Query mode, never as an agent.',
-              style: Type.sans(14, color: t.muted),
+            const PageNote(
+              'Visitors ask without a key, so an embed answers only in Chat or Query mode, '
+              'never as an agent.',
             ),
             if (system.embedProblem case final problem?) ...[
               const SizedBox(height: 12),

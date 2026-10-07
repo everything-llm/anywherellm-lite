@@ -2,7 +2,9 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/chat.dart';
 import '../../core/markdown.dart';
+import '../../core/prefs.dart';
 import '../state/chat_controller.dart';
+import '../state/prefs_controller.dart';
 
 /// Reads text aloud with the device's own speech.
 abstract interface class Speaker {
@@ -15,14 +17,19 @@ abstract interface class Speaker {
 }
 
 /// Which answer is being read aloud, if any. One reads at a time, and it stops when its answer
-/// leaves the screen: another chat, workspace or server is shown.
+/// leaves the screen: another chat, workspace or server is shown. With [ChatSwitch.readAnswers]
+/// on, each answer that runs to its end is read as it finishes.
 class ReadAloud extends ChangeNotifier {
-  ReadAloud(this._speaker, this._chat) {
+  ReadAloud(this._speaker, this._chat, this._prefs) : _heard = _chat.finished {
     _chat.addListener(_follow);
   }
 
   final Speaker _speaker;
   final ChatController _chat;
+  final PrefsController _prefs;
+
+  /// The finished answer last seen, so each is read once.
+  Turn? _heard;
 
   /// The answer being read.
   Turn? reading;
@@ -58,6 +65,15 @@ class ReadAloud extends ChangeNotifier {
 
   void _follow() {
     if (reading case final turn? when !_chat.turns.contains(turn)) stop();
+    final finished = _chat.finished;
+    if (identical(finished, _heard)) return;
+    _heard = finished;
+    if (finished != null &&
+        _prefs.prefs.isOn(ChatSwitch.readAnswers) &&
+        _chat.turns.contains(finished) &&
+        finished.text.trim().isNotEmpty) {
+      toggle(finished);
+    }
   }
 
   @override

@@ -27,6 +27,10 @@ enum ScreenClass {
 
   /// Whether the Sources panel sits in the layout at [width], rather than in a drawer.
   static bool sourcesInline(double width) => width >= 1120;
+
+  /// Whether Settings shows its list beside a page at [width], rather than one, then the other.
+  static bool settingsSideBySide(double width) =>
+      width >= Sizes.settingsSideBySide;
 }
 
 abstract final class Sizes {
@@ -38,4 +42,10 @@ abstract final class Sizes {
   static const panelMin = 360.0;
   static const card = 16.0;
   static const control = 10.0;
+
+  /// The least width at which Settings shows its list and a page side by side.
+  static const settingsSideBySide = 820.0;
+
+  /// Settings' list of pages, beside a page.
+  static const settingsNav = 236.0;
 }

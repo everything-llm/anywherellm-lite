@@ -2,6 +2,7 @@ import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/ui/chat/composer.dart';
 import 'package:anywherellm/ui/files/files_view.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
+import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter/material.dart';
@@ -58,10 +59,10 @@ void main() {
       size: phone,
       connection: null,
     );
-    h.shell.openSettings();
+    h.shell.openSettings(SettingsPage.connection);
     await tester.pumpAndSettle();
     final key = typingField(find.byType(SettingsDialog)).last;
-    await tester.tap(key);
+    await tapVisible(tester, key);
     raiseKeyboard(tester, keyboard);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);

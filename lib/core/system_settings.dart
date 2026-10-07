@@ -359,51 +359,15 @@ const resetsVectors = {
 
 /// Shown, never written: switching the vector database deletes every vector in the old one and
 /// leaves the new one empty.
-const _readOnly = {'VectorDB'};
+const readOnlySettings = {'VectorDB'};
 
-final _secretName = RegExp(
+/// Matches the name of a setting that holds a key or password, which the server never shows.
+final secretName = RegExp(
   'key|secret|token|password|connectionstring',
   caseSensitive: false,
 );
 
-/// The parts of the form, in order.
-enum SystemSection {
-  chat('Chat model'),
-  embedder('Embedder'),
-  vectors('Vector database'),
-  agent('Agent'),
-  speech('Speech'),
-  images('Image generation'),
-  other('Other');
-
-  const SystemSection(this.label);
-  final String label;
-
-  /// The section [key] belongs to, by its name.
-  static SystemSection of(String key) => switch (key) {
-    _ when key.contains('Embedding') || key.startsWith('VoyageAi') => embedder,
-    _ when key.startsWith('ImageGeneration') => images,
-    _ when _vectorPrefixes.any(key.startsWith) => vectors,
-    _ when key.startsWith('Agent') => agent,
-    _ when _speechPrefixes.any(key.startsWith) => speech,
-    'DisableTelemetry' => other,
-    _ => chat,
-  };
-}
-
-const _vectorPrefixes = [
-  'VectorDB', 'PineCone', 'Chroma', 'Weaviate', 'Qdrant', 'Milvus', 'Zilliz', //
-  'AstraDB', 'PGVector',
-];
-const _speechPrefixes = [
-  'Whisper',
-  'TTS',
-  'TextToSpeech',
-  'SpeechToText',
-  'STT',
-];
-
-/// One setting as the form shows it.
+/// One writable setting the server has a value for.
 class SystemField {
   const SystemField(this.key, this.value, {this.secret = false});
 
@@ -412,24 +376,25 @@ class SystemField {
   /// The value the server has, as text: empty for a secret, whose value is never read.
   final String value;
 
-  /// A key or password: the server says only whether it is set, and the form only replaces it.
+  /// A key or password: the server says only whether it is set, and it can only be replaced.
   final bool secret;
-
-  SystemSection get section => SystemSection.of(key);
-  List<String>? get choices => systemChoices[key];
-  bool get readOnly => _readOnly.contains(key);
-  bool get resetsVectors => _resetsVectors(key);
 }
 
-bool _resetsVectors(String key) => resetsVectors.contains(key);
+/// Setting [key] of [settings] as text: empty when it has none, or for a secret, which the server
+/// shows only as whether it is set.
+String settingText(Map<String, Object?>? settings, String key) =>
+    switch (settings?[key]) {
+      null || bool() => '',
+      final value => '$value',
+    };
 
 /// Whether [key], which the server reported as [value], is a secret it hid behind whether it is
 /// set. A real on-off setting, such as `AgentSkillRerankerEnabled`, names no secret.
 bool _isSecret(String key, Object? value) =>
-    value is bool && _secretName.hasMatch(key);
+    value is bool && secretName.hasMatch(key);
 
-/// The settings the form shows, by section: each writable one the server has a value for, a
-/// provider always, and a secret only when it is set.
+/// The settings the server has, by name: each writable one with a value, a provider always, and
+/// a secret only when it is set.
 List<SystemField> systemFields(Map<String, Object?> settings) {
   final fields = <SystemField>[];
   for (final key in settings.keys.toList()..sort()) {
@@ -441,19 +406,12 @@ List<SystemField> systemFields(Map<String, Object?> settings) {
       fields.add(SystemField(key, value == null ? '' : '$value'));
     }
   }
-  fields.sort((a, b) {
-    final bySection = a.section.index.compareTo(b.section.index);
-    if (bySection != 0) return bySection;
-    final aFirst = systemChoices.containsKey(a.key) ? 0 : 1;
-    final bFirst = systemChoices.containsKey(b.key) ? 0 : 1;
-    return aFirst != bFirst ? aFirst - bFirst : a.key.compareTo(b.key);
-  });
   return fields;
 }
 
 const _indented = JsonEncoder.withIndent('  ');
 
-/// The writable settings the server has a value for, as the JSON Files shows and edits. No
+/// The writable settings the server has a value for, as the JSON Settings shows and edits. No
 /// secret is in it.
 String systemText(Map<String, Object?> settings) =>
     '${_indented.convert({for (final field in systemFields(settings))
@@ -476,10 +434,10 @@ Map<String, String> parseSystemSettings(String text, Map<String, Object?> was) {
   }
   final changed = <String, String>{};
   for (final MapEntry(:key, :value) in json.entries) {
-    if (!systemKeys.contains(key) || _readOnly.contains(key)) {
-      if (_readOnly.contains(key) && value == was[key]) continue;
+    if (!systemKeys.contains(key) || readOnlySettings.contains(key)) {
+      if (readOnlySettings.contains(key) && value == was[key]) continue;
       throw ApiException(
-        _readOnly.contains(key)
+        readOnlySettings.contains(key)
             ? '$key is shown, not written: switching it deletes every vector.'
             : '$key is not a setting the server takes from the app.',
       );

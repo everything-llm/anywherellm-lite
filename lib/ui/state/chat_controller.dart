@@ -167,6 +167,10 @@ class ChatController extends ChangeNotifier {
   /// The commands a message can start with: `/reset`, then the server's presets.
   List<SlashCommand> get commands => withBuiltIns(_presets);
 
+  /// The last answer that ran to its end, neither stopped nor failed.
+  Turn? get finished => _finished;
+  Turn? _finished;
+
   /// The answer running. Only one runs at a time.
   _Running? _running;
 
@@ -795,6 +799,7 @@ class ChatController extends ChangeNotifier {
   void _finish(_Running running, {String? error}) {
     if (!identical(_running, running)) return;
     _running = null;
+    if (error == null && !running.answer.stopped) _finished = running.answer;
     running.answer
       ..streaming = false
       ..status = null

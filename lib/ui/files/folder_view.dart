@@ -10,8 +10,6 @@ import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/confirm_box.dart';
 import '../widgets/upload_queue.dart';
-import 'export_chats.dart';
-import 'vector_count.dart';
 import '../widgets/fields.dart';
 import '../widgets/inline_input.dart';
 import '../widgets/tappable.dart';
@@ -31,7 +29,6 @@ class FolderView extends StatelessWidget {
     NodeKind.library => 'The shared pool of documents. A document lives here once, and workspaces link to it.',
     NodeKind.libraryFolder =>
       'Deleting a document here takes it out of every workspace that uses it.',
-    NodeKind.systemFolder => 'The server\'s settings, with every secret left out, its vector count, and every chat to export.',
     _ => '',
   };
 
@@ -45,12 +42,6 @@ class FolderView extends StatelessWidget {
       children: [
         Text(_about(node.kind), style: Type.sans(14, color: t.muted)),
         const SizedBox(height: 16),
-        if (node.kind == NodeKind.systemFolder) ...[
-          const VectorCount(),
-          const SizedBox(height: 16),
-          const ExportChats(),
-          const SizedBox(height: 16),
-        ],
         if (node.kind == NodeKind.library) ...[
           const _NewFolder(),
           const SizedBox(height: 16),

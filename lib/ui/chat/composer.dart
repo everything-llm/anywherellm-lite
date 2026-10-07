@@ -5,20 +5,29 @@ import 'package:flutter/services.dart';
 import '../../core/chat.dart';
 import '../../core/connection.dart';
 import '../../core/commands.dart';
+import '../../core/prefs.dart';
 import '../app_scope.dart';
 import '../icons.dart';
 import '../layout.dart';
+import '../settings/settings_pages.dart';
+import '../state/chat_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/tappable.dart';
+import 'dictation.dart';
 import 'slash_menu.dart';
 
 /// Where a question is written. Enter sends it and Shift+Enter starts a new line. While this
 /// chat answers, Send becomes Stop; while another chat answers, nothing can be sent. Files
 /// attached go with the next question only. A message that starts with a slash offers the
 /// commands that match it.
+/// Whether [text] can be sent in the chat on screen: nothing runs, the chat is ready, a workspace
+/// is open and there is something to send.
+bool canSend(ChatController chat, String text) =>
+    !chat.busy && chat.ready && chat.active != null && text.trim().isNotEmpty;
+
 class Composer extends StatefulWidget {
   const Composer({super.key, required this.draft, required this.focus});
 
@@ -109,8 +118,16 @@ class _ComposerState extends State<Composer> {
         if (go != _go) return;
         _setDraft('$_before$words');
       },
-      onDone: () {
-        if (mounted) setState(() => _listening = false);
+      onDone: (how) {
+        if (!mounted) return;
+        setState(() => _listening = false);
+        final send = _scope.prefs.prefs.isOn(ChatSwitch.sendDictation);
+        if (how == DictationEnd.paused &&
+            go == _go &&
+            send &&
+            canSend(_scope.chat, widget.draft.text)) {
+          _send(widget.draft.text);
+        }
       },
     );
     if (!started && mounted) {
@@ -334,14 +351,10 @@ class _Form extends StatelessWidget {
             ChatMode.automatic || ChatMode.chat => 'Ask anything…',
             ChatMode.query || null => 'Ask about your files…',
           };
-    final canSend =
-        !chat.busy &&
-        chat.ready &&
-        chat.active != null &&
-        draft.text.trim().isNotEmpty;
+    final sendable = canSend(chat, draft.text);
 
     void send() {
-      if (canSend) onSend(draft.text);
+      if (sendable) onSend(draft.text);
     }
 
     /// Enter picks the highlighted command, or sends the message once it is that command.
@@ -439,21 +452,30 @@ class _Form extends StatelessWidget {
               child: Semantics(
                 label: 'Message',
                 textField: true,
-                child: TextField(
-                  controller: draft,
-                  focusNode: focus,
-                  enabled: !chat.busy,
-                  minLines: 1,
-                  maxLines: null,
-                  keyboardType: TextInputType.multiline,
-                  textInputAction: TextInputAction.newline,
-                  style: Type.sans(15.5, color: t.ink, height: 1.5),
-                  cursorColor: t.accent,
-                  decoration: InputDecoration(
-                    isCollapsed: true,
-                    border: InputBorder.none,
-                    hintText: hint,
-                    hintStyle: Type.sans(15.5, color: t.fade, height: 1.5),
+                // Only the field follows the prefs, for its spellcheck.
+                child: ListenableBuilder(
+                  listenable: scope.prefs,
+                  builder: (context, _) => TextField(
+                    controller: draft,
+                    focusNode: focus,
+                    enabled: !chat.busy,
+                    spellCheckConfiguration:
+                        scope.canSpellcheck &&
+                            scope.prefs.prefs.isOn(ChatSwitch.spellcheck)
+                        ? const SpellCheckConfiguration()
+                        : const SpellCheckConfiguration.disabled(),
+                    minLines: 1,
+                    maxLines: null,
+                    keyboardType: TextInputType.multiline,
+                    textInputAction: TextInputAction.newline,
+                    style: Type.sans(15.5, color: t.ink, height: 1.5),
+                    cursorColor: t.accent,
+                    decoration: InputDecoration(
+                      isCollapsed: true,
+                      border: InputBorder.none,
+                      hintText: hint,
+                      hintStyle: Type.sans(15.5, color: t.fade, height: 1.5),
+                    ),
                   ),
                 ),
               ),
@@ -486,7 +508,8 @@ class _Form extends StatelessWidget {
                       label:
                           'AnythingLLM settings, server ${serverName(server.host)}',
                       tooltip: 'AnythingLLM settings: ${server.baseUrl}',
-                      onTap: scope.shell.openSettings,
+                      onTap: () =>
+                          scope.shell.openSettings(SettingsPage.connection),
                       radius: BorderRadius.circular(6),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
@@ -547,8 +570,8 @@ class _Form extends StatelessWidget {
               else
                 _RoundButton(
                   label: 'Send',
-                  color: canSend ? t.accent : t.off,
-                  onTap: canSend ? send : null,
+                  color: sendable ? t.accent : t.off,
+                  onTap: sendable ? send : null,
                   child: AppIcon(
                     'send',
                     size: IconSize.small,
@@ -687,7 +710,7 @@ class _NoKey extends StatelessWidget {
           AppButton(
             'Open Settings',
             primary: true,
-            onPressed: scope.shell.openSettings,
+            onPressed: () => scope.shell.openSettings(SettingsPage.connection),
           ),
         ],
       ),

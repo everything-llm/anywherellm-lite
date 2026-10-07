@@ -1,16 +1,19 @@
 import 'dart:ui' show Size;
 
 import 'package:anywherellm/core/chat.dart';
+import 'package:anywherellm/core/chat_log.dart';
 import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/upload.dart';
+import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/sidebar.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/drop_zone.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
+import 'package:flutter/material.dart' show SingleChildScrollView;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 
@@ -93,6 +96,40 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('every Settings page fits at $at', (tester) async {
+      final llm = awkward()
+        ..chatLog = [
+          LoggedChat(
+            workspace: longWord,
+            question: longWord,
+            at: DateTime(2026, 10, 7),
+          ),
+        ];
+      final h = await pumpApp(
+        tester,
+        llm: llm,
+        size: size,
+        canDictate: true,
+        canSpeak: true,
+      );
+      h.shell
+        ..openSettings()
+        ..showAllSettings(true);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      for (final page in SettingsPage.values) {
+        h.shell.showSettingsPage(page);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: page.name);
+        await tester.drag(
+          find.byType(SingleChildScrollView).last,
+          const Offset(0, -2000),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: page.name);
+      }
+    });
+
     testWidgets('the QR code and the scanner fit at $at', (tester) async {
       final h = await pumpApp(
         tester,
@@ -104,7 +141,7 @@ void main() {
         ),
         canScan: true,
       );
-      h.shell.openSettings();
+      h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Show QR code'));
       await tester.pumpAndSettle();
@@ -311,9 +348,6 @@ void main() {
         '/library',
         '/library/custom-documents',
         '/library/custom-documents/file-$longWord.pdf.json',
-        '/settings',
-        '/settings/system.json',
-        '/settings/embeds',
         '/keys',
       ]) {
         await h.files.select(path);

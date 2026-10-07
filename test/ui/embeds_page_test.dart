@@ -1,6 +1,6 @@
 import 'package:anywherellm/core/embeds.dart';
-import 'package:anywherellm/ui/files/embeds_view.dart';
-import 'package:anywherellm/ui/state/shell_controller.dart';
+import 'package:anywherellm/ui/settings/embeds_page.dart';
+import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/widgets/controls.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/material.dart';
@@ -11,7 +11,7 @@ import '../support/pump.dart';
 
 /// A control on the embeds page, by the label a screen reader hears.
 Finder control(String label) => find.descendant(
-  of: find.byType(EmbedsView),
+  of: find.byType(EmbedsPage),
   matching: find.byWidgetPredicate(
     (widget) => widget is Tappable && widget.label == label,
   ),
@@ -23,9 +23,7 @@ Future<Harness> openEmbeds(
   Size size = const Size(1400, 1000),
 }) async {
   final h = await pumpApp(tester, llm: llm, size: size);
-  h.shell.showPane(Pane.files);
-  await tester.pumpAndSettle();
-  h.files.select('/settings/embeds');
+  h.shell.openSettings(SettingsPage.embeds);
   await tester.pumpAndSettle();
   return h;
 }
@@ -72,22 +70,23 @@ void main() {
         ),
       ];
     await openEmbeds(tester, llm);
-    await tester.tap(
+    await tapVisible(
+      tester,
       find.descendant(
-        of: find.byType(EmbedsView),
+        of: find.byType(EmbedsPage),
         matching: find.byType(AppSwitch),
       ),
     );
     await tester.pumpAndSettle();
     expect(llm.embedList.single.enabled, isFalse);
-    await tester.tap(control('Delete'));
+    await tapVisible(tester, control('Delete'));
     await tester.pumpAndSettle();
     expect(llm.calls, isNot(contains('deleteEmbed:e-1')));
     expect(
       find.textContaining('Delete the embed for Q3 planning?'),
       findsOneWidget,
     );
-    await tester.tap(control('Delete'));
+    await tapVisible(tester, control('Delete'));
     await tester.pumpAndSettle();
     expect(llm.calls, contains('deleteEmbed:e-1'));
     expect(find.text('No embeds yet.'), findsOneWidget);
@@ -112,7 +111,7 @@ void main() {
         ),
       ];
     await openEmbeds(tester, llm);
-    await tester.tap(control('Show chats'));
+    await tapVisible(tester, control('Show chats'));
     await tester.pumpAndSettle();
     expect(find.text('Opening hours?'), findsOneWidget);
     expect(find.text('9 to 5.'), findsOneWidget);
@@ -132,7 +131,7 @@ void main() {
       ];
     await openEmbeds(tester, llm, size: const Size(360, 640));
     expect(tester.takeException(), isNull);
-    await tester.drag(find.byType(EmbedsView), const Offset(0, -600));
+    await tester.drag(find.byType(EmbedsPage), const Offset(0, -400));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });

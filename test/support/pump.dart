@@ -17,19 +17,19 @@ import 'fake_settings.dart';
 import 'rig.dart';
 
 /// A [Dictation] a test drives: [say] is what the microphone hears, and [finish] is the
-/// recogniser ending the go. With [available] false it cannot listen.
+/// recogniser ending the go, by a pause unless told otherwise. With [available] false it cannot listen.
 class FakeDictation implements Dictation {
   bool available = true;
   int stopped = 0;
   void Function(String)? _onWords;
-  void Function()? _onDone;
+  void Function(DictationEnd how)? _onDone;
 
   bool get listening => _onWords != null;
 
   @override
   Future<bool> start({
     required void Function(String words) onWords,
-    required void Function() onDone,
+    required void Function(DictationEnd how) onDone,
   }) async {
     if (!available) return false;
     _onWords = onWords;
@@ -40,16 +40,17 @@ class FakeDictation implements Dictation {
   @override
   Future<void> stop() async {
     stopped++;
-    finish();
+    finish(DictationEnd.stopped);
   }
 
   void say(String words) => _onWords?.call(words);
 
-  void finish() {
+  /// Ends the go as [how] says, a pause unless told otherwise.
+  void finish([DictationEnd how = DictationEnd.paused]) {
     final done = _onDone;
     _onWords = null;
     _onDone = null;
-    done?.call();
+    done?.call(how);
   }
 }
 
@@ -96,6 +97,7 @@ class Harness extends Rig {
     bool canDictate = false,
     bool canSpeak = false,
     this.labelAnswers = false,
+    this.canSpellcheck = false,
   }) : dictation = canDictate ? FakeDictation() : null,
        speaker = canSpeak ? FakeSpeaker() : null,
        shell = ShellController(sourcesPinned: sourcesOpen);
@@ -105,6 +107,9 @@ class Harness extends Rig {
   /// Whether a finished answer carries its words as a semantics label, as in a browser.
   final bool labelAnswers;
 
+  /// Whether the message box may spellcheck, as on Android.
+  final bool canSpellcheck;
+
   /// What the microphone does, or null when the device cannot listen.
   final FakeDictation? dictation;
 
@@ -112,7 +117,7 @@ class Harness extends Rig {
   final FakeSpeaker? speaker;
 
   late final ReadAloud? readAloud = switch (speaker) {
-    final speaker? => ReadAloud(speaker, chat),
+    final speaker? => ReadAloud(speaker, chat, prefs),
     null => null,
   };
 
@@ -173,6 +178,7 @@ class Harness extends Rig {
       dictation: dictation,
       readAloud: readAloud,
       labelAnswers: labelAnswers,
+      canSpellcheck: canSpellcheck,
       scanner: canScan
           ? (onCode) => TextButton(
               onPressed: () => onCode(scanCode),
@@ -199,6 +205,7 @@ Future<Harness> pumpApp(
   bool canDictate = false,
   bool canSpeak = false,
   bool labelAnswers = false,
+  bool canSpellcheck = false,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -212,6 +219,7 @@ Future<Harness> pumpApp(
     canDictate: canDictate,
     canSpeak: canSpeak,
     labelAnswers: labelAnswers,
+    canSpellcheck: canSpellcheck,
   );
   addTearDown(harness.dispose);
   await harness.prefs.load();

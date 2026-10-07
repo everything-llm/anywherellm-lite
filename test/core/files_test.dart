@@ -50,9 +50,6 @@ void main() {
         '/workspaces/q3/chats',
         '/workspaces/q3/chats/budget',
         '/library',
-        '/settings',
-        '/settings/system.json',
-        '/settings/embeds',
         '/.env',
         '/keys',
       ]);
@@ -96,7 +93,6 @@ void main() {
         NodeBadge.readOnly,
       );
       expect(nodeAt(tree, '/workspaces/q3/chats/budget')!.name, 'Budget.md');
-      expect(nodeAt(tree, '/settings/system.json')!.badge, NodeBadge.none);
       expect(nodeAt(tree, '/.env')!.badge, NodeBadge.locked);
       expect(nodeAt(tree, '/keys')!.badge, NodeBadge.locked);
     });

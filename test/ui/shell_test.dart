@@ -5,6 +5,7 @@ import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/ui/chat/chat_view.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
+import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/sidebar.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/widgets/confirm_box.dart';
@@ -642,7 +643,7 @@ void main() {
         size: const Size(360, 480),
       );
       await h.settings.connect('https://h:3001', 'K1');
-      h.shell.openSettings();
+      h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
       final field = find.bySemanticsLabel('Server password').last;
       await tester.ensureVisible(field);
