@@ -180,6 +180,9 @@ class _Editor extends StatefulWidget {
   State<_Editor> createState() => _EditorState();
 }
 
+/// The opening tag of the server's EverythingLLM block, with or without attributes.
+final _everythingllmBlock = RegExp(r'<everythingllm[\s>]');
+
 class _EditorState extends State<_Editor> {
   late final TextEditingController _draft;
   late final String _saved;
@@ -216,7 +219,7 @@ class _EditorState extends State<_Editor> {
             _saved.trim().isEmpty
                 ? 'Empty: the server\'s default system prompt applies.'
                 : 'This prompt replaces the default system prompt in this workspace.',
-            'A deploy that sets prompts from a repository overwrites this edit; put lasting changes in the repository too.',
+            if (_everythingllmBlock.hasMatch(_saved)) 'Write your own instructions outside the <everythingllm> block; the server\'s update-prompt skill replaces that block.',
           ]
         : [
             'null means the system default. chatMode is the workspace\'s chat mode: automatic (Agent), chat or query.',
