@@ -63,6 +63,6 @@ The repository's `docs/TODO.md` plans push through UnifiedPush in place of ntfy:
 
 A deploy leaves a workspace's own system prompt alone, so Files' `PROMPT.md` edits survive it. The repository's prompt goes into a workspace as the EverythingLLM block only when the agent runs the `update-prompt` skill there. The skill replaces the block and keeps the text around it; a prompt without a block keeps its text after the block, under `Your own instructions:`. The block asks the model to say once when its version is behind `{everythingllm_version}`.
 
-The setup checklist (`packages/hostctl/src/hostctl/machine.py`, `reranker_off`) expects `AGENT_SKILL_RERANKER_ENABLED=false` in AnythingLLM's `.env`, because the reranker scored only the last message with an English-only model and dropped tools from follow-ups. The app's `system.json` form writes `AgentSkillRerankerEnabled` and can switch it back on, which the checklist then reports.
+The setup checklist (`packages/hostctl/src/hostctl/machine.py`, `reranker_off`) expects `AGENT_SKILL_RERANKER_ENABLED=false` in AnythingLLM's `.env`, because the reranker scored only the last message with an English-only model and dropped tools from follow-ups. Settings' Server settings as JSON page writes `AgentSkillRerankerEnabled` and can switch it back on, which the checklist then reports.
 
 The repository leaves the rest of AnythingLLM's settings (providers and keys, workspaces, slash command presets, which built-in skills are off) to AnythingLLM's UI, so the app can own those.

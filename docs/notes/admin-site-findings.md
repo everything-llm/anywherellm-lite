@@ -72,15 +72,15 @@ Every writable column is reachable through `settings.json`, but as raw JSON with
 
 | Web UI page | What it holds | Reachable through `/v1` |
 | --- | --- | --- |
-| AI Providers: LLM, Vector Database, Embedder, Text Splitter and Chunking, Voice and Speech, Transcription, Model Router | Server-wide providers | Only through `system/update-env`, which TODO.md keeps out of scope. `models.json` in Files shows the provider and model keys read-only. |
+| AI Providers: LLM, Vector Database, Embedder, Text Splitter and Chunking, Voice and Speech, Transcription, Model Router | Server-wide providers | Through `system/update-env`, which Settings' AI provider pages write, except the text splitter, which lives in `system_settings`, and the Model Router's own routers. |
 | AI Providers: Image Generation | The provider for `/img` | No provider is set on this server, so image generation through `/v1/openai/images/generations` would fail here. |
-| Admin: Workspace Chats | Every chat on the server in one table, with Export and Clear Chats | Export is in Files under `/settings`. Clearing every chat is not in `/v1`. |
+| Admin: Workspace Chats | Every chat on the server in one table, with Export and Clear Chats | Settings' Workspace chats page lists them through `/v1/admin/workspace-chats` and exports them. Clearing every chat is not in `/v1`. |
 | Admin: Default System Prompt | The prompt new workspaces start with | Not in `/v1`. `workspace/new` takes `openAiPrompt`, so the app can set a prompt when it creates a workspace. |
 | Agent Skills | Built-in skills, app integrations (Gmail, Google Calendar, Outlook), custom skills, agent flows, MCP servers | Not in `/v1`. Server administration. |
 | Community Hub | Trending items, account, import | Out of scope. |
 | Customization: UI Preferences | Theme and display language | Local preferences; the app has its own theme handling and no translations. |
 | Customization: Branding and Whitelabeling | Logo and name | Out of scope. |
-| Customization: Chat | Auto-submit speech, auto-speak replies, spellcheck, scrollbar, auto-scroll, render HTML in answers | Local preferences the app could add without the server. Speech input and output need new dependencies. |
+| Customization: Chat | Auto-submit speech, auto-speak replies, spellcheck, scrollbar, auto-scroll, render HTML in answers | Settings' Chat page has sending dictation when talking stops, reading answers aloud (both on Android), spellcheck, following a streaming answer and reasoning shown open. The scrollbar and rendering HTML in answers are not built. |
 | Channels: Telegram | A Telegram bot | Out of scope. |
 | Tools: Chat Embed, Event Logs, Scheduled Jobs | Embeds, logs, jobs | Embeds are in `/v1/embed/*`; the rest is not in `/v1`. Out of scope. |
 | Tools: Developer API | API keys | Out of scope; the app takes a key someone made here. |

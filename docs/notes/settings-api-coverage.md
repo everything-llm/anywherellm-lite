@@ -74,6 +74,8 @@ For a single-user server with a password, as the home server is.
 | Developer key and web login | Every section on the canvas. |
 | Neither | Adding an MCP server (a file on the server), registering a mobile device (done from the mobile app), and Branding and Interface, which change only the web UI and were left off the canvas. |
 
+The app's Settings builds the three device sections and the sections the developer key reaches: chat model, embedder, vector database (shown, never switched), image generation, voice and speech, transcription, workspace chats (list and export), chat embeds and privacy, plus the server's `.env` settings as JSON. It builds none of the sections that need the web login.
+
 ## Multi-user servers
 
 A multi-user server turns this around. The developer key reaches `system_settings` through `/v1/admin/preferences`, and users and invites through `/v1/admin/*`. The web routes need a user's own login, which AnywhereLLM cannot make: it signs in with the instance password only. When the server sets `SIMPLE_SSO_ENABLED`, `GET /v1/users/:id/issue-auth-token` lets the developer key issue a temporary login for a user, which is a way into the web routes without that user's password. Scheduled jobs, Telegram and the password route refuse a multi-user server whatever the login.

@@ -20,8 +20,8 @@ Requests that work, said to Claude Code:
 | `Main.dc.html`, Desktop chat, light | 1440 x 900: sidebar, chat with two answered questions, composer, Sources panel |
 | `Dark.dc.html`, Desktop chat, dark | `Main.dc.html` imported with the dark theme; it has no markup of its own |
 | `Phone.dc.html` | 390 x 844: a new chat's empty state, with the microphone |
-| `Settings.dc.html` | 640 x 980: the Settings dialog over the scrim |
-| `DesktopSettings.dc.html` | 1440 x 900, clickable: the proposed full Settings over `Main.dc.html`, a 980 px dialog with 26 sections in 7 groups following AnythingLLM's own settings, from Claude Design's "Plain" mockup; each section is tagged with what it needs on the server (this device, developer key, key and password, or server password), from `docs/notes/settings-api-coverage.md`; the `page` tweak picks the section shown and `showAccess` hides the tags |
+| `Settings.dc.html` | 640 x 980: a single-column Settings dialog over the scrim, which the app does not draw; `DesktopSettings.dc.html` is the one built |
+| `DesktopSettings.dc.html` | 1440 x 900, clickable: the full Settings over `Main.dc.html`, a 980 px dialog with 26 sections in 7 groups following AnythingLLM's own settings, from Claude Design's "Plain" mockup; each section is tagged with what it needs on the server (this device, developer key, key and password, or server password), from `docs/notes/settings-api-coverage.md`; the `page` tweak picks the section shown and `showAccess` hides the tags. The app's Settings in `lib/ui/settings/` is built from it, with the 13 pages that this device and the developer key reach |
 | `Components.dc.html` | Every colour token in both themes, the type scale, buttons, fields, switches, badges, citations and alerts |
 
 The sample data is `planningServer()` from `test/support/fake_api.dart`, plus invented answers, word counts, metrics and a server address.
@@ -37,7 +37,7 @@ The sample data is `planningServer()` from `test/support/fake_api.dart`, plus in
 | Chat header, turns, citations, answer buttons | `lib/ui/chat/chat_view.dart`, `lib/ui/chat/message_list.dart`, `lib/ui/chat/answer_body.dart` |
 | Composer | `lib/ui/chat/composer.dart` |
 | Sources panel | `lib/ui/sources/sources_panel.dart`, `lib/ui/widgets/drop_zone.dart` |
-| Settings | `lib/ui/settings/settings_dialog.dart` |
+| Settings (`DesktopSettings.dc.html`) | `lib/ui/settings/settings_dialog.dart` (the frame and the list), `settings_pages.dart` (the pages and groups), `rows.dart` (cards and rows), and a file per page in `lib/ui/settings/`; widths in `Sizes.settingsSideBySide` and `Sizes.settingsNav` |
 | Buttons, fields, segmented control, switch, badge, alert | `lib/ui/widgets/buttons.dart`, `fields.dart`, `segmented.dart`, `controls.dart`, `basics.dart` |
 | Icons, as inline SVG paths | `lib/ui/icons.dart`, the same paths |
 

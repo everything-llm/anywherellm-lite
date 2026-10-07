@@ -17,7 +17,7 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 | Gap | What it needs |
 | --- | --- |
 | Agent tools menu, skills, flows, integrations and MCP servers | Agents run through `/v1` `stream-chat` in a workspace's Agent mode or with `@agent` (checked 2026-10-06). Turning skills, agent flows, app integrations (Gmail, Google Calendar, Outlook) and MCP servers on or off is not in `/v1`. |
-| A model picker | `/v1/openai/models` appears to list workspaces, not a provider's models. The web UI lists a provider's models with `POST /api/system/custom-models` (`provider`, `apiKey`, `basePath`), which takes the web login; until it is checked, the model is a free-text field in Settings' Chat model card, `system.json` and `settings.json`. |
+| A model picker | `/v1/openai/models` appears to list workspaces, not a provider's models. The web UI lists a provider's models with `POST /api/system/custom-models` (`provider`, `apiKey`, `basePath`), which takes the web login; until it is checked, the model is a free-text field on Settings' AI provider pages and in Server settings as JSON and `settings.json`. |
 | Telling a web page from an upload named `url-...` | `docType` reads the stored name alone, so an upload such as `URL-list.md`, stored as `url-list.md-<uuid>.json`, shows `WEB`. A web page's name can end in `.md` or `.html` too, so the name cannot settle it. The document's metadata `chunkSource` (`link://...`) can, but a switched-off file keeps only its path, title and word count in `prefs.json`. |
 | Signing in makes one key | Built against AnythingLLM v1.16.2's source and tested with fakes only. Sign in with the address and password on the home server, then check that the web UI's Developer API page lists one key named `AnywhereLLM` and that the workspaces load. It writes one key to the server. |
 | Signing in again reuses the key | Forget the connection and sign in again, and sign in on a second device: the Developer API page must still list one `AnywhereLLM` key. Then delete it there and check that every device fails with the key refused and signs in again with a new one. |
@@ -52,7 +52,7 @@ The web UI's own endpoints sign in with a session token, not the developer key, 
 | Reset Vector Database | Not in `/v1`. Detaching every document is the nearest equivalent. |
 | Default system prompt for new workspaces | Not in `/v1`. `workspace/new` takes `openAiPrompt`, so the app can set a prompt when it makes a workspace. |
 | Custom system prompt variables | Adding, editing and deleting them is not in `/v1`. The server fills the built-in ones on every answer. |
-| Workspace Chats across the server, and Clear Chats | Not in `/v1`. Export is in Files under `/settings`. |
+| Clear Chats | Not in `/v1`. Listing and exporting every chat are on Settings' Workspace chats page. |
 | Suggested chat messages | Not in `/v1`. |
 | Make, edit or delete a slash-command preset | No `/v1` call writes presets. |
 | Server text-to-speech | Not in `/v1`. |
@@ -66,4 +66,4 @@ The web UI's own endpoints sign in with a session token, not the developer key, 
 
 ## Out of scope
 
-Instance administration beyond `system.json` stays in the web UI: switching the vector database (it deletes every vector), the server's password and signing secret, Scheduled Jobs, Event Logs, Model Router, Telegram, Branding, the Community Hub, Developer API keys, multi-user mode and password protection, the Browser Extension and AnythingLLM Mobile pairing, and the web UI's display language (the app has no translations).
+Instance administration beyond what Settings writes to the server's `.env` stays in the web UI: switching the vector database (it deletes every vector), the server's password and signing secret, Scheduled Jobs, Event Logs, Model Router, Telegram, Branding, the Community Hub, Developer API keys, multi-user mode and password protection, the Browser Extension and AnythingLLM Mobile pairing, and the web UI's display language (the app has no translations).

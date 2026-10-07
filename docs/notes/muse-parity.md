@@ -52,7 +52,7 @@ Ranked by how much a person would notice. Size is S (under a day), M (days), L (
 | G3 | Full-text search with snippets | Name filter | `core/find.dart` `matchesSearch`; sidebar search | Search loaded histories first; full server-side search needs an endpoint. | M |
 | G4 | LaTeX and syntax highlighting | Raw `$$...$$`; plain code | `ui/chat/answer_body.dart` (`flutter_markdown_plus` builders) | Add a math builder (`flutter_math_fork`) and a highlighter for `_CodeBlock`. | S-M |
 | G5 | Attachments as thumbnails | File name chip | composer attachment chips; the sent turn's attachments | Draw image attachments from their bytes in both places. | S |
-| G6 | Scheduled tasks view | None | `/settings` folder in the Files pane | Read-only list of the server's scheduled jobs. Needs an API. | M |
+| G6 | Scheduled tasks view | None | Settings (`lib/ui/settings/`), as a page of its own | Read-only list of the server's scheduled jobs. Needs an API. | M |
 | G7 | Memory view with categories | None | Files pane | Read-only memory list. Needs an API. | M |
 | G8 | Summary titles for chats | First line of the first message | `defaultTitle` in `core/chat.dart`; `_nameAfter` in `ChatController` | Ask the model for a short title after the first answer, as a rename. | S |
 | G9 | Reply-to and reactions | None | Message actions | Reply as a quoted prefix; reactions have no server field. | S (reply only) |
