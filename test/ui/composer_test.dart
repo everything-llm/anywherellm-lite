@@ -36,6 +36,16 @@ XFile contract() =>
     XFile.fromData(Uint8List.fromList([1]), path: 'contract.pdf', length: 1);
 
 void main() {
+  testWidgets("a phone's keyboard starts the message with a capital", (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    expect(
+      tester.widget<EditableText>(composerField).textCapitalization,
+      TextCapitalization.sentences,
+    );
+  });
+
   testWidgets('a picture shows small in the composer and in its question, '
       'and a document by its name', (tester) async {
     FileSelectorPlatform.instance = _Picker([photo(), contract()]);

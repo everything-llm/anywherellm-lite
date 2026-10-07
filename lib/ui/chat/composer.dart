@@ -468,6 +468,8 @@ class _Form extends StatelessWidget {
                     maxLines: null,
                     keyboardType: TextInputType.multiline,
                     textInputAction: TextInputAction.newline,
+                    // A phone's keyboard starts each sentence with a capital.
+                    textCapitalization: TextCapitalization.sentences,
                     style: Type.sans(15.5, color: t.ink, height: 1.5),
                     cursorColor: t.accent,
                     decoration: InputDecoration(
