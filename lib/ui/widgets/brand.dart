@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../tokens.dart';
 import '../type.dart';
+import 'robin_mark.dart';
 
 /// The logo tile and the wordmark.
 class Brand extends StatelessWidget {
@@ -20,16 +21,11 @@ class Brand extends StatelessWidget {
           Container(
             width: 26,
             height: 26,
-            alignment: Alignment.center,
-            padding: const EdgeInsets.only(bottom: 2),
             decoration: BoxDecoration(
               color: t.accent,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Text(
-              'n',
-              style: Type.serif(19, color: t.onaccent, height: 1),
-            ),
+            child: RobinMark(size: 26, color: t.onaccent),
           ),
           const SizedBox(width: 10),
         ],
