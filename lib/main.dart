@@ -17,6 +17,7 @@ import 'ui/chat/dictation.dart';
 import 'ui/chat/speaker.dart';
 import 'ui/chat/speech_dictation.dart';
 import 'ui/files/save_file.dart';
+import 'ui/files/save_android.dart';
 import 'ui/settings/scan_code.dart';
 import 'ui/shell.dart';
 import 'ui/state/chat_controller.dart';
@@ -162,7 +163,7 @@ class _SessionHostState extends State<SessionHost> {
         files: _files,
         system: _system,
         launch: widget.launch,
-        save: saveWithDialog,
+        save: Platform.isAndroid ? saveWithPicker : saveWithDialog,
         scanner: Platform.isAndroid ? cameraScanner : null,
         dictation: _dictation,
         readAloud: _readAloud,

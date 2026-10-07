@@ -17,7 +17,7 @@ class ExportChats extends StatefulWidget {
 class _ExportChatsState extends State<ExportChats> {
   String? _saved;
 
-  /// Asks where to save first, so nothing is fetched when the person cancels.
+  /// Fetches the chats in [format] and saves them where the person picks.
   Future<void> _export(ChatExport format) async {
     final files = AppScope.of(context).files;
     final path = await saveFile(

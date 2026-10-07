@@ -2,12 +2,6 @@
 
 What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each row says what blocks it.
 
-## Defects to fix
-
-| Defect | Fix | Where |
-| --- | --- | --- |
-| Attaching a file in the composer, then saving or forgetting the server password in Settings, silently clears the attachment though the server on screen did not change. | Track the chat on screen by the connection without its password, so saving or forgetting a password is the same server. | `_chatOnScreen` in `lib/ui/chat/composer.dart` (compare `_scope.settings.connection?.withPassword(null)`). |
-
 ## In the developer API, not built yet
 
 | Gap | What it needs |

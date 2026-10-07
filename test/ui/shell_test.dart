@@ -70,6 +70,16 @@ void main() {
       expect(find.byTooltip('Workspaces'), findsNothing);
     });
 
+    testWidgets('says when the saved server does not answer', (tester) async {
+      final llm = planningServer()
+        ..errors['workspaces'] = const ApiException(
+          'Could not reach the server.',
+        );
+      await pumpApp(tester, llm: llm);
+      expect(inSidebar('Connection problem'), findsOneWidget);
+      expect(inSidebar('Connected to AnythingLLM'), findsNothing);
+    });
+
     testWidgets('a workspace with no chats invites a first question', (
       tester,
     ) async {
@@ -551,7 +561,11 @@ void main() {
         findsWidgets,
       );
       expect(control('Save key'), findsOneWidget);
-      expect(control('Use password'), findsNothing);
+      // A mistyped address can be put right: the password form comes back.
+      await tester.tap(control('Use password'));
+      await tester.pumpAndSettle();
+      expect(control('Sign in'), findsOneWidget);
+      expect(control('Save key'), findsNothing);
     });
 
     Future<Harness> connected(WidgetTester tester, FakeAnythingLlm llm) async {
@@ -771,6 +785,32 @@ void main() {
       expect(h.store.saved?.apiKey, 'K9');
       expect(find.text('The key was saved.'), findsOneWidget);
       expect(inSidebar('Q3 planning'), findsOneWidget);
+    });
+
+    testWidgets('a scanned key the server refuses shows in the key field', (
+      tester,
+    ) async {
+      final llm = planningServer()
+        ..verifyError = const ApiException(
+          'The server did not accept the key.',
+        );
+      final h = await pumpApp(tester, llm: llm, connection: null, canScan: true)
+        ..scanCode = pairingCode(
+          const Connection(
+            baseUrl: 'https://owen.example.ts.net',
+            apiKey: 'K9',
+          ),
+        );
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      await tester.tap(control('Scan QR code'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Fake scan'));
+      await tester.pumpAndSettle();
+      expect(h.store.saved, isNull);
+      expect(find.text('The server did not accept the key.'), findsOneWidget);
+      expect(control('Save key'), findsOneWidget);
+      expect(find.text('K9'), findsOneWidget);
     });
 
     testWidgets('a code that is not a connection saves nothing', (

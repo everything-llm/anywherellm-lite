@@ -97,11 +97,14 @@ void main() {
       ('Customer interviews.docx', true),
       ('Q3 roadmap.pdf', false),
     ]);
-    expect(rig.prefsStore.saved.offIn('q3').single.title, 'Q3 roadmap.pdf');
+    expect(
+      rig.prefsStore.saved.offIn(rig.chat.server!.baseUrl, 'q3').single.title,
+      'Q3 roadmap.pdf',
+    );
 
     await rig.sources.toggle(rig.sources.files.last);
     expect(rig.sources.files.every((f) => f.on), isTrue);
-    expect(rig.prefsStore.saved.offIn('q3'), isEmpty);
+    expect(rig.prefsStore.saved.offIn(rig.chat.server!.baseUrl, 'q3'), isEmpty);
   });
 
   test('an added file is uploaded and embedded', () async {
@@ -218,8 +221,8 @@ void main() {
       await rig.sources.toggle(rig.sources.files.first);
       await rig.chat.renameWorkspace('q3', 'Q4');
       await pumpEventQueue();
-      expect(rig.prefs.prefs.offIn('q3'), isEmpty);
-      expect(rig.prefs.prefs.offIn('q4'), hasLength(1));
+      expect(rig.prefs.offIn('q3'), isEmpty);
+      expect(rig.prefs.offIn('q4'), hasLength(1));
       expect(rig.sources.files.where((file) => !file.on), hasLength(1));
       await rig.sources.toggle(rig.sources.files.last);
       expect(llm.spaces.first.docs, hasLength(2));

@@ -32,33 +32,43 @@ class OffDoc {
 
 /// The workspace and chat last on screen, which the app opens at start when they still exist.
 class LastChat {
-  const LastChat(this.slug, [this.thread]);
+  const LastChat(this.slug, [this.thread, this.server]);
 
   final String slug;
 
   /// The chat, or null when the workspace was left on a draft.
   final String? thread;
 
-  @override
-  bool operator ==(Object other) =>
-      other is LastChat && other.slug == slug && other.thread == thread;
+  /// The address of the server it is on, or null when it was saved before servers were told
+  /// apart.
+  final String? server;
 
   @override
-  int get hashCode => Object.hash(slug, thread);
+  bool operator ==(Object other) =>
+      other is LastChat &&
+      other.slug == slug &&
+      other.thread == thread &&
+      other.server == server;
+
+  @override
+  int get hashCode => Object.hash(slug, thread, server);
 
   Map<String, Object?> toJson() => {
     'slug': slug,
     if (thread != null) 'thread': thread,
+    if (server != null) 'server': server,
   };
 
   static LastChat? fromJson(Object? json) {
     if (json is! Map) return null;
     final slug = json['slug'];
     final thread = json['thread'];
+    final server = json['server'];
     if (slug is! String || slug.isEmpty) return null;
     return LastChat(
       slug,
       thread is String && thread.isNotEmpty ? thread : null,
+      server is String && server.isNotEmpty ? server : null,
     );
   }
 }
@@ -87,7 +97,9 @@ class Prefs {
     this.lastChat,
   });
 
-  /// The documents switched off in each workspace, by its slug.
+  /// The documents switched off in each workspace, by [offKey]: its server's address and its
+  /// slug, since two servers can each have a workspace of the same name. A key that is a slug
+  /// alone was saved before servers were told apart; [adoptedBy] gives it a server.
   final Map<String, List<OffDoc>> switchedOff;
 
   /// The slugs of the workspaces in the order the person arranged them. A workspace not listed
@@ -100,7 +112,39 @@ class Prefs {
   /// The workspace and chat last on screen, or null before any was opened.
   final LastChat? lastChat;
 
-  List<OffDoc> offIn(String slug) => switchedOff[slug] ?? const [];
+  /// The key of workspace [slug] on [server] in [switchedOff]. Neither an address nor a slug
+  /// holds a space.
+  static String offKey(String server, String slug) => '$server $slug';
+
+  List<OffDoc> offIn(String server, String slug) =>
+      switchedOff[offKey(server, slug)] ?? const [];
+
+  /// Whether some of these prefs were saved before servers were told apart.
+  bool get hasUnowned =>
+      switchedOff.keys.any((k) => !k.contains(' ')) ||
+      (lastChat != null && lastChat!.server == null);
+
+  /// [a] and [b] as one list, one document a path, [b]'s where both have it.
+  static List<OffDoc> _merged(List<OffDoc> a, List<OffDoc> b) => {
+    for (final doc in a) doc.path: doc,
+    for (final doc in b) doc.path: doc,
+  }.values.toList();
+
+  /// These prefs with what was saved before servers were told apart given to [server]: in the
+  /// app's use until then, one server had them all.
+  Prefs adoptedBy(String server) {
+    final adopted = <String, List<OffDoc>>{};
+    for (final MapEntry(:key, :value) in switchedOff.entries) {
+      final owned = key.contains(' ') ? key : offKey(server, key);
+      adopted[owned] = _merged(adopted[owned] ?? const [], value);
+    }
+    return _copy(
+      switchedOff: adopted,
+      lastChat: () => lastChat == null || lastChat!.server != null
+          ? lastChat
+          : LastChat(lastChat!.slug, lastChat!.thread, server),
+    );
+  }
 
   /// [items] with those named in [workspaceOrder] first, in that order, and the rest after them
   /// in their own order. [slugOf] names an item's workspace.
@@ -132,21 +176,23 @@ class Prefs {
     lastChat: lastChat == null ? this.lastChat : lastChat(),
   );
 
-  /// These prefs with [slug]'s switched-off documents set to [docs].
-  Prefs withOff(String slug, List<OffDoc> docs) => _copy(
+  /// These prefs with the switched-off documents of [slug] on [server] set to [docs].
+  Prefs withOff(String server, String slug, List<OffDoc> docs) => _copy(
     switchedOff: {
       for (final entry in switchedOff.entries)
-        if (entry.key != slug) entry.key: entry.value,
-      if (docs.isNotEmpty) slug: docs,
+        if (entry.key != offKey(server, slug)) entry.key: entry.value,
+      if (docs.isNotEmpty) offKey(server, slug): docs,
     },
   );
 
-  /// These prefs with the documents at [paths] forgotten in every workspace.
-  Prefs withoutDocs(Set<String> paths) => _copy(
+  /// These prefs with the documents at [paths] forgotten in every workspace on [server].
+  Prefs withoutDocs(String server, Set<String> paths) => _copy(
     switchedOff: {
       for (final MapEntry(:key, :value) in switchedOff.entries)
-        if (value.where((d) => !paths.contains(d.path)).toList() case final kept
-            when kept.isNotEmpty)
+        if (!key.startsWith('$server '))
+          key: value
+        else if (value.where((d) => !paths.contains(d.path)).toList()
+            case final kept when kept.isNotEmpty)
           key: kept,
     },
   );
@@ -160,40 +206,45 @@ class Prefs {
     ],
   );
 
-  /// These prefs with [from]'s order, switched-off documents and last chat moved to [to], as
-  /// when a workspace's slug changes.
-  Prefs withRenamedWorkspace(String from, String to) => from == to
-      ? this
-      : _copy(
-          switchedOff: {
-            for (final entry in switchedOff.entries)
-              if (entry.key != from && entry.key != to) entry.key: entry.value,
-            if (switchedOff.containsKey(from) || switchedOff.containsKey(to))
-              to: {
-                for (final doc in offIn(to)) doc.path: doc,
-                for (final doc in offIn(from)) doc.path: doc,
-              }.values.toList(),
-          },
-          workspaceOrder: [
-            for (final s in workspaceOrder)
-              if (s == from) to else if (s != to) s,
-          ],
-          lastChat: () => lastChat?.slug == from
-              ? LastChat(to, lastChat!.thread)
-              : lastChat,
-        );
+  /// Whether the last chat is in workspace [slug] on [server].
+  bool lastChatIn(String server, String slug) =>
+      lastChat?.slug == slug && lastChat?.server == server;
 
-  /// These prefs with [slug] dropped from the order and the last chat, as when the workspace
-  /// is deleted.
-  Prefs withoutWorkspace(String slug) => _copy(
+  /// These prefs with the order, switched-off documents and last chat of workspace [from] on
+  /// [server] moved to [to], as when a workspace's slug changes.
+  Prefs withRenamedWorkspace(String server, String from, String to) {
+    if (from == to) return this;
+    final fromKey = offKey(server, from);
+    final toKey = offKey(server, to);
+    return _copy(
+      switchedOff: {
+        for (final entry in switchedOff.entries)
+          if (entry.key != fromKey && entry.key != toKey)
+            entry.key: entry.value,
+        if (switchedOff.containsKey(fromKey) || switchedOff.containsKey(toKey))
+          toKey: _merged(offIn(server, to), offIn(server, from)),
+      },
+      workspaceOrder: [
+        for (final s in workspaceOrder)
+          if (s == from) to else if (s != to) s,
+      ],
+      lastChat: () => lastChatIn(server, from)
+          ? LastChat(to, lastChat!.thread, server)
+          : lastChat,
+    );
+  }
+
+  /// These prefs with [slug] dropped from the order, and from the last chat when it is on
+  /// [server], as when the workspace is deleted.
+  Prefs withoutWorkspace(String server, String slug) => _copy(
     workspaceOrder: [...workspaceOrder.where((s) => s != slug)],
-    lastChat: () => lastChat?.slug == slug ? null : lastChat,
+    lastChat: () => lastChatIn(server, slug) ? null : lastChat,
   );
 
-  /// These prefs with chat [thread] of workspace [slug] as the last on screen; a null [thread]
-  /// is a draft.
-  Prefs withLastChat(String slug, String? thread) =>
-      _copy(lastChat: () => LastChat(slug, thread));
+  /// These prefs with chat [thread] of workspace [slug] on [server] as the last on screen; a
+  /// null [thread] is a draft.
+  Prefs withLastChat(String server, String slug, String? thread) =>
+      _copy(lastChat: () => LastChat(slug, thread, server));
 
   Prefs withTheme(ThemePref theme) => _copy(theme: theme);
 

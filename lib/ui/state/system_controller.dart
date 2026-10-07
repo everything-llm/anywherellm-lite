@@ -158,7 +158,12 @@ class SystemController extends ChangeNotifier {
   Future<List<EmbedChat>?> embedChats(String uuid) async {
     final server = _server;
     try {
-      return await _api.embedChats(uuid);
+      final chats = await _api.embedChats(uuid);
+      if (_server == server && embedProblem != null) {
+        embedProblem = null;
+        notifyListeners();
+      }
+      return chats;
     } on ApiException catch (error) {
       if (_server == server) {
         embedProblem = Notice(

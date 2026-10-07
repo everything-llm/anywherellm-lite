@@ -31,6 +31,7 @@ class FilesController extends ChangeNotifier {
   ) : _server = _settings.connection?.withPassword(null) {
     _settings.addListener(_serverChanged);
     _chat.addListener(_chatChanged);
+    _sources.addListener(_sourcesChanged);
   }
 
   final AnythingLlmApi _api;
@@ -57,6 +58,10 @@ class FilesController extends ChangeNotifier {
 
   bool _loaded = false;
   bool loading = false;
+
+  /// Whether Files has been shown, so a new server's files are read as soon as its workspaces
+  /// are.
+  bool _wanted = false;
 
   final Set<String> _expanded = {'/workspaces', '/library'};
 
@@ -124,6 +129,7 @@ class FilesController extends ChangeNotifier {
   void dispose() {
     _settings.removeListener(_serverChanged);
     _chat.removeListener(_chatChanged);
+    _sources.removeListener(_sourcesChanged);
     super.dispose();
   }
 
@@ -165,22 +171,53 @@ class FilesController extends ChangeNotifier {
       }
     }
     notifyListeners();
-    if (!_loaded) return;
-    for (final w in _chat.workspaces) {
-      if (_asked.add(w.slug)) unawaited(_readAndShow(w.slug));
+    if (!_loaded) {
+      if (_wanted && !loading && !_chat.loading && _server != null) {
+        unawaited(load());
+      }
+      return;
     }
+    for (final w in _chat.workspaces) {
+      if (_asked.add(w.slug)) unawaited(_show(_readWorkspace(w.slug)));
+    }
+  }
+
+  /// Takes the workspace Sources last read, so a change made there shows here too. A document
+  /// it uses that the library does not list was added there, so the library is read again.
+  void _sourcesChanged() {
+    final read = _sources.read;
+    if (!_loaded || read == null || identical(read, _details[read.slug])) {
+      return;
+    }
+    if (!_chat.workspaces.any((w) => w.slug == read.slug)) return;
+    final had = {for (final d in _details[read.slug]?.documents ?? []) d.path};
+    _details[read.slug] = read;
+    _tree = null;
+    notifyListeners();
+    final added = [
+      for (final d in read.documents)
+        if (!had.contains(d.path)) d.path,
+    ];
+    if (added.isEmpty) return;
+    final listed = {
+      for (final f in library)
+        for (final d in f.files) d.path,
+    };
+    if (!added.every(listed.contains)) unawaited(_show(_readLibrary()));
   }
 
   static bool _under(String path, String slug) =>
       path == '/workspaces/$slug' || path.startsWith('/workspaces/$slug/');
 
-  Future<void> _readAndShow(String slug) async {
-    await _readWorkspace(slug);
+  /// Waits for [read], and shows why it failed when it did.
+  Future<void> _show(Future<Notice?> read) async {
+    if (await read case final failed?) problems = [...problems, failed];
     notifyListeners();
   }
 
   /// Reads every workspace and the library, unless already read.
   Future<void> ensureLoaded() async {
+    _wanted = true;
     if (!_loaded && !loading) await load();
   }
 
@@ -199,9 +236,13 @@ class FilesController extends ChangeNotifier {
     if (_server != server) return;
     loading = false;
     _loaded = true;
-    problems = failed.nonNulls.toList();
+    // Showing the node clears the problems, so the failed reads are added after it.
+    if (selected != null) {
+      await select(selected!);
+      if (_server != server) return;
+    }
+    problems = [...failed.nonNulls, if (selected != null) ...problems];
     notifyListeners();
-    if (selected != null) await select(selected!);
   }
 
   void toggle(String path) {
@@ -289,13 +330,14 @@ class FilesController extends ChangeNotifier {
       return false;
     }
     if (fields.isEmpty) return true;
-    final ok = await _change(
+    final changed = await _change(
       'Could not save ${node.name}',
       () => _api.updateWorkspace(slug, fields),
       slug: slug,
     );
-    if (ok) await select(node.path);
-    return ok;
+    // When the workspace could not be read again, the draft stays on screen with why.
+    if (changed == _Changed.done) await select(node.path);
+    return changed != _Changed.failed;
   }
 
   /// Embeds the library document at [path] in workspace [slug].
@@ -347,10 +389,11 @@ class FilesController extends ChangeNotifier {
     );
     if (_server != server) return;
     sending = null;
-    await _readLibrary();
+    final unread = await _readLibrary();
     problems = [
       for (final (name, why) in sent.refused)
         Notice('Could not add $name', why),
+      ?unread,
     ];
     notifyListeners();
   }
@@ -358,12 +401,12 @@ class FilesController extends ChangeNotifier {
   Future<void> createFolder(String name) async {
     final clean = name.trim();
     if (clean.isEmpty) return;
-    final ok = await _change(
+    final changed = await _change(
       'Could not make the folder',
       () => _api.createFolder(clean),
       library: true,
     );
-    if (ok) _expanded.add(libraryPath(clean));
+    if (changed != _Changed.failed) _expanded.add(libraryPath(clean));
   }
 
   /// Moves the library document at [path] into [folder], and says so when the server kept it
@@ -371,12 +414,13 @@ class FilesController extends ChangeNotifier {
   Future<void> move(String path, String folder) async {
     final to = '$folder/${docName(path)}';
     if (to == path) return;
-    final ok = await _change(
+    final changed = await _change(
       'Could not move the document',
       () => _api.moveDocuments([(path, to)]),
       library: true,
     );
-    if (!ok) return;
+    // A library that could not be read again says nothing about where the document is.
+    if (changed != _Changed.done) return;
     if (library.any((f) => f.files.any((d) => d.path == path))) {
       problems = [
         const Notice(
@@ -393,16 +437,16 @@ class FilesController extends ChangeNotifier {
   /// Deletes the library document at [path], which takes it out of every workspace, and forgets
   /// it wherever it was switched off in Sources.
   Future<void> deleteFromLibrary(String path) async {
-    final ok = await _change(
+    final changed = await _change(
       'Could not delete the document',
       () => _api.removeDocuments([path]),
       slugs: [for (final w in usersOf(path)) w.slug],
       library: true,
     );
-    if (!ok) return;
+    if (changed == _Changed.failed) return;
     final active = _chat.activeSlug;
     final shownOff =
-        active != null && _prefs.prefs.offIn(active).any((d) => d.path == path);
+        active != null && _prefs.offIn(active).any((d) => d.path == path);
     await _prefs.forgetDocs([path]);
     if (shownOff) unawaited(_sources.refresh());
     if (selected == libraryPath(path)) {
@@ -414,7 +458,7 @@ class FilesController extends ChangeNotifier {
   /// and forgets them wherever they were switched off in Sources.
   Future<void> deleteFolder(String name) async {
     final paths = [for (final d in folderDocs(name)) d.path];
-    final ok = await _change(
+    final changed = await _change(
       'Could not delete the folder',
       () => _api.removeFolder(name),
       slugs: [
@@ -425,11 +469,11 @@ class FilesController extends ChangeNotifier {
       ],
       library: true,
     );
-    if (!ok) return;
+    if (changed == _Changed.failed) return;
     final active = _chat.activeSlug;
     final shownOff =
         active != null &&
-        _prefs.prefs.offIn(active).any((d) => paths.contains(d.path));
+        _prefs.offIn(active).any((d) => paths.contains(d.path));
     await _prefs.forgetDocs(paths);
     if (shownOff) unawaited(_sources.refresh());
     _expanded.remove(libraryPath(name));
@@ -463,8 +507,9 @@ class FilesController extends ChangeNotifier {
   }
 
   /// Runs [op], then reads again what it changed: workspace [slug], the workspaces in [slugs],
-  /// and the library when [library]. Returns whether [op] succeeded.
-  Future<bool> _change(
+  /// and the library when [library]. Says whether [op] failed, worked but what it changed could
+  /// not be read again, or worked and was read again.
+  Future<_Changed> _change(
     String failTitle,
     Future<void> Function() op, {
     String? slug,
@@ -478,14 +523,19 @@ class FilesController extends ChangeNotifier {
     } on ApiException catch (error) {
       failed = Notice(failTitle, error.message);
     }
-    if (_server != server) return false;
-    problems = [?failed];
-    await Future.wait([
+    if (_server != server) return _Changed.failed;
+    final unread = await Future.wait([
       for (final s in {?slug, ...slugs}) _readWorkspace(s),
       if (library) _readLibrary(),
     ]);
+    if (_server != server) return _Changed.failed;
+    problems = [?failed, ...unread.nonNulls];
     notifyListeners();
-    return failed == null;
+    return failed != null
+        ? _Changed.failed
+        : unread.any((n) => n != null)
+        ? _Changed.unread
+        : _Changed.done;
   }
 
   /// Reads workspace [slug] again and tells Sources and the sidebar what changed. Returns why it
@@ -528,3 +578,7 @@ class FilesController extends ChangeNotifier {
     contentLoading = false;
   }
 }
+
+/// How a change Files made went: [failed], worked but what it changed could not be read again
+/// ([unread]), or worked and was read again ([done]).
+enum _Changed { failed, unread, done }

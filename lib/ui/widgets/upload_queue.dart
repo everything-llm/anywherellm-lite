@@ -19,16 +19,10 @@ class _Pending {
 /// A [DropZone] whose files wait in a list, each with its own details and a remove button,
 /// until Add sends them all through [onSend].
 class UploadQueue extends StatefulWidget {
-  const UploadQueue({
-    super.key,
-    required this.onSend,
-    required this.onProblem,
-    this.extensions,
-  });
+  const UploadQueue({super.key, required this.onSend, required this.onProblem});
 
   final Future<void> Function(List<UploadFile> files) onSend;
   final void Function(String title, String text) onProblem;
-  final Set<String>? extensions;
 
   @override
   State<UploadQueue> createState() => _UploadQueueState();
@@ -79,11 +73,7 @@ class _UploadQueueState extends State<UploadQueue> {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      DropZone(
-        onFiles: _add,
-        onProblem: widget.onProblem,
-        extensions: widget.extensions,
-      ),
+      DropZone(onFiles: _add, onProblem: widget.onProblem),
       if (_pending.isNotEmpty) ...[
         const SizedBox(height: 10),
         for (final p in _pending)

@@ -245,6 +245,10 @@ class _KeyCardState extends State<_KeyCard> {
     super.initState();
     _url.text =
         _settings.connection?.baseUrl ?? (_settings.allowHttp ? _example : '');
+    // The server may have been out of reach when the app started.
+    if (_settings.connection != null && _settings.auth == null) {
+      unawaited(_settings.readAuth());
+    }
   }
 
   @override
@@ -268,6 +272,8 @@ class _KeyCardState extends State<_KeyCard> {
 
   Future<void> _signIn() async {
     final saved = await _settings.signIn(_url.text, _password.text);
+    // A server with several users gives no key this way, so the form takes one.
+    if (mounted && _settings.needsKey) setState(() => _pasteKey = true);
     if (mounted && saved) {
       setState(() {
         _password.clear();
@@ -291,6 +297,8 @@ class _KeyCardState extends State<_KeyCard> {
     setState(() {
       _scanning = false;
       _scanProblem = null;
+      // A key the server refuses then shows in its field, under why.
+      _pasteKey = true;
       _url.text = connection.baseUrl;
       _key.text = connection.apiKey;
     });
@@ -320,7 +328,6 @@ class _KeyCardState extends State<_KeyCard> {
         final set = connection != null;
         final editing = !set || _replacing;
         final saving = _settings.check == ConnectionCheck.testing;
-        final pasteKey = _pasteKey || _settings.needsKey;
         return _Card(
           children: [
             Row(
@@ -342,7 +349,7 @@ class _KeyCardState extends State<_KeyCard> {
                       Text(
                         set
                             ? 'Saved in your system keyring. Never shown.'
-                            : pasteKey
+                            : _pasteKey
                             ? 'Create a key in AnythingLLM under Settings → Developer API, then paste it here.'
                             : 'Sign in with the password AnythingLLM\'s web page asks for. The app makes its own developer key.',
                         style: Type.sans(12.5, color: t.muted, height: 1.45),
@@ -400,7 +407,7 @@ class _KeyCardState extends State<_KeyCard> {
                 keyboardType: TextInputType.url,
                 autofillHints: const [AutofillHints.url],
               ),
-              if (pasteKey)
+              if (_pasteKey)
                 AppField(
                   controller: _key,
                   label: 'AnythingLLM developer API key',
@@ -426,23 +433,22 @@ class _KeyCardState extends State<_KeyCard> {
                   AppButton(
                     saving
                         ? 'Checking…'
-                        : pasteKey
+                        : _pasteKey
                         ? 'Save key'
                         : 'Sign in',
                     primary: true,
                     onPressed: saving
                         ? null
-                        : pasteKey
+                        : _pasteKey
                         ? _save
                         : _signIn,
                   ),
-                  if (!_settings.needsKey)
-                    AppButton(
-                      pasteKey ? 'Use password' : 'Paste a key',
-                      onPressed: saving
-                          ? null
-                          : () => setState(() => _pasteKey = !_pasteKey),
-                    ),
+                  AppButton(
+                    _pasteKey ? 'Use password' : 'Paste a key',
+                    onPressed: saving
+                        ? null
+                        : () => setState(() => _pasteKey = !_pasteKey),
+                  ),
                   if (_scanner != null)
                     AppButton(
                       'Scan QR code',

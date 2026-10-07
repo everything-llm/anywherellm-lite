@@ -86,6 +86,9 @@ class _NewEmbedState extends State<_NewEmbed> {
   final _perDay = TextEditingController();
   final _perSession = TextEditingController();
 
+  /// Why a limit was not taken, or null.
+  String? _limitProblem;
+
   @override
   void dispose() {
     _sites.dispose();
@@ -97,6 +100,14 @@ class _NewEmbedState extends State<_NewEmbed> {
   Future<void> _make() async {
     final slug = _slug;
     if (slug == null) return;
+    if (!_isLimit(_perDay.text) || !_isLimit(_perSession.text)) {
+      setState(
+        () => _limitProblem =
+            'A limit is a whole number above 0, or empty for no limit.',
+      );
+      return;
+    }
+    setState(() => _limitProblem = null);
     final made = await AppScope.of(context).system.createEmbed(
       NewEmbed(
         workspaceSlug: slug,
@@ -114,11 +125,13 @@ class _NewEmbedState extends State<_NewEmbed> {
     }
   }
 
-  /// [text] as a limit: a whole number above nought, or null for none.
-  int? _count(String text) => switch (int.tryParse(text.trim())) {
-    final n? when n > 0 => n,
-    _ => null,
-  };
+  /// Whether [text] is a limit: empty for none, or a whole number above nought. A limit cannot
+  /// be changed once the embed is made, so a mistyped one is refused rather than dropped.
+  static bool _isLimit(String text) =>
+      text.trim().isEmpty || (int.tryParse(text.trim()) ?? 0) > 0;
+
+  /// [text] as a limit, or null for none.
+  int? _count(String text) => int.tryParse(text.trim());
 
   @override
   Widget build(BuildContext context) {
@@ -179,6 +192,10 @@ class _NewEmbedState extends State<_NewEmbed> {
             ),
           ],
         ),
+        if (_limitProblem case final problem?) ...[
+          const SizedBox(height: 6),
+          HelpText(problem, status: true),
+        ],
         const SizedBox(height: 10),
         ActionRow([
           AppButton(

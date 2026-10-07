@@ -184,6 +184,42 @@ void main() {
     expect(rig.chat.turns.last.error, isNull);
   });
 
+  test('a failed answer\'s chat opened before the server saved it keeps the question', () async {
+    final llm = planningServer()..hold = true;
+    final rig = await started(llm);
+    await rig.chat.send('And next quarter?');
+    llm.chat!.addError(const ApiException('Lost the connection to the relay.'));
+    await pumpEventQueue();
+    await rig.chat.open('priorities');
+    await rig.chat.open('budget');
+    expect(rig.chat.turns.map((t) => t.text), contains('And next quarter?'));
+    expect(rig.chat.turns.last.unfinished, isTrue);
+    llm.histories['budget'] = [
+      ...llm.histories['budget']!,
+      const ChatMessage(role: Role.user, text: 'And next quarter?'),
+      const ChatMessage(role: Role.assistant, text: 'About 45k.'),
+    ];
+    await rig.chat.open('priorities');
+    await rig.chat.open('budget');
+    expect(rig.chat.turns.last.text, 'About 45k.');
+  });
+
+  test(
+    'new chat while a draft\'s thread is made stays on the new draft',
+    () async {
+      final llm = planningServer()..gates['createThread'] = Completer<void>();
+      final rig = await started(llm);
+      rig.chat.newChat();
+      final sending = rig.chat.send('First question');
+      await pumpEventQueue();
+      rig.chat.newChat();
+      llm.gates['createThread']!.complete();
+      await sending;
+      expect(rig.chat.activeThread, isNull);
+      expect(rig.chat.turns, isEmpty);
+    },
+  );
+
   test('a finished answer\'s chat is not read again', () async {
     final llm = planningServer();
     final rig = await started(llm);
@@ -311,17 +347,21 @@ void main() {
 
     test('is saved on opening a chat, a draft and its first message', () async {
       final rig = await started(planningServer());
-      expect(rig.prefsStore.saved.lastChat, const LastChat('q3', 'budget'));
+      final server = rig.chat.server!.baseUrl;
+      expect(rig.prefsStore.saved.lastChat, LastChat('q3', 'budget', server));
       await rig.chat.select('q3', thread: 'priorities');
-      expect(rig.prefsStore.saved.lastChat, const LastChat('q3', 'priorities'));
+      expect(
+        rig.prefsStore.saved.lastChat,
+        LastChat('q3', 'priorities', server),
+      );
       await rig.chat.select('q3', thread: 'budget');
       rig.chat.newChat();
       await pumpEventQueue();
-      expect(rig.prefsStore.saved.lastChat, const LastChat('q3'));
+      expect(rig.prefsStore.saved.lastChat, LastChat('q3', null, server));
       await rig.chat.send('hello');
       expect(
         rig.prefsStore.saved.lastChat,
-        LastChat('q3', rig.chat.activeThread),
+        LastChat('q3', rig.chat.activeThread, server),
       );
       expect(rig.chat.activeThread, isNotNull);
     });
@@ -540,7 +580,7 @@ void main() {
       );
       await rig.chat.deleteWorkspace('household');
       await pumpEventQueue();
-      expect(rig.prefs.prefs.offIn('household'), isEmpty);
+      expect(rig.prefs.offIn('household'), isEmpty);
     });
 
     test('a workspace with an answer running cannot be deleted', () async {
@@ -776,22 +816,8 @@ void main() {
   });
 
   group('signed in', () {
-    /// The planning server, with the budget chat's one exchange given id 5.
-    FakeAnythingLlm withIds() {
-      final llm = planningServer();
-      llm.histories['budget'] = [
-        const ChatMessage(
-          role: Role.user,
-          text: 'What is the budget?',
-          chatId: 5,
-        ),
-        const ChatMessage(role: Role.assistant, text: 'About 40k.', chatId: 5),
-      ];
-      return llm;
-    }
-
     test('retry deletes the old exchange before asking again', () async {
-      final llm = withIds()..answer = 'About 45k.';
+      final llm = withChatIds()..answer = 'About 45k.';
       final rig = await started(llm, password: 'PASS-WORD');
       await rig.chat.retry();
       await pumpEventQueue();
@@ -809,7 +835,7 @@ void main() {
     });
 
     test('a delete that fails asks nothing again', () async {
-      final llm = withIds()
+      final llm = withChatIds()
         ..errors['dropFrom'] = const ApiException('no', status: 500);
       final rig = await started(llm, password: 'PASS-WORD');
       await rig.chat.retry();
@@ -820,14 +846,14 @@ void main() {
     });
 
     test('signed out, retry deletes nothing', () async {
-      final llm = withIds();
+      final llm = withChatIds()..auth = ServerAuth.password;
       final rig = await started(llm);
       await rig.chat.retry();
       expect(llm.calls.where((c) => c.startsWith('dropFrom')), isEmpty);
     });
 
     test('an edited question replaces it and what came after', () async {
-      final llm = withIds()..answer = 'About 50k.';
+      final llm = withChatIds()..answer = 'About 50k.';
       final rig = await started(llm, password: 'PASS-WORD');
       rig.chat.edit(rig.chat.turns.first);
       expect(rig.chat.editing, same(rig.chat.turns.first));
@@ -842,13 +868,94 @@ void main() {
     });
 
     test('signed out, editing only fills the composer', () async {
-      final rig = await started(withIds());
+      final rig = await started(withChatIds()..auth = ServerAuth.password);
       rig.chat.edit(rig.chat.turns.first);
       expect(rig.chat.editing, isNull);
     });
 
+    test(
+      'a server with no password needs no sign-in to replace or mark',
+      () async {
+        final llm = withChatIds()..auth = ServerAuth.none;
+        final rig = await started(llm);
+        expect(rig.chat.signedIn, isFalse);
+        await rig.settings.readAuth();
+        expect(rig.chat.signedIn, isTrue);
+        rig.chat.edit(rig.chat.turns.first);
+        expect(rig.chat.editing, isNotNull);
+      },
+    );
+
+    test(
+      'retry while a question is being edited replaces only the last exchange',
+      () async {
+        final llm = withChatIds()..answer = 'About 45k.';
+        llm.histories['budget'] = [
+          ...llm.histories['budget']!,
+          const ChatMessage(role: Role.user, text: 'And Q4?', chatId: 6),
+          const ChatMessage(
+            role: Role.assistant,
+            text: 'About 42k.',
+            chatId: 6,
+          ),
+        ];
+        final rig = await started(llm, password: 'PASS-WORD');
+        rig.chat.edit(rig.chat.turns.first);
+        await rig.chat.retry();
+        await pumpEventQueue();
+        expect(llm.calls.where((c) => c.startsWith('dropFrom')), [
+          'dropFrom:budget:6',
+        ]);
+        expect(rig.chat.editing, isNull);
+        expect(rig.chat.turns.map((t) => t.text), [
+          'What is the budget?',
+          'About 40k.',
+          'And Q4?',
+          'About 45k.',
+        ]);
+      },
+    );
+
+    test('an edit whose old exchange cannot be deleted is not sent', () async {
+      final llm = withChatIds()
+        ..errors['dropFrom'] = const ApiException('no', status: 500);
+      final rig = await started(llm, password: 'PASS-WORD');
+      final question = rig.chat.turns.first;
+      rig.chat.edit(question);
+      final sent = await rig.chat.send('What is the Q3 budget?');
+      expect(sent, isFalse);
+      expect(rig.chat.editing, same(question));
+      expect(llm.calls.where((c) => c.startsWith('streamChat:')), isEmpty);
+      expect(rig.chat.problem?.title, 'Could not replace the old exchange');
+    });
+
+    test(
+      'a delete that lands after the person moved on reads the chat afresh',
+      () async {
+        final llm = withChatIds()..gates['dropFrom'] = Completer<void>();
+        final rig = await started(llm, password: 'PASS-WORD');
+        final retrying = rig.chat.retry();
+        await pumpEventQueue();
+        await rig.chat.open('priorities');
+        llm.gates['dropFrom']!.complete();
+        await retrying;
+        expect(llm.calls.where((c) => c.startsWith('streamChat:')), isEmpty);
+        llm.calls.clear();
+        await rig.chat.open('budget');
+        expect(llm.calls, contains('history:budget'));
+        expect(rig.chat.turns, isEmpty);
+      },
+    );
+
+    test('new chat clears an edit', () async {
+      final rig = await started(withChatIds(), password: 'PASS-WORD');
+      rig.chat.edit(rig.chat.turns.first);
+      rig.chat.newChat();
+      expect(rig.chat.editing, isNull);
+    });
+
     test('marks an answer, and a second tap clears it', () async {
-      final llm = withIds();
+      final llm = withChatIds();
       final rig = await started(llm, password: 'PASS-WORD');
       final answer = rig.chat.turns.last;
       await rig.chat.mark(answer, true);
@@ -862,7 +969,7 @@ void main() {
     });
 
     test('a mark the server refuses goes back', () async {
-      final llm = withIds()
+      final llm = withChatIds()
         ..errors['setFeedback'] = const ApiException('no', status: 500);
       final rig = await started(llm, password: 'PASS-WORD');
       final answer = rig.chat.turns.last;
@@ -874,7 +981,7 @@ void main() {
     test(
       'saving a password keeps the chat and lists the commands again',
       () async {
-        final llm = withIds()
+        final llm = withChatIds()
           ..errors['slashCommands'] = const ApiException('no', status: 401);
         final rig = await started(llm);
         await pumpEventQueue();
@@ -890,7 +997,7 @@ void main() {
     );
 
     test('a refused saved password says to replace it', () async {
-      final llm = withIds()
+      final llm = withChatIds()
         ..errors['slashCommands'] = const ApiException('no', status: 403);
       final rig = await started(llm, password: 'PASS-WORD');
       await pumpEventQueue();

@@ -669,6 +669,36 @@ void main() {
       );
     });
 
+    test('an answer that goes silent is given up after idle', () async {
+      final silent = StreamController<List<int>>();
+      addTearDown(silent.close);
+      final api = HttpAnythingLlmApi(
+        holder: ConnectionHolder(_connection),
+        idle: const Duration(milliseconds: 50),
+        client: _notRelay((request, body) async {
+          await body.drain<void>();
+          return http.StreamedResponse(silent.stream, 200);
+        }),
+      );
+      final error = await _failure(api.streamChat('w', 't', 'Hi').drain());
+      expect(error.message, contains('sent nothing for too long'));
+    });
+
+    test('a connection cut off mid-answer says so', () async {
+      final api = HttpAnythingLlmApi(
+        holder: ConnectionHolder(_connection),
+        client: _notRelay((request, body) async {
+          await body.drain<void>();
+          return http.StreamedResponse(
+            Stream.error(http.ClientException('Connection reset')),
+            200,
+          );
+        }),
+      );
+      final error = await _failure(api.streamChat('w', 't', 'Hi').drain());
+      expect(error.message, 'The answer was cut off: Connection reset');
+    });
+
     test('sends no mode, so the workspace\'s own chat mode applies', () async {
       late Map<String, dynamic> body;
       await HttpAnythingLlmApi(

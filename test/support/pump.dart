@@ -209,6 +209,8 @@ Future<Harness> pumpApp(
   await harness.prefs.load();
   await tester.pumpWidget(harness.app);
   await harness.chat.load();
+  // As the app's start does, once the connection is read.
+  await harness.settings.readAuth();
   await tester.pumpAndSettle();
   return harness;
 }
@@ -221,6 +223,10 @@ Finder typingField([Finder? of]) {
 
 /// The composer's field, apart from the sidebar's search and every other field on screen.
 Finder get composerField => typingField(find.byType(Composer));
+
+/// The message in the composer.
+String composerText(WidgetTester tester) =>
+    tester.widget<EditableText>(composerField).controller.text;
 
 /// Raises an on-screen keyboard [height] pixels tall as Android does: the window keeps its
 /// size and reports the keyboard as a bottom view inset.

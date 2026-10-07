@@ -5,17 +5,13 @@ import 'package:flutter/widgets.dart';
 
 import '../app_scope.dart';
 
-/// The [FileSaver] the app uses: the system's save dialog, then a write to the place chosen.
+/// The [FileSaver] the app uses on Linux: the system's save dialog, then a write to the place
+/// chosen. It asks first, so nothing is fetched when the person cancels.
 Future<String?> saveWithDialog(
   String suggestedName,
   Future<List<int>?> Function() bytes,
 ) async {
-  final FileSaveLocation? place;
-  try {
-    place = await getSaveLocation(suggestedName: suggestedName);
-  } on UnimplementedError {
-    throw Exception('This device cannot save a file this way.');
-  }
+  final place = await getSaveLocation(suggestedName: suggestedName);
   if (place == null) return null;
   final data = await bytes();
   if (data == null) return null;

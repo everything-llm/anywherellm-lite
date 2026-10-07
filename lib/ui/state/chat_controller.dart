@@ -107,8 +107,10 @@ class _Running {
 class ChatController extends ChangeNotifier {
   ChatController(this._api, this._settings, this._prefs)
     : _server = _settings.connection?.withPassword(null),
-      _password = _settings.connection?.password {
+      _password = _settings.connection?.password,
+      _auth = _settings.auth {
     _settings.addListener(_serverChanged);
+    unawaited(_prefs.useServer(_server?.baseUrl));
   }
 
   final AnythingLlmApi _api;
@@ -125,9 +127,13 @@ class ChatController extends ChangeNotifier {
   /// The server's saved password, which signs in to the web UI's own routes.
   String? _password;
 
-  /// Whether a password for the server is saved, so Retry and Edit replace the old exchange on
-  /// the server and an answer can be marked good or bad.
-  bool get signedIn => _password != null;
+  /// How the server said it signs in, or null before it has said.
+  ServerAuth? _auth;
+
+  /// Whether the web UI's own routes open: a password for the server is saved, or the server has
+  /// none. Retry and Edit then replace the old exchange on the server, and an answer can be
+  /// marked good or bad.
+  bool get signedIn => _password != null || _auth == ServerAuth.none;
 
   /// The question being edited: sending replaces it and everything after it. Only while
   /// [signedIn].
@@ -165,6 +171,13 @@ class ChatController extends ChangeNotifier {
   _Running? _running;
 
   bool loading = false;
+
+  /// Whether the last read of the workspaces failed: the server is out of reach or refused.
+  final unreachable = ValueNotifier(false);
+
+  /// Counts the drafts started, so a draft's first message does not take the person away from a
+  /// newer draft when its thread is made.
+  int _draftGo = 0;
 
   /// Why the last load or change failed.
   Notice? problem;
@@ -223,21 +236,26 @@ class ChatController extends ChangeNotifier {
     _settings.removeListener(_serverChanged);
     _running?.stream?.cancel();
     _linkTimer?.cancel();
+    unreachable.dispose();
     super.dispose();
   }
 
   void _serverChanged() {
     final now = _settings.connection;
     if (now?.withPassword(null) == _server) {
-      if (now?.password == _password) return;
+      if (now?.password == _password && _settings.auth == _auth) return;
+      final newPassword = now?.password != _password;
       _password = now?.password;
+      _auth = _settings.auth;
       if (!signedIn) editing = null;
       notifyListeners();
-      if (_server != null) unawaited(_readCommands());
+      if (newPassword && _server != null) unawaited(_readCommands());
       return;
     }
     _server = now?.withPassword(null);
     _password = now?.password;
+    _auth = _settings.auth;
+    unawaited(_prefs.useServer(_server?.baseUrl));
     editing = null;
     _running?.stream?.cancel();
     _running = null;
@@ -249,6 +267,7 @@ class ChatController extends ChangeNotifier {
     _images.clear();
     docCounts.clear();
     loading = false;
+    unreachable.value = false;
     _clearing = false;
     _presets = const [];
     commandsNote = null;
@@ -266,9 +285,11 @@ class ChatController extends ChangeNotifier {
     final server = _server;
     loading = true;
     notifyListeners();
+    var failed = true;
     await _try('Could not read the workspaces', () async {
       final read = await _api.workspaces();
       if (_server != server) return;
+      failed = false;
       workspaces = read;
       _threads
         ..clear()
@@ -278,6 +299,7 @@ class ChatController extends ChangeNotifier {
     });
     if (_server != server) return;
     loading = false;
+    unreachable.value = failed;
     if (active == null) {
       final (slug, thread) = _startChat;
       await select(slug, thread: thread);
@@ -337,7 +359,9 @@ class ChatController extends ChangeNotifier {
   /// its newest chat when that chat is gone; otherwise [_firstSlug] on its newest chat.
   (String?, String?) get _startChat {
     final last = _prefs.prefs.lastChat;
-    if (last == null || !workspaces.any((w) => w.slug == last.slug)) {
+    if (last == null ||
+        last.server != _server?.baseUrl ||
+        !workspaces.any((w) => w.slug == last.slug)) {
       return (_firstSlug, null);
     }
     final kept = threadsOf(last.slug).any((t) => t.slug == last.thread);
@@ -363,6 +387,7 @@ class ChatController extends ChangeNotifier {
     activeSlug = slug;
     editing = null;
     _draft.clear();
+    _draftGo++;
     await open(
       thread ?? (slug == null ? null : threadsOf(slug).lastOrNull?.slug),
     );
@@ -387,6 +412,9 @@ class ChatController extends ChangeNotifier {
     await _try('Could not read the chat', () async {
       final history = await _api.history(slug, threadSlug);
       if (_server != server || isAnswering(threadSlug)) return;
+      // An answer the server is still writing is saved only once it ends; until then the chat
+      // keeps what it showed, and stays unfinished so it is read again.
+      if (known != null && history.length < known.length) return;
       _turns[threadSlug] = [for (final m in history) Turn.saved(m)];
     });
   }
@@ -395,6 +423,8 @@ class ChatController extends ChangeNotifier {
   void newChat() {
     if (turns.isEmpty) return;
     _draft.clear();
+    _draftGo++;
+    editing = null;
     activeThread = null;
     _rememberChat();
     notifyListeners();
@@ -496,23 +526,28 @@ class ChatController extends ChangeNotifier {
   }
 
   /// Asks [message], with [attachments], in the chat on screen, making its thread first when it
-  /// is a draft. A message that [resetsChat] clears the chat instead.
-  Future<void> send(
+  /// is a draft. A message that [resetsChat] clears the chat instead. True when the message was
+  /// taken; false when nothing was sent, as when the old exchange of an edit could not be
+  /// deleted, so the person still has it to send.
+  Future<bool> send(
     String message, {
     List<Attachment> attachments = const [],
   }) async {
     final slug = activeSlug;
     final text = message.trim();
-    if (slug == null || text.isEmpty || busy || !ready) return;
+    if (slug == null || text.isEmpty || busy || !ready) return false;
     _clearLinkNotice();
-    if (resetsChat(text, _presets)) return _reset(slug);
+    if (resetsChat(text, _presets)) {
+      await _reset(slug);
+      return true;
+    }
     if (editing case final edited?) {
-      editing = null;
       final at = this.turns.indexOf(edited);
       if (at >= 0) {
-        if (!await _dropFrom(edited.chatId)) return;
+        if (!await _dropFrom(edited.chatId)) return false;
         _setTurns(this.turns.sublist(0, at));
       }
+      editing = null;
     }
     final user = Turn.user(
       text,
@@ -523,6 +558,7 @@ class ChatController extends ChangeNotifier {
     final first = this.turns.every((t) => t.role != Role.user);
     final running = _running = _Running(answer, slug)..thread = activeThread;
     final server = _server;
+    final draftGo = _draftGo;
     _setTurns(turns);
     notifyListeners();
 
@@ -531,11 +567,11 @@ class ChatController extends ChangeNotifier {
       try {
         final made = await _api.createThread(slug);
         // A new server has started afresh: the chat belongs to the old one.
-        if (_server != server) return;
+        if (_server != server) return true;
         threadSlug = made.slug;
         _threads[slug] = [...threadsOf(slug), made];
         _turns[made.slug] = turns;
-        if (activeSlug == slug && activeThread == null) {
+        if (activeSlug == slug && activeThread == null && _draftGo == draftGo) {
           _draft.clear();
           activeThread = made.slug;
           _rememberChat();
@@ -543,12 +579,12 @@ class ChatController extends ChangeNotifier {
         running.thread = made.slug;
       } on ApiException catch (error) {
         _finish(running, error: error.message);
-        return;
+        return true;
       }
       // Stopped while the thread was being made: the chat stays, the answer does not run.
       if (!identical(_running, running)) {
         notifyListeners();
-        return;
+        return true;
       }
     }
     final thread = threadSlug;
@@ -583,6 +619,7 @@ class ChatController extends ChangeNotifier {
           },
           cancelOnError: true,
         );
+    return true;
   }
 
   /// Whether [retry] can ask the last question again: nothing runs, the chat's last turn is an
@@ -602,6 +639,11 @@ class ChatController extends ChangeNotifier {
   /// again when the chat is next read.
   Future<void> retry() async {
     if (!canRetry) return;
+    // Retry replaces the last exchange only; a question being edited stays as it was.
+    if (editing != null) {
+      editing = null;
+      notifyListeners();
+    }
     final turns = this.turns;
     final question = turns[turns.length - 2];
     if (!await _dropFrom(question.chatId ?? turns.last.chatId)) return;
@@ -661,7 +703,12 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
     try {
       await _api.dropFrom(slug, thread, chatId);
-      return _server == server && activeSlug == slug && activeThread == thread;
+      if (_server == server && activeSlug == slug && activeThread == thread) {
+        return true;
+      }
+      // The person moved on meanwhile: the chat is read afresh when it is next opened.
+      if (_server == server) _turns.remove(thread);
+      return false;
     } on ApiException catch (error) {
       if (_server == server) {
         problem = Notice('Could not replace the old exchange', error.message);
@@ -676,6 +723,7 @@ class ChatController extends ChangeNotifier {
   /// Clears the history of the chat on screen, on the server and here. A draft has none, so it
   /// is only emptied.
   Future<void> _reset(String slug) async {
+    editing = null;
     final thread = activeThread;
     if (thread == null) {
       _draft.clear();

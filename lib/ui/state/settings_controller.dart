@@ -63,7 +63,7 @@ class SettingsController extends ChangeNotifier {
       _holder.current = await _store.load();
     });
     notifyListeners();
-    unawaited(_readAuth());
+    unawaited(readAuth());
   }
 
   /// Asks the server whether [url] and [key] open it. Saves nothing.
@@ -176,7 +176,7 @@ class SettingsController extends ChangeNotifier {
     );
     message = keyringProblem == null ? saved : null;
     notifyListeners();
-    unawaited(_readAuth());
+    unawaited(readAuth());
   }
 
   /// Uses [password] for the server in use from now on, once the server takes it, and keeps it
@@ -232,8 +232,8 @@ class SettingsController extends ChangeNotifier {
   }
 
   /// Asks the server in use how it signs in, into [auth]. Best effort: a failure leaves it null,
-  /// and Settings then asks for nothing.
-  Future<void> _readAuth() async {
+  /// and Settings then asks for nothing until it is asked again.
+  Future<void> readAuth() async {
     final server = connection;
     if (server == null) return;
     ServerAuth? found;
@@ -242,7 +242,7 @@ class SettingsController extends ChangeNotifier {
     } on ApiException {
       found = null;
     }
-    if (connection?.baseUrl != server.baseUrl) return;
+    if (connection?.baseUrl != server.baseUrl || found == auth) return;
     auth = found;
     notifyListeners();
   }

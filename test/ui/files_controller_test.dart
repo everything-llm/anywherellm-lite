@@ -190,6 +190,17 @@ void main() {
       },
     );
 
+    test('a move whose library cannot be read again claims nothing', () async {
+      final llm = planningServer();
+      await llm.createFolder('archive');
+      final rig = await started(llm);
+      llm.errors['libraryFolders'] = const ApiException('down');
+      await rig.files.move(roadmap, 'archive');
+      expect(rig.files.problems.map((p) => p.title), [
+        'Could not read the library',
+      ]);
+    });
+
     test('deleting from the library leaves every workspace and the switched-off list', () async {
       final llm = planningServer();
       final rig = await started(
@@ -207,7 +218,7 @@ void main() {
         llm.spaces.first.docs.map((d) => d.path),
         isNot(contains(roadmap)),
       );
-      expect(rig.prefs.prefs.offIn('household'), isEmpty);
+      expect(rig.prefs.offIn('household'), isEmpty);
       expect(rig.files.selected, '/library/custom-documents');
       expect(nodeAt(rig.files.tree, '/workspaces/q3/docs/$roadmap'), isNull);
     });
@@ -229,7 +240,7 @@ void main() {
       await rig.files.deleteFolder('custom-documents');
       expect(llm.calls, contains('removeFolder:custom-documents'));
       expect(llm.spaces.first.docs, isEmpty);
-      expect(rig.prefs.prefs.offIn('household'), isEmpty);
+      expect(rig.prefs.offIn('household'), isEmpty);
       expect(rig.files.selected, '/library');
       expect(nodeAt(rig.files.tree, '/library/custom-documents'), isNull);
       expect(nodeAt(rig.files.tree, '/workspaces/q3/docs/$roadmap'), isNull);
@@ -302,6 +313,37 @@ void main() {
     await rig.files.ensureLoaded();
     expect(rig.files.library, isNotEmpty);
     expect(rig.files.detail('q3'), isNotNull);
+  });
+
+  test('Files on screen reads a new server\'s files by itself', () async {
+    final rig = Rig(llm: planningServer(), connection: sampleConnection);
+    addTearDown(rig.dispose);
+    await rig.start();
+    await rig.files.ensureLoaded();
+    await rig.settings.save('https://other:3001', 'K2');
+    await pumpEventQueue();
+    expect(rig.files.library, isNotEmpty);
+    expect(rig.files.detail('q3'), isNotNull);
+  });
+
+  test('Read again keeps the reads that failed in view', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    await rig.files.select('/workspaces/q3/PROMPT.md');
+    llm.errors['workspace'] = const ApiException('down');
+    await rig.files.load();
+    expect(rig.files.problems.map((p) => p.title), [
+      'Could not read q3',
+      'Could not read household',
+    ]);
+  });
+
+  test('a change made in Sources shows in Files', () async {
+    final rig = await started(planningServer());
+    expect(rig.files.usersOf(roadmap).map((w) => w.slug), ['q3']);
+    final file = rig.sources.files.firstWhere((f) => f.path == roadmap);
+    await rig.sources.toggle(file);
+    expect(rig.files.usersOf(roadmap), isEmpty);
   });
 
   test('exporting gives the file and a refusal says why', () async {

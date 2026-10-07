@@ -107,11 +107,7 @@ class _ComposerState extends State<Composer> {
     final started = await dictation.start(
       onWords: (words) {
         if (go != _go) return;
-        final text = '$_before$words';
-        widget.draft.value = TextEditingValue(
-          text: text,
-          selection: TextSelection.collapsed(offset: text.length),
-        );
+        _setDraft('$_before$words');
       },
       onDone: () {
         if (mounted) setState(() => _listening = false);
@@ -127,11 +123,14 @@ class _ComposerState extends State<Composer> {
     }
   }
 
-  Object _chatOnScreen() => (
-    _scope.settings.connection,
-    _scope.chat.activeSlug,
-    _scope.chat.activeThread,
+  /// Puts [text] in the message, with the cursor at its end.
+  void _setDraft(String text) => widget.draft.value = TextEditingValue(
+    text: text,
+    selection: TextSelection.collapsed(offset: text.length),
   );
+
+  Object _chatOnScreen() =>
+      (_scope.chat.server, _scope.chat.activeSlug, _scope.chat.activeThread);
 
   /// Drops the attachments when another chat, workspace or server is shown, so they never go
   /// with a message they were not picked for.
@@ -157,11 +156,7 @@ class _ComposerState extends State<Composer> {
 
   /// Puts [command] in the message, ready for the rest of it.
   void _pick(SlashCommand command) {
-    final text = '${command.command} ';
-    widget.draft.value = TextEditingValue(
-      text: text,
-      selection: TextSelection.collapsed(offset: text.length),
-    );
+    _setDraft('${command.command} ');
     widget.focus.requestFocus();
   }
 
@@ -215,7 +210,13 @@ class _ComposerState extends State<Composer> {
     ];
   });
 
-  void _sent() {
+  /// Sends [text] with the attachments, emptying the composer at once. When nothing was sent,
+  /// as when an edit's old exchange could not be deleted, the text and files come back, unless
+  /// the person has typed again or another chat shows.
+  Future<void> _send(String text) async {
+    final attached = _attached;
+    final shown = _chatShown;
+    widget.draft.clear();
     _go++;
     if (_listening) _scope.dictation?.stop();
     setState(() {
@@ -223,6 +224,11 @@ class _ComposerState extends State<Composer> {
       _problem = null;
       _listening = false;
     });
+    final sent = await _scope.chat.send(text, attachments: attached);
+    if (sent || !mounted || _chatShown != shown) return;
+    if (widget.draft.text.isNotEmpty || _attached.isNotEmpty) return;
+    _setDraft(text);
+    setState(() => _attached = attached);
   }
 
   @override
@@ -256,7 +262,7 @@ class _ComposerState extends State<Composer> {
                 onSlash: _slash,
                 onAttach: _attach,
                 onRemove: _remove,
-                onSent: _sent,
+                onSend: _send,
                 onDictate: scope.dictation == null ? null : _dictate,
                 listening: _listening,
                 micProblem: _micProblem,
@@ -283,7 +289,7 @@ class _Form extends StatelessWidget {
     required this.onSlash,
     required this.onAttach,
     required this.onRemove,
-    required this.onSent,
+    required this.onSend,
     required this.onDictate,
     required this.listening,
     required this.micProblem,
@@ -303,7 +309,7 @@ class _Form extends StatelessWidget {
   final VoidCallback onSlash;
   final VoidCallback onAttach;
   final ValueChanged<Attachment> onRemove;
-  final VoidCallback onSent;
+  final ValueChanged<String> onSend;
 
   /// Starts or ends dictation, or null where the device cannot listen.
   final VoidCallback? onDictate;
@@ -335,11 +341,7 @@ class _Form extends StatelessWidget {
         draft.text.trim().isNotEmpty;
 
     void send() {
-      if (!canSend) return;
-      final text = draft.text;
-      draft.clear();
-      chat.send(text, attachments: attached);
-      onSent();
+      if (canSend) onSend(draft.text);
     }
 
     /// Enter picks the highlighted command, or sends the message once it is that command.
@@ -659,13 +661,11 @@ class _NoKey extends StatelessWidget {
                 style: style,
                 children: [
                   TextSpan(
-                    text: 'No AnythingLLM API key yet. ',
+                    text: 'Not connected yet. ',
                     style: style.copyWith(fontWeight: FontWeight.w600),
                   ),
                   const TextSpan(
-                    text:
-                        'AnywhereLLM talks to AnythingLLM and needs its developer API key. '
-                        'Add it in Settings to start asking.',
+                    text: 'Sign in to your AnythingLLM server in Settings to start asking.',
                   ),
                 ],
               ),

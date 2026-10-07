@@ -22,13 +22,16 @@ void main() {
     await JsonPrefsStore(file).save(
       const Prefs(
         switchedOff: {
-          'w': [OffDoc(path: 'f/a.json', title: 'a')],
+          'https://s w': [OffDoc(path: 'f/a.json', title: 'a')],
         },
       ),
     );
     expect(file.existsSync(), isTrue);
     expect(File('${file.path}.tmp').existsSync(), isFalse);
-    expect((await JsonPrefsStore(file).load()).offIn('w').single.title, 'a');
+    expect(
+      (await JsonPrefsStore(file).load()).offIn('https://s', 'w').single.title,
+      'a',
+    );
   });
 
   test('saves at once land in order, the last one winning', () async {

@@ -639,6 +639,22 @@ FakeAnythingLlm answering(String answer, {List<Citation> cited = const []}) {
   return llm;
 }
 
+/// [planningServer] with the budget chat's one exchange given id 5, its question sent with
+/// [attachments].
+FakeAnythingLlm withChatIds({List<String> attachments = const []}) {
+  final llm = planningServer();
+  llm.histories['budget'] = [
+    ChatMessage(
+      role: Role.user,
+      text: 'What is the budget?',
+      chatId: 5,
+      attachments: attachments,
+    ),
+    const ChatMessage(role: Role.assistant, text: 'About 40k.', chatId: 5),
+  ];
+  return llm;
+}
+
 FakeAnythingLlm planningServer() {
   final llm = FakeAnythingLlm();
   llm.spaces = [

@@ -60,7 +60,10 @@ void main() {
     );
     await _boot(tester, FakeSettingsStore(sampleConnection), prefsStore);
     // Opening any other chat would have saved it in place of this one.
-    expect(prefsStore.saved.lastChat, const LastChat('q3', 'priorities'));
+    expect(
+      prefsStore.saved.lastChat,
+      LastChat('q3', 'priorities', sampleConnection.baseUrl),
+    );
   });
 
   testWidgets('a keyring that cannot be read still opens the app on Settings', (

@@ -79,7 +79,9 @@ class FilesView extends StatelessWidget {
     final scope = AppScope.of(context);
     final files = scope.files;
     if (!scope.settings.configured) {
-      return const Blank('Add your AnythingLLM key in Settings to begin.');
+      return const Blank(
+        'Sign in to your AnythingLLM server in Settings to begin.',
+      );
     }
     if (node == null) {
       return Blank(

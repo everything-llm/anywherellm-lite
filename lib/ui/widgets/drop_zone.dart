@@ -33,18 +33,9 @@ UploadFile _upload(XFile file) {
 
 /// Drop files here, or click to browse.
 class DropZone extends StatefulWidget {
-  const DropZone({
-    super.key,
-    required this.onFiles,
-    required this.onProblem,
-    this.extensions,
-  });
+  const DropZone({super.key, required this.onFiles, required this.onProblem});
 
-  /// The extensions the picker offers, with the dot, or null for any file. A drop takes any
-  /// file; [onFiles] decides.
-  final Set<String>? extensions;
-
-  /// Sends the files.
+  /// Sends the files. A drop or a pick takes any file; this decides which the server reads.
   final Future<void> Function(List<UploadFile> files) onFiles;
 
   /// Reports a failure that is not about one file.
@@ -62,16 +53,7 @@ class _DropZoneState extends State<DropZone> {
   Future<void> _browse() async {
     final List<XFile> picked;
     try {
-      final extensions = widget.extensions;
-      picked = await openFiles(
-        acceptedTypeGroups: [
-          if (extensions != null)
-            XTypeGroup(
-              label: 'Files the server reads',
-              extensions: [for (final e in extensions) e.replaceFirst('.', '')],
-            ),
-        ],
-      );
+      picked = await openFiles();
     } catch (error) {
       widget.onProblem('Could not open the file picker', '$error');
       return;

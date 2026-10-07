@@ -7,7 +7,7 @@ import '../tokens.dart';
 import '../type.dart';
 import 'tappable.dart';
 
-/// The way to Settings at the foot of the sidebar, with whether a key is set.
+/// The way to Settings at the foot of the sidebar, with whether a server is set and answers.
 class SidebarSettingsButton extends StatelessWidget {
   const SidebarSettingsButton({super.key});
 
@@ -16,9 +16,10 @@ class SidebarSettingsButton extends StatelessWidget {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
     return ListenableBuilder(
-      listenable: scope.settings,
+      listenable: Listenable.merge([scope.settings, scope.chat.unreachable]),
       builder: (context, _) {
         final set = scope.settings.configured;
+        final ok = set && !scope.chat.unreachable.value;
         return Tappable(
           label: 'Settings',
           onTap: scope.shell.openSettings,
@@ -31,7 +32,7 @@ class SidebarSettingsButton extends StatelessWidget {
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: set ? t.okdot : t.warnfg,
+                    color: ok ? t.okdot : t.warnfg,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -49,7 +50,11 @@ class SidebarSettingsButton extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        set ? 'Connected to AnythingLLM' : 'Not connected',
+                        ok
+                            ? 'Connected to AnythingLLM'
+                            : set
+                            ? 'Connection problem'
+                            : 'Not connected',
                         style: Type.sans(12, color: t.muted),
                       ),
                     ],

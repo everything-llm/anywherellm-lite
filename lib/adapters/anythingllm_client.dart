@@ -35,6 +35,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     this.timeout = const Duration(seconds: 15),
     this.uploadTimeout = const Duration(minutes: 5),
     this.quiet = const Duration(seconds: 45),
+    this.idle = const Duration(minutes: 5),
     this.rejoinDelays = const [
       Duration(seconds: 1),
       Duration(seconds: 2),
@@ -58,6 +59,10 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   /// How long a relay's run may send nothing before its connection counts as dropped. The relay
   /// pings every 15 s.
   final Duration quiet;
+
+  /// How long a direct answer or a reset may send nothing before it is given up. AnythingLLM
+  /// sends no pings, and an agent's tool can run a while without a word.
+  final Duration idle;
 
   /// The waits before each try at rejoining a run whose connection dropped. A run fails once
   /// they are used up without an event coming in between.
@@ -864,7 +869,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   Connection _secure(Connection connection) {
     if (!allowHttp && connection.uri.scheme == 'http') {
       throw const ApiException(
-        'Use an https:// address. This device does not send the API key over plain http.',
+        'Use an https:// address. This device does not sign in over plain http.',
       );
     }
     return connection;
@@ -980,9 +985,16 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       _decode(await http.Response.fromStream(response));
     }
     try {
-      yield* chatEvents(response.stream);
+      // Not yield*, which passes errors on without letting them be caught here.
+      await for (final event in chatEvents(response.stream.timeout(idle))) {
+        yield event;
+      }
     } on http.ClientException catch (error) {
       throw ApiException('The answer was cut off: ${error.message}');
+    } on TimeoutException {
+      throw const ApiException(
+        'The server sent nothing for too long, so the answer was given up.',
+      );
     }
   }
 

@@ -15,13 +15,38 @@ class PrefsController extends ChangeNotifier {
   /// Why the last change could not be saved. The change still holds for this run.
   Notice? problem;
 
+  /// The address of the server in use, which the switched-off documents and the last chat
+  /// belong to, or null when none is.
+  String? _server;
+
   Future<void> load() async {
     prefs = await _store.load();
     notifyListeners();
+    await _adopt();
   }
 
-  Future<void> setOff(String slug, List<OffDoc> docs) =>
-      _change(prefs.withOff(slug, docs));
+  /// Makes [server] the one the switched-off documents and the last chat are about. What was
+  /// saved before servers were told apart becomes the first server's.
+  Future<void> useServer(String? server) async {
+    _server = server;
+    await _adopt();
+  }
+
+  Future<void> _adopt() async {
+    if (_server case final server? when prefs.hasUnowned) {
+      await _change(prefs.adoptedBy(server));
+    }
+  }
+
+  /// The documents switched off in workspace [slug] of the server in use.
+  List<OffDoc> offIn(String slug) =>
+      _server == null ? const [] : prefs.offIn(_server!, slug);
+
+  Future<void> setOff(String slug, List<OffDoc> docs) async {
+    if (_server case final server?) {
+      await _change(prefs.withOff(server, slug, docs));
+    }
+  }
 
   /// Arranges the workspaces as [slugs].
   Future<void> setWorkspaceOrder(List<String> slugs) =>
@@ -30,24 +55,29 @@ class PrefsController extends ChangeNotifier {
   /// Remembers chat [thread] of workspace [slug] as the one to open at start; a null [thread]
   /// is a draft.
   Future<void> setLastChat(String slug, String? thread) async {
-    if (prefs.lastChat != LastChat(slug, thread)) {
-      await _change(prefs.withLastChat(slug, thread));
+    final server = _server;
+    if (server != null && prefs.lastChat != LastChat(slug, thread, server)) {
+      await _change(prefs.withLastChat(server, slug, thread));
     }
   }
 
   /// Drops a deleted workspace from the arrangement and the last chat.
   Future<void> forgetWorkspace(String slug) async {
-    if (prefs.workspaceOrder.contains(slug) || prefs.lastChat?.slug == slug) {
-      await _change(prefs.withoutWorkspace(slug));
+    final server = _server;
+    if (server == null) return;
+    if (prefs.workspaceOrder.contains(slug) || prefs.lastChatIn(server, slug)) {
+      await _change(prefs.withoutWorkspace(server, slug));
     }
   }
 
   /// Keeps a workspace's order, switched-off files and last chat when its slug changes.
   Future<void> renameWorkspace(String from, String to) async {
+    final server = _server;
+    if (server == null) return;
     if (prefs.workspaceOrder.contains(from) ||
-        prefs.switchedOff.containsKey(from) ||
-        prefs.lastChat?.slug == from) {
-      await _change(prefs.withRenamedWorkspace(from, to));
+        prefs.switchedOff.containsKey(Prefs.offKey(server, from)) ||
+        prefs.lastChatIn(server, from)) {
+      await _change(prefs.withRenamedWorkspace(server, from, to));
     }
   }
 
@@ -57,7 +87,9 @@ class PrefsController extends ChangeNotifier {
 
   /// Forgets the documents at [paths] wherever they were switched off, as when they are deleted.
   Future<void> forgetDocs(Iterable<String> paths) async {
-    final next = prefs.withoutDocs(paths.toSet());
+    final server = _server;
+    if (server == null) return;
+    final next = prefs.withoutDocs(server, paths.toSet());
     if (next.encode() != prefs.encode()) await _change(next);
   }
 

@@ -136,7 +136,7 @@ class _Body extends StatelessWidget {
         final (title, text) = !scope.settings.configured
             ? (
                 'Welcome to AnywhereLLM',
-                'Add your AnythingLLM key in Settings to begin.',
+                'Sign in to your AnythingLLM server in Settings to begin.',
               )
             : chat.loading
             ? ('Loading…', '')

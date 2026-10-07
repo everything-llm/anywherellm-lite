@@ -291,8 +291,8 @@ String settingsText(WorkspaceSettings settings) =>
     '${_indented.convert(settings.values)}\n';
 
 /// The settings in [text] that differ from [was], ready to write. Throws [ApiException] when the
-/// text is not a JSON object, names a setting Files does not know, gives one a value of the
-/// wrong type or range, or changes one this app never writes.
+/// text is not a JSON object, names a setting Files does not know, or gives one a value of the
+/// wrong type or range.
 Map<String, Object?> parseSettings(String text, WorkspaceSettings was) {
   final Object? json;
   try {

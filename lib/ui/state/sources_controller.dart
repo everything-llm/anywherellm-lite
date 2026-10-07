@@ -32,6 +32,12 @@ class SourcesController extends ChangeNotifier {
   List<SourceFile> files = const [];
   bool loading = false;
 
+  /// The workspace as last read, from which [files] and [chatMode] come, or null before then.
+  Workspace? read;
+
+  /// Counts the reads started, so an answer that comes after a newer read's is dropped.
+  int _reads = 0;
+
   /// The workspace's chat mode on the server, which every message answers in, or null before it
   /// is read or when the server names one this app does not know.
   final chatMode = ValueNotifier<ChatMode?>(null);
@@ -80,6 +86,7 @@ class SourcesController extends ChangeNotifier {
   void _chatChanged() {
     if (_chat.activeSlug == _slug) return;
     _slug = _chat.activeSlug;
+    read = null;
     files = const [];
     chatMode.value = null;
     problems = const [];
@@ -99,19 +106,21 @@ class SourcesController extends ChangeNotifier {
     final slug = _slug;
     final server = _chat.server;
     if (slug == null) return;
+    final go = ++_reads;
+    bool current() => server == _chat.server && slug == _slug && go == _reads;
     loading = true;
     notifyListeners();
     try {
       final workspace = await _api.workspace(slug);
-      if (server != _chat.server || slug != _slug) return;
+      if (!current()) return;
       _apply(workspace);
     } on ApiException catch (error) {
-      if (server != _chat.server || slug != _slug) return;
+      if (!current()) return;
       problems = [
         Notice('Could not read this workspace\'s files', error.message),
       ];
     } finally {
-      if (server == _chat.server && slug == _slug) {
+      if (current()) {
         loading = false;
         notifyListeners();
       }
@@ -126,10 +135,8 @@ class SourcesController extends ChangeNotifier {
   }
 
   void _apply(Workspace workspace) {
-    files = mergeSources(
-      workspace.documents,
-      _prefs.prefs.offIn(workspace.slug),
-    );
+    read = workspace;
+    files = mergeSources(workspace.documents, _prefs.offIn(workspace.slug));
     chatMode.value = ChatMode.fromServer(
       workspace.settings?.values['chatMode'],
     );
@@ -374,7 +381,7 @@ class SourcesController extends ChangeNotifier {
   /// Adds [file] to the workspace's remembered switched-off files, or drops it from them.
   Future<void> _remember(String slug, SourceFile file, {required bool off}) =>
       _prefs.setOff(slug, [
-        for (final doc in _prefs.prefs.offIn(slug))
+        for (final doc in _prefs.offIn(slug))
           if (doc.path != file.path) doc,
         if (off) file.asOff,
       ]);

@@ -1,17 +1,20 @@
 import 'package:anywherellm/core/prefs.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+const _s = 'https://s:3001';
+const _t = 'https://t:3001';
+
 void main() {
   test('round-trips through its JSON', () {
     const prefs = Prefs(
       switchedOff: {
-        'q3': [
+        '$_s q3': [
           OffDoc(path: 'custom-documents/a.json', title: 'a.md', words: 9),
         ],
       },
     );
     final back = Prefs.decode(prefs.encode());
-    final doc = back.offIn('q3').single;
+    final doc = back.offIn(_s, 'q3').single;
     expect(
       (doc.path, doc.title, doc.words),
       ('custom-documents/a.json', 'a.md', 9),
@@ -29,7 +32,7 @@ void main() {
     final prefs = Prefs.decode(
       '{"groundedOnly": true, "switchedOff": {"w": [{"path": "f/x.json"}]}}',
     );
-    expect(prefs.offIn('w').single.path, 'f/x.json');
+    expect(prefs.adoptedBy(_s).offIn(_s, 'w').single.path, 'f/x.json');
     expect(prefs.encode(), isNot(contains('groundedOnly')));
   });
 
@@ -37,14 +40,14 @@ void main() {
     final prefs = Prefs.decode(
       '{"switchedOff": {"w": [{"path": ""}, 7, {"path": "f/x.json"}]}}',
     );
-    expect(prefs.offIn('w').single.title, 'f/x.json');
+    expect(prefs.adoptedBy(_s).offIn(_s, 'w').single.title, 'f/x.json');
   });
 
   test('withOff replaces one workspace and drops it when empty', () {
     const doc = OffDoc(path: 'p', title: 't');
-    final prefs = const Prefs().withOff('a', [doc]).withOff('b', [doc]);
-    expect(prefs.switchedOff.keys, ['a', 'b']);
-    expect(prefs.withOff('a', []).switchedOff.keys, ['b']);
+    final prefs = const Prefs().withOff(_s, 'a', [doc]).withOff(_s, 'b', [doc]);
+    expect(prefs.switchedOff.keys, ['$_s a', '$_s b']);
+    expect(prefs.withOff(_s, 'a', []).switchedOff.keys, ['$_s b']);
   });
 
   test(
@@ -52,10 +55,13 @@ void main() {
     () {
       const a = OffDoc(path: 'f/a.json', title: 'a');
       const b = OffDoc(path: 'f/b.json', title: 'b');
-      final prefs = const Prefs().withOff('w', [a, b]).withOff('v', [a]);
-      final next = prefs.withoutDocs({'f/a.json', 'f/c.json'});
-      expect(next.switchedOff.keys, ['w']);
-      expect(next.offIn('w').single.path, 'f/b.json');
+      final prefs = const Prefs()
+          .withOff(_s, 'w', [a, b])
+          .withOff(_s, 'v', [a])
+          .withOff(_t, 'v', [a]);
+      final next = prefs.withoutDocs(_s, {'f/a.json', 'f/c.json'});
+      expect(next.switchedOff.keys, ['$_s w', '$_t v']);
+      expect(next.offIn(_s, 'w').single.path, 'f/b.json');
     },
   );
 
@@ -71,10 +77,13 @@ void main() {
   });
 
   test('the last chat round-trips, and a draft has no chat', () {
-    final chat = const Prefs().withLastChat('a', 't');
-    expect(Prefs.decode(chat.encode()).lastChat, const LastChat('a', 't'));
-    final draft = const Prefs().withLastChat('a', null);
-    expect(Prefs.decode(draft.encode()).lastChat, const LastChat('a'));
+    final chat = const Prefs().withLastChat(_s, 'a', 't');
+    expect(Prefs.decode(chat.encode()).lastChat, const LastChat('a', 't', _s));
+    final draft = const Prefs().withLastChat(_s, 'a', null);
+    expect(
+      Prefs.decode(draft.encode()).lastChat,
+      const LastChat('a', null, _s),
+    );
     expect(Prefs.decode(const Prefs().encode()).lastChat, isNull);
   });
 
@@ -90,14 +99,16 @@ void main() {
   test(
     'the last chat follows a renamed workspace and goes with a deleted one',
     () {
-      final prefs = const Prefs().withLastChat('a', 't');
+      final prefs = const Prefs().withLastChat(_s, 'a', 't');
       expect(
-        prefs.withRenamedWorkspace('a', 'z').lastChat,
-        const LastChat('z', 't'),
+        prefs.withRenamedWorkspace(_s, 'a', 'z').lastChat,
+        const LastChat('z', 't', _s),
       );
-      expect(prefs.withRenamedWorkspace('b', 'z').lastChat, prefs.lastChat);
-      expect(prefs.withoutWorkspace('a').lastChat, isNull);
-      expect(prefs.withoutWorkspace('b').lastChat, prefs.lastChat);
+      expect(prefs.withRenamedWorkspace(_s, 'b', 'z').lastChat, prefs.lastChat);
+      expect(prefs.withRenamedWorkspace(_t, 'a', 'z').lastChat, prefs.lastChat);
+      expect(prefs.withoutWorkspace(_s, 'a').lastChat, isNull);
+      expect(prefs.withoutWorkspace(_s, 'b').lastChat, prefs.lastChat);
+      expect(prefs.withoutWorkspace(_t, 'a').lastChat, prefs.lastChat);
       expect(prefs.withTheme(ThemePref.dark).lastChat, prefs.lastChat);
     },
   );
@@ -125,21 +136,45 @@ void main() {
 
   test('a renamed workspace keeps its place', () {
     final prefs = const Prefs(workspaceOrder: ['a', 'b', 'c']);
-    expect(prefs.withRenamedWorkspace('b', 'z').workspaceOrder, [
+    expect(prefs.withRenamedWorkspace(_s, 'b', 'z').workspaceOrder, [
       'a',
       'z',
       'c',
     ]);
-    expect(prefs.withRenamedWorkspace('b', 'c').workspaceOrder, ['a', 'c']);
+    expect(prefs.withRenamedWorkspace(_s, 'b', 'c').workspaceOrder, ['a', 'c']);
   });
 
   test('switching a document off keeps the other prefs', () {
     final prefs = const Prefs()
         .withTheme(ThemePref.light)
         .withOrder(['a'])
-        .withOff('a', const [OffDoc(path: 'f/x.json', title: 'x')]);
+        .withOff(_s, 'a', const [OffDoc(path: 'f/x.json', title: 'x')]);
     expect(prefs.theme, ThemePref.light);
     expect(prefs.workspaceOrder, ['a']);
-    expect(prefs.withoutWorkspace('a').workspaceOrder, isEmpty);
+    expect(prefs.withoutWorkspace(_s, 'a').workspaceOrder, isEmpty);
+  });
+
+  test(
+    'two servers keep apart what is switched off in same-named workspaces',
+    () {
+      const a = OffDoc(path: 'f/a.json', title: 'a');
+      final prefs = const Prefs().withOff(_s, 'my-workspace', [a]);
+      expect(prefs.offIn(_s, 'my-workspace').single.path, 'f/a.json');
+      expect(prefs.offIn(_t, 'my-workspace'), isEmpty);
+    },
+  );
+
+  test('what was saved before servers were told apart goes to the first one', () {
+    final prefs = Prefs.decode(
+      '{"switchedOff": {"w": [{"path": "f/x.json"}], "$_t w": [{"path": "f/y.json"}]},'
+      ' "lastChat": {"slug": "w", "thread": "t1"}}',
+    );
+    expect(prefs.hasUnowned, isTrue);
+    final adopted = prefs.adoptedBy(_s);
+    expect(adopted.hasUnowned, isFalse);
+    expect(adopted.offIn(_s, 'w').single.path, 'f/x.json');
+    expect(adopted.offIn(_t, 'w').single.path, 'f/y.json');
+    expect(adopted.lastChat, const LastChat('w', 't1', _s));
+    expect(Prefs.decode(adopted.encode()).hasUnowned, isFalse);
   });
 }
