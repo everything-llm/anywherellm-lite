@@ -1109,6 +1109,119 @@ void main() {
       expect(refused.message, isNot(contains('PASS-WRONG')));
     });
 
+    group('a key from the password', () {
+      const base = 'https://host.example.ts.net:3001';
+
+      test('reuses the key named AnywhereLLM', () async {
+        final server = _SignInServer()
+          ..routes['/api/system/api-keys'] = {
+            'apiKeys': [
+              {'id': 1, 'name': 'Laptop', 'secret': 'OTHER'},
+              {'id': 2, 'name': 'AnywhereLLM', 'secret': 'SHARED-KEY'},
+            ],
+            'error': null,
+          };
+        final key = await server.api().issueKey(base, password: 'PASS-WORD');
+        expect(key, 'SHARED-KEY');
+        expect(server.seen.map((r) => r.url.path), [
+          '/api/request-token',
+          '/api/system/api-keys',
+        ]);
+        expect(server.seen.last.headers['Authorization'], 'Bearer TOKEN-1');
+      });
+
+      test('makes one named AnywhereLLM when there is none', () async {
+        final server = _SignInServer()
+          ..routes['/api/system/api-keys'] = {
+            'apiKeys': [
+              {'id': 1, 'name': null, 'secret': 'UNNAMED'},
+              {'id': 2, 'name': 'AnywhereLLM', 'secret': ''},
+            ],
+          }
+          ..routes['/api/system/generate-api-key'] = {
+            'apiKey': {'id': 3, 'name': 'AnywhereLLM', 'secret': 'NEW-KEY'},
+            'error': null,
+          };
+        final key = await server.api().issueKey(base, password: 'PASS-WORD');
+        expect(key, 'NEW-KEY');
+        final made = server.seen.last;
+        expect(made.method, 'POST');
+        expect(made.url.path, '/api/system/generate-api-key');
+        expect(jsonDecode(made.body), {'name': 'AnywhereLLM'});
+      });
+
+      test('a key the server does not make says so', () async {
+        final server = _SignInServer()
+          ..routes['/api/system/api-keys'] = {'apiKeys': []}
+          ..routes['/api/system/generate-api-key'] = {
+            'apiKey': null,
+            'error': 'disk full',
+          };
+        final error = await _failure(
+          server.api().issueKey(base, password: 'PASS-WORD'),
+        );
+        expect(error.message, 'disk full');
+      });
+
+      test('an open server is asked without credentials', () async {
+        final seen = <http.Request>[];
+        final api = _api((request) async {
+          seen.add(request);
+          return http.Response(
+            jsonEncode(
+              request.url.path == '/api/system/api-keys'
+                  ? {'apiKeys': []}
+                  : {
+                      'apiKey': {'name': 'AnywhereLLM', 'secret': 'OPEN-KEY'},
+                    },
+            ),
+            200,
+          );
+        }, current: null);
+        expect(await api.issueKey(base), 'OPEN-KEY');
+        for (final request in seen) {
+          expect(request.headers.containsKey('Authorization'), isFalse);
+        }
+      });
+
+      test('a server that wants a password says so', () async {
+        final server = _SignInServer();
+        final error = await _failure(server.api().issueKey(base));
+        expect(error.status, 401);
+        expect(
+          error.message,
+          'This needs the server password. Add it in Settings.',
+        );
+      });
+
+      test('a wrong password is refused without being repeated', () async {
+        final server = _SignInServer();
+        final error = await _failure(
+          server.api().issueKey(base, password: 'PASS-WRONG'),
+        );
+        expect(error.message, 'The server did not accept the password.');
+        expect(error.message, isNot(contains('PASS-WRONG')));
+        expect(server.seen.map((r) => r.url.path), ['/api/request-token']);
+      });
+
+      test('an http address fails before the password is sent', () async {
+        var sent = 0;
+        final api = HttpAnythingLlmApi(
+          holder: ConnectionHolder(),
+          allowHttp: false,
+          client: MockClient((_) async {
+            sent++;
+            return http.Response('{}', 200);
+          }),
+        );
+        final error = await _failure(
+          api.issueKey('http://h:3001', password: 'PASS-WORD'),
+        );
+        expect(error.message, contains('https://'));
+        expect(sent, 0);
+      });
+    });
+
     test('asks how the server signs in without the key', () async {
       final seen = <http.Request>[];
       Future<ServerAuth> ask(Map<String, Object?> results) =>

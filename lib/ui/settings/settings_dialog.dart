@@ -222,7 +222,11 @@ class _KeyCardState extends State<_KeyCard> {
   late final CodeScanner? _scanner = AppScope.of(context).scanner;
   final _url = TextEditingController();
   final _key = TextEditingController();
+  final _password = TextEditingController();
   bool _replacing = false;
+
+  /// Whether the form takes a pasted developer key instead of the server's password.
+  bool _pasteKey = false;
   bool _confirmForget = false;
   bool _showCode = false;
   bool _scanning = false;
@@ -248,6 +252,7 @@ class _KeyCardState extends State<_KeyCard> {
     _forgetTimer?.cancel();
     _url.dispose();
     _key.dispose();
+    _password.dispose();
     super.dispose();
   }
 
@@ -256,6 +261,16 @@ class _KeyCardState extends State<_KeyCard> {
     if (mounted && saved) {
       setState(() {
         _key.clear();
+        _replacing = false;
+      });
+    }
+  }
+
+  Future<void> _signIn() async {
+    final saved = await _settings.signIn(_url.text, _password.text);
+    if (mounted && saved) {
+      setState(() {
+        _password.clear();
         _replacing = false;
       });
     }
@@ -305,6 +320,7 @@ class _KeyCardState extends State<_KeyCard> {
         final set = connection != null;
         final editing = !set || _replacing;
         final saving = _settings.check == ConnectionCheck.testing;
+        final pasteKey = _pasteKey || _settings.needsKey;
         return _Card(
           children: [
             Row(
@@ -316,7 +332,7 @@ class _KeyCardState extends State<_KeyCard> {
                     spacing: 2,
                     children: [
                       Text(
-                        'AnythingLLM developer API key',
+                        'AnythingLLM server',
                         style: Type.sans(
                           14.5,
                           weight: FontWeight.w500,
@@ -324,7 +340,11 @@ class _KeyCardState extends State<_KeyCard> {
                         ),
                       ),
                       Text(
-                        set ? 'Saved in your system keyring. Never shown.' : 'Create one in AnythingLLM under Settings → Developer API, then paste it here.',
+                        set
+                            ? 'Saved in your system keyring. Never shown.'
+                            : pasteKey
+                            ? 'Create a key in AnythingLLM under Settings → Developer API, then paste it here.'
+                            : 'Sign in with the password AnythingLLM\'s web page asks for. The app makes its own developer key.',
                         style: Type.sans(12.5, color: t.muted, height: 1.45),
                       ),
                     ],
@@ -380,24 +400,49 @@ class _KeyCardState extends State<_KeyCard> {
                 keyboardType: TextInputType.url,
                 autofillHints: const [AutofillHints.url],
               ),
-              AppField(
-                controller: _key,
-                label: 'AnythingLLM developer API key',
-                hint: 'Paste the AnythingLLM API key',
-                obscure: true,
-                // Not a password: AppField leaves it out of autofill, so no saved login is
-                // offered for it.
-                keyboardType: TextInputType.visiblePassword,
-              ),
+              if (pasteKey)
+                AppField(
+                  controller: _key,
+                  label: 'AnythingLLM developer API key',
+                  hint: 'Paste the AnythingLLM API key',
+                  obscure: true,
+                  // Not a password: AppField leaves it out of autofill, so no saved login is
+                  // offered for it.
+                  keyboardType: TextInputType.visiblePassword,
+                )
+              else
+                AppField(
+                  controller: _password,
+                  label: 'Server password',
+                  hint: 'Leave it empty if the server has none',
+                  obscure: true,
+                  keyboardType: TextInputType.visiblePassword,
+                  onSubmitted: (_) => saving ? null : _signIn(),
+                ),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
                   AppButton(
-                    saving ? 'Checking…' : 'Save key',
+                    saving
+                        ? 'Checking…'
+                        : pasteKey
+                        ? 'Save key'
+                        : 'Sign in',
                     primary: true,
-                    onPressed: saving ? null : _save,
+                    onPressed: saving
+                        ? null
+                        : pasteKey
+                        ? _save
+                        : _signIn,
                   ),
+                  if (!_settings.needsKey)
+                    AppButton(
+                      pasteKey ? 'Use password' : 'Paste a key',
+                      onPressed: saving
+                          ? null
+                          : () => setState(() => _pasteKey = !_pasteKey),
+                    ),
                   if (_scanner != null)
                     AppButton(
                       'Scan QR code',

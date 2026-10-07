@@ -170,6 +170,33 @@ class FakeAnythingLlm implements AnythingLlmApi {
     }
   });
 
+  /// The developer keys the server holds, by name. [issueKey] adds `AnywhereLLM` when it is
+  /// missing.
+  final Map<String, String> apiKeys = {};
+
+  @override
+  Future<String> issueKey(String baseUrl, {String? password}) =>
+      _run('issueKey', () {
+        if (auth == ServerAuth.multiUser) {
+          throw const ApiException(
+            'This needs the server password. Add it in Settings.',
+            status: 401,
+          );
+        }
+        if (auth == ServerAuth.password && password != serverPassword) {
+          throw password == null
+              ? const ApiException(
+                  'This needs the server password. Add it in Settings.',
+                  status: 401,
+                )
+              : const ApiException(
+                  'The server did not accept the password.',
+                  status: 403,
+                );
+        }
+        return apiKeys.putIfAbsent('AnywhereLLM', () => 'MADE-KEY');
+      }, baseUrl);
+
   @override
   Future<List<Workspace>> workspaces() => _run(
     'workspaces',
