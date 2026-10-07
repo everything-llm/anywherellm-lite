@@ -177,6 +177,23 @@ $$\frac{a}{b}$$
     semantics.dispose();
   });
 
+  testWidgets('a model failure shows as a failure, with Retry and no Copy', (
+    tester,
+  ) async {
+    await pumpApp(
+      tester,
+      llm: answering('The agent model failed to respond: 400 bad input'),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('The model did not answer'), findsOneWidget);
+    expect(
+      find.text('The agent model failed to respond: 400 bad input'),
+      findsOneWidget,
+    );
+    expect(find.byTooltip('Copy answer'), findsNothing);
+    expect(find.byTooltip('Retry'), findsOneWidget);
+  });
+
   testWidgets('a streaming answer has no Copy until it ends', (tester) async {
     final llm = _server()..hold = true;
     final h = await pumpApp(tester, llm: llm);

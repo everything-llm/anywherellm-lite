@@ -4,7 +4,10 @@ import 'package:file_selector_platform_interface/file_selector_platform_interfac
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:flutter/widgets.dart';
+
 import '../support/fake_api.dart';
+import '../support/pixels.dart';
 import '../support/pump.dart';
 
 /// A file picker that picks [files], once [picked] completes when it is given.
@@ -25,11 +28,32 @@ class _Picker extends FileSelectorPlatform {
   }
 }
 
+/// A one-pixel `photo.png`.
+XFile photo() => XFile.fromData(pixel, path: 'photo.png', length: pixel.length);
+
 /// A one-byte `contract.pdf`.
 XFile contract() =>
     XFile.fromData(Uint8List.fromList([1]), path: 'contract.pdf', length: 1);
 
 void main() {
+  testWidgets('a picture shows small in the composer and in its question, '
+      'and a document by its name', (tester) async {
+    FileSelectorPlatform.instance = _Picker([photo(), contract()]);
+    final llm = planningServer()..hold = true;
+    await pumpApp(tester, llm: llm);
+    await tester.tap(find.byTooltip('Attach files to this message'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Image), findsOneWidget);
+    expect(find.text('contract.pdf'), findsOneWidget);
+    await tester.enterText(composerField, 'What is this?');
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.bySemanticsLabel('photo.png'), findsOneWidget);
+    expect(find.text('photo.png'), findsNothing);
+    expect(find.text('contract.pdf'), findsOneWidget);
+  });
+
   testWidgets(
     'files attached in one chat do not go with a message in another',
     (tester) async {

@@ -2,6 +2,7 @@
 // defensively, since the server's answers do not always match its own schema.
 
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'outputs.dart';
 
@@ -180,6 +181,23 @@ class Thread {
 
 enum Role { user, assistant }
 
+/// The bytes of an [attachment] the server kept as a picture: an `image/` type whose
+/// `contentString` is a base64 data URL. Null for any other.
+Uint8List? _picture(Map<String, dynamic> attachment) {
+  if (!_text(attachment, 'mime').startsWith('image/')) return null;
+  final data = _pictureData.firstMatch(_text(attachment, 'contentString'));
+  if (data == null) return null;
+  try {
+    return base64Decode(data[1]!);
+  } on FormatException {
+    return null;
+  }
+}
+
+final _pictureData = RegExp(
+  r'^data:image/[\w.+-]+;base64,([A-Za-z0-9+/=\s]+)$',
+);
+
 /// One turn of a chat, as the server keeps it.
 class ChatMessage {
   const ChatMessage({
@@ -187,6 +205,7 @@ class ChatMessage {
     required this.text,
     this.citations = const [],
     this.attachments = const [],
+    this.pictures = const {},
     this.files = const [],
     this.metrics,
     this.chatId,
@@ -205,6 +224,14 @@ class ChatMessage {
       for (final attachment in jsonObjects(json['attachments']))
         ?_known(attachment, 'name'),
     ],
+    pictures: {
+      for (final attachment in jsonObjects(json['attachments']))
+        if ((_known(attachment, 'name'), _picture(attachment)) case (
+          final name?,
+          final bytes?,
+        ))
+          name: bytes,
+    },
     files: generatedFilesOf(json['outputs']),
     metrics: metricsOf(json['metrics']),
     chatId: switch (json['chatId']) {
@@ -222,6 +249,9 @@ class ChatMessage {
 
   /// The names of the files sent with the message.
   final List<String> attachments;
+
+  /// The bytes of each picture among [attachments], by name, when the server kept them.
+  final Map<String, Uint8List> pictures;
 
   /// What the answer drew on, each once, in the server's order.
   final List<Citation> citations;

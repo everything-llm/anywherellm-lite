@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../../core/chat.dart';
@@ -23,12 +26,51 @@ import 'speaker.dart';
 ///
 /// The list is reversed so it starts at the newest turn and stays pinned there as an answer
 /// grows, and builds only the turns in view. Its parent rebuilds it when the chat changes; a
-/// streaming answer rebuilds only itself.
-class MessageList extends StatelessWidget {
+/// streaming answer rebuilds only itself. A new question brings the newest turn into view:
+/// one just sent scrolls there, and another chat opens there.
+class MessageList extends StatefulWidget {
   const MessageList({super.key, required this.onSuggest});
 
   /// Puts a suggested question in the composer.
   final ValueChanged<String> onSuggest;
+
+  @override
+  State<MessageList> createState() => _MessageListState();
+}
+
+class _MessageListState extends State<MessageList> {
+  final _scroll = ScrollController();
+
+  /// The last question in view when the list was last built.
+  Turn? _question;
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// Brings the newest turn into view after this frame when the last question changed.
+  void _follow(ChatController chat, List<Turn> turns) {
+    final question = turns.where((t) => t.role == Role.user).lastOrNull;
+    if (identical(question, _question)) return;
+    _question = question;
+    final sent = chat.answeringHere;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scroll.hasClients || _scroll.offset == 0) return;
+      if (sent) {
+        unawaited(
+          _scroll.animateTo(
+            0,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+          ),
+        );
+      } else {
+        _scroll.jumpTo(0);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,8 +79,9 @@ class MessageList extends StatelessWidget {
     final workspace = chat.active;
     final turns = chat.turns;
     if (workspace == null) return const SizedBox.shrink();
+    _follow(chat, turns);
     if (turns.isEmpty) {
-      return _Empty(workspace: workspace.name, onSuggest: onSuggest);
+      return _Empty(workspace: workspace.name, onSuggest: widget.onSuggest);
     }
     // The person's text size scales the turns, not the controls around them.
     return ListenableBuilder(
@@ -61,6 +104,7 @@ class MessageList extends StatelessWidget {
   Widget _turns(BuildContext context, List<Turn> turns) {
     final chat = AppScope.of(context).chat;
     return ListView.builder(
+      controller: _scroll,
       reverse: true,
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
       itemCount: turns.length,
@@ -88,9 +132,10 @@ class MessageList extends StatelessWidget {
                     ? _UserBubble(
                         turn.text,
                         attachments: turn.attachments,
+                        pictures: turn.pictures,
                         onEdit: () {
                           chat.edit(turn);
-                          onSuggest(turn.text);
+                          widget.onSuggest(turn.text);
                         },
                       )
                     : _Answer(turn, retry: i == 0 ? _retryOf(chat) : null),
@@ -241,6 +286,7 @@ class _UserBubble extends StatelessWidget {
   const _UserBubble(
     this.text, {
     this.attachments = const [],
+    this.pictures = const {},
     required this.onEdit,
   });
 
@@ -248,6 +294,9 @@ class _UserBubble extends StatelessWidget {
 
   /// The names of the files sent with the question.
   final List<String> attachments;
+
+  /// The bytes of each picture among [attachments], by name, drawn in place of its name.
+  final Map<String, Uint8List> pictures;
 
   /// Puts [text] back in the composer, to replace the question when the app is signed in.
   final VoidCallback onEdit;
@@ -297,26 +346,65 @@ class _UserBubble extends StatelessWidget {
           for (final name in attachments)
             Padding(
               padding: const EdgeInsets.only(top: 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppIcon('attach', size: IconSize.xs, color: t.muted),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Type.sans(13, color: t.muted),
-                    ),
-                  ),
-                ],
-              ),
+              child: switch (pictures[name]) {
+                final bytes? => _Picture(
+                  bytes,
+                  name: name,
+                  orElse: _named(context, name),
+                ),
+                null => _named(context, name),
+              },
             ),
         ],
       ),
     );
   }
+
+  /// A file sent with the question, by its name.
+  Widget _named(BuildContext context, String name) {
+    final t = Tokens.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AppIcon('attach', size: IconSize.xs, color: t.muted),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Type.sans(13, color: t.muted),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A picture sent with a question, drawn small; [orElse] when its bytes do not decode.
+class _Picture extends StatelessWidget {
+  const _Picture(this.bytes, {required this.name, required this.orElse});
+
+  final Uint8List bytes;
+  final String name;
+  final Widget orElse;
+
+  static const _height = 120.0;
+
+  @override
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: const BoxConstraints(maxHeight: _height, maxWidth: 240),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.memory(
+        bytes,
+        fit: BoxFit.contain,
+        cacheHeight: (_height * MediaQuery.devicePixelRatioOf(context)).round(),
+        semanticLabel: name,
+        errorBuilder: (_, _, _) => orElse,
+      ),
+    ),
+  );
 }
 
 class _Answer extends StatelessWidget {
@@ -334,6 +422,8 @@ class _Answer extends StatelessWidget {
   Widget _build(BuildContext context, Widget? _) {
     final split = splitReasoning(turn.text);
     final thinking = turn.streaming && split.thinking;
+    final failure = turn.streaming ? null : modelFailure(split.answer);
+    final answered = split.answer.isNotEmpty && failure == null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -341,7 +431,10 @@ class _Answer extends StatelessWidget {
           _Reasoning(split.reasoning, thinking: thinking),
           if (split.answer.isNotEmpty) const SizedBox(height: 10),
         ],
-        if (split.answer.isNotEmpty) AnswerBody(split.answer),
+        if (failure != null)
+          AlertBox(AlertKind.bad, 'The model did not answer', text: failure)
+        else if (split.answer.isNotEmpty)
+          AnswerBody(split.answer),
         if (turn.streaming && turn.status != null) _Status(turn.status!),
         if (turn.streaming && !thinking)
           const Padding(padding: EdgeInsets.only(top: 6), child: Caret()),
@@ -357,16 +450,15 @@ class _Answer extends StatelessWidget {
           const SizedBox(height: 12),
           GeneratedFiles(turn.files),
         ],
-        if (!turn.streaming && (split.answer.isNotEmpty || retry != null)) ...[
+        if (!turn.streaming && (answered || retry != null)) ...[
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              if (split.answer.isNotEmpty)
-                CopyButton(split.answer, tooltip: 'Copy answer'),
+              if (answered) CopyButton(split.answer, tooltip: 'Copy answer'),
               if (AppScope.of(context).readAloud case final aloud?
-                  when split.answer.isNotEmpty)
+                  when answered)
                 _ReadAloudButton(aloud, turn),
               if (retry case final retry?)
                 IconBtn(
@@ -376,7 +468,8 @@ class _Answer extends StatelessWidget {
                   box: 30,
                   size: IconSize.xs,
                 ),
-              if (_feedbackOf(context, turn) case final chat?) ...[
+              if (_feedbackOf(context, turn) case final chat?
+                  when answered) ...[
                 for (final good in const [true, false])
                   IconBtn(
                     good ? 'thumb-up' : 'thumb-down',

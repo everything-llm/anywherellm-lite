@@ -1,5 +1,7 @@
 // Asking a workspace: what a streamed answer is made of, and how a chat gets its name.
 
+import 'dart:typed_data';
+
 import 'outputs.dart';
 import 'server_models.dart';
 import 'upload.dart';
@@ -126,6 +128,14 @@ bool loadableImage(Uri uri, Uri? server, {required bool allowHttp}) =>
     (uri.scheme == 'https' ||
         (uri.scheme == 'http' && server.scheme == 'http' && allowHttp));
 
+/// The failure an agent's [answer] reports in place of an answer, or null when it is an answer.
+/// AnythingLLM's agent sends a model's failure as the answer's text, starting with
+/// `The agent model failed to respond`, and stores it so.
+String? modelFailure(String answer) {
+  final text = answer.trim();
+  return text.startsWith('The agent model failed to respond') ? text : null;
+}
+
 /// The name a chat takes from its first [message]: its first line, cut to 42 code points so an
 /// emoji is never split.
 String defaultTitle(String message) {
@@ -139,13 +149,15 @@ String defaultTitle(String message) {
 /// A file sent with one message, read in for that message only.
 class Attachment {
   /// An attachment of [bytes] named [name], typed by [attachmentMime].
-  Attachment.of(this.name, this.bytes) : mime = attachmentMime(name);
+  Attachment.of(this.name, List<int> bytes)
+    : bytes = bytes is Uint8List ? bytes : Uint8List.fromList(bytes),
+      mime = attachmentMime(name);
 
   final String name;
 
   /// `image/...` for a picture, or [documentMime] for any other file.
   final String mime;
-  final List<int> bytes;
+  final Uint8List bytes;
 
   bool get isImage => mime.startsWith('image/');
 }

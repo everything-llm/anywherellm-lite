@@ -540,6 +540,34 @@ void main() {
       expect(turns.last.attachments, isEmpty);
     });
 
+    test('a history keeps the pictures sent with a question', () async {
+      final turns = await _answering({
+        'history': [
+          {
+            'role': 'user',
+            'content': 'What colour?',
+            'attachments': [
+              {
+                'name': 'teal.png',
+                'mime': 'image/png',
+                'contentString':
+                    'data:image/png;base64,${base64Encode([1, 2, 3])}',
+              },
+              {
+                'name': 'notes.csv',
+                'mime': 'application/anythingllm-document',
+                'contentString': 'data:text/csv;base64,${base64Encode([4])}',
+              },
+              {'name': 'bad.png', 'mime': 'image/png', 'contentString': '%%'},
+            ],
+          },
+        ],
+      }).history('w', 't');
+      expect(turns.single.attachments, ['teal.png', 'notes.csv', 'bad.png']);
+      expect(turns.single.pictures.keys, ['teal.png']);
+      expect(turns.single.pictures['teal.png'], [1, 2, 3]);
+    });
+
     test('a history turn keeps its exchange id and feedback', () async {
       final turns = await _answering({
         'history': [

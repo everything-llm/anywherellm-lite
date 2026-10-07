@@ -583,11 +583,23 @@ class _AttachedChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AppIcon(
-            attachment.isImage ? 'attach' : 'doc',
-            size: IconSize.xs,
-            color: t.muted,
-          ),
+          if (attachment.isImage)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Image.memory(
+                attachment.bytes,
+                width: 22,
+                height: 22,
+                fit: BoxFit.cover,
+                cacheWidth: (22 * MediaQuery.devicePixelRatioOf(context))
+                    .round(),
+                excludeFromSemantics: true,
+                errorBuilder: (_, _, _) =>
+                    AppIcon('attach', size: IconSize.xs, color: t.muted),
+              ),
+            )
+          else
+            AppIcon('doc', size: IconSize.xs, color: t.muted),
           const SizedBox(width: 6),
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 200),

@@ -245,6 +245,24 @@ void main() {
     expect(llm.calls.where((c) => c.startsWith('history')), isEmpty);
   });
 
+  test('text an agent writes after a tool starts a new paragraph', () async {
+    final llm = planningServer()..hold = true;
+    final rig = await started(llm);
+    await rig.chat.send('Build it');
+    final answer = rig.chat.turns.last;
+    llm.chat!
+      ..add(const TextChunk('Keeping it private instead.'))
+      ..add(const StatusChunk('Running write-file'))
+      ..add(const TextChunk('Done -- built.'))
+      ..add(const StatusChunk('Running browse'))
+      ..add(const TextChunk(' Opened it.'));
+    await pumpEventQueue();
+    expect(
+      answer.text,
+      'Keeping it private instead.\n\nDone -- built. Opened it.',
+    );
+  });
+
   test('an agent answer shows its status, then its whole answer', () async {
     final llm = planningServer()..hold = true;
     final rig = await started(llm);

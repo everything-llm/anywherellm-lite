@@ -134,6 +134,18 @@ void main() {
     });
   });
 
+  test('an agent model failure is told from an answer', () {
+    expect(
+      modelFailure('  The agent model failed to respond: 400 bad input\n'),
+      'The agent model failed to respond: 400 bad input',
+    );
+    expect(
+      modelFailure('It said "The agent model failed to respond" once.'),
+      isNull,
+    );
+    expect(modelFailure(''), isNull);
+  });
+
   test('only web and mail links open', () {
     expect(
       [
