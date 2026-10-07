@@ -10,9 +10,9 @@ import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
-import '../widgets/min_height.dart';
 import '../widgets/upload_queue.dart';
 import '../widgets/rise.dart';
+import '../widgets/side_panel.dart';
 import '../widgets/tappable.dart';
 import 'add_source.dart';
 import 'chat_mode_chooser.dart';
@@ -26,133 +26,85 @@ class SourcesPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
-    return Semantics(
-      container: true,
-      label: 'Sources',
-      child: MinHeight(
-        min: Sizes.panelMin,
-        child: Container(
-          width: Sizes.sources,
-          decoration: BoxDecoration(
-            color: t.panel2,
-            border: Border(left: BorderSide(color: t.line)),
-          ),
-          padding: const EdgeInsets.all(16),
-          child: ListenableBuilder(
-            listenable: scope.sources,
-            builder: (context, _) {
-              final sources = scope.sources;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Semantics(
-                          header: true,
-                          child: Text(
-                            'Sources',
-                            style: Type.sans(
-                              15,
-                              weight: FontWeight.w600,
-                              color: t.ink,
-                            ),
-                          ),
-                        ),
-                      ),
-                      IconBtn(
-                        'close',
-                        tooltip: 'Close',
-                        box: 28,
-                        size: IconSize.xs,
-                        onPressed: scope.shell.closeSources,
+    return SidePanel(
+      title: 'Sources',
+      about: everyModeDrawsOn,
+      onClose: scope.shell.closeSources,
+      child: ListenableBuilder(
+        listenable: scope.sources,
+        builder: (context, _) {
+          final sources = scope.sources;
+          // Everything below the heading scrolls together, so the chat mode, an open
+          // form or a long list of files waiting to be added never pushes past the panel.
+          return CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const ChatModeChooser(),
+                    const SizedBox(height: 14),
+                    // Keyed by workspace, so what waits to be added stays with it.
+                    UploadQueue(
+                      key: ValueKey(('queue', scope.chat.activeSlug)),
+                      onSend: sources.upload,
+                      onProblem: sources.report,
+                    ),
+                    const SizedBox(height: 8),
+                    AddSource(key: ValueKey(('add', scope.chat.activeSlug))),
+                    const SizedBox(height: 4),
+                    TestQuestion(
+                      key: ValueKey(('test', scope.chat.activeSlug)),
+                    ),
+                    if (sources.sending case final name?) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        'Adding $name…',
+                        style: Type.sans(12.5, color: t.muted),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(everyModeDrawsOn, style: Type.sans(13, color: t.muted)),
-                  const SizedBox(height: 14),
-                  // Everything below the heading scrolls together, so the chat mode, an open
-                  // form or a long list of files waiting to be added never pushes past the panel.
-                  Expanded(
-                    child: CustomScrollView(
-                      slivers: [
-                        SliverToBoxAdapter(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              const ChatModeChooser(),
-                              const SizedBox(height: 14),
-                              // Keyed by workspace, so what waits to be added stays with it.
-                              UploadQueue(
-                                key: ValueKey(('queue', scope.chat.activeSlug)),
-                                onSend: sources.upload,
-                                onProblem: sources.report,
-                              ),
-                              const SizedBox(height: 8),
-                              AddSource(
-                                key: ValueKey(('add', scope.chat.activeSlug)),
-                              ),
-                              const SizedBox(height: 4),
-                              TestQuestion(
-                                key: ValueKey(('test', scope.chat.activeSlug)),
-                              ),
-                              if (sources.sending case final name?) ...[
-                                const SizedBox(height: 10),
-                                Text(
-                                  'Adding $name…',
-                                  style: Type.sans(12.5, color: t.muted),
-                                ),
-                              ],
-                              for (final problem in sources.problems) ...[
-                                const SizedBox(height: 10),
-                                AlertBox(
-                                  AlertKind.bad,
-                                  problem.title,
-                                  text: problem.text,
-                                ),
-                              ],
-                              if (sources.removed case final file?) ...[
-                                const SizedBox(height: 10),
-                                _UndoToast(file),
-                              ],
-                              const SizedBox(height: 14),
-                            ],
-                          ),
-                        ),
-                        if (sources.files.isEmpty)
-                          SliverToBoxAdapter(
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: 16),
-                              child: Text(
-                                sources.loading ? 'Loading…' : 'No files yet.',
-                                textAlign: TextAlign.center,
-                                style: Type.sans(13.5, color: t.muted),
-                              ),
-                            ),
-                          )
-                        else
-                          SliverList.separated(
-                            itemCount: sources.files.length,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(height: 6),
-                            itemBuilder: (context, i) => Rise(
-                              key: ValueKey(sources.files[i].path),
-                              child: _FileRow(
-                                sources.files[i],
-                                flashed:
-                                    sources.flashed == sources.files[i].path,
-                              ),
-                            ),
-                          ),
-                      ],
+                    for (final problem in sources.problems) ...[
+                      const SizedBox(height: 10),
+                      AlertBox(
+                        AlertKind.bad,
+                        problem.title,
+                        text: problem.text,
+                      ),
+                    ],
+                    if (sources.removed case final file?) ...[
+                      const SizedBox(height: 10),
+                      _UndoToast(file),
+                    ],
+                    const SizedBox(height: 14),
+                  ],
+                ),
+              ),
+              if (sources.files.isEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Text(
+                      sources.loading ? 'Loading…' : 'No files yet.',
+                      textAlign: TextAlign.center,
+                      style: Type.sans(13.5, color: t.muted),
                     ),
                   ),
-                ],
-              );
-            },
-          ),
-        ),
+                )
+              else
+                SliverList.separated(
+                  itemCount: sources.files.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 6),
+                  itemBuilder: (context, i) => Rise(
+                    key: ValueKey(sources.files[i].path),
+                    child: _FileRow(
+                      sources.files[i],
+                      flashed: sources.flashed == sources.files[i].path,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }

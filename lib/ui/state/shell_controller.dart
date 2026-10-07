@@ -10,8 +10,9 @@ enum Pane { chats, files }
 /// The sidebar is a drawer only below desktop width; Sources sits in the layout at wide widths
 /// and is a drawer below that.
 ///
-/// Sources keeps one open flag per layout: the panel in the layout starts open
-/// ([sourcesPinned]), the drawer starts closed. [sourcesOpen] is the flag of the layout in use.
+/// The panel to the right of the chat shows Sources or the chat's browser. It keeps one open
+/// flag per layout: the panel in the layout starts open ([sourcesPinned]), the drawer starts
+/// closed. [rightOpen] is the flag of the layout in use.
 class ShellController extends ChangeNotifier {
   ShellController({this._sourcesPinned = true});
 
@@ -26,11 +27,23 @@ class ShellController extends ChangeNotifier {
   /// Whether Sources sits in the layout, as the shell last laid it out.
   bool _inline = true;
 
+  /// Whether the panel to the right shows the browser rather than Sources.
+  bool _browser = false;
+
+  /// Whether the panel was open before the browser took it, to be put back when it closes.
+  bool _openBeforeBrowser = false;
+
   bool get sideOpen => _sideOpen;
 
-  /// Sources is never open while Files is on screen.
-  bool get sourcesOpen =>
+  /// Whether the panel to the right is open. It is never open while Files is on screen.
+  bool get rightOpen =>
       _pane == Pane.chats && (_inline ? _sourcesPinned : _sourcesDrawer);
+
+  /// Whether the panel to the right shows the browser, open or not.
+  bool get rightShowsBrowser => _browser;
+
+  bool get sourcesOpen => rightOpen && !_browser;
+  bool get browserOpen => rightOpen && _browser;
   bool get settingsOpen => _settingsOpen;
 
   /// The page Settings shows, or null for its list where the list and a page do not fit side by
@@ -46,9 +59,25 @@ class ShellController extends ChangeNotifier {
 
   void toggleSide() => _set(side: !_sideOpen);
   void closeSide() => _set(side: false);
-  void toggleSources() => _setSources(!sourcesOpen);
-  void openSources() => _setSources(true);
-  void closeSources() => _setSources(false);
+
+  /// Shows Sources, or closes the panel when Sources already shows in it.
+  void toggleSources() => _setRight(open: !sourcesOpen, browser: false);
+  void openSources() => _setRight(open: true, browser: false);
+
+  /// Closes the panel to the right, whatever it shows.
+  void closeSources() => _setRight(open: false, browser: false);
+
+  /// Shows the chat's browser in the panel to the right, opening it.
+  void showBrowser() {
+    if (browserOpen) return;
+    _openBeforeBrowser = sourcesOpen;
+    _setRight(open: true, browser: true);
+  }
+
+  /// Takes the browser out of the panel and puts back what was there: Sources, open or closed.
+  void closeBrowser() {
+    if (_browser) _setRight(open: _openBeforeBrowser, browser: false);
+  }
 
   /// Opens Settings on [page], or on its list.
   void openSettings([SettingsPage? page]) {
@@ -78,7 +107,10 @@ class ShellController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void closeDrawers() => _set(side: false, drawer: false);
+  void closeDrawers() {
+    if (!_inline) _setRight(open: false, browser: false);
+    _set(side: false);
+  }
 
   void showPane(Pane pane) {
     if (pane == _pane) return;
@@ -86,8 +118,13 @@ class ShellController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _setSources(bool open) =>
-      _inline ? _set(pinned: open) : _set(drawer: open);
+  void _setRight({required bool open, required bool browser}) {
+    if (browser != _browser) {
+      _browser = browser;
+      notifyListeners();
+    }
+    _inline ? _set(pinned: open) : _set(drawer: open);
+  }
 
   void _set({bool? side, bool? pinned, bool? drawer, bool? settings}) {
     final next = (

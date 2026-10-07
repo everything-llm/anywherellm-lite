@@ -10,6 +10,7 @@ import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_api.dart';
@@ -239,6 +240,24 @@ Finder typingField([Finder? of]) {
 
 /// The composer's field, apart from the sidebar's search and every other field on screen.
 Finder get composerField => typingField(find.byType(Composer));
+
+/// The text field that has the focus, or else the composer.
+Finder get typingInto {
+  final focused = find.byWidgetPredicate(
+    (widget) => widget is EditableText && widget.focusNode.hasFocus,
+  );
+  return focused.evaluate().isEmpty ? composerField : focused;
+}
+
+/// Types [text] where the focus is and presses Enter. Pumps a fixed time rather than settling,
+/// since the caret of a streaming answer never stops blinking.
+Future<void> typeAndEnter(WidgetTester tester, String text) async {
+  await tester.enterText(typingInto, text);
+  await tester.pump();
+  await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
+}
 
 /// The message in the composer.
 String composerText(WidgetTester tester) =>

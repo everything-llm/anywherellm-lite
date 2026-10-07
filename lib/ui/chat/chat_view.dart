@@ -10,6 +10,8 @@ import '../widgets/basics.dart';
 import '../widgets/controls.dart';
 import '../widgets/pane_header.dart';
 import '../widgets/tappable.dart';
+import '../state/chat_controller.dart';
+import 'browser_chip.dart';
 import 'composer.dart';
 import 'message_list.dart';
 
@@ -220,6 +222,7 @@ class _Header extends StatelessWidget {
                     compact: compact,
                     onTap: chat.newChat,
                   ),
+                  _BrowserButton(compact: compact),
                   const SizedBox(width: 8),
                   _HeaderButton(
                     label: 'Sources',
@@ -248,9 +251,13 @@ class _HeaderButton extends StatelessWidget {
     this.pressed,
     this.trailing,
     this.compact = false,
+    this.heard,
   });
 
   final String label;
+
+  /// What a screen reader hears in place of [label], when it says more.
+  final String? heard;
   final String icon;
   final VoidCallback onTap;
   final bool? pressed;
@@ -263,7 +270,7 @@ class _HeaderButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return Tappable(
-      label: label,
+      label: heard ?? label,
       tooltip: compact ? label : null,
       toggled: pressed,
       onTap: onTap,
@@ -292,4 +299,82 @@ class _HeaderButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Browser in the header, while the chat on screen has a card of the everythingllm browser or
+/// its answer is using the browser: it shows and hides the browser beside the chat, and pulses
+/// while the agent is using it. It reads the running answer itself, which notifies on each
+/// chunk where the controller does not.
+class _BrowserButton extends StatelessWidget {
+  const _BrowserButton({required this.compact});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) => BrowserStateBuilder(builder: _build);
+
+  Widget _build(BuildContext context, Turn? running) {
+    final scope = AppScope.of(context);
+    final shell = scope.shell;
+    final used = running?.browserSteps.isNotEmpty ?? false;
+    if (scope.chat.browserCard == null && !used) return const SizedBox.shrink();
+    final browsing = running?.browsing ?? false;
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: _HeaderButton(
+        label: 'Browser',
+        heard: browsing ? 'Browser, in use now' : 'Browser',
+        icon: 'globe',
+        compact: compact,
+        pressed: shell.browserOpen,
+        onTap: shell.browserOpen ? shell.closeBrowser : shell.showBrowser,
+        trailing: browsing ? const _Pulse() : null,
+      ),
+    );
+  }
+}
+
+/// A dot that pulses, or holds still where the system asks for reduced motion.
+class _Pulse extends StatefulWidget {
+  const _Pulse();
+
+  @override
+  State<_Pulse> createState() => _PulseState();
+}
+
+class _PulseState extends State<_Pulse> with SingleTickerProviderStateMixin {
+  late final _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+    lowerBound: 0.35,
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.value = 1;
+    } else if (!_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+    opacity: _controller,
+    child: Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        color: Tokens.of(context).accent,
+        shape: BoxShape.circle,
+      ),
+    ),
+  );
 }

@@ -18,6 +18,36 @@ final answerMarkdown = md.ExtensionSet(
 List<md.Node> parseAnswer(String text) =>
     md.Document(extensionSet: answerMarkdown, encodeHtml: false).parse(text);
 
+/// Each image in the answer [text] that sits inside a link, in order: its address, its
+/// description, and the address of the link around it.
+List<({Uri image, String alt, Uri link})> linkedImagesIn(String text) {
+  if (!text.contains('![')) return const [];
+  final found = <({Uri image, String alt, Uri link})>[];
+  void visit(md.Node node, Uri? link) {
+    if (node is! md.Element) return;
+    if (node.tag == 'img' && link != null) {
+      if (Uri.tryParse(node.attributes['src'] ?? '') case final image?) {
+        found.add((
+          image: image,
+          alt: node.attributes['alt'] ?? '',
+          link: link,
+        ));
+      }
+    }
+    final href = node.tag == 'a'
+        ? Uri.tryParse(node.attributes['href'] ?? '')
+        : null;
+    for (final child in node.children ?? const <md.Node>[]) {
+      visit(child, href ?? link);
+    }
+  }
+
+  for (final node in parseAnswer(text)) {
+    visit(node, null);
+  }
+  return found;
+}
+
 /// `package:markdown`'s bare address, cut before a `]` that closes no `[` of its own.
 class _BoundedAutolink extends md.AutolinkExtensionSyntax {
   @override

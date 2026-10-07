@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../core/browser.dart';
 import '../../core/chat.dart';
 import '../../core/commands.dart';
 import '../../core/connection.dart';
@@ -65,14 +66,43 @@ class Turn extends ChangeNotifier {
   /// What an agent is doing while the answer runs, such as a tool it runs, or null.
   String? status;
 
+  /// The everythingllm browser's steps in this answer, in order, as the stream told them. A
+  /// saved answer has none: its history keeps no status lines.
+  List<String> browserSteps = const [];
+
+  /// Whether the latest [status] is one of [browserSteps].
+  bool get browsing => streaming && _browserStatus;
+  bool _browserStatus = false;
+
+  /// Notifies when [status] changes, which the text does far more often; a view of the
+  /// browser listens here rather than to every chunk.
+  Listenable get statusChanges => _statusChanges;
+  final _statusChanges = ChangeNotifier();
+
+  /// The browser cards in [text] on the [server] given, read again only when either changes.
+  List<BrowserCard> _cardsOf(Uri? server) {
+    if (_cards case (final read, final on, final cards)
+        when identical(read, text) && on == server) {
+      return cards;
+    }
+    final cards = browserCards(text, server: server);
+    _cards = (text, server, cards);
+    return cards;
+  }
+
+  (String, Uri?, List<BrowserCard>)? _cards;
+
   void _grow(String more) {
     text += more;
     notifyListeners();
   }
 
-  void _setStatus(String line) {
+  void _setStatus(String line, {String? tool}) {
     status = line;
+    _browserStatus = isBrowserTool(tool);
+    if (_browserStatus) browserSteps = [...browserSteps, line];
     notifyListeners();
+    _statusChanges.notifyListeners();
   }
 
   void _replace(String whole) {
@@ -238,6 +268,23 @@ class ChatController extends ChangeNotifier {
       _running != null && turns.contains(_running!.answer);
 
   bool isAnswering(String thread) => _running?.thread == thread;
+
+  /// The answer running in the chat on screen, or null. It notifies on each chunk, which this
+  /// controller does not.
+  Turn? get runningHere => answeringHere ? _running!.answer : null;
+
+  /// The newest browser card in the chat on screen's finished answers, or null. A running
+  /// answer's card counts once it ends, so the text streaming in is never parsed for one.
+  BrowserCard? get browserCard {
+    for (final turn in turns.reversed) {
+      if (turn.role != Role.assistant || turn.streaming) continue;
+      if (cardsOf(turn).lastOrNull case final card?) return card;
+    }
+    return null;
+  }
+
+  /// The browser cards in [turn]'s text, on this server, read once per text.
+  List<BrowserCard> cardsOf(Turn turn) => turn._cardsOf(_server?.uri);
 
   bool answeringIn(String slug) => _running?.slug == slug;
 
@@ -608,7 +655,10 @@ class ChatController extends ChangeNotifier {
         .listen(
           (event) => switch (event) {
             TextChunk(:final text) => answer._grow(text),
-            StatusChunk(:final text) => answer._setStatus(text),
+            StatusChunk(:final text, :final tool) => answer._setStatus(
+              text,
+              tool: tool,
+            ),
             WholeAnswer(:final text) => answer._replace(text),
             ChatDone(
               :final citations,

@@ -71,6 +71,16 @@ Ruled out: carrying the card in the answer's `outputs`, which the app already re
 1. G5 in the app: watch the card large beside the chat.
 1. G8: a take-over view that works on a phone.
 
+## Done in the app
+
+| Gap | What the app does now |
+| --- | --- |
+| G3 | A browser skill's call shows as a step in words, read from the call's arguments: `Opening httpbin.org`, `Typing into a field`, `Looking for "points"`. What is typed never shows. The skills' own `introspect` lines, once the server sends them, would still say more, since they can name the element. |
+| G4 | While the agent uses the browser, a Browser chip in the running answer replaces the status line. The chat's header has Browser, with a pulsing dot while the browser is in use. An answer that used the browser without a card keeps a chip listing its steps. |
+| G5 | Tapping a browser card, the chip or Browser in the header opens a panel beside the chat: the card large and live, Take over, and the steps. The card in it is followed only while the panel shows. |
+
+The chip, the dot and the steps come from the stream, so they work on any server whose provider is verbose, and they show nothing in AnythingLLM's own UI. Whether the card belongs to this chat still depends on bug 1.
+
 ## Scratch chats left in place
 
 - Muse side chats: W1 (`42ded5b4-cc75-4bdd-b519-5563ebf739a0`), W2 (`0669ac60-e80a-402c-8e9e-9ff1d3dcf98e`), W3 and W4 (`ad7c5d6a-009b-4afb-93fa-f278e990d136`, locked), W5 (`1539e049-e8f5-4e33-bf7b-a03cd6c410d4`).

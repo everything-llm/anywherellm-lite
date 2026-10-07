@@ -36,6 +36,9 @@ enum ScreenClass {
 abstract final class Sizes {
   static const sidebar = 264.0;
   static const sources = 312.0;
+
+  /// The browser panel, in the place of Sources: wide enough to read its card.
+  static const browser = 440.0;
   static const column = 720.0;
 
   /// The least height a pane in `MinHeight` is laid out at; shorter, it scrolls whole.

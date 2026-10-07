@@ -1,7 +1,10 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app_scope.dart';
+import 'chat/browser_panel.dart';
 import 'chat/chat_view.dart';
 import 'files/files_view.dart';
 import 'layout.dart';
@@ -38,6 +41,8 @@ class AppShell extends StatelessWidget {
         shell.closeSettings();
       } else if (shell.sideOpen) {
         shell.closeSide();
+      } else if (shell.browserOpen) {
+        shell.closeBrowser();
       } else {
         return false;
       }
@@ -55,9 +60,27 @@ class AppShell extends StatelessWidget {
           builder: (context, _) {
             final sideDrawer = screen.sidebarDrawer && shell.sideOpen;
             final files = shell.pane == Pane.files;
-            final sourcesDrawer = !sourcesInline && shell.sourcesOpen;
+            final sourcesDrawer = !sourcesInline && shell.rightOpen;
+            final browser = shell.rightShowsBrowser;
+            // The panel to the right: Sources, or the chat's browser, wider and never wider
+            // than the screen.
+            final rightWidth = browser
+                ? min(Sizes.browser, box.maxWidth)
+                : Sizes.sources;
+            // Closed, the panel stays built for its closing animation; TickerMode, inside that
+            // animation, tells a live card in it to let go.
+            final right = TickerMode(
+              enabled: shell.rightOpen,
+              child: browser
+                  ? BrowserPanel(width: rightWidth)
+                  : const SourcesPanel(),
+            );
             return _BackGuard(
-              open: shell.settingsOpen || shell.sideOpen || sourcesDrawer,
+              open:
+                  shell.settingsOpen ||
+                  shell.sideOpen ||
+                  sourcesDrawer ||
+                  shell.browserOpen,
               onBack: () {
                 if (!closeTop(settingsSideBySide: settingsSideBySide)) {
                   shell.closeSources();
@@ -115,17 +138,15 @@ class AppShell extends StatelessWidget {
                                   AnimatedContainer(
                                     duration: duration,
                                     curve: Curves.easeOut,
-                                    width: shell.sourcesOpen
-                                        ? Sizes.sources
-                                        : 0,
+                                    width: shell.rightOpen ? rightWidth : 0,
                                     child: ClipRect(
                                       child: OverflowBox(
                                         alignment: Alignment.centerLeft,
-                                        minWidth: Sizes.sources,
-                                        maxWidth: Sizes.sources,
+                                        minWidth: rightWidth,
+                                        maxWidth: rightWidth,
                                         child: _Hidden(
-                                          hidden: !shell.sourcesOpen,
-                                          child: const SourcesPanel(),
+                                          hidden: !shell.rightOpen,
+                                          child: right,
                                         ),
                                       ),
                                     ),
@@ -146,9 +167,9 @@ class AppShell extends StatelessWidget {
                               _Drawer(
                                 open: sourcesDrawer,
                                 left: false,
-                                width: Sizes.sources,
+                                width: rightWidth,
                                 duration: duration,
-                                child: const SourcesPanel(),
+                                child: right,
                               ),
                             if (shell.settingsOpen) ...[
                               _Scrim(onTap: shell.closeSettings),

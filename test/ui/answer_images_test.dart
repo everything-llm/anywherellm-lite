@@ -89,8 +89,10 @@ void main() {
     expect(_shown(tester), pixel);
     expect(find.textContaining('mail.example'), findsNothing);
 
+    // A browser card opens the chat's browser beside it, not the take-over view.
     await _tapCard(tester);
-    expect(h.opened, [page]);
+    expect(h.shell.browserOpen, isTrue);
+    expect(h.opened, isEmpty);
   });
 
   testWidgets('a card that cannot be read shows its description', (

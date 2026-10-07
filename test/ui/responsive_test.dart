@@ -307,6 +307,37 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('the browser, its chip and its panel fit at $at', (
+      tester,
+    ) async {
+      final llm = awkward()..hold = true;
+      llm.histories['t']!.add(
+        ChatMessage(
+          role: Role.assistant,
+          text:
+              'Card: [![Browser: https://example.com/$longWord]'
+              '(https://h:8445/_live/browser/bw-3aeecef2b460eeb7.jpg)]'
+              '(https://h:8445/_live/browser/bw-3aeecef2b460eeb7)',
+        ),
+      );
+      final h = await pumpApp(tester, llm: llm, size: size);
+      await h.chat.send('again');
+      llm.chat!.add(
+        StatusChunk('Looking for "$longWord"', tool: 'browser-read'),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(tester.takeException(), isNull);
+      h.shell.showBrowser();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(tester.takeException(), isNull);
+      llm.chat!
+        ..add(const WholeAnswer('Found it.'))
+        ..add(const ChatDone([]));
+      await llm.chat!.close();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('a draft and the no-key banner fit at $at', (tester) async {
       final h = await pumpApp(tester, llm: awkward(), size: size);
       h.chat.newChat();

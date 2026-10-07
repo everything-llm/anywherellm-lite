@@ -64,10 +64,12 @@ class TextChunk extends ChatEvent {
   final String text;
 }
 
-/// What the agent is doing now, such as running a tool. It is not part of the answer.
+/// What the agent is doing now, such as running a tool. It is not part of the answer. [tool]
+/// names the tool it calls, when the status is a [toolCall].
 class StatusChunk extends ChatEvent {
-  const StatusChunk(this.text);
+  const StatusChunk(this.text, {this.tool});
   final String text;
+  final String? tool;
 }
 
 /// The whole answer, which takes the place of the text streamed so far. An agent streams what it
@@ -80,14 +82,22 @@ class WholeAnswer extends ChatEvent {
 /// An agent's status [thought] in plain words: `@agent: Using SearXNG…` loses its prefix, and
 /// `@agent is executing `web-browsing` tool {…}` becomes `Running web-browsing`.
 String agentStatus(String thought) {
-  final line = thought.trim();
-  final tool = _runningTool.firstMatch(line);
-  if (tool != null) return 'Running ${tool.group(1)}';
-  final text = line.replaceFirst(_agentPrefix, '');
+  if (toolCall(thought) case final call?) return 'Running ${call.name}';
+  final text = thought.trim().replaceFirst(_agentPrefix, '');
   return text.split('\n').first.trim();
 }
 
-final _runningTool = RegExp(r'^@agent is executing `([^`]+)`');
+/// A tool call an agent's status [thought] reports, as AnythingLLM words it when its provider
+/// is verbose: ``@agent is executing `browser-act` tool {...}``, the tool's [name] and its
+/// arguments, JSON as sent, in [args]; or null for any other thought.
+({String name, String args})? toolCall(String thought) {
+  final call = _toolCall.firstMatch(thought.trim());
+  return call == null ? null : (name: call[1]!, args: call[2]!);
+}
+
+final _toolCall = RegExp(
+  r'^@agent is executing `([^`]+)`(?: tool)?\s*([\s\S]*)$',
+);
 final _agentPrefix = RegExp(r'^@agent:?\s*');
 
 /// The answer is complete. [citations] are what it drew on, [files] what an agent made with

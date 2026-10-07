@@ -20,6 +20,7 @@ import '../widgets/controls.dart';
 import '../widgets/rise.dart';
 import '../widgets/tappable.dart';
 import 'answer_body.dart';
+import 'browser_chip.dart';
 import 'generated_files.dart';
 import 'speaker.dart';
 
@@ -479,12 +480,24 @@ class _Answer extends StatelessWidget {
             split.answer,
             label: AppScope.of(context).labelAnswers && !turn.streaming,
           ),
-        if (turn.streaming && turn.status != null) _Status(turn.status!),
+        if (turn.browsing)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: BrowserChip(turn),
+          )
+        else if (turn.streaming && turn.status != null)
+          _Status(turn.status!),
         if (turn.streaming && !thinking)
           const Padding(padding: EdgeInsets.only(top: 6), child: Caret()),
         if (turn.error case final error?) ...[
           const SizedBox(height: 10),
           AlertBox(AlertKind.bad, 'The answer stopped', text: error),
+        ],
+        if (!turn.streaming &&
+            turn.browserSteps.isNotEmpty &&
+            AppScope.of(context).chat.cardsOf(turn).isEmpty) ...[
+          const SizedBox(height: 10),
+          BrowserChip(turn),
         ],
         if (!turn.streaming && turn.citations.isNotEmpty) ...[
           const SizedBox(height: 12),

@@ -37,24 +37,6 @@ Finder inChat(Finder finder) =>
 
 Finder get message => find.bySemanticsLabel('Message');
 
-/// The text field that has the focus, or else the composer.
-Finder get typingInto {
-  final focused = find.byWidgetPredicate(
-    (widget) => widget is EditableText && widget.focusNode.hasFocus,
-  );
-  return focused.evaluate().isEmpty ? composerField : focused;
-}
-
-/// Types [text] where the focus is and presses Enter. Pumps a fixed time rather than settling,
-/// since the caret of a streaming answer never stops blinking.
-Future<void> typeAndEnter(WidgetTester tester, String text) async {
-  await tester.enterText(typingInto, text);
-  await tester.pump();
-  await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-  await tester.pump();
-  await tester.pump(const Duration(milliseconds: 500));
-}
-
 void main() {
   group('a wide window', () {
     testWidgets('shows the workspaces, the chat and its Sources side by side', (

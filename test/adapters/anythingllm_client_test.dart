@@ -925,6 +925,44 @@ void main() {
       );
     });
 
+    test('a browser skill call is a browser step in words', () async {
+      final events = await streaming([
+        data({
+          'id': 'a',
+          'type': 'agentThought',
+          'thought':
+              '@agent is executing `browser-act` tool {\n  "action": "fill",\n'
+              '  "ref": "e1",\n  "text": "Scratch Test"\n}',
+          'close': false,
+          'error': null,
+        }),
+        data({
+          'id': 'a',
+          'type': 'agentThought',
+          'thought':
+              '@agent is executing `web-browsing` tool {\n  "query": "news"\n}',
+          'close': false,
+          'error': null,
+        }),
+        data({
+          'uuid': 'a',
+          'type': 'finalizeResponseStream',
+          'textResponse': 'Filled.',
+          'sources': [],
+          'close': true,
+          'error': false,
+        }),
+      ]).streamChat('w', 't', 'Fill it').toList();
+      final statuses = events.whereType<StatusChunk>().toList();
+      expect(
+        [for (final s in statuses) (s.text, s.tool)],
+        [
+          ('Typing into a field', 'browser-act'),
+          ('Running web-browsing', 'web-browsing'),
+        ],
+      );
+    });
+
     test('text after a tool starts a new paragraph, unless spaced', () async {
       Map<String, Object?> piece(String text) => {
         'type': 'textResponseChunk',
