@@ -69,6 +69,35 @@ void main() {
     expect(h.opened, [_page]);
   });
 
+  testWidgets('a card whose description holds an address is still a card', (
+    tester,
+  ) async {
+    final card = Uri.parse(
+      'https://h:8445/_live/browser/bw-3aeecef2b460eeb7.jpg',
+    );
+    final page = Uri.parse('https://h:8445/_live/browser/bw-3aeecef2b460eeb7');
+    final llm = answering(
+      'Card: [![Browser: https://mail.example/un/v2/sh/WCPx]($card)]($page)',
+    )..images[card] = [pixel];
+    final h = await pumpApp(tester, llm: llm);
+    await tester.pumpAndSettle();
+    expect(_shown(tester), pixel);
+    expect(find.textContaining('mail.example'), findsNothing);
+
+    tester
+        .widget<GestureDetector>(
+          find
+              .ancestor(
+                of: find.byType(Image),
+                matching: find.byType(GestureDetector),
+              )
+              .first,
+        )
+        .onTap!();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(h.opened, [page]);
+  });
+
   testWidgets('a card that cannot be read shows its description', (
     tester,
   ) async {

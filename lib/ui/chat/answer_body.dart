@@ -49,7 +49,7 @@ class AnswerBody extends StatelessWidget {
     final markdown = MarkdownBody(
       data: text,
       selectable: true,
-      extensionSet: md.ExtensionSet.gitHubFlavored,
+      extensionSet: answerMarkdown,
       inlineSyntaxes: mathSyntaxes,
       onTapLink: (_, href, _) {
         if (href != null) openLink(context, href);
@@ -143,7 +143,7 @@ Set<Uri> linkedImages(String text) {
   }
 
   final document = md.Document(
-    extensionSet: md.ExtensionSet.gitHubFlavored,
+    extensionSet: answerMarkdown,
     encodeHtml: false,
   );
   for (final node in document.parse(text)) {
