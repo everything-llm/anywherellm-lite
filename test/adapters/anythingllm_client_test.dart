@@ -1814,6 +1814,59 @@ void main() {
       await _failure(_answering({'vectorCount': 'many'}).vectorCount());
     });
 
+    test(
+      'the chat log reads a page of chats and whether more follow',
+      () async {
+        final seen = <http.Request>[];
+        final log = await _answering({
+          'chats': [
+            {
+              'id': 7,
+              'prompt': 'When is the boiler due?',
+              'response': '{"text":"In May.","sources":[]}',
+              'createdAt': '2026-10-06T09:15:00.000Z',
+              'workspace': {'name': 'Household', 'slug': 'household'},
+              'user': {'username': 'API'},
+            },
+            {'id': 8, 'prompt': 'Hi', 'response': 'plain'},
+          ],
+          'hasPages': true,
+        }, seen: seen).workspaceChats(page: 2);
+        expect(seen.single.url.path, '/api/v1/admin/workspace-chats');
+        expect(jsonDecode(seen.single.body), {'offset': 2});
+        expect(log.more, isTrue);
+        final first = log.chats.first;
+        expect(
+          (first.workspace, first.question),
+          ('Household', 'When is the boiler due?'),
+        );
+        expect(first.at, DateTime.utc(2026, 10, 6, 9, 15));
+        expect((log.chats.last.question, log.chats.last.workspace), ('Hi', ''));
+      },
+    );
+
+    test('the relay is found by its health check, once', () async {
+      var asked = 0;
+      final api = _api((request) async {
+        if (request.url.path == '/everythingllm/health') asked++;
+        return http.Response(
+          jsonEncode({
+            'service': 'everythingllm',
+            'features': ['runs'],
+          }),
+          200,
+        );
+      });
+      expect(await api.relayFound(), isTrue);
+      expect(await api.relayFound(), isTrue);
+      expect(asked, 1);
+      expect(
+        await _api((request) async => http.Response('<!doctype html>', 200))
+            .relayFound(),
+        isFalse,
+      );
+    });
+
     test('a generated file is its bytes, by its storage name', () async {
       final seen = <http.Request>[];
       final bytes = await _api((request) async {

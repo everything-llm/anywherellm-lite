@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'chat.dart';
+import 'chat_log.dart';
 import 'commands.dart';
 import 'connection.dart';
 import 'embeds.dart';
@@ -158,6 +159,13 @@ abstract interface class AnythingLlmApi {
 
   /// Every chat on the server, in [format], as the file's bytes.
   Future<List<int>> exportChats(ChatExport format);
+
+  /// Page [page] of every chat the server recorded, newest first, [ChatLog.pageSize] a page.
+  Future<ChatLog> workspaceChats({int page = 0});
+
+  /// Whether the server in use has the everythingllm relay, which keeps an answer running after
+  /// the app lets go of it.
+  Future<bool> relayFound();
 
   /// The bytes of a file or image an agent made, by the [storageName] the server gave it.
   Future<List<int>> generatedFile(String storageName);

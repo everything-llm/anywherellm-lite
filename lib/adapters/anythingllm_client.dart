@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import '../core/chat.dart';
+import '../core/chat_log.dart';
 import '../core/commands.dart';
 import '../core/connection.dart';
 import '../core/embeds.dart';
@@ -864,6 +865,16 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     ))
       EmbedChat.fromJson(json),
   ];
+
+  /// `/v1/admin/workspace-chats` answers every workspace's chats on any server, though its
+  /// other `/v1/admin` routes refuse one with a single user.
+  @override
+  Future<ChatLog> workspaceChats({int page = 0}) async => ChatLog.fromJson(
+    await _send('POST', '/api/v1/admin/workspace-chats', {'offset': page}),
+  );
+
+  @override
+  Future<bool> relayFound() => _isRelay(_current);
 
   @override
   Future<int> vectorCount() async => switch (_field(

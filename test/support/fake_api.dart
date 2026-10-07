@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:anywherellm/core/chat.dart';
+import 'package:anywherellm/core/chat_log.dart';
 import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/embeds.dart';
@@ -534,6 +535,25 @@ class FakeAnythingLlm implements AnythingLlmApi {
   @override
   Future<List<int>> exportChats(ChatExport format) =>
       _run('exportChats', () => exported.codeUnits, format.name);
+
+  /// What [workspaceChats] pages through, newest first.
+  List<LoggedChat> chatLog = [];
+
+  @override
+  Future<ChatLog> workspaceChats({int page = 0}) => _run('workspaceChats', () {
+    const size = ChatLog.pageSize;
+    final start = page * size;
+    return ChatLog(
+      chatLog.skip(start).take(size).toList(),
+      more: chatLog.length > start + size,
+    );
+  }, '$page');
+
+  /// What [relayFound] answers.
+  bool relay = false;
+
+  @override
+  Future<bool> relayFound() => _run('relayFound', () => relay);
 
   /// Writes each change into [system]; a secret, which the server reports only as set, becomes
   /// true.
