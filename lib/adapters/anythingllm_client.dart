@@ -798,37 +798,28 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     bool emptyOk = false,
   }) async {
     final connection = _current;
-    if (connection.password == null) {
-      return _call(
-        connection,
-        timeout,
-        () async => http.Response.fromStream(
-          await _client.send(
-            _request(connection, method, path, body)
-              ..headers.remove('Authorization'),
-          ),
-        ),
-        emptyOk: emptyOk,
-        rejected: _needsPassword,
-      );
-    }
+    final signsIn = connection.password != null;
     for (var again = false; ; again = true) {
-      final token = await _token(connection);
+      final token = signsIn ? await _token(connection) : null;
       try {
         return await _call(
           connection,
           timeout,
-          () async => http.Response.fromStream(
-            await _client.send(
-              _request(connection, method, path, body)
-                ..headers['Authorization'] = 'Bearer $token',
-            ),
-          ),
+          () async {
+            final request = _request(connection, method, path, body);
+            if (token == null) {
+              request.headers.remove('Authorization');
+            } else {
+              request.headers['Authorization'] = 'Bearer $token';
+            }
+            return http.Response.fromStream(await _client.send(request));
+          },
           emptyOk: emptyOk,
-          rejected: _passwordRefused,
+          rejected: signsIn ? _passwordRefused : _needsPassword,
         );
       } on ApiException catch (error) {
-        if (again || (error.status != 401 && error.status != 403)) rethrow;
+        final refused = error.status == 401 || error.status == 403;
+        if (!signsIn || again || !refused) rethrow;
         _tokens.remove(connection);
       }
     }

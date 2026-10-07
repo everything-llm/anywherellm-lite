@@ -4,11 +4,8 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 
 ## Defects to fix
 
-Found in a review of the server-password, relay, embeds and read-aloud changes.
-
 | Defect | Fix | Where |
 | --- | --- | --- |
-| On a server with no password the app never uses the web UI's own routes, so the server's slash-command presets are never listed, and the message wrongly says the server has a password. | When the server has no password (`ServerAuth.none`), call the web-UI route with no token rather than throwing "This needs the server password"; keep the password path only for a server that has one. Also stop `whyNoPresets` claiming a password when the 401 was raised by the app itself. Same sign-in covers presets, Retry and Edit that replace the old exchange, and thumbs up or down. | `_token`/`_session` in `lib/adapters/anythingllm_client.dart`; `whyNoPresets` in `lib/core/commands.dart`; `_readCommands` in `lib/ui/state/chat_controller.dart`. |
 | Attaching a file in the composer, then saving or forgetting the server password in Settings, silently clears the attachment though the server on screen did not change. | Track the chat on screen by the connection without its password, so saving or forgetting a password is the same server. | `_chatOnScreen` in `lib/ui/chat/composer.dart` (compare `_scope.settings.connection?.withPassword(null)`). |
 
 ## In the developer API, not built yet
@@ -26,7 +23,7 @@ Found in a review of the server-password, relay, embeds and read-aloud changes.
 | Gap | What it needs |
 | --- | --- |
 | Agent tools menu, skills, flows, integrations and MCP servers | Agents run through `/v1` `stream-chat` in a workspace's Agent mode or with `@agent` (checked 2026-10-06). Turning skills, agent flows, app integrations (Gmail, Google Calendar, Outlook) and MCP servers on or off is not in `/v1`. |
-| A model picker | `/v1/openai/models` appears to list workspaces, not a provider's models. If so, the model stays a free-text field in `settings.json`. |
+| A model picker | `/v1/openai/models` appears to list workspaces, not a provider's models. The web UI lists a provider's models with `POST /api/system/custom-models` (`provider`, `apiKey`, `basePath`), which takes the web login; until it is checked, the model is a free-text field in Settings' Chat model card, `system.json` and `settings.json`. |
 | Telling a web page from an upload named `url-...` | `docType` reads the stored name alone, so an upload such as `URL-list.md`, stored as `url-list.md-<uuid>.json`, shows `WEB`. A web page's name can end in `.md` or `.html` too, so the name cannot settle it. The document's metadata `chunkSource` (`link://...`) can, but a switched-off file keeps only its path, title and word count in `prefs.json`. |
 
 ## Local, no server needed

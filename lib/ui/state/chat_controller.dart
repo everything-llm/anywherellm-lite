@@ -119,9 +119,8 @@ class ChatController extends ChangeNotifier {
   /// saving or forgetting one does not start afresh.
   Connection? _server;
 
-  /// The server in use, without its optional web UI password. Follows a saved connection even
-  /// while Settings is waiting for the keyring to finish writing it.
-  Connection? get server => _settings.connection?.withPassword(null);
+  /// The server the workspaces and chats are about, without its optional web UI password.
+  Connection? get server => _server;
 
   /// The server's saved password, which signs in to the web UI's own routes.
   String? _password;

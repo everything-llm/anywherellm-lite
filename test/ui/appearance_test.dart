@@ -23,6 +23,8 @@ void main() {
     expect(themeMode(tester), ThemeMode.system);
     h.shell.openSettings();
     await tester.pumpAndSettle();
+    await tester.ensureVisible(control('Dark'));
+    await tester.pumpAndSettle();
     await tester.tap(control('Dark'));
     await tester.pumpAndSettle();
     expect(themeMode(tester), ThemeMode.dark);
@@ -51,6 +53,8 @@ void main() {
             .scale(10);
     expect(answerScale(), 10);
     h.shell.openSettings();
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(control('Large'));
     await tester.pumpAndSettle();
     await tester.tap(control('Large'));
     await tester.pumpAndSettle();

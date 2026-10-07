@@ -306,6 +306,49 @@ const systemChoices = {
   ],
 };
 
+/// The setting that names the chat model, by each `LLMProvider` that has one, from AnythingLLM
+/// 1.16.2's `KEY_MAPPING`. Text Generation Web UI serves whatever model it has loaded, and the
+/// model router picks a model itself, so neither is here.
+const chatModelKeys = {
+  'openai': 'OpenAiModelPref',
+  'azure': 'AzureOpenAiModelPref',
+  'anthropic': 'AnthropicModelPref',
+  'gemini': 'GeminiLLMModelPref',
+  'lmstudio': 'LMStudioModelPref',
+  'localai': 'LocalAiModelPref',
+  'ollama': 'OllamaLLMModelPref',
+  'togetherai': 'TogetherAiModelPref',
+  'fireworksai': 'FireworksAiLLMModelPref',
+  'mistral': 'MistralModelPref',
+  'perplexity': 'PerplexityModelPref',
+  'openrouter': 'OpenRouterModelPref',
+  'novita': 'NovitaLLMModelPref',
+  'groq': 'GroqModelPref',
+  'koboldcpp': 'KoboldCPPModelPref',
+  'cohere': 'CohereModelPref',
+  'litellm': 'LiteLLMModelPref',
+  'generic-openai': 'GenericOpenAiModelPref',
+  'bedrock': 'AwsBedrockLLMModel',
+  'deepseek': 'DeepSeekModelPref',
+  'apipie': 'ApipieLLMModelPref',
+  'xai': 'XAIModelPref',
+  'nvidia-nim': 'NvidiaNimLLMModelPref',
+  'ppio': 'PPIOModelPref',
+  'moonshotai': 'MoonshotAiModelPref',
+  'cometapi': 'CometApiLLMModelPref',
+  'foundry': 'FoundryModelPref',
+  'zai': 'ZAiModelPref',
+  'giteeai': 'GiteeAIModelPref',
+  'llmman': 'LlmmanModelPref',
+  'privatemode': 'PrivateModeModelPref',
+  'sambanova': 'SambaNovaLLMModelPref',
+  'lemonade': 'LemonadeLLMModelPref',
+  'minimax': 'MinimaxModelPref',
+  'cerebras': 'CerebrasModelPref',
+  'omlx': 'OMLXLLMModelPref',
+  'vertex': 'VertexAiLLMModelPref',
+};
+
 /// The settings whose change makes the server delete every vector it holds, so that every
 /// workspace's documents must be embedded again.
 const resetsVectors = {

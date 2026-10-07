@@ -333,13 +333,13 @@ class FilesController extends ChangeNotifier {
     } on ApiException {
       // The server decides each file then.
     }
-    if (_settings.connection?.withPassword(null) != server) return;
+    if (_server != server) return;
     final sent = await sendEach(
       _api,
       picked,
       accepted: accepted,
       folder: folder,
-      shouldContinue: () => _settings.connection?.withPassword(null) == server,
+      shouldContinue: () => _server == server,
       onSending: (name) {
         sending = name;
         notifyListeners();
@@ -472,21 +472,20 @@ class FilesController extends ChangeNotifier {
     bool library = false,
   }) async {
     final server = _server;
-    var ok = true;
+    Notice? failed;
     try {
       await op();
-      problems = const [];
     } on ApiException catch (error) {
-      problems = [Notice(failTitle, error.message)];
-      ok = false;
+      failed = Notice(failTitle, error.message);
     }
     if (_server != server) return false;
+    problems = [?failed];
     await Future.wait([
       for (final s in {?slug, ...slugs}) _readWorkspace(s),
       if (library) _readLibrary(),
     ]);
     notifyListeners();
-    return ok;
+    return failed == null;
   }
 
   /// Reads workspace [slug] again and tells Sources and the sidebar what changed. Returns why it

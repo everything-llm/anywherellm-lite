@@ -273,6 +273,18 @@ void main() {
     expect(nodeAt(rig.files.tree, '/workspaces/travel/PROMPT.md'), isNotNull);
   });
 
+  test('a late failure on a forgotten server shows no problem', () async {
+    final llm = planningServer()
+      ..errors['createFolder'] = const ApiException('No');
+    final rig = await started(llm);
+    final gate = llm.gates['createFolder'] = Completer<void>();
+    final making = rig.files.createFolder('drafts');
+    await rig.settings.save('https://other:3001', 'K2');
+    gate.complete();
+    await making;
+    expect(rig.files.problems, isEmpty);
+  });
+
   test('a late Files load neither restores old data nor stays busy', () async {
     final llm = planningServer();
     final rig = await started(llm);

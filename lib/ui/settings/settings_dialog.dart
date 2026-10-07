@@ -15,6 +15,7 @@ import '../widgets/controls.dart';
 import '../widgets/fields.dart';
 import '../widgets/segmented.dart';
 import '../widgets/qr_mark.dart';
+import 'model_card.dart';
 
 /// The AnythingLLM address and key, and how answers are made. Drawn over the app by the shell.
 class SettingsDialog extends StatelessWidget {
@@ -73,6 +74,7 @@ class SettingsDialog extends StatelessWidget {
                 const _Section('AnythingLLM API'),
                 const _KeyCard(),
                 const _PasswordCard(),
+                const _ModelSection(),
                 const _Section('Appearance'),
                 const _AppearanceCard(),
                 const SizedBox(height: 22),
@@ -122,6 +124,31 @@ class _Card extends StatelessWidget {
         spacing: 10,
         children: children,
       ),
+    );
+  }
+}
+
+/// The server's chat provider and model, once a server is saved.
+class _ModelSection extends StatelessWidget {
+  const _ModelSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = AppScope.of(context).settings;
+    return ListenableBuilder(
+      listenable: settings,
+      builder: (context, _) {
+        // A password saved or forgotten is the same server, so the card keeps its draft.
+        final server = settings.connection?.withPassword(null);
+        if (server == null) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _Section('Chat model'),
+            _Card(children: [ModelCard(key: ValueKey(server))]),
+          ],
+        );
+      },
     );
   }
 }

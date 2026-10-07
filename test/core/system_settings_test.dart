@@ -23,6 +23,18 @@ const _server = <String, Object?>{
 };
 
 void main() {
+  test('each chat provider with a model names a setting the server takes', () {
+    expect(
+      systemChoices['LLMProvider']!.where((p) => !chatModelKeys.containsKey(p)),
+      ['textgenwebui', 'anythingllm-router'],
+    );
+    expect(
+      chatModelKeys.keys,
+      everyElement(isIn(systemChoices['LLMProvider']!)),
+    );
+    expect(chatModelKeys.values, everyElement(isIn(systemKeys)));
+  });
+
   group('the form', () {
     test('shows writable settings with a value, providers always, set secrets only', () {
       final fields = systemFields(_server);

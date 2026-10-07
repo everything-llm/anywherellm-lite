@@ -60,6 +60,22 @@ void main() {
     },
   );
 
+  test('a new server is in use before the keyring has it', () async {
+    final store = _SlowSettingsStore();
+    final rig = Rig(
+      llm: planningServer(),
+      store: store,
+      connection: sampleConnection,
+    );
+    addTearDown(rig.dispose);
+    await rig.start();
+    final saving = rig.settings.save('https://other:3001', 'K2');
+    expect(rig.chat.server?.baseUrl, 'https://other:3001');
+    expect(rig.chat.workspaces, isEmpty);
+    store.gate.complete();
+    await saving;
+  });
+
   test('lists the workspace\'s files, on', () async {
     final rig = await started(planningServer());
     expect(rig.sources.files.map((f) => (f.title, f.on)), [

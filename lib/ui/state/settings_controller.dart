@@ -9,7 +9,8 @@ import 'notice.dart';
 enum ConnectionCheck { idle, testing, ok, failed }
 
 /// The AnythingLLM address and key: the one in use, testing a candidate, saving and removing;
-/// and the server's password, for the web UI's own routes, when the server has one.
+/// and the server's password, for the web UI's own routes, when the server has one. Listeners
+/// hear of a new connection as soon as the client uses it, before the keyring has written it.
 class SettingsController extends ChangeNotifier {
   /// Keeps the connection in use in [holder], where the client reads it.
   SettingsController(
@@ -100,6 +101,7 @@ class SettingsController extends ChangeNotifier {
     passwordMessage = null;
     _holder.current = candidate;
     check = ConnectionCheck.idle;
+    notifyListeners();
     await _keyring(
       'Could not save the connection',
       () => _store.save(candidate),
@@ -137,6 +139,7 @@ class SettingsController extends ChangeNotifier {
       return false;
     }
     _holder.current = candidate;
+    notifyListeners();
     await _keyring('Could not save the password', () => _store.save(candidate));
     passwordMessage = keyringProblem == null ? 'The password was saved.' : null;
     notifyListeners();
@@ -149,6 +152,7 @@ class SettingsController extends ChangeNotifier {
     if (current == null || current.password == null) return;
     final candidate = current.withPassword(null);
     _holder.current = candidate;
+    notifyListeners();
     await _keyring(
       'Could not remove the saved password',
       () => _store.save(candidate),
@@ -181,6 +185,7 @@ class SettingsController extends ChangeNotifier {
     auth = null;
     passwordMessage = null;
     check = ConnectionCheck.idle;
+    notifyListeners();
     await _keyring(
       'Could not remove the saved connection',
       () => _store.clear(),

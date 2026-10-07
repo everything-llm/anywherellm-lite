@@ -285,6 +285,7 @@ class SourcesController extends ChangeNotifier {
   /// workspace's own settings choose them.
   Future<void> search(String query) async {
     final slug = _slug;
+    final server = _chat.server;
     final question = query.trim();
     if (slug == null || question.isEmpty) return;
     searched = question;
@@ -292,11 +293,15 @@ class SourcesController extends ChangeNotifier {
     notifyListeners();
     try {
       final found = await _api.searchDocs(slug, question);
-      if (slug != _slug || searched != question) return;
+      if (server != _chat.server || slug != _slug || searched != question) {
+        return;
+      }
       hits = found;
       problems = const [];
     } on ApiException catch (error) {
-      if (slug != _slug || searched != question) return;
+      if (server != _chat.server || slug != _slug || searched != question) {
+        return;
+      }
       hits = null;
       problems = [Notice('Could not test the question', error.message)];
     }
@@ -316,15 +321,16 @@ class SourcesController extends ChangeNotifier {
   /// the workspace again.
   Future<void> setChatMode(ChatMode mode) async {
     final slug = _slug;
+    final server = _chat.server;
     if (slug == null || mode == chatMode.value) return;
     final was = chatMode.value;
     chatMode.value = mode;
     try {
       await _api.updateWorkspace(slug, {'chatMode': mode.name});
-      if (slug != _slug) return;
+      if (server != _chat.server || slug != _slug) return;
       problems = const [];
     } on ApiException catch (error) {
-      if (slug != _slug) return;
+      if (server != _chat.server || slug != _slug) return;
       chatMode.value = was;
       problems = [Notice('Could not change the chat mode', error.message)];
       notifyListeners();
@@ -378,12 +384,15 @@ class SourcesController extends ChangeNotifier {
     Future<void> Function(String) op,
   ) async {
     final slug = _slug;
+    final server = _chat.server;
     if (slug == null) return;
     try {
       await op(slug);
-      if (slug == _slug) problems = const [];
+      if (server == _chat.server && slug == _slug) problems = const [];
     } on ApiException catch (error) {
-      if (slug == _slug) problems = [Notice(failTitle, error.message)];
+      if (server == _chat.server && slug == _slug) {
+        problems = [Notice(failTitle, error.message)];
+      }
     }
     await refresh();
   }
