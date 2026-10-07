@@ -76,6 +76,26 @@ void main() {
     expect(back.textSize, TextSize.large);
   });
 
+  test('the chat switches round-trip, and one not set is its default', () {
+    final prefs = const Prefs()
+        .withSwitch(ChatSwitch.spellcheck, false)
+        .withSwitch(ChatSwitch.readAnswers, true);
+    final back = Prefs.decode(prefs.encode());
+    expect(back.isOn(ChatSwitch.spellcheck), isFalse);
+    expect(back.isOn(ChatSwitch.readAnswers), isTrue);
+    expect(back.isOn(ChatSwitch.followAnswer), isTrue);
+    expect(back.isOn(ChatSwitch.reasoningOpen), isFalse);
+  });
+
+  test('a chat switch it cannot read is its default', () {
+    final prefs = Prefs.decode(
+      '{"chat": {"spellcheck": "no", "nope": true, "followAnswer": false}}',
+    );
+    expect(prefs.isOn(ChatSwitch.spellcheck), isTrue);
+    expect(prefs.isOn(ChatSwitch.followAnswer), isFalse);
+    expect(Prefs.decode('{"chat": 3}').switches, isEmpty);
+  });
+
   test('the last chat round-trips, and a draft has no chat', () {
     final chat = const Prefs().withLastChat(_s, 'a', 't');
     expect(Prefs.decode(chat.encode()).lastChat, const LastChat('a', 't', _s));

@@ -85,6 +85,9 @@ class PrefsController extends ChangeNotifier {
 
   Future<void> setTextSize(TextSize size) => _change(prefs.withTextSize(size));
 
+  Future<void> setSwitch(ChatSwitch which, bool on) =>
+      _change(prefs.withSwitch(which, on));
+
   /// Forgets the documents at [paths] wherever they were switched off, as when they are deleted.
   Future<void> forgetDocs(Iterable<String> paths) async {
     final server = _server;

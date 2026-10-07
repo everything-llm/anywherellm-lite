@@ -88,6 +88,28 @@ enum TextSize {
   final double scale;
 }
 
+/// A chat behaviour the person switches on or off, with whether it is on before they choose.
+enum ChatSwitch {
+  /// Sends a dictated message when listening ends, rather than leaving it in the message box.
+  sendDictation(false),
+
+  /// Reads each finished answer aloud as soon as it arrives.
+  readAnswers(false),
+
+  /// Marks misspelled words in the message box.
+  spellcheck(true),
+
+  /// Keeps the newest text of a streaming answer in view.
+  followAnswer(true),
+
+  /// Shows a model's reasoning unfolded.
+  reasoningOpen(false);
+
+  const ChatSwitch(this.byDefault);
+
+  final bool byDefault;
+}
+
 class Prefs {
   const Prefs({
     this.switchedOff = const {},
@@ -95,6 +117,7 @@ class Prefs {
     this.theme = ThemePref.system,
     this.textSize = TextSize.normal,
     this.lastChat,
+    this.switches = const {},
   });
 
   /// The documents switched off in each workspace, by [offKey]: its server's address and its
@@ -111,6 +134,11 @@ class Prefs {
 
   /// The workspace and chat last on screen, or null before any was opened.
   final LastChat? lastChat;
+
+  /// The chat switches the person set; one not here is [ChatSwitch.byDefault].
+  final Map<ChatSwitch, bool> switches;
+
+  bool isOn(ChatSwitch which) => switches[which] ?? which.byDefault;
 
   /// The key of workspace [slug] on [server] in [switchedOff]. Neither an address nor a slug
   /// holds a space.
@@ -168,12 +196,14 @@ class Prefs {
     ThemePref? theme,
     TextSize? textSize,
     LastChat? Function()? lastChat,
+    Map<ChatSwitch, bool>? switches,
   }) => Prefs(
     switchedOff: switchedOff ?? this.switchedOff,
     workspaceOrder: workspaceOrder ?? this.workspaceOrder,
     theme: theme ?? this.theme,
     textSize: textSize ?? this.textSize,
     lastChat: lastChat == null ? this.lastChat : lastChat(),
+    switches: switches ?? this.switches,
   );
 
   /// These prefs with the switched-off documents of [slug] on [server] set to [docs].
@@ -250,6 +280,9 @@ class Prefs {
 
   Prefs withTextSize(TextSize size) => _copy(textSize: size);
 
+  Prefs withSwitch(ChatSwitch which, bool on) =>
+      _copy(switches: {...switches, which: on});
+
   String encode() => jsonEncode({
     'switchedOff': {
       for (final entry in switchedOff.entries)
@@ -259,6 +292,9 @@ class Prefs {
     'theme': theme.name,
     'textSize': textSize.name,
     if (lastChat != null) 'lastChat': lastChat!.toJson(),
+    'chat': {
+      for (final MapEntry(:key, :value) in switches.entries) key.name: value,
+    },
   });
 
   /// Reads what [encode] wrote. Anything it cannot read falls back to the default, and keys it
@@ -273,6 +309,8 @@ class Prefs {
     if (json is! Map) return const Prefs();
     final off = json['switchedOff'];
     final order = json['workspaceOrder'];
+    final chat = json['chat'];
+    final switchNamed = ChatSwitch.values.asNameMap();
     return Prefs(
       switchedOff: {
         if (off is Map)
@@ -291,6 +329,12 @@ class Prefs {
       textSize:
           TextSize.values.asNameMap()[json['textSize']] ?? TextSize.normal,
       lastChat: LastChat.fromJson(json['lastChat']),
+      switches: {
+        if (chat is Map)
+          for (final MapEntry(:key, :value) in chat.entries)
+            if (switchNamed[key] case final which? when value is bool)
+              which: value,
+      },
     );
   }
 }
