@@ -95,11 +95,15 @@ class Harness extends Rig {
     this.canScan = false,
     bool canDictate = false,
     bool canSpeak = false,
+    this.labelAnswers = false,
   }) : dictation = canDictate ? FakeDictation() : null,
        speaker = canSpeak ? FakeSpeaker() : null,
        shell = ShellController(sourcesPinned: sourcesOpen);
 
   final ShellController shell;
+
+  /// Whether a finished answer carries its words as a semantics label, as in a browser.
+  final bool labelAnswers;
 
   /// What the microphone does, or null when the device cannot listen.
   final FakeDictation? dictation;
@@ -168,6 +172,7 @@ class Harness extends Rig {
       },
       dictation: dictation,
       readAloud: readAloud,
+      labelAnswers: labelAnswers,
       scanner: canScan
           ? (onCode) => TextButton(
               onPressed: () => onCode(scanCode),
@@ -181,7 +186,8 @@ class Harness extends Rig {
 
 /// Sizes the test window, builds the app on [llm] and lets the first loads finish. With no
 /// [connection], no server is set up. With [canScan], Settings offers a fake QR scanner, with
-/// [canDictate] the composer a microphone, and with [canSpeak] each answer Read aloud.
+/// [canDictate] the composer a microphone, with [canSpeak] each answer Read aloud, and with
+/// [labelAnswers] each finished answer a semantics label, as in a browser.
 Future<Harness> pumpApp(
   WidgetTester tester, {
   FakeAnythingLlm? llm,
@@ -192,6 +198,7 @@ Future<Harness> pumpApp(
   bool canScan = false,
   bool canDictate = false,
   bool canSpeak = false,
+  bool labelAnswers = false,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -204,6 +211,7 @@ Future<Harness> pumpApp(
     canScan: canScan,
     canDictate: canDictate,
     canSpeak: canSpeak,
+    labelAnswers: labelAnswers,
   );
   addTearDown(harness.dispose);
   await harness.prefs.load();

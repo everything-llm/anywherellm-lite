@@ -56,7 +56,7 @@ FakeAnythingLlm awkward() {
     ChatMessage(
       role: Role.user,
       text: 'And these?',
-      attachments: ['photo-$longWord.png'],
+      attachments: [SentFile('photo-$longWord.png')],
     ),
     ChatMessage(
       role: Role.assistant,

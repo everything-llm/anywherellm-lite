@@ -54,6 +54,16 @@ final Highlight _highlight = Highlight()
     'diff': langDiff,
   });
 
+/// The GitHub themes without their `root` style, so the code block keeps its own colours.
+final _light = {...githubTheme}..remove('root');
+final _dark = {...githubDarkTheme}..remove('root');
+
+/// The spans [highlighted] made lately, so a block already coloured is not coloured again each
+/// time a streaming answer rebuilds. The one used longest ago goes first past [_keep], so the
+/// partial blocks of a streaming answer go before a finished block still on screen.
+final _made = <(String, String, bool, TextStyle), TextSpan?>{};
+const _keep = 64;
+
 /// [code] coloured as [language], the name a Markdown fence gives, drawn over [base]; null when
 /// no language is named or it is not one of the registered ones, so the code stays plain.
 TextSpan? highlighted(
@@ -63,12 +73,21 @@ TextSpan? highlighted(
   required bool dark,
 }) {
   if (language == null || _highlight.getLanguage(language) == null) return null;
-  final theme = {...(dark ? githubDarkTheme : githubTheme)}..remove('root');
+  final key = (code, language.toLowerCase(), dark, base);
+  if (_made.containsKey(key)) return _made[key] = _made.remove(key);
+  if (_made.length >= _keep) _made.remove(_made.keys.first);
+  return _made[key] = _colour(code, key.$2, base, dark ? _dark : _light);
+}
+
+TextSpan? _colour(
+  String code,
+  String language,
+  TextStyle base,
+  Map<String, TextStyle> theme,
+) {
   try {
     final renderer = TextSpanRenderer(base, theme);
-    _highlight
-        .highlight(code: code, language: language.toLowerCase())
-        .render(renderer);
+    _highlight.highlight(code: code, language: language).render(renderer);
     return renderer.span;
   } on Object {
     return null;

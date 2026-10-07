@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -536,7 +537,7 @@ void main() {
         'roadmap.pdf',
         'notes.md',
       ]);
-      expect(turns.first.attachments, ['photo.png']);
+      expect(turns.first.attachments.map((a) => a.name), ['photo.png']);
       expect(turns.last.attachments, isEmpty);
     });
 
@@ -563,9 +564,13 @@ void main() {
           },
         ],
       }).history('w', 't');
-      expect(turns.single.attachments, ['teal.png', 'notes.csv', 'bad.png']);
-      expect(turns.single.pictures.keys, ['teal.png']);
-      expect(turns.single.pictures['teal.png'], [1, 2, 3]);
+      final sent = turns.single.attachments;
+      expect(sent.map((a) => a.name), ['teal.png', 'notes.csv', 'bad.png']);
+      expect(sent.map((a) => a.picture), [
+        [1, 2, 3],
+        isNull,
+        isNull,
+      ]);
     });
 
     test('a history turn keeps its exchange id and feedback', () async {
@@ -913,10 +918,36 @@ void main() {
           'text .</think>',
           'status Running web-browsing',
           'status Using SearXNG to search for "news"',
-          'text Head',
+          'text \n\nHead',
           'whole <think>Pick.</think>Headline: [x](https://x.test)',
           'done [A story https://x.test/story, Another null]',
         ],
+      );
+    });
+
+    test('text after a tool starts a new paragraph, unless spaced', () async {
+      Map<String, Object?> piece(String text) => {
+        'type': 'textResponseChunk',
+        'textResponse': text,
+      };
+      Map<String, Object?> thought(String text) => {
+        'type': 'agentThought',
+        'thought': text,
+      };
+      final events = await streaming([
+        data(piece('Kept it private.')),
+        data(thought('@agent: Running write-file')),
+        data(piece('Done.')),
+        data(thought('@agent: Running browse')),
+        data(piece(' Opened it.')),
+        data({'type': 'finalizeResponseStream', 'close': true}),
+      ]).streamChat('w', 't', 'Hi').toList();
+      expect(
+        [
+          for (final e in events)
+            if (e case TextChunk(:final text)) text,
+        ],
+        ['Kept it private.', '\n\nDone.', ' Opened it.'],
       );
     });
 
@@ -1497,7 +1528,7 @@ void main() {
             't',
             'What is this?',
             attachments: [
-              Attachment.of('photo.PNG', const [1, 2, 3]),
+              Attachment.of('photo.PNG', Uint8List.fromList([1, 2, 3])),
               Attachment.of('report.pdf', utf8.encode('%PDF')),
             ],
           )
@@ -1523,7 +1554,9 @@ void main() {
 
     test('a document of unknown type is sent as octet-stream', () {
       expect(
-        attachmentJson(Attachment.of('notes.xyz', const [0]))['contentString'],
+        attachmentJson(
+          Attachment.of('notes.xyz', Uint8List(1)),
+        )['contentString'],
         startsWith('data:application/octet-stream;base64,'),
       );
     });
@@ -2027,7 +2060,7 @@ void main() {
             't',
             'Look',
             attachments: [
-              Attachment.of('photo.png', const [1, 2, 3]),
+              Attachment.of('photo.png', Uint8List.fromList([1, 2, 3])),
             ],
           )
           .toList();

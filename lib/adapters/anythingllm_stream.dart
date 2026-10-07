@@ -16,7 +16,9 @@ Stream<ChatEvent> chatEvents(Stream<List<int>> bytes) =>
 /// A chat or query answer streams `textResponse` pieces, and the closing chunk (`close: true`)
 /// has the `sources`. An agent answer also streams `agentThought` chunks, which become
 /// [StatusChunk]s; its pieces include what it wrote before and between tools, so the whole
-/// answer then comes as one `textResponse` chunk, a [WholeAnswer]. A `finalizeResponseStream`
+/// answer then comes as one `textResponse` chunk, a [WholeAnswer]. The pieces on either side of
+/// a tool come without space between them, so a piece after a status line starts a new
+/// paragraph, unless either side already has space there. A `finalizeResponseStream`
 /// chunk after the close has an agent's `sources`, and the `outputs` it made, as files.
 /// Whichever chunk carries the answer's `metrics` hands them on.
 ///
@@ -28,6 +30,9 @@ Stream<ChatEvent> chatEventsOf(Stream<Map<String, dynamic>> chunks) async* {
   AnswerMetrics? metrics;
   int? chatId;
   var whole = false;
+  // The last character of text yielded, and whether a status line came after it.
+  String? last;
+  var afterStatus = false;
   await for (final chunk in chunks) {
     final error = chunk['error'];
     if (error is String && error.trim().isNotEmpty) {
@@ -46,11 +51,13 @@ Stream<ChatEvent> chatEventsOf(Stream<Map<String, dynamic>> chunks) async* {
       case 'agentThought':
         if (chunk['thought'] case final String thought
             when thought.trim().isNotEmpty) {
+          afterStatus = true;
           yield StatusChunk(agentStatus(thought));
         }
       case 'textResponse':
         if (text is String && text.isNotEmpty) {
           whole = true;
+          last = text[text.length - 1];
           yield WholeAnswer(text);
         }
       case 'finalizeResponseStream':
@@ -67,11 +74,19 @@ Stream<ChatEvent> chatEventsOf(Stream<Map<String, dynamic>> chunks) async* {
       case 'usageMetrics':
         break;
       default:
-        if (text is String && text.isNotEmpty) yield TextChunk(text);
+        if (text is String && text.isNotEmpty) {
+          final apart =
+              afterStatus && last != null && !_spaced.hasMatch(last + text[0]);
+          afterStatus = false;
+          last = text[text.length - 1];
+          yield TextChunk(apart ? '\n\n$text' : text);
+        }
     }
   }
   yield ChatDone(citations, files: files, metrics: metrics, chatId: chatId);
 }
+
+final _spaced = RegExp(r'\s');
 
 /// The JSON object of each `data:` line in [bytes]; any other line is skipped.
 Stream<Map<String, dynamic>> _dataChunks(Stream<List<int>> bytes) async* {

@@ -1,12 +1,12 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import '../../core/chat.dart';
+import '../../core/markdown.dart';
 import '../../core/ports.dart';
 import '../app_scope.dart';
 import '../links.dart';
@@ -16,7 +16,6 @@ import '../widgets/buttons.dart';
 import '../widgets/tappable.dart';
 import 'highlight.dart';
 import 'math.dart';
-import 'speaker.dart';
 import '../icons.dart';
 
 /// An answer's text, drawn as Markdown and selectable. A code block and a table scroll sideways
@@ -27,15 +26,13 @@ import '../icons.dart';
 /// to that site. Any other image shows as its description, which reads as a link: a tap opens
 /// the link around the image, or else the image's own address.
 class AnswerBody extends StatelessWidget {
-  const AnswerBody(this.text, {super.key});
+  const AnswerBody(this.text, {super.key, this.label = false});
 
   final String text;
 
-  /// Whether the answer carries its words as a semantics label. A browser's semantics tree
-  /// leaves out selectable text, so a screen reader there would find no answer at all; on
-  /// other platforms the text is already there.
-  @visibleForTesting
-  static bool labelled = kIsWeb;
+  /// Whether the answer carries its words as a semantics label, for a screen reader where the
+  /// selectable text is missing from the semantics tree ([AppScope.labelAnswers]).
+  final bool label;
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +50,7 @@ class AnswerBody extends StatelessWidget {
       data: text,
       selectable: true,
       extensionSet: md.ExtensionSet.gitHubFlavored,
-      inlineSyntaxes: [MathSyntax()],
+      inlineSyntaxes: mathSyntaxes,
       onTapLink: (_, href, _) {
         if (href != null) openLink(context, href);
       },
@@ -118,7 +115,7 @@ class AnswerBody extends StatelessWidget {
         horizontalRuleDecoration: BoxDecoration(border: Border(top: border)),
       ),
     );
-    if (!labelled) return markdown;
+    if (!label) return markdown;
     // Explicit child nodes keep a link or a Copy code button from merging into the label.
     return Semantics(
       container: true,

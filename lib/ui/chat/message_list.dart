@@ -26,8 +26,8 @@ import 'speaker.dart';
 ///
 /// The list is reversed so it starts at the newest turn and stays pinned there as an answer
 /// grows, and builds only the turns in view. Its parent rebuilds it when the chat changes; a
-/// streaming answer rebuilds only itself. A new question brings the newest turn into view:
-/// one just sent scrolls there, and another chat opens there.
+/// streaming answer rebuilds only itself. Another chat opens at its newest turn, and a message
+/// sent scrolls there.
 class MessageList extends StatefulWidget {
   const MessageList({super.key, required this.onSuggest});
 
@@ -41,8 +41,8 @@ class MessageList extends StatefulWidget {
 class _MessageListState extends State<MessageList> {
   final _scroll = ScrollController();
 
-  /// The last question in view when the list was last built.
-  Turn? _question;
+  /// [ChatController.sends] when the list was last built.
+  int? _sends;
 
   @override
   void dispose() {
@@ -50,25 +50,20 @@ class _MessageListState extends State<MessageList> {
     super.dispose();
   }
 
-  /// Brings the newest turn into view after this frame when the last question changed.
-  void _follow(ChatController chat, List<Turn> turns) {
-    final question = turns.where((t) => t.role == Role.user).lastOrNull;
-    if (identical(question, _question)) return;
-    _question = question;
-    final sent = chat.answeringHere;
+  /// Scrolls to the newest turn after this frame when a message was sent since the last build.
+  void _follow(ChatController chat) {
+    final sent = _sends != null && chat.sends != _sends;
+    _sends = chat.sends;
+    if (!sent) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scroll.hasClients || _scroll.offset == 0) return;
-      if (sent) {
-        unawaited(
-          _scroll.animateTo(
-            0,
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOut,
-          ),
-        );
-      } else {
-        _scroll.jumpTo(0);
-      }
+      unawaited(
+        _scroll.animateTo(
+          0,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        ),
+      );
     });
   }
 
@@ -79,7 +74,7 @@ class _MessageListState extends State<MessageList> {
     final workspace = chat.active;
     final turns = chat.turns;
     if (workspace == null) return const SizedBox.shrink();
-    _follow(chat, turns);
+    _follow(chat);
     if (turns.isEmpty) {
       return _Empty(workspace: workspace.name, onSuggest: widget.onSuggest);
     }
@@ -104,6 +99,8 @@ class _MessageListState extends State<MessageList> {
   Widget _turns(BuildContext context, List<Turn> turns) {
     final chat = AppScope.of(context).chat;
     return ListView.builder(
+      // Another chat gets a list of its own, which starts at its newest turn.
+      key: ValueKey((chat.activeSlug, chat.activeThread)),
       controller: _scroll,
       reverse: true,
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
@@ -132,7 +129,6 @@ class _MessageListState extends State<MessageList> {
                     ? _UserBubble(
                         turn.text,
                         attachments: turn.attachments,
-                        pictures: turn.pictures,
                         onEdit: () {
                           chat.edit(turn);
                           widget.onSuggest(turn.text);
@@ -286,17 +282,13 @@ class _UserBubble extends StatelessWidget {
   const _UserBubble(
     this.text, {
     this.attachments = const [],
-    this.pictures = const {},
     required this.onEdit,
   });
 
   final String text;
 
-  /// The names of the files sent with the question.
-  final List<String> attachments;
-
-  /// The bytes of each picture among [attachments], by name, drawn in place of its name.
-  final Map<String, Uint8List> pictures;
+  /// The files sent with the question: a picture drawn small, any other by its name.
+  final List<SentFile> attachments;
 
   /// Puts [text] back in the composer, to replace the question when the app is signed in.
   final VoidCallback onEdit;
@@ -343,25 +335,28 @@ class _UserBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(text, style: Type.sans(15.5, color: t.ink, height: 1.5)),
-          for (final name in attachments)
+          for (final file in attachments)
             Padding(
               padding: const EdgeInsets.only(top: 6),
-              child: switch (pictures[name]) {
-                final bytes? => _Picture(
-                  bytes,
-                  name: name,
-                  orElse: _named(context, name),
-                ),
-                null => _named(context, name),
+              child: switch (file.picture) {
+                final bytes? => _Picture(bytes, name: file.name),
+                null => _FileName(file.name),
               },
             ),
         ],
       ),
     );
   }
+}
 
-  /// A file sent with the question, by its name.
-  Widget _named(BuildContext context, String name) {
+/// A file sent with a question, by its name.
+class _FileName extends StatelessWidget {
+  const _FileName(this.name);
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -381,13 +376,12 @@ class _UserBubble extends StatelessWidget {
   }
 }
 
-/// A picture sent with a question, drawn small; [orElse] when its bytes do not decode.
+/// A picture sent with a question, drawn small; its name when its bytes do not decode.
 class _Picture extends StatelessWidget {
-  const _Picture(this.bytes, {required this.name, required this.orElse});
+  const _Picture(this.bytes, {required this.name});
 
   final Uint8List bytes;
   final String name;
-  final Widget orElse;
 
   static const _height = 120.0;
 
@@ -401,7 +395,7 @@ class _Picture extends StatelessWidget {
         fit: BoxFit.contain,
         cacheHeight: (_height * MediaQuery.devicePixelRatioOf(context)).round(),
         semanticLabel: name,
-        errorBuilder: (_, _, _) => orElse,
+        errorBuilder: (_, _, _) => _FileName(name),
       ),
     ),
   );
@@ -434,7 +428,10 @@ class _Answer extends StatelessWidget {
         if (failure != null)
           AlertBox(AlertKind.bad, 'The model did not answer', text: failure)
         else if (split.answer.isNotEmpty)
-          AnswerBody(split.answer),
+          AnswerBody(
+            split.answer,
+            label: AppScope.of(context).labelAnswers && !turn.streaming,
+          ),
         if (turn.streaming && turn.status != null) _Status(turn.status!),
         if (turn.streaming && !thinking)
           const Padding(padding: EdgeInsets.only(top: 6), child: Caret()),

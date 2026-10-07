@@ -42,6 +42,7 @@ class AppScope extends InheritedWidget {
     this.scanner,
     this.dictation,
     this.readAloud,
+    this.labelAnswers = false,
     required super.child,
   });
 
@@ -63,6 +64,10 @@ class AppScope extends InheritedWidget {
 
   /// Reads an answer aloud, or null where the device has no speech to read with.
   final ReadAloud? readAloud;
+
+  /// Whether a finished answer carries its words as a semantics label, as in a browser, whose
+  /// semantics tree leaves out selectable text; elsewhere the text is already there.
+  final bool labelAnswers;
 
   static AppScope of(BuildContext context) {
     // Never notifies, so no dependency is needed. That also lets initState read it.

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:anywherellm/core/chat.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -30,7 +32,7 @@ void main() {
     test('a picture is typed by its extension, in any case', () {
       expect(attachmentMime('photo.JPG'), 'image/jpeg');
       expect(attachmentMime('a.webp'), 'image/webp');
-      expect(Attachment.of('a.gif', const []).isImage, isTrue);
+      expect(Attachment.of('a.gif', Uint8List(0)).isImage, isTrue);
     });
 
     test('any other file, or none, is a document', () {

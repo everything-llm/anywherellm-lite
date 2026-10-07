@@ -149,9 +149,7 @@ String defaultTitle(String message) {
 /// A file sent with one message, read in for that message only.
 class Attachment {
   /// An attachment of [bytes] named [name], typed by [attachmentMime].
-  Attachment.of(this.name, List<int> bytes)
-    : bytes = bytes is Uint8List ? bytes : Uint8List.fromList(bytes),
-      mime = attachmentMime(name);
+  Attachment.of(this.name, this.bytes) : mime = attachmentMime(name);
 
   final String name;
 

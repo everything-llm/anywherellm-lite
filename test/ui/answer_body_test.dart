@@ -1,6 +1,5 @@
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/server_models.dart';
-import 'package:anywherellm/ui/chat/answer_body.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
@@ -31,6 +30,12 @@ FakeAnythingLlm _server() {
     const ChatMessage(role: Role.assistant, text: _answer),
   ];
   return llm;
+}
+
+/// Builds the app with [answer] as the open chat's last answer, and lets it settle.
+Future<void> _show(WidgetTester tester, String answer) async {
+  await pumpApp(tester, llm: answering(answer));
+  await tester.pumpAndSettle();
 }
 
 /// Records what is put on the clipboard.
@@ -85,22 +90,22 @@ void main() {
 
   group('math', () {
     testWidgets('TeX in dollars and brackets is drawn as math', (tester) async {
-      await pumpApp(
-        tester,
-        llm: answering(r'''
+      await _show(tester, r'''
 Inline $x^2$ and \(y\).
 
 $$\frac{a}{b}$$
 
-\[ z = 1 \]'''),
-      );
-      await tester.pumpAndSettle();
+\[ z = 1 \]''');
       expect(find.byType(Math), findsNWidgets(4));
     });
 
+    testWidgets('the same TeX twice is drawn twice', (tester) async {
+      await _show(tester, r'Let $x$ be one, and $x$ again.');
+      expect(find.byType(Math), findsNWidgets(2));
+    });
+
     testWidgets('prices stay text', (tester) async {
-      await pumpApp(tester, llm: answering(r'It costs $5 and $10 a month.'));
-      await tester.pumpAndSettle();
+      await _show(tester, r'It costs $5 and $10 a month.');
       expect(find.byType(Math), findsNothing);
       expect(
         find.textContaining(
@@ -112,14 +117,12 @@ $$\frac{a}{b}$$
     });
 
     testWidgets('a dollar sign in code is not math', (tester) async {
-      await pumpApp(tester, llm: answering(r'Run `echo $HOME$` now.'));
-      await tester.pumpAndSettle();
+      await _show(tester, r'Run `echo $HOME$` now.');
       expect(find.byType(Math), findsNothing);
     });
 
     testWidgets('TeX that does not parse shows its source', (tester) async {
-      await pumpApp(tester, llm: answering(r'Broken: $\frac{a$ here.'));
-      await tester.pumpAndSettle();
+      await _show(tester, r'Broken: $\frac{a$ here.');
       expect(find.text(r'$\frac{a$'), findsOneWidget);
     });
   });
@@ -143,8 +146,7 @@ $$\frac{a}{b}$$
         'plain', (tester) async {
       final copied = _clipboard(tester);
       const code = 'def add(a, b):\n    return a + b  # sum';
-      await pumpApp(tester, llm: answering('```python\n$code\n```'));
-      await tester.pumpAndSettle();
+      await _show(tester, '```python\n$code\n```');
       expect(colours(tester).length, greaterThan(1));
       await tester.tap(find.bySemanticsLabel('Copy code'));
       await tester.pump();
@@ -153,8 +155,7 @@ $$\frac{a}{b}$$
     });
 
     testWidgets('a block with no language stays plain', (tester) async {
-      await pumpApp(tester, llm: answering('```\ndef add(a, b): pass\n```'));
-      await tester.pumpAndSettle();
+      await _show(tester, '```\ndef add(a, b): pass\n```');
       expect(colours(tester), hasLength(1));
     });
   });
@@ -162,10 +163,8 @@ $$\frac{a}{b}$$
   testWidgets('in a browser an answer carries its words for a screen reader', (
     tester,
   ) async {
-    AnswerBody.labelled = true;
-    addTearDown(() => AnswerBody.labelled = false);
     final semantics = tester.ensureSemantics();
-    await pumpApp(tester, llm: _server());
+    await pumpApp(tester, llm: _server(), labelAnswers: true);
     expect(
       find.bySemanticsLabel(RegExp(r'^The plan\nFirst step\nSecond step')),
       findsOneWidget,
@@ -177,14 +176,28 @@ $$\frac{a}{b}$$
     semantics.dispose();
   });
 
+  testWidgets('an answer is labelled only once it has finished', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final llm = planningServer()..hold = true;
+    final h = await pumpApp(tester, llm: llm, labelAnswers: true);
+    await h.chat.send('Go');
+    llm.chat!.add(const TextChunk('Words so far'));
+    await tester.pump(const Duration(milliseconds: 100));
+    final label = find.bySemanticsLabel('Words so far');
+    expect(label, findsNothing);
+    llm.chat!.add(const ChatDone([]));
+    await llm.chat!.close();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(label, findsOneWidget);
+    semantics.dispose();
+  });
+
   testWidgets('a model failure shows as a failure, with Retry and no Copy', (
     tester,
   ) async {
-    await pumpApp(
-      tester,
-      llm: answering('The agent model failed to respond: 400 bad input'),
-    );
-    await tester.pumpAndSettle();
+    await _show(tester, 'The agent model failed to respond: 400 bad input');
     expect(find.text('The model did not answer'), findsOneWidget);
     expect(
       find.text('The agent model failed to respond: 400 bad input'),

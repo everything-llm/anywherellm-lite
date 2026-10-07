@@ -19,17 +19,24 @@ double _scrolledUp(WidgetTester tester) => tester
     .position
     .pixels;
 
+/// An answer long enough to scroll.
+final _long = [for (var i = 1; i <= 80; i++) 'Line $i.'].join('\n\n');
+
+/// Scrolls the chat up, away from its newest turn.
+Future<void> _scrollUp(WidgetTester tester) async {
+  await tester.drag(find.byType(MessageList), const Offset(0, 400));
+  await tester.pumpAndSettle();
+  expect(_scrolledUp(tester), greaterThan(0));
+}
+
 void main() {
   testWidgets('sending while scrolled up brings the new question into view', (
     tester,
   ) async {
-    final long = [for (var i = 1; i <= 80; i++) 'Line $i.'].join('\n\n');
-    final llm = answering(long)..hold = true;
+    final llm = answering(_long)..hold = true;
     await pumpApp(tester, llm: llm);
     await tester.pumpAndSettle();
-    await tester.drag(find.byType(MessageList), const Offset(0, 400));
-    await tester.pumpAndSettle();
-    expect(_scrolledUp(tester), greaterThan(0));
+    await _scrollUp(tester);
 
     await tester.enterText(composerField, 'And then?');
     await tester.pump();
@@ -42,12 +49,10 @@ void main() {
   });
 
   testWidgets('another chat opens at its newest turn', (tester) async {
-    final long = [for (var i = 1; i <= 80; i++) 'Line $i.'].join('\n\n');
-    final llm = answering(long);
+    final llm = answering(_long);
     final h = await pumpApp(tester, llm: llm);
     await tester.pumpAndSettle();
-    await tester.drag(find.byType(MessageList), const Offset(0, 400));
-    await tester.pumpAndSettle();
+    await _scrollUp(tester);
     llm.histories['priorities'] = [...llm.histories['budget']!];
     await h.chat.open('priorities');
     await tester.pumpAndSettle();

@@ -15,7 +15,7 @@ import 'settings_controller.dart';
 /// One turn on screen. An answer grows while it streams, and notifies only its own listeners
 /// as it does, so a chunk rebuilds the answer and nothing else.
 class Turn extends ChangeNotifier {
-  Turn.user(this.text, {this.attachments = const [], this.pictures = const {}})
+  Turn.user(this.text, {this.attachments = const []})
     : role = Role.user,
       streaming = false;
 
@@ -26,7 +26,6 @@ class Turn extends ChangeNotifier {
       text = message.text,
       citations = message.citations,
       attachments = message.attachments,
-      pictures = message.pictures,
       files = message.files,
       metrics = message.metrics,
       chatId = message.chatId,
@@ -36,11 +35,8 @@ class Turn extends ChangeNotifier {
   final Role role;
   String text;
 
-  /// The names of the files sent with a question.
-  List<String> attachments = const [];
-
-  /// The bytes of each picture among [attachments], by name, where they are known.
-  Map<String, Uint8List> pictures = const {};
+  /// The files sent with a question.
+  List<SentFile> attachments = const [];
   List<Citation> citations = const [];
 
   /// What an agent made with the answer.
@@ -69,31 +65,13 @@ class Turn extends ChangeNotifier {
   /// What an agent is doing while the answer runs, such as a tool it runs, or null.
   String? status;
 
-  /// Whether a status line came since the last piece of text, so the next piece starts what the
-  /// agent wrote after a tool.
-  bool _afterStatus = false;
-
-  /// Adds [more] to the text. The pieces an agent writes before and after a tool come without
-  /// space between them, so text after a status line starts a new paragraph, unless either side
-  /// already has space there.
   void _grow(String more) {
-    if (_afterStatus &&
-        text.isNotEmpty &&
-        more.isNotEmpty &&
-        !_spaced.hasMatch(text[text.length - 1]) &&
-        !_spaced.hasMatch(more[0])) {
-      text += '\n\n';
-    }
-    _afterStatus = false;
     text += more;
     notifyListeners();
   }
 
-  static final _spaced = RegExp(r'\s');
-
   void _setStatus(String line) {
     status = line;
-    _afterStatus = true;
     notifyListeners();
   }
 
@@ -191,6 +169,10 @@ class ChatController extends ChangeNotifier {
 
   /// The answer running. Only one runs at a time.
   _Running? _running;
+
+  /// How many messages have been sent, so the chat can bring each new one into view.
+  int get sends => _sends;
+  int _sends = 0;
 
   bool loading = false;
 
@@ -575,11 +557,10 @@ class ChatController extends ChangeNotifier {
     }
     final user = Turn.user(
       text,
-      attachments: [for (final a in attachments) a.name],
-      pictures: {
+      attachments: [
         for (final a in attachments)
-          if (a.isImage) a.name: a.bytes,
-      },
+          a.isImage ? SentFile.picture(a.name, a.bytes) : SentFile(a.name),
+      ],
     );
     final answer = Turn.answer();
     final turns = [...this.turns, user, answer];
@@ -588,6 +569,7 @@ class ChatController extends ChangeNotifier {
     final server = _server;
     final draftGo = _draftGo;
     _setTurns(turns);
+    _sends++;
     notifyListeners();
 
     var threadSlug = activeThread;

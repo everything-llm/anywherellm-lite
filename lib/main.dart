@@ -194,6 +194,7 @@ class _SessionHostState extends State<SessionHost> {
         scanner: _android ? cameraScanner : null,
         dictation: _dictation,
         readAloud: _readAloud,
+        labelAnswers: kIsWeb,
         child: const AppShell(),
       );
     },

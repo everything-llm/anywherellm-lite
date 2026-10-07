@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:async';
 
 import 'package:anywherellm/core/chat.dart';
@@ -243,24 +245,6 @@ void main() {
     llm.calls.clear();
     await rig.chat.open('budget');
     expect(llm.calls.where((c) => c.startsWith('history')), isEmpty);
-  });
-
-  test('text an agent writes after a tool starts a new paragraph', () async {
-    final llm = planningServer()..hold = true;
-    final rig = await started(llm);
-    await rig.chat.send('Build it');
-    final answer = rig.chat.turns.last;
-    llm.chat!
-      ..add(const TextChunk('Keeping it private instead.'))
-      ..add(const StatusChunk('Running write-file'))
-      ..add(const TextChunk('Done -- built.'))
-      ..add(const StatusChunk('Running browse'))
-      ..add(const TextChunk(' Opened it.'));
-    await pumpEventQueue();
-    expect(
-      answer.text,
-      'Keeping it private instead.\n\nDone -- built. Opened it.',
-    );
   });
 
   test('an agent answer shows its status, then its whole answer', () async {
@@ -656,8 +640,8 @@ void main() {
     await rig.chat.send(
       'What is in these?',
       attachments: [
-        Attachment.of('photo.png', const [1]),
-        Attachment.of('report.pdf', const [2]),
+        Attachment.of('photo.png', Uint8List(1)),
+        Attachment.of('report.pdf', Uint8List(1)),
       ],
     );
     await pumpEventQueue();
@@ -666,7 +650,12 @@ void main() {
       ('report.pdf', documentMime),
     ]);
     final question = rig.chat.turns[rig.chat.turns.length - 2];
-    expect(question.attachments, ['photo.png', 'report.pdf']);
+    expect(question.attachments.map((a) => a.name), [
+      'photo.png',
+      'report.pdf',
+    ]);
+    expect(question.attachments.first.picture, hasLength(1));
+    expect(question.attachments.last.picture, isNull);
   });
 
   group('slash commands', () {
@@ -837,7 +826,7 @@ void main() {
         final rig = await started(planningServer());
         await rig.chat.send(
           'What is in this?',
-          attachments: [Attachment.of('notes.md', 'hi'.codeUnits)],
+          attachments: [Attachment.of('notes.md', utf8.encode('hi'))],
         );
         await pumpEventQueue();
         expect(rig.chat.canRetry, isFalse);

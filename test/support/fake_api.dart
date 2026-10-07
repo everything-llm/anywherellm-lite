@@ -660,7 +660,7 @@ FakeAnythingLlm withChatIds({List<String> attachments = const []}) {
       role: Role.user,
       text: 'What is the budget?',
       chatId: 5,
-      attachments: attachments,
+      attachments: [for (final name in attachments) SentFile(name)],
     ),
     const ChatMessage(role: Role.assistant, text: 'About 40k.', chatId: 5),
   ];

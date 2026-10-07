@@ -181,22 +181,55 @@ class Thread {
 
 enum Role { user, assistant }
 
-/// The bytes of an [attachment] the server kept as a picture: an `image/` type whose
-/// `contentString` is a base64 data URL. Null for any other.
-Uint8List? _picture(Map<String, dynamic> attachment) {
-  if (!_text(attachment, 'mime').startsWith('image/')) return null;
-  final data = _pictureData.firstMatch(_text(attachment, 'contentString'));
-  if (data == null) return null;
-  try {
-    return base64Decode(data[1]!);
-  } on FormatException {
-    return null;
+/// A file sent with a question: its name, and for a picture, its bytes.
+class SentFile {
+  /// A file known by its [name] alone, such as a document.
+  SentFile(this.name);
+
+  /// A picture whose [bytes] are at hand, as when it was just sent.
+  SentFile.picture(this.name, Uint8List bytes) : _bytes = bytes;
+
+  SentFile._saved(this.name, this._dataUrl);
+
+  /// An entry of a history message's `attachments`, or null when it has no name. A picture keeps
+  /// its `contentString` data URL, decoded the first time [picture] is read, so reading a history
+  /// for anything else costs nothing.
+  static SentFile? fromJson(Map<String, dynamic> json) {
+    final name = _known(json, 'name');
+    if (name == null) return null;
+    return _text(json, 'mime').startsWith('image/')
+        ? SentFile._saved(name, _text(json, 'contentString'))
+        : SentFile(name);
+  }
+
+  final String name;
+  Uint8List? _bytes;
+
+  /// A history picture's data URL until [picture] decodes it, so the text is not kept beside
+  /// the bytes.
+  String? _dataUrl;
+
+  /// The picture's bytes, or null for any other file and for a data URL that is not a base64
+  /// image.
+  Uint8List? get picture {
+    if (_dataUrl case final dataUrl?) {
+      _dataUrl = null;
+      _bytes = _decode(dataUrl);
+    }
+    return _bytes;
+  }
+
+  static Uint8List? _decode(String dataUrl) {
+    try {
+      final data = UriData.parse(dataUrl);
+      return data.isBase64 && data.mimeType.startsWith('image/')
+          ? data.contentAsBytes()
+          : null;
+    } on FormatException {
+      return null;
+    }
   }
 }
-
-final _pictureData = RegExp(
-  r'^data:image/[\w.+-]+;base64,([A-Za-z0-9+/=\s]+)$',
-);
 
 /// One turn of a chat, as the server keeps it.
 class ChatMessage {
@@ -205,7 +238,6 @@ class ChatMessage {
     required this.text,
     this.citations = const [],
     this.attachments = const [],
-    this.pictures = const {},
     this.files = const [],
     this.metrics,
     this.chatId,
@@ -222,16 +254,8 @@ class ChatMessage {
     citations: citationsOf(json['sources']),
     attachments: [
       for (final attachment in jsonObjects(json['attachments']))
-        ?_known(attachment, 'name'),
+        ?SentFile.fromJson(attachment),
     ],
-    pictures: {
-      for (final attachment in jsonObjects(json['attachments']))
-        if ((_known(attachment, 'name'), _picture(attachment)) case (
-          final name?,
-          final bytes?,
-        ))
-          name: bytes,
-    },
     files: generatedFilesOf(json['outputs']),
     metrics: metricsOf(json['metrics']),
     chatId: switch (json['chatId']) {
@@ -247,11 +271,8 @@ class ChatMessage {
   final Role role;
   final String text;
 
-  /// The names of the files sent with the message.
-  final List<String> attachments;
-
-  /// The bytes of each picture among [attachments], by name, when the server kept them.
-  final Map<String, Uint8List> pictures;
+  /// The files sent with the message.
+  final List<SentFile> attachments;
 
   /// What the answer drew on, each once, in the server's order.
   final List<Citation> citations;
