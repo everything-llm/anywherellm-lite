@@ -85,6 +85,22 @@ AnywhereLLM-only features that Muse lacks: Edit and Retry of a message, answer m
 
 Two things looked like bugs but came from the harness: Send needing two presses, and an answer that seemed not to stream. Both happened only when the AnywhereLLM tab was hidden behind the Muse tab while I typed or waited, and Flutter does not paint a hidden tab. Ctrl+C in a Flutter text field also did not reach the system clipboard under automation; check it by hand.
 
+## Fixed since the run
+
+Each fix has a test that fails without it, and each was checked in the Chrome build against the `parity-scratch` chats.
+
+| # | Fix |
+| --- | --- |
+| B1 | After an answer that closes without `chatId`, the app reads the chat's history for the ids, under guards against taking a wrong one. |
+| B2 | A list of turns the controller has handed out is never changed in place, and the view redraws once a draft has its thread. |
+| G1 | An image that does not load says so, with why in its tooltip, and a tap opens the link around it or its own address. |
+| Q3 | Text streamed after a tool's status line starts a new paragraph. |
+| B4 | A stored or streamed `The agent model failed to respond` shows as a failure box, with Retry. |
+| G4 | TeX renders as math under CanvasKit, prices stay text, and a fenced block in a known language is coloured. |
+| G5 | A picture shows small in the composer and in its question, including from the history, which keeps the image's data URL. |
+| Q4 | Sending while scrolled up scrolls to the new question; opening another chat starts at its newest turn. |
+| G10 | Confirmed for the web build only: its semantics tree had the code and math but none of the selectable text. On the web an answer now carries its words as a label. |
+
 ## Process
 
 What went well:
@@ -111,7 +127,7 @@ The run cost 2% of Muse's weekly free-plan limit (23% to 25%).
 
 Nothing was deleted. For the user to remove or restore:
 
-- AnythingLLM workspace `parity-scratch` and its 15 chats (the 15th, "Count from 1 to 40", checked the fixes for B1 and B2).
+- AnythingLLM workspace `parity-scratch` and its 15 chats (the 15th, "Count from 1 to 40", checked the fixes for B1 and B2; one more exchange in the A11 chat checked Q4).
 - AnythingLLM one-off job "scratch test reminder - delete me", Thursday 2026-10-08 09:00 CEST (it deletes itself after running).
 - AnythingLLM sandbox file `/project/pomodoro/index.html` in `parity-scratch`, and research run `dr-8338e2fd` on the research site.
 - Muse: the "Scratch test reminder" scheduled task for Thursday 09:00 (Upcoming tab; it offers only Delete), the "Pomodoro Timer" artifact, the fox image, and the "Search backend comparison report" document. The 14 scratch side chats are archived, not deleted; Muse's A1 prompt went into the C4 side chat after a missed "New side chat" click.
