@@ -6,7 +6,7 @@
     "background_color": "#181922",
     "theme_color": "#181922",
     "description": "A chat client for an AnythingLLM server.",
-        "prefer_related_applications": false,
+    "prefer_related_applications": false,
     "icons": [
         {
             "src": "icons/Icon-192.png",
