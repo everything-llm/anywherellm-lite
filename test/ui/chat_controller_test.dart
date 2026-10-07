@@ -75,6 +75,20 @@ void main() {
     expect(rig.chat.busy, isFalse);
   });
 
+  test('the turns a draft showed stay whole once its chat is made', () async {
+    final llm = planningServer()..hold = true;
+    final rig = await started(llm);
+    await rig.chat.select('household');
+    String? seen;
+    rig.chat.addListener(() => seen = rig.chat.activeThread);
+    final sending = rig.chat.send('hello');
+    final shown = rig.chat.turns;
+    await sending;
+    expect(shown.map((t) => t.role), [Role.user, Role.assistant]);
+    expect(seen, rig.chat.activeThread);
+    expect(seen, isNotNull);
+  });
+
   test(
     'a chat the person named keeps its name after the first answer',
     () async {
@@ -816,6 +830,118 @@ void main() {
   });
 
   group('signed in', () {
+    group('an answer that closes without its id', () {
+      Future<(FakeAnythingLlm, Rig)> asked() async {
+        final llm = withChatIds()
+          ..omitsChatId = true
+          ..answer = 'About 42k.';
+        final rig = await started(llm, password: 'PASS-WORD');
+        await rig.chat.send('And Q4?');
+        await pumpEventQueue();
+        return (llm, rig);
+      }
+
+      test('takes it from the history, and retry deletes by it', () async {
+        final (llm, rig) = await asked();
+        expect(rig.chat.turns.map((t) => t.chatId), [5, 5, 100, 100]);
+        await rig.chat.retry();
+        await pumpEventQueue();
+        expect(llm.calls, contains('dropFrom:budget:100'));
+      });
+
+      test('takes none when the history read fails', () async {
+        final llm = withChatIds()
+          ..omitsChatId = true
+          ..errors['history'] = const ApiException('no', status: 500);
+        final rig = await started(llm, password: 'PASS-WORD');
+        await rig.chat.select('household');
+        await rig.chat.send('Bills?');
+        await pumpEventQueue();
+        expect(rig.chat.turns.map((t) => t.chatId), [null, null]);
+      });
+
+      Future<List<int?>> heldWith(List<ChatMessage> saved) async {
+        final llm = withChatIds()..hold = true;
+        final rig = await started(llm, password: 'PASS-WORD');
+        await rig.chat.send('And Q4?');
+        llm.histories['budget'] = [...llm.histories['budget']!, ...saved];
+        llm.chat!
+          ..add(const TextChunk('About 42k.'))
+          ..add(const ChatDone([]));
+        await llm.chat!.close();
+        await pumpEventQueue();
+        return [for (final t in rig.chat.turns) t.chatId];
+      }
+
+      test('takes none from a history whose last question differs', () async {
+        expect(
+          await heldWith(const [
+            ChatMessage(role: Role.user, text: 'And Q1?', chatId: 6),
+            ChatMessage(role: Role.assistant, text: 'About 42k.', chatId: 6),
+          ]),
+          [5, 5, null, null],
+        );
+      });
+
+      test('takes none older than an id the chat has', () async {
+        expect(
+          await heldWith(const [
+            ChatMessage(role: Role.user, text: 'And Q4?', chatId: 4),
+            ChatMessage(role: Role.assistant, text: 'About 42k.', chatId: 4),
+          ]),
+          [5, 5, null, null],
+        );
+      });
+
+      test('takes none for a stopped answer', () async {
+        final llm = withChatIds()..hold = true;
+        final rig = await started(llm, password: 'PASS-WORD');
+        final reads = llm.calls.where((c) => c.startsWith('history')).length;
+        await rig.chat.send('And Q4?');
+        rig.chat.stop();
+        await pumpEventQueue();
+        expect(
+          llm.calls.where((c) => c.startsWith('history')),
+          hasLength(reads),
+        );
+      });
+
+      test('takes none from an exchange saved after it', () async {
+        final llm = withChatIds()..omitsChatId = true;
+        final rig = await started(llm, password: 'PASS-WORD');
+        final read = llm.gates['history'] = Completer<void>();
+        await rig.chat.send('And Q4?');
+        await pumpEventQueue();
+        await rig.chat.send('And Q4?');
+        await pumpEventQueue();
+        read.complete();
+        await pumpEventQueue();
+        expect(rig.chat.turns.map((t) => t.chatId), [
+          5,
+          5,
+          null,
+          null,
+          101,
+          101,
+        ]);
+      });
+
+      test('signed out, reads nothing', () async {
+        final llm = withChatIds()
+          ..omitsChatId = true
+          ..auth = ServerAuth.password;
+        final rig = await started(llm);
+        await rig.settings.readAuth();
+        final reads = llm.calls.where((c) => c.startsWith('history')).length;
+        await rig.chat.send('And Q4?');
+        await pumpEventQueue();
+        expect(
+          llm.calls.where((c) => c.startsWith('history')),
+          hasLength(reads),
+        );
+      });
+    });
+
     test('retry deletes the old exchange before asking again', () async {
       final llm = withChatIds()..answer = 'About 45k.';
       final rig = await started(llm, password: 'PASS-WORD');

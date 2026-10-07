@@ -119,6 +119,10 @@ class FakeAnythingLlm implements AnythingLlmApi {
   bool hold = false;
   StreamController<ChatEvent>? chat;
 
+  /// Whether [streamChat]'s closing event leaves out the answer's id, as AnythingLLM's agent path
+  /// does. The exchange is then saved to [histories] under that id, as the server saves it.
+  bool omitsChatId = false;
+
   /// The status lines [streamChat] sends before the answer, as an agent does.
   List<String> agentStatus = const [];
 
@@ -281,6 +285,14 @@ class FakeAnythingLlm implements AnythingLlmApi {
       chat = StreamController<ChatEvent>();
       return chat!.stream;
     }
+    final id = nextChatId++;
+    if (omitsChatId) {
+      histories[thread] = [
+        ...?histories[thread],
+        ChatMessage(role: Role.user, text: message, chatId: id),
+        ChatMessage(role: Role.assistant, text: answer, chatId: id),
+      ];
+    }
     return Stream.fromIterable([
       for (final line in agentStatus) StatusChunk(line),
       TextChunk(answer),
@@ -288,7 +300,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
         [for (final title in cited) Citation(title)],
         files: made,
         metrics: measured,
-        chatId: nextChatId++,
+        chatId: omitsChatId ? null : id,
       ),
     ]);
   }

@@ -153,7 +153,7 @@ class ChatController extends ChangeNotifier {
   String? activeThread;
 
   final Map<String, List<Turn>> _turns = {};
-  final List<Turn> _draft = [];
+  List<Turn> _draft = [];
 
   /// The chats whose names the person chose, which the first message does not rename.
   final Set<String> _named = {};
@@ -208,6 +208,8 @@ class ChatController extends ChangeNotifier {
 
   String get title => thread?.name ?? newChatName;
 
+  /// The turns of the chat on screen. A list handed out here is never changed afterwards: every
+  /// change sets a new list, since the view may still be drawing from the old one.
   List<Turn> get turns =>
       activeThread == null ? _draft : (_turns[activeThread] ?? const []);
 
@@ -262,7 +264,7 @@ class ChatController extends ChangeNotifier {
     workspaces = const [];
     _threads.clear();
     _turns.clear();
-    _draft.clear();
+    _draft = [];
     _madeFiles.clear();
     _images.clear();
     docCounts.clear();
@@ -386,7 +388,7 @@ class ChatController extends ChangeNotifier {
   Future<void> select(String? slug, {String? thread}) async {
     activeSlug = slug;
     editing = null;
-    _draft.clear();
+    _draft = [];
     _draftGo++;
     await open(
       thread ?? (slug == null ? null : threadsOf(slug).lastOrNull?.slug),
@@ -422,7 +424,7 @@ class ChatController extends ChangeNotifier {
   /// Starts a draft, unless the chat on screen is already empty.
   void newChat() {
     if (turns.isEmpty) return;
-    _draft.clear();
+    _draft = [];
     _draftGo++;
     editing = null;
     activeThread = null;
@@ -517,7 +519,7 @@ class ChatController extends ChangeNotifier {
       if (at >= 0) list.removeAt(at);
       _turns.remove(threadSlug);
       if (activeThread == threadSlug) {
-        _draft.clear();
+        _draft = [];
         await open(
           list.isEmpty ? null : list[at.clamp(0, list.length - 1)].slug,
         );
@@ -572,9 +574,10 @@ class ChatController extends ChangeNotifier {
         _threads[slug] = [...threadsOf(slug), made];
         _turns[made.slug] = turns;
         if (activeSlug == slug && activeThread == null && _draftGo == draftGo) {
-          _draft.clear();
+          _draft = [];
           activeThread = made.slug;
           _rememberChat();
+          notifyListeners();
         }
         running.thread = made.slug;
       } on ApiException catch (error) {
@@ -613,6 +616,9 @@ class ChatController extends ChangeNotifier {
           ),
           onDone: () {
             _finish(running);
+            if (answer.chatId == null && signedIn) {
+              unawaited(_learnIds(slug, thread, user, answer));
+            }
             if (first && !_named.contains(thread)) {
               unawaited(_nameAfter(slug, thread, text));
             }
@@ -726,7 +732,7 @@ class ChatController extends ChangeNotifier {
     editing = null;
     final thread = activeThread;
     if (thread == null) {
-      _draft.clear();
+      _draft = [];
       notifyListeners();
       return;
     }
@@ -802,11 +808,52 @@ class ChatController extends ChangeNotifier {
     }
   }
 
+  /// Takes the ids of the exchange [user] and [answer] from the chat's history, for an answer
+  /// whose closing chunk did not say them, as an agent's does not. A wrong id would make Retry or
+  /// an edit delete other exchanges, so the ids are taken only while the exchange is still the
+  /// last in its chat and finished, and only from a last history entry that asks the same
+  /// question under an id newer than every id the chat already has.
+  Future<void> _learnIds(
+    String slug,
+    String thread,
+    Turn user,
+    Turn answer,
+  ) async {
+    final server = _server;
+    final List<ChatMessage> history;
+    try {
+      history = await _api.history(slug, thread);
+    } on ApiException {
+      return;
+    }
+    final turns = _turns[thread];
+    if (_server != server ||
+        turns == null ||
+        turns.length < 2 ||
+        !identical(turns.last, answer) ||
+        !identical(turns[turns.length - 2], user) ||
+        answer.unfinished ||
+        answer.chatId != null ||
+        isAnswering(thread)) {
+      return;
+    }
+    if (history case [..., final asked, final said]
+        when asked.role == Role.user &&
+            said.role == Role.assistant &&
+            said.chatId != null &&
+            asked.chatId == said.chatId &&
+            asked.text.trim() == user.text.trim()) {
+      final id = said.chatId!;
+      if (turns.any((t) => t.chatId != null && t.chatId! >= id)) return;
+      answer.chatId = user.chatId = id;
+      answer.notifyListeners();
+      notifyListeners();
+    }
+  }
+
   void _setTurns(List<Turn> turns) {
     if (activeThread == null) {
-      _draft
-        ..clear()
-        ..addAll(turns);
+      _draft = turns;
     } else {
       _turns[activeThread!] = turns;
     }

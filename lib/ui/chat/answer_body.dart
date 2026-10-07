@@ -6,11 +6,13 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import '../../core/chat.dart';
+import '../../core/ports.dart';
 import '../app_scope.dart';
 import '../links.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';
+import '../widgets/tappable.dart';
 import '../icons.dart';
 
 /// An answer's text, drawn as Markdown and selectable. A code block and a table scroll sideways
@@ -18,7 +20,8 @@ import '../icons.dart';
 /// the app. An image loads only from the AnythingLLM server's own host, on any port, as a tool's
 /// card does, and only over https or the server's own scheme where plain http is allowed:
 /// loading any other would send its address, which a model could have filled with what it read,
-/// to that site. Any other image shows as its description.
+/// to that site. Any other image shows as its description, which reads as a link: a tap opens
+/// the link around the image, or else the image's own address.
 class AnswerBody extends StatelessWidget {
   const AnswerBody(this.text, {super.key});
 
@@ -35,6 +38,7 @@ class AnswerBody extends StatelessWidget {
     final settings = AppScope.of(context).settings;
     final server = settings.connection?.uri;
     final allowHttp = settings.allowHttp;
+    final linked = linkedImages(text);
     return MarkdownBody(
       data: text,
       selectable: true,
@@ -42,8 +46,13 @@ class AnswerBody extends StatelessWidget {
       onTapLink: (_, href, _) {
         if (href != null) openLink(context, href);
       },
-      imageBuilder: (uri, _, alt) =>
-          _Image(uri, alt: alt, server: server, allowHttp: allowHttp),
+      imageBuilder: (uri, _, alt) => _Image(
+        uri,
+        alt: alt,
+        server: server,
+        allowHttp: allowHttp,
+        linked: linked.contains(uri),
+      ),
       builders: {'pre': _CodeBlockBuilder()},
       styleSheet: MarkdownStyleSheet(
         p: body,
@@ -98,8 +107,37 @@ class AnswerBody extends StatelessWidget {
   }
 }
 
+/// The addresses of the images in the Markdown [text] that sit inside a link.
+Set<Uri> linkedImages(String text) {
+  if (!text.contains('![')) return const {};
+  final found = <Uri>{};
+  void visit(md.Node node, {required bool inLink}) {
+    if (node is! md.Element) return;
+    if (node.tag == 'img' && inLink) {
+      if (Uri.tryParse(node.attributes['src'] ?? '') case final uri?) {
+        found.add(uri);
+      }
+    }
+    for (final child in node.children ?? const <md.Node>[]) {
+      visit(child, inLink: inLink || node.tag == 'a');
+    }
+  }
+
+  final document = md.Document(
+    extensionSet: md.ExtensionSet.gitHubFlavored,
+    encodeHtml: false,
+  );
+  for (final node in document.parse(text)) {
+    visit(node, inLink: false);
+  }
+  return found;
+}
+
 /// An image in an answer: loaded when it is on the [server]'s host over https, or over http
-/// when the [server] itself is http and [allowHttp] holds; otherwise its description. A live
+/// when the [server] itself is http and [allowHttp] holds; otherwise its description. The
+/// description says whether the image was not loaded or failed to load, and why it failed. It
+/// opens the image's address when tapped, unless the image is [linked], where the link around
+/// it takes the tap. A live
 /// image, such as a run's progress card, shows each new frame as it comes, and is followed only
 /// while it can be seen: not while the chat is offstage behind Files ([TickerMode]) or the app
 /// is hidden, since a watched card keeps the host's browser from being stopped. Hiding is heard
@@ -110,12 +148,16 @@ class _Image extends StatefulWidget {
     required this.alt,
     required this.server,
     required this.allowHttp,
+    required this.linked,
   });
 
   final Uri uri;
   final String? alt;
   final Uri? server;
   final bool allowHttp;
+
+  /// Whether the image sits inside a link, which then takes a tap on its description.
+  final bool linked;
 
   bool get loadable => loadableImage(uri, server, allowHttp: allowHttp);
 
@@ -128,6 +170,9 @@ class _ImageState extends State<_Image> {
 
   /// Whether the read ended, by finishing or failing, so there is nothing more to follow.
   bool _ended = false;
+
+  /// Why the read failed, or null.
+  String? _failure;
 
   bool _onstage = true;
   bool _appShown = true;
@@ -178,6 +223,7 @@ class _ImageState extends State<_Image> {
         ? AppScope.of(context).chat.lastFrame(widget.uri)
         : null;
     _ended = false;
+    _failure = null;
   }
 
   /// Reads the image while it can be seen and has more to give, and lets go of it otherwise.
@@ -190,7 +236,8 @@ class _ImageState extends State<_Image> {
         .imageFrames(widget.uri)
         .listen(
           _show,
-          onError: (Object _) => _end(),
+          onError: (Object error) =>
+              _end(failure: error is ApiException ? error.message : '$error'),
           onDone: _end,
           cancelOnError: true,
         );
@@ -206,8 +253,9 @@ class _ImageState extends State<_Image> {
     setState(() => _frame = frame);
   }
 
-  void _end() => setState(() {
+  void _end({String? failure}) => setState(() {
     _ended = true;
+    _failure = failure;
     _reading = null;
   });
 
@@ -216,15 +264,45 @@ class _ImageState extends State<_Image> {
     _reading = null;
   }
 
-  @override
-  Widget build(BuildContext context) {
+  /// The image's description, drawn as a link: the host it is not loaded from, or that it did
+  /// not load, with why in its tooltip.
+  Widget _described(BuildContext context) {
     final t = Tokens.of(context);
     final alt = widget.alt?.trim();
-    final described = Text(
-      '[${alt != null && alt.isNotEmpty ? alt : 'image'}: ${widget.uri.host}]',
-      style: Type.sans(14, color: t.muted),
+    final name = alt != null && alt.isNotEmpty ? alt : 'image';
+    final failed = widget.loadable;
+    final text = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AppIcon('link', size: IconSize.xs, color: t.accent),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            '[$name: ${failed ? 'did not load' : widget.uri.host}]',
+            style: Type.sans(
+              14,
+              color: t.accent,
+            ).copyWith(decoration: TextDecoration.underline),
+          ),
+        ),
+      ],
     );
+    final why = failed
+        ? _failure ?? 'The image did not load.'
+        : 'Not loaded: images load only from the server\'s own host.';
+    if (widget.linked) return Tooltip(message: why, child: text);
+    return Tappable(
+      label: 'Open $name',
+      tooltip: why,
+      onTap: () => openLink(context, widget.uri.toString()),
+      child: text,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final frame = _frame;
+    final described = _described(context);
     if (!widget.loadable || (frame == null && _ended)) return described;
     if (frame == null) return const SizedBox.shrink();
     return ConstrainedBox(

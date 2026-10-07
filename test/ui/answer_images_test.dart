@@ -75,7 +75,52 @@ void main() {
     await pumpApp(tester, llm: _withCard());
     await tester.pumpAndSettle();
     expect(find.byType(Image), findsNothing);
-    expect(find.text('[Run: h]'), findsOneWidget);
+    expect(find.text('[Run: did not load]'), findsOneWidget);
+    expect(
+      find.byTooltip('The image could not be read: the server answered 404.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a card that did not load opens the link around it', (
+    tester,
+  ) async {
+    final h = await pumpApp(tester, llm: _withCard());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('[Run: did not load]'));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(h.opened, [_page]);
+  });
+
+  testWidgets('an image outside a link opens its own address', (tester) async {
+    final chart = Uri.parse('https://h:8445/_cards/chart.png');
+    final h = await pumpApp(
+      tester,
+      llm: answering('Here:\n\n![Chart]($chart)'),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('[Chart: did not load]'));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(h.opened, [chart]);
+  });
+
+  testWidgets('an image off the server is not read and says where it is', (
+    tester,
+  ) async {
+    final elsewhere = Uri.parse('https://elsewhere.example/chart.png');
+    final llm = answering('Here:\n\n![Chart]($elsewhere)');
+    final h = await pumpApp(tester, llm: llm);
+    await tester.pumpAndSettle();
+    expect(llm.calls.where((c) => c.startsWith('answerImage')), isEmpty);
+    expect(
+      find.byTooltip(
+        "Not loaded: images load only from the server's own host.",
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('[Chart: elsewhere.example]'));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(h.opened, [elsewhere]);
   });
 
   testWidgets('a plain card is read once, and shown again without asking', (

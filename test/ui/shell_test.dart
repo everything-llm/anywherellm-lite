@@ -135,6 +135,23 @@ void main() {
       expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
     });
 
+    testWidgets('a new chat keeps its question on screen while the first '
+        'answer runs, whatever redraws the list', (tester) async {
+      final llm = planningServer()..hold = true;
+      final h = await pumpApp(tester, llm: llm);
+      await h.chat.select('household');
+      await tester.pump();
+      final made = llm.gates['createThread'] = Completer<void>();
+      await typeAndEnter(tester, 'What is due?');
+      made.complete();
+      await tester.pump();
+      tester.platformDispatcher.textScaleFactorTestValue = 1.1;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pump();
+      expect(find.text('What is due?'), findsOneWidget);
+      expect(find.byType(Caret), findsOneWidget);
+    });
+
     testWidgets('Stop ends the answer', (tester) async {
       final llm = planningServer()..hold = true;
       final h = await pumpApp(tester, llm: llm);
