@@ -1,33 +1,77 @@
 import 'package:markdown/markdown.dart' as md;
 
-/// GitHub-flavoured Markdown as an answer is read. A bare address stops at a `]` it did not
-/// open, as on GitHub, which links bare addresses only after links and images are read: so a
-/// card whose description holds an address, `[![Browser: https://...](card.jpg)](page)`, stays
-/// an image inside a link, and `https://x.example/?ids[]=1` stays one address.
+/// GitHub-flavoured Markdown as an answer is read, TeX included ([mathSyntaxes]). A bare
+/// address stops at a `]` it did not open, as on GitHub, which links bare addresses only after
+/// links and images are read: so a card whose description holds an address,
+/// `[![Browser: https://...](card.jpg)](page)`, stays an image inside a link, and
+/// `https://x.example/?ids[]=1` stays one address.
 final answerMarkdown = md.ExtensionSet(
   md.ExtensionSet.gitHubFlavored.blockSyntaxes,
   [
+    ...mathSyntaxes,
     for (final syntax in md.ExtensionSet.gitHubFlavored.inlineSyntaxes)
       syntax is md.AutolinkExtensionSyntax ? _BoundedAutolink() : syntax,
   ],
 );
 
-/// `package:markdown`'s bare address, which ends before a `]` that closes no `[` of its own.
+/// [text] parsed as an answer is drawn, with its characters left unescaped.
+List<md.Node> parseAnswer(String text) =>
+    md.Document(extensionSet: answerMarkdown, encodeHtml: false).parse(text);
+
+/// `package:markdown`'s bare address, cut before a `]` that closes no `[` of its own.
 class _BoundedAutolink extends md.AutolinkExtensionSyntax {
-  static final _pattern = RegExp(
-    // The scheme or `www.`, a domain, then a path of bracketed groups and of anything but a
-    // space, `<` or `]`, that does not end in trailing punctuation. A group is tried first, so
-    // `[]` in `?ids[]=1` is read as a pair rather than as an `[` alone.
-    r'((?:(?:https?|ftp):\/\/|www\.)(?:[-_a-z0-9]+\.)*(?:[-a-z0-9]+\.[-a-z0-9]+)'
-    r'(?:\[[^\s<\]]*\]|[^\s<\]])*(?:\[[^\s<\]]*\]|[^\s<?!.,:*_~\]]))'
-    // Or an email address.
-    r'|([-_.+a-z0-9]+@(?:[-_a-z0-9]+\.)+[-_a-z0-9]*[a-z0-9])',
-    multiLine: true,
-    caseSensitive: false,
-  );
+  @override
+  bool onMatch(md.InlineParser parser, Match match) {
+    if (match[1] != null) {
+      final address = match[0]!;
+      var depth = 0;
+      for (var i = 0; i < address.length; i++) {
+        if (address[i] == '[') {
+          depth++;
+        } else if (address[i] == ']') {
+          if (depth == 0) {
+            // Matched again on what comes before the `]`, so trailing punctuation is left out
+            // as it is from any address.
+            final cut = pattern.matchAsPrefix(
+              match.input.substring(0, match.start + i),
+              match.start,
+            );
+            return cut != null && super.onMatch(parser, cut);
+          }
+          depth--;
+        }
+      }
+    }
+    return super.onMatch(parser, match);
+  }
+}
+
+/// The syntaxes that make TeX in an answer a `math` element, whose `display` attribute says
+/// whether it stands on its own: `$$...$$` and `\[...\]` do, `$...$` and `\(...\)` sit in the
+/// text. A dollar pair is math only as pandoc reads it: the opening `$` has no space after it,
+/// and the closing `$` has no space before it and no digit after it, so prices such as
+/// "$5 and $10" stay text. Each is tried only where its first character is.
+final mathSyntaxes = <md.InlineSyntax>[
+  _MathSyntax(
+    r'\$\$([\s\S]+?)\$\$|\$(?!\s)((?:\\.|[^$\\\n])+?)(?<!\s)\$(?!\d)',
+    0x24, // $
+  ),
+  _MathSyntax(r'\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)', 0x5C), // \
+];
+
+/// One of [mathSyntaxes]: its first group is display math, its second math in the text.
+class _MathSyntax extends md.InlineSyntax {
+  _MathSyntax(super.pattern, int start) : super(startCharacter: start);
 
   @override
-  RegExp get pattern => _pattern;
+  bool onMatch(md.InlineParser parser, Match match) {
+    final display = match[1] != null;
+    parser.addNode(
+      md.Element.text('math', (match[1] ?? match[2])!.trim())
+        ..attributes['display'] = '$display',
+    );
+    return true;
+  }
 }
 
 /// [markdown] as the words a person would read: no markup, a link as its text, and each block
@@ -48,12 +92,7 @@ String plainText(String markdown) {
     }
   }
 
-  walk(
-    md.Document(
-      extensionSet: answerMarkdown,
-      encodeHtml: false,
-    ).parse(markdown),
-  );
+  walk(parseAnswer(markdown));
   return lines.join('\n');
 }
 

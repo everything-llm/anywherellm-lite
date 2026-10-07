@@ -50,7 +50,6 @@ class AnswerBody extends StatelessWidget {
       data: text,
       selectable: true,
       extensionSet: answerMarkdown,
-      inlineSyntaxes: mathSyntaxes,
       onTapLink: (_, href, _) {
         if (href != null) openLink(context, href);
       },
@@ -142,14 +141,7 @@ Set<Uri> linkedImages(String text) {
     }
   }
 
-  // Parsed as [AnswerBody] parses it, math included, so an image is linked here exactly when
-  // it is linked on screen.
-  final document = md.Document(
-    extensionSet: answerMarkdown,
-    inlineSyntaxes: mathSyntaxes,
-    encodeHtml: false,
-  );
-  for (final node in document.parse(text)) {
+  for (final node in parseAnswer(text)) {
     visit(node, inLink: false);
   }
   return found;

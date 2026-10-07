@@ -36,6 +36,22 @@ Future<void> _arrives(
 int _reads(FakeAnythingLlm llm) =>
     llm.calls.where((c) => c == 'answerImage:$_card').length;
 
+/// Taps the card shown. The test's image never decodes, so it has no size to tap: this calls
+/// the link around it.
+Future<void> _tapCard(WidgetTester tester) async {
+  tester
+      .widget<GestureDetector>(
+        find
+            .ancestor(
+              of: find.byType(Image),
+              matching: find.byType(GestureDetector),
+            )
+            .first,
+      )
+      .onTap!();
+  await tester.pump(const Duration(milliseconds: 500));
+}
+
 void main() {
   testWidgets('a live card shows each new frame and opens its page', (
     tester,
@@ -54,18 +70,7 @@ void main() {
     await _arrives(tester, live, redPixel);
     expect(_shown(tester), redPixel);
 
-    // The test's image never decodes, so it has no size to tap: call the link around it.
-    tester
-        .widget<GestureDetector>(
-          find
-              .ancestor(
-                of: find.byType(Image),
-                matching: find.byType(GestureDetector),
-              )
-              .first,
-        )
-        .onTap!();
-    await tester.pump(const Duration(milliseconds: 500));
+    await _tapCard(tester);
     expect(h.opened, [_page]);
   });
 
@@ -84,17 +89,7 @@ void main() {
     expect(_shown(tester), pixel);
     expect(find.textContaining('mail.example'), findsNothing);
 
-    tester
-        .widget<GestureDetector>(
-          find
-              .ancestor(
-                of: find.byType(Image),
-                matching: find.byType(GestureDetector),
-              )
-              .first,
-        )
-        .onTap!();
-    await tester.pump(const Duration(milliseconds: 500));
+    await _tapCard(tester);
     expect(h.opened, [page]);
   });
 

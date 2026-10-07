@@ -8,6 +8,12 @@ const _card =
     '(https://owen.example:8445/_live/browser/bw-3aeecef2b460eeb7.jpg)]'
     '(https://owen.example:8445/_live/browser/bw-3aeecef2b460eeb7)';
 
+/// The elements of the one paragraph [text] is, as an answer is parsed.
+List<md.Element> _inline(String text) =>
+    (parseAnswer(text).single as md.Element).children!
+        .whereType<md.Element>()
+        .toList();
+
 void main() {
   test('an answer is read as words, without its markup', () {
     expect(
@@ -27,8 +33,7 @@ void main() {
   });
 
   test("an address in a card's description leaves the card whole", () {
-    final p = md.Document(extensionSet: answerMarkdown).parse(_card).single;
-    final link = (p as md.Element).children!.whereType<md.Element>().single;
+    final link = _inline(_card).single;
     expect(link.tag, 'a');
     expect(
       link.attributes['href'],
@@ -47,12 +52,13 @@ void main() {
   });
 
   test('a bare address in the text is still a link', () {
-    final p = md.Document(extensionSet: answerMarkdown)
-        .parse('See https://x.example/a_(b) and (www.y.example).')
-        .single;
-    final links = (p as md.Element).children!.whereType<md.Element>();
     expect(
-      [for (final a in links) a.attributes['href']],
+      [
+        for (final a in _inline(
+          'See https://x.example/a_(b) and (www.y.example).',
+        ))
+          a.attributes['href'],
+      ],
       ['https://x.example/a_(b)', 'http://www.y.example'],
     );
   });
@@ -61,16 +67,24 @@ void main() {
     expect(plainText('Tom & Jerry <3 "cheese"'), 'Tom & Jerry <3 "cheese"');
   });
 
+  test('TeX is read as its source, as math rather than as emphasis', () {
+    expect(plainText(r'Here $a_i + b_i$ holds.'), r'Here a_i + b_i holds.');
+  });
+
   test('a bare address keeps the brackets it opens and closes', () {
-    final p = md.Document(extensionSet: answerMarkdown, encodeHtml: false)
-        .parse(
-          'See https://x.example/?ids[]=1&f[name]=a [see https://y.example/b].',
-        )
-        .single;
-    final links = (p as md.Element).children!.whereType<md.Element>();
     expect(
-      [for (final a in links) a.textContent],
-      ['https://x.example/?ids[]=1&f[name]=a', 'https://y.example/b'],
+      [
+        for (final a in _inline(
+          'See https://x.example/?ids[]=1&f[name]=a [see https://y.example/b] '
+          'and https://z.example/a[b[c]].',
+        ))
+          a.textContent,
+      ],
+      [
+        'https://x.example/?ids[]=1&f[name]=a',
+        'https://y.example/b',
+        'https://z.example/a[b[c]]',
+      ],
     );
   });
 }
