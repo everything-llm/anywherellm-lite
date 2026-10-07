@@ -19,6 +19,21 @@ Future<String?> saveWithDialog(
   return place.path;
 }
 
+/// The [FileSaver] the app uses in a browser: a download named [suggestedName], which the
+/// browser files where its settings say, so nothing is asked first and the name is returned.
+Future<String?> saveAsDownload(
+  String suggestedName,
+  Future<List<int>?> Function() bytes,
+) async {
+  final data = await bytes();
+  if (data == null) return null;
+  await XFile.fromData(
+    Uint8List.fromList(data),
+    name: suggestedName,
+  ).saveTo(suggestedName);
+  return suggestedName;
+}
+
 /// Saves what [bytes] gives as [suggestedName] through [AppScope.save], and returns where, or
 /// null. A failure shows as [failTitle] through [report], or in Files when it is null.
 Future<String?> saveFile(

@@ -31,6 +31,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   HttpAnythingLlmApi({
     required this._holder,
     this.allowHttp = true,
+    this.browserOrigin,
     http.Client? client,
     this.timeout = const Duration(seconds: 15),
     this.uploadTimeout = const Duration(minutes: 5),
@@ -50,6 +51,10 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   /// Whether the key may go to an `http://` address. False on Android: Dart's HTTP client ignores
   /// Android's cleartext policy, so the client applies it.
   final bool allowHttp;
+
+  /// The page's origin when the app runs in a browser, where every request is cross-origin and a
+  /// server that does not allow it fails like one out of reach; null elsewhere.
+  final String? browserOrigin;
   final http.Client _client;
   final Duration timeout;
 
@@ -288,15 +293,23 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   /// JSON naming the `everythingllm` service with `runs` among its features. The route is open, so
   /// the key is not sent. AnythingLLM answers a path it does not know with its web page and a 200,
   /// so the body decides. A 5xx is not remembered, so a relay failing for a moment is asked again
-  /// on the next message.
+  /// on the next message. In a browser a failed request is remembered as no relay, so answers go
+  /// to AnythingLLM itself: a relay that does not allow requests from [browserOrigin] fails so on
+  /// every ask.
   Future<bool> _isRelay(Connection connection) async {
     final server = connection.withPassword(null);
     if (_relays[server] case final known?) return known;
-    final response = await _fetch(
-      connection,
-      timeout,
-      () => _client.get(Uri.parse('${connection.baseUrl}$relayPath/health')),
-    );
+    final http.Response response;
+    try {
+      response = await _fetch(
+        connection,
+        timeout,
+        () => _client.get(Uri.parse('${connection.baseUrl}$relayPath/health')),
+      );
+    } on ApiException {
+      if (browserOrigin == null) rethrow;
+      return _relays[server] = false;
+    }
     if (response.statusCode >= 500) return false;
     final health = response.statusCode == 200 ? _json(response) : null;
     return _relays[server] =
@@ -1085,7 +1098,8 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       'Could not reach ${connection.host}: $message',
     ),
     http.ClientException(:final message) => ApiException(
-      'Could not reach the server: $message',
+      'Could not reach the server: $message'
+      '${browserOrigin == null ? '' : '. A browser also says this when the server does not allow requests from $browserOrigin.'}',
     ),
     _ => ApiException('Could not reach the server: $error'),
   };

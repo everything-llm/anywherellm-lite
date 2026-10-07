@@ -1,6 +1,6 @@
 # AnywhereLLM
 
-A lightweight Linux chat client for an AnythingLLM server. Ask questions in a workspace and get answers drawn from the files you add to it.
+A lightweight chat client for an AnythingLLM server, for Linux, Android and Chrome. Ask questions in a workspace and get answers drawn from the files you add to it.
 
 ## What it does
 
@@ -21,15 +21,15 @@ Until a key is saved, the app opens with Settings showing, and the composer poin
 
 | What | Where |
 | --- | --- |
-| Server address and API key | One entry in the system keyring, through `flutter_secure_storage`. No error message shows the key. |
-| The switched-off files | `~/.config/anywherellm/prefs.json`, or under `$XDG_CONFIG_HOME` when set. Nothing secret. |
+| Server address and API key | One entry in the system keyring, through `flutter_secure_storage`. In Chrome it is the page's local storage, encrypted with a key kept beside it. No error message shows the key. |
+| The switched-off files | `~/.config/anywherellm/prefs.json`, or under `$XDG_CONFIG_HOME` when set. In Chrome, the page's local storage. Nothing secret. |
 | Workspaces, chats and files | The AnythingLLM server. |
 
 If the keyring cannot be read or written, the app still starts, uses what you entered for that run, and says so in Settings.
 
 ## Requirements
 
-- Flutter 3.47 on Linux.
+- Flutter 3.47.
 - `libsecret-1-dev`, for building: `sudo apt install libsecret-1-dev`.
 - A running, unlocked secret service, such as gnome-keyring, for saving the key.
 - An AnythingLLM server and an API key created under Settings, Developer API in AnythingLLM.
@@ -39,7 +39,10 @@ If the keyring cannot be read or written, the app still starts, uses what you en
 ```bash
 flutter pub get
 flutter run -d linux
+flutter run -d chrome
 ```
+
+In Chrome the server must allow requests from the page's origin; AnythingLLM does. Serve a built app (`flutter build web`, then `build/web`) over https or from localhost, since the browser keeps the key only there.
 
 Settings opens on the first run. Enter the server address (for example `https://host.example.ts.net:3001`) and the key, then press Save key.
 

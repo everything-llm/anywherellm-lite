@@ -63,12 +63,11 @@ pubspec_overrides.yaml
 # ------------------------------------------------------------------------------
 # Platforms this app does not target
 # ------------------------------------------------------------------------------
-# Linux and Android are built; android/.gitignore keeps Gradle state and keys out.
+# Linux, Android and the web are built; android/.gitignore keeps Gradle state and keys out.
 # Delete a line to re-adopt one.
 /ios/
 /macos/
 /windows/
-/web/
 
 # ------------------------------------------------------------------------------
 # Secrets & local-only config

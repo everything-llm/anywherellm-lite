@@ -5,7 +5,7 @@ flutter_native_splash:
   image: assets/icon/splash.png
   android: true
   ios: false
-  web: false
+  web: true
   android_12:
     color: "#181922"
     image: assets/icon/icon-foreground.png

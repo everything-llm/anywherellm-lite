@@ -26,6 +26,7 @@ dependencies:
   mobile_scanner: ">=7.4.2 <7.5.0"
   speech_to_text: ">=7.5.0 <7.6.0"
   flutter_tts: ">=4.2.5 <4.3.0"
+  web: ">=1.1.1 <1.2.0"
 
 dev_dependencies:
   flutter_test:

@@ -2076,6 +2076,32 @@ void main() {
       },
     );
 
+    test('in a browser, a health check that fails to send is remembered as no relay', () async {
+      final paths = <String>[];
+      final api = HttpAnythingLlmApi(
+        holder: ConnectionHolder(_connection),
+        browserOrigin: 'http://localhost:8080',
+        client: MockClient.streaming((request, body) async {
+          await body.drain<void>();
+          paths.add(request.url.path);
+          if (request.url.path == '/everythingllm/health') {
+            throw http.ClientException('Failed to fetch');
+          }
+          return http.StreamedResponse(
+            Stream.value(utf8.encode('data: {"close":true}\n\n')),
+            200,
+          );
+        }),
+      );
+      await api.streamChat('w', 't', 'Hi').toList();
+      await api.streamChat('w', 't', 'Again').toList();
+      expect(paths, [
+        '/everythingllm/health',
+        '/api/v1/workspace/w/thread/t/stream-chat',
+        '/api/v1/workspace/w/thread/t/stream-chat',
+      ]);
+    });
+
     for (final (what, health) in [
       (
         'another service',

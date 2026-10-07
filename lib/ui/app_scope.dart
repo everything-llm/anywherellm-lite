@@ -16,7 +16,7 @@ typedef LinkOpener = Future<bool> Function(Uri url);
 /// Asks where to save a file called [suggestedName], and writes what [bytes] gives there.
 /// Returns where it saved, or null when the person cancelled or [bytes] gave null. On Linux
 /// [bytes] runs only after a place is chosen; on Android it runs first, since the system's
-/// dialog takes the bytes with it. Throws [Exception] when the file cannot be written.
+/// dialog takes the bytes with it. A browser downloads the file and never asks. Throws [Exception] when the file cannot be written.
 typedef FileSaver = Future<String?> Function(
   String suggestedName,
   Future<List<int>?> Function() bytes,

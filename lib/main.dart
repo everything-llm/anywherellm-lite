@@ -1,10 +1,13 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'adapters/anythingllm_client.dart';
+import 'adapters/browser_prefs_store_stub.dart'
+    if (dart.library.js_interop) 'adapters/browser_prefs_store.dart';
 import 'adapters/json_prefs_store.dart';
 import 'adapters/keyring_settings_store.dart';
 import 'core/connection.dart';
@@ -16,8 +19,8 @@ import 'ui/chat/device_speaker.dart';
 import 'ui/chat/dictation.dart';
 import 'ui/chat/speaker.dart';
 import 'ui/chat/speech_dictation.dart';
-import 'ui/files/save_file.dart';
 import 'ui/files/save_android.dart';
+import 'ui/files/save_file.dart';
 import 'ui/settings/scan_code.dart';
 import 'ui/shell.dart';
 import 'ui/state/chat_controller.dart';
@@ -32,16 +35,23 @@ import 'ui/state/system_controller.dart';
 ///
 /// The app talks only to the AnythingLLM server set up in Settings. The address and key live in
 /// the system keyring; the other preferences in a JSON file. Android uses https only and keeps
-/// the file in the app's private storage.
+/// the file in the app's private storage. In a browser both live in the page's local storage, and
+/// a page served over https uses https only, since the browser blocks http from it.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final android = Platform.isAndroid;
-  final prefsFile = android
+  final allowHttp = !_android && !(kIsWeb && Uri.base.scheme == 'https');
+  final prefsFile = _android
       ? File('${(await getApplicationSupportDirectory()).path}/prefs.json')
       : null;
   final holder = ConnectionHolder();
-  final llm = HttpAnythingLlmApi(holder: holder, allowHttp: !android);
-  final prefs = PrefsController(JsonPrefsStore(prefsFile));
+  final llm = HttpAnythingLlmApi(
+    holder: holder,
+    allowHttp: allowHttp,
+    browserOrigin: kIsWeb ? Uri.base.origin : null,
+  );
+  final prefs = PrefsController(
+    kIsWeb ? BrowserPrefsStore() : JsonPrefsStore(prefsFile),
+  );
   runApp(
     AnywhereLlmApp(
       prefs: prefs,
@@ -49,28 +59,45 @@ Future<void> main() async {
         llm: llm,
         settings: SettingsController(
           llm,
-          KeyringSettingsStore(),
+          KeyringSettingsStore(failureHint: _keyringHint),
           holder,
-          allowHttp: !android,
+          allowHttp: allowHttp,
         ),
         prefs: prefs,
         shell: ShellController(),
-        launch: (url) => launchUrl(url, mode: _launchMode(url, android)),
+        launch: (url) => launchUrl(url, mode: _launchMode(url)),
       ),
     ),
   );
 }
 
-/// Reads the saved connection and preferences, then shows the app, with Settings open when no
-/// server is set up.
+/// Whether the app runs on Android. `Platform` throws in a browser, so it is asked only outside one.
+final _android = !kIsWeb && Platform.isAndroid;
+
+/// Saves a file: a download in a browser, the system's save dialog elsewhere.
+final FileSaver _save = kIsWeb
+    ? saveAsDownload
+    : _android
+    ? saveWithPicker
+    : saveWithDialog;
+
+/// What to check when the keyring fails, after a space, or empty.
+final _keyringHint = kIsWeb
+    ? ' A browser keeps it only for a page served over https or from localhost.'
+    : Platform.isLinux
+    ? ' Is a secret service such as gnome-keyring running and unlocked?'
+    : '';
+
 /// How [url] opens: a web page in the in-app browser on Android, which Back closes, and
-/// anything else, or anything on Linux, in the app the system picks. The in-app browser takes
-/// only http and https.
-LaunchMode _launchMode(Uri url, bool android) =>
-    android && (url.scheme == 'http' || url.scheme == 'https')
+/// anything else, or anything on Linux, in the app the system picks, which in a browser is a
+/// new tab. The in-app browser takes only http and https.
+LaunchMode _launchMode(Uri url) =>
+    _android && (url.scheme == 'http' || url.scheme == 'https')
     ? LaunchMode.inAppBrowserView
     : LaunchMode.externalApplication;
 
+/// Reads the saved connection and preferences, then shows the app, with Settings open when no
+/// server is set up.
 class SessionHost extends StatefulWidget {
   const SessionHost({
     super.key,
@@ -102,7 +129,7 @@ class _SessionHostState extends State<SessionHost> {
   ReadAloud? _readAloud;
 
   /// Listens for speech on Android, and is null where the device has no such service to use.
-  final Dictation? _dictation = Platform.isAndroid ? SpeechDictation() : null;
+  final Dictation? _dictation = _android ? SpeechDictation() : null;
 
   /// The controllers listen before the keyring is read, so reading a saved connection is what
   /// loads the workspaces.
@@ -119,7 +146,7 @@ class _SessionHostState extends State<SessionHost> {
       _sources,
     );
     _system = SystemController(widget.llm, widget.settings);
-    if (Platform.isAndroid) _readAloud = ReadAloud(DeviceSpeaker(), _chat);
+    if (_android) _readAloud = ReadAloud(DeviceSpeaker(), _chat);
     _loaded = _load();
   }
 
@@ -163,8 +190,8 @@ class _SessionHostState extends State<SessionHost> {
         files: _files,
         system: _system,
         launch: widget.launch,
-        save: Platform.isAndroid ? saveWithPicker : saveWithDialog,
-        scanner: Platform.isAndroid ? cameraScanner : null,
+        save: _save,
+        scanner: _android ? cameraScanner : null,
         dictation: _dictation,
         readAloud: _readAloud,
         child: const AppShell(),
