@@ -1,6 +1,6 @@
 # Muse parity testing: how it was run
 
-How the Muse versus AnythingLLM comparison of 2026-10-07 was run, so it can be repeated. The findings are in `docs/muse-parity.md` in the everythingllm repository on owen (`diot@192.168.0.29:/home/diot/dev/everythingllm`). The run used Claude Code with the Claude in Chrome extension driving the user's own Chrome, with both sites already signed in, plus read-only SSH to owen.
+How the Muse versus AnythingLLM comparison of 2026-10-07 was run, so it can be repeated. The findings are in `docs/.notes/muse-parity.md` in the everythingllm repository on owen (`diot@192.168.0.29:/home/diot/dev/everythingllm`). The run used Claude Code with the Claude in Chrome extension driving the user's own Chrome, with both sites already signed in, plus read-only SSH to owen.
 
 ## Ground rules
 
@@ -80,4 +80,4 @@ To test a Google Apps Script bridge without AnythingLLM, POST `{"key": ..., "act
 
 ## Writing up
 
-The report has four parts: a probe table (both tools side by side, with timings), what Muse does well, a gap table (Muse feature, AnythingLLM status, closest repo piece, build, size S/M/L), and a numbered bug table with evidence and where to look. It goes in the everythingllm repo's `docs/`, linted with the `mdlint` skill, and left uncommitted. Leave personal data seen in Muse's main chat and memory out of it.
+The report has four parts: a probe table (both tools side by side, with timings), what Muse does well, a gap table (Muse feature, AnythingLLM status, closest repo piece, build, size S/M/L), and a numbered bug table with evidence and where to look. It goes in the everythingllm repo's `docs/.notes/`, which git ignores, because the report names personal accounts. Lint it with the `mdlint` skill. Leave personal data seen in Muse's main chat and memory out of it.
