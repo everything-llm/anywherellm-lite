@@ -54,7 +54,7 @@ Future<void> main() async {
         ),
         prefs: prefs,
         shell: ShellController(),
-        launch: (url) => launchUrl(url, mode: LaunchMode.externalApplication),
+        launch: (url) => launchUrl(url, mode: _launchMode(url, android)),
       ),
     ),
   );
@@ -62,6 +62,14 @@ Future<void> main() async {
 
 /// Reads the saved connection and preferences, then shows the app, with Settings open when no
 /// server is set up.
+/// How [url] opens: a web page in the in-app browser on Android, which Back closes, and
+/// anything else, or anything on Linux, in the app the system picks. The in-app browser takes
+/// only http and https.
+LaunchMode _launchMode(Uri url, bool android) =>
+    android && (url.scheme == 'http' || url.scheme == 'https')
+    ? LaunchMode.inAppBrowserView
+    : LaunchMode.externalApplication;
+
 class SessionHost extends StatefulWidget {
   const SessionHost({
     super.key,
@@ -124,8 +132,11 @@ class _SessionHostState extends State<SessionHost> {
     super.dispose();
   }
 
+  /// Reads the prefs before the connection, so the workspace order and the last chat are known
+  /// when the workspaces load.
   Future<void> _load() async {
-    await Future.wait([widget.settings.load(), widget.prefs.load()]);
+    await widget.prefs.load();
+    await widget.settings.load();
     if (!widget.settings.configured) widget.shell.openSettings();
   }
 

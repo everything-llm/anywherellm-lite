@@ -273,6 +273,67 @@ void main() {
     expect(rig.chat.activeSlug, 'household');
   });
 
+  group('the last chat', () {
+    test('opens at start, ahead of the person\'s order', () async {
+      final rig = await started(
+        planningServer(),
+        prefs: const Prefs(
+          workspaceOrder: ['household', 'q3'],
+          lastChat: LastChat('q3', 'priorities'),
+        ),
+      );
+      expect(rig.chat.activeSlug, 'q3');
+      expect(rig.chat.activeThread, 'priorities');
+    });
+
+    test('opens its workspace\'s newest chat once it is gone', () async {
+      final rig = await started(
+        planningServer(),
+        prefs: const Prefs(lastChat: LastChat('q3', 'deleted')),
+      );
+      expect(rig.chat.activeSlug, 'q3');
+      expect(rig.chat.activeThread, 'budget');
+    });
+
+    test(
+      'gives way to the person\'s order once its workspace is gone',
+      () async {
+        final rig = await started(
+          planningServer(),
+          prefs: const Prefs(
+            workspaceOrder: ['household', 'q3'],
+            lastChat: LastChat('deleted', 'priorities'),
+          ),
+        );
+        expect(rig.chat.activeSlug, 'household');
+      },
+    );
+
+    test('is saved on opening a chat, a draft and its first message', () async {
+      final rig = await started(planningServer());
+      expect(rig.prefsStore.saved.lastChat, const LastChat('q3', 'budget'));
+      await rig.chat.select('q3', thread: 'priorities');
+      expect(rig.prefsStore.saved.lastChat, const LastChat('q3', 'priorities'));
+      await rig.chat.select('q3', thread: 'budget');
+      rig.chat.newChat();
+      await pumpEventQueue();
+      expect(rig.prefsStore.saved.lastChat, const LastChat('q3'));
+      await rig.chat.send('hello');
+      expect(
+        rig.prefsStore.saved.lastChat,
+        LastChat('q3', rig.chat.activeThread),
+      );
+      expect(rig.chat.activeThread, isNotNull);
+    });
+
+    test('follows a workspace whose slug changes', () async {
+      final llm = planningServer()..renamedSlug = 'q4';
+      final rig = await started(llm);
+      await rig.chat.renameWorkspace('q3', 'Q4 planning');
+      expect(rig.prefsStore.saved.lastChat?.slug, 'q4');
+    });
+  });
+
   test('select can open a chat other than the newest', () async {
     final llm = planningServer();
     final rig = await started(llm);

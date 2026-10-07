@@ -27,17 +27,26 @@ class PrefsController extends ChangeNotifier {
   Future<void> setWorkspaceOrder(List<String> slugs) =>
       _change(prefs.withOrder(slugs));
 
-  /// Drops a deleted workspace from the arrangement.
+  /// Remembers chat [thread] of workspace [slug] as the one to open at start; a null [thread]
+  /// is a draft.
+  Future<void> setLastChat(String slug, String? thread) async {
+    if (prefs.lastChat != LastChat(slug, thread)) {
+      await _change(prefs.withLastChat(slug, thread));
+    }
+  }
+
+  /// Drops a deleted workspace from the arrangement and the last chat.
   Future<void> forgetWorkspace(String slug) async {
-    if (prefs.workspaceOrder.contains(slug)) {
+    if (prefs.workspaceOrder.contains(slug) || prefs.lastChat?.slug == slug) {
       await _change(prefs.withoutWorkspace(slug));
     }
   }
 
-  /// Keeps a workspace's order and switched-off files when its slug changes.
+  /// Keeps a workspace's order, switched-off files and last chat when its slug changes.
   Future<void> renameWorkspace(String from, String to) async {
     if (prefs.workspaceOrder.contains(from) ||
-        prefs.switchedOff.containsKey(from)) {
+        prefs.switchedOff.containsKey(from) ||
+        prefs.lastChat?.slug == from) {
       await _change(prefs.withRenamedWorkspace(from, to));
     }
   }

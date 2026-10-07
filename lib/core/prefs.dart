@@ -30,6 +30,39 @@ class OffDoc {
   }
 }
 
+/// The workspace and chat last on screen, which the app opens at start when they still exist.
+class LastChat {
+  const LastChat(this.slug, [this.thread]);
+
+  final String slug;
+
+  /// The chat, or null when the workspace was left on a draft.
+  final String? thread;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LastChat && other.slug == slug && other.thread == thread;
+
+  @override
+  int get hashCode => Object.hash(slug, thread);
+
+  Map<String, Object?> toJson() => {
+    'slug': slug,
+    if (thread != null) 'thread': thread,
+  };
+
+  static LastChat? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final slug = json['slug'];
+    final thread = json['thread'];
+    if (slug is! String || slug.isEmpty) return null;
+    return LastChat(
+      slug,
+      thread is String && thread.isNotEmpty ? thread : null,
+    );
+  }
+}
+
 /// Which colours the app uses: the system's light or dark, or one of them always.
 enum ThemePref { system, light, dark }
 
@@ -51,6 +84,7 @@ class Prefs {
     this.workspaceOrder = const [],
     this.theme = ThemePref.system,
     this.textSize = TextSize.normal,
+    this.lastChat,
   });
 
   /// The documents switched off in each workspace, by its slug.
@@ -62,6 +96,9 @@ class Prefs {
 
   final ThemePref theme;
   final TextSize textSize;
+
+  /// The workspace and chat last on screen, or null before any was opened.
+  final LastChat? lastChat;
 
   List<OffDoc> offIn(String slug) => switchedOff[slug] ?? const [];
 
@@ -86,11 +123,13 @@ class Prefs {
     List<String>? workspaceOrder,
     ThemePref? theme,
     TextSize? textSize,
+    LastChat? Function()? lastChat,
   }) => Prefs(
     switchedOff: switchedOff ?? this.switchedOff,
     workspaceOrder: workspaceOrder ?? this.workspaceOrder,
     theme: theme ?? this.theme,
     textSize: textSize ?? this.textSize,
+    lastChat: lastChat == null ? this.lastChat : lastChat(),
   );
 
   /// These prefs with [slug]'s switched-off documents set to [docs].
@@ -121,8 +160,8 @@ class Prefs {
     ],
   );
 
-  /// These prefs with [from]'s order and switched-off documents moved to [to], as when a
-  /// workspace's slug changes.
+  /// These prefs with [from]'s order, switched-off documents and last chat moved to [to], as
+  /// when a workspace's slug changes.
   Prefs withRenamedWorkspace(String from, String to) => from == to
       ? this
       : _copy(
@@ -139,11 +178,22 @@ class Prefs {
             for (final s in workspaceOrder)
               if (s == from) to else if (s != to) s,
           ],
+          lastChat: () => lastChat?.slug == from
+              ? LastChat(to, lastChat!.thread)
+              : lastChat,
         );
 
-  /// These prefs with [slug] dropped from the order, as when the workspace is deleted.
-  Prefs withoutWorkspace(String slug) =>
-      _copy(workspaceOrder: [...workspaceOrder.where((s) => s != slug)]);
+  /// These prefs with [slug] dropped from the order and the last chat, as when the workspace
+  /// is deleted.
+  Prefs withoutWorkspace(String slug) => _copy(
+    workspaceOrder: [...workspaceOrder.where((s) => s != slug)],
+    lastChat: () => lastChat?.slug == slug ? null : lastChat,
+  );
+
+  /// These prefs with chat [thread] of workspace [slug] as the last on screen; a null [thread]
+  /// is a draft.
+  Prefs withLastChat(String slug, String? thread) =>
+      _copy(lastChat: () => LastChat(slug, thread));
 
   Prefs withTheme(ThemePref theme) => _copy(theme: theme);
 
@@ -157,6 +207,7 @@ class Prefs {
     'workspaceOrder': workspaceOrder,
     'theme': theme.name,
     'textSize': textSize.name,
+    if (lastChat != null) 'lastChat': lastChat!.toJson(),
   });
 
   /// Reads what [encode] wrote. Anything it cannot read falls back to the default, and keys it
@@ -188,6 +239,7 @@ class Prefs {
       theme: ThemePref.values.asNameMap()[json['theme']] ?? ThemePref.system,
       textSize:
           TextSize.values.asNameMap()[json['textSize']] ?? TextSize.normal,
+      lastChat: LastChat.fromJson(json['lastChat']),
     );
   }
 }

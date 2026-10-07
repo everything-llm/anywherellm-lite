@@ -274,7 +274,8 @@ class ChatController extends ChangeNotifier {
     if (_server != server) return;
     loading = false;
     if (active == null) {
-      await select(_firstSlug);
+      final (slug, thread) = _startChat;
+      await select(slug, thread: thread);
     } else {
       notifyListeners();
     }
@@ -327,6 +328,24 @@ class ChatController extends ChangeNotifier {
   String? get _firstSlug =>
       _prefs.prefs.inOrder(workspaces, (w) => w.slug).firstOrNull?.slug;
 
+  /// The workspace and chat to open first: the last on screen while the workspace exists, on
+  /// its newest chat when that chat is gone; otherwise [_firstSlug] on its newest chat.
+  (String?, String?) get _startChat {
+    final last = _prefs.prefs.lastChat;
+    if (last == null || !workspaces.any((w) => w.slug == last.slug)) {
+      return (_firstSlug, null);
+    }
+    final kept = threadsOf(last.slug).any((t) => t.slug == last.thread);
+    return (last.slug, kept ? last.thread : null);
+  }
+
+  /// Remembers the chat on screen as the one to open at start.
+  void _rememberChat() {
+    if (activeSlug case final slug?) {
+      unawaited(_prefs.setLastChat(slug, activeThread));
+    }
+  }
+
   void setDocCount(String slug, int count) {
     if (docCounts[slug] == count) return;
     docCounts[slug] = count;
@@ -350,6 +369,7 @@ class ChatController extends ChangeNotifier {
     activeThread = threadSlug;
     editing = null;
     _clearLinkNotice();
+    _rememberChat();
     notifyListeners();
     final slug = activeSlug;
     if (slug == null || threadSlug == null) return;
@@ -371,6 +391,7 @@ class ChatController extends ChangeNotifier {
     if (turns.isEmpty) return;
     _draft.clear();
     activeThread = null;
+    _rememberChat();
     notifyListeners();
   }
 
@@ -512,6 +533,7 @@ class ChatController extends ChangeNotifier {
         if (activeSlug == slug && activeThread == null) {
           _draft.clear();
           activeThread = made.slug;
+          _rememberChat();
         }
         running.thread = made.slug;
       } on ApiException catch (error) {

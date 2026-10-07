@@ -70,6 +70,38 @@ void main() {
     expect(back.textSize, TextSize.large);
   });
 
+  test('the last chat round-trips, and a draft has no chat', () {
+    final chat = const Prefs().withLastChat('a', 't');
+    expect(Prefs.decode(chat.encode()).lastChat, const LastChat('a', 't'));
+    final draft = const Prefs().withLastChat('a', null);
+    expect(Prefs.decode(draft.encode()).lastChat, const LastChat('a'));
+    expect(Prefs.decode(const Prefs().encode()).lastChat, isNull);
+  });
+
+  test('a last chat it cannot read is none', () {
+    expect(Prefs.decode('{"lastChat": "a"}').lastChat, isNull);
+    expect(Prefs.decode('{"lastChat": {"slug": ""}}').lastChat, isNull);
+    expect(
+      Prefs.decode('{"lastChat": {"slug": "a", "thread": 4}}').lastChat,
+      const LastChat('a'),
+    );
+  });
+
+  test(
+    'the last chat follows a renamed workspace and goes with a deleted one',
+    () {
+      final prefs = const Prefs().withLastChat('a', 't');
+      expect(
+        prefs.withRenamedWorkspace('a', 'z').lastChat,
+        const LastChat('z', 't'),
+      );
+      expect(prefs.withRenamedWorkspace('b', 'z').lastChat, prefs.lastChat);
+      expect(prefs.withoutWorkspace('a').lastChat, isNull);
+      expect(prefs.withoutWorkspace('b').lastChat, prefs.lastChat);
+      expect(prefs.withTheme(ThemePref.dark).lastChat, prefs.lastChat);
+    },
+  );
+
   test('an unknown theme or size reads as the default', () {
     final prefs = Prefs.decode(
       '{"theme": "neon", "textSize": 3, "workspaceOrder": ["a", 4, "b"]}',
