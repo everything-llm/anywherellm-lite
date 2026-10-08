@@ -9,6 +9,7 @@ import 'chat/app_panel.dart';
 import 'chat/browser_panel.dart';
 import 'chat/chat_view.dart';
 import 'files/files_view.dart';
+import 'files/workspace_pages.dart';
 import 'layout.dart';
 import 'quick_switcher.dart';
 import 'settings/settings_dialog.dart';
@@ -67,6 +68,7 @@ class AppShell extends StatelessWidget {
     bool closeTop({
       required bool settingsSideBySide,
       required bool sidebarDrawer,
+      required bool phone,
     }) {
       if (shell.popup.value != null) {
         shell.closePopup();
@@ -82,6 +84,15 @@ class AppShell extends StatelessWidget {
         shell.closeApp();
       } else if (shell.browserOpen) {
         shell.closeBrowser();
+      } else if (phone && shell.pane == Pane.files) {
+        // A phone's workspace pages step back: a document's text, a page, then the chat.
+        if (scope.files.reading != null) {
+          scope.files.closeText();
+        } else if (shell.workspacePage != null) {
+          shell.showWorkspacePage(null);
+        } else {
+          shell.showPane(Pane.chats);
+        }
       } else {
         return false;
       }
@@ -133,12 +144,14 @@ class AppShell extends StatelessWidget {
                   sideDrawer ||
                   sourcesDrawer ||
                   sheetOpen ||
+                  (screen.isPhone && files) ||
                   shell.appOpen ||
                   shell.browserOpen,
               onBack: () {
                 if (!closeTop(
                   settingsSideBySide: settingsSideBySide,
                   sidebarDrawer: screen.sidebarDrawer,
+                  phone: screen.isPhone,
                 )) {
                   shell.closeSources();
                 }
@@ -159,6 +172,7 @@ class AppShell extends StatelessWidget {
                     if (!closeTop(
                           settingsSideBySide: settingsSideBySide,
                           sidebarDrawer: screen.sidebarDrawer,
+                          phone: screen.isPhone,
                         ) &&
                         (sourcesDrawer || sheetOpen)) {
                       shell.closeSources();
@@ -201,9 +215,11 @@ class AppShell extends StatelessWidget {
                                         ),
                                       ),
                                       if (files)
-                                        FilesView(
-                                          showMenu: screen.sidebarDrawer,
-                                        ),
+                                        screen.isPhone
+                                            ? const WorkspacePages()
+                                            : FilesView(
+                                                showMenu: screen.sidebarDrawer,
+                                              ),
                                     ],
                                   ),
                                 ),

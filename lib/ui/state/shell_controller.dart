@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../core/chat.dart';
+import '../../core/files.dart';
 import '../settings/settings_pages.dart';
 import 'chat_controller.dart';
 
@@ -78,6 +79,19 @@ class ShellController extends ChangeNotifier {
 
   bool _sourcesPinned;
   bool _sourcesDrawer = false;
+  FilesSection? _workspacePage;
+
+  /// On a phone, where Files is the open workspace's pages: the page open, or null for the list
+  /// of them.
+  FilesSection? get workspacePage => _workspacePage;
+
+  /// Opens one of the workspace's pages on a phone, or the list of them.
+  void showWorkspacePage(FilesSection? page) {
+    if (page == _workspacePage) return;
+    _workspacePage = page;
+    notifyListeners();
+  }
+
   bool _settingsOpen = false;
   Pane _pane = Pane.chats;
   SettingsPage? _settingsPage;
@@ -211,6 +225,7 @@ class ShellController extends ChangeNotifier {
   void showPane(Pane pane) {
     if (pane == _pane) return;
     _pane = pane;
+    _workspacePage = null;
     closePopup();
     notifyListeners();
   }

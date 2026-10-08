@@ -459,49 +459,78 @@ void main() {
   for (final size in sizes) {
     final at = '${size.width.toInt()}x${size.height.toInt()}';
 
-    testWidgets('Files and each kind of node fit at $at', (tester) async {
+    testWidgets('the workspace\'s pages fit at $at', skip: size.width >= 720, (
+      tester,
+    ) async {
       final llm = awkward();
       llm.spaces.first.prompt = 'prompt-$longWord';
       final h = await pumpApp(tester, llm: llm, size: size);
-      h.shell
-        ..showPane(Pane.files)
-        ..toggleSide();
+      h.shell.showPane(Pane.files);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      for (final path in [
-        '/workspaces/w',
-        '/workspaces/w/docs',
-        '/workspaces/w/chats',
-        '/library/custom-documents',
+      for (final page in [
+        FilesSection.documents,
+        FilesSection.instructions,
+        FilesSection.answers,
       ]) {
-        h.files.toggle(path);
-      }
-      for (final path in [
-        '/workspaces/w',
-        '/workspaces/w/docs',
-        '/workspaces/w/PROMPT.md',
-        '/workspaces/w/settings.json',
-        '/workspaces/w/chats/t',
-        '/workspaces/w/docs/custom-documents/file-$longWord.pdf.json',
-        '/library',
-        '/library/custom-documents',
-        '/library/custom-documents/file-$longWord.pdf.json',
-        '/keys',
-      ]) {
-        await h.files.select(path);
+        h.shell.showWorkspacePage(page);
+        await h.files.openSection(page);
         await tester.pumpAndSettle();
-        expect(h.files.node, isNotNull, reason: path);
-        expect(tester.takeException(), isNull, reason: path);
+        expect(tester.takeException(), isNull, reason: '$page');
       }
-      h.shell.closeSide();
-      await h.files.select('/library/custom-documents');
+      await tester.tap(find.text('Chat model').last);
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Delete folder…'));
-      await tester.tap(find.text('Delete folder…'));
-      await tester.pumpAndSettle();
-      expect(find.bySemanticsLabel('Cancel'), findsWidgets);
       expect(tester.takeException(), isNull);
     });
+
+    // A phone shows the workspace's pages, with no tree.
+    testWidgets(
+      'Files and each kind of node fit at $at',
+      skip: size.width < 720,
+      (tester) async {
+        final llm = awkward();
+        llm.spaces.first.prompt = 'prompt-$longWord';
+        final h = await pumpApp(tester, llm: llm, size: size);
+        h.shell
+          ..showPane(Pane.files)
+          ..toggleSide();
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        for (final path in [
+          '/workspaces/w',
+          '/workspaces/w/docs',
+          '/workspaces/w/chats',
+          '/library/custom-documents',
+        ]) {
+          h.files.toggle(path);
+        }
+        for (final path in [
+          '/workspaces/w',
+          '/workspaces/w/docs',
+          '/workspaces/w/PROMPT.md',
+          '/workspaces/w/settings.json',
+          '/workspaces/w/chats/t',
+          '/workspaces/w/docs/custom-documents/file-$longWord.pdf.json',
+          '/library',
+          '/library/custom-documents',
+          '/library/custom-documents/file-$longWord.pdf.json',
+          '/keys',
+        ]) {
+          await h.files.select(path);
+          await tester.pumpAndSettle();
+          expect(h.files.node, isNotNull, reason: path);
+          expect(tester.takeException(), isNull, reason: path);
+        }
+        h.shell.closeSide();
+        await h.files.select('/library/custom-documents');
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Delete folder…'));
+        await tester.tap(find.text('Delete folder…'));
+        await tester.pumpAndSettle();
+        expect(find.bySemanticsLabel('Cancel'), findsWidgets);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   for (final size in sizes) {

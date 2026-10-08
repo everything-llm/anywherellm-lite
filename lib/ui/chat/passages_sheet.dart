@@ -67,7 +67,11 @@ class PassagesView extends StatelessWidget {
                       citation.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Type.sans(14, weight: FontWeight.w500, color: t.ink),
+                      style: Type.sans(
+                        14,
+                        weight: FontWeight.w500,
+                        color: t.ink,
+                      ),
                     ),
                     Text(
                       passages.length == 1

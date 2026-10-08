@@ -1,6 +1,7 @@
 import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/ui/chat/composer.dart';
-import 'package:anywherellm/ui/files/files_view.dart';
+import 'package:anywherellm/core/files.dart';
+import 'package:anywherellm/ui/files/workspace_pages.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
@@ -132,11 +133,13 @@ void main() {
     'a workspace prompt being edited on a phone on its side is above the keyboard',
     (tester) async {
       final h = await pumpApp(tester, llm: planningServer(), size: side);
-      h.shell.showPane(Pane.files);
+      h.shell
+        ..showPane(Pane.files)
+        ..showWorkspacePage(FilesSection.instructions);
       await tester.pumpAndSettle();
-      await h.files.select('/workspaces/q3/PROMPT.md');
+      await h.files.openSection(FilesSection.instructions);
       await tester.pumpAndSettle();
-      final field = typingField(find.byType(FilesView)).first;
+      final field = typingField(find.byType(WorkspacePages)).first;
       await tester.tap(field, warnIfMissed: false);
       raiseKeyboard(tester, sideKeyboard);
       await tester.pumpAndSettle();

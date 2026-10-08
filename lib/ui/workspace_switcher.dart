@@ -14,6 +14,7 @@ import 'widgets/basics.dart';
 import 'widgets/confirm_box.dart';
 import 'widgets/inline_input.dart';
 import 'widgets/menu.dart';
+import 'widgets/sheet.dart';
 import 'widgets/tappable.dart';
 
 /// Whether Ctrl+1 to Ctrl+9 are shown beside the workspaces: on a desktop, where there is a
@@ -182,6 +183,22 @@ class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
               onCancel: ask.reset,
               commitOnBlur: true,
             )
+          : ScreenClass.ofContext(context).isPhone
+          // A phone's menu is a sheet over the window.
+          ? PopupSheet(
+              open: _shell.menuOpen,
+              onClose: () => _shell.closePopup(Popup.workspaces),
+              title: 'Workspaces',
+              sheet: (context) => SingleChildScrollView(
+                child: _WorkspaceMenu(
+                  sheet: true,
+                  onRename: () => ask.ask(Asking.rename),
+                  onDelete: () => ask.ask(Asking.delete),
+                  onCreate: () => ask.ask(Asking.create),
+                ),
+              ),
+              child: _button(context),
+            )
           : PopupAnchor(
               open: _shell.menuOpen,
               onClose: () => _shell.closePopup(Popup.workspaces),
@@ -253,16 +270,21 @@ class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
   }
 }
 
+/// The workspaces, to open one or drag it to another place, then Files and settings, Rename,
+/// Delete and New workspace. In a phone's [sheet] each workspace says how many documents it
+/// has, and Files and settings is named for the workspace's pages.
 class _WorkspaceMenu extends StatelessWidget {
   const _WorkspaceMenu({
     required this.onRename,
     required this.onDelete,
     required this.onCreate,
+    this.sheet = false,
   });
 
   final VoidCallback onRename;
   final VoidCallback onDelete;
   final VoidCallback onCreate;
+  final bool sheet;
 
   @override
   Widget build(BuildContext context) {
@@ -272,58 +294,70 @@ class _WorkspaceMenu extends StatelessWidget {
     final ordered = scope.prefs.prefs.inOrder(chat.workspaces, (w) => w.slug);
     final active = chat.active;
     final keys = showsWorkspaceKeys(context);
-    return AppMenu(
-      label: 'Workspaces',
-      children: [
-        if (ordered.isNotEmpty)
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 320),
-            child: ReorderableListView.builder(
-              shrinkWrap: true,
-              // The row starts a drag, not a handle beside it.
-              buildDefaultDragHandles: false,
-              itemCount: ordered.length,
-              onReorderItem: (from, to) {
-                final slugs = [for (final w in ordered) w.slug];
-                slugs.insert(to, slugs.removeAt(from));
-                scope.prefs.setWorkspaceOrder(slugs);
-              },
-              // The dragged row is drawn in the app's overlay, outside AppScope, so it is
-              // shown as a name alone.
-              proxyDecorator: (child, i, animation) =>
-                  _DragGhost(ordered[i].name),
-              itemBuilder: (context, i) => _WorkspaceItem(
-                ordered[i],
-                key: ValueKey(ordered[i].slug),
-                index: i,
-                shortcut: keys && i < 9 ? 'Ctrl ${i + 1}' : null,
-              ),
+    final items = <Widget>[
+      if (ordered.isNotEmpty)
+        ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: sheet ? 400 : 320),
+          child: ReorderableListView.builder(
+            shrinkWrap: true,
+            // The row starts a drag, not a handle beside it.
+            buildDefaultDragHandles: false,
+            itemCount: ordered.length,
+            onReorderItem: (from, to) {
+              final slugs = [for (final w in ordered) w.slug];
+              slugs.insert(to, slugs.removeAt(from));
+              scope.prefs.setWorkspaceOrder(slugs);
+            },
+            // The dragged row is drawn in the app's overlay, outside AppScope, so it is
+            // shown as a name alone.
+            proxyDecorator: (child, i, animation) =>
+                _DragGhost(ordered[i].name),
+            itemBuilder: (context, i) => _WorkspaceItem(
+              ordered[i],
+              key: ValueKey(ordered[i].slug),
+              index: i,
+              shortcut: keys && i < 9 ? 'Ctrl ${i + 1}' : null,
+              sheet: sheet,
             ),
           ),
-        if (ordered.isNotEmpty) const MenuDivider(),
-        AppMenuItem(
-          shell.pane == Pane.files ? 'Chats' : 'Files and settings',
-          onTap: () => shell.showPane(
-            shell.pane == Pane.files ? Pane.chats : Pane.files,
-          ),
         ),
-        if (active != null) ...[
-          AppMenuItem('Rename workspace', onTap: onRename),
-          AppMenuItem(
-            'Delete workspace…',
-            danger: true,
-            onTap: chat.answeringIn(active.slug) ? null : onDelete,
-          ),
-        ],
-        const MenuDivider(),
+      if (ordered.isNotEmpty) const MenuDivider(),
+      AppMenuItem(
+        shell.pane == Pane.files
+            ? 'Chats'
+            : sheet
+            ? 'Documents, instructions and settings'
+            : 'Files and settings',
+        onTap: () {
+          if (sheet) {
+            shell.closePopup(Popup.workspaces);
+            shell.closeSide();
+          }
+          shell.showPane(shell.pane == Pane.files ? Pane.chats : Pane.files);
+        },
+      ),
+      if (active != null) ...[
+        AppMenuItem('Rename workspace', onTap: onRename),
         AppMenuItem(
-          'New workspace',
-          icon: 'plus',
-          accent: true,
-          onTap: onCreate,
+          'Delete workspace…',
+          danger: true,
+          onTap: chat.answeringIn(active.slug) ? null : onDelete,
         ),
       ],
-    );
+      const MenuDivider(),
+      AppMenuItem('New workspace', icon: 'plus', accent: true, onTap: onCreate),
+    ];
+    if (sheet) {
+      return Semantics(
+        container: true,
+        label: 'Workspaces',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: items,
+        ),
+      );
+    }
+    return AppMenu(label: 'Workspaces', children: items);
   }
 }
 
@@ -334,7 +368,11 @@ class _WorkspaceItem extends StatelessWidget {
     super.key,
     required this.index,
     this.shortcut,
+    this.sheet = false,
   });
+
+  /// In a phone's sheet: taller, with the workspace's document count.
+  final bool sheet;
 
   final Workspace workspace;
 
@@ -351,6 +389,7 @@ class _WorkspaceItem extends StatelessWidget {
     final t = Tokens.of(context);
     final active = chat.activeSlug == workspace.slug;
     final ready = !active && chat.readyIn(workspace.slug);
+    final count = sheet ? chat.docCounts[workspace.slug] : null;
     return _Draggable(
       index: index,
       child: Tappable(
@@ -363,7 +402,7 @@ class _WorkspaceItem extends StatelessWidget {
         radius: BorderRadius.circular(8),
         color: active ? t.sel : null,
         child: SizedBox(
-          height: 40,
+          height: sheet ? 48 : 40,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Row(
@@ -381,13 +420,20 @@ class _WorkspaceItem extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Type.sans(
-                      14,
+                      sheet ? 15.5 : 14,
                       weight: active ? FontWeight.w600 : FontWeight.w400,
                       color: t.ink,
                     ),
                   ),
                 ),
                 if (ready) const ReadyDot(),
+                if (count != null) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    plural(count, 'doc', 'docs'),
+                    style: Type.sans(12.5, color: t.muted),
+                  ),
+                ],
                 if (shortcut != null)
                   Text(shortcut!, style: Type.sans(12, color: t.muted)),
               ],

@@ -146,10 +146,7 @@ class _AnswerMoreState extends State<AnswerMore> {
             if (details) ...[
               const SizedBox(width: 12),
               Flexible(
-                child: Text(
-                  metrics.text,
-                  style: Type.sans(12, color: t.muted),
-                ),
+                child: Text(metrics.text, style: Type.sans(12, color: t.muted)),
               ),
             ],
           ],
@@ -196,7 +193,10 @@ class _AnswerMenu extends StatelessWidget {
         ),
       for (final (name, value) in metrics?.named ?? const <(String, String)>[])
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: pad, vertical: sheet ? 8 : 5),
+          padding: EdgeInsets.symmetric(
+            horizontal: pad,
+            vertical: sheet ? 8 : 5,
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

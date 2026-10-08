@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../icons.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import 'tappable.dart';
@@ -169,6 +170,7 @@ class AppMenuItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    final phone = ScreenClass.ofContext(context).isPhone;
     final color = danger
         ? t.badfg
         : accent
@@ -180,7 +182,7 @@ class AppMenuItem extends StatelessWidget {
       radius: BorderRadius.circular(8),
       dimWhenDisabled: 0.4,
       child: SizedBox(
-        height: 38,
+        height: phone ? 48 : 38,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Row(
@@ -197,7 +199,7 @@ class AppMenuItem extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Type.sans(14, color: color),
+                  style: Type.sans(phone ? 15 : 14, color: color),
                 ),
               ),
             ],

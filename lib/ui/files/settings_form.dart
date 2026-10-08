@@ -9,9 +9,12 @@ import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
+import '../chat/model_picker.dart';
 import '../widgets/fields.dart';
+import '../widgets/phone_page.dart';
 import '../widgets/setting_row.dart';
 import '../widgets/segmented.dart';
+import '../widgets/tappable.dart';
 
 /// The similarity thresholds the web UI offers, with the score each one stands for.
 const similarityPresets = [
@@ -41,9 +44,15 @@ class SettingsForm extends StatefulWidget {
     required this.slug,
     required this.onJson,
     this.plain = false,
+    this.phone = false,
   });
 
   final String slug;
+
+  /// Shows only what a phone does, in the composer's words: Answer from as a card for each
+  /// mode, the chat model, which opens the [ModelPicker], and what Files only says when the
+  /// files do not cover a question. The rest is kept as the server has it.
+  final bool phone;
 
   /// Names the chat mode and the refusal as the Essentials view does, in the composer's words,
   /// rather than AnythingLLM's.
@@ -75,6 +84,9 @@ class _SettingsFormState extends State<SettingsForm> {
   late Object? _similarity;
   bool _saving = false;
   bool _checked = false;
+
+  /// Whether the model picker shows, on a phone.
+  bool _picking = false;
 
   @override
   void initState() {
@@ -195,6 +207,15 @@ class _SettingsFormState extends State<SettingsForm> {
         .where((p) => similarity is num && p.$1 == similarity)
         .firstOrNull;
     final dirty = _dirty;
+    final buttons = ActionRow([
+      AppButton('Revert', onPressed: dirty && !_saving ? _revert : null),
+      AppButton(
+        _saving ? 'Saving…' : 'Save',
+        primary: true,
+        onPressed: dirty && !_saving ? _save : null,
+      ),
+    ]);
+    if (widget.phone) return _phone(context, buttons);
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
@@ -334,22 +355,164 @@ class _SettingsFormState extends State<SettingsForm> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                ActionRow([
-                  AppButton(
-                    'Revert',
-                    onPressed: dirty && !_saving ? _revert : null,
-                  ),
-                  AppButton(
-                    _saving ? 'Saving…' : 'Save',
-                    primary: true,
-                    onPressed: dirty && !_saving ? _save : null,
-                  ),
-                ]),
+                buttons,
               ],
             ),
           ),
         ),
       ],
+    );
+  }
+
+  /// The phone's three settings, under their buttons' row.
+  Widget _phone(BuildContext context, Widget buttons) {
+    final scope = AppScope.of(context);
+    final workspace = scope.chat.active?.name ?? 'this workspace';
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+      children: [
+        const SizedBox(height: 14),
+        const SectionLabel('Answer from'),
+        const SizedBox(height: 6),
+        Semantics(
+          container: true,
+          label: 'Answer from',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final mode in ChatMode.values)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: RadioCard(
+                    title: mode.title,
+                    about: mode.detail,
+                    selected: _mode == mode.name,
+                    onTap: () => setState(() => _mode = mode.name),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        const SectionLabel('Model'),
+        const SizedBox(height: 6),
+        ListenableBuilder(
+          listenable: Listenable.merge([scope.sources, scope.system]),
+          builder: (context, _) {
+            final own = scope.sources.chatModel;
+            final model = workspaceModel(scope);
+            return GroupCard(
+              children: [
+                NavRow(
+                  title: 'Chat model',
+                  about:
+                      own ??
+                      (model == 'Chat model' ? null : 'The server\'s: $model'),
+                  onTap: () => setState(() => _picking = !_picking),
+                ),
+              ],
+            );
+          },
+        ),
+        if (_picking) ...[
+          const SizedBox(height: 8),
+          ModelPicker(onClose: () => setState(() => _picking = false)),
+        ],
+        const SizedBox(height: 18),
+        const SectionLabel('When the files do not cover it'),
+        const SizedBox(height: 6),
+        AppField(
+          controller: _text['queryRefusalResponse']!,
+          label: 'When the files do not cover it',
+          hint: 'System default',
+          maxLines: 3,
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 8),
+        Footnote(
+          'What Files only says when no document matches. These apply to every chat in '
+          '$workspace. Chat history, temperature and document search are in the desktop app.',
+        ),
+        const SizedBox(height: 16),
+        buttons,
+      ],
+    );
+  }
+}
+
+/// One choice of several, as a card: a radio ring, [title] and the line [about] under it, the
+/// chosen one filled.
+class RadioCard extends StatelessWidget {
+  const RadioCard({
+    super.key,
+    required this.title,
+    required this.about,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String title;
+  final String about;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Tappable(
+      label: '$title. $about',
+      selected: selected,
+      onTap: onTap,
+      radius: BorderRadius.circular(12),
+      color: selected ? t.sel : t.panel,
+      side: BorderSide(color: selected ? Colors.transparent : t.line),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 56),
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        child: Row(
+          children: [
+            Container(
+              width: 18,
+              height: 18,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: selected ? t.accent : t.fade,
+                  width: 1.5,
+                ),
+              ),
+              child: selected
+                  ? Container(
+                      width: 9,
+                      height: 9,
+                      decoration: BoxDecoration(
+                        color: t.accent,
+                        shape: BoxShape.circle,
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Type.sans(
+                      15,
+                      weight: selected ? FontWeight.w600 : FontWeight.w500,
+                      color: t.ink,
+                    ),
+                  ),
+                  Text(about, style: Type.sans(12.5, color: t.muted)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

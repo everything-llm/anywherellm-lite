@@ -6,6 +6,7 @@ import 'package:anywherellm/core/upload.dart';
 import 'package:anywherellm/ui/files/essentials.dart';
 import 'package:anywherellm/ui/files/file_tree.dart';
 import 'package:anywherellm/ui/files/files_view.dart';
+import 'package:anywherellm/ui/files/workspace_pages.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/upload_queue.dart';
 import 'package:flutter/material.dart';
@@ -243,17 +244,45 @@ void main() {
     expect(inPane(find.text('No documents yet.')), findsOneWidget);
   });
 
-  testWidgets('a section picked in the phone\'s drawer closes it', (
-    tester,
-  ) async {
-    final h = await openFiles(tester, size: const Size(360, 640));
-    h.shell.toggleSide();
-    await tester.pumpAndSettle();
-    await tapSection(tester, 'Answer settings');
-    expect(h.shell.sideOpen, isFalse);
-    expect(h.files.section, FilesSection.answers);
-    expect(tester.takeException(), isNull);
-  });
+  testWidgets(
+    'on a phone Files is the workspace\'s pages, and Back steps out',
+    (tester) async {
+      final h = await pumpApp(
+        tester,
+        llm: planningServer(),
+        size: const Size(390, 844),
+      );
+      h.shell.showPane(Pane.files);
+      await tester.pumpAndSettle();
+      final pages = find.byType(WorkspacePages);
+      expect(pages, findsOneWidget);
+      expect(find.byType(FileTree), findsNothing);
+      Finder inPages(Finder f) => find.descendant(of: pages, matching: f);
+      expect(inPages(find.text('Q3 planning')), findsOneWidget);
+      expect(inPages(find.textContaining('used in answers')), findsOneWidget);
+      expect(
+        inPages(
+          find.text('Created files and the file tree are in the desktop app.'),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(inPages(find.text('Answer settings')));
+      await tester.pumpAndSettle();
+      expect(h.shell.workspacePage, FilesSection.answers);
+      // Three settings only, in the composer's words.
+      expect(inPages(find.text('Files & knowledge')), findsOneWidget);
+      expect(inPages(find.text('Chat model')), findsOneWidget);
+      expect(inPages(find.text('Chat history')), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(h.shell.workspacePage, isNull);
+      expect(h.shell.pane, Pane.files);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(h.shell.pane, Pane.chats);
+    },
+  );
 
   testWidgets('the sections list only while Essentials is on', (tester) async {
     final h = await openFiles(tester);

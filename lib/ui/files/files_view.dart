@@ -76,7 +76,7 @@ class FilesView extends StatelessWidget {
                 ),
               Expanded(
                 child: essentials
-                    ? _essential(context, node)
+                    ? essentialSection(context, node)
                     : _body(context, node),
               ),
             ],
@@ -84,31 +84,6 @@ class FilesView extends StatelessWidget {
         );
       },
     );
-  }
-
-  /// The Essentials view's section of the open workspace, each but Created files the same node
-  /// as in the tree.
-  Widget _essential(BuildContext context, FileNode? node) {
-    final scope = AppScope.of(context);
-    final files = scope.files;
-    final workspace = scope.chat.active;
-    if (workspace == null) return const Blank('No workspace is open.');
-    if (files.reading != null) return const TextViewer();
-    final section = files.section;
-    final key = ValueKey('${node?.path}#${files.revision}');
-    return switch (section) {
-      // Keyed by workspace, so what waits to be added stays with it.
-      FilesSection.documents => EssentialDocs(key: ValueKey(workspace.slug)),
-      FilesSection.created => CreatedFiles(workspace: workspace.name),
-      _ when files.contentLoading || (node == null && files.loading) =>
-        const Blank('Loading…'),
-      _ when node == null => Blank(
-        'The server did not send this workspace\'s '
-        '${section == FilesSection.instructions ? 'prompt' : 'settings'}.',
-      ),
-      FilesSection.instructions => _Editor(key: key, node: node),
-      FilesSection.answers => _SettingsPage(key: key, node: node, plain: true),
-    };
   }
 
   Widget _body(BuildContext context, FileNode? node) {
@@ -185,12 +160,20 @@ class TextPage extends StatelessWidget {
 /// A workspace's `settings.json`: the form, or the JSON itself when asked for. Its key changes
 /// each time the settings are read afresh, which drops the draft.
 class _SettingsPage extends StatelessWidget {
-  const _SettingsPage({super.key, required this.node, this.plain = false});
+  const _SettingsPage({
+    super.key,
+    required this.node,
+    this.plain = false,
+    this.phone = false,
+  });
 
   final FileNode node;
 
   /// Names the form's fields as the Essentials view does.
   final bool plain;
+
+  /// Shows only what a phone does: Answer from, the model and the refusal.
+  final bool phone;
 
   @override
   Widget build(BuildContext context) {
@@ -200,6 +183,7 @@ class _SettingsPage extends StatelessWidget {
         : SettingsForm(
             slug: node.slug!,
             plain: plain,
+            phone: phone,
             onJson: () => files.showSettingsAsJson(true),
           );
   }
@@ -335,4 +319,39 @@ class _EditorState extends State<_Editor> {
       ),
     );
   }
+}
+
+/// The Essentials view's section of the open workspace, each but Created files the same node as
+/// in the tree, or the text of one of its documents. On a [phone] its answer settings are the
+/// few a phone shows.
+Widget essentialSection(
+  BuildContext context,
+  FileNode? node, {
+  bool phone = false,
+}) {
+  final scope = AppScope.of(context);
+  final files = scope.files;
+  final workspace = scope.chat.active;
+  if (workspace == null) return const Blank('No workspace is open.');
+  if (files.reading != null) return const TextViewer();
+  final section = files.section;
+  final key = ValueKey('${node?.path}#${files.revision}');
+  return switch (section) {
+    // Keyed by workspace, so what waits to be added stays with it.
+    FilesSection.documents => EssentialDocs(key: ValueKey(workspace.slug)),
+    FilesSection.created => CreatedFiles(workspace: workspace.name),
+    _ when files.contentLoading || (node == null && files.loading) =>
+      const Blank('Loading…'),
+    _ when node == null => Blank(
+      'The server did not send this workspace\'s '
+      '${section == FilesSection.instructions ? 'prompt' : 'settings'}.',
+    ),
+    FilesSection.instructions => _Editor(key: key, node: node),
+    FilesSection.answers => _SettingsPage(
+      key: key,
+      node: node,
+      plain: true,
+      phone: phone,
+    ),
+  };
 }

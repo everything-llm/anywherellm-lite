@@ -228,7 +228,9 @@ class SheetHeader extends StatelessWidget {
     return Container(
       padding: EdgeInsets.fromLTRB(20, 4, 8, divided ? 10 : 2),
       decoration: divided
-          ? BoxDecoration(border: Border(bottom: BorderSide(color: t.line2)))
+          ? BoxDecoration(
+              border: Border(bottom: BorderSide(color: t.line2)),
+            )
           : null,
       child: Row(
         children: [

@@ -81,7 +81,10 @@ class _SidebarState extends State<Sidebar> {
                   ]),
                   builder: (context, _) => switch (_ask.asking) {
                     Asking.delete || Asking.create => WorkspaceQuestion(_ask),
-                    _ when AppScope.of(context).shell.pane == Pane.files =>
+                    // A phone's Files is the workspace's pages, with no tree.
+                    _
+                        when AppScope.of(context).shell.pane == Pane.files &&
+                            !ScreenClass.ofContext(context).isPhone =>
                       const _Files(),
                     _ => const _Chats(),
                   },

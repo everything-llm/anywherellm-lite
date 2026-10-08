@@ -311,18 +311,19 @@ void main() {
       ),
     );
 
-    testWidgets('the box stays off while another chat of the workspace answers', (
-      tester,
-    ) async {
-      await answering(tester);
-      await tester.tap(find.bySemanticsLabel('Quarter priorities').first);
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(field(tester).enabled, isFalse);
-      expect(
-        field(tester).decoration!.hintText,
-        'Another chat in this workspace is still answering…',
-      );
-    });
+    testWidgets(
+      'the box stays off while another chat of the workspace answers',
+      (tester) async {
+        await answering(tester);
+        await tester.tap(find.bySemanticsLabel('Quarter priorities').first);
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(field(tester).enabled, isFalse);
+        expect(
+          field(tester).decoration!.hintText,
+          'Another chat in this workspace is still answering…',
+        );
+      },
+    );
 
     testWidgets('a chat of another workspace takes a message', (tester) async {
       final llm = planningServer()..hold = true;
