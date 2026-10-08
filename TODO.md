@@ -22,6 +22,7 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 | Signing in makes one key | Built against AnythingLLM v1.16.2's source and tested with fakes only. Sign in with the address and password on the home server, then check that the web UI's Developer API page lists one key named `AnywhereLLM` and that the workspaces load. It writes one key to the server. |
 | Signing in again reuses the key | Forget the connection and sign in again, and sign in on a second device: the Developer API page must still list one `AnywhereLLM` key. Then delete it there and check that every device fails with the key refused and signs in again with a new one. |
 | A server with no password | Signing in with the address alone needs a server without a password; none has been tried. |
+| Closing the window during a chat's undo | Delete a chat and close the Linux window within 6 s: the chat must be gone from the server. It relies on Flutter handing the window's close to `AppLifecycleListener.onExitRequested`, which tests cannot show. |
 
 ## Local, no server needed
 
@@ -30,6 +31,17 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 | Send a dictated message on its own | The web UI's auto-submit speech. Dictation fills the message and waits for Send. |
 | Read every answer aloud as it arrives | The web UI's auto-speak. Read aloud is a button on each answer, on Android only. |
 | Spellcheck, auto-scroll and HTML in answers | The web UI's Customization > Chat preferences. Each is a local setting. |
+
+## From the design canvas, not built yet
+
+A quieter restyle drawn on the canvas's main chat board after the workspace switcher was built. Each is local.
+
+| Gap | Note |
+| --- | --- |
+| Sans-serif wordmark | The sidebar's AnywhereLLM is Instrument Sans 19 w600, not Instrument Serif 24. |
+| Sans-serif chat title | The chat header's title is sans 15 w600, the workspace in muted w400, not serif 20. |
+| Borderless Browser and Sources buttons | The header's Browser and Sources have no fill or border until pressed. |
+| Sources' files as plain rows | A file is a row with 8 px padding and radius 10, not a bordered card. |
 
 ## Needs a new dependency
 
