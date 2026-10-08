@@ -14,6 +14,9 @@ export 'errors.dart';
 /// password, which the app does not do.
 enum ServerAuth { none, password, multiUser }
 
+/// A running answer found again: see [AnythingLlmApi.rejoinChat].
+typedef RejoinedAnswer = ({String? question, Stream<ChatEvent> events});
+
 /// The AnythingLLM server, as the UI sees it. Every method throws [ApiException] on failure.
 /// Every method but [verify] uses the connection in use, and throws [NotConfigured] when there
 /// is none.
@@ -71,6 +74,13 @@ abstract interface class AnythingLlmApi {
     String message, {
     List<Attachment> attachments = const [],
   });
+
+  /// The answer a server that keeps answers going without the app is still writing in the chat,
+  /// which the app did not start in this run: its [question], when the server says it, and its
+  /// [events] from the start. Cancelling the subscription lets go of it, and [stopChat] stops it.
+  /// Null when there is no such answer, the server has no such relay, or it cannot be asked: a
+  /// chat never fails to open for this.
+  Future<RejoinedAnswer?> rejoinChat(String slug, String thread);
 
   /// Stops the answer [streamChat] is running in the chat, on a server that keeps answers going
   /// without the app. Does nothing when there is none. Call it before cancelling the

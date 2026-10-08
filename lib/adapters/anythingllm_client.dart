@@ -290,6 +290,76 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     );
   }
 
+  /// The running run of the chat on the relay, which `GET /everythingllm/v1/runs?status=running`
+  /// lists, followed from its first event. The list is read as JSON holding runs, or an object
+  /// with them under `runs`; each names its `id`, `workspace` and `thread`, and may carry the
+  /// question that started it, as `message` or `question`, or in its `body`. A run whose body is a
+  /// `reset` clears the chat and is no answer. A route or an answer that is not there, or no
+  /// server set up, reads as no run: opening a chat never fails for this.
+  @override
+  Future<RejoinedAnswer?> rejoinChat(String slug, String thread) async {
+    try {
+      final connection = _current;
+      if (!await _isRelay(connection)) return null;
+      final listed = await _get(
+        connection,
+        '$relayPath/v1/runs?status=running',
+      );
+      for (final run in jsonObjects(listed is Map ? listed['runs'] : listed)) {
+        final id = run['id'];
+        final status = run['status'];
+        final body = run['body'];
+        if (id is! String ||
+            run['workspace'] != slug ||
+            run['thread'] != thread ||
+            (status is String && status != 'running') ||
+            (body is Map && body['reset'] == true)) {
+          continue;
+        }
+        final known = Future<String>.value(id);
+        return (
+          question: _questionOf(run),
+          events: _letGo(
+            (gone) => _followRun(connection, (slug, thread), known, known, gone),
+          ),
+        );
+      }
+    } on ApiException {
+      return null;
+    }
+    return null;
+  }
+
+  /// The question a listed [run] was started with, or null when it does not say.
+  String? _questionOf(Map<String, dynamic> run) {
+    final body = run['body'];
+    for (final said in [
+      run['message'],
+      run['question'],
+      if (body is Map) body['message'],
+    ]) {
+      if (said is String && said.trim().isNotEmpty) return said.trim();
+    }
+    return null;
+  }
+
+  /// Follows run [id] as [chat]'s run until it ends or [gone] completes. [started] is [id], or
+  /// null when the run did not start; [stopChat] reaches the run through it while it is followed.
+  Stream<ChatEvent> _followRun(
+    Connection connection,
+    (String, String) chat,
+    Future<String?> started,
+    Future<String> id,
+    Future<void> gone,
+  ) async* {
+    _runs[chat] = (connection, started);
+    try {
+      yield* chatEventsOf(_runChunks(connection, await id, gone));
+    } finally {
+      if (identical(_runs[chat]?.$2, started)) _runs.remove(chat);
+    }
+  }
+
   /// Whether the server at [connection] has the relay: its `GET /everythingllm/health` answers
   /// JSON naming the `everythingllm` service with `runs` among its features. The route is open, so
   /// the key is not sent. AnythingLLM answers a path it does not know with its web page and a 200,
@@ -320,28 +390,28 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
         (health['features'] as List).contains('runs');
   }
 
-  /// The answer to [body] as a run on the relay at [connection]. Cancelling it closes the
-  /// connection that follows the run at once, which an `async*` body waiting for the next event
-  /// would not do; the run itself goes on.
+  /// The answer to [body] as a run on the relay at [connection].
   Stream<ChatEvent> _run(
     Connection connection,
     String slug,
     String thread,
     Map<String, Object?> body,
     Duration limit,
+  ) => _letGo((gone) => _startRun(connection, slug, thread, body, limit, gone));
+
+  /// The events [start] makes, until [gone] completes. Cancelling the stream completes it, which
+  /// closes the connection that follows the run at once, as an `async*` body waiting for the next
+  /// event would not; the run itself goes on.
+  Stream<ChatEvent> _letGo(
+    Stream<ChatEvent> Function(Future<void> gone) start,
   ) {
     final gone = Completer<void>();
     StreamSubscription<ChatEvent>? answer;
     late final StreamController<ChatEvent> out;
     out = StreamController<ChatEvent>(
-      onListen: () => answer = _startRun(
-        connection,
-        slug,
-        thread,
-        body,
-        limit,
-        gone.future,
-      ).listen(out.add, onError: out.addError, onDone: out.close),
+      onListen: () =>
+          answer = start(gone.future)
+              .listen(out.add, onError: out.addError, onDone: out.close),
       onPause: () => answer?.pause(),
       onResume: () => answer?.resume(),
       onCancel: () {
@@ -362,8 +432,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     Map<String, Object?> body,
     Duration limit,
     Future<void> gone,
-  ) async* {
-    final chat = (slug, thread);
+  ) {
     final id = _beginRun(connection, slug, thread, body, limit);
     final started = id.then<String?>(
       (id) => id,
@@ -376,12 +445,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
         return null;
       },
     );
-    _runs[chat] = (connection, started);
-    try {
-      yield* chatEventsOf(_runChunks(connection, await id, gone));
-    } finally {
-      if (identical(_runs[chat]?.$2, started)) _runs.remove(chat);
-    }
+    return _followRun(connection, (slug, thread), started, id, gone);
   }
 
   /// Asks the relay to run [body], and gives the run's id.

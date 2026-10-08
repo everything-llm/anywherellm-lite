@@ -588,6 +588,21 @@ class _Answer extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (turn.rejoined && turn.streaming) ...[
+          Row(
+            children: [
+              const ReadyDot(gap: false),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  'Kept answering while the app was closed.',
+                  style: Type.sans(12.5, color: Tokens.of(context).muted),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+        ],
         if (thinking || split.reasoning.isNotEmpty) ...[
           _Reasoning(split.reasoning, thinking: thinking),
           if (split.answer.isNotEmpty) const SizedBox(height: 10),

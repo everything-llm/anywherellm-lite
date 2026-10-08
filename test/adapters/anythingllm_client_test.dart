@@ -2047,6 +2047,8 @@ void main() {
       int Function(int attempt)? eventsStatus,
       List<Duration> rejoinDelays = const [Duration.zero],
       Duration quiet = const Duration(seconds: 5),
+      Object? running,
+      int runningStatus = 200,
     }) {
       var attempt = 0;
       var probe = 0;
@@ -2080,6 +2082,12 @@ void main() {
                 ),
               ),
               status,
+            );
+          }
+          if (path == '/everythingllm/v1/runs' && request.method == 'GET') {
+            return http.StreamedResponse(
+              Stream.value(utf8.encode(jsonEncode(running ?? {'runs': []}))),
+              runningStatus,
             );
           }
           if (path == '/everythingllm/v1/runs') {
@@ -2475,6 +2483,173 @@ void main() {
       );
       expect(error.message, 'That thread already has an answer running.');
       expect(error.status, 409);
+    });
+
+    group('rejoining a running answer', () {
+      Map<String, Object?> listed(
+        String id, {
+        String workspace = 'w',
+        String thread = 't',
+        Object? more,
+      }) => {
+        'id': id,
+        'workspace': workspace,
+        'thread': thread,
+        'status': 'running',
+        if (more is Map<String, Object?>) ...more,
+      };
+
+      Future<List<ChatEvent>> events(RejoinedAnswer found) =>
+          found.events.toList();
+
+      test(
+        'lists the running runs and follows the chat\'s from the start',
+        () async {
+          final seen = <http.Request>[];
+          final api = relay(
+            (_) => lines([
+              chunk(1, {'type': 'textResponseChunk', 'textResponse': 'Kept '}),
+              chunk(2, {'type': 'textResponseChunk', 'textResponse': 'going'}),
+              event(3, 'done', {}),
+            ]),
+            seen: seen,
+            running: {
+              'runs': [
+                listed('r_9', thread: 'other'),
+                listed(
+                  'r_1',
+                  more: {
+                    'body': {'message': 'The question?'},
+                  },
+                ),
+              ],
+            },
+          );
+          final found = await api.rejoinChat('w', 't');
+          expect(found!.question, 'The question?');
+          final got = await events(found);
+          expect(
+            got.whereType<TextChunk>().map((c) => c.text).join(),
+            'Kept going',
+          );
+          final list = seen.firstWhere(
+            (r) => r.url.path == '/everythingllm/v1/runs',
+          );
+          expect(list.method, 'GET');
+          expect(list.url.queryParameters, {'status': 'running'});
+          final follow = seen.firstWhere(
+            (r) => r.url.path == '/everythingllm/v1/runs/r_1/events',
+          );
+          expect(follow.headers.containsKey('Last-Event-ID'), isFalse);
+        },
+      );
+
+      test(
+        'reads a bare list of runs, and a question beside the run',
+        () async {
+          final api = relay(
+            (_) => lines([event(1, 'done', {})]),
+            running: [
+              listed('r_1', more: {'message': 'Asked beside'}),
+            ],
+          );
+          expect((await api.rejoinChat('w', 't'))!.question, 'Asked beside');
+        },
+      );
+
+      test('no running run in the chat is no answer', () async {
+        final api = relay(
+          (_) => lines([]),
+          running: {
+            'runs': [
+              listed('r_1', thread: 'other'),
+              listed('r_2', workspace: 'x'),
+            ],
+          },
+        );
+        expect(await api.rejoinChat('w', 't'), isNull);
+      });
+
+      test('a run that is not running is not followed', () async {
+        final api = relay(
+          (_) => lines([]),
+          running: {
+            'runs': [
+              {'id': 'r_1', 'workspace': 'w', 'thread': 't', 'status': 'done'},
+            ],
+          },
+        );
+        expect(await api.rejoinChat('w', 't'), isNull);
+      });
+
+      test('a server that is not a relay is not asked', () async {
+        final seen = <http.Request>[];
+        final api = relay(
+          (_) => lines([]),
+          seen: seen,
+          health: {'service': 'other'},
+          running: {
+            'runs': [listed('r_1')],
+          },
+        );
+        expect(await api.rejoinChat('w', 't'), isNull);
+        expect(
+          seen.where((r) => r.url.path == '/everythingllm/v1/runs'),
+          isEmpty,
+        );
+      });
+
+      test('a list that fails, or is not there, is no answer', () async {
+        expect(
+          await relay(
+            (_) => lines([]),
+            runningStatus: 500,
+          ).rejoinChat('w', 't'),
+          isNull,
+        );
+        expect(
+          await relay(
+            (_) => lines([]),
+            runningStatus: 404,
+          ).rejoinChat('w', 't'),
+          isNull,
+        );
+        expect(
+          await relay(
+            (_) => lines([]),
+            running: 'nonsense',
+          ).rejoinChat('w', 't'),
+          isNull,
+        );
+      });
+
+      test('stop cancels a run found again', () async {
+        final seen = <http.Request>[];
+        final held = StreamController<List<int>>();
+        final api = relay(
+          (_) => held.stream,
+          seen: seen,
+          running: {
+            'runs': [listed('r_1')],
+          },
+        );
+        final found = await api.rejoinChat('w', 't');
+        final first = Completer<void>();
+        final subscription = found!.events.listen((_) {
+          if (!first.isCompleted) first.complete();
+        });
+        held.add(
+          utf8.encode(
+            chunk(1, {'type': 'textResponseChunk', 'textResponse': 'H'}),
+          ),
+        );
+        await first.future;
+        await api.stopChat('w', 't');
+        await subscription.cancel();
+        expect(held.hasListener, isFalse);
+        expect(seen.last.method, 'POST');
+        expect(seen.last.url.path, '/everythingllm/v1/runs/r_1/cancel');
+      });
     });
 
     test('stop cancels the run on the relay', () async {

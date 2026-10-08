@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/ui/chat/message_list.dart';
@@ -113,6 +115,32 @@ void main() {
     llm.chat!.addError(const AnswerStillRunning());
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Ask again'), findsNothing);
+  });
+
+  testWidgets('an answer found still running says it kept going', (
+    tester,
+  ) async {
+    final llm = planningServer();
+    final events = StreamController<ChatEvent>();
+    addTearDown(events.close);
+    llm.running['budget'] = (question: 'And next quarter?', events: events);
+    // Held until the app has settled: a streaming answer's caret never lets it settle.
+    final found = llm.gates['rejoinChat'] = Completer<void>();
+    final h = await pumpApp(tester, llm: llm);
+    found.complete();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      find.text('Kept answering while the app was closed.'),
+      findsOneWidget,
+    );
+    expect(h.chat.busy, isTrue);
+    events
+      ..add(const TextChunk('About 45k.'))
+      ..add(const ChatDone([]));
+    await events.close();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Kept answering while the app was closed.'), findsNothing);
+    expect(find.text('About 45k.'), findsOneWidget);
   });
 
   testWidgets('sending while scrolled up brings the new question into view', (

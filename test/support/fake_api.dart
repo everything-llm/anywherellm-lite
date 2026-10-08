@@ -309,6 +309,19 @@ class FakeAnythingLlm implements AnythingLlmApi {
     ]);
   }
 
+  /// What [rejoinChat] finds running, by thread: the question and the events, which the test adds
+  /// to.
+  final Map<String, ({String? question, StreamController<ChatEvent> events})>
+  running = {};
+
+  @override
+  Future<RejoinedAnswer?> rejoinChat(String slug, String thread) =>
+      _run('rejoinChat', () {
+        final found = running[thread];
+        if (found == null) return null;
+        return (question: found.question, events: found.events.stream);
+      }, thread);
+
   @override
   Future<void> stopChat(String slug, String thread) =>
       _run('stopChat', () {}, thread);

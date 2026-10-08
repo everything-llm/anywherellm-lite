@@ -396,6 +396,139 @@ void main() {
     },
   );
 
+  group('an answer the relay kept going', () {
+    StreamController<ChatEvent> running(
+      FakeAnythingLlm llm, {
+      String? question = 'And next quarter?',
+    }) {
+      final events = StreamController<ChatEvent>();
+      llm.running['budget'] = (question: question, events: events);
+      addTearDown(events.close);
+      return events;
+    }
+
+    test('is followed again when its chat is opened', () async {
+      final llm = planningServer();
+      final events = running(llm);
+      final rig = await started(llm);
+      await pumpEventQueue();
+      expect(rig.chat.busy, isTrue);
+      expect(rig.chat.turns.map((t) => t.text), [
+        'What is the budget?',
+        'About 40k.',
+        'And next quarter?',
+        '',
+      ]);
+      expect(rig.chat.turns.last.rejoined, isTrue);
+      expect(rig.chat.turns.last.streaming, isTrue);
+      events
+        ..add(const TextChunk('About '))
+        ..add(const TextChunk('45k.'));
+      await pumpEventQueue();
+      expect(rig.chat.turns.last.text, 'About 45k.');
+    });
+
+    test('ends as any answer does, and the saved chat replaces it', () async {
+      final llm = planningServer();
+      final events = running(llm);
+      final rig = await started(llm);
+      await pumpEventQueue();
+      events.add(const TextChunk('About 45k.'));
+      llm.histories['budget'] = [
+        ...llm.histories['budget']!,
+        const ChatMessage(
+          role: Role.user,
+          text: 'And next quarter?',
+          chatId: 7,
+        ),
+        const ChatMessage(role: Role.assistant, text: 'About 45k.', chatId: 7),
+      ];
+      events.add(const ChatDone([]));
+      await events.close();
+      await pumpEventQueue();
+      expect(rig.chat.busy, isFalse);
+      expect(rig.chat.turns.last.text, 'About 45k.');
+      expect(rig.chat.turns.last.rejoined, isFalse);
+      expect(rig.chat.turns.last.chatId, 7);
+    });
+
+    test('keeps what came when the server has not saved it yet', () async {
+      final llm = planningServer();
+      final events = running(llm);
+      final rig = await started(llm);
+      await pumpEventQueue();
+      events
+        ..add(const TextChunk('About 45k.'))
+        ..add(const ChatDone([]));
+      await events.close();
+      await pumpEventQueue();
+      expect(rig.chat.busy, isFalse);
+      expect(rig.chat.turns.last.text, 'About 45k.');
+    });
+
+    test('is not asked about for a chat with nothing running', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await pumpEventQueue();
+      expect(llm.calls, contains('rejoinChat:budget'));
+      expect(rig.chat.busy, isFalse);
+      expect(rig.chat.turns, hasLength(2));
+    });
+
+    test('takes the place of the answer the app lost touch with', () async {
+      final llm = planningServer()..hold = true;
+      final rig = await started(llm);
+      await rig.chat.send('And next quarter?');
+      llm.chat!.addError(const AnswerStillRunning());
+      await pumpEventQueue();
+      expect(rig.chat.turns.last.stillRunning, isTrue);
+      final events = running(llm);
+      await rig.chat.open('priorities');
+      await rig.chat.open('budget');
+      await pumpEventQueue();
+      expect(
+        rig.chat.turns.where((t) => t.text == 'And next quarter?'),
+        hasLength(1),
+      );
+      expect(rig.chat.turns.last.rejoined, isTrue);
+      expect(rig.chat.turns.last.error, isNull);
+      expect(rig.chat.busy, isTrue);
+      events.add(const TextChunk('About 45k.'));
+      await pumpEventQueue();
+      expect(rig.chat.turns.last.text, 'About 45k.');
+    });
+
+    test('can be stopped', () async {
+      final llm = planningServer();
+      running(llm);
+      final rig = await started(llm);
+      await pumpEventQueue();
+      rig.chat.stop();
+      await pumpEventQueue();
+      expect(llm.calls, contains('stopChat:budget'));
+      expect(rig.chat.busy, isFalse);
+      expect(rig.chat.turns.last.stopped, isTrue);
+    });
+
+    test('with no question said, shows the answer alone', () async {
+      final llm = planningServer();
+      running(llm, question: null);
+      final rig = await started(llm);
+      await pumpEventQueue();
+      expect(rig.chat.turns, hasLength(3));
+      expect(rig.chat.turns.last.rejoined, isTrue);
+    });
+
+    test('a failed lookup does not fail the chat', () async {
+      final llm = planningServer()
+        ..errors['rejoinChat'] = const ApiException('No.');
+      final rig = await started(llm);
+      await pumpEventQueue();
+      expect(rig.chat.problem, isNull);
+      expect(rig.chat.turns, hasLength(2));
+    });
+  });
+
   test('a finished answer\'s chat is not read again', () async {
     final llm = planningServer();
     final rig = await started(llm);

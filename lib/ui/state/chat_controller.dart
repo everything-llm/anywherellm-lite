@@ -60,6 +60,10 @@ class Turn extends ChangeNotifier {
   /// with, so it will be in the chat when it is done.
   bool stillRunning = false;
 
+  /// Whether the answer was found already running on the relay when the chat was opened, so it
+  /// was written while the app was closed or out of touch.
+  bool rejoined = false;
+
   /// Whether the person stopped the answer.
   bool stopped = false;
 
@@ -602,6 +606,10 @@ class ChatController extends ChangeNotifier {
       }
       _turns[threadSlug] = [for (final m in history) Turn.saved(m)];
     });
+    // Not waited for: a chat is open once its turns are read, and the lookup may take a while.
+    if (_server == server && activeThread == threadSlug) {
+      unawaited(_rejoin(slug, threadSlug, server));
+    }
   }
 
   /// Starts a draft, unless the chat on screen is already empty.
@@ -856,44 +864,148 @@ class ChatController extends ChangeNotifier {
       }
     }
     final thread = threadSlug;
-    running.stream = _api
-        .streamChat(slug, thread, text, attachments: attachments)
-        .listen(
-          (event) => switch (event) {
-            TextChunk(:final text) => answer._grow(text),
-            StatusChunk(:final text, :final tool) => answer._setStatus(
-              text,
-              tool: tool,
-            ),
-            WholeAnswer(:final text) => answer._replace(text),
-            ChatDone(
-              :final citations,
-              :final files,
-              :final metrics,
-              :final chatId,
-            ) =>
-              answer
-                ..citations = citations
-                ..files = files
-                ..metrics = metrics
-                ..chatId = user.chatId = chatId,
-          },
-          onError: (Object error) {
-            if (error is AnswerStillRunning) answer.stillRunning = true;
-            _finish(
-              running,
-              error: error is ApiException ? error.message : '$error',
-            );
-          },
-          onDone: () {
-            _finish(running);
-            if (answer.chatId == null && signedIn) {
-              unawaited(_learnIds(slug, thread, user, answer));
-            }
-          },
-          cancelOnError: true,
-        );
+    _follow(
+      running,
+      answer,
+      _api.streamChat(slug, thread, text, attachments: attachments),
+      user: user,
+    );
     return true;
+  }
+
+  /// Reads [events] into [answer], the answer [running] is, until it ends or fails. [user] is
+  /// the question just sent, whose id the server's closing event also carries; null for an
+  /// answer found again, whose chat is read once it ends.
+  void _follow(
+    _Running running,
+    Turn answer,
+    Stream<ChatEvent> events, {
+    Turn? user,
+  }) {
+    final slug = running.slug;
+    final thread = running.thread!;
+    running.stream = events.listen(
+      (event) {
+        switch (event) {
+          case TextChunk(:final text):
+            answer._grow(text);
+          case StatusChunk(:final text, :final tool):
+            answer._setStatus(text, tool: tool);
+          case WholeAnswer(:final text):
+            answer._replace(text);
+          case ChatDone(
+            :final citations,
+            :final files,
+            :final metrics,
+            :final chatId,
+          ):
+            answer
+              ..citations = citations
+              ..files = files
+              ..metrics = metrics
+              ..chatId = chatId;
+            user?.chatId = chatId;
+        }
+      },
+      onError: (Object error) {
+        if (error is AnswerStillRunning) answer.stillRunning = true;
+        _finish(
+          running,
+          error: error is ApiException ? error.message : '$error',
+        );
+      },
+      onDone: () {
+        _finish(running);
+        if (user == null) {
+          unawaited(_readAgain(slug, thread, answer));
+        } else if (answer.chatId == null && signedIn) {
+          unawaited(_learnIds(slug, thread, user, answer));
+        }
+      },
+      cancelOnError: true,
+    );
+  }
+
+  /// Follows the answer the relay is still writing in chat [thread], if there is one that this
+  /// run of the app did not start, as when it was closed meanwhile or lost touch with it. The
+  /// answer the app let go of, which the chat shows as unfinished, is the one followed again. Only
+  /// a chat whose history was read, and that nothing changed while the relay was asked: a
+  /// message sent, a clear or a read meanwhile is newer than what the relay listed.
+  Future<void> _rejoin(String slug, String thread, Connection? server) async {
+    final shown = _turns[thread];
+    if (shown == null || busy) return;
+    final RejoinedAnswer? found;
+    try {
+      found = await _api.rejoinChat(slug, thread);
+    } on ApiException {
+      return;
+    }
+    if (found == null ||
+        _disposed ||
+        _server != server ||
+        busy ||
+        activeSlug != slug ||
+        activeThread != thread ||
+        !identical(_turns[thread], shown)) {
+      return;
+    }
+    final turns = [...shown];
+    if (turns.lastOrNull case final last?
+        when last.role == Role.assistant && last.unfinished) {
+      turns.removeLast();
+    }
+    if (found.question case final question?
+        when turns.lastOrNull?.role != Role.user ||
+            turns.last.text != question) {
+      turns.add(Turn.user(question));
+    }
+    final answer = Turn.answer()..rejoined = true;
+    _turns[thread] = [...turns, answer];
+    final running = _running = _Running(answer, slug)..thread = thread;
+    editing = null;
+    _sends++;
+    notifyListeners();
+    _follow(running, answer, found.events);
+  }
+
+  /// Reads chat [thread] once [answer], found again, has ended, so the turns on screen are the
+  /// saved ones, with their ids. [answer] stays the same turn and takes what the server saved,
+  /// so what follows it, as Read aloud does, keeps it. Keeps what is shown when the server has
+  /// not saved it yet, or when the chat changed or a question is being edited meanwhile.
+  Future<void> _readAgain(String slug, String thread, Turn answer) async {
+    final server = _server;
+    final shown = _turns[thread];
+    if (shown == null || !identical(shown.lastOrNull, answer)) return;
+    try {
+      final history = await _api.history(slug, thread);
+      if (_disposed ||
+          _server != server ||
+          !identical(_turns[thread], shown) ||
+          (editing != null && shown.contains(editing))) {
+        return;
+      }
+      // The answer is saved once it ends; until the history is as long as the turns shown, it
+      // does not have it yet.
+      if (history.lastOrNull case final saved?
+          when saved.role == Role.assistant && history.length >= shown.length) {
+        answer
+          ..text = saved.text
+          ..citations = saved.citations
+          ..files = saved.files
+          ..metrics = saved.metrics
+          ..chatId = saved.chatId
+          ..feedback = saved.feedback
+          ..rejoined = false
+          ..notifyListeners();
+        _turns[thread] = [
+          for (final m in history.take(history.length - 1)) Turn.saved(m),
+          answer,
+        ];
+        notifyListeners();
+      }
+    } on ApiException {
+      // The turns on screen are the answer; nothing else depends on the read.
+    }
   }
 
   /// Whether [retry] can ask the last question again: nothing runs, the chat is not being read
