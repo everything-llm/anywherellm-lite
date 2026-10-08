@@ -76,8 +76,8 @@ class _InlineInputState extends State<InlineInput> {
         bindings: {
           const SingleActivator(LogicalKeyboardKey.escape): () =>
               _finish(widget.onCancel),
-          // Bound here rather than through onSubmitted, so a key press and the platform's
-          // text action reach one handler.
+          // A soft keyboard's Done sends a text action, not a key, which onEditingComplete
+          // takes; [_finish] runs once whichever comes first.
           const SingleActivator(LogicalKeyboardKey.enter): () =>
               _finish(widget.onSubmit),
           const SingleActivator(LogicalKeyboardKey.numpadEnter): () =>
@@ -89,6 +89,7 @@ class _InlineInputState extends State<InlineInput> {
           child: TextField(
             controller: widget.controller,
             focusNode: _focus,
+            onEditingComplete: () => _finish(widget.onSubmit),
             maxLength: widget.maxLength,
             maxLengthEnforcement: MaxLengthEnforcement.enforced,
             style: Type.sans(13.5, color: t.ink),

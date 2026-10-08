@@ -155,6 +155,19 @@ void main() {
       expect(inSidebar('Reading notes'), findsOneWidget);
     });
 
+    testWidgets('a soft keyboard\'s Done makes the workspace too', (
+      tester,
+    ) async {
+      final llm = planningServer();
+      await pumpApp(tester, llm: llm);
+      await tester.tap(control('New workspace'));
+      await tester.pumpAndSettle();
+      await tester.enterText(typingInto, 'Travel');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(llm.calls, contains('createWorkspace:Travel'));
+    });
+
     testWidgets('Esc leaves the new workspace name without making one', (
       tester,
     ) async {

@@ -31,15 +31,19 @@ class AppShell extends StatelessWidget {
     final duration = motion(context, const Duration(milliseconds: 250));
 
     /// Closes what is on top; where Settings shows one page at a time, a page goes back to the
-    /// list first.
-    bool closeTop({required bool settingsSideBySide}) {
+    /// list first. The sidebar counts only while it is a drawer, since an inline one has nothing
+    /// to close.
+    bool closeTop({
+      required bool settingsSideBySide,
+      required bool sidebarDrawer,
+    }) {
       if (shell.settingsOpen &&
           !settingsSideBySide &&
           shell.settingsPage != null) {
         shell.showSettingsPage(null);
       } else if (shell.settingsOpen) {
         shell.closeSettings();
-      } else if (shell.sideOpen) {
+      } else if (sidebarDrawer && shell.sideOpen) {
         shell.closeSide();
       } else if (shell.browserOpen) {
         shell.closeBrowser();
@@ -78,18 +82,24 @@ class AppShell extends StatelessWidget {
             return _BackGuard(
               open:
                   shell.settingsOpen ||
-                  shell.sideOpen ||
+                  sideDrawer ||
                   sourcesDrawer ||
                   shell.browserOpen,
               onBack: () {
-                if (!closeTop(settingsSideBySide: settingsSideBySide)) {
+                if (!closeTop(
+                  settingsSideBySide: settingsSideBySide,
+                  sidebarDrawer: screen.sidebarDrawer,
+                )) {
                   shell.closeSources();
                 }
               },
               child: CallbackShortcuts(
                 bindings: {
                   const SingleActivator(LogicalKeyboardKey.escape): () {
-                    if (!closeTop(settingsSideBySide: settingsSideBySide) &&
+                    if (!closeTop(
+                          settingsSideBySide: settingsSideBySide,
+                          sidebarDrawer: screen.sidebarDrawer,
+                        ) &&
                         sourcesDrawer) {
                       shell.closeSources();
                     }
@@ -109,7 +119,10 @@ class AppShell extends StatelessWidget {
                             Row(
                               children: [
                                 if (screen.sidebarInline) const Sidebar(),
+                                // Keyed, so the chat keeps its state when the panels on both
+                                // sides come or go in one resize.
                                 Expanded(
+                                  key: const ValueKey('main'),
                                   child: Stack(
                                     fit: StackFit.expand,
                                     children: [
