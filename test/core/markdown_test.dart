@@ -25,6 +25,13 @@ void main() {
     );
   });
 
+  test('a table is read a row to a line, its cells apart', () {
+    expect(
+      plainText('| Name | Age |\n| --- | --- |\n| Ann | 31 |\n| Bo |  |'),
+      'Name, Age\nAnn, 31\nBo',
+    );
+  });
+
   test('a list item with markup in it is read as one line', () {
     expect(
       plainText('- pay **rent** first\n- then food\n  - nested *item*'),

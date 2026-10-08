@@ -71,9 +71,16 @@ class ReadAloud extends ChangeNotifier {
     if (finished != null &&
         _prefs.prefs.isOn(ChatSwitch.readAnswers) &&
         _chat.turns.contains(finished) &&
-        finished.text.trim().isNotEmpty) {
+        _readable(finished)) {
       toggle(finished);
     }
+  }
+
+  /// Whether [turn] has an answer to read, as the chat shows Read aloud for it: some answer
+  /// beside its reasoning, and not the model's failure.
+  static bool _readable(Turn turn) {
+    final answer = splitReasoning(turn.text).answer;
+    return answer.isNotEmpty && modelFailure(answer) == null;
   }
 
   @override

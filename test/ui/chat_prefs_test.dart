@@ -102,6 +102,25 @@ void main() {
     expect(h.speaker!.spoken, ['Twelve months.']);
   });
 
+  testWidgets('a model\'s failure or reasoning alone is not read aloud', (
+    tester,
+  ) async {
+    final llm = planningServer()
+      ..answer = 'The agent model failed to respond: timeout.';
+    final h = await pumpApp(
+      tester,
+      llm: llm,
+      canSpeak: true,
+      prefsStore: withSwitch(ChatSwitch.readAnswers, true),
+    );
+    await h.chat.send('How long?');
+    await tester.pumpAndSettle();
+    llm.answer = '<think>Nothing to say.</think>';
+    await h.chat.send('And now?');
+    await tester.pumpAndSettle();
+    expect(h.speaker!.spoken, isEmpty);
+  });
+
   testWidgets('a stopped answer is not read aloud', (tester) async {
     final llm = planningServer()..hold = true;
     final h = await pumpApp(

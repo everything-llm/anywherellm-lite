@@ -116,7 +116,7 @@ String plainText(String markdown) {
             (child) => child is md.Element && _blocks.contains(child.tag),
           )) {
         walk(node.children ?? const []);
-      } else if (node.textContent.trim() case final line when line.isNotEmpty) {
+      } else if (_textOf(node).trim() case final line when line.isNotEmpty) {
         lines.add(line);
       }
     }
@@ -125,6 +125,15 @@ String plainText(String markdown) {
   walk(parseAnswer(markdown));
   return lines.join('\n');
 }
+
+/// [node]'s words, with a table row's cells apart.
+String _textOf(md.Node node) => node is md.Element && node.tag == 'tr'
+    ? [
+        for (final cell in node.children ?? const <md.Node>[])
+          if (cell.textContent.trim() case final text when text.isNotEmpty)
+            text,
+      ].join(', ')
+    : node.textContent;
 
 /// The Markdown elements that start a line of their own.
 const _blocks = {
