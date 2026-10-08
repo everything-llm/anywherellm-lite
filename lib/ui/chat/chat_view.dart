@@ -155,7 +155,12 @@ class _Body extends StatelessWidget {
                 Text(
                   title,
                   textAlign: TextAlign.center,
-                  style: Type.serif(32, color: t.ink),
+                  style: Type.serif(
+                    40,
+                    color: t.ink,
+                    height: 1.1,
+                    letterSpacing: -0.6,
+                  ),
                 ),
                 if (text.isNotEmpty) ...[
                   const SizedBox(height: 8),
@@ -303,7 +308,7 @@ class _HeaderButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              AppIcon(icon, size: IconSize.xs, color: t.ink),
+              AppIcon(icon, size: IconSize.xs, color: compact ? t.ink2 : t.ink),
               if (!compact) ...[
                 const SizedBox(width: 7),
                 Text(
