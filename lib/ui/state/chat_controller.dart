@@ -97,10 +97,22 @@ class Turn extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Whether the status line that comes next is a browser skill's own words for the step its
+  /// call began: everythingllm's skills say it right after AnythingLLM reports the call.
+  bool _ownWords = false;
+
   void _setStatus(String line, {String? tool}) {
     status = line;
-    _browserStatus = isBrowserTool(tool);
-    if (_browserStatus) browserSteps = [...browserSteps, line];
+    if (tool != null) {
+      _browserStatus = _ownWords = isBrowserTool(tool);
+      if (_browserStatus) browserSteps = [...browserSteps, line];
+    } else if (_ownWords) {
+      // The skill's words name the element, so they take the place of the call's.
+      _ownWords = false;
+      browserSteps = [...browserSteps.take(browserSteps.length - 1), line];
+    } else {
+      _browserStatus = false;
+    }
     notifyListeners();
     _statusChanges.notifyListeners();
   }
@@ -1002,12 +1014,17 @@ class ChatController extends ChangeNotifier {
     if (known != null && known.whole) return Stream.value(known.frame);
     final server = _server;
     var frames = 0;
+    Uint8List? previous;
     return _api
         .answerImage(url)
         .transform(
           StreamTransformer.fromHandlers(
             handleData: (frame, sink) {
               if (_server != server) return;
+              // A live card sends a still frame again so a browser draws it at once; the copy
+              // would only be decoded again.
+              if (previous != null && listEquals(previous, frame)) return;
+              previous = frame;
               frames++;
               _images[url] = (frame: frame, whole: false);
               sink.add(frame);

@@ -75,6 +75,8 @@ String? browserStep(({String name, String args}) call) {
       _ => 'Opening a page',
     },
     'browser-act' => _acts[text('action')] ?? 'Using the browser',
+    'browser-read' when args['card'] == true || args['card'] == 'true' =>
+      'Getting the browser\'s card',
     'browser-read' => switch (text('find')) {
       final String find => 'Looking for "$find"',
       null => 'Reading the page',

@@ -51,7 +51,9 @@ void main() {
     expect(find.text('1. Opening news.ycombinator.com'), findsOneWidget);
 
     // Another tool's status is a status line again.
-    llm.chat!.add(const StatusChunk('Running web-browsing'));
+    llm.chat!.add(
+      const StatusChunk('Running web-browsing', tool: 'web-browsing'),
+    );
     await _wait(tester);
     expect(find.text('Running web-browsing'), findsOneWidget);
     expect(control('Browser'), findsOneWidget);

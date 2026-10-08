@@ -183,6 +183,46 @@ void main() {
     expect(rig.chat.busy, isFalse);
   });
 
+  test('a browser skill\'s own words take the place of its call\'s', () async {
+    final llm = planningServer()..hold = true;
+    final rig = await started(llm);
+    await rig.chat.send('Fill it');
+    final answer = rig.chat.turns.last;
+    llm.chat!
+      ..add(const StatusChunk('Typing into a field', tool: 'browser-act'))
+      ..add(const StatusChunk('Filling in Customer name'));
+    await pumpEventQueue();
+    expect(answer.browsing, isTrue);
+    expect(answer.status, 'Filling in Customer name');
+    expect(answer.browserSteps, ['Filling in Customer name']);
+
+    // Only the first line after a call is the skill's; another is not the browser's.
+    llm.chat!.add(const StatusChunk('Loading glm-5.3 into memory'));
+    await pumpEventQueue();
+    expect(answer.browsing, isFalse);
+    expect(answer.browserSteps, ['Filling in Customer name']);
+  });
+
+  test('a live card\'s repeated frame is given once', () async {
+    final card = Uri.parse(
+      'https://h:8445/_live/browser/bw-3aeecef2b460eeb7.jpg',
+    );
+    final live = StreamController<Uint8List>();
+    final llm = planningServer()..liveImages[card] = live;
+    final rig = await started(llm);
+    final frames = rig.chat.imageFrames(card).toList();
+    final one = Uint8List.fromList([1, 2, 3]);
+    live
+      ..add(one)
+      ..add(Uint8List.fromList([1, 2, 3]))
+      ..add(Uint8List.fromList([4, 5]));
+    await live.close();
+    expect(await frames, [
+      [1, 2, 3],
+      [4, 5],
+    ]);
+  });
+
   group('refresh', () {
     test('reads the chat on screen again', () async {
       final llm = planningServer();

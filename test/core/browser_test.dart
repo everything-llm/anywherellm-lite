@@ -33,6 +33,7 @@ void main() {
             'Waiting for the page',
         _call('browser-read', '{}'): 'Reading the page',
         _call('browser-read', '{"find": "points"}'): 'Looking for "points"',
+        _call('browser-read', '{"card": true}'): 'Getting the browser\'s card',
         _call('browser-handoff', '{"reason": "log in"}'):
             'Handing the browser to you',
         _call('browser-handoff', '{"done": true}'): 'Taking the browser back',
