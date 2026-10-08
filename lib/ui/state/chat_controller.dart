@@ -324,13 +324,21 @@ class ChatController extends ChangeNotifier {
       activeThread == null ? _draft : (_turns[activeThread] ?? const []);
 
   /// Whether the chat on screen is being cleared on the server.
-  bool get clearing => _clearing;
-  bool _clearing = false;
+  bool get clearing => _clearingIn.contains(activeThread);
+
+  /// The chats being cleared on the server.
+  final _clearingIn = <String>{};
+
+  /// The chats whose exchanges are being deleted on the server, for Retry or an edit.
+  final _droppingIn = <String>{};
 
   /// Whether the chat on screen can take no message now: a chat of its workspace answers, this
-  /// one or another, [atLimit] holds, or a chat is being cleared or its exchanges dropped.
-  bool get busy => _clearing || _dropping || workspaceAnswering || atLimit;
-  bool _dropping = false;
+  /// one or another, [atLimit] holds, or this chat is being cleared or its exchanges dropped.
+  bool get busy => _changing(activeThread) || workspaceAnswering || atLimit;
+
+  /// Whether chat [thread] is being cleared or its exchanges dropped on the server.
+  bool _changing(String? thread) =>
+      _clearingIn.contains(thread) || _droppingIn.contains(thread);
 
   /// Whether [maxRuns] answers are running, so no other can start.
   bool get atLimit => maxRuns != null && _runs.length >= maxRuns!;
@@ -399,7 +407,7 @@ class ChatController extends ChangeNotifier {
   /// deleted on the server gives way to its workspace's newest chat. Does nothing while the
   /// chat is being cleared or its exchanges dropped, which the reading would race.
   Future<void> refresh() async {
-    if (_server == null || _refreshing || _clearing || _dropping) return;
+    if (_server == null || _refreshing || _changing(activeThread)) return;
     _refreshing = true;
     if (_here case final running?) {
       unawaited(running.stream?.cancel());
@@ -487,7 +495,8 @@ class ChatController extends ChangeNotifier {
     docCounts.clear();
     loading = false;
     unreachable.value = false;
-    _clearing = false;
+    _clearingIn.clear();
+    _droppingIn.clear();
     _presets = const [];
     commandsNote = null;
     activeSlug = null;
@@ -1067,10 +1076,9 @@ class ChatController extends ChangeNotifier {
     _follow(running, answer, found.events);
   }
 
-  /// Whether chat [thread] is followed already, or a chat is being cleared or its exchanges
-  /// dropped, which a run found meanwhile would race.
-  bool _following(String thread) =>
-      isAnswering(thread) || _clearing || _dropping;
+  /// Whether chat [thread] is followed already, or is being cleared or its exchanges dropped,
+  /// which a run found meanwhile would race.
+  bool _following(String thread) => isAnswering(thread) || _changing(thread);
 
   /// Reads chat [thread] once [answer], found again, has ended, so the turns on screen are the
   /// saved ones, with their ids. [answer] stays the same turn and takes what the server saved,
@@ -1197,7 +1205,7 @@ class ChatController extends ChangeNotifier {
       return true;
     }
     final server = _server;
-    _dropping = true;
+    _droppingIn.add(thread);
     notifyListeners();
     try {
       await _api.dropFrom(slug, thread, chatId);
@@ -1213,8 +1221,11 @@ class ChatController extends ChangeNotifier {
       }
       return false;
     } finally {
-      _dropping = false;
-      notifyListeners();
+      // A new server has started afresh, dropping included.
+      if (_server == server) {
+        _droppingIn.remove(thread);
+        notifyListeners();
+      }
     }
   }
 
@@ -1229,7 +1240,7 @@ class ChatController extends ChangeNotifier {
       return;
     }
     final server = _server;
-    _clearing = true;
+    _clearingIn.add(thread);
     notifyListeners();
     try {
       await _try('Could not clear the chat', () async {
@@ -1240,7 +1251,7 @@ class ChatController extends ChangeNotifier {
     } finally {
       // A new server has started afresh, clearing included.
       if (_server == server) {
-        _clearing = false;
+        _clearingIn.remove(thread);
         notifyListeners();
       }
     }

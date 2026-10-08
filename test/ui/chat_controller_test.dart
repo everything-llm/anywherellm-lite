@@ -981,16 +981,19 @@ void main() {
       expect(rig.chat.busy, isFalse);
     });
 
-    test('a run the relay kept going is followed while another answers', () async {
-      final llm = planningServer();
-      final events = StreamController<ChatEvent>();
-      addTearDown(() => unawaited(events.close()));
-      llm.running['budget'] = (question: 'And next quarter?', events: events);
-      final rig = await householdAnswering(llm);
-      expect(rig.chat.runningHere, isNotNull);
-      expect(rig.chat.turns.last.rejoined, isTrue);
-      expect(rig.chat.answeringIn('household'), isTrue);
-    });
+    test(
+      'a run the relay kept going is followed while another answers',
+      () async {
+        final llm = planningServer();
+        final events = StreamController<ChatEvent>();
+        addTearDown(() => unawaited(events.close()));
+        llm.running['budget'] = (question: 'And next quarter?', events: events);
+        final rig = await householdAnswering(llm);
+        expect(rig.chat.runningHere, isNotNull);
+        expect(rig.chat.turns.last.rejoined, isTrue);
+        expect(rig.chat.answeringIn('household'), isTrue);
+      },
+    );
 
     test('a refused message shows only in its own chat', () async {
       final llm = planningServer();
@@ -1347,6 +1350,44 @@ void main() {
       await clearing;
       expect(rig.chat.busy, isFalse);
       expect(rig.chat.problem, isNull);
+    });
+
+    test('another chat takes a message while one clears', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      final gate = llm.gates['resetChat'] = Completer<void>();
+      final clearing = rig.chat.send('/reset');
+      await pumpEventQueue();
+      await rig.chat.select('q3', thread: 'priorities');
+      expect(rig.chat.clearing, isFalse);
+      expect(rig.chat.busy, isFalse);
+      await rig.chat.send('Hello');
+      expect(llm.calls, contains('streamChat:priorities:Hello'));
+      gate.complete();
+      await clearing;
+      await rig.chat.select('q3', thread: 'budget');
+      expect(rig.chat.turns, isEmpty);
+    });
+
+    test('a run in another chat is followed while one clears', () async {
+      final llm = planningServer();
+      final events = StreamController<ChatEvent>();
+      addTearDown(() => unawaited(events.close()));
+      final rig = await started(llm);
+      await pumpEventQueue();
+      final gate = llm.gates['resetChat'] = Completer<void>();
+      final clearing = rig.chat.send('/reset');
+      await pumpEventQueue();
+      llm.running['priorities'] = (
+        question: 'Asked on the phone',
+        events: events,
+      );
+      await rig.chat.select('q3', thread: 'priorities');
+      await pumpEventQueue();
+      expect(rig.chat.isAnswering('priorities'), isTrue);
+      expect(rig.chat.turns.last.rejoined, isTrue);
+      gate.complete();
+      await clearing;
     });
 
     test('a preset whose prompt is /reset clears the chat too', () async {
