@@ -81,6 +81,26 @@ void main() {
     expect(bars.map((b) => b.thumbVisibility), contains(true));
   });
 
+  testWidgets('a code block and display math show their scrollbars', (
+    tester,
+  ) async {
+    final code = 'final total = ${List.filled(30, 'price').join(' + ')};';
+    final sum = List.filled(40, 'x_i').join(' + ');
+    await pumpApp(
+      tester,
+      llm: answering('```dart\n$code\n```\n\n\$\$$sum\$\$'),
+      size: const Size(500, 800),
+    );
+    await tester.pumpAndSettle();
+    final bars = tester.widgetList<Scrollbar>(
+      find.descendant(
+        of: find.byType(AnswerBody),
+        matching: find.byType(Scrollbar),
+      ),
+    );
+    expect(bars.where((b) => b.thumbVisibility == true), hasLength(2));
+  });
+
   testWidgets('an answer is drawn as Markdown', (tester) async {
     await pumpApp(tester, llm: _server());
     expect(find.textContaining('## The plan'), findsNothing);

@@ -15,20 +15,21 @@ import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
+import '../widgets/side_scroll.dart';
 import 'card_image.dart';
 import 'highlight.dart';
 import 'math.dart';
 import '../icons.dart';
 
-/// An answer's text, drawn as Markdown and selectable. A code block and a table scroll sideways
-/// rather than widen the chat, a table showing its scrollbar while it does, and a code block has
-/// its own Copy button. A link opens outside
-/// the app. An image loads only from the AnythingLLM server's own host, on any port, as a tool's
-/// card does, and only over https or the server's own scheme where plain http is allowed:
-/// loading any other would send its address, which a model could have filled with what it read,
-/// to that site. Any other image shows as its description, which reads as a link: a tap opens
-/// the link around the image, or else the image's own address. A linked app card opens its app
-/// beside the chat, or in a sheet on a phone, rather than its page.
+/// An answer's text, drawn as Markdown and selectable. A code block, a table and display math
+/// scroll sideways rather than widen the chat, showing a scrollbar while they do, and a code
+/// block has its own Copy button. A link opens outside the app. An image loads only from the
+/// AnythingLLM server's own host, on any port, as a tool's card does, and only over https or
+/// the server's own scheme where plain http is allowed: loading any other would send its
+/// address, which a model could have filled with what it read, to that site. Any other image
+/// shows as its description, which reads as a link: a tap opens the link around the image, or
+/// else the image's own address. A linked app card opens its app beside the chat, or in a sheet
+/// on a phone, rather than its page.
 class AnswerBody extends StatelessWidget {
   const AnswerBody(
     this.text, {
@@ -145,8 +146,8 @@ class AnswerBody extends StatelessWidget {
           vertical: 6,
         ),
         tableHeadCellsDecoration: BoxDecoration(color: t.panel2),
-        // A table wider than the chat shows its scrollbar, under the table, so its cut edge
-        // reads as more to scroll to.
+        // The package scrolls a table itself; these give it what [SideScroll] gives a code
+        // block and display math: its scrollbar under it while it is wider than the chat.
         tableScrollbarThumbVisibility: true,
         tablePadding: const EdgeInsets.only(bottom: 10),
         horizontalRuleDecoration: BoxDecoration(border: Border(top: border)),
@@ -191,8 +192,9 @@ class _CodeBlockBuilder extends MarkdownElementBuilder {
   }
 }
 
-/// A code block: monospaced, scrolling sideways, with a Copy button in its corner. Code in a
-/// [language] [highlighted] knows is coloured; Copy takes the plain code either way.
+/// A code block: monospaced, scrolling sideways ([SideScroll]), with a Copy button in its
+/// corner. Code in a [language] [highlighted] knows is coloured; Copy takes the plain code
+/// either way.
 class _CodeBlock extends StatelessWidget {
   const _CodeBlock(this.code, {this.language});
 
@@ -214,9 +216,8 @@ class _CodeBlock extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(14, 12, 44, 12),
+          SideScroll(
+            padding: const EdgeInsets.fromLTRB(14, 12, 44, 14),
             child: Text.rich(
               highlighted(
                     code,

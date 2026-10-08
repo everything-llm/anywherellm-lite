@@ -3,8 +3,11 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:markdown/markdown.dart' as md;
 
+import '../widgets/side_scroll.dart';
+
 /// Draws a `math` element from `mathSyntaxes` in [style]. Display math scrolls sideways rather
-/// than widen the chat. TeX that does not parse shows as its source in [fallback].
+/// than widen the chat, showing its scrollbar while it does ([SideScroll]). TeX that does not
+/// parse shows as its source in [fallback].
 class MathBuilder extends MarkdownElementBuilder {
   MathBuilder({required this.style, required this.fallback});
 
@@ -30,9 +33,8 @@ class MathBuilder extends MarkdownElementBuilder {
           Text(display ? '\$\$$tex\$\$' : '\$$tex\$', style: fallback),
     );
     if (!display) return math;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(vertical: 4),
+    return SideScroll(
+      padding: const EdgeInsets.only(top: 4, bottom: 10),
       child: math,
     );
   }
