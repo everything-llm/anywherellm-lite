@@ -10,11 +10,14 @@ import 'tappable.dart';
 enum AlertKind { warn, bad, info }
 
 class AlertBox extends StatelessWidget {
-  const AlertBox(this.kind, this.title, {super.key, this.text});
+  const AlertBox(this.kind, this.title, {super.key, this.text, this.action});
 
   final AlertKind kind;
   final String title;
   final String? text;
+
+  /// A button under the text, such as the one that asks again.
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +58,10 @@ class AlertBox extends StatelessWidget {
             if (text != null) ...[
               const SizedBox(height: 6),
               Text(text!, style: Type.sans(14, color: body)),
+            ],
+            if (action case final action?) ...[
+              const SizedBox(height: 10),
+              Align(alignment: Alignment.centerLeft, child: action),
             ],
           ],
         ),

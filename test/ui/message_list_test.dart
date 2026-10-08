@@ -1,3 +1,4 @@
+import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/ui/chat/message_list.dart';
 import 'package:flutter/material.dart';
@@ -54,6 +55,64 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('The answer stopped'), findsOneWidget);
     expect(find.text('Still being written'), findsNothing);
+  });
+
+  testWidgets('a failed last answer can be asked again', (tester) async {
+    final llm = planningServer()..hold = true;
+    final h = await pumpApp(tester, llm: llm);
+    await h.chat.send('And next quarter?');
+    await tester.pump();
+    llm.chat!.addError(const ApiException('The server stopped the answer.'));
+    await tester.pump(const Duration(milliseconds: 300));
+    llm.hold = false;
+    final before = llm.calls.where((c) => c.startsWith('streamChat')).length;
+    await tester.tap(find.text('Ask again'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      llm.calls.where((c) => c.startsWith('streamChat')).length,
+      before + 1,
+    );
+    expect(llm.calls.last, contains('And next quarter?'));
+  });
+
+  testWidgets('a failed answer that is not the last has no Ask again', (
+    tester,
+  ) async {
+    final llm = planningServer()..hold = true;
+    final h = await pumpApp(tester, llm: llm);
+    await h.chat.send('And next quarter?');
+    await tester.pump();
+    llm.chat!.addError(const ApiException('The server stopped the answer.'));
+    await tester.pump(const Duration(milliseconds: 300));
+    llm.hold = false;
+    await h.chat.send('Never mind.');
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Ask again'), findsNothing);
+  });
+
+  testWidgets('a stopped answer says it is not saved in the chat', (
+    tester,
+  ) async {
+    final llm = planningServer()..hold = true;
+    final h = await pumpApp(tester, llm: llm);
+    await h.chat.send('And next quarter?');
+    await tester.pump();
+    llm.chat!.add(const TextChunk('Next quarter we'));
+    await tester.pump();
+    expect(find.text('Stopped · not saved in the chat'), findsNothing);
+    h.chat.stop();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Stopped · not saved in the chat'), findsOneWidget);
+  });
+
+  testWidgets('a lost connection offers no Ask again', (tester) async {
+    final llm = planningServer()..hold = true;
+    final h = await pumpApp(tester, llm: llm);
+    await h.chat.send('And next quarter?');
+    await tester.pump();
+    llm.chat!.addError(const AnswerStillRunning());
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Ask again'), findsNothing);
   });
 
   testWidgets('sending while scrolled up brings the new question into view', (

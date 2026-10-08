@@ -619,7 +619,14 @@ class _Answer extends StatelessWidget {
                   'appear here when it\'s done; Refresh checks for it sooner.',
             )
           else
-            AlertBox(AlertKind.bad, 'The answer stopped', text: error),
+            AlertBox(
+              AlertKind.bad,
+              'The answer stopped',
+              text: error,
+              action: retry?.onPressed == null
+                  ? null
+                  : AppButton('Ask again', onPressed: retry!.onPressed),
+            ),
         ],
         if (!turn.streaming &&
             turn.browserSteps.isNotEmpty &&
@@ -666,6 +673,11 @@ class _Answer extends StatelessWidget {
                   ),
               ],
               if (turn.metrics case final metrics?) _Metrics(metrics),
+              if (turn.stopped)
+                Text(
+                  'Stopped · not saved in the chat',
+                  style: Type.sans(12, color: Tokens.of(context).muted),
+                ),
             ],
           ),
         ],
