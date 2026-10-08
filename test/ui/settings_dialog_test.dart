@@ -62,23 +62,79 @@ void main() {
     final h = await pumpApp(tester, llm: planningServer(), size: phone);
     h.shell.openSettings();
     await tester.pumpAndSettle();
+    // Two groups and no switch: this app's pages, then the server's one row.
     expect(find.text('Theme'), findsNothing);
-    await tester.tap(control('Appearance'));
+    expect(find.text('Server'), findsOneWidget);
+    expect(find.text('Chat model'), findsNothing);
+    expect(control('All settings'), findsNothing);
+    await tester.tap(find.text('Appearance'));
     await tester.pumpAndSettle();
     expect(find.text('Theme'), findsOneWidget);
-    expect(control('Chat model'), findsNothing);
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
     expect(h.shell.settingsOpen, isTrue);
-    expect(control('Chat model'), findsOneWidget);
-    await tester.tap(control('Appearance'));
+    expect(h.shell.settingsPage, isNull);
+    // Server lists the server's pages, and each goes back to it.
+    await tester.tap(find.text('Server'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('All settings'));
+    expect(find.text('What AnythingLLM runs with.'), findsOneWidget);
+    await tester.tap(find.text('Chat model'));
     await tester.pumpAndSettle();
-    expect(control('Appearance'), findsOneWidget);
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    expect(h.shell.settingsPage, SettingsPage.chatModel);
+    await tester.tap(find.byTooltip('Back to Server'));
+    await tester.pumpAndSettle();
+    expect(h.shell.settingsPage, SettingsPage.server);
+    expect(tester.takeException(), isNull);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(h.shell.settingsPage, isNull);
+    await tester.tap(find.byTooltip('Back to the chat'));
     await tester.pumpAndSettle();
     expect(h.shell.settingsOpen, isFalse);
+  });
+
+  testWidgets('a phone\'s first run offers Scan QR code first', (tester) async {
+    final h = await pumpApp(
+      tester,
+      size: phone,
+      connection: null,
+      canScan: true,
+    );
+    // As the app opens it at a start with nothing saved.
+    h.shell.openSettings(SettingsPage.connection);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Connect to your'), findsOneWidget);
+    final scan = tester.getTopLeft(control('Scan QR code'));
+    expect(scan.dy, lessThan(tester.getTopLeft(find.text('or sign in')).dy));
+    expect(
+      tester.getTopLeft(find.text('or sign in')).dy,
+      lessThan(tester.getTopLeft(control('Sign in')).dy),
+    );
+    expect(control('Paste a key'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('on a phone the camera fills the window, and Back stops it', (
+    tester,
+  ) async {
+    final h = await pumpApp(
+      tester,
+      size: phone,
+      connection: null,
+      canScan: true,
+    );
+    h.shell.openSettings(SettingsPage.connection);
+    await tester.pumpAndSettle();
+    await tester.tap(control('Scan QR code'));
+    await tester.pumpAndSettle();
+    expect(h.shell.scanning, isTrue);
+    expect(find.text('Fake scan'), findsOneWidget);
+    expect(find.textContaining('choose Connect a phone'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(h.shell.scanning, isFalse);
+    expect(find.text('Fake scan'), findsNothing);
+    expect(h.shell.settingsOpen, isTrue);
   });
 
   testWidgets('Connection says how the server signs in and finds the relay', (

@@ -224,10 +224,7 @@ void main() {
     h.shell.openSettings(SettingsPage.chat);
     await tester.pumpAndSettle();
     expect(
-      find.text(
-        'Show the model, time, tokens, speed and cost under every answer. Otherwise they '
-        'sit in the answer\'s More menu.',
-      ),
+      find.text('The model, time, tokens, speed and cost under every answer.'),
       findsOneWidget,
     );
     await tester.tap(control('Show answer details'));

@@ -159,11 +159,16 @@ void main() {
       );
       h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Connect a phone'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Connect a phone'));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
+      // A phone shows its code to no other phone.
+      if (size.width >= 720) {
+        await tester.ensureVisible(find.text('Connect a phone'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Connect a phone'));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      } else {
+        expect(find.text('Connect a phone'), findsNothing);
+      }
       await tester.ensureVisible(find.text('Edit connection'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Edit connection'));

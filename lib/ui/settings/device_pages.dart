@@ -55,6 +55,18 @@ class AppearancePage extends StatelessWidget {
   }
 }
 
+/// What the Chat page holds, as a phone's Settings list says it: the switches this device has.
+String chatSummary(AppScope scope) {
+  final parts = [
+    if (scope.dictation != null) 'dictation',
+    if (scope.readAloud != null) 'reading aloud',
+    if (scope.canSpellcheck) 'spellcheck',
+    'answer details',
+  ];
+  final line = parts.join(', ');
+  return line[0].toUpperCase() + line.substring(1);
+}
+
 /// How the chat behaves on this device: each [ChatSwitch] the device can use.
 class ChatPage extends StatelessWidget {
   const ChatPage({super.key});
@@ -81,13 +93,12 @@ class ChatPage extends StatelessWidget {
       (
         ChatSwitch.followAnswer,
         'Follow a streaming answer',
-        'Keep the newest text in view while it arrives, unless you have scrolled up.',
+        'Keeps the newest text in view unless you have scrolled up.',
       ),
       (
         ChatSwitch.answerDetails,
         'Show answer details',
-        'Show the model, time, tokens, speed and cost under every answer. Otherwise they sit '
-            'in the answer\'s More menu.',
+        'The model, time, tokens, speed and cost under every answer.',
       ),
     ];
     return ListenableBuilder(

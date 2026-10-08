@@ -72,10 +72,12 @@ class AppShell extends StatelessWidget {
     }) {
       if (shell.popup.value != null) {
         shell.closePopup();
+      } else if (shell.scanning) {
+        shell.setScanning(false);
       } else if (shell.settingsOpen &&
           !settingsSideBySide &&
           shell.settingsPage != null) {
-        shell.showSettingsPage(null);
+        shell.settingsBack(phone: phone);
       } else if (shell.settingsOpen) {
         shell.closeSettings();
       } else if (sidebarDrawer && shell.sideOpen) {
@@ -144,6 +146,7 @@ class AppShell extends StatelessWidget {
                   sideDrawer ||
                   sourcesDrawer ||
                   sheetOpen ||
+                  shell.scanning ||
                   (screen.isPhone && files) ||
                   shell.appOpen ||
                   shell.browserOpen,
@@ -262,7 +265,15 @@ class AppShell extends StatelessWidget {
                               ),
                             // The sheet's own scrim closes it.
                             if (sheetOpen) Positioned.fill(child: right),
-                            if (shell.settingsOpen) ...[
+                            // A phone's Settings is a page over the window.
+                            if (shell.settingsOpen && screen.isPhone)
+                              const Positioned.fill(
+                                child: SettingsDialog(
+                                  sideBySide: false,
+                                  phone: true,
+                                ),
+                              )
+                            else if (shell.settingsOpen) ...[
                               _Scrim(onTap: shell.closeSettings),
                               Center(
                                 child: SettingsDialog(

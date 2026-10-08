@@ -80,6 +80,16 @@ class ShellController extends ChangeNotifier {
   bool _sourcesPinned;
   bool _sourcesDrawer = false;
   FilesSection? _workspacePage;
+  bool _scanning = false;
+
+  /// Whether Settings is reading a pairing code with the camera, which Esc and Back stop first.
+  bool get scanning => _scanning;
+
+  void setScanning(bool on) {
+    if (on == _scanning) return;
+    _scanning = on;
+    notifyListeners();
+  }
 
   /// On a phone, where Files is the open workspace's pages: the page open, or null for the list
   /// of them.
@@ -198,13 +208,27 @@ class ShellController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void closeSettings() => _set(settings: false);
+  void closeSettings() {
+    _scanning = false;
+    _set(settings: false);
+  }
 
   void showSettingsPage(SettingsPage? page) {
     if (page == _settingsPage) return;
     _settingsPage = page;
     _allSettings |= !(page?.essential ?? true);
     notifyListeners();
+  }
+
+  /// Goes back from the Settings page shown: on a [phone] to the page it was opened from, the
+  /// Server page or the list; elsewhere to the list. From the list, Settings closes.
+  void settingsBack({required bool phone}) {
+    final page = _settingsPage;
+    if (page == null) {
+      closeSettings();
+    } else {
+      showSettingsPage(phone ? page.phoneParent : null);
+    }
   }
 
   /// Lists every page of Settings, or only the essentials, which leaves a page that is not one.

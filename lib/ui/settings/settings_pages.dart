@@ -35,6 +35,12 @@ enum SettingsPage {
     essential: true,
     needsServer: false,
   ),
+  server(
+    SettingsGroup.providers,
+    'Server',
+    'What AnythingLLM runs with.',
+    phoneOnly: true,
+  ),
   chatModel(
     SettingsGroup.providers,
     'Chat model',
@@ -97,6 +103,7 @@ enum SettingsPage {
     this.about, {
     this.essential = false,
     this.needsServer = true,
+    this.phoneOnly = false,
   });
 
   final SettingsGroup group;
@@ -110,4 +117,12 @@ enum SettingsPage {
 
   /// Whether the page is about the server, and so shows only once one is saved.
   final bool needsServer;
+
+  /// Whether only a phone has the page: [server], which lists the server's pages there.
+  final bool phoneOnly;
+
+  /// The page a phone's back arrow goes to from this one: [server] from a page about the
+  /// server, or null, the list, from the others.
+  SettingsPage? get phoneParent =>
+      needsServer && this != server ? server : null;
 }

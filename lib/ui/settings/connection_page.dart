@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import '../../core/connection.dart';
 import '../../core/ports.dart';
 import '../app_scope.dart';
+import '../layout.dart';
 import '../state/settings_controller.dart';
+import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
@@ -15,6 +17,7 @@ import '../widgets/fields.dart';
 import 'pairing_code.dart';
 import 'password_card.dart';
 import 'rows.dart';
+import 'scan_view.dart';
 
 /// How this device reaches the server: the address and key, the server's password, and what
 /// the server and the relay say. The server reads Connected once Test connection passes here,
@@ -36,14 +39,67 @@ class _ConnectionPageState extends State<ConnectionPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      _KeyCard(tested: _tested),
-      const PasswordCard(),
-      _ServerStatus(onTest: _test),
-    ],
-  );
+  Widget build(BuildContext context) {
+    final settings = AppScope.of(context).settings;
+    final phone = ScreenClass.ofContext(context).isPhone;
+    return ListenableBuilder(
+      listenable: settings,
+      builder: (context, child) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // A phone with nothing saved opens on its first run's welcome.
+          if (phone && settings.connection == null) const _Welcome(),
+          child!,
+          const PasswordCard(),
+          _ServerStatus(onTest: _test),
+        ],
+      ),
+      child: _KeyCard(tested: _tested),
+    );
+  }
+}
+
+/// A phone's first run, over the sign-in form: what to do to connect.
+class _Welcome extends StatelessWidget {
+  const _Welcome();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final scan = AppScope.of(context).scanner != null;
+    final big = Type.serif(40, color: t.ink, height: 1.1, letterSpacing: -0.6);
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, bottom: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(
+            header: true,
+            child: Text.rich(
+              TextSpan(
+                style: big,
+                children: [
+                  const TextSpan(text: 'Connect to your '),
+                  TextSpan(
+                    text: 'AnythingLLM',
+                    style: big.copyWith(fontStyle: FontStyle.italic),
+                  ),
+                  const TextSpan(text: '.'),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            scan
+                ? 'Already set up on your computer? Scan its code and this phone is connected.'
+                : 'Sign in with the address and password of your AnythingLLM server.',
+            style: Type.sans(15, color: t.ink2, height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// The relay and how the server signs in, and a test of the saved connection, once one is saved.
@@ -139,7 +195,14 @@ class _KeyCardState extends State<_KeyCard> {
   bool _pasteKey = false;
   bool _confirmForget = false;
   bool _showCode = false;
-  bool _scanning = false;
+
+  /// The shell, which holds whether the camera reads a code, so Back can stop it.
+  late final ShellController _shell = AppScope.of(context).shell;
+  bool get _scanning => _shell.scanning;
+  set _scanning(bool on) => _shell.setScanning(on);
+
+  /// Shows the phone's camera view over the window while it reads a code.
+  final _scanView = OverlayPortalController()..show();
 
   /// Why the last scanned code could not be used.
   String? _scanProblem;
@@ -231,13 +294,19 @@ class _KeyCardState extends State<_KeyCard> {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    final phone = ScreenClass.ofContext(context).isPhone;
     return ListenableBuilder(
-      listenable: _settings,
+      listenable: Listenable.merge([_settings, _shell]),
       builder: (context, _) {
         final connection = _settings.connection;
         final set = connection != null;
         final editing = !set || _replacing;
         final saving = _settings.check == ConnectionCheck.testing;
+        void startScan() => setState(() {
+          _scanning = true;
+          _scanProblem = null;
+        });
+        if (phone && !set) return _firstRun(context, saving, startScan);
         return PanelCard(
           children: [
             Row(
@@ -288,7 +357,8 @@ class _KeyCardState extends State<_KeyCard> {
                     _scanning = false;
                   }),
                 ),
-                if (!_replacing)
+                // A phone shows its code to no other phone.
+                if (!_replacing && !phone)
                   AppButton(
                     _showCode ? 'Hide the code' : 'Connect a phone',
                     onPressed: () => setState(() => _showCode = !_showCode),
@@ -299,15 +369,18 @@ class _KeyCardState extends State<_KeyCard> {
                 ),
               ]),
             if (set && !_replacing && _showCode) PairingCode(connection),
-            if (_scanner case final scan? when editing && _scanning) ...[
-              scan(_scanned),
-              ActionRow([
-                AppButton(
-                  'Cancel',
-                  onPressed: () => setState(() => _scanning = false),
-                ),
-              ]),
-            ],
+            if (_scanner case final scan? when editing && _scanning)
+              if (phone)
+                _phoneScan(scan)
+              else ...[
+                scan(_scanned),
+                ActionRow([
+                  AppButton(
+                    'Cancel',
+                    onPressed: () => setState(() => _scanning = false),
+                  ),
+                ]),
+              ],
             if (editing && !_scanning) ...[
               AppField(
                 controller: _url,
@@ -358,12 +431,7 @@ class _KeyCardState extends State<_KeyCard> {
                 if (_scanner != null)
                   AppButton(
                     'Scan QR code',
-                    onPressed: saving
-                        ? null
-                        : () => setState(() {
-                            _scanning = true;
-                            _scanProblem = null;
-                          }),
+                    onPressed: saving ? null : startScan,
                   ),
               ]),
             ],
@@ -376,6 +444,100 @@ class _KeyCardState extends State<_KeyCard> {
           ],
         );
       },
+    );
+  }
+
+  /// The phone's camera view over the window, which keeps this card's scope.
+  Widget _phoneScan(CodeScanner scan) => OverlayPortal(
+    controller: _scanView,
+    overlayChildBuilder: (context) =>
+        ScanView(camera: scan(_scanned), onCancel: () => _scanning = false),
+    child: const SizedBox.shrink(),
+  );
+
+  /// A phone's first run: Scan QR code first where there is a camera, then the address and
+  /// the password, Sign in and Paste a key, or the key in the password's place.
+  Widget _firstRun(BuildContext context, bool saving, VoidCallback startScan) {
+    final t = Tokens.of(context);
+    final scanner = _scanner;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 14,
+      children: [
+        if (scanner != null) ...[
+          if (_scanning) _phoneScan(scanner),
+          AppButton(
+            'Scan QR code',
+            primary: true,
+            onPressed: saving ? null : startScan,
+          ),
+          Row(
+            children: [
+              Expanded(child: Divider(color: t.line)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  _pasteKey ? 'or paste a key' : 'or sign in',
+                  style: Type.sans(12.5, color: t.muted),
+                ),
+              ),
+              Expanded(child: Divider(color: t.line)),
+            ],
+          ),
+        ],
+        AppField(
+          controller: _url,
+          label: 'Server address',
+          hint: _example,
+          keyboardType: TextInputType.url,
+          autofillHints: const [AutofillHints.url],
+        ),
+        if (_pasteKey)
+          AppField(
+            controller: _key,
+            label: 'AnythingLLM developer API key',
+            hint: 'Paste the AnythingLLM API key',
+            obscure: true,
+            keyboardType: TextInputType.visiblePassword,
+          )
+        else ...[
+          AppField(
+            controller: _password,
+            label: 'Password',
+            hint: 'Leave it empty if the server has none',
+            obscure: true,
+            keyboardType: TextInputType.visiblePassword,
+            onSubmitted: (_) => saving ? null : _signIn(),
+          ),
+          Text(
+            'The password AnythingLLM\'s web page asks for. The app makes its own developer key.',
+            style: Type.sans(12.5, color: t.muted, height: 1.45),
+          ),
+        ],
+        ActionRow(alignment: WrapAlignment.start, [
+          AppButton(
+            saving
+                ? 'Checking…'
+                : _pasteKey
+                ? 'Save key'
+                : 'Sign in',
+            primary: scanner == null,
+            onPressed: saving
+                ? null
+                : _pasteKey
+                ? _save
+                : _signIn,
+          ),
+          TextAction.plain(_pasteKey ? 'Use password' : 'Paste a key', () {
+            if (!saving) setState(() => _pasteKey = !_pasteKey);
+          }, height: 44),
+        ]),
+        if (_scanProblem case final problem?) HelpText(problem, status: true),
+        if (_settings.message case final message?)
+          HelpText(message, status: true),
+        if (_settings.keyringProblem case final problem?)
+          AlertBox(AlertKind.warn, problem.title, text: problem.text),
+      ],
     );
   }
 }
