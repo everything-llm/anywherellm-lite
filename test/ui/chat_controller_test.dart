@@ -1011,6 +1011,20 @@ void main() {
       expect(rig.chat.alreadyAnswering, isFalse);
       expect(rig.chat.answeringIn('household'), isTrue);
     });
+
+    test('a refusal in another chat keeps the first one', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await pumpEventQueue();
+      llm.errors['streamChat'] = const AlreadyAnswering('Already answering.');
+      unawaited(rig.chat.send('And a shorter one?'));
+      unawaited(rig.chat.select('household'));
+      await pumpEventQueue();
+      await rig.chat.send('Plan the meals');
+      await pumpEventQueue();
+      await rig.chat.select('q3', thread: 'budget');
+      expect(rig.chat.takeRefused()!.text, 'And a shorter one?');
+    });
   });
 
   test('a new server starts afresh', () async {

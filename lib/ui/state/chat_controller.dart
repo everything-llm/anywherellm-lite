@@ -263,8 +263,8 @@ class ChatController extends ChangeNotifier {
   /// on another device, while that answer may still run.
   final _refusedIn = <String>{};
 
-  /// The message the relay refused, which the composer takes back with [takeRefused].
-  ({String thread, String text, List<Attachment> attachments})? _refused;
+  /// The messages the relay refused, by chat, which the composer takes back with [takeRefused].
+  final _refused = <String, ({String text, List<Attachment> attachments})>{};
 
   /// Whether the chat on screen refused the last message because it was already answering,
   /// maybe on another device: its answer is followed here, and the message waits in the
@@ -273,12 +273,8 @@ class ChatController extends ChangeNotifier {
 
   /// The message the relay refused in the chat on screen, with its files, for the composer to
   /// put back; null once taken, or when it was refused in another chat.
-  ({String text, List<Attachment> attachments})? takeRefused() {
-    final refused = _refused;
-    if (refused == null || refused.thread != activeThread) return null;
-    _refused = null;
-    return (text: refused.text, attachments: refused.attachments);
-  }
+  ({String text, List<Attachment> attachments})? takeRefused() =>
+      _refused.remove(activeThread);
 
   /// How many messages have been sent, so the chat can bring each new one into view.
   int get sends => _sends;
@@ -333,11 +329,7 @@ class ChatController extends ChangeNotifier {
 
   /// Whether the chat on screen can take no message now: a chat of its workspace answers, this
   /// one or another, [atLimit] holds, or a chat is being cleared or its exchanges dropped.
-  bool get busy =>
-      _clearing ||
-      _dropping ||
-      (activeSlug != null && answeringIn(activeSlug!)) ||
-      atLimit;
+  bool get busy => _clearing || _dropping || workspaceAnswering || atLimit;
   bool _dropping = false;
 
   /// Whether [maxRuns] answers are running, so no other can start.
@@ -443,6 +435,9 @@ class ChatController extends ChangeNotifier {
   /// Whether a chat of workspace [slug] is answering, a draft whose chat is being made included.
   bool answeringIn(String slug) => _runs.any((r) => r.slug == slug);
 
+  /// Whether a chat of the workspace on screen is answering, this one or another.
+  bool get workspaceAnswering => activeSlug != null && answeringIn(activeSlug!);
+
   @override
   void dispose() {
     // The last chance to send a delete still waiting to be undone.
@@ -481,7 +476,7 @@ class ChatController extends ChangeNotifier {
     }
     _runs.clear();
     _refusedIn.clear();
-    _refused = null;
+    _refused.clear();
     workspaces = const [];
     _threads.clear();
     _turns.clear();
@@ -628,7 +623,7 @@ class ChatController extends ChangeNotifier {
     activeThread = threadSlug;
     if (threadSlug != null) _ready.remove(threadSlug);
     // A refused message goes back to the composer only in its own chat.
-    if (_refused?.thread != threadSlug) _refused = null;
+    _refused.removeWhere((thread, _) => thread != threadSlug);
     editing = null;
     _clearLinkNotice();
     _rememberChat();
@@ -1006,7 +1001,7 @@ class ChatController extends ChangeNotifier {
       ];
     }
     _refusedIn.add(thread);
-    _refused = (thread: thread, text: sent.text, attachments: sent.attachments);
+    _refused[thread] = (text: sent.text, attachments: sent.attachments);
     notifyListeners();
     final server = _server;
     unawaited(

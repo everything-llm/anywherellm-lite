@@ -531,7 +531,7 @@ class _Form extends StatelessWidget {
         ? 'Answering…'
         : chat.clearing
         ? 'Clearing the chat…'
-        : chat.activeSlug != null && chat.answeringIn(chat.activeSlug!)
+        : chat.workspaceAnswering
         ? 'Another chat in this workspace is still answering…'
         : chat.atLimit
         ? '${chat.maxRuns} chats are answering. Send when one ends.'
