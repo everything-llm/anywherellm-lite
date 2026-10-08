@@ -2449,6 +2449,7 @@ void main() {
         ).streamChat('w', 't', 'Hi').toList(),
       );
       expect(error.message, startsWith('Lost the connection to the relay.'));
+      expect(error, isA<AnswerStillRunning>());
     });
 
     test('a failed run gives the relay\'s words', () async {

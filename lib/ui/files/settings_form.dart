@@ -294,9 +294,11 @@ class _SettingsFormState extends State<SettingsForm> {
                   problem: problems['topN'],
                 ),
                 SettingRow(
-                  label: 'Document similarity threshold',
+                  label: 'Minimum relevance',
                   help: preset != null
-                      ? 'A passage needs a similarity score of at least ${preset.$1}.'
+                      ? 'How closely a passage must match the question to be used. '
+                            '${preset.$2} needs a similarity score of ${preset.$1}; '
+                            'AnythingLLM calls this the similarity threshold.'
                       : similarity == null
                       ? 'Using the system default.'
                       : 'Set to $similarity on the server. Pick one to replace it.',

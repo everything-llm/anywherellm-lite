@@ -470,10 +470,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       }
       if (left) return;
       if (misses == rejoinDelays.length) {
-        throw const ApiException(
-          'Lost the connection to the relay. The answer is still being written there and will '
-          'be in the chat when it is done.',
-        );
+        throw const AnswerStillRunning();
       }
       await Future.any([Future<void>.delayed(rejoinDelays[misses++]), gone]);
     }

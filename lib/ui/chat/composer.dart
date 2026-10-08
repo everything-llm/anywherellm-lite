@@ -797,13 +797,16 @@ class _RoundButton extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => Tappable(
-    label: label,
-    tooltip: label,
+  Widget build(BuildContext context) => TouchTarget(
     onTap: onTap,
-    radius: BorderRadius.circular(Sizes.control),
-    color: color,
-    child: SizedBox.square(dimension: 34, child: Center(child: child)),
+    child: Tappable(
+      label: label,
+      tooltip: label,
+      onTap: onTap,
+      radius: BorderRadius.circular(Sizes.control),
+      color: color,
+      child: SizedBox.square(dimension: 34, child: Center(child: child)),
+    ),
   );
 }
 

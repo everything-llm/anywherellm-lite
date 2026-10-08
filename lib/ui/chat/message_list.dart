@@ -607,7 +607,15 @@ class _Answer extends StatelessWidget {
           const Padding(padding: EdgeInsets.only(top: 6), child: Caret()),
         if (turn.error case final error?) ...[
           const SizedBox(height: 10),
-          AlertBox(AlertKind.bad, 'The answer stopped', text: error),
+          if (turn.stillRunning)
+            const StatusBox(
+              'Still being written',
+              text:
+                  'The connection dropped, but the answer keeps going on the server. It will '
+                  'appear here when it\'s done; Refresh checks for it sooner.',
+            )
+          else
+            AlertBox(AlertKind.bad, 'The answer stopped', text: error),
         ],
         if (!turn.streaming &&
             turn.browserSteps.isNotEmpty &&

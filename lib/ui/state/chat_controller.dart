@@ -56,6 +56,10 @@ class Turn extends ChangeNotifier {
   /// Why the answer failed, or null.
   String? error;
 
+  /// Whether the answer [error] names is still being written by the relay the app lost touch
+  /// with, so it will be in the chat when it is done.
+  bool stillRunning = false;
+
   /// Whether the person stopped the answer.
   bool stopped = false;
 
@@ -757,10 +761,13 @@ class ChatController extends ChangeNotifier {
                 ..metrics = metrics
                 ..chatId = user.chatId = chatId,
           },
-          onError: (Object error) => _finish(
-            running,
-            error: error is ApiException ? error.message : '$error',
-          ),
+          onError: (Object error) {
+            if (error is AnswerStillRunning) answer.stillRunning = true;
+            _finish(
+              running,
+              error: error is ApiException ? error.message : '$error',
+            );
+          },
           onDone: () {
             _finish(running);
             if (answer.chatId == null && signedIn) {

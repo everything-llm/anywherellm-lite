@@ -54,6 +54,33 @@ class AppButton extends StatelessWidget {
 }
 
 /// A square icon button with a hover fill.
+/// [child], a control drawn smaller than a finger, given a square of [TouchTarget.side] to be
+/// tapped in on a phone, where a tap beside it does what [onTap] does. Elsewhere [child] alone.
+class TouchTarget extends StatelessWidget {
+  const TouchTarget({super.key, required this.onTap, required this.child});
+
+  /// The least a finger needs.
+  static const side = 44.0;
+
+  final VoidCallback? onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!ScreenClass.ofContext(context).isPhone) return child;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      // [child] already says what it is and does.
+      excludeFromSemantics: true,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: side, minHeight: side),
+        child: Center(widthFactor: 1, heightFactor: 1, child: child),
+      ),
+    );
+  }
+}
+
 class IconBtn extends StatelessWidget {
   const IconBtn(
     this.icon, {
@@ -83,22 +110,25 @@ class IconBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    return Tappable(
-      label: tooltip,
-      tooltip: tooltip,
+    return TouchTarget(
       onTap: onPressed,
-      toggled: active,
-      radius: BorderRadius.circular(box <= 32 ? 6 : 8),
-      color: active == true ? t.accentbg : null,
-      hoverColor: dangerHover ? t.badbg : null,
-      dimWhenDisabled: 0.4,
-      child: SizedBox.square(
-        dimension: box,
-        child: Center(
-          child: AppIcon(
-            icon,
-            size: size,
-            color: active == true ? t.accent : t.ink2,
+      child: Tappable(
+        label: tooltip,
+        tooltip: tooltip,
+        onTap: onPressed,
+        toggled: active,
+        radius: BorderRadius.circular(box <= 32 ? 6 : 8),
+        color: active == true ? t.accentbg : null,
+        hoverColor: dangerHover ? t.badbg : null,
+        dimWhenDisabled: 0.4,
+        child: SizedBox.square(
+          dimension: box,
+          child: Center(
+            child: AppIcon(
+              icon,
+              size: size,
+              color: active == true ? t.accent : t.ink2,
+            ),
           ),
         ),
       ),

@@ -1,3 +1,4 @@
+import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/ui/chat/message_list.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -30,6 +31,31 @@ Future<void> _scrollUp(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('an answer the relay goes on writing is not shown as a failure', (
+    tester,
+  ) async {
+    final llm = planningServer()..hold = true;
+    final h = await pumpApp(tester, llm: llm);
+    await h.chat.send('And next quarter?');
+    await tester.pump();
+    llm.chat!.addError(const AnswerStillRunning());
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Still being written'), findsOneWidget);
+    expect(find.text('The answer stopped'), findsNothing);
+    expect(h.chat.turns.last.unfinished, isTrue);
+  });
+
+  testWidgets('any other failure is', (tester) async {
+    final llm = planningServer()..hold = true;
+    final h = await pumpApp(tester, llm: llm);
+    await h.chat.send('And next quarter?');
+    await tester.pump();
+    llm.chat!.addError(const ApiException('The server stopped the answer.'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('The answer stopped'), findsOneWidget);
+    expect(find.text('Still being written'), findsNothing);
+  });
+
   testWidgets('sending while scrolled up brings the new question into view', (
     tester,
   ) async {

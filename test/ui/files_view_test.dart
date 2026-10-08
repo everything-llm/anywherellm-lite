@@ -178,7 +178,7 @@ void main() {
       expect(inPane(find.text('Chat mode')), findsOneWidget);
       expect(inPane(find.text('Max context snippets')), findsOneWidget);
       expect(
-        inPane(find.text('Document similarity threshold')),
+        inPane(find.text('Minimum relevance')),
         findsOneWidget,
       );
       final save = tester.widget<Tappable>(inPane(control('Save')));

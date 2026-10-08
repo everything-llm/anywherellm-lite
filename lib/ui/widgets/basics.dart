@@ -47,6 +47,60 @@ class AlertBox extends StatelessWidget {
   }
 }
 
+/// A calm note of something under way, with an accent dot by its [title]: not a failure, so
+/// not drawn as one.
+class StatusBox extends StatelessWidget {
+  const StatusBox(this.title, {super.key, this.text});
+
+  final String title;
+  final String? text;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: t.accentbg,
+          borderRadius: BorderRadius.circular(Sizes.card),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    color: t.accent,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Type.sans(14, weight: FontWeight.w600, color: t.ink),
+                  ),
+                ),
+              ],
+            ),
+            if (text != null) ...[
+              const SizedBox(height: 6),
+              Text(text!, style: Type.sans(14, color: t.ink2)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// A small capitalised heading over a group, as over the workspaces and in Settings.
 class SectionLabel extends StatelessWidget {
   const SectionLabel(this.text, {super.key});

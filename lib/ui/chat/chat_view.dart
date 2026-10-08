@@ -7,6 +7,7 @@ import '../icons.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
+import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
 import '../widgets/pane_header.dart';
 import '../widgets/tappable.dart';
@@ -279,31 +280,34 @@ class _HeaderButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    return Tappable(
-      label: heard ?? label,
-      tooltip: compact ? label : null,
-      toggled: pressed,
+    return TouchTarget(
       onTap: onTap,
-      radius: BorderRadius.circular(9),
-      color: pressed == true ? t.hover : t.panel,
-      side: BorderSide(color: t.line),
-      child: SizedBox(
-        height: 36,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppIcon(icon, size: IconSize.xs, color: t.ink),
-              if (!compact) ...[
-                const SizedBox(width: 7),
-                Text(
-                  label,
-                  style: Type.sans(14, weight: FontWeight.w500, color: t.ink),
-                ),
+      child: Tappable(
+        label: heard ?? label,
+        tooltip: compact ? label : null,
+        toggled: pressed,
+        onTap: onTap,
+        radius: BorderRadius.circular(9),
+        color: pressed == true ? t.hover : t.panel,
+        side: BorderSide(color: t.line),
+        child: SizedBox(
+          height: 36,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppIcon(icon, size: IconSize.xs, color: t.ink),
+                if (!compact) ...[
+                  const SizedBox(width: 7),
+                  Text(
+                    label,
+                    style: Type.sans(14, weight: FontWeight.w500, color: t.ink),
+                  ),
+                ],
+                if (trailing != null) ...[const SizedBox(width: 7), trailing!],
               ],
-              if (trailing != null) ...[const SizedBox(width: 7), trailing!],
-            ],
+            ),
           ),
         ),
       ),

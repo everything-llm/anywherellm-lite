@@ -10,6 +10,16 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// A relay's answer the app lost touch with while the relay goes on writing it, so it will
+/// be in the chat when it is done.
+class AnswerStillRunning extends ApiException {
+  const AnswerStillRunning()
+    : super(
+        'Lost the connection to the relay. The answer is still being written there and will '
+        'be in the chat when it is done.',
+      );
+}
+
 /// A call made before any server was set up in Settings.
 class NotConfigured extends ApiException {
   const NotConfigured()
