@@ -47,7 +47,7 @@ App first. Size is S (under a day), M (days), L (a week or more).
 | G3 | A pinned bar with the picture and Stop while the card is out of view | The header's Browser with a pulsing dot | `_BrowserButton`, `BrowserStateBuilder`, the composer's Stop | While the running answer's chip is scrolled away: a bar under the header with the step, Stop and a tap to the panel; with G1, the picture | app | S |
 | G4 | Task titles that tell steps apart | `Opening news.ycombinator.com` twice for two pages; `Filling in Customer name:` | `browserStep` (`lib/core/browser.dart`) has the address | Add the path when the host repeats; drop a trailing colon from an element's name; show a step's seconds once it has run 10 s | app | S |
 | G5 | A live card in a web client | The tab's card is never drawn in the web build | `chatimage.live.push(cors=...)`; the relay checks the developer key with `/api/v1/auth` | Send `Access-Control-Allow-Origin` on a tab's card only to a request that carries the developer key, and have `answerImage` send it to the card host. The key would then go to a second port of the same host | everythingllm, app | M, S |
-| G6 | Other chats usable while one browses | Every other composer is off until the answer ends | The relay runs one answer per chat, not per app | Let `ChatController` hold a running answer per chat | app | L |
+| G6 | Other chats usable while one browses | Built on 2026-10-08: a chat of another workspace takes a message while one answers; a chat of the same workspace waits, since its agent runs share one browser tab until AnythingLLM's `ephemeral.js` sends `thread_id` (bug 1 of the first run) | The relay runs one answer per chat, not per app | `ChatController` holds a running answer per workspace, at most 3 in a browser | app | L |
 | G7 | A credentials modal over the chat | A separate form, clearer about whose site it is, with 2FA and "Ask me before each use" | `/login/<id>/` | Keep the form | -- | -- |
 
 Ruled out for the web build: a CORS header on every tab card. everythingllm leaves it off on purpose, because a tab may be signed in somewhere and any page that learned the card's address could read its screenshots (`packages/browser/src/browser/live.py`).
@@ -87,7 +87,7 @@ The first run's bugs: 1, one tab per workspace, no longer shows, though Anything
 1. Bug 8: the prompt rule on cards, in everythingllm.
 1. Bug 7: one chat's tab in its take-over view.
 1. G5: tab cards in the web build, behind the developer key.
-1. G6: answers in more than one chat at once.
+1. G6: answers in more than one chat of a workspace at once, once AnythingLLM keys an agent run's browser by chat.
 
 ## Scratch chats left in place
 

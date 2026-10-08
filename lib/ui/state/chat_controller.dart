@@ -160,8 +160,8 @@ class _Deleted {
   final bool open;
 }
 
-/// The one answer running: the chat it belongs to, null while its draft's thread is being made,
-/// and the stream it reads.
+/// An answer running: the chat it belongs to, null while its draft's thread is being made, and
+/// the stream it reads.
 class _Running {
   _Running(this.answer, this.slug);
 
@@ -177,13 +177,16 @@ class _Running {
   String? nameAs;
 }
 
-/// The workspaces and their chats, the chat on screen, and the one answer that may be running.
+/// The workspaces and their chats, the chat on screen, and the answers running.
+///
+/// One answer runs at a time in each workspace, since agent runs in one workspace share its
+/// browser on the server, and at most [maxRuns] in all, when that is set.
 ///
 /// A chat not yet asked anything is a draft: it lives only here until its first message, which
 /// makes the thread on the server. Everything it knows is about the server in [_settings]; a new
 /// server starts it afresh.
 class ChatController extends ChangeNotifier {
-  ChatController(this._api, this._settings, this._prefs)
+  ChatController(this._api, this._settings, this._prefs, {this.maxRuns})
     : _server = _settings.connection?.withPassword(null),
       _password = _settings.connection?.password,
       _auth = _settings.auth {
@@ -194,6 +197,10 @@ class ChatController extends ChangeNotifier {
   final AnythingLlmApi _api;
   final SettingsController _settings;
   final PrefsController _prefs;
+
+  /// How many answers may run at once across workspaces, or null for no limit. In a browser
+  /// each holds a connection open, and the browser opens only a few to one server.
+  final int? maxRuns;
 
   /// The server the fields below describe: its address and key, without the password, so
   /// saving or forgetting one does not start afresh.
@@ -249,12 +256,12 @@ class ChatController extends ChangeNotifier {
   Turn? get finished => _finished;
   Turn? _finished;
 
-  /// The answer running. Only one runs at a time.
-  _Running? _running;
+  /// The answers running, at most one in each workspace but for one found running on the relay.
+  final _runs = <_Running>[];
 
-  /// The chat whose last message the relay refused because it was already answering, maybe on
-  /// another device, while that answer may still run.
-  String? _refusedIn;
+  /// The chats whose last message the relay refused because they were already answering, maybe
+  /// on another device, while that answer may still run.
+  final _refusedIn = <String>{};
 
   /// The message the relay refused, which the composer takes back with [takeRefused].
   ({String thread, String text, List<Attachment> attachments})? _refused;
@@ -262,7 +269,7 @@ class ChatController extends ChangeNotifier {
   /// Whether the chat on screen refused the last message because it was already answering,
   /// maybe on another device: its answer is followed here, and the message waits in the
   /// composer to be sent when it ends.
-  bool get alreadyAnswering => _refusedIn != null && _refusedIn == activeThread;
+  bool get alreadyAnswering => _refusedIn.contains(activeThread);
 
   /// The message the relay refused in the chat on screen, with its files, for the composer to
   /// put back; null once taken, or when it was refused in another chat.
@@ -324,17 +331,29 @@ class ChatController extends ChangeNotifier {
   bool get clearing => _clearing;
   bool _clearing = false;
 
-  /// Whether an answer runs, a chat is being cleared or exchanges are being dropped, so no
-  /// message can be sent.
-  bool get busy => _running != null || _clearing || _dropping;
+  /// Whether the chat on screen can take no message now: a chat of its workspace answers, this
+  /// one or another, [atLimit] holds, or a chat is being cleared or its exchanges dropped.
+  bool get busy =>
+      _clearing ||
+      _dropping ||
+      (activeSlug != null && answeringIn(activeSlug!)) ||
+      atLimit;
   bool _dropping = false;
+
+  /// Whether [maxRuns] answers are running, so no other can start.
+  bool get atLimit => maxRuns != null && _runs.length >= maxRuns!;
 
   /// Whether the chat on screen can take a message: a draft, or a chat whose history is read.
   bool get ready => activeThread == null || _turns.containsKey(activeThread);
 
-  /// Whether the chat on screen is the one answering.
-  bool get answeringHere =>
-      _running != null && turns.contains(_running!.answer);
+  /// The answer running in the chat on screen, or null.
+  _Running? get _here {
+    final turns = this.turns;
+    return _runs.where((r) => turns.contains(r.answer)).firstOrNull;
+  }
+
+  /// Whether the chat on screen is answering.
+  bool get answeringHere => _here != null;
 
   /// The chats whose answer ended, neither failed nor stopped, while another chat was on
   /// screen, until they are opened, each to its workspace's slug. Kept for this run only.
@@ -346,11 +365,11 @@ class ChatController extends ChangeNotifier {
   /// Whether a chat of workspace [slug] has an answer ready.
   bool readyIn(String slug) => _ready.containsValue(slug);
 
-  bool isAnswering(String thread) => _running?.thread == thread;
+  bool isAnswering(String thread) => _runs.any((r) => r.thread == thread);
 
   /// The answer running in the chat on screen, or null. It notifies on each chunk, which this
   /// controller does not.
-  Turn? get runningHere => answeringHere ? _running!.answer : null;
+  Turn? get runningHere => _here?.answer;
 
   /// The browser's cards in the chat on screen's finished answers, newest first. A running
   /// answer's cards count once it ends, so the text streaming in is never parsed for one.
@@ -390,7 +409,7 @@ class ChatController extends ChangeNotifier {
   Future<void> refresh() async {
     if (_server == null || _refreshing || _clearing || _dropping) return;
     _refreshing = true;
-    if (_running case final running? when turns.contains(running.answer)) {
+    if (_here case final running?) {
       unawaited(running.stream?.cancel());
       _finish(
         running,
@@ -421,7 +440,8 @@ class ChatController extends ChangeNotifier {
     }
   }
 
-  bool answeringIn(String slug) => _running?.slug == slug;
+  /// Whether a chat of workspace [slug] is answering, a draft whose chat is being made included.
+  bool answeringIn(String slug) => _runs.any((r) => r.slug == slug);
 
   @override
   void dispose() {
@@ -429,7 +449,9 @@ class ChatController extends ChangeNotifier {
     unawaited(flushDelete());
     _disposed = true;
     _settings.removeListener(_serverChanged);
-    _running?.stream?.cancel();
+    for (final running in _runs) {
+      running.stream?.cancel();
+    }
     _linkTimer?.cancel();
     unreachable.dispose();
     super.dispose();
@@ -454,9 +476,11 @@ class ChatController extends ChangeNotifier {
     _auth = _settings.auth;
     unawaited(_prefs.useServer(_server?.baseUrl));
     editing = null;
-    _running?.stream?.cancel();
-    _running = null;
-    _refusedIn = null;
+    for (final running in _runs) {
+      running.stream?.cancel();
+    }
+    _runs.clear();
+    _refusedIn.clear();
     _refused = null;
     workspaces = const [];
     _threads.clear();
@@ -853,7 +877,8 @@ class ChatController extends ChangeNotifier {
     );
     final answer = Turn.answer();
     final turns = [...this.turns, user, answer];
-    final running = _running = _Running(answer, slug)..thread = activeThread;
+    final running = _Running(answer, slug)..thread = activeThread;
+    _runs.add(running);
     final server = _server;
     final draftGo = _draftGo;
     _setTurns(turns);
@@ -883,7 +908,7 @@ class ChatController extends ChangeNotifier {
         return true;
       }
       // Stopped while the thread was being made: the chat stays, the answer does not run.
-      if (!identical(_running, running)) {
+      if (!_runs.contains(running)) {
         notifyListeners();
         return true;
       }
@@ -971,8 +996,7 @@ class ChatController extends ChangeNotifier {
     Turn user,
     ({String text, List<Attachment> attachments}) sent,
   ) {
-    if (!identical(_running, running)) return;
-    _running = null;
+    if (!_runs.remove(running)) return;
     final slug = running.slug;
     final thread = running.thread!;
     if (_turns[thread] case final turns?) {
@@ -981,16 +1005,18 @@ class ChatController extends ChangeNotifier {
           if (!identical(turn, user) && !identical(turn, running.answer)) turn,
       ];
     }
-    _refusedIn = thread;
+    _refusedIn.add(thread);
     _refused = (thread: thread, text: sent.text, attachments: sent.attachments);
     notifyListeners();
     final server = _server;
     unawaited(
       _rejoin(slug, thread, server, elsewhere: true).then((_) {
         // Nothing found running: it ended meanwhile, and the message can simply be sent.
-        if (_disposed || _server != server || _refusedIn != thread) return;
+        if (_disposed || _server != server || !_refusedIn.contains(thread)) {
+          return;
+        }
         if (isAnswering(thread)) return;
-        _refusedIn = null;
+        _refusedIn.remove(thread);
         notifyListeners();
       }),
     );
@@ -1001,7 +1027,8 @@ class ChatController extends ChangeNotifier {
   /// it was started [elsewhere], on another device. The answer the app let go of, which the chat
   /// shows as unfinished, is the one followed again. Only a chat whose history was read, and that
   /// nothing changed while the relay was asked: a message sent, a clear or a read meanwhile is
-  /// newer than what the relay listed.
+  /// newer than what the relay listed. Another chat answering does not keep it from being
+  /// followed, as the relay already runs it.
   Future<void> _rejoin(
     String slug,
     String thread,
@@ -1009,7 +1036,7 @@ class ChatController extends ChangeNotifier {
     bool elsewhere = false,
   }) async {
     final shown = _turns[thread];
-    if (shown == null || busy) return;
+    if (shown == null || _following(thread)) return;
     final RejoinedAnswer? found;
     try {
       found = await _api.rejoinChat(slug, thread);
@@ -1019,7 +1046,7 @@ class ChatController extends ChangeNotifier {
     if (found == null ||
         _disposed ||
         _server != server ||
-        busy ||
+        _following(thread) ||
         activeSlug != slug ||
         activeThread != thread ||
         !identical(_turns[thread], shown)) {
@@ -1037,12 +1064,18 @@ class ChatController extends ChangeNotifier {
     }
     final answer = Turn.answer()..rejoined = !elsewhere;
     _turns[thread] = [...turns, answer];
-    final running = _running = _Running(answer, slug)..thread = thread;
+    final running = _Running(answer, slug)..thread = thread;
+    _runs.add(running);
     editing = null;
     _sends++;
     notifyListeners();
     _follow(running, answer, found.events);
   }
+
+  /// Whether chat [thread] is followed already, or a chat is being cleared or its exchanges
+  /// dropped, which a run found meanwhile would race.
+  bool _following(String thread) =>
+      isAnswering(thread) || _clearing || _dropping;
 
   /// Reads chat [thread] once [answer], found again, has ended, so the turns on screen are the
   /// saved ones, with their ids. [answer] stays the same turn and takes what the server saved,
@@ -1218,9 +1251,9 @@ class ChatController extends ChangeNotifier {
     }
   }
 
-  /// Stops the running answer, on the server too, keeping what came so far.
+  /// Stops the answer running in the chat on screen, on the server too, keeping what came so far.
   void stop() {
-    final running = _running;
+    final running = _here;
     if (running == null) return;
     if (running.thread case final thread? when running.stream != null) {
       unawaited(_stopOnServer(running.slug, thread));
@@ -1249,9 +1282,8 @@ class ChatController extends ChangeNotifier {
 
   /// Ends [running], with [error] when it failed, unless it was already stopped or dropped.
   void _finish(_Running running, {String? error}) {
-    if (!identical(_running, running)) return;
-    _running = null;
-    if (running.thread == _refusedIn) _refusedIn = null;
+    if (!_runs.remove(running)) return;
+    _refusedIn.remove(running.thread);
     if ((running.thread, running.nameAs) case (final thread?, final message?)
         when !_named.contains(thread)) {
       unawaited(_nameAfter(running.slug, thread, message));

@@ -10,13 +10,15 @@ import 'fake_api.dart';
 import 'fake_settings.dart';
 
 /// A [FakeAnythingLlm] with the app's controllers over it. [connection] is in use from the
-/// start, as if read from the keyring.
+/// start, as if read from the keyring. [maxRuns] caps the answers running at once, as in a
+/// browser.
 class Rig {
   Rig({
     FakeAnythingLlm? llm,
     FakeSettingsStore? store,
     FakePrefsStore? prefsStore,
     Connection? connection,
+    int? maxRuns,
   }) : llm = llm ?? FakeAnythingLlm(),
        store = store ?? FakeSettingsStore(),
        prefsStore = prefsStore ?? FakePrefsStore() {
@@ -26,7 +28,7 @@ class Rig {
       ConnectionHolder(connection),
     );
     prefs = PrefsController(this.prefsStore);
-    chat = ChatController(this.llm, settings, prefs);
+    chat = ChatController(this.llm, settings, prefs, maxRuns: maxRuns);
     sources = SourcesController(this.llm, chat, prefs);
     files = FilesController(this.llm, settings, chat, prefs, sources);
     system = SystemController(this.llm, settings);

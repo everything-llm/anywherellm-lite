@@ -17,11 +17,13 @@ Future<Rig> started(
   FakeAnythingLlm llm, {
   Prefs prefs = const Prefs(),
   String? password,
+  int? maxRuns,
 }) async {
   final rig = Rig(
     llm: llm,
     connection: sampleConnection.withPassword(password),
     prefsStore: FakePrefsStore(prefs),
+    maxRuns: maxRuns,
   );
   addTearDown(rig.dispose);
   await rig.start();
@@ -130,7 +132,7 @@ void main() {
     },
   );
 
-  test('an answer streams in, and only one runs at a time', () async {
+  test('an answer streams in, and only one runs in a workspace', () async {
     final llm = planningServer()..hold = true;
     final rig = await started(llm);
     await rig.chat.send('Summarise');
@@ -892,6 +894,123 @@ void main() {
     expect(llm.calls.where((c) => c.startsWith('history')), [
       'history:priorities',
     ]);
+  });
+
+  group('answers in several workspaces', () {
+    /// Starts an answer in a new chat of Household, then shows Q3's budget chat.
+    Future<Rig> householdAnswering(FakeAnythingLlm llm, {int? maxRuns}) async {
+      llm.hold = true;
+      final rig = await started(llm, maxRuns: maxRuns);
+      await rig.chat.select('household');
+      await rig.chat.send('Plan the meals');
+      await pumpEventQueue();
+      await rig.chat.select('q3', thread: 'budget');
+      await pumpEventQueue();
+      return rig;
+    }
+
+    test('run at once, each into its own chat', () async {
+      final llm = planningServer();
+      final rig = await householdAnswering(llm);
+      final meals = llm.chats['th-1']!;
+      expect(rig.chat.answeringIn('household'), isTrue);
+      expect(rig.chat.busy, isFalse);
+      expect(await rig.chat.send('And next quarter?'), isTrue);
+      await pumpEventQueue();
+      final budget = rig.chat.runningHere!;
+      llm.chats['budget']!.add(const TextChunk('About 45k.'));
+      meals.add(const TextChunk('Soup on Monday.'));
+      await pumpEventQueue();
+      expect(budget.text, 'About 45k.');
+      expect(rig.chat.answeringIn('q3'), isTrue);
+      expect(rig.chat.answeringIn('household'), isTrue);
+      await rig.chat.select('household', thread: 'th-1');
+      expect(rig.chat.runningHere!.text, 'Soup on Monday.');
+    });
+
+    test('stop stops only the chat on screen', () async {
+      final llm = planningServer();
+      final rig = await householdAnswering(llm);
+      await rig.chat.send('And next quarter?');
+      await pumpEventQueue();
+      rig.chat.stop();
+      await pumpEventQueue();
+      expect(llm.calls, contains('stopChat:budget'));
+      expect(llm.calls, isNot(contains('stopChat:th-1')));
+      expect(rig.chat.answeringIn('q3'), isFalse);
+      expect(rig.chat.answeringIn('household'), isTrue);
+      expect(llm.chats['th-1']!.hasListener, isTrue);
+    });
+
+    test('one that ends off screen is ready and its chat named', () async {
+      final llm = planningServer();
+      final rig = await householdAnswering(llm);
+      llm.chats['th-1']!.add(const TextChunk('Soup on Monday.'));
+      await llm.chats['th-1']!.close();
+      await pumpEventQueue();
+      expect(rig.chat.answeringIn('household'), isFalse);
+      expect(rig.chat.isReady('th-1'), isTrue);
+      expect(rig.chat.readyIn('household'), isTrue);
+      expect(
+        rig.chat.threadsOf('household').single.name,
+        defaultTitle('Plan the meals'),
+      );
+    });
+
+    test('a new server lets go of every one', () async {
+      final llm = planningServer();
+      final rig = await householdAnswering(llm);
+      await rig.chat.send('And next quarter?');
+      await pumpEventQueue();
+      await rig.settings.clear();
+      await pumpEventQueue();
+      expect(llm.chats['th-1']!.hasListener, isFalse);
+      expect(llm.chats['budget']!.hasListener, isFalse);
+      expect(rig.chat.busy, isFalse);
+    });
+
+    test('at the limit, no other starts', () async {
+      final llm = planningServer();
+      final rig = await householdAnswering(llm, maxRuns: 1);
+      expect(rig.chat.atLimit, isTrue);
+      expect(rig.chat.busy, isTrue);
+      expect(await rig.chat.send('And next quarter?'), isFalse);
+      expect(llm.calls, isNot(contains('streamChat:budget:And next quarter?')));
+      await llm.chats['th-1']!.close();
+      await pumpEventQueue();
+      expect(rig.chat.busy, isFalse);
+    });
+
+    test('a run the relay kept going is followed while another answers', () async {
+      final llm = planningServer();
+      final events = StreamController<ChatEvent>();
+      addTearDown(() => unawaited(events.close()));
+      llm.running['budget'] = (question: 'And next quarter?', events: events);
+      final rig = await householdAnswering(llm);
+      expect(rig.chat.runningHere, isNotNull);
+      expect(rig.chat.turns.last.rejoined, isTrue);
+      expect(rig.chat.answeringIn('household'), isTrue);
+    });
+
+    test('a refused message shows only in its own chat', () async {
+      final llm = planningServer();
+      final rig = await householdAnswering(llm);
+      final events = StreamController<ChatEvent>();
+      addTearDown(() => unawaited(events.close()));
+      llm.running['budget'] = (question: 'Asked on the phone', events: events);
+      llm.errors['streamChat'] = const AlreadyAnswering('Already answering.');
+      await rig.chat.send('And a shorter one?');
+      await pumpEventQueue();
+      expect(rig.chat.alreadyAnswering, isTrue);
+      await rig.chat.select('household', thread: 'th-1');
+      expect(rig.chat.alreadyAnswering, isFalse);
+      await rig.chat.select('q3', thread: 'budget');
+      expect(rig.chat.alreadyAnswering, isTrue);
+      await events.close();
+      await pumpEventQueue();
+      expect(rig.chat.alreadyAnswering, isFalse);
+      expect(rig.chat.answeringIn('household'), isTrue);
+    });
   });
 
   test('a new server starts afresh', () async {

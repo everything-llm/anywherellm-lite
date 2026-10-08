@@ -303,18 +303,43 @@ void main() {
       expect(sent(llm, 'Second'), 0);
     });
 
-    testWidgets('the box stays off while another chat answers', (tester) async {
+    /// The composer's field, found by its type, since a field that is off is read only.
+    TextField field(WidgetTester tester) => tester.widget<TextField>(
+      find.descendant(
+        of: find.byType(Composer),
+        matching: find.byType(TextField),
+      ),
+    );
+
+    testWidgets('the box stays off while another chat of the workspace answers', (
+      tester,
+    ) async {
       await answering(tester);
       await tester.tap(find.bySemanticsLabel('Quarter priorities').first);
       await tester.pump(const Duration(milliseconds: 300));
-      // A field that is off is read only, so it is found by its type.
-      final field = tester.widget<TextField>(
-        find.descendant(
-          of: find.byType(Composer),
-          matching: find.byType(TextField),
-        ),
+      expect(field(tester).enabled, isFalse);
+      expect(
+        field(tester).decoration!.hintText,
+        'Another chat in this workspace is still answering…',
       );
-      expect(field.enabled, isFalse);
+    });
+
+    testWidgets('a chat of another workspace takes a message', (tester) async {
+      final llm = planningServer()..hold = true;
+      final h = await pumpApp(tester, llm: llm);
+      await tester.enterText(composerField, 'First');
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump(const Duration(milliseconds: 300));
+      await h.chat.select('household');
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(field(tester).enabled, isTrue);
+      await tester.enterText(composerField, 'Second');
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(sent(llm, 'Second'), 1);
+      expect(h.chat.answeringIn('q3'), isTrue);
     });
   });
 }

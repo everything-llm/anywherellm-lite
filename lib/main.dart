@@ -141,7 +141,14 @@ class _SessionHostState extends State<SessionHost> {
   @override
   void initState() {
     super.initState();
-    _chat = ChatController(widget.llm, widget.settings, widget.prefs);
+    // A browser opens only six connections to one server over HTTP/1.1, and each answer
+    // holds one.
+    _chat = ChatController(
+      widget.llm,
+      widget.settings,
+      widget.prefs,
+      maxRuns: kIsWeb ? 3 : null,
+    );
     _sources = SourcesController(widget.llm, _chat, widget.prefs);
     _files = FilesController(
       widget.llm,

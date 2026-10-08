@@ -531,8 +531,10 @@ class _Form extends StatelessWidget {
         ? 'Answering…'
         : chat.clearing
         ? 'Clearing the chat…'
-        : chat.busy
-        ? 'Another chat is still answering…'
+        : chat.activeSlug != null && chat.answeringIn(chat.activeSlug!)
+        ? 'Another chat in this workspace is still answering…'
+        : chat.atLimit
+        ? '${chat.maxRuns} chats are answering. Send when one ends.'
         : switch (scope.sources.chatMode.value) {
             ChatMode.automatic || ChatMode.chat => 'Ask anything…',
             ChatMode.query || null => 'Ask about your files…',

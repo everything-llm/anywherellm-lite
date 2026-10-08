@@ -55,7 +55,7 @@ class FakeWorkspace {
 /// test completes it. Every call but [verify] is recorded in [calls] as `name` or `name:arg`.
 ///
 /// [streamChat] answers with [answer] and [cited], or, when [hold] is set, with whatever the
-/// test adds to the controller [chat] makes.
+/// test adds to the controller [chat] makes, which [chats] also keeps by thread.
 class FakeAnythingLlm implements AnythingLlmApi {
   final List<Connection> verified = [];
   Object? verifyError;
@@ -122,6 +122,9 @@ class FakeAnythingLlm implements AnythingLlmApi {
   final Map<Uri, StreamController<Uint8List>> liveImages = {};
   bool hold = false;
   StreamController<ChatEvent>? chat;
+
+  /// Each held answer's controller, by thread: the last one when a chat asked twice.
+  final Map<String, StreamController<ChatEvent>> chats = {};
 
   /// Whether [streamChat]'s closing event leaves out the answer's id, as AnythingLLM's agent path
   /// does. The exchange is then saved to [histories] under that id, as the server saves it.
@@ -289,7 +292,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
     final error = errors['streamChat'];
     if (error != null) return Stream.error(error);
     if (hold) {
-      chat = StreamController<ChatEvent>();
+      chat = chats[thread] = StreamController<ChatEvent>();
       return chat!.stream;
     }
     final id = nextChatId++;
