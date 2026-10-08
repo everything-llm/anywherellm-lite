@@ -28,6 +28,14 @@ typedef FileSaver = Future<String?> Function(
 /// Hands the file [name], holding [bytes], to the system's share sheet.
 typedef FileSharer = Future<void> Function(String name, List<int> bytes);
 
+/// An app's own page, [page], in a web view, with [placeholder] over it until it loads, and a
+/// link off its host handed to [onLeave].
+typedef AppView = Widget Function(
+  Uri page, {
+  required Widget placeholder,
+  required void Function(Uri url) onLeave,
+});
+
 /// A camera view that reads QR codes and calls [onCode] with the first one's text.
 typedef CodeScanner = Widget Function(void Function(String code) onCode);
 
@@ -51,6 +59,7 @@ class AppScope extends InheritedWidget {
     this.scanner,
     this.share,
     this.shares,
+    this.appView,
     this.dictation,
     this.pasteImage,
     this.readAloud,
@@ -79,6 +88,10 @@ class AppScope extends InheritedWidget {
   /// What other apps share with AnywhereLLM, or null where the device has no share sheet to
   /// receive from.
   final Stream<SharedItem>? shares;
+
+  /// Shows an app's page in its sheet, or null where the device has no web view, and the sheet
+  /// shows the app's card.
+  final AppView? appView;
 
   /// Writes what the person says in the composer, or null where the device cannot listen.
   final Dictation? dictation;

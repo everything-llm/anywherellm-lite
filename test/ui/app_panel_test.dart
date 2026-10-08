@@ -148,6 +148,15 @@ void main() {
     expect(live.hasListener, isFalse);
   });
 
+  testWidgets('beside the chat the app shows its card, web view or not', (
+    tester,
+  ) async {
+    await pumpApp(tester, llm: _withApp(), canViewApps: true);
+    await _tapCard(tester);
+    expect(find.byType(AppPanel), findsOneWidget);
+    expect(find.textContaining('Web view of'), findsNothing);
+  });
+
   group('on a phone', () {
     const phone = Size(390, 844);
 
@@ -182,6 +191,21 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(SheetFrame), findsNothing);
       expect(h.shell.appOpen, isFalse);
+    });
+
+    testWidgets('with a web view the sheet shows the app\'s own page', (
+      tester,
+    ) async {
+      await pumpApp(tester, llm: _withApp(), size: phone, canViewApps: true);
+      await _tapCard(tester);
+      expect(
+        find.descendant(
+          of: find.byType(SheetFrame),
+          matching: find.text('Web view of $_page'),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('Back and a drag down close the sheet', (tester) async {

@@ -104,6 +104,7 @@ class Harness extends Rig {
     this.canPasteImages = false,
     this.canShare = false,
     this.shares,
+    this.canViewApps = false,
   }) : dictation = canDictate ? FakeDictation() : null,
        speaker = canSpeak ? FakeSpeaker() : null,
        shell = ShellController(sourcesPinned: sourcesOpen);
@@ -161,6 +162,9 @@ class Harness extends Rig {
   /// What other apps share with the app, as a test adds it, or null where it receives none.
   final StreamController<SharedItem>? shares;
 
+  /// Whether an app's sheet shows its page, as on Android. The page is a line of text naming it.
+  final bool canViewApps;
+
   /// Every file the app shared, by name, with its bytes.
   final Map<String, List<int>> shared = {};
 
@@ -198,6 +202,10 @@ class Harness extends Rig {
       },
       share: canShare ? (name, bytes) async => shared[name] = bytes : null,
       shares: shares?.stream,
+      appView: canViewApps
+          ? (page, {required placeholder, required onLeave}) =>
+                Text('Web view of $page')
+          : null,
       dictation: dictation,
       pasteImage: canPasteImages ? () async => clipboardImage : null,
       readAloud: readAloud,
@@ -234,6 +242,7 @@ Future<Harness> pumpApp(
   bool canPasteImages = false,
   bool canShare = false,
   StreamController<SharedItem>? shares,
+  bool canViewApps = false,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -246,6 +255,7 @@ Future<Harness> pumpApp(
     canScan: canScan,
     canShare: canShare,
     shares: shares,
+    canViewApps: canViewApps,
     canDictate: canDictate,
     canSpeak: canSpeak,
     labelAnswers: labelAnswers,

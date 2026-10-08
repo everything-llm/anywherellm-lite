@@ -34,8 +34,10 @@ Widget _card(BuildContext context, AppCard app) {
 
 /// The app an answer's card opened, beside the chat in the browser's place, or as a [sheet] over
 /// the chat on a phone: its name and kind, its live card drawn large, Open in the browser, which
-/// opens its page, and Close, which puts back what the panel showed. It only shows the app;
-/// changing it happens on its page. Dragging the sheet down, or a tap on the scrim, closes it.
+/// opens its page, and Close, which puts back what the panel showed. Beside the chat it only
+/// shows the app; changing it happens on its page. The sheet shows that page itself where the
+/// device has a web view ([AppScope.appView]). Dragging the sheet down, or a tap on the scrim,
+/// closes it.
 class AppPanel extends StatelessWidget {
   const AppPanel({
     super.key,
@@ -70,7 +72,15 @@ class AppPanel extends StatelessWidget {
         ),
         if (!sheet) const SizedBox(width: 2),
       ],
-      child: SingleChildScrollView(child: _card(context, app)),
+      child: switch (AppScope.of(context).appView) {
+        // On a phone with a web view, the app's own page, which can change it.
+        final view? when sheet => view(
+          app.page,
+          placeholder: _card(context, app),
+          onLeave: (url) => openLink(context, url.toString()),
+        ),
+        _ => SingleChildScrollView(child: _card(context, app)),
+      },
     );
   }
 }

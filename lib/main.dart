@@ -18,6 +18,7 @@ import 'core/ports.dart';
 import 'ui/app.dart';
 import 'ui/app_scope.dart';
 import 'ui/boot_screen.dart';
+import 'ui/chat/app_web_view.dart';
 import 'ui/chat/device_speaker.dart';
 import 'ui/chat/dictation.dart';
 import 'ui/chat/speaker.dart';
@@ -230,6 +231,7 @@ class _SessionHostState extends State<SessionHost> {
         scanner: _android ? cameraScanner : null,
         share: _android ? shareBytes : null,
         shares: _shares,
+        appView: _android ? appWebView : null,
         dictation: _dictation,
         pasteImage: _linux ? () => Pasteboard.image : null,
         readAloud: _readAloud,
