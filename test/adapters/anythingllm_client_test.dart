@@ -2582,6 +2582,23 @@ void main() {
         expect(await api.rejoinChat('w', 't'), isNull);
       });
 
+      test('a run that clears the chat is no answer', () async {
+        final api = relay(
+          (_) => lines([]),
+          running: {
+            'runs': [
+              listed(
+                'r_1',
+                more: {
+                  'body': {'reset': true},
+                },
+              ),
+            ],
+          },
+        );
+        expect(await api.rejoinChat('w', 't'), isNull);
+      });
+
       test('a server that is not a relay is not asked', () async {
         final seen = <http.Request>[];
         final api = relay(

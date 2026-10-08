@@ -121,8 +121,9 @@ void main() {
     tester,
   ) async {
     final llm = planningServer();
+    // Closed below, not in a tear-down: one would wait on the test's fake clock, which no
+    // longer runs then.
     final events = StreamController<ChatEvent>();
-    addTearDown(events.close);
     llm.running['budget'] = (question: 'And next quarter?', events: events);
     // Held until the app has settled: a streaming answer's caret never lets it settle.
     final found = llm.gates['rejoinChat'] = Completer<void>();

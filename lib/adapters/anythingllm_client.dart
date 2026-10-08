@@ -320,7 +320,8 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
         return (
           question: _questionOf(run),
           events: _letGo(
-            (gone) => _followRun(connection, (slug, thread), known, known, gone),
+            (gone) =>
+                _followRun(connection, (slug, thread), known, known, gone),
           ),
         );
       }

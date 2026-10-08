@@ -403,7 +403,8 @@ void main() {
     }) {
       final events = StreamController<ChatEvent>();
       llm.running['budget'] = (question: question, events: events);
-      addTearDown(events.close);
+      // Not waited for: closing a stream nobody followed never finishes.
+      addTearDown(() => unawaited(events.close()));
       return events;
     }
 
@@ -433,6 +434,7 @@ void main() {
       final events = running(llm);
       final rig = await started(llm);
       await pumpEventQueue();
+      final answer = rig.chat.turns.last;
       events.add(const TextChunk('About 45k.'));
       llm.histories['budget'] = [
         ...llm.histories['budget']!,
@@ -450,6 +452,8 @@ void main() {
       expect(rig.chat.turns.last.text, 'About 45k.');
       expect(rig.chat.turns.last.rejoined, isFalse);
       expect(rig.chat.turns.last.chatId, 7);
+      // The same turn, so what follows it, as Read aloud does, keeps it.
+      expect(rig.chat.turns.last, same(answer));
     });
 
     test('keeps what came when the server has not saved it yet', () async {
@@ -459,11 +463,38 @@ void main() {
       await pumpEventQueue();
       events
         ..add(const TextChunk('About 45k.'))
-        ..add(const ChatDone([]));
+        ..add(const ChatDone([], chatId: 9));
       await events.close();
       await pumpEventQueue();
       expect(rig.chat.busy, isFalse);
       expect(rig.chat.turns.last.text, 'About 45k.');
+      expect(rig.chat.turns.last.chatId, 9);
+    });
+
+    test('is not followed in a chat whose history could not be read', () async {
+      final llm = planningServer()
+        ..errors['history'] = const ApiException('No.');
+      running(llm);
+      final rig = await started(llm);
+      await pumpEventQueue();
+      expect(rig.chat.busy, isFalse);
+      expect(rig.chat.ready, isFalse);
+    });
+
+    test('is not followed once a message was sent meanwhile', () async {
+      final llm = planningServer();
+      running(llm);
+      final found = llm.gates['rejoinChat'] = Completer<void>();
+      final rig = await started(llm);
+      await rig.chat.send('Something else?');
+      await pumpEventQueue();
+      found.complete();
+      await pumpEventQueue();
+      expect(rig.chat.turns.where((t) => t.rejoined), isEmpty);
+      expect(
+        rig.chat.turns.where((t) => t.text == 'And next quarter?'),
+        isEmpty,
+      );
     });
 
     test('is not asked about for a chat with nothing running', () async {
