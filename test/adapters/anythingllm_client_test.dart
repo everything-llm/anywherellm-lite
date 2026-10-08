@@ -2101,6 +2101,29 @@ void main() {
       throw http.ClientException('Connection reset');
     }
 
+    test('a relay gone from its route is asked about again', () async {
+      final seen = <http.Request>[];
+      final api = relay((_) => lines([]), seen: seen, startStatus: 502);
+      await _failure(api.streamChat('w', 't', 'Hi').drain<void>());
+      await _failure(api.streamChat('w', 't', 'Again').drain<void>());
+      expect(
+        seen.where((r) => r.url.path == '/everythingllm/health'),
+        hasLength(2),
+      );
+    });
+
+    test('asked again, the relay is checked afresh', () async {
+      final seen = <http.Request>[];
+      final api = relay((_) => lines([]), seen: seen);
+      expect(await api.relayFound(), isTrue);
+      expect(await api.relayFound(), isTrue);
+      expect(await api.relayFound(again: true), isTrue);
+      expect(
+        seen.where((r) => r.url.path == '/everythingllm/health'),
+        hasLength(2),
+      );
+    });
+
     test('starts a run of the stream-chat body and reads its chunks', () async {
       final seen = <http.Request>[];
       final events = await relay(

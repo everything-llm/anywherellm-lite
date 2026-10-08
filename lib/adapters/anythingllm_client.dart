@@ -365,7 +365,17 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   ) async* {
     final chat = (slug, thread);
     final id = _beginRun(connection, slug, thread, body, limit);
-    final started = id.then<String?>((id) => id, onError: (_) => null);
+    final started = id.then<String?>(
+      (id) => id,
+      onError: (Object error) {
+        // A relay that is gone, or whose route is, is asked about again on the next message.
+        if (error is ApiException &&
+            (error.status == 404 || (error.status ?? 0) >= 500)) {
+          _relays.remove(connection.withPassword(null));
+        }
+        return null;
+      },
+    );
     _runs[chat] = (connection, started);
     try {
       yield* chatEventsOf(_runChunks(connection, await id, gone));
@@ -874,7 +884,10 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   );
 
   @override
-  Future<bool> relayFound() => _isRelay(_current);
+  Future<bool> relayFound({bool again = false}) {
+    if (again) _relays.remove(_current.withPassword(null));
+    return _isRelay(_current);
+  }
 
   @override
   Future<int> vectorCount() async => switch (_field(

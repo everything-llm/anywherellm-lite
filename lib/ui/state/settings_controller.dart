@@ -86,7 +86,7 @@ class SettingsController extends ChangeNotifier {
     if (server == null) return;
     await _check(server);
     if (connection != server) return;
-    await Future.wait([readAuth(), readRelay()]);
+    await Future.wait([readAuth(), readRelay(again: true)]);
   }
 
   /// Asks the server whether [candidate] opens it, into [check] and [message].
@@ -105,13 +105,16 @@ class SettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Asks the server in use whether it has the relay, into [relay].
-  Future<void> readRelay() async {
+  /// Asks the server in use whether it has the relay, into [relay]; [again] asks afresh rather
+  /// than taking what was found before.
+  Future<void> readRelay({bool again = false}) async {
     final server = connection;
     if (server == null) return;
     RelayState found;
     try {
-      found = await _api.relayFound() ? RelayState.found : RelayState.absent;
+      found = await _api.relayFound(again: again)
+          ? RelayState.found
+          : RelayState.absent;
     } on ApiException {
       found = RelayState.unreachable;
     }

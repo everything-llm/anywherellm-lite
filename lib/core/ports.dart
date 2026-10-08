@@ -164,8 +164,8 @@ abstract interface class AnythingLlmApi {
   Future<ChatLog> workspaceChats({int page = 0});
 
   /// Whether the server in use has the everythingllm relay, which keeps an answer running after
-  /// the app lets go of it.
-  Future<bool> relayFound();
+  /// the app lets go of it. The answer is kept for the server, unless [again] asks afresh.
+  Future<bool> relayFound({bool again = false});
 
   /// The bytes of a file or image an agent made, by the [storageName] the server gave it.
   Future<List<int>> generatedFile(String storageName);

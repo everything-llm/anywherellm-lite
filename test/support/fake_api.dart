@@ -553,7 +553,8 @@ class FakeAnythingLlm implements AnythingLlmApi {
   bool relay = false;
 
   @override
-  Future<bool> relayFound() => _run('relayFound', () => relay);
+  Future<bool> relayFound({bool again = false}) =>
+      _run('relayFound', () => relay, again ? 'again' : null);
 
   /// Writes each change into [system]; a secret, which the server reports only as set, becomes
   /// true.
