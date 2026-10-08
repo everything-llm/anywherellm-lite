@@ -77,6 +77,27 @@ void main() {
     expect(rig.chat.busy, isFalse);
   });
 
+  test('a draft whose first answer is stopped is still named', () async {
+    final llm = planningServer()..hold = true;
+    final rig = await started(llm);
+    await rig.chat.select('household');
+    await rig.chat.send('What bills are due this month?');
+    await pumpEventQueue();
+    rig.chat.stop();
+    await pumpEventQueue();
+    expect(rig.chat.title, 'What bills are due this month?');
+  });
+
+  test('a chat cleared and asked again keeps its name', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    await rig.chat.send('/reset');
+    await rig.chat.send('Something new entirely');
+    await pumpEventQueue();
+    expect(llm.calls.where((c) => c.startsWith('renameThread')), isEmpty);
+    expect(rig.chat.title, 'Budget questions');
+  });
+
   test('the turns a draft showed stay whole once its chat is made', () async {
     final llm = planningServer()..hold = true;
     final rig = await started(llm);
@@ -223,6 +244,36 @@ void main() {
     ]);
   });
 
+  test(
+    'a live card that ended after its repeated frame is read again',
+    () async {
+      final card = Uri.parse(
+        'https://h:8445/_live/browser/bw-3aeecef2b460eeb7.jpg',
+      );
+      final live = StreamController<Uint8List>();
+      final llm = planningServer()..liveImages[card] = live;
+      final rig = await started(llm);
+      final frames = rig.chat.imageFrames(card).toList();
+      live
+        ..add(Uint8List.fromList([1, 2, 3]))
+        ..add(Uint8List.fromList([1, 2, 3]));
+      await live.close();
+      expect(await frames, [
+        [1, 2, 3],
+      ]);
+      llm.calls.clear();
+      final again = StreamController<Uint8List>();
+      llm.liveImages[card] = again;
+      final next = rig.chat.imageFrames(card).toList();
+      again.add(Uint8List.fromList([4, 5]));
+      await again.close();
+      expect(await next, [
+        [4, 5],
+      ]);
+      expect(llm.calls, ['answerImage:$card']);
+    },
+  );
+
   group('refresh', () {
     test('reads the chat on screen again', () async {
       final llm = planningServer();
@@ -258,6 +309,26 @@ void main() {
       await rig.chat.refresh();
       expect(rig.chat.turns.last.text, 'About 45k.');
       expect(rig.chat.turns.last.error, isNull);
+    });
+
+    test('shows a chat cleared elsewhere', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      expect(rig.chat.turns, isNotEmpty);
+      llm.histories['budget'] = const [];
+      await rig.chat.refresh();
+      expect(rig.chat.turns, isEmpty);
+    });
+
+    test('moves off a chat deleted elsewhere', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      expect(rig.chat.activeThread, 'budget');
+      llm.spaces.first.threads.removeWhere((t) => t.slug == 'budget');
+      llm.histories.remove('budget');
+      await rig.chat.refresh();
+      expect(rig.chat.activeThread, 'priorities');
+      expect(rig.chat.problem, isNull);
     });
 
     test('a server back in reach is no longer a connection problem', () async {
@@ -954,6 +1025,20 @@ void main() {
         await rig.chat.send('Bills?');
         await pumpEventQueue();
         expect(rig.chat.turns.map((t) => t.chatId), [null, null]);
+      });
+
+      test('retry reads the id first when it was not taken yet', () async {
+        final llm = withChatIds()
+          ..omitsChatId = true
+          ..errors['history'] = const ApiException('no', status: 500);
+        final rig = await started(llm, password: 'PASS-WORD');
+        await rig.chat.select('household');
+        await rig.chat.send('Bills?');
+        await pumpEventQueue();
+        llm.errors.remove('history');
+        await rig.chat.retry();
+        await pumpEventQueue();
+        expect(llm.calls, contains('dropFrom:${rig.chat.activeThread}:100'));
       });
 
       Future<List<int?>> heldWith(List<ChatMessage> saved) async {

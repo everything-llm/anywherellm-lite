@@ -311,8 +311,8 @@ class _HeaderButton extends StatelessWidget {
   }
 }
 
-/// Browser in the header, while the chat on screen has a card of the everythingllm browser or
-/// its answer is using the browser: it shows and hides the browser beside the chat, and pulses
+/// Browser in the header, while the chat on screen has used the everythingllm browser
+/// ([ChatController.usedBrowser]): it shows and hides the browser beside the chat, and pulses
 /// while the agent is using it. It reads the running answer itself, which notifies on each
 /// chunk where the controller does not.
 class _BrowserButton extends StatelessWidget {

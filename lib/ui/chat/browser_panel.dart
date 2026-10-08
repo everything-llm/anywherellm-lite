@@ -11,11 +11,12 @@ import '../widgets/side_panel.dart';
 import 'browser_chip.dart';
 import 'card_image.dart';
 
-/// The chat on screen's everythingllm browser, beside the chat: its newest card drawn large and
-/// live, Take over to open the browser's take-over view, and the steps of the answer running
-/// in it, or else of the last answer that used it. It follows the chat on screen. The card is
-/// followed only while it can be seen, since a watched card keeps the server's browser from
-/// being stopped.
+/// The chat on screen's everythingllm browser, beside the chat: its newest login request's card
+/// with Open the login form, when no tab's card came after it; its newest tab's card drawn large
+/// and live, with Take over to open the browser's take-over view; and the steps of the answer
+/// running in it, or else of the last answer that used it. It follows the chat on screen. A
+/// card is followed only while it can be seen, since a watched card keeps the server's browser
+/// from being stopped.
 class BrowserPanel extends StatelessWidget {
   const BrowserPanel({super.key, required this.width});
 

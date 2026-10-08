@@ -139,6 +139,10 @@ class _Running {
   final String slug;
   String? thread;
   StreamSubscription<ChatEvent>? stream;
+
+  /// The message a chat this answer's message made is named after when the answer ends, however
+  /// it ends; null for a chat that already had a name.
+  String? nameAs;
 }
 
 /// The workspaces and their chats, the chat on screen, and the one answer that may be running.
@@ -288,9 +292,10 @@ class ChatController extends ChangeNotifier {
   /// The browser's cards in the chat on screen's finished answers, newest first. A running
   /// answer's cards count once it ends, so the text streaming in is never parsed for one.
   Iterable<BrowserCard> get _cardsHere sync* {
+    final server = _server?.uri;
     for (final turn in turns.reversed) {
       if (turn.role != Role.assistant || turn.streaming) continue;
-      yield* cardsOf(turn).reversed;
+      yield* turn._cardsOf(server).reversed;
     }
   }
 
@@ -316,23 +321,37 @@ class ChatController extends ChangeNotifier {
 
   /// Reads the workspaces and the chat on screen again, for when the connection dropped and
   /// what shows may be stale or stuck. An answer still running in this chat is let go of first,
-  /// not stopped: the server may finish it, and it shows when the chat is read again.
+  /// not stopped: the server may finish it, and it shows when the chat is read again. A chat
+  /// deleted on the server gives way to its workspace's newest chat. Does nothing while the
+  /// chat is being cleared or its exchanges dropped, which the reading would race.
   Future<void> refresh() async {
-    if (_server == null || _refreshing) return;
+    if (_server == null || _refreshing || _clearing || _dropping) return;
     _refreshing = true;
     if (_running case final running? when turns.contains(running.answer)) {
       unawaited(running.stream?.cancel());
       _finish(
         running,
         error:
-            'Let go of to read the chat again. The server may still finish it; '
-            'refresh again later to see it.',
+            'Let go of this answer to read the chat again. The server may still finish '
+            'it; refresh again later to see it.',
       );
     }
     notifyListeners();
+    final slug = activeSlug;
+    final thread = activeThread;
     try {
       await load();
-      await open(activeThread, again: true);
+      // Another chat is on screen now, opened by load or by the person, and read as it opened.
+      if (activeSlug != slug || activeThread != thread) return;
+      if (slug != null &&
+          thread != null &&
+          !isAnswering(thread) &&
+          !threadsOf(slug).any((t) => t.slug == thread)) {
+        _turns.remove(thread);
+        await select(slug);
+      } else {
+        await open(thread, again: true);
+      }
     } finally {
       _refreshing = false;
       notifyListeners();
@@ -426,17 +445,21 @@ class ChatController extends ChangeNotifier {
   /// password refuses.
   Future<void> _readCommands() async {
     final server = _server;
+    final read = ++_commandReads;
     try {
       final presets = await _api.slashCommands();
-      if (_server != server) return;
+      if (_server != server || read != _commandReads) return;
       _presets = presets;
       commandsNote = null;
     } on ApiException catch (error) {
-      if (_server != server) return;
+      if (_server != server || read != _commandReads) return;
       commandsNote = whyNoPresets(error, signedIn: signedIn);
     }
     notifyListeners();
   }
+
+  /// Counts the reads of the presets, so only the latest one's answer is kept.
+  var _commandReads = 0;
 
   /// Asks each workspace how many documents it holds, all at once. Best effort: a count that
   /// cannot be read is left out. Sources reports the active workspace's own count.
@@ -525,8 +548,13 @@ class ChatController extends ChangeNotifier {
       final history = await _api.history(slug, threadSlug);
       if (_server != server || isAnswering(threadSlug)) return;
       // An answer the server is still writing is saved only once it ends; until then the chat
-      // keeps what it showed, and stays unfinished so it is read again.
-      if (known != null && history.length < known.length) return;
+      // keeps what it showed, and stays unfinished so it is read again. A finished chat read
+      // [again] takes what the server has, though it was cleared or cut short elsewhere.
+      if (known != null &&
+          known.lastOrNull?.unfinished == true &&
+          history.length < known.length) {
+        return;
+      }
       _turns[threadSlug] = [for (final m in history) Turn.saved(m)];
     });
   }
@@ -624,9 +652,10 @@ class ChatController extends ChangeNotifier {
     await _try('Could not delete the chat', () async {
       await _api.deleteThread(slug, threadSlug);
       if (_server != server) return;
-      final list = _threads[slug] ?? [];
-      final at = list.indexWhere((t) => t.slug == threadSlug);
-      if (at >= 0) list.removeAt(at);
+      final was = threadsOf(slug);
+      final at = was.indexWhere((t) => t.slug == threadSlug);
+      final list = [...was]..removeWhere((t) => t.slug == threadSlug);
+      _threads[slug] = list;
       _turns.remove(threadSlug);
       if (activeThread == threadSlug) {
         _draft = [];
@@ -670,7 +699,6 @@ class ChatController extends ChangeNotifier {
     );
     final answer = Turn.answer();
     final turns = [...this.turns, user, answer];
-    final first = this.turns.every((t) => t.role != Role.user);
     final running = _running = _Running(answer, slug)..thread = activeThread;
     final server = _server;
     final draftGo = _draftGo;
@@ -693,7 +721,9 @@ class ChatController extends ChangeNotifier {
           _rememberChat();
           notifyListeners();
         }
-        running.thread = made.slug;
+        running
+          ..thread = made.slug
+          ..nameAs = text;
       } on ApiException catch (error) {
         _finish(running, error: error.message);
         return true;
@@ -736,20 +766,19 @@ class ChatController extends ChangeNotifier {
             if (answer.chatId == null && signedIn) {
               unawaited(_learnIds(slug, thread, user, answer));
             }
-            if (first && !_named.contains(thread)) {
-              unawaited(_nameAfter(slug, thread, text));
-            }
           },
           cancelOnError: true,
         );
     return true;
   }
 
-  /// Whether [retry] can ask the last question again: nothing runs, the chat's last turn is an
+  /// Whether [retry] can ask the last question again: nothing runs, the chat is not being read
+  /// again by [refresh], which would take the turns it replaces, the chat's last turn is an
   /// answer, and its question went without files, whose bytes are not kept.
   bool get canRetry {
     final turns = this.turns;
     return !busy &&
+        !_refreshing &&
         ready &&
         turns.length >= 2 &&
         turns.last.role == Role.assistant &&
@@ -758,8 +787,9 @@ class ChatController extends ChangeNotifier {
   }
 
   /// Asks the chat's last question again, in place of its answer. While [signedIn] the old
-  /// exchange is deleted on the server first; otherwise the server keeps it too, and it shows
-  /// again when the chat is next read.
+  /// exchange is deleted on the server first, its id read from the chat's history when the
+  /// answer did not say it; otherwise, or when the history does not show it, the server keeps it
+  /// too, and it shows again when the chat is next read.
   Future<void> retry() async {
     if (!canRetry) return;
     // Retry replaces the last exchange only; a question being edited stays as it was.
@@ -769,6 +799,11 @@ class ChatController extends ChangeNotifier {
     }
     final turns = this.turns;
     final question = turns[turns.length - 2];
+    if ((activeSlug, activeThread) case (final slug?, final thread?)
+        when signedIn && question.chatId == null && turns.last.chatId == null) {
+      await _learnIds(slug, thread, question, turns.last);
+      if (!identical(this.turns, turns) || !canRetry) return;
+    }
     if (!await _dropFrom(question.chatId ?? turns.last.chatId)) return;
     if (!identical(this.turns, turns)) return;
     _setTurns(turns.sublist(0, turns.length - 2));
@@ -904,6 +939,10 @@ class ChatController extends ChangeNotifier {
   void _finish(_Running running, {String? error}) {
     if (!identical(_running, running)) return;
     _running = null;
+    if ((running.thread, running.nameAs) case (final thread?, final message?)
+        when !_named.contains(thread)) {
+      unawaited(_nameAfter(running.slug, thread, message));
+    }
     if (error == null && !running.answer.stopped) _finished = running.answer;
     running.answer
       ..streaming = false
@@ -916,9 +955,10 @@ class ChatController extends ChangeNotifier {
   /// Names a new chat after its first message, unless it was renamed meanwhile.
   Future<void> _nameAfter(String slug, String thread, String message) async {
     final name = defaultTitle(message);
+    final server = _server;
     try {
       await _api.renameThread(slug, thread, name);
-      if (!_named.contains(thread)) {
+      if (_server == server && !_named.contains(thread)) {
         _replace(slug, Thread(slug: thread, name: name));
       }
     } on ApiException {
@@ -1021,11 +1061,13 @@ class ChatController extends ChangeNotifier {
           StreamTransformer.fromHandlers(
             handleData: (frame, sink) {
               if (_server != server) return;
+              // Counted before the copy is dropped, so a live card that ended after its first
+              // frame and the copy is not taken for an image that will not change.
+              frames++;
               // A live card sends a still frame again so a browser draws it at once; the copy
               // would only be decoded again.
               if (previous != null && listEquals(previous, frame)) return;
               previous = frame;
-              frames++;
               _images[url] = (frame: frame, whole: false);
               sink.add(frame);
             },
