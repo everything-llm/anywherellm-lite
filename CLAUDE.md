@@ -19,11 +19,14 @@ flutter build apk --debug                      # -> build/app/outputs/flutter-ap
 flutter build apk --release                    # needs android/key.properties
 flutter run -d chrome
 flutter build web                              # -> build/web
+flutter test tool/store_graphics.dart          # store graphics -> build/store/en-US, or $STORE_GRAPHICS
 ```
 
 The Linux build needs `libsecret-1-dev`. Saving a key at run time needs a running, unlocked secret service such as gnome-keyring.
 
 A release APK is signed with the key named in `android/key.properties` (gitignored), which the personal F-Droid repo's `appstore sync` writes the first time it builds the app. Without that file the release build fails rather than signing with the debug key, because every later update must carry the first release's key. `android.enableResourceOptimizations=false` keeps the launcher icon at the path fdroidserver reads, and `allowBackup` is off so a restored backup never carries a Keystore-encrypted key to a device that cannot decrypt it. Its launcher icon and launch screen are made from `assets/icon` (`icon.png`, `icon-foreground.png` for the adaptive icon, `splash.png`), drawn from the robin mark (`RobinMark`, `lib/ui/widgets/robin_mark.dart`, which the logo tile beside the wordmark draws too) in the dark theme's colours: `#a1b4f8` ground, `#131423` ink, `#F2853D` breast. After changing them, run `dart run flutter_launcher_icons` and `dart run flutter_native_splash:create` (configured in `flutter_launcher_icons.yaml` and `flutter_native_splash.yaml`) and commit the generated resources. It needs the Android SDK; `minSdk` is Flutter's default (24), which is what `flutter_secure_storage` requires. On Android the key lives in the Android Keystore.
+
+The F-Droid store page's feature graphic and phone screenshots come from `tool/store_graphics.dart`, which draws them with the app's own fonts over the test fakes, so no real server shows; copy `build/store/en-US` to `metadata/local.anywherellm.anywherellm/en-US` in the app_store project, whose `appstore.toml` holds the listing text, and run `appstore sync` there.
 
 ## Naming
 
