@@ -50,7 +50,7 @@ List<GeneratedFile> generatedFilesOf(Object? outputs) {
   ];
 }
 
-final _storageName = RegExp(r'^[\w.-]+$');
+final _storageName = RegExp(r'^(?!\.+$)[\w.-]+$');
 
 /// [bytes] in words: `812 B`, `14.2 KB` or `3.1 MB`.
 String sizeText(int bytes) => switch (bytes) {

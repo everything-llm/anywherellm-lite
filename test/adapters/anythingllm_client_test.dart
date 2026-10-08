@@ -615,6 +615,10 @@ void main() {
                 'payload': {'filename': 'x', 'storageFilename': '../../.env'},
               },
               {
+                'type': 'PdfFileDownload',
+                'payload': {'filename': 'y', 'storageFilename': '..'},
+              },
+              {
                 'type': 'rechartVisualize',
                 'payload': {'data': []},
               },
@@ -1953,6 +1957,28 @@ void main() {
       );
       expect(gone.message, contains('File not found'));
     });
+
+    test(
+      'a generated HTML file is its bytes, and the web UI\'s page is not',
+      () async {
+        HttpAnythingLlmApi page({required bool attached}) => _api(
+          (request) async => http.Response(
+            '<!doctype html><p>Made</p>',
+            200,
+            headers: {
+              'content-type': 'text/html; charset=utf-8',
+              if (attached)
+                'content-disposition': 'attachment; filename="page.html"',
+            },
+          ),
+        );
+        expect(
+          utf8.decode(await page(attached: true).generatedFile('page-1.html')),
+          '<!doctype html><p>Made</p>',
+        );
+        await _failure(page(attached: false).generatedFile('page-1.html'));
+      },
+    );
 
     test('an export is the file as the server sends it', () async {
       final seen = <http.Request>[];

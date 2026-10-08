@@ -98,12 +98,16 @@ class _MadeImage extends StatefulWidget {
 }
 
 class _MadeImageState extends State<_MadeImage> {
-  Future<List<int>?>? _bytes;
+  /// The image's bytes, made once, so a rebuild draws the same [MemoryImage] rather than
+  /// decoding it again.
+  Future<Uint8List?>? _bytes;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _bytes ??= AppScope.of(context).chat.fileBytes(widget.file);
+    _bytes ??= AppScope.of(context).chat
+        .fileBytes(widget.file)
+        .then((bytes) => bytes == null ? null : Uint8List.fromList(bytes));
   }
 
   @override
@@ -129,7 +133,8 @@ class _MadeImageState extends State<_MadeImage> {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 360),
                 child: Image.memory(
-                  Uint8List.fromList(bytes),
+                  bytes,
+                  gaplessPlayback: true,
                   fit: BoxFit.contain,
                   semanticLabel: widget.file.name,
                   errorBuilder: (_, _, _) => _MadeFile(widget.file),

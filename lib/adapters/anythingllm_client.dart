@@ -708,7 +708,9 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   }
 
   /// The bytes of the file the server answers [path] with, which is not always JSON; a failure
-  /// is decoded as any other.
+  /// is decoded as any other. An HTML page is the web UI's own, as from an address the server
+  /// does not have, unless the server hands it over as an attachment, as an HTML file an agent
+  /// made.
   Future<List<int>> _file(String path) async {
     final connection = _current;
     final request = _request(connection, 'GET', path)
@@ -719,8 +721,12 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       () async => http.Response.fromStream(await _client.send(request)),
     );
     final type = response.headers['content-type'] ?? '';
+    final attached = (response.headers['content-disposition'] ?? '')
+        .trimLeft()
+        .toLowerCase()
+        .startsWith('attachment');
     final ok = response.statusCode >= 200 && response.statusCode < 300;
-    if (!ok || type.startsWith('text/html')) {
+    if (!ok || (type.startsWith('text/html') && !attached)) {
       _decode(response);
       throw const ApiException(_refused);
     }
