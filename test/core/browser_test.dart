@@ -18,7 +18,7 @@ void main() {
     test('names each browser skill call in words', () {
       final steps = {
         _call('browse', '{\n  "url": "https://httpbin.org/forms/post"\n}'):
-            'Opening httpbin.org',
+            'Opening httpbin.org/forms/post',
         _call('browser-act', '{"action": "click", "ref": "e17"}'): 'Clicking',
         _call('browser-act', '{"action": "press", "text": "Enter"}'):
             'Pressing a key',
@@ -46,6 +46,19 @@ void main() {
             'Signing in with a saved login',
       };
       steps.forEach((thought, step) => expect(_step(thought), step));
+    });
+
+    test('names the page opened by its host and path, never its query', () {
+      final steps = {
+        'https://news.ycombinator.com/': 'Opening news.ycombinator.com',
+        'https://news.ycombinator.com/item?id=45123#c1':
+            'Opening news.ycombinator.com/item',
+        'https://example.org/docs/guide/': 'Opening example.org/docs/guide',
+        'https://example.org/${'a' * 60}': 'Opening example.org/${'a' * 39}…',
+      };
+      steps.forEach(
+        (url, step) => expect(_step(_call('browse', '{"url": "$url"}')), step),
+      );
     });
 
     test('never says what is typed', () {

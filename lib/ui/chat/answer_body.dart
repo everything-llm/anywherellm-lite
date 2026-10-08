@@ -20,7 +20,8 @@ import 'math.dart';
 import '../icons.dart';
 
 /// An answer's text, drawn as Markdown and selectable. A code block and a table scroll sideways
-/// rather than widen the chat, and a code block has its own Copy button. A link opens outside
+/// rather than widen the chat, a table showing its scrollbar while it does, and a code block has
+/// its own Copy button. A link opens outside
 /// the app. An image loads only from the AnythingLLM server's own host, on any port, as a tool's
 /// card does, and only over https or the server's own scheme where plain http is allowed:
 /// loading any other would send its address, which a model could have filled with what it read,
@@ -143,6 +144,10 @@ class AnswerBody extends StatelessWidget {
           vertical: 6,
         ),
         tableHeadCellsDecoration: BoxDecoration(color: t.panel2),
+        // A table wider than the chat shows its scrollbar, under the table, so its cut edge
+        // reads as more to scroll to.
+        tableScrollbarThumbVisibility: true,
+        tablePadding: const EdgeInsets.only(bottom: 10),
         horizontalRuleDecoration: BoxDecoration(border: Border(top: border)),
       ),
     );

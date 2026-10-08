@@ -171,8 +171,10 @@ class _MessageListState extends State<MessageList> {
       into: i == 0 ? _newest : null,
       turn: turn,
       child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: Sizes.column),
+        // The column's full width, or the chat's where that is narrower, so a short answer
+        // starts at its left edge rather than shrinking to its text and sitting in the middle.
+        child: SizedBox(
+          width: Sizes.column,
           child: Padding(
             padding: EdgeInsets.only(
               top: first
@@ -678,9 +680,11 @@ class _Answer extends StatelessWidget {
                   ),
               ],
               if (turn.metrics case final metrics?) AnswerMore(turn, metrics),
+              // In Agent mode the server may go on to finish the answer and save it, which
+              // shows when the chat is read again.
               if (turn.stopped)
                 Text(
-                  'Stopped · not saved in the chat',
+                  'Stopped · the server may still save it',
                   style: Type.sans(12, color: Tokens.of(context).muted),
                 ),
             ],

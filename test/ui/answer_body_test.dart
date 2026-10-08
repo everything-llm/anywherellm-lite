@@ -1,5 +1,6 @@
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/server_models.dart';
+import 'package:anywherellm/ui/chat/answer_body.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
@@ -60,6 +61,26 @@ List<String> _clipboard(WidgetTester tester) {
 }
 
 void main() {
+  testWidgets('a table wider than the chat shows its scrollbar', (
+    tester,
+  ) async {
+    final cells = [for (var i = 1; i <= 12; i++) 'Column number $i'];
+    final table = [
+      '| ${cells.join(' | ')} |',
+      '|${' --- |' * cells.length}',
+      '| ${cells.join(' | ')} |',
+    ].join('\n');
+    await pumpApp(tester, llm: answering(table), size: const Size(500, 800));
+    await tester.pumpAndSettle();
+    final bars = tester.widgetList<Scrollbar>(
+      find.descendant(
+        of: find.byType(AnswerBody),
+        matching: find.byType(Scrollbar),
+      ),
+    );
+    expect(bars.map((b) => b.thumbVisibility), contains(true));
+  });
+
   testWidgets('an answer is drawn as Markdown', (tester) async {
     await pumpApp(tester, llm: _server());
     expect(find.textContaining('## The plan'), findsNothing);

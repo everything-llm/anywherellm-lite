@@ -70,8 +70,8 @@ String? browserStep(({String name, String args}) call) {
     _ => null,
   };
   return switch (call.name) {
-    'browse' => switch (Uri.tryParse(text('url') ?? '')?.host) {
-      final String host when host.isNotEmpty => 'Opening $host',
+    'browse' => switch (Uri.tryParse(text('url') ?? '')) {
+      final Uri uri when uri.host.isNotEmpty => 'Opening ${_pageName(uri)}',
       _ => 'Opening a page',
     },
     'browser-act' => _acts[text('action')] ?? 'Using the browser',
@@ -88,6 +88,16 @@ String? browserStep(({String name, String args}) call) {
     _ => _logins[text('action')] ?? 'Using a saved login',
   };
 }
+
+/// The page [uri] names, as its host and path without a trailing `/`, the path cut to
+/// [_pathMax] characters. Never its query or fragment, which can carry a token.
+String _pageName(Uri uri) {
+  var path = uri.path.replaceFirst(RegExp(r'/+$'), '');
+  if (path.length > _pathMax) path = '${path.substring(0, _pathMax)}…';
+  return '${uri.host}$path';
+}
+
+const _pathMax = 40;
 
 const _browserTools = {
   'browse',

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/errors.dart';
+import 'package:anywherellm/core/server_models.dart';
+import 'package:anywherellm/ui/chat/answer_body.dart';
 import 'package:anywherellm/ui/chat/message_list.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -92,7 +94,7 @@ void main() {
     expect(find.text('Ask again'), findsNothing);
   });
 
-  testWidgets('a stopped answer says it is not saved in the chat', (
+  testWidgets('a stopped answer says the server may still save it', (
     tester,
   ) async {
     final llm = planningServer()..hold = true;
@@ -101,10 +103,30 @@ void main() {
     await tester.pump();
     llm.chat!.add(const TextChunk('Next quarter we'));
     await tester.pump();
-    expect(find.text('Stopped · not saved in the chat'), findsNothing);
+    expect(find.text('Stopped · the server may still save it'), findsNothing);
     h.chat.stop();
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Stopped · not saved in the chat'), findsOneWidget);
+    expect(find.text('Stopped · the server may still save it'), findsOneWidget);
+  });
+
+  testWidgets('a one-line answer starts where a wrapped one does', (
+    tester,
+  ) async {
+    final llm = planningServer();
+    llm.histories['budget'] = [
+      const ChatMessage(role: Role.user, text: 'Tell me everything.'),
+      ChatMessage(role: Role.assistant, text: 'All of it. ' * 80),
+      const ChatMessage(role: Role.user, text: 'Is that all?'),
+      const ChatMessage(role: Role.assistant, text: 'Yes.'),
+    ];
+    await pumpApp(tester, llm: llm);
+    await tester.pumpAndSettle();
+    final answers = find.byType(AnswerBody);
+    expect(answers, findsNWidgets(2));
+    expect(
+      tester.getTopLeft(answers.last).dx,
+      tester.getTopLeft(answers.first).dx,
+    );
   });
 
   testWidgets('a lost connection offers no Ask again', (tester) async {
