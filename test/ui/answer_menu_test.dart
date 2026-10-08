@@ -9,10 +9,6 @@ import '../support/fake_api.dart';
 import '../support/fake_settings.dart';
 import '../support/pump.dart';
 
-Finder control(String label) => find.byWidgetPredicate(
-  (widget) => widget is Tappable && widget.label == label,
-);
-
 const _more = 'More for this answer: model, time, tokens, speed and cost';
 const _always = 'Show details under every answer';
 

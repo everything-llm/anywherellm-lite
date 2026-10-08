@@ -14,10 +14,6 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/fake_api.dart';
 import '../support/pump.dart';
 
-Finder control(String label) => find.byWidgetPredicate(
-  (widget) => widget is Tappable && widget.label == label,
-);
-
 Finder inTree(String label) =>
     find.descendant(of: find.byType(FileTree), matching: control(label));
 

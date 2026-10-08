@@ -13,6 +13,7 @@ import '../layout.dart';
 import '../links.dart';
 import '../tokens.dart';
 import '../type.dart';
+import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import 'card_image.dart';
 import 'highlight.dart';
@@ -333,14 +334,7 @@ class _AppCardShown extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: BoxDecoration(
-                      color: t.okdot,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
+                  ReadyDot(gap: false, color: t.okdot),
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(

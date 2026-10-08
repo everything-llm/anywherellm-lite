@@ -14,10 +14,6 @@ import '../support/fake_api.dart';
 import '../support/fake_settings.dart';
 import '../support/pump.dart';
 
-Finder control(String label) => find.byWidgetPredicate(
-  (widget) => widget is Tappable && widget.label == label,
-);
-
 Finder inSidebar(Finder finder) =>
     find.descendant(of: find.byType(Sidebar), matching: finder);
 

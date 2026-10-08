@@ -26,31 +26,28 @@ class SourceFile {
   final bool pinned;
 
   /// The type on the file's tile: `PDF`, `MD`, `WEB` or `FILE`.
-  String get tile => docType(path);
+  String get tile => _docType(path);
 
   /// `1,204 words`, or empty when the server did not count them.
-  String get size => wordCount(words);
+  String get size => words == null ? '' : plural(words!, 'word', 'words');
 
   /// The line under the file's name in Documents: [size], after `Not used` when it is
   /// switched off.
-  String get meta =>
-      on ? size : [notUsed, if (size.isNotEmpty) size].join(' · ');
+  String get meta => on ? size : _joined([_notUsed, size]);
 
   /// The line under the file's name in the Files pane: [size], before `Not used in answers`
   /// when it is switched off.
-  String get filesMeta => on
-      ? size
-      : [if (size.isNotEmpty) size, '$notUsed in answers'].join(' · ');
+  String get filesMeta => on ? size : _joined([size, '$_notUsed in answers']);
 
   OffDoc get asOff => OffDoc(path: path, title: title, words: words);
 }
 
 /// What a switched-off document is marked.
-const notUsed = 'Not used';
+const _notUsed = 'Not used';
 
-/// `1,204 words` for [words], or empty when the server did not count them.
-String wordCount(int? words) =>
-    words == null ? '' : '${grouped(words)} ${words == 1 ? 'word' : 'words'}';
+/// The [parts] that are not empty, with dots between them.
+String _joined(List<String> parts) =>
+    parts.where((part) => part.isNotEmpty).join(' · ');
 
 /// [title] without the extension of the file it came from: `Q3 roadmap` for `Q3 roadmap.pdf`.
 String shortTitle(String title) {
@@ -82,7 +79,7 @@ final _storedId = RegExp(
 
 /// The type of the document at [path], read from the name the server stored it under rather than
 /// its title: `report.pdf-<id>.json` is `PDF`, and a web page's `url-<page>-<id>.json` is `WEB`.
-String docType(String path) {
+String _docType(String path) {
   var name = docName(path);
   if (name.endsWith('.json')) name = name.substring(0, name.length - 5);
   name = name.replaceFirst(_storedId, '');

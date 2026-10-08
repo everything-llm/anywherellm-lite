@@ -229,7 +229,7 @@ class _ProviderFormState extends State<_ProviderForm> with SettingsSaving {
         if (confirmBox(() => _draft(fields)) case final box?)
           box
         else if (widget.settings.any((s) => s.writable) || fields.isNotEmpty)
-          PageActions([
+          ActionRow(alignment: WrapAlignment.start, [
             AppButton(
               saving ? 'Saving…' : 'Save',
               primary: true,
@@ -302,7 +302,7 @@ class _SearchModelWarningState extends State<SearchModelWarning> {
         final count = system.vectors;
         final all = count == null
             ? ''
-            : ', ${grouped(count)} ${count == 1 ? 'passage' : 'passages'} in all';
+            : ', ${plural(count, 'passage', 'passages')} in all';
         return PageWarning(
           'Changing this model clears the searchable copy of every document$all. Each '
           'document has to be prepared again before answers can use it.',

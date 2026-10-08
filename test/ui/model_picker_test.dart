@@ -7,10 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/fake_api.dart';
 import '../support/pump.dart';
 
-Finder control(String label) => find.byWidgetPredicate(
-  (widget) => widget is Tappable && widget.label == label,
-);
-
 Finder inComposer(Finder finder) =>
     find.descendant(of: find.byType(Composer), matching: finder);
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/copy.dart';
 import '../../core/embeds.dart';
 import '../app_scope.dart';
 import '../chat/answer_body.dart';
@@ -85,10 +86,19 @@ class _Columns extends StatelessWidget {
       child: Row(
         spacing: _EmbedRow.gap,
         children: [
-          Expanded(child: ColumnLabel('Workspace')),
-          SizedBox(width: _EmbedRow.modeWidth, child: ColumnLabel('Mode')),
-          SizedBox(width: _EmbedRow.chatsWidth, child: ColumnLabel('Chats')),
-          SizedBox(width: _EmbedRow.onWidth, child: ColumnLabel('On')),
+          Expanded(child: SectionLabel('Workspace', header: false)),
+          SizedBox(
+            width: _EmbedRow.modeWidth,
+            child: SectionLabel('Mode', header: false),
+          ),
+          SizedBox(
+            width: _EmbedRow.chatsWidth,
+            child: SectionLabel('Chats', header: false),
+          ),
+          SizedBox(
+            width: _EmbedRow.onWidth,
+            child: SectionLabel('On', header: false),
+          ),
           SizedBox(width: _EmbedRow.actionsWidth),
         ],
       ),
@@ -252,7 +262,7 @@ class _NewEmbedState extends State<_NewEmbed> {
           'after.',
         ),
         if (_limitProblem case final problem?) HelpText(problem, status: true),
-        PageActions([
+        ActionRow(alignment: WrapAlignment.start, [
           AppButton(
             'Create embed',
             primary: true,
@@ -305,7 +315,7 @@ class _EmbedRowState extends State<_EmbedRow> {
       overflow: TextOverflow.ellipsis,
       style: Type.sans(14, weight: FontWeight.w500, color: t.ink),
     );
-    final chats = embed.chats == 1 ? '1 chat' : '${embed.chats} chats';
+    final chats = plural(embed.chats, 'chat', 'chats');
     final on = AppSwitch(
       value: embed.enabled,
       large: true,

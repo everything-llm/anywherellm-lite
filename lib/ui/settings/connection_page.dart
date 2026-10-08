@@ -102,7 +102,7 @@ class _ServerStatusState extends State<_ServerStatus> {
                 },
               ),
             ]),
-            PageActions([
+            ActionRow(alignment: WrapAlignment.start, [
               AppButton(
                 testing ? 'Testing…' : 'Test connection',
                 onPressed: testing ? null : widget.onTest,

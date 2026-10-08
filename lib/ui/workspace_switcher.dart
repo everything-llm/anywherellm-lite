@@ -68,7 +68,7 @@ class WorkspaceAsk extends ChangeNotifier {
   }
 
   void ask(Asking what) {
-    _shell.closeMenu();
+    _shell.closePopup(Popup.workspaces);
     final active = _chat.active;
     _asking = what;
     _about = active?.slug;
@@ -171,7 +171,7 @@ class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
     final scope = AppScope.of(context);
     final ask = widget.ask;
     return ListenableBuilder(
-      listenable: Listenable.merge([_chat, scope.prefs, _shell, ask]),
+      listenable: Listenable.merge([_chat, scope.prefs, _shell.popup, ask]),
       builder: (context, _) => ask.asking == Asking.rename
           ? InlineInput(
               controller: ask.name,
@@ -184,7 +184,7 @@ class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
             )
           : PopupAnchor(
               open: _shell.menuOpen,
-              onClose: _shell.closeMenu,
+              onClose: () => _shell.closePopup(Popup.workspaces),
               // As wide as the switcher.
               menu: (context) => SizedBox(
                 width: Sizes.sidebar - 24,
@@ -213,7 +213,7 @@ class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
       label: elsewhere ? '$name, an answer is ready in another' : name,
       tooltip: 'Switch workspace',
       expanded: open,
-      onTap: _shell.toggleMenu,
+      onTap: () => _shell.togglePopup(Popup.workspaces),
       radius: BorderRadius.circular(Sizes.control),
       color: open ? t.hover : t.panel,
       side: BorderSide(color: t.line),
@@ -357,7 +357,7 @@ class _WorkspaceItem extends StatelessWidget {
         label: ready ? '${workspace.name}, answer ready' : workspace.name,
         selected: active,
         onTap: () {
-          scope.shell.closeMenu();
+          scope.shell.closePopup(Popup.workspaces);
           if (!active) chat.select(workspace.slug);
         },
         radius: BorderRadius.circular(8),

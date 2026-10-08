@@ -88,7 +88,7 @@ class _ChatsPageState extends State<ChatsPage> {
             const SubHead('Export'),
             if (system.exportProblem case final problem?)
               AlertBox(AlertKind.bad, problem.title, text: problem.text),
-            PageActions([
+            ActionRow(alignment: WrapAlignment.start, [
               for (final format in ChatExport.values)
                 AppButton(
                   format.label,
@@ -118,11 +118,17 @@ class _Columns extends StatelessWidget {
     child: Padding(
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
-        spacing: 12,
+        spacing: _ChatRow.gap,
         children: [
-          SizedBox(width: 140, child: ColumnLabel('Workspace')),
-          Expanded(child: ColumnLabel('Prompt')),
-          SizedBox(width: 110, child: ColumnLabel('Sent', end: true)),
+          SizedBox(
+            width: _ChatRow.workspaceWidth,
+            child: SectionLabel('Workspace', header: false),
+          ),
+          Expanded(child: SectionLabel('Prompt', header: false)),
+          SizedBox(
+            width: _ChatRow.sentWidth,
+            child: SectionLabel('Sent', end: true, header: false),
+          ),
         ],
       ),
     ),
@@ -135,6 +141,11 @@ class _ChatRow extends StatelessWidget {
 
   final LoggedChat chat;
   final bool wide;
+
+  /// The widths of its columns, and the gap between them, which [_Columns] shares.
+  static const gap = 12.0;
+  static const workspaceWidth = 140.0;
+  static const sentWidth = 110.0;
 
   @override
   Widget build(BuildContext context) {
@@ -170,10 +181,10 @@ class _ChatRow extends StatelessWidget {
               ],
             )
           : Row(
-              spacing: 12,
+              spacing: gap,
               children: [
                 SizedBox(
-                  width: 140,
+                  width: workspaceWidth,
                   child: Text(
                     workspace,
                     maxLines: 1,
@@ -183,7 +194,7 @@ class _ChatRow extends StatelessWidget {
                 ),
                 Expanded(child: question),
                 SizedBox(
-                  width: 110,
+                  width: sentWidth,
                   child: Text(sent, textAlign: TextAlign.end, style: muted),
                 ),
               ],

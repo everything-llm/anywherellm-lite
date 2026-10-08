@@ -7,8 +7,9 @@ import '../type.dart';
 import 'tappable.dart';
 
 /// [child], with the menu [menu] builds under it while [open], or over it when [above], level
-/// with its left edge, or its right one when [alignRight]. A tap outside both, or Esc, calls
-/// [onClose]. The menu is drawn in the app's overlay and inherits what [child] does.
+/// with its left edge, or its right one when [alignRight], and moved by [offset] when given. A
+/// tap outside both, or Esc, calls [onClose]. The menu is drawn in the app's overlay and
+/// inherits what [child] does.
 class PopupAnchor extends StatefulWidget {
   const PopupAnchor({
     super.key,
@@ -18,6 +19,9 @@ class PopupAnchor extends StatefulWidget {
     required this.child,
     this.alignRight = false,
     this.above = false,
+    this.width,
+    this.offset,
+    this.group,
   });
 
   final bool open;
@@ -26,6 +30,16 @@ class PopupAnchor extends StatefulWidget {
   final Widget child;
   final bool alignRight;
   final bool above;
+
+  /// The menu's width, or null for its own.
+  final double? width;
+
+  /// Where the menu sits from [child]'s edge, in place of a small gap above or below it.
+  final Offset? offset;
+
+  /// The tap group the menu belongs to, for a part of [child] in a [TapRegion] of it to tap as
+  /// inside the menu; without it, the whole of [child] does.
+  final Object? group;
 
   @override
   State<PopupAnchor> createState() => _PopupAnchorState();
@@ -38,20 +52,24 @@ class _PopupAnchorState extends State<PopupAnchor> {
   final _link = LayerLink();
 
   /// [child] and the menu tap as one: a tap on [child] is not a tap outside the menu.
-  final _group = Object();
+  final _own = Object();
+
+  Object get _group => widget.group ?? _own;
 
   @override
-  Widget build(BuildContext context) => TapRegion(
-    groupId: _group,
-    child: CompositedTransformTarget(
+  Widget build(BuildContext context) {
+    final target = CompositedTransformTarget(
       link: _link,
       child: OverlayPortal(
         controller: _portal,
         overlayChildBuilder: _overlay,
         child: widget.child,
       ),
-    ),
-  );
+    );
+    return widget.group == null
+        ? TapRegion(groupId: _own, child: target)
+        : target;
+  }
 
   Widget _overlay(BuildContext context) {
     if (!widget.open) return const SizedBox.shrink();
@@ -62,7 +80,7 @@ class _PopupAnchorState extends State<PopupAnchor> {
       link: _link,
       targetAnchor: Alignment(right ? 1 : -1, above ? -1 : 1),
       followerAnchor: near,
-      offset: Offset(0, above ? -4 : 6),
+      offset: widget.offset ?? Offset(0, above ? -4 : 6),
       showWhenUnlinked: false,
       child: Align(
         alignment: near,
@@ -73,7 +91,10 @@ class _PopupAnchorState extends State<PopupAnchor> {
             bindings: {
               const SingleActivator(LogicalKeyboardKey.escape): widget.onClose,
             },
-            child: Focus(autofocus: true, child: widget.menu(context)),
+            child: Focus(
+              autofocus: true,
+              child: SizedBox(width: widget.width, child: widget.menu(context)),
+            ),
           ),
         ),
       ),

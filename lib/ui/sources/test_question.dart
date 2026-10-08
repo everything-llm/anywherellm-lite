@@ -12,18 +12,19 @@ import '../widgets/tappable.dart';
 /// Tests what a question finds in the switched-on files: the passages an answer would get, each
 /// with how close it is. Tapping one shows all of it and lights up its file.
 class TestQuestion extends StatefulWidget {
-  const TestQuestion({super.key, this.onDone});
+  const TestQuestion({super.key, this.trigger});
 
-  /// Starts with the question open, for a place that has its own Test a question, and is
-  /// called when Done puts it away. Null starts on a Test a question of its own.
-  final VoidCallback? onDone;
+  /// What stands over the question, given the way to open it, or null while it is open, such
+  /// as a Test a question among other buttons; the question opens under it. Null is a Test a
+  /// question of its own, which the question replaces.
+  final Widget Function(VoidCallback? open)? trigger;
 
   @override
   State<TestQuestion> createState() => _TestQuestionState();
 }
 
 class _TestQuestionState extends State<TestQuestion> {
-  late bool _open = widget.onDone != null;
+  bool _open = false;
   final _question = TextEditingController();
 
   @override
@@ -35,22 +36,33 @@ class _TestQuestionState extends State<TestQuestion> {
   void _close() {
     _question.clear();
     AppScope.of(context).sources.clearSearch();
-    if (widget.onDone case final done?) return done();
     setState(() => _open = false);
   }
 
+  void _show() => setState(() => _open = true);
+
   @override
   Widget build(BuildContext context) {
-    if (!_open) {
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: TextAction(
-          'search',
-          'Test a question',
-          () => setState(() => _open = true),
-        ),
-      );
+    final trigger = widget.trigger;
+    if (trigger == null) {
+      return _open
+          ? _form()
+          : Align(
+              alignment: Alignment.centerLeft,
+              child: TextAction('search', 'Test a question', _show),
+            );
     }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        trigger(_open ? null : _show),
+        if (_open) ...[const SizedBox(height: 12), _form()],
+      ],
+    );
+  }
+
+  /// The question, its buttons, and what it found.
+  Widget _form() {
     final sources = AppScope.of(context).sources;
     final t = Tokens.of(context);
     return ListenableBuilder(

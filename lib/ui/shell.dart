@@ -37,7 +37,7 @@ void _openWorkspace(AppScope scope, int index) {
     scope.chat.workspaces,
     (w) => w.slug,
   );
-  scope.shell.closeMenu();
+  scope.shell.closePopup(Popup.workspaces);
   if (index < ordered.length && ordered[index].slug != scope.chat.activeSlug) {
     scope.chat.select(ordered[index].slug);
   }
@@ -48,8 +48,8 @@ void _openWorkspace(AppScope scope, int index) {
 ///
 /// Below 820 the sidebar is a drawer from the left; below 1120 Sources is a drawer from the
 /// right. On a phone an app opens as a sheet over the chat rather than in that drawer. Esc and
-/// Back close the topmost thing open: the workspace menu, the Answer from menu, an answer's More
-/// menu, Settings, then a drawer, the app or the browser.
+/// Back close the topmost thing open: the popup, Settings, then a drawer, the app or the
+/// browser.
 class AppShell extends StatelessWidget {
   const AppShell({super.key});
 
@@ -67,14 +67,8 @@ class AppShell extends StatelessWidget {
       required bool settingsSideBySide,
       required bool sidebarDrawer,
     }) {
-      if (shell.switcherOpen) {
-        shell.closeSwitcher();
-      } else if (shell.menuOpen) {
-        shell.closeMenu();
-      } else if (shell.answerFromOpen) {
-        shell.closeAnswerFrom();
-      } else if (shell.answerMenu != null) {
-        shell.closeAnswerMenu();
+      if (shell.popup.value != null) {
+        shell.closePopup();
       } else if (shell.settingsOpen &&
           !settingsSideBySide &&
           shell.settingsPage != null) {
@@ -125,12 +119,9 @@ class AppShell extends StatelessWidget {
               },
             );
             return _BackGuard(
+              popup: shell.popup,
               open:
                   shell.settingsOpen ||
-                  shell.switcherOpen ||
-                  shell.menuOpen ||
-                  shell.answerFromOpen ||
-                  shell.answerMenu != null ||
                   sideDrawer ||
                   sourcesDrawer ||
                   shell.appOpen ||
@@ -256,13 +247,25 @@ class AppShell extends StatelessWidget {
                                 ),
                               ),
                             ],
-                            if (shell.switcherOpen) ...[
-                              _Scrim(onTap: shell.closeSwitcher),
-                              const Align(
-                                alignment: Alignment(0, -0.5),
-                                child: QuickSwitcher(),
+                            Positioned.fill(
+                              child: ValueListenableBuilder(
+                                valueListenable: shell.popup,
+                                builder: (context, popup, _) => Stack(
+                                  children: [
+                                    if (popup == Popup.switcher) ...[
+                                      _Scrim(
+                                        onTap: () =>
+                                            shell.closePopup(Popup.switcher),
+                                      ),
+                                      const Align(
+                                        alignment: Alignment(0, -0.5),
+                                        child: QuickSwitcher(),
+                                      ),
+                                    ],
+                                  ],
+                                ),
                               ),
-                            ],
+                            ),
                           ],
                         ),
                       ),
@@ -346,16 +349,19 @@ class _Drawer extends StatelessWidget {
   );
 }
 
-/// Back closes the topmost thing [open] through [onBack], and leaves the app when nothing is.
-/// With the keyboard up it only puts the keyboard away, as Android does elsewhere. It reads the
-/// keyboard itself, so the keyboard's animation rebuilds this and not [child].
+/// Back closes the topmost thing open, a [popup] or what [open] counts, through [onBack], and
+/// leaves the app when nothing is. With the keyboard up it only puts the keyboard away, as
+/// Android does elsewhere. It reads the keyboard and the popup itself, so the keyboard's
+/// animation and a popup rebuild this and not [child].
 class _BackGuard extends StatelessWidget {
   const _BackGuard({
+    required this.popup,
     required this.open,
     required this.onBack,
     required this.child,
   });
 
+  final ValueListenable<Object?> popup;
   final bool open;
   final VoidCallback onBack;
   final Widget child;
@@ -363,16 +369,20 @@ class _BackGuard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
-    return PopScope(
-      canPop: !typing && !open,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
-        if (typing) {
-          FocusManager.instance.primaryFocus?.unfocus();
-        } else {
-          onBack();
-        }
-      },
+    return ValueListenableBuilder(
+      valueListenable: popup,
+      builder: (context, popup, child) => PopScope(
+        canPop: !typing && !open && popup == null,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          if (typing) {
+            FocusManager.instance.primaryFocus?.unfocus();
+          } else {
+            onBack();
+          }
+        },
+        child: child!,
+      ),
       child: child,
     );
   }

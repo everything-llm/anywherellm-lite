@@ -282,6 +282,11 @@ void raiseKeyboard(WidgetTester tester, double height) {
   addTearDown(tester.view.resetViewInsets);
 }
 
+/// The control a screen reader hears as [label].
+Finder control(String label) => find.byWidgetPredicate(
+  (widget) => widget is Tappable && widget.label == label,
+);
+
 /// Scrolls [finder] into view, then taps it, as a person scrolls to a control below the fold.
 Future<void> tapVisible(WidgetTester tester, Finder finder) async {
   await tester.ensureVisible(finder);
@@ -301,22 +306,14 @@ Finder get switcher => find.byWidgetPredicate(
 Future<void> fromMenu(WidgetTester tester, String item) async {
   await tester.tap(switcher);
   await tester.pumpAndSettle();
-  await tester.tap(
-    find.byWidgetPredicate((w) => w is Tappable && w.label == item).last,
-  );
+  await tester.tap(control(item).last);
   await tester.pumpAndSettle();
 }
 
 /// Opens the chat on screen's ⋯ in the sidebar and picks [item] in it.
 Future<void> chatAction(WidgetTester tester, String item) async {
-  await tester.tap(
-    find.byWidgetPredicate(
-      (w) => w is Tappable && w.label == 'Chat actions: rename, pin, delete',
-    ),
-  );
+  await tester.tap(control('Chat actions: rename, pin, delete'));
   await tester.pumpAndSettle();
-  await tester.tap(
-    find.byWidgetPredicate((w) => w is Tappable && w.label == item).last,
-  );
+  await tester.tap(control(item).last);
   await tester.pumpAndSettle();
 }

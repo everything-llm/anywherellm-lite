@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../../core/chat_log.dart';
 import '../../core/connection.dart';
@@ -58,6 +61,21 @@ class SystemController extends ChangeNotifier {
   /// Reads the server's settings unless they are read already.
   Future<void> wantSettings() async {
     if (settings == null) await readSettings();
+  }
+
+  /// Whether [wantSettingsOnce] has asked on this server.
+  bool _wanted = false;
+
+  /// Reads the settings unless they are read already, once a server, for the system's chat
+  /// model beside the composer: a read that failed is asked again on another server, not on
+  /// every rebuild. It asks after the frame, since a read tells this controller's listeners at
+  /// once, so a build may call it.
+  void wantSettingsOnce() {
+    if (_wanted || _server == null) return;
+    _wanted = true;
+    SchedulerBinding.instance.addPostFrameCallback(
+      (_) => unawaited(wantSettings()),
+    );
   }
 
   Future<void> _readSettings() async {
@@ -317,6 +335,7 @@ class SystemController extends ChangeNotifier {
     if (now == _server) return;
     _server = now;
     _reading = null;
+    _wanted = false;
     vectors = null;
     problem = null;
     settings = null;

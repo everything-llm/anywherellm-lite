@@ -4,7 +4,6 @@ import 'package:anywherellm/ui/chat/app_panel.dart';
 import 'package:anywherellm/ui/chat/card_image.dart';
 import 'package:anywherellm/ui/chat/message_list.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
-import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,10 +11,6 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/fake_api.dart';
 import '../support/pixels.dart';
 import '../support/pump.dart';
-
-Finder control(String label) => find.byWidgetPredicate(
-  (widget) => widget is Tappable && widget.label == label,
-);
 
 final _card = Uri.parse('https://h:8455/_live/apps/q3/groceries.png');
 final _page = Uri.parse('https://h:8447/q3/apps/groceries/');
@@ -114,6 +109,21 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(h.shell.browserOpen, isTrue);
+  });
+
+  testWidgets('the browser over an app puts the app back, then Sources', (
+    tester,
+  ) async {
+    final h = await pumpApp(tester, llm: _withApp());
+    await _tapCard(tester);
+    h.shell.showBrowser();
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(h.shell.appOpen, isTrue);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(h.shell.sourcesOpen, isTrue);
   });
 
   testWidgets('the app\'s live card is followed only while its panel is open', (

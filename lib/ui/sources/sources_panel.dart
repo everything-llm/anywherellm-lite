@@ -129,38 +129,16 @@ class _FileRow extends StatelessWidget {
         border: Border.all(color: flashed ? t.accent : Colors.transparent),
         borderRadius: BorderRadius.circular(Sizes.control),
       ),
-      child: Row(
-        children: [
-          TypeTile(file),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  file.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Type.sans(13.5, weight: FontWeight.w500, color: t.ink),
-                ),
-                if (file.meta.isNotEmpty)
-                  Text(
-                    file.meta,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Type.sans(12, color: t.muted),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
+      child: SourceRow(
+        file,
+        meta: file.meta,
+        trailing: [
           AppSwitch(
             value: file.on,
             label: 'Use ${file.title} in answers',
             tooltip: 'Use in answers',
             onChanged: (_) => scope.sources.toggle(file),
           ),
-          const SizedBox(width: 10),
           IconBtn(
             'trash',
             tooltip: 'Remove ${file.title}',
@@ -171,6 +149,64 @@ class _FileRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// A document's row: its [TypeTile], its title with [meta] and anything [below] under it, then
+/// each of [trailing], such as its switch. [roomy] is how the Files pane draws it: a larger
+/// title, wider gaps, and [meta] on up to two lines.
+class SourceRow extends StatelessWidget {
+  const SourceRow(
+    this.file, {
+    super.key,
+    required this.meta,
+    required this.trailing,
+    this.below,
+    this.roomy = false,
+  });
+
+  final SourceFile file;
+  final String meta;
+  final List<Widget> trailing;
+  final Widget? below;
+  final bool roomy;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final gap = roomy ? 12.0 : 10.0;
+    return Row(
+      children: [
+        TypeTile(file),
+        SizedBox(width: gap),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                file.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Type.sans(
+                  roomy ? 14 : 13.5,
+                  weight: FontWeight.w500,
+                  color: t.ink,
+                ),
+              ),
+              if (meta.isNotEmpty)
+                Text(
+                  meta,
+                  maxLines: roomy ? 2 : 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Type.sans(12, color: t.muted),
+                ),
+              ?below,
+            ],
+          ),
+        ),
+        for (final widget in trailing) ...[SizedBox(width: gap), widget],
+      ],
     );
   }
 }

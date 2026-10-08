@@ -64,6 +64,10 @@ class FilesController extends ChangeNotifier {
   /// are.
   bool _wanted = false;
 
+  /// Whether Files is on screen, so the Essentials view follows another workspace opened only
+  /// while it shows, and catches up when it shows again.
+  bool _showing = false;
+
   final Set<String> _expanded = {'/workspaces', '/library'};
 
   /// The path of the node on screen.
@@ -211,9 +215,9 @@ class FilesController extends ChangeNotifier {
     _details[read.slug] = read;
     _tree = null;
     // The workspace's prompt or settings on show are its new ones, so a save compares against
-    // what the editor shows.
-    if (node case final shown? when shown.slug == read.slug) {
-      switch (shown.kind) {
+    // what the editor shows. The path is checked first, since the node needs the tree built.
+    if (selected case final path? when _under(path, read.slug)) {
+      switch (node?.kind) {
         case NodeKind.prompt:
           text = read.prompt ?? '';
           revision++;
@@ -245,12 +249,15 @@ class FilesController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Reads every workspace and the library, unless already read.
+  /// Reads every workspace and the library, unless already read, as Files shows.
   Future<void> ensureLoaded() async {
-    _wanted = true;
+    _wanted = _showing = true;
     _followWorkspace();
     if (!_loaded && !loading) await load();
   }
+
+  /// Notes that Files is no longer on screen. It tells no listener.
+  void hidden() => _showing = false;
 
   /// Shows the Essentials view, on the section last shown, or the whole tree, on the node the
   /// Essentials view showed.
@@ -287,9 +294,11 @@ class FilesController extends ChangeNotifier {
     return Future.value();
   }
 
-  /// Keeps the Essentials view on the open workspace once Files has been shown.
+  /// Keeps the Essentials view on the open workspace while Files is on screen.
   void _followWorkspace() {
-    if (!_essentials || !_wanted || _chat.activeSlug == _essentialSlug) return;
+    if (!_essentials || !_showing || _chat.activeSlug == _essentialSlug) {
+      return;
+    }
     _essentialSlug = _chat.activeSlug;
     unawaited(_openSection());
   }

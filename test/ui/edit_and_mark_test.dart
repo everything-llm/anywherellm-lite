@@ -1,13 +1,8 @@
 import 'package:anywherellm/core/ports.dart';
-import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
 import '../support/pump.dart';
-
-Finder control(String label) => find.byWidgetPredicate(
-  (widget) => widget is Tappable && widget.label == label,
-);
 
 void main() {
   testWidgets('Edit shows that sending replaces the message, and Send as new '

@@ -22,11 +22,6 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/fake_api.dart';
 import '../support/pump.dart';
 
-/// A control by the label a screen reader hears.
-Finder control(String label) => find.byWidgetPredicate(
-  (widget) => widget is Tappable && widget.label == label,
-);
-
 Finder inSidebar(String text) =>
     find.descendant(of: find.byType(Sidebar), matching: find.text(text));
 

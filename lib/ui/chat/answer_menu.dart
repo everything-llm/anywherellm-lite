@@ -39,12 +39,11 @@ class _AnswerMoreState extends State<AnswerMore> {
   @override
   void dispose() {
     // An answer that leaves the screen takes its menu with it, so Back has nothing hidden to
-    // close. Not while the tree is being torn down: the shell then hears it after the frame.
-    final shell = _shell;
-    final turn = widget.turn;
-    if (identical(shell.answerMenu, turn)) {
+    // close. Not while the tree is being torn down: the popup closes after the frame.
+    final (shell, turn) = (_shell, widget.turn);
+    if (identical(shell.popup.value, turn)) {
       WidgetsBinding.instance.addPostFrameCallback(
-        (_) => shell.closeAnswerMenu(turn),
+        (_) => shell.closePopup(turn),
       );
     }
     super.dispose();
@@ -56,9 +55,9 @@ class _AnswerMoreState extends State<AnswerMore> {
     final shell = scope.shell;
     final t = Tokens.of(context);
     return ListenableBuilder(
-      listenable: Listenable.merge([shell, scope.prefs]),
+      listenable: Listenable.merge([shell.popup, scope.prefs]),
       builder: (context, _) {
-        final open = identical(shell.answerMenu, widget.turn);
+        final open = identical(shell.popup.value, widget.turn);
         final details = scope.prefs.prefs.isOn(ChatSwitch.answerDetails);
         return Row(
           mainAxisSize: MainAxisSize.min,
@@ -66,7 +65,7 @@ class _AnswerMoreState extends State<AnswerMore> {
             PopupAnchor(
               open: open,
               above: true,
-              onClose: () => shell.closeAnswerMenu(widget.turn),
+              onClose: () => shell.closePopup(widget.turn),
               menu: (context) => _AnswerMenu(widget.metrics),
               child: Tappable(
                 touchTarget: true,
@@ -74,7 +73,7 @@ class _AnswerMoreState extends State<AnswerMore> {
                     'More for this answer: model, time, tokens, speed and cost',
                 tooltip: 'More',
                 expanded: open,
-                onTap: () => shell.toggleAnswerMenu(widget.turn),
+                onTap: () => shell.togglePopup(widget.turn),
                 radius: BorderRadius.circular(6),
                 color: open ? t.hover : null,
                 child: SizedBox.square(
@@ -138,10 +137,7 @@ class _AnswerMenu extends StatelessWidget {
                 ],
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Container(height: 1, color: t.line2),
-          ),
+          const MenuDivider(),
           ListenableBuilder(
             listenable: prefs,
             builder: (context, _) {

@@ -6,6 +6,7 @@ import '../icons.dart';
 import '../tokens.dart';
 import '../type.dart';
 import 'essentials.dart';
+import '../state/files_controller.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
@@ -22,12 +23,22 @@ class FileTree extends StatefulWidget {
 }
 
 class _FileTreeState extends State<FileTree> {
+  late final FilesController _files;
+
   @override
   void initState() {
     super.initState();
+    _files = AppScope.of(context).files;
     // Loading notifies, which must wait until the frame that builds the tree is done.
-    final files = AppScope.of(context).files;
-    WidgetsBinding.instance.addPostFrameCallback((_) => files.ensureLoaded());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _files.ensureLoaded();
+    });
+  }
+
+  @override
+  void dispose() {
+    _files.hidden();
+    super.dispose();
   }
 
   @override

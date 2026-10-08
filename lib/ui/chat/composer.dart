@@ -543,11 +543,10 @@ class _Form extends StatelessWidget {
       if (sendable) onSend(draft.text);
     }
 
-    // While this chat answers, a message typed is held to go when the answer ends. On a phone
-    // Send when done takes the chips' room, as they are off while the chat answers.
+    // While this chat answers, a message typed is held to go when the answer ends. Send when
+    // done takes the chips' room, as they are off while the chat answers.
     final holdable = here && !held && draft.text.trim().isNotEmpty;
     final phone = ScreenClass.ofContext(context).isPhone;
-    final holdInRow = holdable && phone;
 
     /// Enter picks the highlighted command, or sends the message once it is that command.
     void enter() {
@@ -718,7 +717,7 @@ class _Form extends StatelessWidget {
                 // Takes all the room left, so Send sits at the right edge. On a phone the model is
                 // a row in the Answer from menu, since the row has room for one chip.
                 Expanded(
-                  child: holdInRow
+                  child: holdable
                       ? Align(
                           alignment: Alignment.centerRight,
                           child: _SendWhenDone(onTap: onHold),
@@ -750,10 +749,7 @@ class _Form extends StatelessWidget {
                       size: IconSize.small,
                     ),
                   ),
-                if (holdable) ...[
-                  if (!holdInRow) _SendWhenDone(onTap: onHold),
-                  const SizedBox(width: 8),
-                ],
+                if (holdable) const SizedBox(width: 8),
                 if (here)
                   _RoundButton(
                     label: 'Stop the answer',
@@ -960,24 +956,15 @@ class _AlreadyAnswering extends StatelessWidget {
   const _AlreadyAnswering();
 
   @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Semantics(
-      liveRegion: true,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: t.warnbg,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          'This chat is still answering, maybe on another device. Send when it ends, or stop '
-          'it.',
-          style: Type.sans(13.5, color: t.warnfg, height: 1.45),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    liveRegion: true,
+    child: const AlertBox(
+      AlertKind.warn,
+      'This chat is still answering, maybe on another device. Send when it ends, or stop it.',
+      plain: true,
+    ),
+  );
 }
 
 /// In place of the composer until a key is saved.

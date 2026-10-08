@@ -5,6 +5,7 @@ void main() {
   test('plural picks the word for the count', () {
     expect(plural(1, 'thread', 'threads'), '1 thread');
     expect(plural(0, 'thread', 'threads'), '0 threads');
+    expect(plural(1284, 'thread', 'threads'), '1,284 threads');
   });
 
   test('grouped puts commas between thousands', () {

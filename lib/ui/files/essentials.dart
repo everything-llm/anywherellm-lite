@@ -16,6 +16,7 @@ import '../widgets/upload_queue.dart';
 import '../sources/add_source.dart';
 import '../sources/sources_panel.dart';
 import '../sources/test_question.dart';
+import '../settings/rows.dart';
 import 'doc_views.dart';
 
 /// The Essentials view's sections in the sidebar, each with a hint such as how many documents
@@ -125,15 +126,8 @@ class _Page extends StatelessWidget {
 
 /// The open workspace's documents, the same list as the Documents panel beside a chat: add one,
 /// switch each on or off, test a question, and view the text the server read from each.
-class EssentialDocs extends StatefulWidget {
+class EssentialDocs extends StatelessWidget {
   const EssentialDocs({super.key});
-
-  @override
-  State<EssentialDocs> createState() => _EssentialDocsState();
-}
-
-class _EssentialDocsState extends State<EssentialDocs> {
-  bool _testing = false;
 
   @override
   Widget build(BuildContext context) {
@@ -150,26 +144,26 @@ class _EssentialDocsState extends State<EssentialDocs> {
             style: Type.sans(14, color: t.ink2, height: 1.5),
           ),
           const SizedBox(height: 14),
-          UploadQueue(
-            onSend: sources.upload,
-            onProblem: sources.report,
-            trigger: (browse) => AddSource(
-              buttons: true,
-              leading: AppButton('Add a file', onPressed: browse),
-              trailing: _testing
-                  ? null
-                  : _LinkButton(
-                      'Test a question',
-                      // As tall as the buttons, so it sits level with their first row.
-                      height: ScreenClass.ofContext(context).isPhone ? 44 : 40,
-                      onTap: () => setState(() => _testing = true),
-                    ),
+          TestQuestion(
+            trigger: (test) => UploadQueue(
+              onSend: sources.upload,
+              onProblem: sources.report,
+              trigger: (browse) => AddSource(
+                buttons: true,
+                leading: AppButton('Add a file', onPressed: browse),
+                trailing: test == null
+                    ? null
+                    : TextAction.plain(
+                        'Test a question',
+                        test,
+                        // As tall as the buttons, so it sits level with their first row.
+                        height: ScreenClass.ofContext(context).isPhone
+                            ? 44
+                            : 40,
+                      ),
+              ),
             ),
           ),
-          if (_testing) ...[
-            const SizedBox(height: 12),
-            TestQuestion(onDone: () => setState(() => _testing = false)),
-          ],
           if (sources.sending case final name?) ...[
             const SizedBox(height: 10),
             HelpText('Adding $name…', status: true),
@@ -179,35 +173,21 @@ class _EssentialDocsState extends State<EssentialDocs> {
             AlertBox(AlertKind.bad, problem.title, text: problem.text),
           ],
           const SizedBox(height: 14),
-          Container(
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              color: t.panel,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: t.line),
+          FieldCard([
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Text(
+                docs.isEmpty
+                    ? sources.loading
+                          ? 'Loading…'
+                          : 'No documents yet.'
+                    : '${plural(docs.length, 'document', 'documents')}, '
+                          '${sources.onCount} used in answers',
+                style: Type.sans(12, color: t.muted),
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  child: Text(
-                    docs.isEmpty
-                        ? sources.loading
-                              ? 'Loading…'
-                              : 'No documents yet.'
-                        : '${plural(docs.length, 'document', 'documents')}, '
-                              '${sources.onCount} used in answers',
-                    style: Type.sans(12, color: t.muted),
-                  ),
-                ),
-                for (final doc in docs) _DocRow(doc, key: ValueKey(doc.path)),
-              ],
-            ),
-          ),
+            for (final doc in docs) _DocRow(doc, key: ValueKey(doc.path)),
+          ]),
           const SizedBox(height: 14),
           Text(
             'The server keeps only the text it read from each one, never the uploaded file.',
@@ -232,111 +212,40 @@ class _DocRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
-    final t = Tokens.of(context);
-    final view = _LinkButton(
+    final view = TextAction.plain(
       'View extracted text',
+      () => scope.files.viewText(doc.path, doc.title),
       semanticLabel: 'View extracted text of ${doc.title}',
-      onTap: () => scope.files.viewText(doc.path, doc.title),
+      height: 32,
     );
-    return Container(
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: t.line2)),
-      ),
       child: LayoutBuilder(
         builder: (context, box) {
           final wide = box.maxWidth >= _wide;
-          return Row(
-            children: [
-              TypeTile(doc),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      doc.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Type.sans(
-                        14,
-                        weight: FontWeight.w500,
-                        color: t.ink,
-                      ),
-                    ),
-                    if (doc.filesMeta.isNotEmpty)
-                      Text(
-                        doc.filesMeta,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Type.sans(12, color: t.muted),
-                      ),
-                    if (!wide)
-                      Transform.translate(
-                        offset: const Offset(-8, 0),
-                        child: view,
-                      ),
-                  ],
-                ),
-              ),
-              if (doc.pinned) ...[
-                const SizedBox(width: 12),
-                const AppBadge('Pinned', kind: BadgeKind.accent),
-              ],
-              const SizedBox(width: 12),
+          return SourceRow(
+            doc,
+            meta: doc.filesMeta,
+            roomy: true,
+            // Under the name, its words line up with the name's.
+            below: wide
+                ? null
+                : Transform.translate(offset: const Offset(-6, 0), child: view),
+            trailing: [
+              if (doc.pinned) const AppBadge('Pinned', kind: BadgeKind.accent),
               AppSwitch(
                 value: doc.on,
                 label: 'Use ${doc.title} in answers',
                 tooltip: 'Use in answers',
                 onChanged: (_) => scope.sources.toggle(doc),
               ),
-              if (wide) ...[const SizedBox(width: 12), view],
+              if (wide) view,
             ],
           );
         },
       ),
     );
   }
-}
-
-/// A small button that is only its words, in the accent.
-class _LinkButton extends StatelessWidget {
-  const _LinkButton(
-    this.label, {
-    required this.onTap,
-    this.semanticLabel,
-    this.height = 32,
-  });
-
-  final String label;
-  final VoidCallback onTap;
-
-  /// The least height, with the words in its middle.
-  final double height;
-
-  /// What a screen reader hears, when [label] alone is not enough, as in a list.
-  final String? semanticLabel;
-
-  @override
-  Widget build(BuildContext context) => Tappable(
-    label: semanticLabel ?? label,
-    onTap: onTap,
-    radius: BorderRadius.circular(6),
-    child: ConstrainedBox(
-      constraints: BoxConstraints(minHeight: height),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Align(
-          widthFactor: 1,
-          heightFactor: 1,
-          child: Text(
-            label,
-            style: Type.sans(13, color: Tokens.of(context).accent),
-          ),
-        ),
-      ),
-    ),
-  );
 }
 
 /// The text the server read from the document View extracted text opened, under the way back to

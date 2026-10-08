@@ -2,16 +2,16 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../core/chat.dart';
-import '../../core/connection.dart';
 import '../app_scope.dart';
 import '../icons.dart';
 import '../layout.dart';
+import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
+import '../widgets/menu.dart';
 import '../widgets/tappable.dart';
 import 'composer_chip.dart';
 import 'model_picker.dart';
@@ -33,21 +33,50 @@ bool _canChoose(AppScope scope) {
 /// since that mode is the one that makes an answer decline. It shows once the workspace is read,
 /// and reads Answer from when the server's mode is none the app knows. It is off while an answer
 /// runs in the workspace.
-class AnswerFromChip extends StatelessWidget {
+class AnswerFromChip extends StatefulWidget {
   const AnswerFromChip({super.key});
 
   @override
+  State<AnswerFromChip> createState() => _AnswerFromChipState();
+}
+
+class _AnswerFromChipState extends State<AnswerFromChip> {
+  late final AppScope _scope;
+
+  /// Whether the open workspace has been read, the one thing the chip takes from Sources
+  /// beside its mode.
+  late bool _read;
+
+  @override
+  void initState() {
+    super.initState();
+    _scope = AppScope.of(context);
+    _read = _scope.sources.read != null;
+    _scope.sources.addListener(_sourcesChanged);
+  }
+
+  @override
+  void dispose() {
+    _scope.sources.removeListener(_sourcesChanged);
+    super.dispose();
+  }
+
+  void _sourcesChanged() {
+    final read = _scope.sources.read != null;
+    if (read != _read) setState(() => _read = read);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
+    final scope = _scope;
     return ListenableBuilder(
       listenable: Listenable.merge([
-        scope.shell,
+        scope.shell.popup,
         scope.chat,
-        scope.sources,
         scope.sources.chatMode,
       ]),
       builder: (context, _) {
-        if (scope.chat.activeSlug == null || scope.sources.read == null) {
+        if (scope.chat.activeSlug == null || !_read) {
           return const SizedBox.shrink();
         }
         final mode = scope.sources.chatMode.value;
@@ -60,7 +89,9 @@ class AnswerFromChip extends StatelessWidget {
             tooltip: 'What answers in this workspace draw on',
             open: scope.shell.answerFromOpen,
             tinted: mode == ChatMode.query,
-            onTap: _canChoose(scope) ? scope.shell.toggleAnswerFrom : null,
+            onTap: _canChoose(scope)
+                ? () => scope.shell.togglePopup(Popup.answerFrom)
+                : null,
           ),
         );
       },
@@ -87,15 +118,8 @@ class AnswerFromAnchor extends StatefulWidget {
 }
 
 class _AnswerFromAnchorState extends State<AnswerFromAnchor> {
-  // Always showing: the overlay draws nothing while the menu is closed.
-  final _portal = OverlayPortalController()..show();
-  final _link = LayerLink();
   late final AppScope _scope;
   String? _slug;
-
-  /// The server the system's settings were asked of for the Model row, so a failed read is not
-  /// asked again on every rebuild.
-  Connection? _asked;
 
   @override
   void initState() {
@@ -111,77 +135,53 @@ class _AnswerFromAnchorState extends State<AnswerFromAnchor> {
     super.dispose();
   }
 
+  void _close() => _scope.shell.closePopup(Popup.answerFrom);
+
   void _chatChanged() {
     final slug = _scope.chat.activeSlug;
     final moved = slug != _slug;
     _slug = slug;
-    if (moved || (slug != null && _scope.chat.answeringIn(slug))) {
-      _scope.shell.closeAnswerFrom();
-    }
+    if (moved || (slug != null && _scope.chat.answeringIn(slug))) _close();
   }
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, box) => CompositedTransformTarget(
-      link: _link,
-      child: OverlayPortal(
-        controller: _portal,
-        overlayChildBuilder: (context) => _overlay(context, box.maxWidth),
-        child: widget.child,
-      ),
-    ),
-  );
-
-  Widget _overlay(BuildContext context, double cardWidth) {
+  Widget build(BuildContext context) {
     final scope = _scope;
-    return ListenableBuilder(
-      listenable: Listenable.merge([
-        scope.shell,
-        scope.chat,
-        scope.sources,
-        scope.sources.chatMode,
-        scope.system,
-      ]),
-      builder: (context, _) {
-        if (!scope.shell.answerFromOpen || !_canChoose(scope)) {
-          return const SizedBox.shrink();
-        }
-        final phone = ScreenClass.ofContext(context).isPhone;
-        final server = scope.chat.server;
-        if (phone && server != null && server != _asked) {
-          _asked = server;
-          WidgetsBinding.instance.addPostFrameCallback(
-            (_) => unawaited(scope.system.wantSettings()),
-          );
-        }
-        final width = phone ? cardWidth : math.min(348.0, cardWidth);
-        final left = phone ? 0.0 : math.min(76.0, cardWidth - width);
-        return CompositedTransformFollower(
-          link: _link,
-          targetAnchor: Alignment.topLeft,
-          followerAnchor: Alignment.bottomLeft,
-          offset: Offset(left, -8),
-          showWhenUnlinked: false,
-          child: Align(
-            alignment: Alignment.bottomLeft,
-            child: TapRegion(
-              groupId: _group,
-              onTapOutside: (_) => scope.shell.closeAnswerFrom(),
-              child: CallbackShortcuts(
-                bindings: {
-                  const SingleActivator(LogicalKeyboardKey.escape):
-                      scope.shell.closeAnswerFrom,
-                },
-                child: Focus(
-                  autofocus: true,
-                  child: SizedBox(
-                    width: width,
-                    child: _Menu(phone: phone, onPickModel: widget.onPickModel),
-                  ),
-                ),
-              ),
+    final phone = ScreenClass.ofContext(context).isPhone;
+    return LayoutBuilder(
+      builder: (context, box) {
+        final card = box.maxWidth;
+        final width = phone ? card : math.min(348.0, card);
+        final left = phone ? 0.0 : math.min(76.0, card - width);
+        return ValueListenableBuilder(
+          valueListenable: scope.shell.popup,
+          builder: (context, popup, child) => PopupAnchor(
+            open: popup == Popup.answerFrom,
+            onClose: _close,
+            group: _group,
+            above: true,
+            width: width,
+            offset: Offset(left, -8),
+            menu: (context) => ListenableBuilder(
+              listenable: Listenable.merge([
+                scope.chat,
+                scope.sources,
+                scope.sources.chatMode,
+                scope.system,
+              ]),
+              builder: (context, _) {
+                if (!_canChoose(scope)) return const SizedBox.shrink();
+                if (phone) scope.system.wantSettingsOnce();
+                return _Menu(
+                  phone: phone,
+                  onPickModel: widget.onPickModel,
+                  onClose: _close,
+                );
+              },
             ),
+            child: child!,
           ),
+          child: widget.child,
         );
       },
     );
@@ -191,10 +191,15 @@ class _AnswerFromAnchorState extends State<AnswerFromAnchor> {
 /// The Answer from menu: the three modes, and a note that the choice is the workspace's. On a
 /// phone the Model row comes before the note, since the composer has room for one chip.
 class _Menu extends StatelessWidget {
-  const _Menu({required this.phone, required this.onPickModel});
+  const _Menu({
+    required this.phone,
+    required this.onPickModel,
+    required this.onClose,
+  });
 
   final bool phone;
   final VoidCallback onPickModel;
+  final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -202,79 +207,40 @@ class _Menu extends StatelessWidget {
     final t = Tokens.of(context);
     final mode = scope.sources.chatMode.value;
     final workspace = scope.chat.active?.name ?? 'this workspace';
-    final note = Text(
-      '${phone ? 'Both apply' : 'Applies'} to every chat in $workspace.',
-      style: Type.sans(12, color: t.muted, height: 1.4),
+    final note = Padding(
+      padding: EdgeInsets.fromLTRB(10, phone ? 6 : 2, 10, phone ? 6 : 4),
+      child: Text(
+        '${phone ? 'Both apply' : 'Applies'} to every chat in $workspace.',
+        style: Type.sans(12, color: t.muted, height: 1.4),
+      ),
     );
-    return Container(
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: t.panel,
-        borderRadius: BorderRadius.circular(phone ? 14 : 12),
-        border: Border.all(color: t.line),
-        boxShadow: [
-          BoxShadow(
-            color: t.shadow,
-            // Flutter blurs a radius more than CSS does; 34 here is CSS's 40.
-            blurRadius: 34,
-            spreadRadius: -12,
-            offset: const Offset(0, 16),
-          ),
-        ],
-      ),
-      child: Semantics(
-        container: true,
-        label: 'Answer from',
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 2,
-          children: [
-            Padding(
-              padding: EdgeInsets.fromLTRB(10, phone ? 8 : 6, 10, 4),
-              child: const SectionLabel('Answer from'),
-            ),
-            for (final m in ChatMode.values)
-              _Choice(
-                m,
-                chosen: m == mode,
-                phone: phone,
-                onTap: () {
-                  scope.shell.closeAnswerFrom();
-                  unawaited(scope.sources.setChatMode(m));
-                },
-              ),
-            if (phone) ...[
-              Container(
-                height: 1,
-                margin: const EdgeInsets.symmetric(vertical: 4),
-                color: t.line2,
-              ),
-              _ModelRow(
-                onTap: () {
-                  scope.shell.closeAnswerFrom();
-                  onPickModel();
-                },
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                child: note,
-              ),
-            ] else
-              Container(
-                margin: const EdgeInsets.only(top: 4),
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
-                decoration: BoxDecoration(
-                  border: Border(top: BorderSide(color: t.line2)),
-                ),
-                child: note,
-              ),
-          ],
+    return AppMenu(
+      label: 'Answer from',
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(10, phone ? 8 : 6, 10, 4),
+          child: const SectionLabel('Answer from'),
         ),
-      ),
+        for (final m in ChatMode.values)
+          _Choice(
+            m,
+            chosen: m == mode,
+            phone: phone,
+            onTap: () {
+              onClose();
+              unawaited(scope.sources.setChatMode(m));
+            },
+          ),
+        const MenuDivider(),
+        if (phone)
+          _ModelRow(
+            onTap: () {
+              onClose();
+              onPickModel();
+            },
+          ),
+        note,
+      ],
     );
   }
 }

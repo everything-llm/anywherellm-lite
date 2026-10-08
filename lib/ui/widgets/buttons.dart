@@ -111,56 +111,86 @@ class IconBtn extends StatelessWidget {
   }
 }
 
-/// A form's buttons, such as Cancel and Add, in a row at its end that wraps when narrow.
+/// A form's buttons, such as Cancel and Add, in a row at its end that wraps when narrow. A
+/// page's own buttons under its cards sit from the start of the line ([WrapAlignment.start]).
 class ActionRow extends StatelessWidget {
-  const ActionRow(this.children, {super.key});
+  const ActionRow(
+    this.children, {
+    super.key,
+    this.alignment = WrapAlignment.end,
+  });
 
   final List<Widget> children;
+  final WrapAlignment alignment;
 
   @override
-  Widget build(BuildContext context) => Wrap(
-    alignment: WrapAlignment.end,
-    spacing: 8,
-    runSpacing: 8,
-    children: children,
-  );
+  Widget build(BuildContext context) =>
+      Wrap(alignment: alignment, spacing: 8, runSpacing: 8, children: children);
 }
 
-/// A small text button with an icon before it.
+/// A small text button in the accent, with an icon before it, or only its words
+/// ([TextAction.plain]).
 class TextAction extends StatelessWidget {
   const TextAction(
-    this.icon,
+    String this.icon,
     this.label,
     this.onTap, {
     super.key,
     this.semanticLabel,
+    this.height,
   });
 
-  final String icon;
+  const TextAction.plain(
+    this.label,
+    this.onTap, {
+    super.key,
+    this.semanticLabel,
+    this.height,
+  }) : icon = null;
+
+  final String? icon;
   final String label;
   final VoidCallback onTap;
 
   /// What a screen reader hears, when [label] alone is not enough, as in a list.
   final String? semanticLabel;
 
+  /// The least height, with the words in its middle, as beside buttons whose row it shares.
+  final double? height;
+
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    final content = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon case final icon?) ...[
+          AppIcon(icon, size: IconSize.xs, color: t.accent),
+          const SizedBox(width: 6),
+        ],
+        // Wraps where the line is too narrow for it.
+        Flexible(
+          child: Text(label, style: Type.sans(13, color: t.accent)),
+        ),
+      ],
+    );
     return Tappable(
       label: semanticLabel ?? label,
       onTap: onTap,
       radius: BorderRadius.circular(6),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AppIcon(icon, size: IconSize.xs, color: t.accent),
-            const SizedBox(width: 6),
-            Text(label, style: Type.sans(13, color: t.accent)),
-          ],
+      child: switch (height) {
+        final height? => ConstrainedBox(
+          constraints: BoxConstraints(minHeight: height),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Align(widthFactor: 1, heightFactor: 1, child: content),
+          ),
         ),
-      ),
+        null => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+          child: content,
+        ),
+      },
     );
   }
 }

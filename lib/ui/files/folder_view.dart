@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/copy.dart';
 import '../../core/files.dart';
+import '../../core/prefs.dart';
+import '../../core/server_models.dart';
 import '../../core/sources.dart';
 import '../app_scope.dart';
 import '../icons.dart';
@@ -60,19 +62,13 @@ class FolderView extends StatelessWidget {
           ],
           const SizedBox(height: 16),
         ],
-        if (node.kind == NodeKind.docs)
-          _Docs(node)
-        else ...[
-          if (node.children.isEmpty)
-            Text(
-              files.loading ? 'Loading…' : 'Empty.',
-              style: Type.sans(13.5, color: t.muted),
-            ),
-          for (final child in node.children) _ChildRow(child),
-        ],
         if (node.kind == NodeKind.docs) ...[
+          _Docs(node),
           const SizedBox(height: 24),
           _Attach(node.slug!),
+        ] else ...[
+          if (node.children.isEmpty) const _Empty(),
+          for (final child in node.children) _ChildRow(child),
         ],
       ],
     );
@@ -128,34 +124,61 @@ class _DeleteFolderState extends State<_DeleteFolder> {
   }
 }
 
+/// What an empty folder says: that it is still being read, or that it is empty.
+class _Empty extends StatelessWidget {
+  const _Empty();
+
+  @override
+  Widget build(BuildContext context) => Text(
+    AppScope.of(context).files.loading ? 'Loading…' : 'Empty.',
+    style: Type.sans(13.5, color: Tokens.of(context).muted),
+  );
+}
+
 /// A workspace's documents: those it answers from, each a link to open, and after them those
 /// switched off on this device, which open in the library. Each says its size, and a switched-off
 /// one that it is not used; only its icon fades.
-class _Docs extends StatelessWidget {
+class _Docs extends StatefulWidget {
   const _Docs(this.node);
 
   final FileNode node;
 
   @override
+  State<_Docs> createState() => _DocsState();
+}
+
+class _DocsState extends State<_Docs> {
+  /// What [_docs] were merged from, so another change to the prefs, such as a chat opened,
+  /// merges nothing again.
+  List<WorkspaceDoc>? _embedded;
+  List<OffDoc>? _off;
+  List<SourceFile> _docs = const [];
+
+  List<SourceFile> _merged(List<WorkspaceDoc> embedded, List<OffDoc> off) {
+    if (!identical(embedded, _embedded) || !identical(off, _off)) {
+      _embedded = embedded;
+      _off = off;
+      _docs = mergeSources(embedded, off);
+    }
+    return _docs;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final files = scope.files;
-    final t = Tokens.of(context);
-    final slug = node.slug!;
+    final slug = widget.node.slug!;
     return ListenableBuilder(
       listenable: scope.prefs,
       builder: (context, _) {
-        final links = {for (final child in node.children) child.ref: child};
-        final docs = mergeSources(
+        final links = {
+          for (final child in widget.node.children) child.ref: child,
+        };
+        final docs = _merged(
           files.detail(slug)?.documents ?? const [],
           scope.prefs.offIn(slug),
         );
-        if (docs.isEmpty) {
-          return Text(
-            files.loading ? 'Loading…' : 'Empty.',
-            style: Type.sans(13.5, color: t.muted),
-          );
-        }
+        if (docs.isEmpty) return const _Empty();
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

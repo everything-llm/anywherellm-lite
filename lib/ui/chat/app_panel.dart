@@ -62,14 +62,7 @@ class AppPanel extends StatelessWidget {
         ),
         const SizedBox(width: 2),
       ],
-      // A Column, not a ListView: a live card is no height until its first frame, and a list
-      // drops a child of no height at its start and never builds it again.
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [_card(context, app)],
-        ),
-      ),
+      child: SingleChildScrollView(child: _card(context, app)),
     );
   }
 }
@@ -90,17 +83,23 @@ class AppSheet extends StatefulWidget {
 }
 
 class _AppSheetState extends State<AppSheet> {
-  /// How far the sheet has been dragged down.
-  double _drag = 0;
+  /// How far the sheet has been dragged down. Only the sheet's place follows it, not the sheet.
+  final _drag = ValueNotifier<double>(0);
+
+  @override
+  void dispose() {
+    _drag.dispose();
+    super.dispose();
+  }
 
   void _dragged(DragUpdateDetails details) =>
-      setState(() => _drag = (_drag + details.delta.dy).clamp(0, 10000));
+      _drag.value = (_drag.value + details.delta.dy).clamp(0, 10000);
 
   void _let(DragEndDetails details) {
-    if (_drag > 120 || details.velocity.pixelsPerSecond.dy > 700) {
+    if (_drag.value > 120 || details.velocity.pixelsPerSecond.dy > 700) {
       AppScope.of(context).shell.closeApp();
     } else {
-      setState(() => _drag = 0);
+      _drag.value = 0;
     }
   }
 
@@ -184,11 +183,15 @@ class _AppSheetState extends State<AppSheet> {
         ],
       ),
     );
-    return Positioned(
-      left: 0,
-      right: 0,
-      top: AppSheet.gap + _drag,
-      bottom: -_drag,
+    return ValueListenableBuilder(
+      valueListenable: _drag,
+      builder: (context, drag, sheet) => Positioned(
+        left: 0,
+        right: 0,
+        top: AppSheet.gap + drag,
+        bottom: -drag,
+        child: sheet!,
+      ),
       child: Semantics(
         container: true,
         label: app.name,
@@ -210,13 +213,9 @@ class _AppSheetState extends State<AppSheet> {
             children: [
               header,
               Expanded(
-                // A Column, not a ListView, for a live card of no height until its first frame.
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [_card(context, app)],
-                  ),
+                  child: _card(context, app),
                 ),
               ),
             ],

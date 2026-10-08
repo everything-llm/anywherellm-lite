@@ -1,9 +1,6 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../core/connection.dart';
 import '../../core/providers.dart';
 import '../../core/system_settings.dart';
 import '../app_scope.dart';
@@ -31,21 +28,12 @@ String workspaceModel(AppScope scope) {
 /// The model the open workspace answers with, its own or the system's, in the composer after
 /// the Answer from chip on a desktop. Tapped, it opens the [ModelPicker]. It asks for the
 /// system's settings once a server, for the system's model.
-class ModelChip extends StatefulWidget {
+class ModelChip extends StatelessWidget {
   const ModelChip({super.key, required this.open, required this.onTap});
 
   /// Whether the picker shows.
   final bool open;
   final VoidCallback onTap;
-
-  @override
-  State<ModelChip> createState() => _ModelChipState();
-}
-
-class _ModelChipState extends State<ModelChip> {
-  /// The server the system's settings were asked of, so a failed read is not asked again on
-  /// every rebuild.
-  Connection? _asked;
 
   @override
   Widget build(BuildContext context) {
@@ -57,20 +45,14 @@ class _ModelChipState extends State<ModelChip> {
         if (scope.sources.read == null || slug == null) {
           return const SizedBox.shrink();
         }
-        final server = scope.chat.server;
-        if (server != null && server != _asked) {
-          _asked = server;
-          WidgetsBinding.instance.addPostFrameCallback(
-            (_) => unawaited(scope.system.wantSettings()),
-          );
-        }
+        scope.system.wantSettingsOnce();
         final model = workspaceModel(scope);
         return ComposerChip(
           text: model,
           label: 'Chat model, $model',
           tooltip: 'The model this workspace answers with',
-          open: widget.open,
-          onTap: scope.chat.answeringIn(slug) ? null : widget.onTap,
+          open: open,
+          onTap: scope.chat.answeringIn(slug) ? null : onTap,
         );
       },
     );

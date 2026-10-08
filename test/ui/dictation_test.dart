@@ -1,13 +1,8 @@
-import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
 import '../support/pump.dart';
-
-Finder control(String label) => find.byWidgetPredicate(
-  (widget) => widget is Tappable && widget.label == label,
-);
 
 String message(WidgetTester tester) =>
     tester.widget<EditableText>(composerField).controller.text;

@@ -1,6 +1,7 @@
 // The server's providers by what they do, each with the settings it reads, as Settings shows
 // them: a chooser such as `LLMProvider`, its values by name, and each value's own settings.
 
+import 'connection.dart';
 import 'system_settings.dart';
 
 /// How a provider's setting is typed.
@@ -571,12 +572,6 @@ final _privateHost = RegExp(
 
 _Reach _reach(String host) {
   if (host.isEmpty) return _Reach.service;
-  if (host == 'localhost' ||
-      host.startsWith('127.') ||
-      host == '::1' ||
-      host == '0.0.0.0' ||
-      host == 'host.docker.internal') {
-    return _Reach.server;
-  }
+  if (isLoopback(host) || host == 'host.docker.internal') return _Reach.server;
   return _privateHost.hasMatch(host) ? _Reach.network : _Reach.service;
 }

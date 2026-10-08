@@ -3,7 +3,6 @@ import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/chat/browser_panel.dart';
 import 'package:anywherellm/ui/chat/card_image.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
-import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,10 +10,6 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/fake_api.dart';
 import '../support/pixels.dart';
 import '../support/pump.dart';
-
-Finder control(String label) => find.byWidgetPredicate(
-  (widget) => widget is Tappable && widget.label == label,
-);
 
 final _card = Uri.parse('https://h:8445/_live/browser/bw-3aeecef2b460eeb7.jpg');
 final _page = Uri.parse('https://h:8445/_live/browser/bw-3aeecef2b460eeb7');

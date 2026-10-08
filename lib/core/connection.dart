@@ -114,15 +114,18 @@ Connection parsePairingCode(String raw) {
   return Connection.parse(url, key);
 }
 
+/// Whether [host] names the machine it is used on: `localhost`, `127.x.x.x`, `::1` or
+/// `0.0.0.0`.
+bool isLoopback(String host) =>
+    host == 'localhost' ||
+    host.startsWith('127.') ||
+    host == '::1' ||
+    host == '0.0.0.0';
+
 /// Why a phone cannot use [connection]'s [pairingCode], or null when it can.
 String? pairingProblem(Connection connection) {
   final host = connection.host;
-  final loopback =
-      host == 'localhost' ||
-      host.startsWith('127.') ||
-      host == '::1' ||
-      host == '0.0.0.0';
-  if (loopback) {
+  if (isLoopback(host)) {
     return 'On the phone, $host is the phone itself. Use an address the phone can reach, '
         "such as the server's Tailscale name.";
   }

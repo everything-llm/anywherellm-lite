@@ -115,7 +115,7 @@ class _QuickSwitcherState extends State<QuickSwitcher> {
     final chat = scope.chat;
     final slug = entry.workspace.slug;
     scope.shell
-      ..closeSwitcher()
+      ..closePopup(Popup.switcher)
       ..closeSide()
       ..showPane(Pane.chats);
     switch (entry.thread) {

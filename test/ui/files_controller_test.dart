@@ -369,6 +369,20 @@ void main() {
       expect(rig.files.selected, isNull);
     });
 
+    test(
+      'a workspace opened while Files is hidden is followed when it shows',
+      () async {
+        final rig = await started(planningServer());
+        await rig.files.ensureLoaded();
+        rig.files.hidden();
+        await rig.chat.select('household');
+        await pumpEventQueue();
+        expect(rig.files.selected, docsPath('q3'));
+        await rig.files.ensureLoaded();
+        expect(rig.files.selected, docsPath('household'));
+      },
+    );
+
     test('selecting a node shows the whole tree around it', () async {
       final rig = await started(planningServer());
       await rig.files.ensureLoaded();

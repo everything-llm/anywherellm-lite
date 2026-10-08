@@ -363,9 +363,12 @@ class _Empty extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
+                    // Only the first two switched-on files are named.
                     for (final s in suggestionsFor([
-                      for (final f in sources.files)
-                        if (f.on) f.title,
+                      ...sources.files
+                          .where((f) => f.on)
+                          .map((f) => f.title)
+                          .take(2),
                     ]))
                       _Suggestion(s, onTap: () => onSuggest(s)),
                   ],

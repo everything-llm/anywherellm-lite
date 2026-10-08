@@ -291,7 +291,6 @@ class _ChatsState extends State<_Chats> {
   }
 }
 
-/// The keys that move to a field, drawn small inside it.
 /// The search, drawn as one of the sidebar's rows: no border, 40 px tall, the search icon before
 /// the text and [suffix] after it. It fills while it has the focus.
 class _SearchRow extends StatelessWidget {
@@ -350,6 +349,7 @@ class _SearchRow extends StatelessWidget {
   }
 }
 
+/// The keys that move to a field, drawn small inside it.
 class _KeyHint extends StatelessWidget {
   const _KeyHint(this.keys);
 

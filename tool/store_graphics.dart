@@ -13,6 +13,7 @@ import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
+import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/type.dart';
 import 'package:anywherellm/ui/widgets/robin_mark.dart';
 import 'package:flutter/rendering.dart';
@@ -226,7 +227,7 @@ void main() {
     h.shell.toggleSide();
     await tester.pumpAndSettle();
     await _capture(tester, 'phoneScreenshots/2_chats.png');
-    h.shell.toggleMenu();
+    h.shell.togglePopup(Popup.workspaces);
     await tester.pumpAndSettle();
     await _capture(tester, 'phoneScreenshots/3_workspaces.png');
 

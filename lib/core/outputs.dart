@@ -1,6 +1,8 @@
 // What an answer carries besides its text: files and images an agent made, and the numbers
 // of how it ran.
 
+import 'copy.dart';
+
 /// A file or image an agent made with an answer. Its bytes come from the server by
 /// [storageName], which the server gave it; [name] is what it is called for the person.
 class GeneratedFile {
@@ -100,7 +102,7 @@ class AnswerMetrics {
     if (_cost case final cost?) ('Cost', cost),
   ];
 
-  String? get _tokens => tokens == null ? null : _grouped(tokens!);
+  String? get _tokens => tokens == null ? null : grouped(tokens!);
   String? get _speed => speed == null ? null : '${speed!.round()} tok/s';
   String? get _seconds =>
       seconds == null ? null : '${seconds!.toStringAsFixed(1)} s';
@@ -130,7 +132,3 @@ AnswerMetrics? metricsOf(Object? metrics) {
   );
   return found.text.isEmpty ? null : found;
 }
-
-/// [n] with commas between thousands: `1,642`.
-String _grouped(int n) =>
-    n.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+$)'), (_) => ',');

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../core/chat.dart';
@@ -10,10 +11,15 @@ enum Pane { chats, files }
 /// What the panel to the right of the chat shows: Sources, the chat's browser, or an app.
 enum Beside { sources, browser, app }
 
+/// A popup over the window or a part of it, at most one open at a time: the sidebar's workspace
+/// menu, the Ctrl+K switcher, or the composer's Answer from menu. An answer's More menu is
+/// keyed by its [Turn] instead.
+enum Popup { workspaces, switcher, answerFrom }
+
 /// What is open around the chat: the sidebar drawer, the Documents panel (Sources in the code),
-/// the Settings dialog, the composer's Answer from menu and an answer's More menu, and which
-/// [Pane] is on screen. The sidebar is a drawer only below desktop width; Sources sits in the
-/// layout at wide widths and is a drawer below that.
+/// the Settings dialog, the [popup] open, and which [Pane] is on screen. The sidebar is a drawer
+/// only below desktop width; Sources sits in the layout at wide widths and is a drawer below
+/// that.
 ///
 /// The panel to the right of the chat shows Sources, the chat's browser or an app ([Beside]). It
 /// keeps one open flag per layout: the panel in the layout starts open ([sourcesPinned]), the
@@ -22,88 +28,52 @@ class ShellController extends ChangeNotifier {
   ShellController({this._sourcesPinned = true});
 
   bool _sideOpen = false;
-  bool _menuOpen = false;
 
   /// The sidebar's search field.
   final searchFocus = FocusNode(debugLabel: 'Search chats');
 
+  final _popup = ValueNotifier<Object?>(null);
+
   @override
   void dispose() {
     searchFocus.dispose();
+    _popup.dispose();
     super.dispose();
   }
 
-  bool _switcherOpen = false;
+  /// The popup open: a [Popup], or the [Turn] whose More menu is open, or null. It notifies
+  /// apart from the shell, so opening or closing one rebuilds only what listens to it.
+  ValueListenable<Object?> get popup => _popup;
 
   /// Whether the Ctrl+K switcher is open over the window.
-  bool get switcherOpen => _switcherOpen;
+  bool get switcherOpen => _popup.value == Popup.switcher;
+
+  /// Whether the sidebar's workspace menu is open.
+  bool get menuOpen => _popup.value == Popup.workspaces;
+
+  /// Whether the composer's Answer from menu is open.
+  bool get answerFromOpen => _popup.value == Popup.answerFrom;
+
+  /// The answer whose More menu is open, or null.
+  Turn? get answerMenu => switch (_popup.value) {
+    final Turn turn => turn,
+    _ => null,
+  };
+
+  /// Opens the popup [key], closing any other, or closes it when it is open.
+  void togglePopup(Object key) =>
+      _popup.value = identical(_popup.value, key) ? null : key;
+
+  /// Closes the popup open, or only [key] when it is given.
+  void closePopup([Object? key]) {
+    if (key == null || identical(_popup.value, key)) _popup.value = null;
+  }
 
   /// Opens the switcher, or closes it when it is open. Settings keeps the window while it is
   /// open.
   void toggleSwitcher() {
-    if (_settingsOpen && !_switcherOpen) return;
-    _switcherOpen = !_switcherOpen;
-    _menuOpen = false;
-    _answerFromOpen = false;
-    _answerMenu = null;
-    notifyListeners();
-  }
-
-  void closeSwitcher() {
-    if (!_switcherOpen) return;
-    _switcherOpen = false;
-    notifyListeners();
-  }
-
-  /// Whether the sidebar's workspace menu is open.
-  bool get menuOpen => _menuOpen;
-
-  void toggleMenu() {
-    _menuOpen = !_menuOpen;
-    notifyListeners();
-  }
-
-  void closeMenu() {
-    if (!_menuOpen) return;
-    _menuOpen = false;
-    notifyListeners();
-  }
-
-  bool _answerFromOpen = false;
-
-  /// Whether the composer's Answer from menu is open.
-  bool get answerFromOpen => _answerFromOpen;
-
-  void toggleAnswerFrom() {
-    _answerFromOpen = !_answerFromOpen;
-    notifyListeners();
-  }
-
-  void closeAnswerFrom() {
-    if (!_answerFromOpen) return;
-    _answerFromOpen = false;
-    notifyListeners();
-  }
-
-  Turn? _answerMenu;
-
-  /// The answer whose More menu is open, or null.
-  Turn? get answerMenu => _answerMenu;
-
-  /// Opens [answer]'s More menu, or closes it when it is open.
-  void toggleAnswerMenu(Turn answer) {
-    _answerMenu = identical(_answerMenu, answer) ? null : answer;
-    notifyListeners();
-  }
-
-  /// Closes the More menu that is open, or only [answer]'s when it is given.
-  void closeAnswerMenu([Turn? answer]) {
-    if (_answerMenu == null ||
-        (answer != null && !identical(_answerMenu, answer))) {
-      return;
-    }
-    _answerMenu = null;
-    notifyListeners();
+    if (_settingsOpen && !switcherOpen) return;
+    togglePopup(Popup.switcher);
   }
 
   bool _sourcesPinned;
@@ -119,12 +89,10 @@ class ShellController extends ChangeNotifier {
   /// What the panel to the right shows.
   Beside _beside = Beside.sources;
 
-  /// Whether the panel was open before the browser took it, to be put back when it closes.
-  bool _openBeforeBrowser = false;
-
-  /// What the panel showed, and whether it was open, before an app took it, to be put back
-  /// when the app closes.
-  (Beside, bool) _beforeApp = (Beside.sources, false);
+  /// What the panel showed before the browser or an app took it, to be put back when that
+  /// closes: the browser or app it took over from, if one showed, and whether Sources was open
+  /// before either did.
+  ({Beside? under, bool sources}) _before = (under: null, sources: false);
 
   AppCard? _app;
 
@@ -167,35 +135,43 @@ class ShellController extends ChangeNotifier {
   void closeSources() => _setRight(open: false, beside: Beside.sources);
 
   /// Shows the chat's browser in the panel to the right, opening it.
-  void showBrowser() {
-    if (browserOpen) return;
-    _openBeforeBrowser = sourcesOpen;
-    _setRight(open: true, beside: Beside.browser);
-  }
+  void showBrowser() => _take(Beside.browser);
 
-  /// Takes the browser out of the panel and puts back what was there: Sources, open or closed.
-  void closeBrowser() {
-    if (_beside == Beside.browser) {
-      _setRight(open: _openBeforeBrowser, beside: Beside.sources);
-    }
-  }
+  /// Takes the browser out of the panel and puts back what was there, open or closed.
+  void closeBrowser() => _giveBack(Beside.browser);
 
   /// Shows [app] in the panel to the right, opening it; on a phone the shell draws it as a sheet
   /// over the chat instead.
   void showApp(AppCard app) {
-    if (!appOpen) _beforeApp = (_beside, rightOpen);
     if (app != _app) {
       _app = app;
       notifyListeners();
     }
-    _setRight(open: true, beside: Beside.app);
+    _take(Beside.app);
   }
 
   /// Takes the app out of the panel and puts back what was there, open or closed.
-  void closeApp() {
-    if (_beside != Beside.app) return;
-    final (beside, open) = _beforeApp;
-    _setRight(open: open, beside: beside);
+  void closeApp() => _giveBack(Beside.app);
+
+  /// Opens the panel on [next], remembering what it showed.
+  void _take(Beside next) {
+    if (rightOpen && _beside == next) return;
+    _before = !rightOpen
+        ? (under: null, sources: false)
+        : _beside == Beside.sources
+        ? (under: null, sources: true)
+        : (under: _beside, sources: _before.sources);
+    _setRight(open: true, beside: next);
+  }
+
+  /// Takes [shown] out of the panel, if it is there, and puts back what it took over from.
+  void _giveBack(Beside shown) {
+    if (_beside != shown) return;
+    final (:under, :sources) = _before;
+    _before = (under: null, sources: sources);
+    under == null
+        ? _setRight(open: sources, beside: Beside.sources)
+        : _setRight(open: true, beside: under);
   }
 
   /// Opens Settings on [page], or on its list.
@@ -204,10 +180,7 @@ class ShellController extends ChangeNotifier {
     _allSettings |= !(page?.essential ?? true);
     _settingsOpen = true;
     _sideOpen = false;
-    _menuOpen = false;
-    _switcherOpen = false;
-    _answerFromOpen = false;
-    _answerMenu = null;
+    _popup.value = null;
     notifyListeners();
   }
 
@@ -238,9 +211,7 @@ class ShellController extends ChangeNotifier {
   void showPane(Pane pane) {
     if (pane == _pane) return;
     _pane = pane;
-    _menuOpen = false;
-    _answerFromOpen = false;
-    _answerMenu = null;
+    closePopup();
     notifyListeners();
   }
 
@@ -264,7 +235,7 @@ class ShellController extends ChangeNotifier {
     }
     _sideOpen = next.$1;
     // The menu is the sidebar's: it goes with the drawer.
-    if (!_sideOpen) _menuOpen = false;
+    if (!_sideOpen) closePopup(Popup.workspaces);
     _sourcesPinned = next.$2;
     _sourcesDrawer = next.$3;
     _settingsOpen = next.$4;

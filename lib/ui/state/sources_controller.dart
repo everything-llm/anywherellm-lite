@@ -30,7 +30,17 @@ class SourcesController extends ChangeNotifier {
   /// The workspace [files] describe.
   String? _slug;
 
-  List<SourceFile> files = const [];
+  /// The workspace's documents, switched on first, and how many of them are on.
+  List<SourceFile> get files => _files;
+  int get onCount => _onCount;
+  List<SourceFile> _files = const [];
+  int _onCount = 0;
+
+  void _setFiles(List<SourceFile> files) {
+    _files = files;
+    _onCount = files.where((f) => f.on).length;
+  }
+
   bool loading = false;
 
   /// The workspace as last read, from which [files] and [chatMode] come, or null before then.
@@ -69,8 +79,6 @@ class SourcesController extends ChangeNotifier {
   static const undoFor = Duration(seconds: 6);
   static const flashFor = Duration(milliseconds: 1800);
 
-  int get onCount => files.where((f) => f.on).length;
-
   /// The file titled [title], or null when it is no longer in Sources.
   SourceFile? byTitle(String title) =>
       files.where((f) => f.title == title).firstOrNull;
@@ -88,7 +96,7 @@ class SourcesController extends ChangeNotifier {
     if (_chat.activeSlug == _slug) return;
     _slug = _chat.activeSlug;
     read = null;
-    files = const [];
+    _setFiles(const []);
     chatMode.value = null;
     problems = const [];
     loading = false;
@@ -140,7 +148,7 @@ class SourcesController extends ChangeNotifier {
 
   void _apply(Workspace workspace) {
     read = workspace;
-    files = mergeSources(workspace.documents, _prefs.offIn(workspace.slug));
+    _setFiles(mergeSources(workspace.documents, _prefs.offIn(workspace.slug)));
     chatMode.value = ChatMode.fromServer(
       workspace.settings?.values['chatMode'],
     );
