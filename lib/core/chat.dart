@@ -140,6 +140,16 @@ bool loadableImage(Uri uri, Uri? server, {required bool allowHttp}) =>
     (uri.scheme == 'https' ||
         (uri.scheme == 'http' && server.scheme == 'http' && allowHttp));
 
+/// Whether [uri] is a live app card on the [server]'s host: everythingllm's sandbox draws an
+/// app's current state at `/_live/apps/<workspace>/<name>.png`. It is an ordinary live card; its
+/// page, which the link around it names, opens through the app's link opener.
+bool isAppCard(Uri uri, Uri? server) =>
+    server != null &&
+    uri.host == server.host &&
+    _appCard.hasMatch(uri.path);
+
+final _appCard = RegExp(r'^/_live/apps/[^/]+/[^/]+\.png$');
+
 /// The failure an agent's [answer] reports in place of an answer, or null when it is an answer.
 /// AnythingLLM's agent sends a model's failure as the answer's text, starting with
 /// `The agent model failed to respond`, and stores it so.

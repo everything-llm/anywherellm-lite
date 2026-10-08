@@ -6,6 +6,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import '../../core/browser.dart';
+import '../../core/chat.dart';
 import '../../core/markdown.dart';
 import '../app_scope.dart';
 import '../links.dart';
@@ -58,13 +59,23 @@ class AnswerBody extends StatelessWidget {
           openLink(context, href);
         }
       },
-      imageBuilder: (uri, _, alt) => CardImage(
-        uri,
-        alt: alt,
-        server: server,
-        allowHttp: allowHttp,
-        linked: linked.contains(uri),
-      ),
+      imageBuilder: (uri, _, alt) {
+        final card = CardImage(
+          uri,
+          alt: alt,
+          server: server,
+          allowHttp: allowHttp,
+          linked: linked.contains(uri),
+        );
+        if (!isAppCard(uri, server)) return card;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            card,
+            if (linked.contains(uri)) _LiveCaption(),
+          ],
+        );
+      },
       builders: {
         'pre': _CodeBlockBuilder(),
         'math': MathBuilder(style: body, fallback: code),
@@ -261,6 +272,29 @@ class _CopyButtonState extends State<CopyButton> {
           size: IconSize.xs,
         ),
       ],
+    );
+  }
+}
+
+/// Under an app card whose link opens its page: the card is live, and a tap opens the app.
+class _LiveCaption extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(color: t.okdot, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text('Live · tap to open', style: Type.sans(12.5, color: t.muted)),
+        ],
+      ),
     );
   }
 }

@@ -255,4 +255,32 @@ void main() {
       );
     });
   });
+
+  group('isAppCard', () {
+    final server = Uri.parse('https://owen.example.ts.net:3001');
+    bool card(String image, {Uri? from}) => isAppCard(Uri.parse(image), from);
+
+    test('a live app card on the server\'s host, on any port', () {
+      expect(
+        card(
+          'https://owen.example.ts.net:8455/_live/apps/home/groceries.png',
+          from: server,
+        ),
+        isTrue,
+      );
+    });
+
+    test('nothing else', () {
+      const other = 'https://owen.example.ts.net:8455';
+      expect(card('$other/_live/apps/home/groceries.png'), isFalse);
+      expect(
+        card('https://evil.test/_live/apps/home/groceries.png', from: server),
+        isFalse,
+      );
+      expect(card('$other/_live/apps/home.png', from: server), isFalse);
+      expect(card('$other/_live/apps/a/b/c.png', from: server), isFalse);
+      expect(card('$other/_live/browser/bw-1.jpg', from: server), isFalse);
+      expect(card('$other/_cards/groceries.png', from: server), isFalse);
+    });
+  });
 }

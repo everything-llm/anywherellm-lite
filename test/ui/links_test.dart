@@ -147,4 +147,29 @@ void main() {
       'answerImage:https://h:8445/card.png',
     ]);
   });
+
+  testWidgets('an app card is live and opens its page', (tester) async {
+    final card = Uri.parse('https://h:8455/_live/apps/home/groceries.png');
+    final page = Uri.parse('https://h:8447/home/apps/groceries/');
+    final llm = answering('Added oat milk.\n\n[![Groceries]($card)]($page)\n')
+      ..images[card] = [pixel];
+    final h = await pumpApp(tester, llm: llm);
+    await tester.pumpAndSettle();
+    expect(find.text('Live · tap to open'), findsOneWidget);
+    // A one-pixel picture is drawn square, taller than the chat shows: tap its top.
+    await tester.tapAt(
+      tester.getTopLeft(find.byType(Image)) + const Offset(20, 20),
+    );
+    await tester.pump();
+    expect(h.opened, [page]);
+  });
+
+  testWidgets('another card has no live caption', (tester) async {
+    final llm = answering(
+      '[![Report](https://h:8445/card.png)](https://h:8445/r)',
+    )..images[Uri.parse('https://h:8445/card.png')] = [pixel];
+    await pumpApp(tester, llm: llm);
+    await tester.pumpAndSettle();
+    expect(find.text('Live · tap to open'), findsNothing);
+  });
 }
