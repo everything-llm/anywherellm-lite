@@ -6,7 +6,7 @@ import 'package:file_selector_platform_interface/file_selector_platform_interfac
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 
 import '../support/fake_api.dart';
 import '../support/pixels.dart';
@@ -219,5 +219,102 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Pasted image.gif'), findsOneWidget);
+  });
+
+  group('the next question while an answer runs', () {
+    Finder sendWhenDone() => find.byTooltip('Send when done');
+
+    Future<FakeAnythingLlm> answering(WidgetTester tester) async {
+      final llm = planningServer()..hold = true;
+      await pumpApp(tester, llm: llm);
+      await tester.enterText(composerField, 'First');
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump(const Duration(milliseconds: 300));
+      return llm;
+    }
+
+    int sent(FakeAnythingLlm llm, String message) =>
+        llm.calls.where((c) => c.endsWith(':$message')).length;
+
+    testWidgets('can be typed, and is held to go when the answer ends', (
+      tester,
+    ) async {
+      final llm = await answering(tester);
+      expect(sendWhenDone(), findsNothing);
+      await tester.enterText(composerField, 'Second');
+      await tester.pump();
+      expect(sendWhenDone(), findsOneWidget);
+      await tester.tap(sendWhenDone());
+      await tester.pump();
+      expect(find.text('Sends when this answer ends.'), findsOneWidget);
+      expect(sent(llm, 'Second'), 0);
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(sent(llm, 'Second'), 1);
+      expect(find.text('Sends when this answer ends.'), findsNothing);
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+    });
+
+    testWidgets('Enter holds it too, and Stop sends it', (tester) async {
+      final llm = await answering(tester);
+      await tester.enterText(composerField, 'Second');
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(find.text('Sends when this answer ends.'), findsOneWidget);
+      await tester.tap(find.byTooltip('Stop'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(sent(llm, 'Second'), 1);
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+    });
+
+    testWidgets("typing more or Don't send lets it go", (tester) async {
+      final llm = await answering(tester);
+      await tester.enterText(composerField, 'Second');
+      await tester.pump();
+      await tester.tap(sendWhenDone());
+      await tester.pump();
+      await tester.enterText(composerField, 'Second, longer');
+      await tester.pump();
+      expect(find.text('Sends when this answer ends.'), findsNothing);
+      await tester.tap(sendWhenDone());
+      await tester.pump();
+      await tester.tap(find.bySemanticsLabel("Don't send"));
+      await tester.pump();
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(sent(llm, 'Second, longer'), 0);
+      expect(find.text('Second, longer'), findsOneWidget);
+    });
+
+    testWidgets('another chat shown lets it go', (tester) async {
+      final llm = await answering(tester);
+      await tester.enterText(composerField, 'Second');
+      await tester.pump();
+      await tester.tap(sendWhenDone());
+      await tester.pump();
+      await tester.tap(find.bySemanticsLabel('Quarter priorities').first);
+      await tester.pump(const Duration(milliseconds: 300));
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(sent(llm, 'Second'), 0);
+    });
+
+    testWidgets('the box stays off while another chat answers', (tester) async {
+      await answering(tester);
+      await tester.tap(find.bySemanticsLabel('Quarter priorities').first);
+      await tester.pump(const Duration(milliseconds: 300));
+      // A field that is off is read only, so it is found by its type.
+      final field = tester.widget<TextField>(
+        find.descendant(
+          of: find.byType(Composer),
+          matching: find.byType(TextField),
+        ),
+      );
+      expect(field.enabled, isFalse);
+    });
   });
 }

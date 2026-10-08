@@ -311,6 +311,9 @@ class ChatController extends ChangeNotifier {
   bool get answeringHere =>
       _running != null && turns.contains(_running!.answer);
 
+  /// The answer that runs, or null.
+  Turn? get runningAnswer => _running?.answer;
+
   bool isAnswering(String thread) => _running?.thread == thread;
 
   /// The answer running in the chat on screen, or null. It notifies on each chunk, which this

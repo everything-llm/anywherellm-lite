@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -64,6 +66,11 @@ class _ComposerState extends State<Composer> {
   late Object _chatShown;
 
   String _typed = '';
+
+  /// The answer a held message waits for, and the message as it was held: it goes when that
+  /// answer ends, however it ends, while it is still on screen and the message unchanged.
+  Turn? _held;
+  String _heldText = '';
 
   /// Whether the microphone is listening, and what the message held when it began, which what
   /// is heard follows.
@@ -163,6 +170,8 @@ class _ComposerState extends State<Composer> {
   /// with a message they were not picked for.
   void _chatChanged() {
     final shown = _chatOnScreen();
+    if (shown != _chatShown && _held != null) setState(() => _held = null);
+    _sendHeld();
     if (shown == _chatShown) return;
     _chatShown = shown;
     if (_attached.isEmpty && _problem == null) return;
@@ -174,6 +183,8 @@ class _ComposerState extends State<Composer> {
 
   void _changed() {
     if (widget.draft.text == _typed) return;
+    // Typing more lets go of a held message: what goes is what was held.
+    if (_held != null && widget.draft.text != _heldText) _held = null;
     if (_listening && widget.draft.text != _dictated) {
       _go++;
       _scope.dictation?.stop();
@@ -183,6 +194,33 @@ class _ComposerState extends State<Composer> {
       _typed = widget.draft.text;
       _highlight = 0;
       _menuClosed = false;
+    });
+  }
+
+  /// Holds the message typed while this chat answers, to go when the answer ends.
+  void _hold() {
+    final answer = _scope.chat.runningAnswer;
+    if (answer == null || widget.draft.text.trim().isEmpty) return;
+    setState(() {
+      _held = answer;
+      _heldText = widget.draft.text;
+    });
+  }
+
+  void _release() => setState(() => _held = null);
+
+  /// Sends the held message once its answer has ended. It waits for the controller to finish
+  /// telling everyone, so the chat is no longer busy when it sends.
+  void _sendHeld() {
+    final held = _held;
+    final chat = _scope.chat;
+    if (held == null || identical(chat.runningAnswer, held)) return;
+    _held = null;
+    if (!chat.turns.contains(held)) return;
+    scheduleMicrotask(() {
+      if (mounted && canSend(_scope.chat, widget.draft.text)) {
+        unawaited(_send(widget.draft.text));
+      }
     });
   }
 
@@ -351,6 +389,9 @@ class _ComposerState extends State<Composer> {
                   onAttach: _attach,
                   onRemove: _remove,
                   onSend: _send,
+                  held: _held != null,
+                  onHold: _hold,
+                  onRelease: _release,
                   onDictate: scope.dictation == null ? null : _dictate,
                   listening: _listening,
                   micProblem: _micProblem,
@@ -391,6 +432,9 @@ class _Form extends StatelessWidget {
     required this.onAttach,
     required this.onRemove,
     required this.onSend,
+    required this.held,
+    required this.onHold,
+    required this.onRelease,
     required this.onDictate,
     required this.listening,
     required this.micProblem,
@@ -414,6 +458,11 @@ class _Form extends StatelessWidget {
   final VoidCallback onAttach;
   final ValueChanged<Attachment> onRemove;
   final ValueChanged<String> onSend;
+
+  /// Whether the message waits for the answer running here to end.
+  final bool held;
+  final VoidCallback onHold;
+  final VoidCallback onRelease;
 
   /// Starts or ends dictation, or null where the device cannot listen.
   final VoidCallback? onDictate;
@@ -464,6 +513,12 @@ class _Form extends StatelessWidget {
       if (sendable) onSend(draft.text);
     }
 
+    // While this chat answers, a message typed is held to go when the answer ends.
+    final holdable = here && !held && draft.text.trim().isNotEmpty;
+    void hold() {
+      if (holdable) onHold();
+    }
+
     /// Enter picks the highlighted command, or sends the message once it is that command.
     void enter() {
       final command = matches[highlight].command;
@@ -476,9 +531,15 @@ class _Form extends StatelessWidget {
 
     final menu = matches.isNotEmpty;
     final bindings = <ShortcutActivator, VoidCallback>{
-      const SingleActivator(LogicalKeyboardKey.enter): menu ? enter : send,
+      const SingleActivator(LogicalKeyboardKey.enter): menu
+          ? enter
+          : here
+          ? hold
+          : send,
       const SingleActivator(LogicalKeyboardKey.numpadEnter): menu
           ? enter
+          : here
+          ? hold
           : send,
       if (menu) ...{
         const SingleActivator(LogicalKeyboardKey.tab): () =>
@@ -532,6 +593,20 @@ class _Form extends StatelessWidget {
             ),
             const SizedBox(height: 8),
           ],
+          if (held) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Sends when this answer ends.',
+                    style: Type.sans(12, color: t.muted),
+                  ),
+                ),
+                TextAction('close', "Don't send", onRelease),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
           if (menu) ...[
             SlashMenu(
               commands: matches,
@@ -566,7 +641,8 @@ class _Form extends StatelessWidget {
                     TextField(
                       controller: draft,
                       focusNode: focus,
-                      enabled: !chat.busy,
+                      // Open while this chat answers, for the next message.
+                      enabled: !chat.busy || here,
                       spellCheckConfiguration:
                           scope.canSpellcheck &&
                               scope.prefs.prefs.isOn(ChatSwitch.spellcheck)
@@ -670,6 +746,10 @@ class _Form extends StatelessWidget {
                     size: IconSize.small,
                   ),
                 ),
+              if (holdable) ...[
+                _SendWhenDone(onTap: hold),
+                const SizedBox(width: 8),
+              ],
               if (here)
                 _RoundButton(
                   label: 'Stop',
@@ -808,6 +888,45 @@ class _RoundButton extends StatelessWidget {
       child: SizedBox.square(dimension: 34, child: Center(child: child)),
     ),
   );
+}
+
+/// Holds the message typed while this chat answers, to go when the answer ends. There is no
+/// Send now: the relay runs one answer a chat.
+class _SendWhenDone extends StatelessWidget {
+  const _SendWhenDone({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return TouchTarget(
+      onTap: onTap,
+      child: Tappable(
+        label: 'Send when done',
+        tooltip: 'Send when done',
+        onTap: onTap,
+        radius: BorderRadius.circular(Sizes.control),
+        color: t.accentbg,
+        child: SizedBox(
+          height: 34,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Center(
+              child: Text(
+                'Send when done',
+                style: Type.sans(
+                  13.5,
+                  weight: FontWeight.w500,
+                  color: t.accent,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// In place of the composer until a key is saved.
