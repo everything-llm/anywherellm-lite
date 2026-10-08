@@ -4,11 +4,12 @@ import '../tokens.dart';
 import '../type.dart';
 import 'robin_mark.dart';
 
-/// The logo tile and the wordmark.
+/// The logo tile and the wordmark: sans 19 beside the sidebar's chats, or [serif] 34 on a screen
+/// of its own.
 class Brand extends StatelessWidget {
-  const Brand({super.key, this.size = 24, this.logo = true});
+  const Brand({super.key, this.serif = false, this.logo = true});
 
-  final double size;
+  final bool serif;
   final bool logo;
 
   @override
@@ -36,11 +37,14 @@ class Brand extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Text(
               'AnywhereLLM',
-              style: Type.serif(
-                size,
-                color: t.ink,
-                letterSpacing: -0.01 * size,
-              ),
+              style: serif
+                  ? Type.serif(34, color: t.ink, letterSpacing: -0.34)
+                  : Type.sans(
+                      19,
+                      weight: FontWeight.w600,
+                      color: t.ink,
+                      letterSpacing: -0.2,
+                    ),
             ),
           ),
         ),

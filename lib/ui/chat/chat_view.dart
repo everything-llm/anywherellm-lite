@@ -188,7 +188,7 @@ class _Header extends StatelessWidget {
       builder: (context, _) {
         final chat = scope.chat;
         final workspace = chat.active;
-        final title = PaneHeader.titleStyle(context);
+        final title = PaneHeader.chatTitleStyle(context);
         return PaneHeader(
           showMenu: showMenu,
           onMenu: scope.shell.toggleSide,
@@ -200,11 +200,17 @@ class _Header extends StatelessWidget {
                   : [
                       TextSpan(
                         text: workspace.name,
-                        style: title.copyWith(color: t.muted),
+                        style: title.copyWith(
+                          color: t.muted,
+                          fontWeight: FontWeight.w400,
+                        ),
                       ),
                       TextSpan(
                         text: ' / ',
-                        style: title.copyWith(color: t.fade),
+                        style: title.copyWith(
+                          color: t.fade,
+                          fontWeight: FontWeight.w400,
+                        ),
                       ),
                       TextSpan(text: chat.title),
                     ],
@@ -289,8 +295,7 @@ class _HeaderButton extends StatelessWidget {
       toggled: pressed,
       onTap: onTap,
       radius: BorderRadius.circular(9),
-      color: pressed == true ? t.hover : t.panel,
-      side: BorderSide(color: t.line),
+      color: pressed == true ? t.hover : null,
       child: SizedBox(
         height: 36,
         child: Padding(

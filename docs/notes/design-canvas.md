@@ -1,6 +1,6 @@
 # The AnywhereLLM design canvas
 
-The app's look is mirrored in a Claude Design canvas at <https://claude.ai/artifact/VwYwfCQ2jLNQsYfojqfiGo>, pinned in the owner's claude.ai sidebar. The owner proposes style changes there. Claude Code built it by hand from `lib/ui` at commit 238c2e1 on 2026-10-07; it was not compared with the running app pixel for pixel.
+The app's look is mirrored in a Claude Design canvas at <https://claude.ai/artifact/VwYwfCQ2jLNQsYfojqfiGo>, pinned in the owner's claude.ai sidebar. The owner proposes style changes there. Claude Code built it by hand from `lib/ui` at commit 238c2e1 on 2026-10-07; it was not compared with the running app pixel for pixel. The owner's quieter restyle of the main chat board (sans wordmark and chat title, borderless header buttons, plain Sources rows) was built into the app on 2026-10-08.
 
 ## Who can read it
 

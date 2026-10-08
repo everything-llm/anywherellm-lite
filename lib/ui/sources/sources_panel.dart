@@ -124,11 +124,10 @@ class _FileRow extends StatelessWidget {
     final t = Tokens.of(context);
     return AnimatedContainer(
       duration: motion(context, const Duration(milliseconds: 300)),
-      padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
       decoration: BoxDecoration(
-        color: flashed ? t.accentbg : t.panel,
+        color: flashed ? t.accentbg : Colors.transparent,
         borderRadius: BorderRadius.circular(Sizes.control),
-        border: Border.all(color: flashed ? t.accent : t.line2),
       ),
       child: Row(
         children: [

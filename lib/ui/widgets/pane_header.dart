@@ -29,6 +29,14 @@ class PaneHeader extends StatelessWidget {
   static TextStyle titleStyle(BuildContext context) =>
       Type.serif(20, color: Tokens.of(context).ink, height: 1.2);
 
+  /// The chat's title, in sans: its workspace and the separator take [FontWeight.w400] over it.
+  static TextStyle chatTitleStyle(BuildContext context) => Type.sans(
+    15,
+    weight: FontWeight.w600,
+    color: Tokens.of(context).ink,
+    height: 1.3,
+  );
+
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);

@@ -32,17 +32,6 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 | Read every answer aloud as it arrives | The web UI's auto-speak. Read aloud is a button on each answer, on Android only. |
 | Spellcheck, auto-scroll and HTML in answers | The web UI's Customization > Chat preferences. Each is a local setting. |
 
-## From the design canvas, not built yet
-
-A quieter restyle drawn on the canvas's main chat board after the workspace switcher was built. Each is local.
-
-| Gap | Note |
-| --- | --- |
-| Sans-serif wordmark | The sidebar's AnywhereLLM is Instrument Sans 19 w600, not Instrument Serif 24. |
-| Sans-serif chat title | The chat header's title is sans 15 w600, the workspace in muted w400, not serif 20. |
-| Borderless Browser and Sources buttons | The header's Browser and Sources have no fill or border until pressed. |
-| Sources' files as plain rows | A file is a row with 8 px padding and radius 10, not a bordered card. |
-
 ## Needs a new dependency
 
 | Gap | What it needs |
