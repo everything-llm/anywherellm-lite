@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import '../../core/chat.dart';
 import '../../core/files.dart';
 import '../settings/settings_pages.dart';
+import '../share/shared_item.dart';
 import 'chat_controller.dart';
 
 /// What the main pane shows: the chat, or the server's data as files.
@@ -81,6 +82,24 @@ class ShellController extends ChangeNotifier {
   bool _sourcesDrawer = false;
   FilesSection? _workspacePage;
   bool _scanning = false;
+  SharedItem? _shared;
+
+  /// What another app shared with AnywhereLLM, which the shell offers to add or ask about, or
+  /// null.
+  SharedItem? get shared => _shared;
+
+  /// Offers [item], shared from another app, over whatever shows.
+  void showShared(SharedItem item) {
+    _shared = item;
+    _popup.value = null;
+    notifyListeners();
+  }
+
+  void closeShared() {
+    if (_shared == null) return;
+    _shared = null;
+    notifyListeners();
+  }
 
   /// Whether Settings is reading a pairing code with the camera, which Esc and Back stop first.
   bool get scanning => _scanning;

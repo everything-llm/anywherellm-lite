@@ -26,6 +26,8 @@ import 'ui/files/save_android.dart';
 import 'ui/files/save_file.dart';
 import 'ui/files/share_file.dart';
 import 'ui/settings/scan_code.dart';
+import 'ui/share/android_shares.dart';
+import 'ui/share/shared_item.dart';
 import 'ui/settings/settings_pages.dart';
 import 'ui/shell.dart';
 import 'ui/state/chat_controller.dart';
@@ -137,6 +139,11 @@ class _SessionHostState extends State<SessionHost> {
   /// Listens for speech on Android, and is null where the device has no such service to use.
   final Dictation? _dictation = _android ? SpeechDictation() : null;
 
+  /// What other apps share with AnywhereLLM on Android, read once for the app's life.
+  final Stream<SharedItem>? _shares = _android
+      ? androidShares().asBroadcastStream()
+      : null;
+
   /// The controllers listen before the keyring is read, so reading a saved connection is what
   /// loads the workspaces.
   @override
@@ -222,6 +229,7 @@ class _SessionHostState extends State<SessionHost> {
         save: _save,
         scanner: _android ? cameraScanner : null,
         share: _android ? shareBytes : null,
+        shares: _shares,
         dictation: _dictation,
         pasteImage: _linux ? () => Pasteboard.image : null,
         readAloud: _readAloud,

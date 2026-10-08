@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 
 import 'chat/dictation.dart';
 import 'chat/speaker.dart';
+import 'share/shared_item.dart';
 import 'state/chat_controller.dart';
 import 'state/files_controller.dart';
 import 'state/prefs_controller.dart';
@@ -49,6 +50,7 @@ class AppScope extends InheritedWidget {
     required this.save,
     this.scanner,
     this.share,
+    this.shares,
     this.dictation,
     this.pasteImage,
     this.readAloud,
@@ -73,6 +75,10 @@ class AppScope extends InheritedWidget {
   /// Shares a file an agent made with another app, or null where the device has no share
   /// sheet.
   final FileSharer? share;
+
+  /// What other apps share with AnywhereLLM, or null where the device has no share sheet to
+  /// receive from.
+  final Stream<SharedItem>? shares;
 
   /// Writes what the person says in the composer, or null where the device cannot listen.
   final Dictation? dictation;

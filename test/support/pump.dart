@@ -4,6 +4,7 @@ import 'package:anywherellm/ui/app_scope.dart';
 import 'package:anywherellm/ui/chat/composer.dart';
 import 'package:anywherellm/ui/chat/dictation.dart';
 import 'package:anywherellm/ui/chat/speaker.dart';
+import 'package:anywherellm/ui/share/shared_item.dart';
 import 'package:anywherellm/ui/shell.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
@@ -102,6 +103,7 @@ class Harness extends Rig {
     this.canSpellcheck = false,
     this.canPasteImages = false,
     this.canShare = false,
+    this.shares,
   }) : dictation = canDictate ? FakeDictation() : null,
        speaker = canSpeak ? FakeSpeaker() : null,
        shell = ShellController(sourcesPinned: sourcesOpen);
@@ -156,6 +158,9 @@ class Harness extends Rig {
   /// Whether the device has a share sheet. Each file handed to it is kept in [shared].
   final bool canShare;
 
+  /// What other apps share with the app, as a test adds it, or null where it receives none.
+  final StreamController<SharedItem>? shares;
+
   /// Every file the app shared, by name, with its bytes.
   final Map<String, List<int>> shared = {};
 
@@ -192,6 +197,7 @@ class Harness extends Rig {
         return '/saved/$name';
       },
       share: canShare ? (name, bytes) async => shared[name] = bytes : null,
+      shares: shares?.stream,
       dictation: dictation,
       pasteImage: canPasteImages ? () async => clipboardImage : null,
       readAloud: readAloud,
@@ -227,6 +233,7 @@ Future<Harness> pumpApp(
   bool canSpellcheck = false,
   bool canPasteImages = false,
   bool canShare = false,
+  StreamController<SharedItem>? shares,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -238,6 +245,7 @@ Future<Harness> pumpApp(
     sourcesOpen: sourcesOpen,
     canScan: canScan,
     canShare: canShare,
+    shares: shares,
     canDictate: canDictate,
     canSpeak: canSpeak,
     labelAnswers: labelAnswers,

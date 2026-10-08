@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -14,6 +15,8 @@ import 'files/workspace_pages.dart';
 import 'layout.dart';
 import 'quick_switcher.dart';
 import 'settings/settings_dialog.dart';
+import 'share/share_sheet.dart';
+import 'share/shared_item.dart';
 import 'sidebar.dart';
 import 'sources/sources_panel.dart';
 import 'state/shell_controller.dart';
@@ -57,7 +60,10 @@ class AppShell extends StatelessWidget {
   const AppShell({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      _ShareListener(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
     final scope = AppScope.of(context);
     final shell = scope.shell;
     final t = Tokens.of(context);
@@ -71,7 +77,9 @@ class AppShell extends StatelessWidget {
       required bool sidebarDrawer,
       required bool phone,
     }) {
-      if (shell.popup.value != null) {
+      if (shell.shared != null) {
+        shell.closeShared();
+      } else if (shell.popup.value != null) {
         shell.closePopup();
       } else if (shell.scanning) {
         shell.setScanning(false);
@@ -148,6 +156,7 @@ class AppShell extends StatelessWidget {
                   sourcesDrawer ||
                   sheetOpen ||
                   shell.scanning ||
+                  shell.shared != null ||
                   (screen.isPhone && files) ||
                   shell.appOpen ||
                   shell.browserOpen,
@@ -282,6 +291,11 @@ class AppShell extends StatelessWidget {
                                 ),
                               ),
                             ],
+                            // What another app shared, over everything but a popup.
+                            if (shell.shared case final item?)
+                              Positioned.fill(
+                                child: ShareSheet(item, key: ObjectKey(item)),
+                              ),
                             Positioned.fill(
                               child: ValueListenableBuilder(
                                 valueListenable: shell.popup,
@@ -449,4 +463,34 @@ class _AboveKeyboard extends StatelessWidget {
       child: child,
     ),
   );
+}
+
+/// Hands each item another app shares to the shell, which offers it in a sheet.
+class _ShareListener extends StatefulWidget {
+  const _ShareListener({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_ShareListener> createState() => _ShareListenerState();
+}
+
+class _ShareListenerState extends State<_ShareListener> {
+  StreamSubscription<SharedItem>? _shares;
+
+  @override
+  void initState() {
+    super.initState();
+    final scope = AppScope.of(context);
+    _shares = scope.shares?.listen(scope.shell.showShared);
+  }
+
+  @override
+  void dispose() {
+    _shares?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
