@@ -29,6 +29,7 @@ dependencies:
   speech_to_text: ">=7.5.0 <7.6.0"
   flutter_tts: ">=4.2.5 <4.3.0"
   web: ">=1.1.1 <1.2.0"
+  characters: ">=1.4.0 <1.5.0"
 
 dev_dependencies:
   flutter_test:

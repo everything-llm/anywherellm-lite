@@ -19,6 +19,14 @@ void main() {
       expect(defaultTitle('${'a' * 40}😀 and more'), '${'a' * 40}😀…');
     });
 
+    test('never splits an emoji made of several code points', () {
+      const family = '👨‍👩‍👧';
+      expect(
+        defaultTitle('${'a' * 40}$family and more'),
+        '${'a' * 40}$family…',
+      );
+    });
+
     test('keeps a line of exactly 42 characters whole', () {
       expect(defaultTitle('b' * 42), 'b' * 42);
     });
@@ -99,6 +107,24 @@ void main() {
       expect(split.reasoning, 'Hm.');
       expect(split.answer, '`a` b');
     });
+
+    test('a finished answer keeps a bare tag that never closed', () {
+      const text = 'Wrap the output in a <think> tag. Then parse the rest.';
+      expect(splitReasoning(text).answer, text);
+      expect(splitReasoning(text).thinking, isFalse);
+      final streaming = splitReasoning(text, streaming: true);
+      expect(streaming.answer, 'Wrap the output in a');
+      expect(streaming.thinking, isTrue);
+    });
+
+    test(
+      'a finished answer that opens with an unclosed block is reasoning',
+      () {
+        final split = splitReasoning('<think>Ran out of tokens');
+        expect(split.reasoning, 'Ran out of tokens');
+        expect(split.answer, isEmpty);
+      },
+    );
 
     test('text without a block is all answer', () {
       final split = splitReasoning('Use `a < b` here.');

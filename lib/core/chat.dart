@@ -2,6 +2,8 @@
 
 import 'dart:typed_data';
 
+import 'package:characters/characters.dart';
+
 import 'outputs.dart';
 import 'server_models.dart';
 import 'upload.dart';
@@ -146,14 +148,14 @@ String? modelFailure(String answer) {
   return text.startsWith('The agent model failed to respond') ? text : null;
 }
 
-/// The name a chat takes from its first [message]: its first line, cut to 42 code points so an
-/// emoji is never split.
+/// The name a chat takes from its first [message]: its first line, cut to 42 characters as a
+/// person sees them, so an emoji is never split.
 String defaultTitle(String message) {
   final line = message.trim().split('\n').first.trim();
   if (line.isEmpty) return newChatName;
-  final points = line.runes;
-  if (points.length <= 42) return line;
-  return '${String.fromCharCodes(points.take(41)).trimRight()}…';
+  final shown = line.characters;
+  if (shown.length <= 42) return line;
+  return '${shown.take(41).toString().trimRight()}…';
 }
 
 /// A file sent with one message, read in for that message only.
@@ -206,8 +208,10 @@ final _thought = RegExp(
 /// Splits [text] into the reasoning a model wrapped in `<think>` or `<thinking>` tags and the
 /// answer around it. A tag inside a code span or block is answer. [Reasoned.thinking] is true while a block is still open, as when the
 /// answer is streaming. Text with no such block is all answer, except the start of an opening
-/// tag that has not all arrived yet, which is held back.
-Reasoned splitReasoning(String text) {
+/// tag that has not all arrived yet, which is held back. Once the text is no longer
+/// [streaming], a block that never closed is answer unless the text opens with it, since a
+/// bare tag in prose would otherwise take the rest of the answer with it.
+Reasoned splitReasoning(String text, {bool streaming = false}) {
   final start = text.trimLeft();
   if (start.isNotEmpty &&
       start.length < '<thinking>'.length &&
@@ -218,8 +222,14 @@ Reasoned splitReasoning(String text) {
   var thinking = false;
   final answer = text.replaceAllMapped(_thought, (match) {
     if (match[1] case final code?) return code;
+    final open = !match[0]!.endsWith('</${match[2]}>');
+    if (open &&
+        !streaming &&
+        text.substring(0, match.start).trim().isNotEmpty) {
+      return match[0]!;
+    }
     parts.add(match[3]!.trim());
-    thinking = !match[0]!.endsWith('</${match[2]}>');
+    thinking = open;
     return '';
   });
   return (

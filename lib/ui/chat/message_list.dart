@@ -49,7 +49,6 @@ class _MessageListState extends State<MessageList> {
   /// The newest turn, while it is an answer that streams, and how tall it was last drawn.
   Turn? _growing;
   double _height = 0;
-  final _newest = GlobalKey(debugLabel: 'newest turn');
 
   @override
   void dispose() {
@@ -81,7 +80,9 @@ class _MessageListState extends State<MessageList> {
     _measuring = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _measuring = false;
-      final box = _newest.currentContext?.findRenderObject();
+      final growing = _growing;
+      if (growing == null) return;
+      final box = _keyOf(growing).currentContext?.findRenderObject();
       if (!mounted || box is! RenderBox || !_scroll.hasClients) return;
       final height = box.size.height;
       final grown = _height == 0 ? 0.0 : height - _height;
@@ -142,6 +143,10 @@ class _MessageListState extends State<MessageList> {
     );
   }
 
+  /// The key of [turn]'s place in the list, which goes with it as turns are added below it, so
+  /// what it shows open or folded stays with it.
+  static GlobalObjectKey _keyOf(Turn turn) => GlobalObjectKey(turn);
+
   Widget _turns(BuildContext context, List<Turn> turns) {
     final chat = AppScope.of(context).chat;
     return ListView.builder(
@@ -151,6 +156,11 @@ class _MessageListState extends State<MessageList> {
       reverse: true,
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
       itemCount: turns.length,
+      findChildIndexCallback: (key) {
+        if (key is! GlobalObjectKey) return null;
+        final at = turns.indexWhere((t) => identical(t, key.value));
+        return at < 0 ? null : turns.length - 1 - at;
+      },
       itemBuilder: (context, i) {
         final turn = turns[turns.length - 1 - i];
         final first = i == turns.length - 1;
@@ -160,8 +170,7 @@ class _MessageListState extends State<MessageList> {
             turn.role != Role.user &&
             turns[turns.length - 2 - i].role == Role.user;
         return Center(
-          // Always on the newest, so the key never comes off a turn and rebuilds it.
-          key: i == 0 ? _newest : null,
+          key: _keyOf(turn),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: Sizes.column),
             child: Padding(
@@ -462,7 +471,7 @@ class _Answer extends StatelessWidget {
       ListenableBuilder(listenable: turn, builder: _build);
 
   Widget _build(BuildContext context, Widget? _) {
-    final split = splitReasoning(turn.text);
+    final split = splitReasoning(turn.text, streaming: turn.streaming);
     final thinking = turn.streaming && split.thinking;
     final failure = turn.streaming ? null : modelFailure(split.answer);
     final answered = split.answer.isNotEmpty && failure == null;

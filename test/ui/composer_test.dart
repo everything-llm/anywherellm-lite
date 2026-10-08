@@ -58,6 +58,8 @@ void main() {
     await tester.enterText(composerField, 'What is this?');
     await tester.pump();
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    // The new turns rise into view from nothing.
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.bySemanticsLabel('photo.png'), findsOneWidget);
     expect(find.text('photo.png'), findsNothing);
