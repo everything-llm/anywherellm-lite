@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
@@ -69,6 +71,8 @@ mixin SettingsSaving<T extends StatefulWidget> on State<T> {
     final resets = system.vectorResets(draft);
     if (resets.isNotEmpty && confirming == null) {
       setState(() => confirming = resets);
+      // The question names how many passages go, as the server counts them now.
+      unawaited(system.readVectors());
       return;
     }
     setState(() => confirming = null);
@@ -79,15 +83,23 @@ mixin SettingsSaving<T extends StatefulWidget> on State<T> {
   Widget? confirmBox(String Function() draft) {
     final resets = confirming;
     if (resets == null) return null;
-    final count = AppScope.of(context).system.vectors;
-    final passages = count == null ? 'every passage' : 'all $count passages';
-    return ConfirmBox(
-      text:
-          'Changing ${resets.join(' and ')} makes the server delete $passages it has stored. '
-          'Every workspace\'s documents must then be prepared again before answers can use them.',
-      action: 'Change and delete',
-      onCancel: () => setState(() => confirming = null),
-      onConfirm: () => save(draft()),
+    final system = AppScope.of(context).system;
+    return ListenableBuilder(
+      listenable: system,
+      builder: (context, _) {
+        final count = system.vectors;
+        final passages = count == null
+            ? 'every passage'
+            : 'all $count passages';
+        return ConfirmBox(
+          text:
+              'Changing ${resets.join(' and ')} makes the server delete $passages it has stored. '
+              'Every workspace\'s documents must then be prepared again before answers can use them.',
+          action: 'Change and delete',
+          onCancel: () => setState(() => confirming = null),
+          onConfirm: () => save(draft()),
+        );
+      },
     );
   }
 }

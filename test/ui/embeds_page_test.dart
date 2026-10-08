@@ -57,6 +57,16 @@ void main() {
     expect(find.text('0 chats · embed-1'), findsOneWidget);
   });
 
+  testWidgets('a workspace made after the page opens can be picked', (
+    tester,
+  ) async {
+    final h = await openEmbeds(tester, planningServer());
+    expect(control('Travel'), findsNothing);
+    await h.chat.createWorkspace('Travel');
+    await tester.pump();
+    expect(control('Travel'), findsOneWidget);
+  });
+
   testWidgets('an embed turns off, and is deleted after asking', (
     tester,
   ) async {

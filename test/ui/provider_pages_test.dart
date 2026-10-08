@@ -150,7 +150,7 @@ void main() {
   ) async {
     final llm = server();
     final h = await openPage(tester, llm, SettingsPage.searchModel);
-    await h.system.readVectors();
+    expect(h.system.vectors, isNull);
     await tester.enterText(field('Model'), 'nomic-embed-text');
     await tester.pump();
     await tester.tap(control('Save'));
@@ -168,6 +168,7 @@ void main() {
     await tester.tap(control('Change and delete'));
     await tester.pumpAndSettle();
     expect(llm.calls, contains('updateSystem:EmbeddingModelPref'));
+    expect(h.system.vectors, isNull, reason: 'the count went with the reset');
   });
 
   testWidgets('storage shows the database and its passages, never a picker', (

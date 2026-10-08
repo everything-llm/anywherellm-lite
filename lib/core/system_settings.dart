@@ -418,8 +418,8 @@ String systemText(Map<String, Object?> settings) =>
       if (!field.secret) field.key: settings[field.key]})}\n';
 
 /// The settings in [text] that differ from [was], each as the text `update-env` writes. A secret,
-/// which [was] has only as whether it is set, is sent when it is given at all, since its value is
-/// never known. Throws [ApiException] when
+/// which [was] has only as whether it is set, is sent when it is given as text, since its value is
+/// never known; given as true or false, as the server reports it, it is left as it was. Throws [ApiException] when
 /// the text is not a JSON object, names a setting the app does not write, empties one, or gives
 /// a provider a value the server does not take.
 Map<String, String> parseSystemSettings(String text, Map<String, Object?> was) {
@@ -443,6 +443,7 @@ Map<String, String> parseSystemSettings(String text, Map<String, Object?> was) {
       );
     }
     final secret = _isSecret(key, was[key]);
+    if (secret && value is bool) continue;
     if (value == null) {
       if (was[key] == null || secret) continue;
       throw ApiException('$key cannot be emptied here; leave it as it was.');

@@ -56,7 +56,7 @@ String sentText(DateTime at, DateTime now) {
   final today = DateTime(now.year, now.month, now.day);
   String two(int n) => n.toString().padLeft(2, '0');
   if (day == today) return 'Today ${two(at.hour)}:${two(at.minute)}';
-  if (day == today.subtract(const Duration(days: 1))) return 'Yesterday';
+  if (day == DateTime(now.year, now.month, now.day - 1)) return 'Yesterday';
   final date = '${at.day} ${_months[at.month - 1]}';
   return at.year == now.year ? date : '$date ${at.year}';
 }

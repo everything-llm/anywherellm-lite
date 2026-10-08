@@ -10,6 +10,21 @@ void main() {
     expect(sentText(DateTime(2025, 12, 31), now), '31 Dec 2025');
   });
 
+  test('yesterday is the calendar day before, whatever the hours between', () {
+    expect(
+      sentText(DateTime(2026, 2, 28, 22), DateTime(2026, 3, 1, 1)),
+      'Yesterday',
+    );
+    expect(
+      sentText(DateTime(2025, 12, 31, 8), DateTime(2026, 1, 1, 8)),
+      'Yesterday',
+    );
+    expect(
+      sentText(DateTime(2025, 3, 30, 9), DateTime(2025, 3, 31, 12)),
+      'Yesterday',
+    );
+  });
+
   test('a page the server answers oddly reads as empty', () {
     expect(ChatLog.fromJson(null).chats, isEmpty);
     expect(ChatLog.fromJson({'chats': 'no'}).more, isFalse);

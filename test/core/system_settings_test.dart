@@ -100,6 +100,16 @@ void main() {
       );
     });
 
+    test('a secret given as true or false, as the server shows it, is left as it is', () {
+      expect(
+        parseSystemSettings(
+          '{"OpenAiKey": true, "GenericOpenAiKey": false}',
+          _server,
+        ),
+        isEmpty,
+      );
+    });
+
     test('sends only what changed, as text', () {
       expect(
         parseSystemSettings(

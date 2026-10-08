@@ -137,7 +137,7 @@ Object? _jsonOrNull(String text) {
 
 /// The HTML a web page carries to show [uuid]'s chat box, served by the server at [server].
 String embedSnippet(Uri server, String uuid) {
-  final base = server.replace(path: '', query: null, fragment: null);
+  final base = server.replace(query: null, fragment: null);
   final origin = base.toString().replaceFirst(RegExp(r'[/?#]+$'), '');
   return '<script\n'
       '  data-embed-id="$uuid"\n'

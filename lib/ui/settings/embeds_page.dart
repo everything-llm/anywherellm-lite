@@ -135,6 +135,16 @@ class _NewEmbedState extends State<_NewEmbed> {
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
+    // Follows the workspaces, which may load after the page opens, and whether an embed is
+    // being changed.
+    return ListenableBuilder(
+      listenable: Listenable.merge([scope.chat, scope.system]),
+      builder: _form,
+    );
+  }
+
+  Widget _form(BuildContext context, Widget? _) {
+    final scope = AppScope.of(context);
     final workspaces = scope.chat.workspaces;
     final changing = scope.system.changing;
     return Column(

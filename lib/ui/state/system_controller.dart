@@ -41,9 +41,19 @@ class SystemController extends ChangeNotifier {
   /// The read of the settings under way, which a second ask joins.
   Future<void>? _reading;
 
+  /// Counts the reads of the settings started, so an answer is kept only when no read started
+  /// after it, as a save's does.
+  var _settingsReads = 0;
+
   /// Reads the server's settings afresh, or joins the read under way.
-  Future<void> readSettings() =>
-      _reading ??= _readSettings().whenComplete(() => _reading = null);
+  Future<void> readSettings() {
+    if (_reading case final reading?) return reading;
+    late final Future<void> reading;
+    reading = _reading = _readSettings().whenComplete(() {
+      if (identical(_reading, reading)) _reading = null;
+    });
+    return reading;
+  }
 
   /// Reads the server's settings unless they are read already.
   Future<void> wantSettings() async {
@@ -53,13 +63,14 @@ class SystemController extends ChangeNotifier {
   Future<void> _readSettings() async {
     final server = _server;
     if (server == null) return;
+    final number = ++_settingsReads;
     try {
       final read = await _api.systemSettings();
-      if (_server != server) return;
+      if (_server != server || number != _settingsReads) return;
       settings = read;
       settingsProblem = null;
     } on ApiException catch (error) {
-      if (_server != server) return;
+      if (_server != server || number != _settingsReads) return;
       settingsProblem = Notice('Could not read the settings', error.message);
     }
     settingsRevision++;
@@ -105,9 +116,14 @@ class SystemController extends ChangeNotifier {
     } on ApiException catch (error) {
       failed = Notice('Could not save the settings', error.message);
     }
+    // The server may have written some before it refused one, so a reset may have run either way.
+    if (_server == server && changes.keys.any(resetsVectors.contains)) {
+      vectors = null;
+    }
+    final number = ++_settingsReads;
     try {
       final read = await _api.systemSettings();
-      if (_server == server) settings = read;
+      if (_server == server && number == _settingsReads) settings = read;
     } on ApiException catch (error) {
       failed ??= Notice('Could not read the settings again', error.message);
     }
@@ -300,6 +316,7 @@ class SystemController extends ChangeNotifier {
     final now = _settings.connection?.withPassword(null);
     if (now == _server) return;
     _server = now;
+    _reading = null;
     vectors = null;
     problem = null;
     settings = null;

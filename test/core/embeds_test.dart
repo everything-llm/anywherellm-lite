@@ -71,4 +71,13 @@ void main() {
       '</script>',
     );
   });
+
+  test('the HTML keeps a server\'s base path', () {
+    expect(
+      embedSnippet(Uri.parse('https://host.example/anythingllm/'), 'e-1'),
+      contains(
+        'data-base-api-url="https://host.example/anythingllm/api/embed"',
+      ),
+    );
+  });
 }
