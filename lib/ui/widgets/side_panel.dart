@@ -6,10 +6,13 @@ import '../tokens.dart';
 import '../type.dart';
 import 'buttons.dart';
 import 'min_height.dart';
+import 'sheet.dart';
 
 /// A panel beside the chat, such as Sources: [title] with [actions] and a close button, the line
 /// [about] under it, or after the title when [aboutBeside], and [child] filling the rest. It
 /// scrolls whole below [Sizes.panelMin]. A [live] [about] is read out when it changes.
+///
+/// As a [sheet], on a phone, it is a [SheetFrame] over the chat instead, [sheetHeight] tall.
 class SidePanel extends StatelessWidget {
   const SidePanel({
     super.key,
@@ -21,6 +24,8 @@ class SidePanel extends StatelessWidget {
     this.live = false,
     this.aboutBeside = false,
     this.actions = const [],
+    this.sheet = false,
+    this.sheetHeight = SheetHeight.tall,
   });
 
   final String title;
@@ -34,8 +39,23 @@ class SidePanel extends StatelessWidget {
   /// Buttons before the close button, such as one that opens the panel's page elsewhere.
   final List<Widget> actions;
 
+  /// Whether it is drawn as a sheet over the chat rather than beside it.
+  final bool sheet;
+  final SheetHeight sheetHeight;
+
   @override
   Widget build(BuildContext context) {
+    if (sheet) {
+      return SheetFrame(
+        title: title,
+        about: about,
+        live: live,
+        actions: actions,
+        onClose: onClose,
+        height: sheetHeight,
+        child: child,
+      );
+    }
     final t = Tokens.of(context);
     final heading = Semantics(
       header: true,

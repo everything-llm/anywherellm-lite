@@ -1,0 +1,278 @@
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+
+import '../icons.dart';
+import '../tokens.dart';
+import '../type.dart';
+import 'buttons.dart';
+import 'rise.dart';
+
+/// How tall a [SheetFrame] stands: [tall] fills the screen but for [SheetFrame.gap] above it,
+/// and [fit] takes the height of what it holds, at most [SheetFrame.maxFraction] of the screen.
+enum SheetHeight { tall, fit }
+
+/// A sheet over the chat on a phone, filling what it is given: the scrim, which closes it when
+/// tapped, and the sheet itself at the bottom, under a drag handle, with [title], the line
+/// [about] under it, [actions] and Close, then [child]. Dragging the handle or the header down
+/// past 120 px, or flinging it, closes it; a shorter drag puts it back.
+///
+/// [child] is laid out under the header in what is left: a [SheetHeight.tall] sheet gives it a
+/// fixed height, so a scroll view fills it; a [SheetHeight.fit] sheet gives it a loose one.
+class SheetFrame extends StatefulWidget {
+  const SheetFrame({
+    super.key,
+    required this.title,
+    required this.onClose,
+    required this.child,
+    this.about,
+    this.actions = const [],
+    this.height = SheetHeight.fit,
+    this.maxFraction = 0.78,
+    this.live = false,
+    this.padding = const EdgeInsets.fromLTRB(16, 4, 16, 20),
+  });
+
+  final String title;
+  final String? about;
+  final VoidCallback onClose;
+  final Widget child;
+
+  /// Buttons before Close, such as one that opens the sheet's page elsewhere.
+  final List<Widget> actions;
+  final SheetHeight height;
+
+  /// The most of the screen a [SheetHeight.fit] sheet takes.
+  final double maxFraction;
+
+  /// Whether [about] is read out when it changes.
+  final bool live;
+
+  /// Around [child].
+  final EdgeInsets padding;
+
+  /// The room left above a [SheetHeight.tall] sheet, where the chat shows through the scrim.
+  static const gap = 72.0;
+
+  @override
+  State<SheetFrame> createState() => _SheetFrameState();
+}
+
+class _SheetFrameState extends State<SheetFrame>
+    with SingleTickerProviderStateMixin {
+  /// How far the sheet has been dragged down, or still has to rise as it opens.
+  late final _offset = AnimationController.unbounded(vsync: this);
+
+  /// Whether the sheet's first rise has been started.
+  bool _rose = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_rose) return;
+    _rose = true;
+    final rise = motion(context, const Duration(milliseconds: 220));
+    if (rise == Duration.zero) return;
+    _offset.value = 160;
+    _offset.animateTo(0, duration: rise, curve: Curves.easeOut);
+  }
+
+  @override
+  void dispose() {
+    _offset.dispose();
+    super.dispose();
+  }
+
+  void _dragged(DragUpdateDetails details) {
+    _offset.stop();
+    _offset.value = math.max(0, _offset.value + details.delta.dy);
+  }
+
+  void _let(DragEndDetails details) {
+    if (_offset.value > 120 || details.velocity.pixelsPerSecond.dy > 700) {
+      widget.onClose();
+    } else {
+      _offset.animateTo(
+        0,
+        duration: motion(context, const Duration(milliseconds: 180)),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final tall = widget.height == SheetHeight.tall;
+    final header = GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onVerticalDragUpdate: _dragged,
+      onVerticalDragEnd: _let,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: t.line,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ),
+          ),
+          SheetHeader(
+            title: widget.title,
+            about: widget.about,
+            live: widget.live,
+            actions: widget.actions,
+            onClose: widget.onClose,
+            divided: tall,
+          ),
+        ],
+      ),
+    );
+    return LayoutBuilder(
+      builder: (context, box) {
+        final most = tall
+            ? math.max(0.0, box.maxHeight - SheetFrame.gap)
+            : box.maxHeight * widget.maxFraction;
+        final sheet = Semantics(
+          container: true,
+          explicitChildNodes: true,
+          label: widget.title,
+          child: Container(
+            constraints: BoxConstraints(maxHeight: most),
+            height: tall ? most : null,
+            decoration: BoxDecoration(
+              color: t.panel,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: t.shadow,
+                  blurRadius: 32,
+                  spreadRadius: -12,
+                  offset: const Offset(0, -12),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                header,
+                Flexible(
+                  fit: tall ? FlexFit.tight : FlexFit.loose,
+                  child: Padding(padding: widget.padding, child: widget.child),
+                ),
+              ],
+            ),
+          ),
+        );
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: widget.onClose,
+                child: ColoredBox(color: t.scrim),
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: AnimatedBuilder(
+                animation: _offset,
+                builder: (context, sheet) => Transform.translate(
+                  offset: Offset(0, _offset.value),
+                  child: sheet,
+                ),
+                child: sheet,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// A sheet's header: [title] at 17, the line [about] under it, [actions] and a 44 px Close, with
+/// a rule under it when [divided].
+class SheetHeader extends StatelessWidget {
+  const SheetHeader({
+    super.key,
+    required this.title,
+    required this.onClose,
+    this.about,
+    this.live = false,
+    this.actions = const [],
+    this.divided = false,
+  });
+
+  final String title;
+  final String? about;
+  final bool live;
+  final List<Widget> actions;
+  final VoidCallback onClose;
+  final bool divided;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 4, 8, divided ? 10 : 2),
+      decoration: divided
+          ? BoxDecoration(border: Border(bottom: BorderSide(color: t.line2)))
+          : null,
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Semantics(
+                  header: true,
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Type.sans(
+                      17,
+                      weight: FontWeight.w600,
+                      color: t.ink,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+                if (about case final about?)
+                  Semantics(
+                    liveRegion: live,
+                    child: Text(
+                      about,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Type.sans(12.5, color: t.muted),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 4),
+          ...actions,
+          IconBtn(
+            'close',
+            tooltip: 'Close',
+            box: 44,
+            size: IconSize.small,
+            onPressed: onClose,
+          ),
+        ],
+      ),
+    );
+  }
+}

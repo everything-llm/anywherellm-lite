@@ -47,7 +47,8 @@ void _openWorkspace(AppScope scope, int index) {
 /// them when it is open.
 ///
 /// Below 820 the sidebar is a drawer from the left; below 1120 Sources is a drawer from the
-/// right. On a phone an app opens as a sheet over the chat rather than in that drawer. Esc and
+/// right. On a phone the panel to the right, Sources, the browser or an app, is a sheet over
+/// the chat instead. Esc and
 /// Back close the topmost thing open: the popup, Settings, then a drawer, the app or the
 /// browser.
 class AppShell extends StatelessWidget {
@@ -98,24 +99,27 @@ class AppShell extends StatelessWidget {
           builder: (context, _) {
             final sideDrawer = screen.sidebarDrawer && shell.sideOpen;
             final files = shell.pane == Pane.files;
-            // On a phone an app is a sheet over the chat, not the drawer to the right.
-            final appSheet = screen.isPhone && shell.beside == Beside.app;
-            final sourcesDrawer =
-                !sourcesInline && shell.rightOpen && !appSheet;
-            final beside = appSheet ? Beside.sources : shell.beside;
+            // On a phone the panel to the right is a sheet over the chat, not a drawer.
+            final sheet = screen.isPhone;
+            final sourcesDrawer = !sourcesInline && !sheet && shell.rightOpen;
+            final sheetOpen = sheet && shell.rightOpen;
             // The panel to the right: Sources, or the chat's browser or an app, wider and never
             // wider than the screen.
-            final rightWidth = beside == Beside.sources
+            final rightWidth = shell.beside == Beside.sources
                 ? Sizes.sources
                 : min(Sizes.browser, box.maxWidth);
             // Closed, the panel stays built for its closing animation; TickerMode, inside that
             // animation, tells a live card in it to let go.
             final right = TickerMode(
-              enabled: shell.rightOpen && !appSheet,
-              child: switch (beside) {
-                Beside.sources => const SourcesPanel(),
-                Beside.browser => BrowserPanel(width: rightWidth),
-                Beside.app => AppPanel(app: shell.app!, width: rightWidth),
+              enabled: shell.rightOpen,
+              child: switch (shell.beside) {
+                Beside.sources => SourcesPanel(sheet: sheet),
+                Beside.browser => BrowserPanel(width: rightWidth, sheet: sheet),
+                Beside.app => AppPanel(
+                  app: shell.app!,
+                  width: rightWidth,
+                  sheet: sheet,
+                ),
               },
             );
             return _BackGuard(
@@ -124,6 +128,7 @@ class AppShell extends StatelessWidget {
                   shell.settingsOpen ||
                   sideDrawer ||
                   sourcesDrawer ||
+                  sheetOpen ||
                   shell.appOpen ||
                   shell.browserOpen,
               onBack: () {
@@ -151,7 +156,7 @@ class AppShell extends StatelessWidget {
                           settingsSideBySide: settingsSideBySide,
                           sidebarDrawer: screen.sidebarDrawer,
                         ) &&
-                        sourcesDrawer) {
+                        (sourcesDrawer || sheetOpen)) {
                       shell.closeSources();
                     }
                   },
@@ -227,7 +232,7 @@ class AppShell extends StatelessWidget {
                                 duration: duration,
                                 child: const Sidebar(),
                               ),
-                            if (!sourcesInline)
+                            if (!sourcesInline && !sheet)
                               _Drawer(
                                 open: sourcesDrawer,
                                 left: false,
@@ -235,10 +240,8 @@ class AppShell extends StatelessWidget {
                                 duration: duration,
                                 child: right,
                               ),
-                            if (appSheet && shell.appOpen) ...[
-                              _Scrim(onTap: shell.closeApp),
-                              AppSheet(app: shell.app!),
-                            ],
+                            // The sheet's own scrim closes it.
+                            if (sheetOpen) Positioned.fill(child: right),
                             if (shell.settingsOpen) ...[
                               _Scrim(onTap: shell.closeSettings),
                               Center(

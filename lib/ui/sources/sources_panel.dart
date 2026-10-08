@@ -11,6 +11,7 @@ import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
 import '../widgets/upload_queue.dart';
 import '../widgets/rise.dart';
+import '../widgets/sheet.dart';
 import '../widgets/side_panel.dart';
 import 'add_source.dart';
 import 'test_question.dart';
@@ -18,7 +19,10 @@ import 'test_question.dart';
 /// The active workspace's files, which people see as Documents: add them, switch them on and
 /// off, remove them, and test what a question finds in them.
 class SourcesPanel extends StatelessWidget {
-  const SourcesPanel({super.key});
+  const SourcesPanel({super.key, this.sheet = false});
+
+  /// Whether it is a sheet over the chat, as on a phone.
+  final bool sheet;
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +32,8 @@ class SourcesPanel extends StatelessWidget {
       title: 'Documents',
       about: 'Answers draw on the ones switched on.',
       onClose: scope.shell.closeSources,
+      sheet: sheet,
+      sheetHeight: SheetHeight.fit,
       child: ListenableBuilder(
         listenable: scope.sources,
         builder: (context, _) {

@@ -4,6 +4,7 @@ import 'package:anywherellm/ui/chat/app_panel.dart';
 import 'package:anywherellm/ui/chat/card_image.dart';
 import 'package:anywherellm/ui/chat/message_list.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
+import 'package:anywherellm/ui/widgets/sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -156,9 +157,12 @@ void main() {
       final h = await pumpApp(tester, llm: _withApp(), size: phone);
       expect(find.text('Live · tap to open'), findsOneWidget);
       await _tapCard(tester);
-      final sheet = find.byType(AppSheet);
+      final sheet = find.byType(SheetFrame);
       expect(sheet, findsOneWidget);
-      expect(find.byType(AppPanel), findsNothing);
+      expect(
+        find.ancestor(of: sheet, matching: find.byType(AppPanel)),
+        findsOneWidget,
+      );
       expect(
         find.descendant(of: sheet, matching: find.text('Groceries')),
         findsOneWidget,
@@ -176,7 +180,7 @@ void main() {
       // A tap on the scrim above the sheet closes it.
       await tester.tapAt(const Offset(195, 30));
       await tester.pumpAndSettle();
-      expect(find.byType(AppSheet), findsNothing);
+      expect(find.byType(SheetFrame), findsNothing);
       expect(h.shell.appOpen, isFalse);
     });
 
@@ -185,18 +189,18 @@ void main() {
       await _tapCard(tester);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(find.byType(AppSheet), findsNothing);
+      expect(find.byType(SheetFrame), findsNothing);
       await _tapCard(tester);
-      expect(find.byType(AppSheet), findsOneWidget);
+      expect(find.byType(SheetFrame), findsOneWidget);
       await tester.drag(
         find.descendant(
-          of: find.byType(AppSheet),
+          of: find.byType(SheetFrame),
           matching: find.text('Groceries'),
         ),
         const Offset(0, 300),
       );
       await tester.pumpAndSettle();
-      expect(find.byType(AppSheet), findsNothing);
+      expect(find.byType(SheetFrame), findsNothing);
       expect(h.shell.rightOpen, isFalse);
     });
   });

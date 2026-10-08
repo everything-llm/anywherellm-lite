@@ -245,6 +245,13 @@ void main() {
         loads('https://owen.example.ts.net:8445/card.png', from: server),
         isTrue,
       );
+      expect(
+        loads(
+          'https://owen.example.ts.net:8445/_webimages/a1b2.jpg',
+          from: server,
+        ),
+        isTrue,
+      );
     });
 
     test('never another host, nor with no server', () {

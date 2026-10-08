@@ -150,6 +150,24 @@ void main() {
     expect(h.opened, [elsewhere]);
   });
 
+  testWidgets('a web picture the server copied shows and opens its source', (
+    tester,
+  ) async {
+    // image-search saves the picture on the pages site and links it to the page it is on.
+    final copy = Uri.parse('https://h:8445/_webimages/0a1b2c3d4e5f.jpg');
+    final source = Uri.parse('https://zoo.example/red-panda');
+    final llm = answering('Red pandas:\n\n[![Red panda]($copy)]($source)')
+      ..images[copy] = [pixel];
+    final h = await pumpApp(tester, llm: llm);
+    await tester.pumpAndSettle();
+    expect(_shown(tester), pixel);
+    expect(llm.calls, contains('answerImage:$copy'));
+    expect(llm.calls.where((c) => c.contains('zoo.example')), isEmpty);
+
+    await _tapCard(tester);
+    expect(h.opened, [source]);
+  });
+
   testWidgets('a plain card is read once, and shown again without asking', (
     tester,
   ) async {

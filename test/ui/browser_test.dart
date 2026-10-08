@@ -3,6 +3,7 @@ import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/chat/browser_panel.dart';
 import 'package:anywherellm/ui/chat/card_image.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
+import 'package:anywherellm/ui/widgets/sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -142,6 +143,26 @@ void main() {
     await tester.pumpAndSettle();
     expect(h.shell.browserOpen, isFalse);
     expect(h.shell.sourcesOpen, isTrue);
+  });
+
+  testWidgets('on a phone the browser is a sheet over the chat', (
+    tester,
+  ) async {
+    final llm = answering('Done.\n\n${_cardLine()}')..images[_card] = [pixel];
+    final h = await pumpApp(tester, llm: llm, size: const Size(390, 844));
+    await tester.pumpAndSettle();
+    await tester.tap(control('Browser'));
+    await tester.pumpAndSettle();
+    final sheet = find.byType(SheetFrame);
+    expect(
+      find.descendant(of: sheet, matching: control('Take over')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(h.shell.browserOpen, isFalse);
+    expect(find.byType(SheetFrame), findsNothing);
   });
 
   testWidgets('a closed browser panel lets go of the live card', (

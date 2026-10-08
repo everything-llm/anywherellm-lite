@@ -13,6 +13,7 @@ import 'package:anywherellm/ui/widgets/controls.dart';
 import 'package:anywherellm/ui/widgets/fields.dart';
 import 'package:anywherellm/ui/widgets/pane_header.dart';
 import 'package:anywherellm/ui/widgets/qr_mark.dart';
+import 'package:anywherellm/ui/widgets/sheet.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:flutter/material.dart';
@@ -947,6 +948,48 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.getTopRight(find.byType(SourcesPanel)).dx, 1000);
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(h.shell.sourcesOpen, isFalse);
+    });
+
+    testWidgets('on a phone, Documents is a sheet over the chat', (
+      tester,
+    ) async {
+      final h = await pumpApp(
+        tester,
+        llm: planningServer(),
+        size: const Size(390, 844),
+        sourcesOpen: false,
+      );
+      expect(find.byType(SourcesPanel), findsNothing);
+      await tester.tap(control('Documents, 2 on'));
+      await tester.pumpAndSettle();
+      final sheet = find.byType(SheetFrame);
+      expect(
+        find.descendant(of: sheet, matching: find.text('Documents')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: sheet, matching: find.text('Q3 roadmap.pdf')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      // The scrim above the sheet closes it, and so do Back and a drag down.
+      await tester.tapAt(const Offset(195, 30));
+      await tester.pumpAndSettle();
+      expect(h.shell.sourcesOpen, isFalse);
+      expect(find.byType(SheetFrame), findsNothing);
+      await tester.tap(control('Documents, 2 on'));
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(h.shell.sourcesOpen, isFalse);
+      await tester.tap(control('Documents, 2 on'));
+      await tester.pumpAndSettle();
+      await tester.drag(
+        find.descendant(of: sheet, matching: find.text('Documents')),
+        const Offset(0, 300),
+      );
       await tester.pumpAndSettle();
       expect(h.shell.sourcesOpen, isFalse);
     });
