@@ -81,7 +81,7 @@ class ChatPage extends StatelessWidget {
       (
         ChatSwitch.followAnswer,
         'Follow a streaming answer',
-        'Keep the newest text in view while it arrives.',
+        'Keep the newest text in view while it arrives, unless you have scrolled up.',
       ),
       (
         ChatSwitch.reasoningOpen,

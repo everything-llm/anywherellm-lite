@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../../core/chat.dart';
 import '../../core/outputs.dart';
@@ -12,6 +13,7 @@ import '../links.dart';
 import '../icons.dart';
 import '../layout.dart';
 import '../state/chat_controller.dart';
+import '../state/prefs_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
@@ -27,7 +29,8 @@ import 'speaker.dart';
 /// The chat on screen, newest at the bottom. Empty, it invites a first question.
 ///
 /// The list is reversed so it starts at the newest turn and stays pinned there as an answer
-/// grows, and builds only the turns in view. Its parent rebuilds it when the chat changes; a
+/// grows, and builds only the turns in view. Scrolled up from the newest text, what is in view
+/// stays put while the answer grows below it. Its parent rebuilds it when the chat changes; a
 /// streaming answer rebuilds only itself. Another chat opens at its newest turn, and a message
 /// sent scrolls there.
 class MessageList extends StatefulWidget {
@@ -46,53 +49,27 @@ class _MessageListState extends State<MessageList> {
   /// [ChatController.sends] when the list was last built.
   int? _sends;
 
-  /// The newest turn, while it is an answer that streams, and how tall it was last drawn.
-  Turn? _growing;
-  double _height = 0;
+  /// How far from the newest text the list may sit and still count as at the bottom.
+  static const _atBottom = 8.0;
+
+  /// The newest turn's height as last laid out.
+  final _newest = _Extent();
 
   @override
   void dispose() {
-    _growing?.removeListener(_grew);
     _scroll.dispose();
     super.dispose();
   }
 
-  /// Watches [turn] grow while it streams, so the list can keep its start in view.
-  void _watch(Turn? turn) {
-    if (identical(turn, _growing)) return;
-    _growing?.removeListener(_grew);
-    _growing = turn;
-    _height = 0;
-    turn?.addListener(_grew);
-  }
-
-  /// Whether a measure of the growing answer waits for the end of this frame.
-  bool _measuring = false;
-
-  /// With [ChatSwitch.followAnswer] off, scrolls up by as much as the streaming answer grew,
-  /// so what was in view stays put and the newest text arrives below it. Measures once a frame,
-  /// however many pieces arrived in it.
-  void _grew() {
-    if (_measuring ||
-        AppScope.of(context).prefs.prefs.isOn(ChatSwitch.followAnswer)) {
-      return;
-    }
-    _measuring = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _measuring = false;
-      final growing = _growing;
-      if (growing == null) return;
-      final box = _keyOf(growing).currentContext?.findRenderObject();
-      if (!mounted || box is! RenderBox || !_scroll.hasClients) return;
-      final height = box.size.height;
-      final grown = _height == 0 ? 0.0 : height - _height;
-      _height = height;
-      if (grown <= 0) return;
-      final position = _scroll.position;
-      _scroll.jumpTo(
-        (position.pixels + grown).clamp(0, position.maxScrollExtent),
-      );
-    });
+  /// Whether the newest turn's growth should leave what is in view put rather than push it up:
+  /// always while the list is scrolled up from the newest text, and while an answer streams
+  /// with [ChatSwitch.followAnswer] off. The list is reversed, so its offset counts up from the
+  /// newest text.
+  bool _holds(Turn? newest, PrefsController prefs) {
+    if (_scroll.hasClients && _scroll.position.pixels > _atBottom) return true;
+    return newest != null &&
+        newest.streaming &&
+        !prefs.prefs.isOn(ChatSwitch.followAnswer);
   }
 
   /// Scrolls to the newest turn after this frame when a message was sent since the last build.
@@ -120,8 +97,6 @@ class _MessageListState extends State<MessageList> {
     final turns = chat.turns;
     if (workspace == null) return const SizedBox.shrink();
     _follow(chat);
-    final newest = turns.lastOrNull;
-    _watch(newest != null && newest.streaming ? newest : null);
     if (turns.isEmpty) {
       return _Empty(workspace: workspace.name, onSuggest: widget.onSuggest);
     }
@@ -148,56 +123,188 @@ class _MessageListState extends State<MessageList> {
   static GlobalObjectKey _keyOf(Turn turn) => GlobalObjectKey(turn);
 
   Widget _turns(BuildContext context, List<Turn> turns) {
-    final chat = AppScope.of(context).chat;
-    return ListView.builder(
+    final scope = AppScope.of(context);
+    final chat = scope.chat;
+    return CustomScrollView(
       // Another chat gets a list of its own, which starts at its newest turn.
       key: ValueKey((chat.activeSlug, chat.activeThread)),
       controller: _scroll,
       reverse: true,
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-      itemCount: turns.length,
-      findChildIndexCallback: (key) {
-        if (key is! GlobalObjectKey) return null;
-        final at = turns.indexWhere((t) => identical(t, key.value));
-        return at < 0 ? null : turns.length - 1 - at;
-      },
-      itemBuilder: (context, i) {
-        final turn = turns[turns.length - 1 - i];
-        final first = i == turns.length - 1;
-        // An answer sits closer to its own question than a question to the answer before it.
-        final answering =
-            !first &&
-            turn.role != Role.user &&
-            turns[turns.length - 2 - i].role == Role.user;
-        return Center(
-          key: _keyOf(turn),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: Sizes.column),
-            child: Padding(
-              padding: EdgeInsets.only(
-                top: first
-                    ? 0
-                    : answering
-                    ? 16
-                    : 26,
-              ),
-              child: Rise(
-                child: turn.role == Role.user
-                    ? _UserBubble(
-                        turn.text,
-                        attachments: turn.attachments,
-                        onEdit: () {
-                          chat.edit(turn);
-                          widget.onSuggest(turn.text);
-                        },
-                      )
-                    : _Answer(turn, retry: i == 0 ? _retryOf(chat) : null),
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+          sliver: _HoldPlace(
+            newest: _newest,
+            holds: () => _holds(turns.lastOrNull, scope.prefs),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, i) => _turn(chat, turns, i),
+                childCount: turns.length,
+                findChildIndexCallback: (key) {
+                  if (key is! GlobalObjectKey) return null;
+                  final at = turns.indexWhere((t) => identical(t, key.value));
+                  return at < 0 ? null : turns.length - 1 - at;
+                },
               ),
             ),
           ),
-        );
-      },
+        ),
+      ],
     );
+  }
+
+  /// The [i]th turn from the newest.
+  Widget _turn(ChatController chat, List<Turn> turns, int i) {
+    final turn = turns[turns.length - 1 - i];
+    final first = i == turns.length - 1;
+    // An answer sits closer to its own question than a question to the answer before it.
+    final answering =
+        !first &&
+        turn.role != Role.user &&
+        turns[turns.length - 2 - i].role == Role.user;
+    return _Measured(
+      key: _keyOf(turn),
+      into: i == 0 ? _newest : null,
+      turn: turn,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: Sizes.column),
+          child: Padding(
+            padding: EdgeInsets.only(
+              top: first
+                  ? 0
+                  : answering
+                  ? 16
+                  : 26,
+            ),
+            child: Rise(
+              child: turn.role == Role.user
+                  ? _UserBubble(
+                      turn.text,
+                      attachments: turn.attachments,
+                      onEdit: () {
+                        chat.edit(turn);
+                        widget.onSuggest(turn.text);
+                      },
+                    )
+                  : _Answer(turn, retry: i == 0 ? _retryOf(chat) : null),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A turn's height as it was last laid out, written by [_Measured] during its own layout,
+/// where reading it is allowed.
+class _Extent {
+  Turn? turn;
+  double height = 0;
+
+  /// Whether the turn was laid out since [_RenderHoldPlace] last looked.
+  bool fresh = false;
+}
+
+/// [child], which writes its height into [into] each time it is laid out.
+class _Measured extends SingleChildRenderObjectWidget {
+  const _Measured({
+    super.key,
+    required this.into,
+    required this.turn,
+    required Widget super.child,
+  });
+
+  final _Extent? into;
+  final Turn turn;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderMeasured(into, turn);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderMeasured renderObject) =>
+      renderObject
+        ..into = into
+        ..turn = turn;
+}
+
+class _RenderMeasured extends RenderProxyBox {
+  _RenderMeasured(this.into, this.turn);
+
+  _Extent? into;
+  Turn turn;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    if (into case final extent?) {
+      extent
+        ..turn = turn
+        ..height = size.height
+        ..fresh = true;
+    }
+  }
+}
+
+/// The turns' list, which keeps what is in view put when the newest turn grows while [holds]:
+/// in the same layout, it moves the scroll offset by as much as that turn grew, so nothing that
+/// was drawn moves.
+class _HoldPlace extends SingleChildRenderObjectWidget {
+  const _HoldPlace({
+    required this.newest,
+    required this.holds,
+    required Widget sliver,
+  }) : super(child: sliver);
+
+  final _Extent newest;
+  final bool Function() holds;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderHoldPlace(newest, holds);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderHoldPlace renderObject,
+  ) => renderObject
+    ..newest = newest
+    ..holds = holds;
+}
+
+class _RenderHoldPlace extends RenderProxySliver {
+  _RenderHoldPlace(this.newest, this.holds);
+
+  _Extent newest;
+  bool Function() holds;
+
+  /// The newest turn and its height at the last layout that laid it out.
+  Turn? _turn;
+  double _height = 0;
+
+  @override
+  void performLayout() {
+    newest.fresh = false;
+    super.performLayout();
+    final list = child;
+    final first = list is RenderSliverMultiBoxAdaptor ? list.firstChild : null;
+    if (list is! RenderSliverMultiBoxAdaptor ||
+        first == null ||
+        list.indexOf(first) != 0) {
+      // Out of view: laid out afresh when it comes back, the list places it itself.
+      _turn = null;
+      return;
+    }
+    // Laid out before and not since, it has not changed.
+    if (!newest.fresh) return;
+    // A turn just added below the others is not growth either.
+    final grown = identical(newest.turn, _turn) ? newest.height - _height : 0.0;
+    _turn = newest.turn;
+    _height = newest.height;
+    if (grown > 0.5 && holds()) {
+      geometry = SliverGeometry(scrollOffsetCorrection: grown);
+    }
   }
 }
 

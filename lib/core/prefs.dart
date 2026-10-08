@@ -99,7 +99,7 @@ enum ChatSwitch {
   /// Marks misspelled words in the message box.
   spellcheck(true),
 
-  /// Keeps the newest text of a streaming answer in view.
+  /// Keeps the newest text of a streaming answer in view while the chat is at its bottom.
   followAnswer(true),
 
   /// Shows a model's reasoning unfolded.

@@ -182,6 +182,41 @@ void main() {
     });
   }
 
+  testWidgets('scrolled up, a streaming answer leaves what is in view put', (
+    tester,
+  ) async {
+    final llm = planningServer()..hold = true;
+    final h = await pumpApp(tester, llm: llm, size: const Size(1280, 500));
+    await h.chat.send('Tell me everything.');
+    await tester.pump(const Duration(milliseconds: 300));
+    for (var i = 0; i < 12; i++) {
+      llm.chat!.add(TextChunk('Paragraph $i.\n\n'));
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(listOffset(tester), 0, reason: 'at the bottom it follows');
+    final scroll = tester.state<ScrollableState>(
+      find
+          .descendant(
+            of: find.byType(MessageList),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    scroll.position.jumpTo(120);
+    await tester.pump();
+    final read = find.textContaining('Paragraph 9.');
+    final before = tester.getTopLeft(read).dy;
+    for (var i = 12; i < 20; i++) {
+      llm.chat!.add(TextChunk('Paragraph $i.\n\n'));
+      await tester.pump(const Duration(milliseconds: 50));
+      // Held in the same frame the answer grew, so it never jumps and comes back.
+      expect(tester.getTopLeft(read).dy, moreOrLessEquals(before, epsilon: 1));
+    }
+    expect(listOffset(tester), greaterThan(120));
+    await llm.chat!.close();
+    await tester.pump(const Duration(milliseconds: 100));
+  });
+
   testWidgets('spellcheck follows its switch where the device has one', (
     tester,
   ) async {
