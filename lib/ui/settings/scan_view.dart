@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../icons.dart';
 import '../type.dart';
 
 /// A phone's camera view for a pairing code, over the whole window: Cancel, the camera in a
@@ -43,9 +44,15 @@ class ScanView extends StatelessWidget {
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: onCancel,
-                    child: const SizedBox.square(
+                    child: SizedBox.square(
                       dimension: 44,
-                      child: Icon(Icons.close, color: Colors.white, size: 20),
+                      child: Center(
+                        child: AppIcon(
+                          'close',
+                          size: IconSize.small,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
                 ),
