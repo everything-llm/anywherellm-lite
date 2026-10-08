@@ -9,6 +9,7 @@ import 'chat/browser_panel.dart';
 import 'chat/chat_view.dart';
 import 'files/files_view.dart';
 import 'layout.dart';
+import 'quick_switcher.dart';
 import 'settings/settings_dialog.dart';
 import 'sidebar.dart';
 import 'sources/sources_panel.dart';
@@ -41,17 +42,6 @@ void _openWorkspace(AppScope scope, int index) {
   }
 }
 
-/// Moves to the sidebar's search, showing the chats and opening the sidebar where it is a
-/// [drawer].
-void _findChats(AppScope scope, {required bool drawer}) {
-  final shell = scope.shell..showPane(Pane.chats);
-  if (drawer && !shell.sideOpen) shell.toggleSide();
-  // The field is built in this frame when the drawer has just opened.
-  WidgetsBinding.instance.addPostFrameCallback(
-    (_) => shell.searchFocus.requestFocus(),
-  );
-}
-
 /// The window: sidebar, chat and Sources, arranged for the width they have, with Settings over
 /// them when it is open.
 ///
@@ -75,7 +65,9 @@ class AppShell extends StatelessWidget {
       required bool settingsSideBySide,
       required bool sidebarDrawer,
     }) {
-      if (shell.menuOpen) {
+      if (shell.switcherOpen) {
+        shell.closeSwitcher();
+      } else if (shell.menuOpen) {
         shell.closeMenu();
       } else if (shell.settingsOpen &&
           !settingsSideBySide &&
@@ -122,6 +114,7 @@ class AppShell extends StatelessWidget {
             return _BackGuard(
               open:
                   shell.settingsOpen ||
+                  shell.switcherOpen ||
                   shell.menuOpen ||
                   sideDrawer ||
                   sourcesDrawer ||
@@ -141,8 +134,7 @@ class AppShell extends StatelessWidget {
                     const SingleActivator(
                       LogicalKeyboardKey.keyK,
                       control: true,
-                    ): () =>
-                        _findChats(scope, drawer: screen.sidebarDrawer),
+                    ): shell.toggleSwitcher,
                     for (final (i, key) in _digits.indexed)
                       SingleActivator(key, control: true): () =>
                           _openWorkspace(scope, i),
@@ -242,6 +234,13 @@ class AppShell extends StatelessWidget {
                                 child: SettingsDialog(
                                   sideBySide: settingsSideBySide,
                                 ),
+                              ),
+                            ],
+                            if (shell.switcherOpen) ...[
+                              _Scrim(onTap: shell.closeSwitcher),
+                              const Align(
+                                alignment: Alignment(0, -0.5),
+                                child: QuickSwitcher(),
                               ),
                             ],
                           ],

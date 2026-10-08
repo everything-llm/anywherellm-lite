@@ -1,8 +1,10 @@
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/server_models.dart';
+import 'package:anywherellm/ui/quick_switcher.dart';
 import 'package:anywherellm/ui/sidebar.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -230,25 +232,116 @@ void main() {
       await ctrl(tester, LogicalKeyboardKey.digit1);
       expect(h.chat.activeSlug, 'q3');
     });
+  });
 
-    testWidgets('Ctrl+K moves to the search', (tester) async {
+  group('the Ctrl K switcher', () {
+    final field = find.descendant(
+      of: find.byType(QuickSwitcher),
+      matching: find.byType(EditableText),
+    );
+
+    Finder row(String label) => find.descendant(
+      of: find.byType(QuickSwitcher),
+      matching: control(label),
+    );
+
+    testWidgets('opens over the window and Esc closes it', (tester) async {
       final h = await pumpApp(tester, llm: planningServer());
+      expect(find.byType(QuickSwitcher), findsNothing);
       await ctrl(tester, LogicalKeyboardKey.keyK);
-      expect(h.shell.searchFocus.hasFocus, isTrue);
+      expect(h.shell.switcherOpen, isTrue);
+      expect(find.byType(QuickSwitcher), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(h.shell.switcherOpen, isFalse);
+      expect(find.byType(QuickSwitcher), findsNothing);
     });
 
-    testWidgets('Ctrl+K opens the sidebar where it is a drawer', (
+    testWidgets('Ctrl+K again closes it', (tester) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      await ctrl(tester, LogicalKeyboardKey.keyK);
+      await ctrl(tester, LogicalKeyboardKey.keyK);
+      expect(h.shell.switcherOpen, isFalse);
+    });
+
+    testWidgets('lists each workspace with its chats when nothing is typed', (
       tester,
     ) async {
+      await pumpApp(tester, llm: planningServer());
+      await ctrl(tester, LogicalKeyboardKey.keyK);
+      expect(row('Q3 planning'), findsOneWidget);
+      expect(row('Household'), findsOneWidget);
+    });
+
+    testWidgets('a chat of another workspace opens that workspace', (
+      tester,
+    ) async {
+      final llm = planningServer();
+      llm.spaces[1].threads.add(const Thread(slug: 'chores', name: 'Chores'));
+      llm.histories['chores'] = const [];
+      const other = Thread(slug: 'chores', name: 'Chores');
+      final h = await pumpApp(tester, llm: llm);
+      expect(h.chat.activeSlug, 'q3');
+      await ctrl(tester, LogicalKeyboardKey.keyK);
+      await tester.enterText(field, other.name);
+      await tester.pumpAndSettle();
+      await tester.tap(row(other.name));
+      await tester.pumpAndSettle();
+      expect(h.chat.activeSlug, 'household');
+      expect(h.chat.activeThread, other.slug);
+      expect(h.shell.switcherOpen, isFalse);
+    });
+
+    testWidgets('Enter opens the first chat found', (tester) async {
+      final h = await pumpApp(tester, llm: fourChats());
+      await ctrl(tester, LogicalKeyboardKey.keyK);
+      await tester.enterText(field, 'ff');
+      await tester.pumpAndSettle();
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(h.shell.switcherOpen, isFalse);
+      // Newest made first.
+      expect(h.chat.activeThread, 'kickoff');
+    });
+
+    testWidgets('Down moves to the next, Up back', (tester) async {
+      final h = await pumpApp(tester, llm: fourChats());
+      await ctrl(tester, LogicalKeyboardKey.keyK);
+      await tester.enterText(field, 'ff');
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(h.chat.activeThread, 'offsite');
+    });
+
+    testWidgets('says when nothing matches', (tester) async {
+      await pumpApp(tester, llm: planningServer());
+      await ctrl(tester, LogicalKeyboardKey.keyK);
+      await tester.enterText(field, 'zzzz');
+      await tester.pumpAndSettle();
+      expect(find.text('Nothing matches "zzzz".'), findsOneWidget);
+    });
+
+    testWidgets('a tap outside closes it', (tester) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      await ctrl(tester, LogicalKeyboardKey.keyK);
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pumpAndSettle();
+      expect(h.shell.switcherOpen, isFalse);
+    });
+
+    testWidgets('fits a phone', (tester) async {
       final h = await pumpApp(
         tester,
         llm: planningServer(),
-        size: const Size(700, 800),
+        size: const Size(360, 640),
       );
-      expect(h.shell.sideOpen, isFalse);
-      await ctrl(tester, LogicalKeyboardKey.keyK);
-      expect(h.shell.sideOpen, isTrue);
-      expect(h.shell.searchFocus.hasFocus, isTrue);
+      h.shell.toggleSwitcher();
+      await tester.pumpAndSettle();
+      expect(find.byType(QuickSwitcher), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 

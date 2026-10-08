@@ -144,9 +144,7 @@ bool loadableImage(Uri uri, Uri? server, {required bool allowHttp}) =>
 /// app's current state at `/_live/apps/<workspace>/<name>.png`. It is an ordinary live card; its
 /// page, which the link around it names, opens through the app's link opener.
 bool isAppCard(Uri uri, Uri? server) =>
-    server != null &&
-    uri.host == server.host &&
-    _appCard.hasMatch(uri.path);
+    server != null && uri.host == server.host && _appCard.hasMatch(uri.path);
 
 final _appCard = RegExp(r'^/_live/apps/[^/]+/[^/]+\.png$');
 

@@ -70,10 +70,7 @@ class AnswerBody extends StatelessWidget {
         if (!isAppCard(uri, server)) return card;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            card,
-            if (linked.contains(uri)) _LiveCaption(),
-          ],
+          children: [card, if (linked.contains(uri)) _LiveCaption()],
         );
       },
       builders: {

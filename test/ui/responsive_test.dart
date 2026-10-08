@@ -8,12 +8,13 @@ import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/upload.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
+import 'package:anywherellm/ui/quick_switcher.dart';
 import 'package:anywherellm/ui/sidebar.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/drop_zone.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
-import 'package:flutter/material.dart' show SingleChildScrollView;
+import 'package:flutter/material.dart' show EditableText, SingleChildScrollView;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 
@@ -338,6 +339,23 @@ void main() {
       await llm.chat!.close();
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the Ctrl K switcher fits at $at', (tester) async {
+      final h = await pumpApp(tester, llm: awkward(), size: size);
+      h.shell.toggleSwitcher();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(QuickSwitcher),
+          matching: find.byType(EditableText),
+        ),
+        'an-extremely',
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.byType(QuickSwitcher), findsOneWidget);
     });
 
     testWidgets('a draft and the no-key banner fit at $at', (tester) async {

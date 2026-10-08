@@ -261,16 +261,7 @@ class _ChatsState extends State<_Chats> {
     final scope = AppScope.of(context);
     final chat = scope.chat;
     final ordered = scope.prefs.prefs.inOrder(chat.workspaces, (w) => w.slug);
-    final found = [
-      for (final w in ordered)
-        if ([
-              for (final thread in chat.threadsOf(w.slug).reversed)
-                if (matchesSearch(query, thread.name)) thread,
-            ]
-            case final threads
-            when threads.isNotEmpty || matchesSearch(query, w.name))
-          (w, threads),
-    ];
+    final found = findChats(query, ordered, chat.threadsOf);
     if (found.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(12),

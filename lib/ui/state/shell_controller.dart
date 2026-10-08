@@ -19,13 +19,33 @@ class ShellController extends ChangeNotifier {
   bool _sideOpen = false;
   bool _menuOpen = false;
 
-  /// The sidebar's search field, which Ctrl+K moves to.
+  /// The sidebar's search field.
   final searchFocus = FocusNode(debugLabel: 'Search chats');
 
   @override
   void dispose() {
     searchFocus.dispose();
     super.dispose();
+  }
+
+  bool _switcherOpen = false;
+
+  /// Whether the Ctrl+K switcher is open over the window.
+  bool get switcherOpen => _switcherOpen;
+
+  /// Opens the switcher, or closes it when it is open. Settings keeps the window while it is
+  /// open.
+  void toggleSwitcher() {
+    if (_settingsOpen && !_switcherOpen) return;
+    _switcherOpen = !_switcherOpen;
+    _menuOpen = false;
+    notifyListeners();
+  }
+
+  void closeSwitcher() {
+    if (!_switcherOpen) return;
+    _switcherOpen = false;
+    notifyListeners();
   }
 
   /// Whether the sidebar's workspace menu is open.
@@ -111,6 +131,7 @@ class ShellController extends ChangeNotifier {
     _settingsOpen = true;
     _sideOpen = false;
     _menuOpen = false;
+    _switcherOpen = false;
     notifyListeners();
   }
 
