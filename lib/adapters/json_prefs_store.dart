@@ -10,8 +10,15 @@ class JsonPrefsStore implements PrefsStore {
 
   final File _file;
 
-  /// The last write, which the next one waits for, so writes land in the order they were asked.
-  Future<void> _last = Future.value();
+  /// The prefs to write next, while a write runs: only the newest is written, since each holds
+  /// everything.
+  Prefs? _pending;
+
+  /// The writes under way, which a save meanwhile joins.
+  Future<void>? _writing;
+
+  /// Whether the file's folder is known to exist.
+  bool _folder = false;
 
   static File _defaultFile() {
     final env = Platform.environment;
@@ -31,17 +38,40 @@ class JsonPrefsStore implements PrefsStore {
     }
   }
 
-  /// Writes beside the file and renames over it, so a crash never leaves half a file.
+  /// Writes beside the file and renames over it, so a crash never leaves half a file. A save
+  /// made while another writes waits for it and writes only the newest prefs saved meanwhile;
+  /// each save's future ends when what it asked is on disk, or fails with the last write's
+  /// failure.
   @override
   Future<void> save(Prefs prefs) {
-    final write = _last.then((_) => _write(prefs));
-    _last = write.catchError((_) {});
-    return write;
+    _pending = prefs;
+    return _writing ??= _drain();
+  }
+
+  Future<void> _drain() async {
+    try {
+      ApiException? failed;
+      for (var next = _pending; next != null; next = _pending) {
+        _pending = null;
+        try {
+          await _write(next);
+          failed = null;
+        } on ApiException catch (error) {
+          failed = error;
+        }
+      }
+      if (failed != null) throw failed;
+    } finally {
+      _writing = null;
+    }
   }
 
   Future<void> _write(Prefs prefs) async {
     try {
-      await _file.parent.create(recursive: true);
+      if (!_folder) {
+        await _file.parent.create(recursive: true);
+        _folder = true;
+      }
       final temp = File('${_file.path}.tmp');
       await temp.writeAsString(prefs.encode(), flush: true);
       await temp.rename(_file.path);

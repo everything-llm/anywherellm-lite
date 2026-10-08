@@ -100,10 +100,13 @@ class _MessageListState extends State<MessageList> {
     if (turns.isEmpty) {
       return _Empty(workspace: workspace.name, onSuggest: widget.onSuggest);
     }
-    // The person's text size scales the turns, not the controls around them.
+    // The person's text size scales the turns, not the controls around them. The turns are
+    // built once here: a change to another pref, such as a pin, leaves the scale as it was, so
+    // MediaQuery tells them nothing.
     return ListenableBuilder(
       listenable: scope.prefs,
-      builder: (context, _) {
+      child: _turns(context, turns),
+      builder: (context, turns) {
         final media = MediaQuery.of(context);
         return MediaQuery(
           data: media.copyWith(
@@ -112,7 +115,7 @@ class _MessageListState extends State<MessageList> {
               scope.prefs.prefs.textSize.scale,
             ),
           ),
-          child: _turns(context, turns),
+          child: turns!,
         );
       },
     );

@@ -49,6 +49,18 @@ void main() {
     expect((await store.load()).switchedOff, isEmpty);
   });
 
+  test('saves made while one writes go as the newest alone', () async {
+    final file = File('${dir.path}/anywherellm/prefs.json');
+    final store = JsonPrefsStore(file);
+    const themes = [ThemePref.light, ThemePref.dark, ThemePref.system];
+    // The first starts writing; the other two wait, and only the last is written.
+    final saves = [for (final theme in themes) store.save(Prefs(theme: theme))];
+    await Future.wait(saves);
+    expect((await store.load()).theme, ThemePref.system);
+    await store.save(const Prefs(theme: ThemePref.dark));
+    expect((await store.load()).theme, ThemePref.dark);
+  });
+
   test('a file it cannot write is an ApiException naming the path', () async {
     final blocker = File('${dir.path}/blocker')..writeAsStringSync('');
     final store = JsonPrefsStore(File('${blocker.path}/prefs.json'));
