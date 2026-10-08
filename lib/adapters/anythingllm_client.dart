@@ -970,7 +970,8 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   }
 
   /// The web UI's login token for [connection], signing in with its password when there is none
-  /// yet. Without a password this fails with status 401, and with a refused one with 403.
+  /// yet. Without a password this fails with status 401, and with a refused one with the
+  /// server's 401, or 403 when it answers that the password is not valid.
   Future<String> _token(Connection connection) async {
     if (_tokens[connection] case final token?) return token;
     final password =
