@@ -991,35 +991,86 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   );
 
   /// The events of a POST of [body] to [path], whose answer streams server-sent events. A
-  /// failed status is an [ApiException] with the server's words, as is a stream cut off.
+  /// failed status is an [ApiException] with the server's words, as is a stream cut off. A
+  /// cancel lets go of the response at once, even before the first event, as the `async*`
+  /// readers of [chatEvents] would not until their next `yield`: the server stops answering
+  /// when the connection closes.
   Stream<ChatEvent> _events(
     String path,
     Map<String, Object?> body,
     Duration limit,
-  ) async* {
-    final connection = _current;
-    final request = _request(connection, 'POST', path, body)
-      ..headers['Accept'] = 'text/event-stream';
-    final response = await _fetch(
-      connection,
-      limit,
-      () => _client.send(request),
-    );
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      _decode(await http.Response.fromStream(response));
+  ) {
+    late final StreamController<ChatEvent> out;
+    StreamSubscription<ChatEvent>? reading;
+    // The response's bytes, read here rather than by [chatEvents], so a cancel can close it.
+    StreamSubscription<List<int>>? response;
+    final bytes = StreamController<List<int>>();
+    var cancelled = false;
+    Future<void> fail(Object error) async {
+      if (cancelled) return;
+      out.addError(switch (error) {
+        http.ClientException(:final message) => ApiException(
+          'The answer was cut off: $message',
+        ),
+        TimeoutException() => const ApiException(
+          'The server sent nothing for too long, so the answer was given up.',
+        ),
+        _ => error,
+      });
+      await out.close();
     }
-    try {
-      // Not yield*, which passes errors on without letting them be caught here.
-      await for (final event in chatEvents(response.stream.timeout(idle))) {
-        yield event;
+
+    Future<void> start() async {
+      try {
+        final connection = _current;
+        final request = _request(connection, 'POST', path, body)
+          ..headers['Accept'] = 'text/event-stream';
+        final answer = await _fetch(
+          connection,
+          limit,
+          () => _client.send(request),
+        );
+        if (cancelled) {
+          unawaited(answer.stream.listen(null).cancel());
+          return;
+        }
+        if (answer.statusCode < 200 || answer.statusCode >= 300) {
+          _decode(await http.Response.fromStream(answer));
+        }
+        response = answer.stream
+            .timeout(idle)
+            .listen(
+              bytes.add,
+              onError: bytes.addError,
+              onDone: bytes.close,
+              cancelOnError: true,
+            );
+        reading = chatEvents(bytes.stream).listen(
+          out.add,
+          onError: (Object error) {
+            unawaited(response?.cancel());
+            unawaited(bytes.close());
+            unawaited(fail(error));
+          },
+          onDone: out.close,
+          cancelOnError: true,
+        );
+      } on Object catch (error) {
+        await fail(error);
       }
-    } on http.ClientException catch (error) {
-      throw ApiException('The answer was cut off: ${error.message}');
-    } on TimeoutException {
-      throw const ApiException(
-        'The server sent nothing for too long, so the answer was given up.',
-      );
     }
+
+    out = StreamController(
+      onListen: () => unawaited(start()),
+      onCancel: () {
+        cancelled = true;
+        unawaited(response?.cancel());
+        // Ends the readers' `await for`, so their cancel completes now.
+        unawaited(bytes.close());
+        return reading?.cancel();
+      },
+    );
+    return out.stream;
   }
 
   /// A [method] to [path] on [connection] with the key, and [body] as JSON when given.

@@ -1077,6 +1077,31 @@ void main() {
       );
     });
 
+    test(
+      'stopping before the first chunk lets go of the answer at once',
+      () async {
+        final body = StreamController<List<int>>();
+        final api = HttpAnythingLlmApi(
+          holder: ConnectionHolder(_connection),
+          client: MockClient.streaming((request, _) async {
+            if (request.url.path == '/everythingllm/health') {
+              return http.StreamedResponse(
+                Stream.value(utf8.encode('no')),
+                404,
+              );
+            }
+            return http.StreamedResponse(body.stream, 200);
+          }),
+        );
+        final subscription = api.streamChat('w', 't', 'Hi').listen(null);
+        await pumpEventQueue();
+        expect(body.hasListener, isTrue);
+        await subscription.cancel().timeout(const Duration(seconds: 1));
+        expect(body.hasListener, isFalse);
+        await body.close();
+      },
+    );
+
     test('reset posts only the reset flag and reads the reply', () async {
       Object? sent;
       final api = HttpAnythingLlmApi(
