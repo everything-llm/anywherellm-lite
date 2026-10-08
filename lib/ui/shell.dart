@@ -8,6 +8,7 @@ import 'app_scope.dart';
 import 'chat/app_panel.dart';
 import 'chat/browser_panel.dart';
 import 'chat/chat_view.dart';
+import 'chat/generated_files.dart';
 import 'files/files_view.dart';
 import 'files/workspace_pages.dart';
 import 'layout.dart';
@@ -286,6 +287,14 @@ class AppShell extends StatelessWidget {
                                 valueListenable: shell.popup,
                                 builder: (context, popup, _) => Stack(
                                   children: [
+                                    // An agent's image, open over everything.
+                                    if (popup case final ImageView view)
+                                      Positioned.fill(
+                                        child: ImageViewer(
+                                          view,
+                                          onClose: () => shell.closePopup(view),
+                                        ),
+                                      ),
                                     if (popup == Popup.switcher) ...[
                                       _Scrim(
                                         onTap: () =>

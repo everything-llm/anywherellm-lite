@@ -1,4 +1,6 @@
 import 'package:anywherellm/core/outputs.dart';
+import 'package:anywherellm/ui/chat/generated_files.dart';
+import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -38,18 +40,20 @@ void main() {
     expect(find.text('report.pdf'), findsOneWidget);
     expect(find.text('2.0 KB'), findsOneWidget);
     expect(llm.calls, isNot(contains('generatedFile:pdf-1.pdf')));
-    await tester.tap(control('Download report.pdf'));
+    await tester.tap(control('Save report.pdf'));
     await tester.pumpAndSettle();
     expect(h.saved['report.pdf'], [37, 80, 68, 70]);
+    expect(control('Saved report.pdf'), findsOneWidget);
   });
 
   testWidgets('a file the server no longer has says so', (tester) async {
     final llm = planningServer()..made = const [_report];
     final h = await pumpApp(tester, llm: llm);
     await ask(tester, 'Make me a report');
-    await tester.tap(control('Download report.pdf'));
+    await tester.tap(control('Save report.pdf'));
     await tester.pumpAndSettle();
     expect(h.saved, isEmpty);
+    expect(control('Saved report.pdf'), findsNothing);
     expect(find.text('Could not get report.pdf'), findsOneWidget);
     expect(find.text('File not found'), findsOneWidget);
   });
@@ -66,7 +70,8 @@ void main() {
       find.byWidgetPredicate((w) => w is Image && w.semanticLabel == 'cat.png'),
       findsOneWidget,
     );
-    await tester.tap(find.byTooltip('Download cat.png'));
+    expect(find.textContaining('Image · PNG'), findsOneWidget);
+    await tester.tap(control('Save cat.png'));
     await tester.pumpAndSettle();
     expect(h.saved['cat.png'], pixel);
     expect(
@@ -75,13 +80,61 @@ void main() {
     );
   });
 
-  testWidgets('an image that cannot be read becomes a download chip', (
+  testWidgets('a tapped image opens over the window, to save or share', (
+    tester,
+  ) async {
+    final llm = planningServer()
+      ..made = const [_cat]
+      ..generated['img-1.png'] = pixel;
+    final h = await pumpApp(
+      tester,
+      llm: llm,
+      size: const Size(390, 844),
+      canShare: true,
+    );
+    await ask(tester, 'Draw a cat');
+    expect(tester.takeException(), isNull);
+    // The image decodes outside the test's clock, so it has no size to tap.
+    tester.widget<Tappable>(control('Open cat.png')).onTap!();
+    await tester.pumpAndSettle();
+    final viewer = find.byType(ImageViewer);
+    expect(viewer, findsOneWidget);
+    await tester.tap(find.descendant(of: viewer, matching: control('Share')));
+    await tester.pumpAndSettle();
+    expect(h.shared['cat.png'], pixel);
+    await tester.tap(find.descendant(of: viewer, matching: control('Save')));
+    await tester.pumpAndSettle();
+    expect(h.saved['cat.png'], pixel);
+    expect(tester.takeException(), isNull);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(ImageViewer), findsNothing);
+  });
+
+  testWidgets('without a share sheet there is no Share', (tester) async {
+    final llm = planningServer()
+      ..made = const [_cat]
+      ..generated['img-1.png'] = pixel;
+    await pumpApp(tester, llm: llm);
+    await ask(tester, 'Draw a cat');
+    expect(find.byTooltip('Share cat.png'), findsNothing);
+    tester.widget<Tappable>(control('Open cat.png')).onTap!();
+    await tester.pumpAndSettle();
+    expect(control('Share'), findsNothing);
+    await tester.tap(
+      find.descendant(of: find.byType(ImageViewer), matching: control('Close')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(ImageViewer), findsNothing);
+  });
+
+  testWidgets('an image that cannot be read becomes a file card', (
     tester,
   ) async {
     final llm = planningServer()..made = const [_cat];
     await pumpApp(tester, llm: llm);
     await ask(tester, 'Draw a cat');
-    expect(control('Download cat.png'), findsOneWidget);
+    expect(control('Save cat.png'), findsOneWidget);
     expect(find.text('Could not get cat.png'), findsOneWidget);
   });
 

@@ -101,6 +101,7 @@ class Harness extends Rig {
     this.labelAnswers = false,
     this.canSpellcheck = false,
     this.canPasteImages = false,
+    this.canShare = false,
   }) : dictation = canDictate ? FakeDictation() : null,
        speaker = canSpeak ? FakeSpeaker() : null,
        shell = ShellController(sourcesPinned: sourcesOpen);
@@ -152,6 +153,12 @@ class Harness extends Rig {
   /// The text the fake scanner reads.
   String scanCode = '';
 
+  /// Whether the device has a share sheet. Each file handed to it is kept in [shared].
+  final bool canShare;
+
+  /// Every file the app shared, by name, with its bytes.
+  final Map<String, List<int>> shared = {};
+
   /// Every file the app saved, by the name it suggested, with its bytes.
   final Map<String, List<int>> saved = {};
 
@@ -184,6 +191,7 @@ class Harness extends Rig {
         saved[name] = data;
         return '/saved/$name';
       },
+      share: canShare ? (name, bytes) async => shared[name] = bytes : null,
       dictation: dictation,
       pasteImage: canPasteImages ? () async => clipboardImage : null,
       readAloud: readAloud,
@@ -218,6 +226,7 @@ Future<Harness> pumpApp(
   bool labelAnswers = false,
   bool canSpellcheck = false,
   bool canPasteImages = false,
+  bool canShare = false,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -228,6 +237,7 @@ Future<Harness> pumpApp(
     connection: connection,
     sourcesOpen: sourcesOpen,
     canScan: canScan,
+    canShare: canShare,
     canDictate: canDictate,
     canSpeak: canSpeak,
     labelAnswers: labelAnswers,

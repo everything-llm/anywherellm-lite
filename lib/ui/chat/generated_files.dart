@@ -1,6 +1,5 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/outputs.dart';
 import '../app_scope.dart';
@@ -12,8 +11,10 @@ import '../widgets/buttons.dart';
 import '../widgets/tappable.dart';
 
 /// The files and images an agent made with an answer. An image shows, read from the server with
-/// the key as any other call is; a file is a chip that downloads it. Each saves through
-/// [AppScope.save], and a failure shows as the chat's problem.
+/// the key as any other call is, under a line naming its type and size, with Save and, where
+/// the device can share, Share; tapped, it opens over the window. A file is a card with its
+/// type, name and size and Save. Each saves through [AppScope.save], and a failure shows as the
+/// chat's problem.
 class GeneratedFiles extends StatelessWidget {
   const GeneratedFiles(this.files, {super.key});
 
@@ -21,31 +22,108 @@ class GeneratedFiles extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Wrap(
-    spacing: 6,
+    spacing: 8,
     runSpacing: 8,
     children: [
       for (final file in files)
         file.isImage
             ? _MadeImage(file, key: ValueKey(file.storageName))
-            : _MadeFile(file),
+            : _MadeFile(file, key: ValueKey(file.storageName)),
     ],
   );
 }
 
-/// Asks where to save [file], then reads and writes it there.
-Future<void> _download(BuildContext context, GeneratedFile file) async {
+/// Asks where to save [file], then reads and writes it there. Says whether it was saved.
+Future<bool> _download(BuildContext context, GeneratedFile file) async {
   final chat = AppScope.of(context).chat;
-  await saveFile(
+  final where = await saveFile(
     context,
     file.name,
     () => chat.fileBytes(file),
     failTitle: 'Could not save ${file.name}',
     report: chat.report,
   );
+  return where != null;
+}
+
+/// Hands [file] to the system's share sheet, reading it first.
+Future<void> _share(BuildContext context, GeneratedFile file) async {
+  final scope = AppScope.of(context);
+  final share = scope.share;
+  if (share == null) return;
+  final bytes = await scope.chat.fileBytes(file);
+  if (bytes == null) return;
+  try {
+    await share(file.name, bytes);
+  } on Exception catch (error) {
+    scope.chat.report('Could not share ${file.name}', '$error');
+  }
+}
+
+/// The type on a file's tile: its extension, as `PDF`, or `FILE`.
+String _typeOf(String name) {
+  final dot = name.lastIndexOf('.');
+  if (dot < 0 || dot == name.length - 1) return 'FILE';
+  final ext = name.substring(dot + 1).toUpperCase();
+  return ext.length > 4 ? 'FILE' : ext;
+}
+
+/// Save, which reads Saved once the file is saved.
+class _SaveButton extends StatefulWidget {
+  const _SaveButton(this.file);
+
+  final GeneratedFile file;
+
+  @override
+  State<_SaveButton> createState() => _SaveButtonState();
+}
+
+class _SaveButtonState extends State<_SaveButton> {
+  bool _saved = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Tappable(
+      touchTarget: true,
+      label: _saved ? 'Saved ${widget.file.name}' : 'Save ${widget.file.name}',
+      tooltip: _saved ? null : 'Save',
+      onTap: () async {
+        final saved = await _download(context, widget.file);
+        if (mounted && saved) setState(() => _saved = true);
+      },
+      radius: BorderRadius.circular(8),
+      child: SizedBox(
+        height: 32,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppIcon(
+                _saved ? 'check' : 'download',
+                size: IconSize.xs,
+                color: t.accent,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _saved ? 'Saved' : 'Save',
+                style: Type.sans(
+                  13.5,
+                  weight: FontWeight.w500,
+                  color: t.accent,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _MadeFile extends StatelessWidget {
-  const _MadeFile(this.file);
+  const _MadeFile(this.file, {super.key});
 
   final GeneratedFile file;
 
@@ -53,32 +131,55 @@ class _MadeFile extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final size = file.size;
-    return Tappable(
-      label: 'Download ${file.name}',
-      tooltip: 'Download',
-      onTap: () => _download(context, file),
-      radius: BorderRadius.circular(99),
-      color: t.accentbg,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 5, 12, 5),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 420),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
+        decoration: BoxDecoration(
+          color: t.panel,
+          border: Border.all(color: t.line),
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AppIcon('download', size: IconSize.xs, color: t.accent),
-            const SizedBox(width: 6),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 240),
+            Container(
+              width: 28,
+              height: 34,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: t.accentbg,
+                borderRadius: BorderRadius.circular(5),
+              ),
               child: Text(
-                file.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Type.sans(12.5, color: t.accent),
+                _typeOf(file.name),
+                style: Type.sans(
+                  9,
+                  weight: FontWeight.w600,
+                  color: t.accent,
+                  letterSpacing: 0.27,
+                ),
               ),
             ),
-            if (size != null) ...[
-              const SizedBox(width: 6),
-              Text(sizeText(size), style: Type.sans(12, color: t.muted)),
-            ],
+            const SizedBox(width: 10),
+            Flexible(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    file.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Type.sans(14, weight: FontWeight.w500, color: t.ink),
+                  ),
+                  if (size != null)
+                    Text(sizeText(size), style: Type.sans(12, color: t.muted)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            _SaveButton(file),
           ],
         ),
       ),
@@ -87,7 +188,7 @@ class _MadeFile extends StatelessWidget {
 }
 
 /// An image an agent made, drawn once its bytes arrive, or a [_MadeFile] when they cannot be
-/// read or drawn.
+/// read or drawn. Tapped, it opens over the window.
 class _MadeImage extends StatefulWidget {
   const _MadeImage(this.file, {super.key});
 
@@ -112,45 +213,223 @@ class _MadeImageState extends State<_MadeImage> {
 
   @override
   Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
     final t = Tokens.of(context);
+    final file = widget.file;
     return FutureBuilder(
       future: _bytes,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return Text(
-            'Loading ${widget.file.name}…',
+            'Loading ${file.name}…',
             style: Type.sans(12.5, color: t.muted),
           );
         }
         final bytes = snapshot.data;
-        if (bytes == null) return _MadeFile(widget.file);
+        if (bytes == null) return _MadeFile(file);
+        final size = file.size ?? bytes.length;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 360),
-                child: Image.memory(
-                  bytes,
-                  gaplessPlayback: true,
-                  fit: BoxFit.contain,
-                  semanticLabel: widget.file.name,
-                  errorBuilder: (_, _, _) => _MadeFile(widget.file),
+            Tappable(
+              label: 'Open ${file.name}',
+              onTap: () => scope.shell.togglePopup(ImageView(file, bytes)),
+              radius: BorderRadius.circular(8),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 360),
+                  child: Image.memory(
+                    bytes,
+                    gaplessPlayback: true,
+                    fit: BoxFit.contain,
+                    semanticLabel: file.name,
+                    errorBuilder: (_, _, _) => _MadeFile(file),
+                  ),
                 ),
               ),
             ),
-            IconBtn(
-              'download',
-              tooltip: 'Download ${widget.file.name}',
-              onPressed: () => _download(context, widget.file),
-              box: 30,
-              size: IconSize.xs,
+            const SizedBox(height: 2),
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 4,
+              children: [
+                Text(
+                  'Image · ${_typeOf(file.name)} · ${sizeText(size)}',
+                  style: Type.sans(12.5, color: t.muted),
+                ),
+                _SaveButton(file),
+                if (scope.share != null)
+                  IconBtn(
+                    'share',
+                    tooltip: 'Share ${file.name}',
+                    onPressed: () => _share(context, file),
+                    box: 30,
+                    size: IconSize.xs,
+                  ),
+              ],
             ),
           ],
         );
       },
+    );
+  }
+}
+
+/// An image an agent made, open over the window: the popup the shell draws as an
+/// [ImageViewer].
+class ImageView {
+  const ImageView(this.file, this.bytes);
+
+  final GeneratedFile file;
+  final Uint8List bytes;
+}
+
+/// [view]'s image over the whole window, on a dark ground, to pinch and pan: its name and
+/// Close, then Save and, where the device can share, Share.
+class ImageViewer extends StatelessWidget {
+  const ImageViewer(this.view, {super.key, required this.onClose});
+
+  final ImageView view;
+  final VoidCallback onClose;
+
+  static const _ground = Color(0xFF101018);
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final file = view.file;
+    final light = Colors.white;
+    Widget button(
+      String label,
+      String icon,
+      VoidCallback onTap, {
+      required bool filled,
+    }) => Expanded(
+      child: Tappable(
+        label: label,
+        onTap: onTap,
+        radius: BorderRadius.circular(12),
+        color: filled ? light : Colors.transparent,
+        side: filled
+            ? null
+            : BorderSide(color: light.withValues(alpha: 0.55), width: 1.5),
+        child: SizedBox(
+          height: 48,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AppIcon(
+                icon,
+                size: IconSize.small,
+                color: filled ? _ground : light,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: Type.sans(
+                  15.5,
+                  weight: FontWeight.w600,
+                  color: filled ? _ground : light,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    return CallbackShortcuts(
+      bindings: {const SingleActivator(LogicalKeyboardKey.escape): onClose},
+      child: Focus(
+        autofocus: true,
+        child: Semantics(
+          container: true,
+          scopesRoute: true,
+          explicitChildNodes: true,
+          label: 'Image',
+          child: ColoredBox(
+            color: _ground,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: 60,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 16, right: 6),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            file.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Type.sans(
+                              15,
+                              weight: FontWeight.w500,
+                              color: light,
+                            ),
+                          ),
+                        ),
+                        Tappable(
+                          label: 'Close',
+                          tooltip: 'Close',
+                          onTap: onClose,
+                          radius: BorderRadius.circular(10),
+                          child: SizedBox.square(
+                            dimension: 44,
+                            child: Center(
+                              child: AppIcon(
+                                'close',
+                                size: IconSize.small,
+                                color: light,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: InteractiveViewer(
+                    maxScale: 5,
+                    child: Center(
+                      child: Image.memory(
+                        view.bytes,
+                        gaplessPlayback: true,
+                        fit: BoxFit.contain,
+                        semanticLabel: file.name,
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+                  child: Row(
+                    spacing: 8,
+                    children: [
+                      button(
+                        'Save',
+                        'download',
+                        () => _download(context, file),
+                        filled: true,
+                      ),
+                      if (scope.share != null)
+                        button(
+                          'Share',
+                          'share',
+                          () => _share(context, file),
+                          filled: false,
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

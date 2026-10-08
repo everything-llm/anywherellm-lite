@@ -24,6 +24,9 @@ typedef FileSaver = Future<String?> Function(
   Future<List<int>?> Function() bytes,
 );
 
+/// Hands the file [name], holding [bytes], to the system's share sheet.
+typedef FileSharer = Future<void> Function(String name, List<int> bytes);
+
 /// A camera view that reads QR codes and calls [onCode] with the first one's text.
 typedef CodeScanner = Widget Function(void Function(String code) onCode);
 
@@ -45,6 +48,7 @@ class AppScope extends InheritedWidget {
     required this.launch,
     required this.save,
     this.scanner,
+    this.share,
     this.dictation,
     this.pasteImage,
     this.readAloud,
@@ -65,6 +69,10 @@ class AppScope extends InheritedWidget {
 
   /// Reads a QR code in Settings, or null where the device has no camera to scan with.
   final CodeScanner? scanner;
+
+  /// Shares a file an agent made with another app, or null where the device has no share
+  /// sheet.
+  final FileSharer? share;
 
   /// Writes what the person says in the composer, or null where the device cannot listen.
   final Dictation? dictation;
