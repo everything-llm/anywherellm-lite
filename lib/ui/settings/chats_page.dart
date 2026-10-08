@@ -26,7 +26,11 @@ class _ChatsPageState extends State<ChatsPage> {
   @override
   void initState() {
     super.initState();
-    AppScope.of(context).system.readChats();
+    // After the frame: the read tells its listeners at once, and some are built elsewhere.
+    final system = AppScope.of(context).system;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) system.readChats();
+    });
   }
 
   /// Fetches the chats in [format] and saves them where the person picks.

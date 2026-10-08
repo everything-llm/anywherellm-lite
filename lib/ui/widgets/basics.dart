@@ -5,7 +5,9 @@ import '../tokens.dart';
 import '../type.dart';
 import 'tappable.dart';
 
-enum AlertKind { warn, bad }
+/// What a box says: a warning, a failure, or a calm note of something under way, which has
+/// an accent dot by its title.
+enum AlertKind { warn, bad, info }
 
 class AlertBox extends StatelessWidget {
   const AlertBox(this.kind, this.title, {super.key, this.text});
@@ -17,83 +19,42 @@ class AlertBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final bad = kind == AlertKind.bad;
-    final fg = bad ? t.badfg : t.warnfg;
-    return Semantics(
-      liveRegion: bad,
-      container: true,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: bad ? t.badbg : t.warnbg,
-          border: bad ? Border.all(color: t.badln) : null,
-          borderRadius: BorderRadius.circular(Sizes.card),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: Type.sans(14, weight: FontWeight.w600, color: fg),
-            ),
-            if (text != null) ...[
-              const SizedBox(height: 6),
-              Text(text!, style: Type.sans(14, color: fg)),
-            ],
-          ],
-        ),
-      ),
+    final (fill, border, ink, body) = switch (kind) {
+      AlertKind.bad => (t.badbg, Border.all(color: t.badln), t.badfg, t.badfg),
+      AlertKind.warn => (t.warnbg, null, t.warnfg, t.warnfg),
+      AlertKind.info => (t.accentbg, null, t.ink, t.ink2),
+    };
+    final heading = Text(
+      title,
+      style: Type.sans(14, weight: FontWeight.w600, color: ink),
     );
-  }
-}
-
-/// A calm note of something under way, with an accent dot by its [title]: not a failure, so
-/// not drawn as one.
-class StatusBox extends StatelessWidget {
-  const StatusBox(this.title, {super.key, this.text});
-
-  final String title;
-  final String? text;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
     return Semantics(
-      liveRegion: true,
+      liveRegion: kind != AlertKind.warn,
       container: true,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: t.accentbg,
+          color: fill,
+          border: border,
           borderRadius: BorderRadius.circular(Sizes.card),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 7,
-                  height: 7,
-                  decoration: BoxDecoration(
-                    color: t.accent,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Type.sans(14, weight: FontWeight.w600, color: t.ink),
-                  ),
-                ),
-              ],
-            ),
+            if (kind == AlertKind.info)
+              Row(
+                children: [
+                  const ReadyDot(gap: false),
+                  const SizedBox(width: 8),
+                  Expanded(child: heading),
+                ],
+              )
+            else
+              heading,
             if (text != null) ...[
               const SizedBox(height: 6),
-              Text(text!, style: Type.sans(14, color: t.ink2)),
+              Text(text!, style: Type.sans(14, color: body)),
             ],
           ],
         ),
@@ -103,13 +64,15 @@ class StatusBox extends StatelessWidget {
 }
 
 /// The accent dot beside a chat or workspace whose answer finished while it was not on
-/// screen.
+/// screen, with room either side unless [gap] is false.
 class ReadyDot extends StatelessWidget {
-  const ReadyDot({super.key});
+  const ReadyDot({super.key, this.gap = true});
+
+  final bool gap;
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 6),
+    padding: EdgeInsets.symmetric(horizontal: gap ? 6 : 0),
     child: Container(
       width: 7,
       height: 7,
@@ -173,7 +136,7 @@ class UndoBar extends StatelessWidget {
   }
 }
 
-/// A small capitalised heading over a group, as over the workspaces and in Settings.
+/// A small capitalised heading over a group, as over the files and in Settings.
 class SectionLabel extends StatelessWidget {
   const SectionLabel(this.text, {super.key});
 

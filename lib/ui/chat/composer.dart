@@ -68,10 +68,9 @@ class _ComposerState extends State<Composer> {
 
   String _typed = '';
 
-  /// The answer a held message waits for, and the message as it was held: it goes when that
-  /// answer ends, however it ends, while it is still on screen and the message unchanged.
+  /// The answer a held message waits for: it goes when that answer ends, however it ends,
+  /// while it is still on screen and the message unchanged.
   Turn? _held;
-  String _heldText = '';
 
   /// Whether the workspace's chat model picker shows over the field.
   bool _picking = false;
@@ -193,7 +192,7 @@ class _ComposerState extends State<Composer> {
   void _changed() {
     if (widget.draft.text == _typed) return;
     // Typing more lets go of a held message: what goes is what was held.
-    if (_held != null && widget.draft.text != _heldText) _held = null;
+    _held = null;
     if (_listening && widget.draft.text != _dictated) {
       _go++;
       _scope.dictation?.stop();
@@ -208,12 +207,9 @@ class _ComposerState extends State<Composer> {
 
   /// Holds the message typed while this chat answers, to go when the answer ends.
   void _hold() {
-    final answer = _scope.chat.runningAnswer;
+    final answer = _scope.chat.runningHere;
     if (answer == null || widget.draft.text.trim().isEmpty) return;
-    setState(() {
-      _held = answer;
-      _heldText = widget.draft.text;
-    });
+    setState(() => _held = answer);
   }
 
   void _release() => setState(() => _held = null);
@@ -223,7 +219,7 @@ class _ComposerState extends State<Composer> {
   void _sendHeld() {
     final held = _held;
     final chat = _scope.chat;
-    if (held == null || identical(chat.runningAnswer, held)) return;
+    if (held == null || identical(chat.runningHere, held)) return;
     _held = null;
     if (!chat.turns.contains(held)) return;
     scheduleMicrotask(() {
@@ -532,9 +528,6 @@ class _Form extends StatelessWidget {
 
     // While this chat answers, a message typed is held to go when the answer ends.
     final holdable = here && !held && draft.text.trim().isNotEmpty;
-    void hold() {
-      if (holdable) onHold();
-    }
 
     /// Enter picks the highlighted command, or sends the message once it is that command.
     void enter() {
@@ -547,17 +540,14 @@ class _Form extends StatelessWidget {
     }
 
     final menu = matches.isNotEmpty;
+    final VoidCallback onEnter = menu
+        ? enter
+        : here
+        ? onHold
+        : send;
     final bindings = <ShortcutActivator, VoidCallback>{
-      const SingleActivator(LogicalKeyboardKey.enter): menu
-          ? enter
-          : here
-          ? hold
-          : send,
-      const SingleActivator(LogicalKeyboardKey.numpadEnter): menu
-          ? enter
-          : here
-          ? hold
-          : send,
+      const SingleActivator(LogicalKeyboardKey.enter): onEnter,
+      const SingleActivator(LogicalKeyboardKey.numpadEnter): onEnter,
       if (menu) ...{
         const SingleActivator(LogicalKeyboardKey.tab): () =>
             onPick(matches[highlight]),
@@ -596,34 +586,18 @@ class _Form extends StatelessWidget {
             AlertBox(AlertKind.bad, 'Could not listen', text: problem),
             const SizedBox(height: 8),
           ],
-          if (chat.editing != null) ...[
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Editing a sent message: sending replaces it and everything after it.',
-                    style: Type.sans(12, color: t.muted),
-                  ),
-                ),
-                TextAction('close', 'Send as new', chat.cancelEdit),
-              ],
+          if (chat.editing != null)
+            _FormNote(
+              'Editing a sent message: sending replaces it and everything after it.',
+              action: 'Send as new',
+              onAction: chat.cancelEdit,
             ),
-            const SizedBox(height: 8),
-          ],
-          if (held) ...[
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Sends when this answer ends.',
-                    style: Type.sans(12, color: t.muted),
-                  ),
-                ),
-                TextAction('close', "Don't send", onRelease),
-              ],
+          if (held)
+            _FormNote(
+              'Sends when this answer ends.',
+              action: "Don't send",
+              onAction: onRelease,
             ),
-            const SizedBox(height: 8),
-          ],
           if (picking) ...[
             ModelPicker(onClose: onPickModel),
             Divider(height: 21, thickness: 1, color: t.line),
@@ -720,6 +694,7 @@ class _Form extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Tappable(
+                          touchTarget: true,
                           label:
                               'AnythingLLM settings, server ${serverName(server.host)}',
                           tooltip: 'AnythingLLM settings: ${server.baseUrl}',
@@ -775,7 +750,7 @@ class _Form extends StatelessWidget {
                   ),
                 ),
               if (holdable) ...[
-                _SendWhenDone(onTap: hold),
+                _SendWhenDone(onTap: onHold),
                 const SizedBox(width: 8),
               ],
               if (here)
@@ -905,15 +880,38 @@ class _RoundButton extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => TouchTarget(
+  Widget build(BuildContext context) => Tappable(
+    touchTarget: true,
+    label: label,
+    tooltip: label,
     onTap: onTap,
-    child: Tappable(
-      label: label,
-      tooltip: label,
-      onTap: onTap,
-      radius: BorderRadius.circular(Sizes.control),
-      color: color,
-      child: SizedBox.square(dimension: 34, child: Center(child: child)),
+    radius: BorderRadius.circular(Sizes.control),
+    color: color,
+    child: SizedBox.square(dimension: 34, child: Center(child: child)),
+  );
+}
+
+/// A line over the field about the message, with the [action] that undoes it.
+class _FormNote extends StatelessWidget {
+  const _FormNote(this.text, {required this.action, required this.onAction});
+
+  final String text;
+  final String action;
+  final VoidCallback onAction;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            text,
+            style: Type.sans(12, color: Tokens.of(context).muted),
+          ),
+        ),
+        TextAction('close', action, onAction),
+      ],
     ),
   );
 }
@@ -928,27 +926,21 @@ class _SendWhenDone extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    return TouchTarget(
+    return Tappable(
+      touchTarget: true,
+      label: 'Send when done',
+      tooltip: 'Send when done',
       onTap: onTap,
-      child: Tappable(
-        label: 'Send when done',
-        tooltip: 'Send when done',
-        onTap: onTap,
-        radius: BorderRadius.circular(Sizes.control),
-        color: t.accentbg,
-        child: SizedBox(
-          height: 34,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Center(
-              child: Text(
-                'Send when done',
-                style: Type.sans(
-                  13.5,
-                  weight: FontWeight.w500,
-                  color: t.accent,
-                ),
-              ),
+      radius: BorderRadius.circular(Sizes.control),
+      color: t.accentbg,
+      child: SizedBox(
+        height: 34,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Center(
+            child: Text(
+              'Send when done',
+              style: Type.sans(13.5, weight: FontWeight.w500, color: t.accent),
             ),
           ),
         ),

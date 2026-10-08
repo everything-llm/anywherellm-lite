@@ -265,7 +265,7 @@ void main() {
               Prefs.offKey(_server, 'q3'): const ['priorities'],
             },
             recent: {
-              Prefs.offKey(_server, 'q3'): const {'budget': 5},
+              Prefs.offKey(_server, 'q3'): const ['budget'],
             },
           ),
         ),
@@ -309,9 +309,10 @@ void main() {
       await pumpApp(tester, llm: fourChats(), prefsStore: store);
       await tester.tap(inSidebar(control('Offsite venues')));
       await tester.pumpAndSettle();
-      final used = store.saved.recentIn(_server, 'q3');
-      expect(used.keys, containsAll(['kickoff', 'offsite']));
-      expect(used['offsite']!, greaterThan(used['kickoff']!));
+      expect(store.saved.recentIn(_server, 'q3').take(2), [
+        'offsite',
+        'kickoff',
+      ]);
       expect(
         top(tester, 'Offsite venues'),
         lessThan(top(tester, 'Kickoff agenda')),

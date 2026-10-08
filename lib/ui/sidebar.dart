@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../core/chat_groups.dart';
 import '../core/copy.dart';
@@ -17,6 +16,7 @@ import 'widgets/brand.dart';
 import 'widgets/buttons.dart';
 import 'widgets/fields.dart';
 import 'widgets/inline_input.dart';
+import 'widgets/menu.dart';
 import 'widgets/min_height.dart';
 import 'widgets/settings_button.dart';
 import 'widgets/tappable.dart';
@@ -225,15 +225,15 @@ class _ChatsState extends State<_Chats> {
       scope.prefs.pinnedIn(slug),
       scope.prefs.recentIn(slug),
     );
-    final pins = groups.pinned.map((t) => t.slug).toSet();
-    Iterable<Widget> rows(List<Thread> threads) => [
+    // No chat is in two groups, so the pinned ones are the Pinned group's.
+    Iterable<Widget> rows(List<Thread> threads, {bool pinned = false}) => [
       for (final thread in threads)
         _ChatRow(
           thread,
           key: ValueKey(thread.slug),
           workspace: slug,
           current: chat.activeThread == thread.slug,
-          pinned: pins.contains(thread.slug),
+          pinned: pinned,
         ),
     ];
     final mixed = groups.pinned.isNotEmpty || groups.recent.isNotEmpty;
@@ -241,7 +241,7 @@ class _ChatsState extends State<_Chats> {
       children: [
         if (groups.pinned.isNotEmpty) ...[
           const _GroupLabel('Pinned'),
-          ...rows(groups.pinned),
+          ...rows(groups.pinned, pinned: true),
         ],
         if (groups.recent.isNotEmpty) ...[
           const _GroupLabel('Recent', hint: 'on this device'),
@@ -263,14 +263,14 @@ class _ChatsState extends State<_Chats> {
     final ordered = scope.prefs.prefs.inOrder(chat.workspaces, (w) => w.slug);
     final found = [
       for (final w in ordered)
-        (
-          w,
-          [
-            for (final thread in chat.threadsOf(w.slug).reversed)
-              if (matchesSearch(query, thread.name)) thread,
-          ],
-        ),
-    ].where((f) => matchesSearch(query, f.$1.name) || f.$2.isNotEmpty);
+        if ([
+              for (final thread in chat.threadsOf(w.slug).reversed)
+                if (matchesSearch(query, thread.name)) thread,
+            ]
+            case final threads
+            when threads.isNotEmpty || matchesSearch(query, w.name))
+          (w, threads),
+    ];
     if (found.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(12),
@@ -437,9 +437,9 @@ class _ChatRow extends StatefulWidget {
 
 class _ChatRowState extends State<_ChatRow> {
   TextEditingController? _rename;
-  final _menu = OverlayPortalController();
-  final _link = LayerLink();
-  final _group = Object();
+
+  /// Whether the chat's actions show under its ⋯.
+  bool _menu = false;
 
   @override
   void dispose() {
@@ -448,7 +448,6 @@ class _ChatRowState extends State<_ChatRow> {
   }
 
   void _startRename() {
-    if (_menu.isShowing) _menu.hide();
     setState(
       () => _rename = TextEditingController(text: widget.thread.name)
         ..selection = TextSelection(
@@ -557,21 +556,17 @@ class _ChatRowState extends State<_ChatRow> {
             ),
           ),
           if (widget.current)
-            TapRegion(
-              groupId: _group,
-              child: CompositedTransformTarget(
-                link: _link,
-                child: OverlayPortal(
-                  controller: _menu,
-                  overlayChildBuilder: _overlay,
-                  child: IconBtn(
-                    'more',
-                    tooltip: 'Chat actions: rename, pin, delete',
-                    box: 30,
-                    size: IconSize.xs,
-                    onPressed: _menu.toggle,
-                  ),
-                ),
+            PopupAnchor(
+              open: _menu,
+              onClose: () => setState(() => _menu = false),
+              alignRight: true,
+              menu: _actions,
+              child: IconBtn(
+                'more',
+                tooltip: 'Chat actions: rename, pin, delete',
+                box: 30,
+                size: IconSize.xs,
+                onPressed: () => setState(() => _menu = !_menu),
               ),
             ),
         ],
@@ -580,128 +575,45 @@ class _ChatRowState extends State<_ChatRow> {
   }
 
   /// The chat's actions, under its ⋯ and ending at its right edge.
-  Widget _overlay(BuildContext context) {
+  Widget _actions(BuildContext context) {
     final scope = AppScope.of(context);
     final chat = scope.chat;
-    final t = Tokens.of(context);
     final thread = widget.thread.slug;
     void act(VoidCallback action) {
-      _menu.hide();
+      setState(() => _menu = false);
       action();
     }
 
-    return CompositedTransformFollower(
-      link: _link,
-      targetAnchor: Alignment.bottomRight,
-      followerAnchor: Alignment.topRight,
-      offset: const Offset(0, 4),
-      showWhenUnlinked: false,
-      child: Align(
-        alignment: Alignment.topRight,
-        child: TapRegion(
-          groupId: _group,
-          onTapOutside: (_) => _menu.hide(),
-          child: CallbackShortcuts(
-            bindings: {
-              const SingleActivator(LogicalKeyboardKey.escape): _menu.hide,
-            },
-            child: Focus(
-              autofocus: true,
-              child: SizedBox(
-                width: 200,
-                child: Material(
-                  color: t.panel,
-                  elevation: 8,
-                  shadowColor: t.shadow,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: t.line),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(6),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _RowAction(
-                          'Rename chat',
-                          icon: 'pencil',
-                          onTap: () => act(_startRename),
-                        ),
-                        _RowAction(
-                          widget.pinned ? 'Unpin chat' : 'Pin chat',
-                          icon: 'pin',
-                          onTap: () => act(
-                            () => scope.prefs.setPinned(
-                              widget.workspace,
-                              thread,
-                              on: !widget.pinned,
-                            ),
-                          ),
-                        ),
-                        _RowAction(
-                          'Delete chat',
-                          icon: 'trash',
-                          danger: true,
-                          onTap: chat.isAnswering(thread)
-                              ? null
-                              : () => act(() => chat.delete(thread)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+    return SizedBox(
+      width: 200,
+      child: AppMenu(
+        label: 'Chat actions',
+        children: [
+          AppMenuItem(
+            'Rename chat',
+            icon: 'pencil',
+            onTap: () => act(_startRename),
+          ),
+          AppMenuItem(
+            widget.pinned ? 'Unpin chat' : 'Pin chat',
+            icon: 'pin',
+            onTap: () => act(
+              () => scope.prefs.setPinned(
+                widget.workspace,
+                thread,
+                on: !widget.pinned,
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// One of a chat's actions.
-class _RowAction extends StatelessWidget {
-  const _RowAction(
-    this.label, {
-    required this.icon,
-    required this.onTap,
-    this.danger = false,
-  });
-
-  final String label;
-  final String icon;
-  final VoidCallback? onTap;
-  final bool danger;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    final color = danger ? t.badfg : t.ink;
-    return Tappable(
-      label: label,
-      onTap: onTap,
-      radius: BorderRadius.circular(8),
-      dimWhenDisabled: 0.4,
-      child: SizedBox(
-        height: 38,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Row(
-            children: [
-              AppIcon(icon, size: IconSize.xs, color: color),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Type.sans(14, color: color),
-                ),
-              ),
-            ],
+          AppMenuItem(
+            'Delete chat',
+            icon: 'trash',
+            danger: true,
+            onTap: chat.isAnswering(thread)
+                ? null
+                : () => act(() => chat.delete(thread)),
           ),
-        ),
+        ],
       ),
     );
   }

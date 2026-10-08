@@ -1,14 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/connection.dart';
 import '../../core/providers.dart';
 import '../../core/system_settings.dart';
 import '../app_scope.dart';
-import '../state/system_controller.dart';
 import '../icons.dart';
 import '../tokens.dart';
 import '../type.dart';
@@ -16,18 +14,6 @@ import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/fields.dart';
 import '../widgets/tappable.dart';
-
-/// The provider the system answers with and its model, as GET /v1/system gives them, each
-/// empty while not known.
-({String provider, String model}) systemChatModel(
-  Map<String, Object?>? values,
-) {
-  final provider = settingText(values, 'LLMProvider');
-  return (
-    provider: provider,
-    model: settingText(values, chatModelKeys[provider] ?? ''),
-  );
-}
 
 /// The model the open workspace answers with, its own or the system's, in the composer after
 /// the server's name. Tapped, it opens the [ModelPicker].
@@ -46,39 +32,13 @@ class _ModelChipState extends State<ModelChip> {
   /// The server the system's settings were asked of, so a failed read is not asked again on
   /// every rebuild.
   Connection? _asked;
-  late final SystemController _system;
-
-  @override
-  void initState() {
-    super.initState();
-    _system = AppScope.of(context).system..addListener(_systemChanged);
-  }
-
-  @override
-  void dispose() {
-    _system.removeListener(_systemChanged);
-    super.dispose();
-  }
-
-  /// Settings' pages tell the system's controller as they are built, which this chip, built
-  /// elsewhere, follows after the frame.
-  void _systemChanged() {
-    if (SchedulerBinding.instance.schedulerPhase ==
-        SchedulerPhase.persistentCallbacks) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() {});
-      });
-    } else if (mounted) {
-      setState(() {});
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
     return ListenableBuilder(
-      listenable: Listenable.merge([scope.sources, scope.chat]),
+      listenable: Listenable.merge([scope.sources, scope.chat, scope.system]),
       builder: (context, _) {
         final sources = scope.sources;
         final slug = scope.chat.activeSlug;
@@ -93,16 +53,15 @@ class _ModelChipState extends State<ModelChip> {
           );
         }
         final system = systemChatModel(scope.system.settings);
-        final model =
-            sources.chatModel ??
-            (sources.chatProvider == null && system.model.isNotEmpty
-                ? system.model
-                : null) ??
-            (sources.chatProvider != null
-                ? chatProviders.labelOf(sources.chatProvider!)
-                : 'Chat model');
+        final model = switch ((sources.chatModel, sources.chatProvider)) {
+          (final own?, _) => own,
+          (_, final provider?) => chatProviders.labelOf(provider),
+          _ when system.model.isNotEmpty => system.model,
+          _ => 'Chat model',
+        };
         final busy = scope.chat.answeringIn(slug);
         return Tappable(
+          touchTarget: true,
           label: 'Chat model, $model',
           tooltip: 'The model this workspace answers with',
           expanded: widget.open,

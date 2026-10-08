@@ -1,4 +1,3 @@
-import 'prefs.dart';
 import 'server_models.dart';
 
 /// A workspace's chats as the sidebar lists them: the [pinned] ones, the [recent] ones this
@@ -9,31 +8,31 @@ typedef ChatGroups = ({
   List<Thread> rest,
 });
 
-/// Groups [threads], in the server's order (oldest made first), by the slugs [pinned] and
-/// when this device [used] each chat: pinned chats newest made first; then the
-/// [Prefs.recentMax] last used, last used first; then every other chat newest made first.
+/// Groups [threads], in the server's order (oldest made first), by the slugs [pinned] and the
+/// slugs this device used last, [recent], last used first: pinned chats newest made first;
+/// then the recent ones in their order; then every other chat newest made first. A slug of a
+/// chat that is gone counts for nothing.
 ChatGroups groupChats(
   List<Thread> threads,
   List<String> pinned,
-  Map<String, int> used,
+  List<String> recent,
 ) {
-  final newest = threads.reversed.toList();
+  final bySlug = {for (final t in threads) t.slug: t};
   final pins = pinned.toSet();
-  final recent = [
-    for (final t in newest)
-      if (!pins.contains(t.slug) && used.containsKey(t.slug)) t,
-  ]..sort((a, b) => used[b.slug]!.compareTo(used[a.slug]!));
-  final kept = recent.take(Prefs.recentMax).toList();
-  final inRecent = {for (final t in kept) t.slug};
+  final used = [
+    for (final slug in recent)
+      if (!pins.contains(slug)) ?bySlug[slug],
+  ];
+  final listed = {...pins, for (final t in used) t.slug};
   return (
     pinned: [
-      for (final t in newest)
+      for (final t in threads.reversed)
         if (pins.contains(t.slug)) t,
     ],
-    recent: kept,
+    recent: used,
     rest: [
-      for (final t in newest)
-        if (!pins.contains(t.slug) && !inRecent.contains(t.slug)) t,
+      for (final t in threads.reversed)
+        if (!listed.contains(t.slug)) t,
     ],
   );
 }

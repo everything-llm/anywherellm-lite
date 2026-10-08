@@ -608,7 +608,8 @@ class _Answer extends StatelessWidget {
         if (turn.error case final error?) ...[
           const SizedBox(height: 10),
           if (turn.stillRunning)
-            const StatusBox(
+            const AlertBox(
+              AlertKind.info,
               'Still being written',
               text:
                   'The connection dropped, but the answer keeps going on the server. It will '

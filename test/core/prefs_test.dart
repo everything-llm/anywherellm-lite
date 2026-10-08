@@ -203,11 +203,11 @@ void main() {
       final prefs = const Prefs()
           .withPin(_s, 'q3', 'a', on: true)
           .withPin(_t, 'q3', 'b', on: true)
-          .withUse(_s, 'q3', 'c', 10);
+          .withUse(_s, 'q3', 'c');
       final back = Prefs.decode(prefs.encode());
       expect(back.pinnedIn(_s, 'q3'), ['a']);
       expect(back.pinnedIn(_t, 'q3'), ['b']);
-      expect(back.recentIn(_s, 'q3'), {'c': 10});
+      expect(back.recentIn(_s, 'q3'), ['c']);
       expect(back.recentIn(_t, 'q3'), isEmpty);
     });
 
@@ -219,28 +219,27 @@ void main() {
       expect(prefs.pinned, isEmpty);
     });
 
-    test('Recent keeps the last used, and a use in the same instant after', () {
+    test('Recent keeps the last used, last used first', () {
       var prefs = const Prefs();
       for (var i = 0; i < Prefs.recentMax + 3; i++) {
-        prefs = prefs.withUse(_s, 'q3', 't$i', 100 + i);
+        prefs = prefs.withUse(_s, 'q3', 't$i');
       }
       final used = prefs.recentIn(_s, 'q3');
       expect(used, hasLength(Prefs.recentMax));
-      expect(used.containsKey('t0'), isFalse);
-      prefs = prefs.withUse(_s, 'q3', 't3', 100);
-      final again = prefs.recentIn(_s, 'q3');
-      expect(again['t3'], greaterThan(again['t12']!));
+      expect(used.first, 't12');
+      expect(used, isNot(contains('t0')));
+      expect(prefs.withUse(_s, 'q3', 't5').recentIn(_s, 'q3').first, 't5');
     });
 
     test('a deleted chat and a deleted workspace are forgotten', () {
       final prefs = const Prefs()
           .withPin(_s, 'q3', 'a', on: true)
-          .withUse(_s, 'q3', 'a', 1)
-          .withUse(_s, 'q3', 'b', 2)
+          .withUse(_s, 'q3', 'a')
+          .withUse(_s, 'q3', 'b')
           .withPin(_s, 'home', 'h', on: true);
       final noChat = prefs.withoutChat(_s, 'q3', 'a');
       expect(noChat.pinnedIn(_s, 'q3'), isEmpty);
-      expect(noChat.recentIn(_s, 'q3'), {'b': 2});
+      expect(noChat.recentIn(_s, 'q3'), ['b']);
       final noWorkspace = prefs.withoutWorkspace(_s, 'q3');
       expect(noWorkspace.pinnedIn(_s, 'q3'), isEmpty);
       expect(noWorkspace.recentIn(_s, 'q3'), isEmpty);
@@ -250,22 +249,22 @@ void main() {
     test('move with a workspace whose slug changes', () {
       final prefs = const Prefs()
           .withPin(_s, 'q3', 'a', on: true)
-          .withUse(_s, 'q3', 'b', 2)
+          .withUse(_s, 'q3', 'b')
           .withRenamedWorkspace(_s, 'q3', 'q4');
       expect(prefs.pinnedIn(_s, 'q4'), ['a']);
-      expect(prefs.recentIn(_s, 'q4'), {'b': 2});
+      expect(prefs.recentIn(_s, 'q4'), ['b']);
       expect(prefs.pinnedIn(_s, 'q3'), isEmpty);
     });
 
     test('that are not its JSON are left out', () {
       final prefs = Prefs.decode(
-        '{"pinned": {"k": [1, "a"], "j": "x"}, "recent": {"k": {"a": "x", "b": 3}}}',
+        '{"pinned": {"k": [1, "a"], "j": "x"}, "recent": {"k": [true, "b"], "j": {"a": 1}}}',
       );
       expect(prefs.pinned, {
         'k': ['a'],
       });
       expect(prefs.recent, {
-        'k': {'b': 3},
+        'k': ['b'],
       });
     });
   });

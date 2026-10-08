@@ -6,13 +6,9 @@ import 'notice.dart';
 
 /// The app's preferences: read once at start, written on every change.
 class PrefsController extends ChangeNotifier {
-  PrefsController(this._store, {DateTime Function()? now})
-    : _now = now ?? DateTime.now;
+  PrefsController(this._store);
 
   final PrefsStore _store;
-
-  /// The time a chat is used at.
-  final DateTime Function() _now;
 
   Prefs prefs = const Prefs();
 
@@ -63,20 +59,16 @@ class PrefsController extends ChangeNotifier {
     final server = _server;
     if (server != null && prefs.lastChat != LastChat(slug, thread, server)) {
       final next = prefs.withLastChat(server, slug, thread);
-      await _change(
-        thread == null
-            ? next
-            : next.withUse(server, slug, thread, _now().millisecondsSinceEpoch),
-      );
+      await _change(thread == null ? next : next.withUse(server, slug, thread));
     }
   }
 
   /// Notes that this device used chat [thread] of workspace [slug] now, for Recent.
   Future<void> useChat(String slug, String thread) async {
-    if (_server case final server?) {
-      await _change(
-        prefs.withUse(server, slug, thread, _now().millisecondsSinceEpoch),
-      );
+    final server = _server;
+    // Already the last used, as when its answer ends while it is on screen: nothing to write.
+    if (server != null && prefs.recentIn(server, slug).firstOrNull != thread) {
+      await _change(prefs.withUse(server, slug, thread));
     }
   }
 
@@ -84,9 +76,10 @@ class PrefsController extends ChangeNotifier {
   List<String> pinnedIn(String slug) =>
       _server == null ? const [] : prefs.pinnedIn(_server!, slug);
 
-  /// When this device last used each chat of workspace [slug] of the server in use.
-  Map<String, int> recentIn(String slug) =>
-      _server == null ? const {} : prefs.recentIn(_server!, slug);
+  /// The chats this device used last in workspace [slug] of the server in use, last used
+  /// first.
+  List<String> recentIn(String slug) =>
+      _server == null ? const [] : prefs.recentIn(_server!, slug);
 
   Future<void> setPinned(String slug, String thread, {required bool on}) async {
     if (_server case final server?) {
@@ -108,8 +101,7 @@ class PrefsController extends ChangeNotifier {
     if (server == null) return;
     if (prefs.workspaceOrder.contains(slug) ||
         prefs.lastChatIn(server, slug) ||
-        prefs.pinned.containsKey(Prefs.offKey(server, slug)) ||
-        prefs.recent.containsKey(Prefs.offKey(server, slug))) {
+        prefs.keepsChatsOf(server, slug)) {
       await _change(prefs.withoutWorkspace(server, slug));
     }
   }
@@ -120,8 +112,7 @@ class PrefsController extends ChangeNotifier {
     if (server == null) return;
     if (prefs.workspaceOrder.contains(from) ||
         prefs.switchedOff.containsKey(Prefs.offKey(server, from)) ||
-        prefs.pinned.containsKey(Prefs.offKey(server, from)) ||
-        prefs.recent.containsKey(Prefs.offKey(server, from)) ||
+        prefs.keepsChatsOf(server, from) ||
         prefs.lastChatIn(server, from)) {
       await _change(prefs.withRenamedWorkspace(server, from, to));
     }

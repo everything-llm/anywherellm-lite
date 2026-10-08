@@ -27,7 +27,11 @@ class _EmbedsPageState extends State<EmbedsPage> {
   @override
   void initState() {
     super.initState();
-    AppScope.of(context).system.readEmbeds();
+    // After the frame: the read tells its listeners at once, and some are built elsewhere.
+    final system = AppScope.of(context).system;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) system.readEmbeds();
+    });
   }
 
   @override

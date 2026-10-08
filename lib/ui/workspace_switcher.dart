@@ -13,6 +13,7 @@ import 'type.dart';
 import 'widgets/basics.dart';
 import 'widgets/confirm_box.dart';
 import 'widgets/inline_input.dart';
+import 'widgets/menu.dart';
 import 'widgets/tappable.dart';
 
 /// Whether Ctrl+1 to Ctrl+9 are shown beside the workspaces: on a desktop, where there is a
@@ -125,7 +126,7 @@ class WorkspaceQuestion extends StatelessWidget {
       child: ask.asking == Asking.delete
           ? ConfirmBox(
               text:
-                  'Delete ${chat.active?.name} and its ${plural(chat.threadsOf(ask._about ?? '').length, 'chat', 'chats')}? Its documents stay in the library.',
+                  'Delete ${chat.active?.name} and its ${plural(chat.threadsOf(chat.activeSlug ?? '').length, 'chat', 'chats')}? Its documents stay in the library.',
               onCancel: ask.reset,
               onConfirm: ask.delete,
             )
@@ -154,11 +155,6 @@ class WorkspaceSwitcher extends StatefulWidget {
 }
 
 class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
-  final _menu = OverlayPortalController();
-  final _link = LayerLink();
-
-  /// The switcher and the menu tap as one: a tap on the switcher is not a tap outside the menu.
-  final _group = Object();
   late final ChatController _chat;
   late final ShellController _shell;
 
@@ -167,23 +163,7 @@ class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
     super.initState();
     final scope = AppScope.of(context);
     _chat = scope.chat;
-    _shell = scope.shell..addListener(_shellChanged);
-    // Built anew in a drawer while the menu was open, as when the window narrows.
-    if (_shell.menuOpen) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _shellChanged());
-    }
-  }
-
-  @override
-  void dispose() {
-    _shell.removeListener(_shellChanged);
-    super.dispose();
-  }
-
-  void _shellChanged() {
-    if (!mounted) return;
-    if (_shell.menuOpen && !_menu.isShowing) _menu.show();
-    if (!_shell.menuOpen && _menu.isShowing) _menu.hide();
+    _shell = scope.shell;
   }
 
   @override
@@ -202,16 +182,19 @@ class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
               onCancel: ask.reset,
               commitOnBlur: true,
             )
-          : TapRegion(
-              groupId: _group,
-              child: CompositedTransformTarget(
-                link: _link,
-                child: OverlayPortal(
-                  controller: _menu,
-                  overlayChildBuilder: _overlay,
-                  child: _button(context),
+          : PopupAnchor(
+              open: _shell.menuOpen,
+              onClose: _shell.closeMenu,
+              // As wide as the switcher.
+              menu: (context) => SizedBox(
+                width: Sizes.sidebar - 24,
+                child: _WorkspaceMenu(
+                  onRename: () => ask.ask(Asking.rename),
+                  onDelete: () => ask.ask(Asking.delete),
+                  onCreate: () => ask.ask(Asking.create),
                 ),
               ),
+              child: _button(context),
             ),
     );
   }
@@ -268,37 +251,6 @@ class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
       ),
     );
   }
-
-  /// The menu, under the switcher and as wide as it.
-  Widget _overlay(BuildContext context) => CompositedTransformFollower(
-    link: _link,
-    targetAnchor: Alignment.bottomLeft,
-    followerAnchor: Alignment.topLeft,
-    offset: const Offset(0, 6),
-    showWhenUnlinked: false,
-    child: Align(
-      alignment: Alignment.topLeft,
-      child: TapRegion(
-        groupId: _group,
-        onTapOutside: (_) => _shell.closeMenu(),
-        child: SizedBox(
-          width: Sizes.sidebar - 24,
-          child: ListenableBuilder(
-            listenable: Listenable.merge([
-              _chat,
-              AppScope.of(context).prefs,
-              _shell,
-            ]),
-            builder: (context, _) => _WorkspaceMenu(
-              onRename: () => widget.ask.ask(Asking.rename),
-              onDelete: () => widget.ask.ask(Asking.delete),
-              onCreate: () => widget.ask.ask(Asking.create),
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
 }
 
 class _WorkspaceMenu extends StatelessWidget {
@@ -317,135 +269,60 @@ class _WorkspaceMenu extends StatelessWidget {
     final scope = AppScope.of(context);
     final chat = scope.chat;
     final shell = scope.shell;
-    final t = Tokens.of(context);
     final ordered = scope.prefs.prefs.inOrder(chat.workspaces, (w) => w.slug);
     final active = chat.active;
     final keys = showsWorkspaceKeys(context);
-    Widget divider() => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-      child: Container(height: 1, color: t.line2),
-    );
-    return Material(
-      color: t.panel,
-      elevation: 8,
-      shadowColor: t.shadow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: t.line),
-      ),
-      child: Semantics(
-        container: true,
-        label: 'Workspaces',
-        child: Padding(
-          padding: const EdgeInsets.all(6),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (ordered.isNotEmpty)
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 320),
-                  child: ReorderableListView.builder(
-                    shrinkWrap: true,
-                    // The row starts a drag, not a handle beside it.
-                    buildDefaultDragHandles: false,
-                    itemCount: ordered.length,
-                    onReorderItem: (from, to) {
-                      final slugs = [for (final w in ordered) w.slug];
-                      slugs.insert(to, slugs.removeAt(from));
-                      scope.prefs.setWorkspaceOrder(slugs);
-                    },
-                    // The dragged row is drawn in the app's overlay, outside AppScope, so it is
-                    // shown as a name alone.
-                    proxyDecorator: (child, i, animation) =>
-                        _DragGhost(ordered[i].name),
-                    itemBuilder: (context, i) => _WorkspaceItem(
-                      ordered[i],
-                      key: ValueKey(ordered[i].slug),
-                      index: i,
-                      shortcut: keys && i < 9 ? 'Ctrl ${i + 1}' : null,
-                    ),
-                  ),
-                ),
-              if (ordered.isNotEmpty) divider(),
-              _MenuItem(
-                shell.pane == Pane.files ? 'Chats' : 'Files and settings',
-                onTap: () => shell.showPane(
-                  shell.pane == Pane.files ? Pane.chats : Pane.files,
-                ),
+    return AppMenu(
+      label: 'Workspaces',
+      children: [
+        if (ordered.isNotEmpty)
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 320),
+            child: ReorderableListView.builder(
+              shrinkWrap: true,
+              // The row starts a drag, not a handle beside it.
+              buildDefaultDragHandles: false,
+              itemCount: ordered.length,
+              onReorderItem: (from, to) {
+                final slugs = [for (final w in ordered) w.slug];
+                slugs.insert(to, slugs.removeAt(from));
+                scope.prefs.setWorkspaceOrder(slugs);
+              },
+              // The dragged row is drawn in the app's overlay, outside AppScope, so it is
+              // shown as a name alone.
+              proxyDecorator: (child, i, animation) =>
+                  _DragGhost(ordered[i].name),
+              itemBuilder: (context, i) => _WorkspaceItem(
+                ordered[i],
+                key: ValueKey(ordered[i].slug),
+                index: i,
+                shortcut: keys && i < 9 ? 'Ctrl ${i + 1}' : null,
               ),
-              if (active != null) ...[
-                _MenuItem('Rename workspace', onTap: onRename),
-                _MenuItem(
-                  'Delete workspace…',
-                  danger: true,
-                  onTap: chat.answeringIn(active.slug) ? null : onDelete,
-                ),
-              ],
-              divider(),
-              _MenuItem(
-                'New workspace',
-                icon: 'plus',
-                accent: true,
-                onTap: onCreate,
-              ),
-            ],
+            ),
+          ),
+        if (ordered.isNotEmpty) const MenuDivider(),
+        AppMenuItem(
+          shell.pane == Pane.files ? 'Chats' : 'Files and settings',
+          onTap: () => shell.showPane(
+            shell.pane == Pane.files ? Pane.chats : Pane.files,
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// One of the menu's actions.
-class _MenuItem extends StatelessWidget {
-  const _MenuItem(
-    this.label, {
-    required this.onTap,
-    this.icon,
-    this.danger = false,
-    this.accent = false,
-  });
-
-  final String label;
-  final VoidCallback? onTap;
-  final String? icon;
-  final bool danger;
-  final bool accent;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    final color = danger
-        ? t.badfg
-        : accent
-        ? t.accent
-        : t.ink;
-    return Tappable(
-      label: label,
-      onTap: onTap,
-      radius: BorderRadius.circular(8),
-      dimWhenDisabled: 0.4,
-      child: SizedBox(
-        height: 38,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 16,
-                child: icon == null
-                    ? null
-                    : AppIcon(icon!, size: IconSize.xs, color: color),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(label, style: Type.sans(14, color: color)),
-              ),
-            ],
+        if (active != null) ...[
+          AppMenuItem('Rename workspace', onTap: onRename),
+          AppMenuItem(
+            'Delete workspace…',
+            danger: true,
+            onTap: chat.answeringIn(active.slug) ? null : onDelete,
           ),
+        ],
+        const MenuDivider(),
+        AppMenuItem(
+          'New workspace',
+          icon: 'plus',
+          accent: true,
+          onTap: onCreate,
         ),
-      ),
+      ],
     );
   }
 }

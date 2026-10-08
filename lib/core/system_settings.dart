@@ -382,6 +382,18 @@ class SystemField {
 
 /// Setting [key] of [settings] as text: empty when it has none, or for a secret, which the server
 /// shows only as whether it is set.
+/// The provider the system answers with and its model, as GET /v1/system gives them in
+/// [values], each empty while not known.
+({String provider, String model}) systemChatModel(
+  Map<String, Object?>? values,
+) {
+  final provider = settingText(values, 'LLMProvider');
+  return (
+    provider: provider,
+    model: settingText(values, chatModelKeys[provider] ?? ''),
+  );
+}
+
 String settingText(Map<String, Object?>? settings, String key) =>
     switch (settings?[key]) {
       null || bool() => '',

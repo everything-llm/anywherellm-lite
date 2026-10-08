@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../layout.dart';
+
 /// The one way a control is tappable: an optional tooltip, a button's semantics, a surface and
 /// an ink well, in that order.
 ///
@@ -28,6 +30,7 @@ class Tappable extends StatelessWidget {
     this.tooltip,
     this.dimWhenDisabled,
     this.excludeSemantics = true,
+    this.touchTarget = false,
   }) : assert(radius == null || shape == null, 'give a radius or a shape');
 
   final String label;
@@ -51,6 +54,13 @@ class Tappable extends StatelessWidget {
 
   /// True hides what [child] says from a screen reader, so [label] is all it hears.
   final bool excludeSemantics;
+
+  /// True gives a control drawn smaller than a finger a square of [touchSide] to be tapped in
+  /// on a phone, where a tap beside it does what [onTap] does.
+  final bool touchTarget;
+
+  /// The least a finger needs.
+  static const touchSide = 44.0;
 
   @override
   Widget build(BuildContext context) {
@@ -91,6 +101,20 @@ class Tappable extends StatelessWidget {
     if (dim != null) {
       result = Opacity(opacity: enabled ? 1 : dim, child: result);
     }
-    return tooltip == null ? result : Tooltip(message: tooltip, child: result);
+    if (tooltip != null) result = Tooltip(message: tooltip, child: result);
+    if (!touchTarget || !ScreenClass.ofContext(context).isPhone) return result;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      // The control already says what it is and does.
+      excludeFromSemantics: true,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          minWidth: touchSide,
+          minHeight: touchSide,
+        ),
+        child: Center(widthFactor: 1, heightFactor: 1, child: result),
+      ),
+    );
   }
 }

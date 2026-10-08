@@ -132,8 +132,6 @@ class Turn extends ChangeNotifier {
   }
 }
 
-/// The one answer running: the chat it belongs to, null while its draft's thread is being made,
-/// and the stream it reads.
 /// A chat [ChatController.delete] took out of the list and has not deleted on the server yet.
 class _Deleted {
   const _Deleted({
@@ -158,6 +156,8 @@ class _Deleted {
   final bool open;
 }
 
+/// The one answer running: the chat it belongs to, null while its draft's thread is being made,
+/// and the stream it reads.
 class _Running {
   _Running(this.answer, this.slug);
 
@@ -311,19 +311,15 @@ class ChatController extends ChangeNotifier {
   bool get answeringHere =>
       _running != null && turns.contains(_running!.answer);
 
-  /// The answer that runs, or null.
-  Turn? get runningAnswer => _running?.answer;
-
   /// The chats whose answer ended, neither failed nor stopped, while another chat was on
-  /// screen, until they are opened. Kept for this run only.
-  final _ready = <String>{};
+  /// screen, until they are opened, each to its workspace's slug. Kept for this run only.
+  final _ready = <String, String>{};
 
   /// Whether chat [thread]'s answer is ready and not yet seen.
-  bool isReady(String thread) => _ready.contains(thread);
+  bool isReady(String thread) => _ready.containsKey(thread);
 
   /// Whether a chat of workspace [slug] has an answer ready.
-  bool readyIn(String slug) =>
-      threadsOf(slug).any((t) => _ready.contains(t.slug));
+  bool readyIn(String slug) => _ready.containsValue(slug);
 
   bool isAnswering(String thread) => _running?.thread == thread;
 
@@ -693,7 +689,6 @@ class ChatController extends ChangeNotifier {
     });
   }
 
-  /// Deletes chat [threadSlug], unless it is answering. Shows the chat before it, or a draft.
   /// How long a deleted chat can be put back before it is deleted on the server.
   static const undoFor = Duration(seconds: 6);
 
@@ -742,12 +737,18 @@ class ChatController extends ChangeNotifier {
     }
   }
 
-  /// Puts the chat [delete] took out back where it was, and on screen if it was.
-  Future<void> undoDelete() async {
+  /// The chat [delete] took out, which is no longer waiting, or null when none was.
+  _Deleted? _takeDeleted() {
     final deleted = _deleted;
-    if (deleted == null) return;
     _deleteTimer?.cancel();
     _deleted = null;
+    return deleted;
+  }
+
+  /// Puts the chat [delete] took out back where it was, and on screen if it was.
+  Future<void> undoDelete() async {
+    final deleted = _takeDeleted();
+    if (deleted == null) return;
     _restore(deleted);
     if (deleted.open && activeSlug == deleted.slug) {
       await open(deleted.chat.slug);
@@ -759,10 +760,8 @@ class ChatController extends ChangeNotifier {
   /// Deletes on the server, now, the chat [delete] took out, on the server it was on. A delete
   /// the server refuses puts the chat back.
   Future<void> flushDelete() async {
-    final deleted = _deleted;
+    final deleted = _takeDeleted();
     if (deleted == null) return;
-    _deleteTimer?.cancel();
-    _deleted = null;
     notifyListeners();
     final thread = deleted.chat.slug;
     try {
@@ -771,20 +770,21 @@ class ChatController extends ChangeNotifier {
         unawaited(_prefs.forgetChat(deleted.slug, thread));
       }
     } on ApiException catch (error) {
-      if (_disposed || _server != deleted.server) return;
-      _restore(deleted);
+      if (_disposed || !_restore(deleted)) return;
       problem = Notice('Could not delete the chat', error.message);
       notifyListeners();
     }
   }
 
-  void _restore(_Deleted deleted) {
-    if (_server != deleted.server) return;
+  /// Puts [deleted] back in its list, and says whether it was its server's to put back.
+  bool _restore(_Deleted deleted) {
+    if (_server != deleted.server) return false;
     final list = [...threadsOf(deleted.slug)];
-    if (list.any((t) => t.slug == deleted.chat.slug)) return;
+    if (list.any((t) => t.slug == deleted.chat.slug)) return true;
     list.insert(deleted.at.clamp(0, list.length), deleted.chat);
     _threads[deleted.slug] = list;
     if (deleted.turns case final turns?) _turns[deleted.chat.slug] = turns;
+    return true;
   }
 
   /// Asks [message], with [attachments], in the chat on screen, making its thread first when it
@@ -1071,7 +1071,7 @@ class ChatController extends ChangeNotifier {
       _finished = running.answer;
       if (running.thread case final thread?
           when thread != activeThread || running.slug != activeSlug) {
-        _ready.add(thread);
+        _ready[thread] = running.slug;
       }
     }
     // An answer in a chat, however it ended, is a use of it, for Recent.

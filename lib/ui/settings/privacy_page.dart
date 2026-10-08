@@ -20,8 +20,7 @@ class PrivacyPage extends StatelessWidget {
     return ServerSettings(
       builder: (values, _) {
         String text(String key) => settingText(values, key);
-        final chat = text('LLMProvider');
-        final model = text(chatModelKeys[chat] ?? '');
+        final (provider: chat, :model) = systemChatModel(values);
         final embedder = text('EmbeddingEngine');
         final store = text('VectorDB');
         final telemetry = switch (values['DisableTelemetry']) {

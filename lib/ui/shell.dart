@@ -16,11 +16,6 @@ import 'state/shell_controller.dart';
 import 'tokens.dart';
 import 'widgets/rise.dart';
 
-/// The window: sidebar, chat and Sources, arranged for the width they have, with Settings over
-/// them when it is open.
-///
-/// Below 820 the sidebar is a drawer from the left; below 1120 Sources is a drawer from the
-/// right. Esc and Back close the topmost thing open: Settings, then a drawer.
 /// Ctrl and these open the workspaces in the sidebar's order.
 const _digits = [
   LogicalKeyboardKey.digit1,
@@ -57,6 +52,12 @@ void _findChats(AppScope scope, {required bool drawer}) {
   );
 }
 
+/// The window: sidebar, chat and Sources, arranged for the width they have, with Settings over
+/// them when it is open.
+///
+/// Below 820 the sidebar is a drawer from the left; below 1120 Sources is a drawer from the
+/// right. Esc and Back close the topmost thing open: the workspace menu, Settings, then a
+/// drawer.
 class AppShell extends StatelessWidget {
   const AppShell({super.key});
 

@@ -7,6 +7,7 @@ import '../../core/connection.dart';
 import '../../core/ports.dart';
 import '../../core/server_models.dart';
 import '../../core/sources.dart';
+import '../../core/system_settings.dart';
 import '../../core/upload.dart';
 import 'chat_controller.dart';
 import 'notice.dart';
@@ -356,10 +357,11 @@ class SourcesController extends ChangeNotifier {
   String? get chatProvider => _own('chatProvider');
   String? get chatModel => _own('chatModel');
 
-  String? _own(String key) => switch (read?.settings?.values[key]) {
-    final String text when text.trim().isNotEmpty => text.trim(),
-    _ => null,
-  };
+  String? _own(String key) =>
+      switch (settingText(read?.settings?.values, key).trim()) {
+        '' => null,
+        final text => text,
+      };
 
   /// Makes the workspace answer with [provider] and [model], null for the system's, the same
   /// columns the Files pane's settings.json writes. Says why the server refused, or null.
