@@ -51,6 +51,23 @@ void main() {
     expect(message(tester), 'hello');
   });
 
+  testWidgets('a change to the message ends the go, and is kept', (
+    tester,
+  ) async {
+    final h = await pumpApp(tester, llm: planningServer(), canDictate: true);
+    await tester.tap(control('Dictate'));
+    await tester.pump();
+    h.dictation!.say('hello');
+    await tester.pump();
+    await tester.enterText(composerField, 'Typed instead');
+    await tester.pump();
+    expect(h.dictation!.stopped, 1);
+    expect(control('Dictate'), findsOneWidget);
+    h.dictation!.say('hello there');
+    await tester.pump();
+    expect(message(tester), 'Typed instead');
+  });
+
   testWidgets('a device that cannot listen says so', (tester) async {
     final h = await pumpApp(tester, llm: planningServer(), canDictate: true);
     h.dictation!.available = false;

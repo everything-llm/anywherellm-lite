@@ -19,15 +19,15 @@ import '../widgets/tappable.dart';
 import 'dictation.dart';
 import 'slash_menu.dart';
 
-/// Where a question is written. Enter sends it and Shift+Enter starts a new line. While this
-/// chat answers, Send becomes Stop; while another chat answers, nothing can be sent. Files
-/// attached go with the next question only. A message that starts with a slash offers the
-/// commands that match it.
 /// Whether [text] can be sent in the chat on screen: nothing runs, the chat is ready, a workspace
 /// is open and there is something to send.
 bool canSend(ChatController chat, String text) =>
     !chat.busy && chat.ready && chat.active != null && text.trim().isNotEmpty;
 
+/// Where a question is written. Enter sends it and Shift+Enter starts a new line. While this
+/// chat answers, Send becomes Stop; while another chat answers, nothing can be sent. Files
+/// attached go with the next question only. A message that starts with a slash offers the
+/// commands that match it.
 class Composer extends StatefulWidget {
   const Composer({super.key, required this.draft, required this.focus});
 
@@ -66,6 +66,10 @@ class _ComposerState extends State<Composer> {
   bool _listening = false;
   String _before = '';
 
+  /// The message as dictation last left it. A message changed from it otherwise, by typing, a
+  /// suggestion or Edit, ends the go, so what is heard never overwrites that change.
+  String _dictated = '';
+
   /// Counts the goes, so words that arrive after a message was sent are not put in the next.
   int _go = 0;
 
@@ -95,8 +99,8 @@ class _ComposerState extends State<Composer> {
     super.dispose();
   }
 
-  /// Starts or ends listening. What is heard follows the message as it stood, and the person
-  /// can still edit it.
+  /// Starts or ends listening. What is heard follows the message as it stood; a change to the
+  /// message made otherwise ends listening.
   Future<void> _dictate() async {
     final dictation = _scope.dictation;
     if (dictation == null) return;
@@ -109,6 +113,7 @@ class _ComposerState extends State<Composer> {
         ? draft
         : '$draft ';
     final go = ++_go;
+    _dictated = draft;
     setState(() {
       _listening = true;
       _micProblem = null;
@@ -116,10 +121,11 @@ class _ComposerState extends State<Composer> {
     final started = await dictation.start(
       onWords: (words) {
         if (go != _go) return;
-        _setDraft('$_before$words');
+        _setDraft(_dictated = '$_before$words');
       },
       onDone: (how) {
-        if (!mounted) return;
+        // A go already ended here, by a send or a change to the message, has nothing to end.
+        if (!mounted || go != _go) return;
         setState(() => _listening = false);
         final send = _scope.prefs.prefs.isOn(ChatSwitch.sendDictation);
         if (how == DictationEnd.paused &&
@@ -164,6 +170,11 @@ class _ComposerState extends State<Composer> {
 
   void _changed() {
     if (widget.draft.text == _typed) return;
+    if (_listening && widget.draft.text != _dictated) {
+      _go++;
+      _scope.dictation?.stop();
+      _listening = false;
+    }
     setState(() {
       _typed = widget.draft.text;
       _highlight = 0;
