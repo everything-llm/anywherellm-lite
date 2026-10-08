@@ -1,4 +1,5 @@
 import 'package:anywherellm/core/chat.dart';
+import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/chat/browser_panel.dart';
 import 'package:anywherellm/ui/chat/card_image.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
@@ -64,6 +65,57 @@ void main() {
     await tester.tap(find.text('Used the browser · 1 step'));
     await tester.pumpAndSettle();
     expect(find.text('1. Opening news.ycombinator.com'), findsNWidgets(2));
+
+    // The chat used the browser, so Browser stays, and its panel, still open, says no card
+    // came.
+    expect(control('Browser'), findsOneWidget);
+    expect(h.shell.browserOpen, isTrue);
+    expect(
+      find.text('The agent has not shown this chat\'s browser yet.'),
+      findsOneWidget,
+    );
+    expect(find.text('The last answer\'s steps'), findsOneWidget);
+  });
+
+  testWidgets(
+    'a login request\'s card stands for the browser, and opens its form',
+    (tester) async {
+      final form = Uri.parse(
+        'https://h:8445/_live/browser/login/lr-${'b' * 32}',
+      );
+      final llm = planningServer()..hold = true;
+      final h = await pumpApp(tester, llm: llm);
+      await typeAndEnter(tester, 'Log me in');
+      llm.chat!
+        ..add(
+          const StatusChunk('Asking you for a login', tool: 'browser-login'),
+        )
+        ..add(WholeAnswer('Card: [![Log in to example.com]($form.png)]($form)'))
+        ..add(const ChatDone([]));
+      await llm.chat!.close();
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Used the browser'), findsNothing);
+
+      await tester.tap(control('Browser'));
+      await tester.pumpAndSettle();
+      expect(find.text('The agent is asking you for a login.'), findsOneWidget);
+      await tester.tap(control('Open the login form'));
+      await tester.pumpAndSettle();
+      expect(h.opened, [form]);
+    },
+  );
+
+  testWidgets('Refresh reads the chat again from the server', (tester) async {
+    final llm = planningServer();
+    await pumpApp(tester, llm: llm);
+    llm.histories['budget'] = [
+      ...llm.histories['budget']!,
+      const ChatMessage(role: Role.user, text: 'Asked on the phone'),
+      const ChatMessage(role: Role.assistant, text: 'Answered on the phone.'),
+    ];
+    await tester.tap(control('Read this chat again from the server'));
+    await tester.pumpAndSettle();
+    expect(find.text('Answered on the phone.'), findsOneWidget);
   });
 
   testWidgets('a chat with a card has Browser in its header, with Take over', (

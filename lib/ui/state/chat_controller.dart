@@ -273,18 +273,59 @@ class ChatController extends ChangeNotifier {
   /// controller does not.
   Turn? get runningHere => answeringHere ? _running!.answer : null;
 
-  /// The newest browser card in the chat on screen's finished answers, or null. A running
-  /// answer's card counts once it ends, so the text streaming in is never parsed for one.
-  BrowserCard? get browserCard {
+  /// The browser's cards in the chat on screen's finished answers, newest first. A running
+  /// answer's cards count once it ends, so the text streaming in is never parsed for one.
+  Iterable<BrowserCard> get _cardsHere sync* {
     for (final turn in turns.reversed) {
       if (turn.role != Role.assistant || turn.streaming) continue;
-      if (cardsOf(turn).lastOrNull case final card?) return card;
+      yield* cardsOf(turn).reversed;
     }
-    return null;
   }
+
+  /// The newest tab's card in the chat on screen, or null.
+  BrowserCard? get browserCard => _cardsHere.where((c) => !c.login).firstOrNull;
+
+  /// The newest login request's card in the chat on screen, when no tab's card came after it.
+  BrowserCard? get loginCard =>
+      _cardsHere.takeWhile((c) => c.login).firstOrNull;
 
   /// The browser cards in [turn]'s text, on this server, read once per text.
   List<BrowserCard> cardsOf(Turn turn) => turn._cardsOf(_server?.uri);
+
+  /// Whether the chat on screen has used the everythingllm browser, as far as it can tell: an
+  /// answer has a card of it, or took browser steps while this app followed it.
+  bool get usedBrowser =>
+      _cardsHere.isNotEmpty ||
+      turns.any((turn) => turn.browserSteps.isNotEmpty);
+
+  /// Whether [refresh] is reading the server again.
+  bool get refreshing => _refreshing;
+  bool _refreshing = false;
+
+  /// Reads the workspaces and the chat on screen again, for when the connection dropped and
+  /// what shows may be stale or stuck. An answer still running in this chat is let go of first,
+  /// not stopped: the server may finish it, and it shows when the chat is read again.
+  Future<void> refresh() async {
+    if (_server == null || _refreshing) return;
+    _refreshing = true;
+    if (_running case final running? when turns.contains(running.answer)) {
+      unawaited(running.stream?.cancel());
+      _finish(
+        running,
+        error:
+            'Let go of to read the chat again. The server may still finish it; '
+            'refresh again later to see it.',
+      );
+    }
+    notifyListeners();
+    try {
+      await load();
+      await open(activeThread, again: true);
+    } finally {
+      _refreshing = false;
+      notifyListeners();
+    }
+  }
 
   bool answeringIn(String slug) => _running?.slug == slug;
 
@@ -451,8 +492,9 @@ class ChatController extends ChangeNotifier {
   }
 
   /// Shows chat [threadSlug] of the active workspace, reading its turns the first time, and
-  /// again when its last answer is [Turn.unfinished], so what the server saved since shows.
-  Future<void> open(String? threadSlug) async {
+  /// again when its last answer is [Turn.unfinished] or the reading is asked for [again], so
+  /// what the server saved since shows.
+  Future<void> open(String? threadSlug, {bool again = false}) async {
     activeThread = threadSlug;
     editing = null;
     _clearLinkNotice();
@@ -462,7 +504,8 @@ class ChatController extends ChangeNotifier {
     if (slug == null || threadSlug == null) return;
     final known = _turns[threadSlug];
     if (known != null &&
-        (known.lastOrNull?.unfinished != true || isAnswering(threadSlug))) {
+        (isAnswering(threadSlug) ||
+            (!again && known.lastOrNull?.unfinished != true))) {
       return;
     }
     final server = _server;

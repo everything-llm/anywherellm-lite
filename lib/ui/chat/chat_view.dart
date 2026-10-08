@@ -217,6 +217,14 @@ class _Header extends StatelessWidget {
               : (compact) => [
                   const SizedBox(width: 12),
                   _HeaderButton(
+                    label: 'Refresh',
+                    heard: 'Read this chat again from the server',
+                    icon: 'refresh',
+                    compact: true,
+                    onTap: chat.refreshing ? null : chat.refresh,
+                  ),
+                  const SizedBox(width: 8),
+                  _HeaderButton(
                     label: 'New chat',
                     icon: 'plus',
                     compact: compact,
@@ -259,7 +267,9 @@ class _HeaderButton extends StatelessWidget {
   /// What a screen reader hears in place of [label], when it says more.
   final String? heard;
   final String icon;
-  final VoidCallback onTap;
+
+  /// Null while the button can do nothing.
+  final VoidCallback? onTap;
   final bool? pressed;
   final Widget? trailing;
 
@@ -316,8 +326,7 @@ class _BrowserButton extends StatelessWidget {
   Widget _build(BuildContext context, Turn? running) {
     final scope = AppScope.of(context);
     final shell = scope.shell;
-    final used = running?.browserSteps.isNotEmpty ?? false;
-    if (scope.chat.browserCard == null && !used) return const SizedBox.shrink();
+    if (!scope.chat.usedBrowser) return const SizedBox.shrink();
     final browsing = running?.browsing ?? false;
     return Padding(
       padding: const EdgeInsets.only(left: 8),

@@ -183,6 +183,55 @@ void main() {
     expect(rig.chat.busy, isFalse);
   });
 
+  group('refresh', () {
+    test('reads the chat on screen again', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      llm.histories['budget'] = [
+        ...llm.histories['budget']!,
+        const ChatMessage(role: Role.user, text: 'Asked elsewhere'),
+        const ChatMessage(role: Role.assistant, text: 'Answered elsewhere.'),
+      ];
+      await rig.chat.refresh();
+      expect(rig.chat.turns.last.text, 'Answered elsewhere.');
+      expect(rig.chat.refreshing, isFalse);
+    });
+
+    test('lets go of a stuck answer without stopping it', () async {
+      final llm = planningServer()..hold = true;
+      final rig = await started(llm);
+      await rig.chat.send('And next quarter?');
+      final thread = rig.chat.activeThread;
+      await rig.chat.refresh();
+      expect(rig.chat.busy, isFalse);
+      expect(rig.chat.turns.last.unfinished, isTrue);
+      expect(rig.chat.turns.last.error, startsWith('Let go of'));
+      expect(llm.calls, isNot(contains('stopChat:$thread')));
+      expect(llm.chat!.hasListener, isFalse);
+
+      // Once the server has saved it, the next refresh shows it.
+      llm.histories['budget'] = [
+        ...llm.histories['budget']!,
+        const ChatMessage(role: Role.user, text: 'And next quarter?'),
+        const ChatMessage(role: Role.assistant, text: 'About 45k.'),
+      ];
+      await rig.chat.refresh();
+      expect(rig.chat.turns.last.text, 'About 45k.');
+      expect(rig.chat.turns.last.error, isNull);
+    });
+
+    test('a server back in reach is no longer a connection problem', () async {
+      final llm = planningServer()
+        ..errors['workspaces'] = const ApiException('Down');
+      final rig = await started(llm);
+      expect(rig.chat.unreachable.value, isTrue);
+      llm.errors.remove('workspaces');
+      await rig.chat.refresh();
+      expect(rig.chat.unreachable.value, isFalse);
+      expect(rig.chat.workspaces, isNotEmpty);
+    });
+  });
+
   test('a failed answer\'s chat is read again when it is opened', () async {
     final llm = planningServer()..hold = true;
     final rig = await started(llm);

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/browser.dart';
 import '../app_scope.dart';
 import '../links.dart';
 import '../state/chat_controller.dart';
@@ -27,15 +28,17 @@ class BrowserPanel extends StatelessWidget {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
     final card = scope.chat.browserCard;
+    final login = scope.chat.loginCard;
     // The running answer comes first, since it is the chat's newest turn.
     final used = scope.chat.turns.reversed
         .where((turn) => turn.browserSteps.isNotEmpty)
         .firstOrNull;
-    final settings = scope.settings;
     return SidePanel(
       title: 'Browser',
       about: running?.browsing ?? false
           ? 'The agent is using it: ${running!.status}'
+          : login != null
+          ? 'The agent is asking you for a login.'
           : card == null
           ? 'The agent has not shown this chat\'s browser yet.'
           : 'The card says who has the browser.',
@@ -48,31 +51,22 @@ class BrowserPanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (card != null) ...[
-              CardImage(
-                card.image,
-                key: ValueKey(card.image),
-                alt: card.title,
-                server: settings.connection?.uri,
-                allowHttp: settings.allowHttp,
-                linked: true,
-                maxHeight: 520,
+            if (login != null) ...[
+              ..._card(
+                context,
+                login,
+                action: 'Open the login form',
+                help: 'Saves the login for the agent to use; it never sees it.',
               ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: AppButton(
-                  'Take over',
-                  primary: true,
-                  onPressed: () => openLink(context, card.page.toString()),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Opens the browser to watch or use it yourself.',
-                style: Type.sans(12.5, color: t.muted),
-              ),
+              const SizedBox(height: 16),
             ],
+            if (card != null)
+              ..._card(
+                context,
+                card,
+                action: 'Take over',
+                help: 'Opens the browser to watch or use it yourself.',
+              ),
             if (used != null) ...[
               const SizedBox(height: 16),
               Text(
@@ -88,5 +82,38 @@ class BrowserPanel extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// [card] drawn large and live, with a button that opens its page, saying [action], and [help]
+  /// under it.
+  List<Widget> _card(
+    BuildContext context,
+    BrowserCard card, {
+    required String action,
+    required String help,
+  }) {
+    final settings = AppScope.of(context).settings;
+    return [
+      CardImage(
+        card.image,
+        key: ValueKey(card.image),
+        alt: card.title,
+        server: settings.connection?.uri,
+        allowHttp: settings.allowHttp,
+        linked: true,
+        maxHeight: 520,
+      ),
+      const SizedBox(height: 12),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: AppButton(
+          action,
+          primary: true,
+          onPressed: () => openLink(context, card.page.toString()),
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(help, style: Type.sans(12.5, color: Tokens.of(context).muted)),
+    ];
   }
 }

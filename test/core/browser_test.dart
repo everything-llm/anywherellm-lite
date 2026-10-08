@@ -114,18 +114,29 @@ void main() {
       );
     });
 
-    test('leaves out login cards, other hosts and unlinked cards', () {
-      final login =
-          '[![Log in to ycombinator.com]'
-          '(https://owen.example:8445/_live/browser/login/lr-${'a' * 32}.png)]'
-          '(https://owen.example:8445/_live/browser/login/lr-${'a' * 32})';
+    test('marks a login request\'s card', () {
+      final form =
+          'https://owen.example:8445/_live/browser/login/lr-${'a' * 32}';
+      final cards = browserCards(
+        'Card: [![Log in to ycombinator.com]($form.png)]($form)',
+        server: _server,
+      );
+      expect(cards.single.login, isTrue);
+      expect(cards.single.page, Uri.parse(form));
+      expect(browserCards(card, server: _server).single.login, isFalse);
+    });
+
+    test('leaves out other hosts, unlinked cards and mismatched links', () {
       const elsewhere =
           '[![Browser: x](https://other.example:8445/_live/browser/bw-3aeecef2b460eeb7.jpg)]'
           '(https://other.example:8445/_live/browser/bw-3aeecef2b460eeb7)';
       const bare =
           '![Browser: x](https://owen.example:8445/_live/browser/bw-3aeecef2b460eeb7.jpg)';
+      const mismatched =
+          '[![Browser: x](https://owen.example:8445/_live/browser/bw-3aeecef2b460eeb7.jpg)]'
+          '(https://owen.example:8445/_live/browser/bw-0123456789abcdef)';
       expect(
-        browserCards('$login\n\n$elsewhere\n\n$bare', server: _server),
+        browserCards('$elsewhere\n\n$bare\n\n$mismatched', server: _server),
         isEmpty,
       );
       expect(browserCards(card, server: null), isEmpty);
