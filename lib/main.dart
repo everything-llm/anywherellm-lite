@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -152,11 +154,23 @@ class _SessionHostState extends State<SessionHost> {
     if (_android) {
       _readAloud = ReadAloud(DeviceSpeaker(), _chat, widget.prefs);
     }
+    // A deleted chat waiting to be undone is deleted before the app may be closed: Android can
+    // end a hidden app without a word.
+    _lifecycle = AppLifecycleListener(
+      onHide: () => unawaited(_chat.flushDelete()),
+      onExitRequested: () async {
+        await _chat.flushDelete();
+        return AppExitResponse.exit;
+      },
+    );
     _loaded = _load();
   }
 
+  late final AppLifecycleListener _lifecycle;
+
   @override
   void dispose() {
+    _lifecycle.dispose();
     _readAloud?.dispose();
     _system.dispose();
     _files.dispose();

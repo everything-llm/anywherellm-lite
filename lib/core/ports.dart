@@ -54,7 +54,9 @@ abstract interface class AnythingLlmApi {
 
   Future<void> renameThread(String slug, String thread, String name);
 
-  Future<void> deleteThread(String slug, String thread);
+  /// [on] sends it to that server rather than the one in use, as when the server in use has
+  /// just changed and a delete was still waiting to be undone.
+  Future<void> deleteThread(String slug, String thread, {Connection? on});
 
   /// The chat's turns, oldest first.
   Future<List<ChatMessage>> history(String slug, String thread);

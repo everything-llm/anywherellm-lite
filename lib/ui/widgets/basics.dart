@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
+import 'tappable.dart';
 
 enum AlertKind { warn, bad }
 
@@ -94,6 +95,58 @@ class StatusBox extends StatelessWidget {
               const SizedBox(height: 6),
               Text(text!, style: Type.sans(14, color: t.ink2)),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A dark bar saying what was just done, with Undo, as after a file is removed or a chat is
+/// deleted.
+class UndoBar extends StatelessWidget {
+  const UndoBar(this.text, {super.key, required this.onUndo});
+
+  final String text;
+  final VoidCallback onUndo;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+        decoration: BoxDecoration(
+          color: t.ink,
+          borderRadius: BorderRadius.circular(Sizes.control),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Type.sans(13, color: t.bg),
+              ),
+            ),
+            Tappable(
+              label: 'Undo',
+              onTap: onUndo,
+              radius: BorderRadius.circular(6),
+              hoverColor: t.bg.withValues(alpha: 0.1),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                child: Text(
+                  'Undo',
+                  style: Type.sans(13, weight: FontWeight.w600, color: t.bg),
+                ),
+              ),
+            ),
           ],
         ),
       ),

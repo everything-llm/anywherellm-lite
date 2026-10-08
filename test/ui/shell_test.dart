@@ -191,9 +191,26 @@ void main() {
       final llm = planningServer();
       final h = await pumpApp(tester, llm: llm);
       await chatAction(tester, 'Delete chat');
-      expect(llm.calls, contains('deleteThread:budget'));
       expect(inSidebar('Budget questions'), findsNothing);
       expect(h.chat.activeThread, 'priorities');
+      expect(inSidebar('Deleted Budget questions'), findsOneWidget);
+      expect(llm.calls, isNot(contains('deleteThread:budget')));
+      await tester.pump(const Duration(seconds: 7));
+      expect(llm.calls, contains('deleteThread:budget'));
+      await tester.pumpAndSettle();
+      expect(inSidebar('Deleted Budget questions'), findsNothing);
+    });
+
+    testWidgets('Undo puts a deleted chat back', (tester) async {
+      final llm = planningServer();
+      final h = await pumpApp(tester, llm: llm);
+      await chatAction(tester, 'Delete chat');
+      await tester.tap(control('Undo'));
+      await tester.pumpAndSettle();
+      expect(inSidebar('Budget questions'), findsOneWidget);
+      expect(h.chat.activeThread, 'budget');
+      await tester.pump(const Duration(seconds: 7));
+      expect(llm.calls, isNot(contains('deleteThread:budget')));
     });
 
     testWidgets('the pencil renames the workspace on Enter', (tester) async {

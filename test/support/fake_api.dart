@@ -260,12 +260,15 @@ class FakeAnythingLlm implements AnythingLlmApi {
         list[at] = Thread(slug: thread, name: name);
       }, '$thread:$name');
 
+  /// The server each delete was sent to by name, when it was not the one in use.
+  final deletedOn = <String, Connection>{};
+
   @override
-  Future<void> deleteThread(String slug, String thread) => _run(
-    'deleteThread',
-    () => _space(slug).threads.removeWhere((t) => t.slug == thread),
-    thread,
-  );
+  Future<void> deleteThread(String slug, String thread, {Connection? on}) =>
+      _run('deleteThread', () {
+        if (on != null) deletedOn[thread] = on;
+        _space(slug).threads.removeWhere((t) => t.slug == thread);
+      }, thread);
 
   @override
   Future<List<ChatMessage>> history(String slug, String thread) =>

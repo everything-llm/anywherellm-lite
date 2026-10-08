@@ -12,6 +12,7 @@ import 'layout.dart';
 import 'state/shell_controller.dart';
 import 'tokens.dart';
 import 'type.dart';
+import 'widgets/basics.dart';
 import 'widgets/brand.dart';
 import 'widgets/buttons.dart';
 import 'widgets/fields.dart';
@@ -203,6 +204,10 @@ class _ChatsState extends State<_Chats> {
             Expanded(
               child: searching ? _found(context, query) : _groups(context),
             ),
+            if (chat.deletedChat case final name?) ...[
+              const SizedBox(height: 8),
+              UndoBar('Deleted $name', onUndo: chat.undoDelete),
+            ],
           ],
         );
       },

@@ -13,7 +13,6 @@ import '../widgets/controls.dart';
 import '../widgets/upload_queue.dart';
 import '../widgets/rise.dart';
 import '../widgets/side_panel.dart';
-import '../widgets/tappable.dart';
 import 'add_source.dart';
 import 'chat_mode_chooser.dart';
 import 'test_question.dart';
@@ -73,7 +72,7 @@ class SourcesPanel extends StatelessWidget {
                     ],
                     if (sources.removed case final file?) ...[
                       const SizedBox(height: 10),
-                      _UndoToast(file),
+                      UndoBar('Removed ${file.title}', onUndo: scope.sources.undo),
                     ],
                     const SizedBox(height: 14),
                   ],
@@ -196,52 +195,3 @@ class _FileRow extends StatelessWidget {
   }
 }
 
-class _UndoToast extends StatelessWidget {
-  const _UndoToast(this.file);
-
-  final SourceFile file;
-
-  @override
-  Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    final t = Tokens.of(context);
-    return Semantics(
-      liveRegion: true,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
-        decoration: BoxDecoration(
-          color: t.ink,
-          borderRadius: BorderRadius.circular(Sizes.control),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Removed ${file.title}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Type.sans(13, color: t.bg),
-              ),
-            ),
-            Tappable(
-              label: 'Undo',
-              onTap: scope.sources.undo,
-              radius: BorderRadius.circular(6),
-              hoverColor: t.bg.withValues(alpha: 0.1),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-                child: Text(
-                  'Undo',
-                  style: Type.sans(13, weight: FontWeight.w600, color: t.bg),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

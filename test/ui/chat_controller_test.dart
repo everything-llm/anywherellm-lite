@@ -443,13 +443,59 @@ void main() {
       final llm = planningServer();
       final rig = await started(llm);
       await rig.chat.delete('budget');
-      expect(llm.calls, contains('deleteThread:budget'));
+      expect(llm.calls, isNot(contains('deleteThread:budget')));
+      expect(rig.chat.deletedChat, 'Budget questions');
       expect(rig.chat.activeThread, 'priorities');
+      // A second delete sends the first.
       await rig.chat.delete('priorities');
+      expect(llm.calls, contains('deleteThread:budget'));
       expect(rig.chat.activeThread, isNull);
       expect(rig.chat.threadsOf('q3'), isEmpty);
+      await rig.chat.flushDelete();
+      expect(llm.calls, contains('deleteThread:priorities'));
+      expect(rig.chat.deletedChat, isNull);
     },
   );
+
+  group('undoing a delete', () {
+    test('puts the chat back where it was, on screen again', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.chat.delete('budget');
+      await rig.chat.undoDelete();
+      expect(rig.chat.threadsOf('q3').map((t) => t.slug), [
+        'priorities',
+        'budget',
+      ]);
+      expect(rig.chat.activeThread, 'budget');
+      expect(rig.chat.deletedChat, isNull);
+      await rig.chat.flushDelete();
+      expect(llm.calls, isNot(contains('deleteThread:budget')));
+    });
+
+    test('a new server sends the delete to the one it was made on', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.chat.delete('budget');
+      await rig.settings.clear();
+      await pumpEventQueue();
+      expect(llm.calls, contains('deleteThread:budget'));
+      expect(llm.deletedOn['budget']?.baseUrl, sampleConnection.baseUrl);
+    });
+
+    test('a delete the server refuses puts the chat back', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.chat.delete('priorities');
+      llm.errors['deleteThread'] = const ApiException('No.');
+      await rig.chat.flushDelete();
+      expect(
+        rig.chat.threadsOf('q3').map((t) => t.slug),
+        contains('priorities'),
+      );
+      expect(rig.chat.problem?.title, 'Could not delete the chat');
+    });
+  });
 
   test('a chat that is answering cannot be deleted', () async {
     final llm = planningServer()..hold = true;

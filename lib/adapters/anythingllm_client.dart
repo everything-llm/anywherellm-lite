@@ -233,8 +233,8 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
 
   /// The server answers a delete with an empty body.
   @override
-  Future<void> deleteThread(String slug, String thread) =>
-      _send('DELETE', _thread(slug, thread), null, emptyOk: true);
+  Future<void> deleteThread(String slug, String thread, {Connection? on}) =>
+      _send('DELETE', _thread(slug, thread), null, emptyOk: true, on: on);
 
   @override
   Future<List<ChatMessage>> history(String slug, String thread) async => [
@@ -1118,8 +1118,9 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     Duration? limit,
     bool emptyOk = false,
     String refused = _refused,
+    Connection? on,
   }) async {
-    final connection = _current;
+    final connection = on ?? _current;
     return _call(
       connection,
       limit ?? timeout,
