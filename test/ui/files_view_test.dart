@@ -33,18 +33,20 @@ void main() {
     'Files replaces the chat and Sources, and Chats brings them back',
     (tester) async {
       final h = await pumpApp(tester, llm: planningServer());
-      await tester.tap(control('Files'));
-      await tester.pumpAndSettle();
+      await fromMenu(tester, 'Files and settings');
       expect(h.shell.pane, Pane.files);
       expect(find.byType(FileTree), findsOneWidget);
       expect(find.byType(SourcesPanel).hitTestable(), findsNothing);
       expect(find.byType(ChatView).hitTestable(), findsNothing);
       expect(inTree('Q3 planning'), findsOneWidget);
       expect(inTree('custom-documents'), findsOneWidget);
-      await tester.tap(control('Chats'));
+      await tester.tap(control('Back to chats'));
       await tester.pumpAndSettle();
       expect(find.byType(FileTree), findsNothing);
       expect(find.text('About 40k.'), findsOneWidget);
+      await fromMenu(tester, 'Files and settings');
+      await fromMenu(tester, 'Chats');
+      expect(h.shell.pane, Pane.chats);
     },
   );
 
@@ -177,10 +179,7 @@ void main() {
       await openSettings(tester);
       expect(inPane(find.text('Chat mode')), findsOneWidget);
       expect(inPane(find.text('Max context snippets')), findsOneWidget);
-      expect(
-        inPane(find.text('Minimum relevance')),
-        findsOneWidget,
-      );
+      expect(inPane(find.text('Minimum relevance')), findsOneWidget);
       final save = tester.widget<Tappable>(inPane(control('Save')));
       expect(save.onTap, isNull);
     });

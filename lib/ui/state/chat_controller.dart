@@ -661,6 +661,7 @@ class ChatController extends ChangeNotifier {
       final list = [...was]..removeWhere((t) => t.slug == threadSlug);
       _threads[slug] = list;
       _turns.remove(threadSlug);
+      unawaited(_prefs.forgetChat(slug, threadSlug));
       if (activeThread == threadSlug) {
         _draft = [];
         await open(
@@ -951,6 +952,10 @@ class ChatController extends ChangeNotifier {
       unawaited(_nameAfter(running.slug, thread, message));
     }
     if (error == null && !running.answer.stopped) _finished = running.answer;
+    // An answer in a chat, however it ended, is a use of it, for Recent.
+    if (running.thread case final thread?) {
+      unawaited(_prefs.useChat(running.slug, thread));
+    }
     running.answer
       ..streaming = false
       ..status = null

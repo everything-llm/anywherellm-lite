@@ -1,6 +1,7 @@
 // What the app remembers between runs besides the connection.
 
 import 'dart:convert';
+import 'dart:math';
 
 /// A document switched off in a workspace: no longer embedded there, but still listed in its
 /// Sources so it can be switched back on.
@@ -118,7 +119,12 @@ class Prefs {
     this.textSize = TextSize.normal,
     this.lastChat,
     this.switches = const {},
+    this.pinned = const {},
+    this.recent = const {},
   });
+
+  /// How many chats [recent] keeps for a workspace.
+  static const recentMax = 10;
 
   /// The documents switched off in each workspace, by [offKey]: its server's address and its
   /// slug, since two servers can each have a workspace of the same name. A key that is a slug
@@ -137,6 +143,23 @@ class Prefs {
 
   /// The chat switches the person set; one not here is [ChatSwitch.byDefault].
   final Map<ChatSwitch, bool> switches;
+
+  /// The chats pinned in each workspace, by [offKey], in the order they were pinned.
+  /// AnythingLLM keeps no pins, so they are this device's.
+  final Map<String, List<String>> pinned;
+
+  /// When this device last used each chat of a workspace, by [offKey]: a chat's slug to the
+  /// time in milliseconds since the epoch, at most [recentMax] a workspace. The server sends
+  /// no time for a chat.
+  final Map<String, Map<String, int>> recent;
+
+  /// The chats pinned in workspace [slug] on [server].
+  List<String> pinnedIn(String server, String slug) =>
+      pinned[offKey(server, slug)] ?? const [];
+
+  /// When this device last used each chat of workspace [slug] on [server].
+  Map<String, int> recentIn(String server, String slug) =>
+      recent[offKey(server, slug)] ?? const {};
 
   bool isOn(ChatSwitch which) => switches[which] ?? which.byDefault;
 
@@ -197,6 +220,8 @@ class Prefs {
     TextSize? textSize,
     LastChat? Function()? lastChat,
     Map<ChatSwitch, bool>? switches,
+    Map<String, List<String>>? pinned,
+    Map<String, Map<String, int>>? recent,
   }) => Prefs(
     switchedOff: switchedOff ?? this.switchedOff,
     workspaceOrder: workspaceOrder ?? this.workspaceOrder,
@@ -204,7 +229,61 @@ class Prefs {
     textSize: textSize ?? this.textSize,
     lastChat: lastChat == null ? this.lastChat : lastChat(),
     switches: switches ?? this.switches,
+    pinned: pinned ?? this.pinned,
+    recent: recent ?? this.recent,
   );
+
+  /// [map] with [key] set to [value], or without it when [value] is empty.
+  static Map<String, V> _with<V>(Map<String, V> map, String key, V? value) => {
+    for (final entry in map.entries)
+      if (entry.key != key) entry.key: entry.value,
+    ?(value == null ? null : key): ?value,
+  };
+
+  /// These prefs with chat [thread] of workspace [slug] on [server] pinned, or not when [on]
+  /// is false.
+  Prefs withPin(String server, String slug, String thread, {required bool on}) {
+    final list = [...pinnedIn(server, slug).where((t) => t != thread)];
+    if (on) list.add(thread);
+    return _copy(
+      pinned: _with(pinned, offKey(server, slug), list.isEmpty ? null : list),
+    );
+  }
+
+  /// These prefs with chat [thread] of workspace [slug] on [server] used [at], milliseconds
+  /// since the epoch, keeping the [recentMax] most recently used.
+  /// Two uses in the same millisecond still come in the order they were made.
+  Prefs withUse(String server, String slug, String thread, int at) {
+    final latest = recentIn(server, slug).values.fold(0, max);
+    final used = {
+      ...recentIn(server, slug),
+      thread: at > latest ? at : latest + 1,
+    };
+    final kept = (used.entries.toList()..sort((a, b) => b.value - a.value))
+        .take(recentMax);
+    return _copy(
+      recent: _with(recent, offKey(server, slug), {
+        for (final e in kept) e.key: e.value,
+      }),
+    );
+  }
+
+  /// These prefs with chat [thread] of workspace [slug] on [server] neither pinned nor
+  /// recent, as when it is deleted.
+  Prefs withoutChat(String server, String slug, String thread) {
+    final key = offKey(server, slug);
+    final pins = [...pinnedIn(server, slug).where((t) => t != thread)];
+    final used = {...recentIn(server, slug)}..remove(thread);
+    return _copy(
+      pinned: _with(pinned, key, pins.isEmpty ? null : pins),
+      recent: _with(recent, key, used.isEmpty ? null : used),
+    );
+  }
+
+  /// Whether chat [thread] of workspace [slug] on [server] is pinned or recent.
+  bool keepsChat(String server, String slug, String thread) =>
+      pinnedIn(server, slug).contains(thread) ||
+      recentIn(server, slug).containsKey(thread);
 
   /// These prefs with the switched-off documents of [slug] on [server] set to [docs].
   Prefs withOff(String server, String slug, List<OffDoc> docs) => _copy(
@@ -261,14 +340,24 @@ class Prefs {
       lastChat: () => lastChatIn(server, from)
           ? LastChat(to, lastChat!.thread, server)
           : lastChat,
+      pinned: _moved(pinned, fromKey, toKey),
+      recent: _moved(recent, fromKey, toKey),
     );
   }
+
+  /// [map] with what is under [from] under [to] instead.
+  static Map<String, V> _moved<V>(Map<String, V> map, String from, String to) =>
+      map.containsKey(from)
+      ? _with(_with(map, from, null), to, map[from])
+      : map;
 
   /// These prefs with [slug] dropped from the order, and from the last chat when it is on
   /// [server], as when the workspace is deleted.
   Prefs withoutWorkspace(String server, String slug) => _copy(
     workspaceOrder: [...workspaceOrder.where((s) => s != slug)],
     lastChat: () => lastChatIn(server, slug) ? null : lastChat,
+    pinned: _with(pinned, offKey(server, slug), null),
+    recent: _with(recent, offKey(server, slug), null),
   );
 
   /// These prefs with chat [thread] of workspace [slug] on [server] as the last on screen; a
@@ -295,6 +384,8 @@ class Prefs {
     'chat': {
       for (final MapEntry(:key, :value) in switches.entries) key.name: value,
     },
+    if (pinned.isNotEmpty) 'pinned': pinned,
+    if (recent.isNotEmpty) 'recent': recent,
   });
 
   /// Reads what [encode] wrote. Anything it cannot read falls back to the default, and keys it
@@ -310,6 +401,8 @@ class Prefs {
     final off = json['switchedOff'];
     final order = json['workspaceOrder'];
     final chat = json['chat'];
+    final pins = json['pinned'];
+    final used = json['recent'];
     final switchNamed = ChatSwitch.values.asNameMap();
     return Prefs(
       switchedOff: {
@@ -334,6 +427,28 @@ class Prefs {
           for (final MapEntry(:key, :value) in chat.entries)
             if (switchNamed[key] case final which? when value is bool)
               which: value,
+      },
+      pinned: {
+        if (pins is Map)
+          for (final MapEntry(:key, :value) in pins.entries)
+            if (key is String && value is List)
+              if ([
+                    for (final t in value)
+                      if (t is String) t,
+                  ]
+                  case final threads when threads.isNotEmpty)
+                key: threads,
+      },
+      recent: {
+        if (used is Map)
+          for (final MapEntry(:key, :value) in used.entries)
+            if (key is String && value is Map)
+              if ({
+                    for (final MapEntry(key: t, value: at) in value.entries)
+                      if (t is String && at is int) t: at,
+                  }
+                  case final times when times.isNotEmpty)
+                key: times,
       },
     );
   }

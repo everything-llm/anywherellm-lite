@@ -10,6 +10,10 @@ const _paths = {
 /// The small icons, drawn on a 16 unit box.
 const _small = {
   'search': 'M7 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z M10 10l3.5 3.5',
+  'check': 'M3.5 8.5l3 3 6-7',
+  'pin': 'M6 2.5h4 M7 2.5v4L4.5 9h7L9 6.5v-4 M8 9v4.5',
+  'more': 'M3 8a1 1 0 1 0 2 0 1 1 0 0 0-2 0z M7 8a1 1 0 1 0 2 0 1 1 0 0 0-2 0z M11 8a1 1 0 1 0 2 0 1 1 0 0 0-2 0z',
+  'unfold': 'M5 6.5l3-3 3 3 M5 9.5l3 3 3-3',
   'mic': 'M8 2a2 2 0 0 0-2 2v3.5a2 2 0 0 0 4 0V4a2 2 0 0 0-2-2z M3.8 7.5a4.2 4.2 0 0 0 8.4 0 M8 11.7V14',
   'plus': 'M8 3v10M3 8h10',
   'pencil': 'M10.5 2.5l3 3L6 13H3v-3z',

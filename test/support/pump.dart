@@ -6,6 +6,7 @@ import 'package:anywherellm/ui/chat/dictation.dart';
 import 'package:anywherellm/ui/chat/speaker.dart';
 import 'package:anywherellm/ui/shell.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
+import 'package:anywherellm/ui/widgets/tappable.dart';
 
 import 'dart:async';
 
@@ -286,4 +287,36 @@ Future<void> tapVisible(WidgetTester tester, Finder finder) async {
   await tester.ensureVisible(finder);
   await tester.pumpAndSettle();
   await tester.tap(finder);
+}
+
+/// The sidebar's workspace switcher.
+Finder get switcher => find.byWidgetPredicate(
+  (widget) =>
+      widget is Tappable &&
+      widget.label.startsWith('Workspaces') &&
+      widget.tooltip == 'Switch workspace',
+);
+
+/// Opens the sidebar's workspace menu and picks [item] in it.
+Future<void> fromMenu(WidgetTester tester, String item) async {
+  await tester.tap(switcher);
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.byWidgetPredicate((w) => w is Tappable && w.label == item).last,
+  );
+  await tester.pumpAndSettle();
+}
+
+/// Opens the chat on screen's ⋯ in the sidebar and picks [item] in it.
+Future<void> chatAction(WidgetTester tester, String item) async {
+  await tester.tap(
+    find.byWidgetPredicate(
+      (w) => w is Tappable && w.label == 'Chat actions: rename, pin, delete',
+    ),
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.byWidgetPredicate((w) => w is Tappable && w.label == item).last,
+  );
+  await tester.pumpAndSettle();
 }

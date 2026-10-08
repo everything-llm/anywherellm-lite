@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import '../settings/settings_pages.dart';
 
@@ -17,6 +17,31 @@ class ShellController extends ChangeNotifier {
   ShellController({this._sourcesPinned = true});
 
   bool _sideOpen = false;
+  bool _menuOpen = false;
+
+  /// The sidebar's search field, which Ctrl+K moves to.
+  final searchFocus = FocusNode(debugLabel: 'Search chats');
+
+  @override
+  void dispose() {
+    searchFocus.dispose();
+    super.dispose();
+  }
+
+  /// Whether the sidebar's workspace menu is open.
+  bool get menuOpen => _menuOpen;
+
+  void toggleMenu() {
+    _menuOpen = !_menuOpen;
+    notifyListeners();
+  }
+
+  void closeMenu() {
+    if (!_menuOpen) return;
+    _menuOpen = false;
+    notifyListeners();
+  }
+
   bool _sourcesPinned;
   bool _sourcesDrawer = false;
   bool _settingsOpen = false;
@@ -85,6 +110,7 @@ class ShellController extends ChangeNotifier {
     _allSettings |= !(page?.essential ?? true);
     _settingsOpen = true;
     _sideOpen = false;
+    _menuOpen = false;
     notifyListeners();
   }
 
@@ -115,6 +141,7 @@ class ShellController extends ChangeNotifier {
   void showPane(Pane pane) {
     if (pane == _pane) return;
     _pane = pane;
+    _menuOpen = false;
     notifyListeners();
   }
 
@@ -137,6 +164,8 @@ class ShellController extends ChangeNotifier {
       return;
     }
     _sideOpen = next.$1;
+    // The menu is the sidebar's: it goes with the drawer.
+    if (!_sideOpen) _menuOpen = false;
     _sourcesPinned = next.$2;
     _sourcesDrawer = next.$3;
     _settingsOpen = next.$4;

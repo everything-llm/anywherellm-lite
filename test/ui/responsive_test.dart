@@ -271,13 +271,15 @@ void main() {
       final h = await pumpApp(tester, llm: awkward(), size: size);
       h.shell.toggleSide();
       await tester.pumpAndSettle();
+      await tester.tap(switcher);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
       await tester.tap(find.bySemanticsLabel('Rename workspace').last);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsLabel('Delete workspace').last);
-      await tester.pumpAndSettle();
+      await fromMenu(tester, 'Delete workspace…');
       expect(find.bySemanticsLabel('Cancel'), findsWidgets);
       expect(tester.takeException(), isNull);
     });

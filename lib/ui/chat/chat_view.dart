@@ -224,13 +224,16 @@ class _Header extends StatelessWidget {
                     compact: true,
                     onTap: chat.refreshing ? null : chat.refresh,
                   ),
-                  const SizedBox(width: 8),
-                  _HeaderButton(
-                    label: 'New chat',
-                    icon: 'plus',
-                    compact: compact,
-                    onTap: chat.newChat,
-                  ),
+                  // New chat sits at the top of the sidebar while it is in the layout.
+                  if (showMenu) ...[
+                    const SizedBox(width: 8),
+                    _HeaderButton(
+                      label: 'New chat',
+                      icon: 'plus',
+                      compact: compact,
+                      onTap: chat.newChat,
+                    ),
+                  ],
                   _BrowserButton(compact: compact),
                   const SizedBox(width: 8),
                   _HeaderButton(

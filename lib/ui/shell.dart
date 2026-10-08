@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -20,6 +21,42 @@ import 'widgets/rise.dart';
 ///
 /// Below 820 the sidebar is a drawer from the left; below 1120 Sources is a drawer from the
 /// right. Esc and Back close the topmost thing open: Settings, then a drawer.
+/// Ctrl and these open the workspaces in the sidebar's order.
+const _digits = [
+  LogicalKeyboardKey.digit1,
+  LogicalKeyboardKey.digit2,
+  LogicalKeyboardKey.digit3,
+  LogicalKeyboardKey.digit4,
+  LogicalKeyboardKey.digit5,
+  LogicalKeyboardKey.digit6,
+  LogicalKeyboardKey.digit7,
+  LogicalKeyboardKey.digit8,
+  LogicalKeyboardKey.digit9,
+];
+
+/// Opens the [index]th workspace in the order the sidebar's menu lists them.
+void _openWorkspace(AppScope scope, int index) {
+  final ordered = scope.prefs.prefs.inOrder(
+    scope.chat.workspaces,
+    (w) => w.slug,
+  );
+  scope.shell.closeMenu();
+  if (index < ordered.length && ordered[index].slug != scope.chat.activeSlug) {
+    scope.chat.select(ordered[index].slug);
+  }
+}
+
+/// Moves to the sidebar's search, showing the chats and opening the sidebar where it is a
+/// [drawer].
+void _findChats(AppScope scope, {required bool drawer}) {
+  final shell = scope.shell..showPane(Pane.chats);
+  if (drawer && !shell.sideOpen) shell.toggleSide();
+  // The field is built in this frame when the drawer has just opened.
+  WidgetsBinding.instance.addPostFrameCallback(
+    (_) => shell.searchFocus.requestFocus(),
+  );
+}
+
 class AppShell extends StatelessWidget {
   const AppShell({super.key});
 
@@ -37,7 +74,9 @@ class AppShell extends StatelessWidget {
       required bool settingsSideBySide,
       required bool sidebarDrawer,
     }) {
-      if (shell.settingsOpen &&
+      if (shell.menuOpen) {
+        shell.closeMenu();
+      } else if (shell.settingsOpen &&
           !settingsSideBySide &&
           shell.settingsPage != null) {
         shell.showSettingsPage(null);
@@ -82,6 +121,7 @@ class AppShell extends StatelessWidget {
             return _BackGuard(
               open:
                   shell.settingsOpen ||
+                  shell.menuOpen ||
                   sideDrawer ||
                   sourcesDrawer ||
                   shell.browserOpen,
@@ -95,6 +135,17 @@ class AppShell extends StatelessWidget {
               },
               child: CallbackShortcuts(
                 bindings: {
+                  // The browser takes these keys before a page sees them.
+                  if (!kIsWeb) ...{
+                    const SingleActivator(
+                      LogicalKeyboardKey.keyK,
+                      control: true,
+                    ): () =>
+                        _findChats(scope, drawer: screen.sidebarDrawer),
+                    for (final (i, key) in _digits.indexed)
+                      SingleActivator(key, control: true): () =>
+                          _openWorkspace(scope, i),
+                  },
                   const SingleActivator(LogicalKeyboardKey.escape): () {
                     if (!closeTop(
                           settingsSideBySide: settingsSideBySide,

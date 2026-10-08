@@ -20,9 +20,13 @@ class AppField extends StatelessWidget {
     this.keyboardType,
     this.autofillHints,
     this.maxLines = 1,
+    this.focusNode,
   });
 
   final TextEditingController controller;
+
+  /// The field's focus, for something else to move to it, or null for its own.
+  final FocusNode? focusNode;
 
   /// The accessible name. The field has no visible label of its own.
   final String label;
@@ -65,6 +69,7 @@ class AppField extends StatelessWidget {
       label: label,
       textField: true,
       child: TextField(
+        focusNode: focusNode,
         controller: controller,
         autocorrect: false,
         // Flutter on Android marks a field without suggestions as a visible password, which
