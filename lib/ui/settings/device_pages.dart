@@ -84,11 +84,6 @@ class ChatPage extends StatelessWidget {
         'Keep the newest text in view while it arrives, unless you have scrolled up.',
       ),
       (
-        ChatSwitch.reasoningOpen,
-        'Show reasoning open',
-        'Unfold a model\'s reasoning instead of folding it behind Show reasoning.',
-      ),
-      (
         ChatSwitch.answerDetails,
         'Show answer details',
         'Show the model, time, tokens, speed and cost under every answer. Otherwise they sit '

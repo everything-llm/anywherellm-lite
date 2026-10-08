@@ -84,7 +84,7 @@ void main() {
     expect(back.isOn(ChatSwitch.spellcheck), isFalse);
     expect(back.isOn(ChatSwitch.readAnswers), isTrue);
     expect(back.isOn(ChatSwitch.followAnswer), isTrue);
-    expect(back.isOn(ChatSwitch.reasoningOpen), isFalse);
+    expect(back.isOn(ChatSwitch.answerDetails), isFalse);
   });
 
   test('a chat switch it cannot read is its default', () {

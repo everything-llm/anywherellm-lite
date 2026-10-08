@@ -1,6 +1,5 @@
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/prefs.dart';
-import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/chat/message_list.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:flutter/material.dart';
@@ -33,14 +32,15 @@ void main() {
     h.shell.openSettings(SettingsPage.chat);
     await tester.pumpAndSettle();
     expect(control('Follow a streaming answer'), findsOneWidget);
-    expect(control('Show reasoning open'), findsOneWidget);
+    // Reasoning opens from an answer's More menu only.
+    expect(control('Show reasoning open'), findsNothing);
     expect(control('Send dictation when I stop talking'), findsNothing);
     expect(control('Read answers aloud'), findsNothing);
     expect(control('Spellcheck the message'), findsNothing);
-    await tester.tap(control('Show reasoning open'));
+    await tester.tap(control('Follow a streaming answer'));
     await tester.pump();
-    expect(h.prefs.prefs.isOn(ChatSwitch.reasoningOpen), isTrue);
-    expect(h.prefsStore.saved.isOn(ChatSwitch.reasoningOpen), isTrue);
+    expect(h.prefs.prefs.isOn(ChatSwitch.followAnswer), isFalse);
+    expect(h.prefsStore.saved.isOn(ChatSwitch.followAnswer), isFalse);
   });
 
   testWidgets('with send dictation on, a pause sends the message', (
@@ -130,24 +130,6 @@ void main() {
     h.chat.stop();
     await tester.pump(const Duration(milliseconds: 100));
     expect(h.speaker!.spoken, isEmpty);
-  });
-
-  testWidgets('with reasoning open, it shows unfolded', (tester) async {
-    final llm = planningServer();
-    llm.histories['budget'] = [
-      const ChatMessage(role: Role.user, text: 'Colour?'),
-      const ChatMessage(
-        role: Role.assistant,
-        text: '<think>It is a red square.</think>**red**',
-      ),
-    ];
-    await pumpApp(
-      tester,
-      llm: llm,
-      prefsStore: withSwitch(ChatSwitch.reasoningOpen, true),
-    );
-    expect(find.text('It is a red square.'), findsOneWidget);
-    expect(find.text('Hide reasoning'), findsOneWidget);
   });
 
   for (final follow in [true, false]) {

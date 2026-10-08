@@ -190,7 +190,9 @@ void main() {
     final llm = answering('<think>Weighing the plan.</think>About 40k.');
     await pumpApp(tester, llm: llm);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Show reasoning'));
+    await tester.tap(find.byTooltip('More'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('View reasoning'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Weighing the plan.'), findsOneWidget);
 

@@ -102,9 +102,6 @@ enum ChatSwitch {
   /// Keeps the newest text of a streaming answer in view while the chat is at its bottom.
   followAnswer(true),
 
-  /// Shows a model's reasoning unfolded.
-  reasoningOpen(false),
-
   /// Shows how each answer ran, its model, time, tokens, speed and cost, under it, rather than
   /// only in its More menu.
   answerDetails(false);

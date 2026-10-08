@@ -263,7 +263,9 @@ $$\frac{a}{b}$$
     expect(find.bySemanticsLabel('Copy answer'), findsOneWidget);
   });
 
-  testWidgets('reasoning is folded away and left out of Copy', (tester) async {
+  testWidgets('reasoning is hidden until More shows it, and left out of Copy', (
+    tester,
+  ) async {
     final copied = _clipboard(tester);
     final llm = planningServer();
     llm.histories['budget'] = [
@@ -274,13 +276,21 @@ $$\frac{a}{b}$$
       ),
     ];
     await pumpApp(tester, llm: llm);
-    expect(find.text('Show reasoning'), findsOneWidget);
+    expect(find.text('Show reasoning'), findsNothing);
     expect(find.text('It is a red square.'), findsNothing);
     expect(find.textContaining('think>', findRichText: true), findsNothing);
-    await tester.tap(find.text('Show reasoning'));
+    // An answer the server did not measure still has More, for its reasoning alone.
+    await tester.tap(find.byTooltip('More'));
     await tester.pumpAndSettle();
+    expect(find.text('Show details under every answer'), findsNothing);
+    await tester.tap(find.text('View reasoning'));
+    await tester.pumpAndSettle();
+    expect(find.text('View reasoning'), findsNothing);
     expect(find.text('It is a red square.'), findsOneWidget);
-    expect(find.text('Hide reasoning'), findsOneWidget);
+    await tester.tap(find.text('Hide reasoning'));
+    await tester.pumpAndSettle();
+    expect(find.text('It is a red square.'), findsNothing);
+    expect(find.text('Hide reasoning'), findsNothing);
     await tester.tap(find.bySemanticsLabel('Copy answer').last);
     await tester.pump();
     expect(copied, ['**red**']);
@@ -299,7 +309,8 @@ $$\frac{a}{b}$$
     expect(find.textContaining('Hmm', findRichText: true), findsNothing);
     llm.chat!.add(const TextChunk(' square.</think>red'));
     await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('Show reasoning'), findsOneWidget);
+    expect(find.text('Thinking…'), findsNothing);
+    expect(find.textContaining('Hmm', findRichText: true), findsNothing);
     expect(find.textContaining('red', findRichText: true), findsWidgets);
     await llm.chat!.close();
     await tester.pump(const Duration(milliseconds: 100));

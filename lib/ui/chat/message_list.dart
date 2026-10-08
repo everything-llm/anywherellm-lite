@@ -557,7 +557,7 @@ class _Picture extends StatelessWidget {
   );
 }
 
-class _Answer extends StatelessWidget {
+class _Answer extends StatefulWidget {
   const _Answer(this.turn, {this.retry});
 
   final Turn turn;
@@ -566,12 +566,25 @@ class _Answer extends StatelessWidget {
   final _Retry? retry;
 
   @override
+  State<_Answer> createState() => _AnswerState();
+}
+
+class _AnswerState extends State<_Answer> {
+  /// Whether the model's reasoning shows above the answer: only once View reasoning in More
+  /// asks for it, until Hide reasoning puts it away.
+  bool _reasoning = false;
+
+  void _toggleReasoning() => setState(() => _reasoning = !_reasoning);
+
+  @override
   Widget build(BuildContext context) =>
-      ListenableBuilder(listenable: turn, builder: _build);
+      ListenableBuilder(listenable: widget.turn, builder: _build);
 
   Widget _build(BuildContext context, Widget? _) {
+    final (turn, retry) = (widget.turn, widget.retry);
     final split = splitReasoning(turn.text, streaming: turn.streaming);
     final thinking = turn.streaming && split.thinking;
+    final reasoned = !turn.streaming && split.reasoning.isNotEmpty;
     final failure = turn.streaming ? null : modelFailure(split.answer);
     final answered = split.answer.isNotEmpty && failure == null;
     // An answer cut short shows what came in the second ink, under why it stopped.
@@ -597,8 +610,11 @@ class _Answer extends StatelessWidget {
           ),
           const SizedBox(height: 10),
         ],
-        if (thinking || split.reasoning.isNotEmpty) ...[
-          _Reasoning(split.reasoning, thinking: thinking),
+        if (thinking || (reasoned && _reasoning)) ...[
+          _Reasoning(
+            split.reasoning,
+            onHide: thinking ? null : _toggleReasoning,
+          ),
           if (split.answer.isNotEmpty) const SizedBox(height: 10),
         ],
         if (failure != null)
@@ -682,7 +698,14 @@ class _Answer extends StatelessWidget {
                     size: IconSize.xs,
                   ),
               ],
-              if (turn.metrics case final metrics?) AnswerMore(turn, metrics),
+              if (turn.metrics != null || reasoned)
+                AnswerMore(
+                  turn,
+                  turn.metrics,
+                  reasoning: reasoned
+                      ? (shown: _reasoning, toggle: _toggleReasoning)
+                      : null,
+                ),
               // In Agent mode the server may go on to finish the answer and save it, which
               // shows when the chat is read again.
               if (turn.stopped)
@@ -757,60 +780,47 @@ class _Status extends StatelessWidget {
   }
 }
 
-/// The model's reasoning before its answer, folded away. While the model is still reasoning it
-/// says so; afterwards a tap shows or hides what it wrote.
-class _Reasoning extends StatefulWidget {
-  const _Reasoning(this.text, {required this.thinking});
+/// The model's reasoning before its answer. While the model is still reasoning it says Thinking…
+/// and shows none of it; afterwards, once asked for from More, it shows what the model wrote
+/// under Hide reasoning, [onHide].
+class _Reasoning extends StatelessWidget {
+  const _Reasoning(this.text, {required this.onHide});
 
   final String text;
-  final bool thinking;
 
-  @override
-  State<_Reasoning> createState() => _ReasoningState();
-}
-
-class _ReasoningState extends State<_Reasoning> {
-  late bool _open = AppScope.of(context).prefs.prefs
-      .isOn(ChatSwitch.reasoningOpen);
+  /// Puts the reasoning away, or null while the model is still reasoning.
+  final VoidCallback? onHide;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final label = widget.thinking
-        ? 'Thinking…'
-        : _open
-        ? 'Hide reasoning'
-        : 'Show reasoning';
+    final thinking = onHide == null;
+    final label = thinking ? 'Thinking…' : 'Hide reasoning';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Tappable(
           label: label,
-          onTap: widget.text.isEmpty
-              ? null
-              : () => setState(() => _open = !_open),
+          expanded: thinking ? null : true,
+          onTap: onHide,
           radius: BorderRadius.circular(6),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                AnimatedRotation(
-                  turns: _open ? 0.25 : 0,
-                  duration: const Duration(milliseconds: 150),
+                RotatedBox(
+                  quarterTurns: thinking ? 0 : 1,
                   child: AppIcon('chevron', size: IconSize.xs, color: t.muted),
                 ),
                 const SizedBox(width: 6),
                 Text(label, style: Type.sans(13.5, color: t.muted)),
-                if (widget.thinking) ...[
-                  const SizedBox(width: 8),
-                  const Caret(),
-                ],
+                if (thinking) ...[const SizedBox(width: 8), const Caret()],
               ],
             ),
           ),
         ),
-        if (_open && widget.text.isNotEmpty)
+        if (!thinking)
           Container(
             margin: const EdgeInsets.only(top: 6, left: 6),
             padding: const EdgeInsets.only(left: 12),
@@ -818,7 +828,7 @@ class _ReasoningState extends State<_Reasoning> {
               border: Border(left: BorderSide(color: t.line, width: 2)),
             ),
             child: SelectableText(
-              widget.text,
+              text,
               style: Type.sans(14, color: t.muted, height: 1.55),
             ),
           ),

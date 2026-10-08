@@ -13,15 +13,25 @@ import '../widgets/controls.dart';
 import '../widgets/menu.dart';
 import '../widgets/tappable.dart';
 
-/// More, under a finished answer the server measured: its menu, This answer, names the answer's
-/// model, time, tokens, speed and cost, as far as [metrics] has them, over Show details under
-/// every answer, [ChatSwitch.answerDetails]. With that switch on, the whole line of them follows
-/// the button. The menu opens over the button and closes on Esc, Back and a tap outside.
+/// Whether an answer's reasoning shows above it, and what shows or hides it.
+typedef ReasoningToggle = ({bool shown, VoidCallback toggle});
+
+/// More, under a finished answer the server measured or that has reasoning: its menu, This
+/// answer, names the answer's model, time, tokens, speed and cost, as far as [metrics] has them,
+/// then View reasoning when there is [reasoning], then Show details under every answer,
+/// [ChatSwitch.answerDetails], when there are [metrics]. With that switch on, the whole line of
+/// them follows the button. The menu opens over the button and closes on Esc, Back, a tap
+/// outside and View reasoning.
 class AnswerMore extends StatefulWidget {
-  const AnswerMore(this.turn, this.metrics, {super.key});
+  const AnswerMore(this.turn, this.metrics, {super.key, this.reasoning});
 
   final Turn turn;
-  final AnswerMetrics metrics;
+
+  /// How the answer ran, or null when the server did not measure it.
+  final AnswerMetrics? metrics;
+
+  /// The answer's reasoning, or null when it has none.
+  final ReasoningToggle? reasoning;
 
   @override
   State<AnswerMore> createState() => _AnswerMoreState();
@@ -58,7 +68,9 @@ class _AnswerMoreState extends State<AnswerMore> {
       listenable: Listenable.merge([shell.popup, scope.prefs]),
       builder: (context, _) {
         final open = identical(shell.popup.value, widget.turn);
-        final details = scope.prefs.prefs.isOn(ChatSwitch.answerDetails);
+        final metrics = widget.metrics;
+        final details =
+            metrics != null && scope.prefs.prefs.isOn(ChatSwitch.answerDetails);
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -66,11 +78,24 @@ class _AnswerMoreState extends State<AnswerMore> {
               open: open,
               above: true,
               onClose: () => shell.closePopup(widget.turn),
-              menu: (context) => _AnswerMenu(widget.metrics),
+              menu: (context) => _AnswerMenu(
+                metrics,
+                reasoning: switch (widget.reasoning) {
+                  final r? => (
+                    shown: r.shown,
+                    toggle: () {
+                      shell.closePopup(widget.turn);
+                      r.toggle();
+                    },
+                  ),
+                  null => null,
+                },
+              ),
               child: Tappable(
                 touchTarget: true,
-                label:
-                    'More for this answer: model, time, tokens, speed and cost',
+                label: metrics != null
+                    ? 'More for this answer: model, time, tokens, speed and cost'
+                    : 'More for this answer',
                 tooltip: 'More',
                 expanded: open,
                 onTap: () => shell.togglePopup(widget.turn),
@@ -88,7 +113,7 @@ class _AnswerMoreState extends State<AnswerMore> {
               const SizedBox(width: 12),
               Flexible(
                 child: Text(
-                  widget.metrics.text,
+                  metrics.text,
                   style: Type.sans(12, color: t.muted),
                 ),
               ),
@@ -100,16 +125,20 @@ class _AnswerMoreState extends State<AnswerMore> {
   }
 }
 
-/// The menu More opens: how the answer ran, then the switch that shows it under every answer.
+/// The menu More opens: how the answer ran, View or Hide reasoning, then the switch that shows
+/// how each answer ran under it.
 class _AnswerMenu extends StatelessWidget {
-  const _AnswerMenu(this.metrics);
+  const _AnswerMenu(this.metrics, {required this.reasoning});
 
-  final AnswerMetrics metrics;
+  final AnswerMetrics? metrics;
+  final ReasoningToggle? reasoning;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final prefs = AppScope.of(context).prefs;
+    final metrics = this.metrics;
+    final reasoning = this.reasoning;
     return SizedBox(
       width: 248,
       child: AppMenu(
@@ -119,7 +148,8 @@ class _AnswerMenu extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(10, 6, 10, 4),
             child: SectionLabel('This answer'),
           ),
-          for (final (name, value) in metrics.named)
+          for (final (name, value)
+              in metrics?.named ?? const <(String, String)>[])
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               child: Row(
@@ -137,38 +167,44 @@ class _AnswerMenu extends StatelessWidget {
                 ],
               ),
             ),
-          const MenuDivider(),
-          ListenableBuilder(
-            listenable: prefs,
-            builder: (context, _) {
-              final on = prefs.prefs.isOn(ChatSwitch.answerDetails);
-              const label = 'Show details under every answer';
-              return Tappable(
-                label: label,
-                toggled: on,
-                onTap: () => prefs.setSwitch(ChatSwitch.answerDetails, !on),
-                radius: BorderRadius.circular(8),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 40),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            label,
-                            style: Type.sans(13.5, color: t.ink),
+          if (metrics != null) const MenuDivider(),
+          if (reasoning != null)
+            AppMenuItem(
+              reasoning.shown ? 'Hide reasoning' : 'View reasoning',
+              onTap: reasoning.toggle,
+            ),
+          if (metrics != null)
+            ListenableBuilder(
+              listenable: prefs,
+              builder: (context, _) {
+                final on = prefs.prefs.isOn(ChatSwitch.answerDetails);
+                const label = 'Show details under every answer';
+                return Tappable(
+                  label: label,
+                  toggled: on,
+                  onTap: () => prefs.setSwitch(ChatSwitch.answerDetails, !on),
+                  radius: BorderRadius.circular(8),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 40),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              label,
+                              style: Type.sans(13.5, color: t.ink),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        SwitchTrack(value: on),
-                      ],
+                          const SizedBox(width: 10),
+                          SwitchTrack(value: on),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
-          ),
+                );
+              },
+            ),
         ],
       ),
     );
