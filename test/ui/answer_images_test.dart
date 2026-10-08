@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -189,6 +190,27 @@ void main() {
       expect(_reads(llm), 2);
     },
   );
+
+  testWidgets('a live card whose connection dropped is read again after', (
+    tester,
+  ) async {
+    final live = StreamController<Uint8List>.broadcast();
+    addTearDown(live.close);
+    final llm = _withCard()..liveImages[_card] = live;
+    final h = await pumpApp(tester, llm: llm);
+    await tester.pump();
+    await _arrives(tester, live, pixel);
+    live.addError(const ApiException('The connection dropped.'));
+    await tester.pump();
+    expect(live.hasListener, isFalse);
+    expect(_shown(tester), pixel);
+
+    h.shell.showPane(Pane.files);
+    await tester.pump();
+    h.shell.showPane(Pane.chats);
+    await tester.pump();
+    expect(live.hasListener, isTrue);
+  });
 
   testWidgets('a live card is let go of while the app is hidden', (
     tester,

@@ -78,6 +78,16 @@ void main() {
     );
   });
 
+  test('a part with a negative length fails', () async {
+    final body = ascii.encode(
+      '--frame\r\nContent-Type: image/png\r\nContent-Length: -1\r\n\r\nx\r\n',
+    );
+    expect(
+      _frames(Stream.value(body), multipartType),
+      throwsA(isA<ApiException>()),
+    );
+  });
+
   test('a plain image is one frame, however it arrives', () async {
     final body = ascii.encode('a whole png');
     expect(await _frames(_byteByByte(body), 'image/png'), ['a whole png']);

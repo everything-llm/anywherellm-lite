@@ -119,7 +119,7 @@ final class _PartReader {
   void _startBody() {
     final length = _contentLength(latin1.decode(_head));
     _head.clear();
-    if (length == null) {
+    if (length == null || length < 0) {
       throw const ApiException('A live image sent a frame with no length.');
     }
     if (length > limit) throw _tooBig;

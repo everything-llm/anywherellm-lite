@@ -137,8 +137,10 @@ class _CardImageState extends State<CardImage> {
     setState(() => _frame = frame);
   }
 
+  /// Ends the read. One that failed after a frame keeps that frame and is read again the next
+  /// time the image shows, since a live card's connection may only have dropped.
   void _end({String? failure}) => setState(() {
-    _ended = true;
+    _ended = failure == null || _frame == null;
     _failure = failure;
     _reading = null;
   });
