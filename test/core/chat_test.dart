@@ -231,6 +231,34 @@ void main() {
     );
   });
 
+  group('themedCard', () {
+    final server = Uri.parse('https://h:3001');
+    String themed(String card, {bool light = true}) =>
+        themedCard(Uri.parse(card), server, light: light).toString();
+
+    test('asks the server\'s cards for light in the light theme', () {
+      expect(
+        themed('https://h:8445/_cards/q3.png?v=abc'),
+        'https://h:8445/_cards/q3.png?v=abc&theme=light',
+      );
+      expect(
+        themed('https://h:8445/_live/apps/q3/list.png'),
+        'https://h:8445/_live/apps/q3/list.png?theme=light',
+      );
+    });
+
+    test('leaves the dark theme, other paths and other hosts alone', () {
+      for (final (card, light) in [
+        ('https://h:8445/_cards/q3.png', false),
+        ('https://h:8445/pictures/cat.png', true),
+        ('https://elsewhere:8445/_cards/q3.png', true),
+        ('https://h:8445/_cards/q3.png?theme=dark', true),
+      ]) {
+        expect(themed(card, light: light), card);
+      }
+    });
+  });
+
   group('loadableImage', () {
     final server = Uri.parse('https://owen.example.ts.net:3001');
     bool loads(String image, {Uri? from, bool allowHttp = true}) =>

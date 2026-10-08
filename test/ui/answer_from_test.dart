@@ -21,18 +21,31 @@ Finder get menuNote => find.text('Applies to every chat in Q3 planning.');
 
 const phone = Size(390, 844);
 
+/// The planning server with its first workspace on Files & knowledge, so the chip shows.
+FakeAnythingLlm onChat() =>
+    planningServer()..spaces.first.settings['chatMode'] = 'chat';
+
 void main() {
+  testWidgets('the default mode has no chip; the model chip still shows', (
+    tester,
+  ) async {
+    await pumpApp(tester, llm: planningServer());
+    expect(chip, findsNothing);
+    expect(inComposer(find.text('Files, knowledge & tools')), findsNothing);
+    expect(inComposer(find.text('qwen3:8b')), findsOneWidget);
+  });
+
   testWidgets(
     'the composer names the chat mode in plain words, not the server',
     (tester) async {
-      await pumpApp(tester, llm: planningServer());
+      await pumpApp(tester, llm: onChat());
       expect(
         tester.widget<Tappable>(chip).label,
-        'Answer from: Files, knowledge & tools',
+        'Answer from: Files & knowledge',
       );
-      expect(inComposer(find.text('Files, knowledge & tools')), findsOneWidget);
+      expect(inComposer(find.text('Files & knowledge')), findsOneWidget);
       expect(inComposer(find.textContaining('AnythingLLM')), findsNothing);
-      expect(inComposer(find.text('Agent')), findsNothing);
+      expect(inComposer(find.text('Chat')), findsNothing);
       // The model chip follows it on a desktop.
       expect(inComposer(find.text('qwen3:8b')), findsOneWidget);
     },
@@ -41,7 +54,7 @@ void main() {
   testWidgets('the menu lists the modes and sets the workspace\'s mode', (
     tester,
   ) async {
-    final llm = planningServer();
+    final llm = onChat();
     final h = await pumpApp(tester, llm: llm);
     await tester.tap(chip);
     await tester.pumpAndSettle();
@@ -53,7 +66,7 @@ void main() {
     }
     expect(menuNote, findsOneWidget);
     expect(
-      tester.widget<Tappable>(control(ChatMode.automatic.title)).selected,
+      tester.widget<Tappable>(control(ChatMode.chat.title)).selected,
       isTrue,
     );
     await tester.tap(control('Files only'));
@@ -63,10 +76,17 @@ void main() {
     expect(menuNote, findsNothing);
     expect(tester.widget<Tappable>(chip).label, 'Answer from: Files only');
     expect(find.text('Ask about your files…'), findsOneWidget);
+    // Back on the default, the chip goes.
+    await tester.tap(chip);
+    await tester.pumpAndSettle();
+    await tester.tap(control(ChatMode.automatic.title));
+    await tester.pumpAndSettle();
+    expect(llm.spaces.first.settings['chatMode'], 'automatic');
+    expect(chip, findsNothing);
   });
 
   testWidgets('Files only tints the chip', (tester) async {
-    final h = await pumpApp(tester, llm: planningServer());
+    final h = await pumpApp(tester, llm: onChat());
     Color? fill() => tester
         .widget<Material>(
           find.descendant(of: chip, matching: find.byType(Material)).first,
@@ -81,7 +101,7 @@ void main() {
   testWidgets('Esc, a tap outside and the chip again close the menu', (
     tester,
   ) async {
-    final h = await pumpApp(tester, llm: planningServer());
+    final h = await pumpApp(tester, llm: onChat());
     await tester.tap(chip);
     await tester.pumpAndSettle();
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
@@ -104,7 +124,7 @@ void main() {
   testWidgets('the chip is off while an answer runs, which closes the menu', (
     tester,
   ) async {
-    final llm = planningServer()..hold = true;
+    final llm = onChat()..hold = true;
     final h = await pumpApp(tester, llm: llm);
     await tester.tap(chip);
     await tester.pumpAndSettle();
@@ -117,7 +137,7 @@ void main() {
   });
 
   testWidgets('another workspace closes the menu', (tester) async {
-    final h = await pumpApp(tester, llm: planningServer());
+    final h = await pumpApp(tester, llm: onChat());
     await tester.tap(chip);
     await tester.pumpAndSettle();
     await h.chat.select('household');
@@ -128,7 +148,7 @@ void main() {
   testWidgets('on a phone the menu holds the model, which opens the picker', (
     tester,
   ) async {
-    await pumpApp(tester, llm: planningServer(), size: phone);
+    await pumpApp(tester, llm: onChat(), size: phone);
     // No model chip in the row: the row has room for one.
     expect(inComposer(find.text('qwen3:8b')), findsNothing);
     await tester.tap(chip);
@@ -148,7 +168,7 @@ void main() {
     testWidgets(
       'the menu fits at ${size.width.toInt()}x${size.height.toInt()}',
       (tester) async {
-        await pumpApp(tester, llm: planningServer(), size: size);
+        await pumpApp(tester, llm: onChat(), size: size);
         await tester.tap(chip);
         await tester.pumpAndSettle();
         final menu = tester.getRect(control('Files only'));

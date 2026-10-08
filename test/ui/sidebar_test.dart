@@ -343,7 +343,7 @@ void main() {
   });
 
   group('the chat list', () {
-    testWidgets('lists pinned chats, then recent ones, then the rest', (
+    testWidgets('lists pinned chats, then recent ones, then the rest, as one', (
       tester,
     ) async {
       await pumpApp(
@@ -362,12 +362,10 @@ void main() {
       );
       // The newest chat opened at start, so it is the most recent.
       final rows = [
-        'Pinned',
+        'Chats',
         'Quarter priorities',
-        'Recent',
         'Kickoff agenda',
         'Budget questions',
-        'All chats',
         'Offsite venues',
       ];
       for (final (a, b) in [
@@ -375,11 +373,11 @@ void main() {
       ]) {
         expect(top(tester, a), lessThan(top(tester, b)), reason: '$a, $b');
       }
-      expect(find.text('on this device', findRichText: true), findsNothing);
-      expect(
-        find.textContaining('on this device', findRichText: true),
-        findsOneWidget,
-      );
+      // One list: no group names, and the pinned chat marked by its pin.
+      for (final group in ['Pinned', 'Recent', 'All chats']) {
+        expect(inSidebar(find.text(group)), findsNothing);
+      }
+      expect(inSidebar(control('Quarter priorities, pinned')), findsOneWidget);
     });
 
     testWidgets('a workspace never used here lists its chats alone', (
@@ -416,11 +414,10 @@ void main() {
       await pumpApp(tester, llm: planningServer(), prefsStore: store);
       await chatAction(tester, 'Pin chat');
       expect(store.saved.pinnedIn(_server, 'q3'), ['budget']);
-      expect(inSidebar(find.text('Pinned')), findsOneWidget);
-      expect(inSidebar(find.bySemanticsLabel('Pinned')), findsWidgets);
+      expect(inSidebar(control('Budget questions, pinned')), findsOneWidget);
       await chatAction(tester, 'Unpin chat');
       expect(store.saved.pinnedIn(_server, 'q3'), isEmpty);
-      expect(inSidebar(find.text('Pinned')), findsNothing);
+      expect(inSidebar(control('Budget questions, pinned')), findsNothing);
     });
 
     testWidgets('a dot marks a chat whose answer ended elsewhere', (

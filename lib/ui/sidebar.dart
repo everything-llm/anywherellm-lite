@@ -24,7 +24,10 @@ import 'workspace_switcher.dart';
 
 /// The open workspace's switcher, its chats or the server's files, and the way to Settings.
 class Sidebar extends StatefulWidget {
-  const Sidebar({super.key});
+  const Sidebar({super.key, this.width = Sizes.sidebar});
+
+  /// Wider in a phone's drawer.
+  final double width;
 
   @override
   State<Sidebar> createState() => _SidebarState();
@@ -55,7 +58,7 @@ class _SidebarState extends State<Sidebar> {
       child: MinHeight(
         min: Sizes.panelMin,
         child: Container(
-          width: Sizes.sidebar,
+          width: widget.width,
           padding: const EdgeInsets.fromLTRB(12, 18, 12, 12),
           decoration: BoxDecoration(
             color: t.side,
@@ -211,7 +214,8 @@ class _ChatsState extends State<_Chats> {
     );
   }
 
-  /// The open workspace's chats in their groups.
+  /// The open workspace's chats, in one list under Chats: the pinned ones, each with its pin,
+  /// then the ones this device used last, then the rest, newest made first.
   Widget _groups(BuildContext context) {
     final scope = AppScope.of(context);
     final chat = scope.chat;
@@ -233,21 +237,16 @@ class _ChatsState extends State<_Chats> {
           pinned: pinned,
         ),
     ];
-    final mixed = groups.pinned.isNotEmpty || groups.recent.isNotEmpty;
+    final any =
+        groups.pinned.isNotEmpty ||
+        groups.recent.isNotEmpty ||
+        groups.rest.isNotEmpty;
     return ListView(
       children: [
-        if (groups.pinned.isNotEmpty) ...[
-          const _GroupLabel('Pinned'),
-          ...rows(groups.pinned, pinned: true),
-        ],
-        if (groups.recent.isNotEmpty) ...[
-          const _GroupLabel('Recent', hint: 'on this device'),
-          ...rows(groups.recent),
-        ],
-        if (groups.rest.isNotEmpty) ...[
-          if (mixed) const _GroupLabel('All chats'),
-          ...rows(groups.rest),
-        ],
+        if (any) const _GroupLabel('Chats'),
+        ...rows(groups.pinned, pinned: true),
+        ...rows(groups.recent),
+        ...rows(groups.rest),
       ],
     );
   }
@@ -374,12 +373,11 @@ class _KeyHint extends StatelessWidget {
   }
 }
 
-/// A group's name over its chats, with a lighter [hint] after it.
+/// The name over the chats.
 class _GroupLabel extends StatelessWidget {
-  const _GroupLabel(this.label, {this.hint});
+  const _GroupLabel(this.label);
 
   final String label;
-  final String? hint;
 
   @override
   Widget build(BuildContext context) {
@@ -388,18 +386,9 @@ class _GroupLabel extends StatelessWidget {
       header: true,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(10, 14, 10, 4),
-        child: Text.rich(
-          TextSpan(
-            text: label,
-            style: Type.sans(12, weight: FontWeight.w500, color: t.muted),
-            children: [
-              if (hint != null)
-                TextSpan(
-                  text: '  $hint',
-                  style: Type.sans(12, color: t.fade),
-                ),
-            ],
-          ),
+        child: Text(
+          label,
+          style: Type.sans(12, weight: FontWeight.w500, color: t.muted),
         ),
       ),
     );
@@ -547,9 +536,11 @@ class _ChatRowState extends State<_ChatRow> {
         children: [
           Expanded(
             child: Tappable(
-              label: ready
-                  ? '${widget.thread.name}, answer ready'
-                  : widget.thread.name,
+              label: [
+                widget.thread.name,
+                if (widget.pinned) 'pinned',
+                if (ready) 'answer ready',
+              ].join(', '),
               selected: widget.current,
               tooltip: widget.current ? 'Double-click to rename' : null,
               onTap: () async {
@@ -571,14 +562,7 @@ class _ChatRowState extends State<_ChatRow> {
                 child: Row(
                   children: [
                     if (widget.pinned) ...[
-                      Semantics(
-                        label: 'Pinned',
-                        child: AppIcon(
-                          'pin',
-                          size: IconSize.xs,
-                          color: t.muted,
-                        ),
-                      ),
+                      AppIcon('pin', size: IconSize.xs, color: t.muted),
                       const SizedBox(width: 8),
                     ],
                     Expanded(

@@ -8,6 +8,7 @@ import 'package:anywherellm/ui/settings/settings_dialog.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/sidebar.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
+import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/confirm_box.dart';
 import 'package:anywherellm/ui/widgets/controls.dart';
 import 'package:anywherellm/ui/widgets/fields.dart';
@@ -109,6 +110,50 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 2));
       },
     );
+
+    testWidgets('on a phone a citation opens the passages read from its file', (
+      tester,
+    ) async {
+      final llm = planningServer()..hold = true;
+      final h = await pumpApp(tester, llm: llm, size: const Size(390, 844));
+      await typeAndEnter(tester, 'What is the budget?');
+      llm.chat!.add(const TextChunk('About 40k.'));
+      llm.chat!.add(
+        const ChatDone([
+          Citation(
+            'Q3 roadmap.pdf',
+            passages: [
+              Passage('Customer research: about 40k.', score: 0.82),
+              Passage('Cut the study first.', score: 0.47),
+            ],
+          ),
+        ]),
+      );
+      await llm.chat!.close();
+      await tester.pumpAndSettle();
+      // The chat's earlier answer cites the file with no passages, which flashes it instead.
+      await tester.tap(find.byTooltip('Passages read'));
+      await tester.pumpAndSettle();
+      final sheet = find.byType(SheetFrame);
+      expect(
+        find.descendant(of: sheet, matching: find.text('Passages read')),
+        findsOneWidget,
+      );
+      expect(find.text('2 passages, closest first'), findsOneWidget);
+      expect(find.text('82% match'), findsOneWidget);
+      expect(find.text('47% match'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('82% match')).dy,
+        lessThan(tester.getTopLeft(find.text('47% match')).dy),
+      );
+      expect(h.shell.sourcesOpen, isFalse);
+      expect(tester.takeException(), isNull);
+      await tester.tap(control('View extracted text'));
+      await tester.pumpAndSettle();
+      expect(h.shell.popup.value, isNull);
+      expect(h.shell.pane, Pane.files);
+      expect(h.files.reading?.title, 'Q3 roadmap.pdf');
+    });
 
     testWidgets('Shift+Enter starts a new line instead of sending', (
       tester,
@@ -919,7 +964,16 @@ void main() {
               .first,
         );
         expect(bar.padding, const EdgeInsets.only(left: 4, right: 6));
-        expect(find.byTooltip('Refresh'), findsOneWidget);
+        // The workspace sits over the chat's name, and a pull down refreshes in place of a
+        // button.
+        expect(
+          find.descendant(
+            of: find.byType(PaneHeader),
+            matching: find.text('Q3 planning'),
+          ),
+          findsOneWidget,
+        );
+        expect(find.byTooltip('Refresh'), findsNothing);
         // Documents shows its count alone where the header is narrow.
         expect(
           find.descendant(
@@ -930,6 +984,23 @@ void main() {
         );
       },
     );
+
+    testWidgets('on a phone, a pull down on the chat reads it again', (
+      tester,
+    ) async {
+      final llm = planningServer();
+      final h = await pumpApp(tester, llm: llm, size: const Size(390, 844));
+      final reads = llm.calls.where((c) => c == 'workspaces').length;
+      final list = find.byType(CustomScrollView).first;
+      // A short pull does nothing; a long one, let go, refreshes.
+      await tester.drag(list, const Offset(0, 30));
+      await tester.pumpAndSettle();
+      expect(llm.calls.where((c) => c == 'workspaces').length, reads);
+      await tester.drag(list, const Offset(0, 1600));
+      await tester.pumpAndSettle();
+      expect(llm.calls.where((c) => c == 'workspaces').length, reads + 1);
+      expect(h.chat.refreshing, isFalse);
+    });
 
     testWidgets('below 1120, Sources is a drawer over the chat', (
       tester,

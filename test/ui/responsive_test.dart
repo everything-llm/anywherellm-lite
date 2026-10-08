@@ -385,7 +385,11 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('THIS ANSWER'), findsOneWidget);
+      // A menu on a desktop, a sheet titled in sentence case on a phone.
+      expect(
+        find.text(size.width < 720 ? 'This answer' : 'THIS ANSWER'),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     });
 

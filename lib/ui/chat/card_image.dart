@@ -52,6 +52,10 @@ class CardImage extends StatefulWidget {
 class _CardImageState extends State<CardImage> {
   Uint8List? _frame;
 
+  /// Where the image is read from: [CardImage.uri], asking for a light card in the light theme.
+  /// Set as the state first reads its dependencies.
+  Uri? _source;
+
   /// Whether the read ended, by finishing or failing, so there is nothing more to follow.
   bool _ended = false;
 
@@ -63,10 +67,15 @@ class _CardImageState extends State<CardImage> {
   StreamSubscription<Uint8List>? _reading;
   late final AppLifecycleListener _lifecycle;
 
+  Uri _sourceIn(BuildContext context) => themedCard(
+    widget.uri,
+    widget.server,
+    light: Theme.of(context).brightness == Brightness.light,
+  );
+
   @override
   void initState() {
     super.initState();
-    _reset();
     _lifecycle = AppLifecycleListener(
       onHide: () => _setAppShown(false),
       onShow: () => _setAppShown(true),
@@ -77,13 +86,21 @@ class _CardImageState extends State<CardImage> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _onstage = TickerMode.valuesOf(context).enabled;
+    final source = _sourceIn(context);
+    if (source != _source) {
+      _source = source;
+      _stop();
+      _reset();
+    }
     _follow();
   }
 
   @override
   void didUpdateWidget(CardImage old) {
     super.didUpdateWidget(old);
-    if (old.uri == widget.uri && old.loadable == widget.loadable) return;
+    final source = _sourceIn(context);
+    if (source == _source && old.loadable == widget.loadable) return;
+    _source = source;
     _stop();
     _reset();
     _follow();
@@ -104,7 +121,7 @@ class _CardImageState extends State<CardImage> {
   /// Starts from the frame last read for this image, if any.
   void _reset() {
     _frame = widget.loadable
-        ? AppScope.of(context).chat.lastFrame(widget.uri)
+        ? AppScope.of(context).chat.lastFrame(_source!)
         : null;
     _ended = false;
     _failure = null;
@@ -117,7 +134,7 @@ class _CardImageState extends State<CardImage> {
       return;
     }
     _reading ??= AppScope.of(context).chat
-        .imageFrames(widget.uri)
+        .imageFrames(_source!)
         .listen(
           _show,
           onError: (Object error) =>

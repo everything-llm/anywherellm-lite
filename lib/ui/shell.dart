@@ -103,6 +103,10 @@ class AppShell extends StatelessWidget {
             final sheet = screen.isPhone;
             final sourcesDrawer = !sourcesInline && !sheet && shell.rightOpen;
             final sheetOpen = sheet && shell.rightOpen;
+            // A phone's drawer is wider, leaving the chat a strip to tap to close it.
+            final drawerWidth = screen.isPhone
+                ? max(Sizes.sidebar, min(320.0, box.maxWidth - 40))
+                : Sizes.sidebar;
             // The panel to the right: Sources, or the chat's browser or an app, wider and never
             // wider than the screen.
             final rightWidth = shell.beside == Beside.sources
@@ -228,9 +232,9 @@ class AppShell extends StatelessWidget {
                               _Drawer(
                                 open: sideDrawer,
                                 left: true,
-                                width: Sizes.sidebar,
+                                width: drawerWidth,
                                 duration: duration,
-                                child: const Sidebar(),
+                                child: Sidebar(width: drawerWidth),
                               ),
                             if (!sourcesInline && !sheet)
                               _Drawer(

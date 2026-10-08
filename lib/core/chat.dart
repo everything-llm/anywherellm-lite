@@ -124,6 +124,20 @@ bool loadableImage(Uri uri, Uri? server, {required bool allowHttp}) =>
     (uri.scheme == 'https' ||
         (uri.scheme == 'http' && server.scheme == 'http' && allowHttp));
 
+/// The address the app reads the image at [uri] from: with `theme=light` added when [light],
+/// for one of everythingllm's cards on the [server]'s host (a `/_cards/` or `/_live/` path),
+/// which it draws dark unless asked for light; anything else as it is.
+Uri themedCard(Uri uri, Uri? server, {required bool light}) {
+  if (!light || server == null || uri.host != server.host) return uri;
+  if (!uri.path.startsWith('/_cards/') && !uri.path.startsWith('/_live/')) {
+    return uri;
+  }
+  if (uri.queryParameters.containsKey('theme')) return uri;
+  return uri.replace(
+    queryParameters: {...uri.queryParameters, 'theme': 'light'},
+  );
+}
+
 /// Whether [uri] is a live app card on the [server]'s host: everythingllm's sandbox draws an
 /// app's current state at `/_live/apps/<workspace>/<name>.png`. It is an ordinary live card; its
 /// page, which the link around it names, opens through the app's link opener.

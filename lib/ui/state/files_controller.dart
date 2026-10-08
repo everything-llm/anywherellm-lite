@@ -349,7 +349,7 @@ class FilesController extends ChangeNotifier {
     _loaded = true;
     // Showing the node clears the problems, so the failed reads are added after it.
     if (selected != null) {
-      await _select(selected!);
+      await _select(selected!, keepText: true);
       if (_server != server) return;
     }
     problems = [...failed.nonNulls, if (selected != null) ...problems];
@@ -376,9 +376,11 @@ class FilesController extends ChangeNotifier {
     return _select(path);
   }
 
-  Future<void> _select(String path) async {
+  /// Shows the node at [path], putting away the text being read unless [keepText], as when the
+  /// node is only read again.
+  Future<void> _select(String path, {bool keepText = false}) async {
     if (path != selected) _settingsAsJson = false;
-    _reading = null;
+    if (!keepText || path != selected) _reading = null;
     selected = path;
     _clearContent();
     final node = this.node;

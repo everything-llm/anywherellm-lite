@@ -266,6 +266,31 @@ void main() {
     });
   });
 
+  test('a document keeps each passage read from it, closest first', () {
+    final cited = citationsOf([
+      {
+        'title': 'Q3 roadmap.pdf',
+        'text': '<document_metadata>\ntitle: Q3\n</document_metadata>\n\nCut first.',
+        'score': 0.47,
+      },
+      {'title': 'Q3 roadmap.pdf', 'text': 'About 40k.', 'score': 0.82},
+      {'title': 'Q3 roadmap.pdf', 'text': 'No score.'},
+      {'title': 'Q3 roadmap.pdf', 'text': 'Odd score.', 'score': 7},
+      {'title': 'Notes.md'},
+    ]);
+    expect(cited.map((c) => c.title), ['Q3 roadmap.pdf', 'Notes.md']);
+    expect(
+      [for (final p in cited.first.passages) (p.text, p.score)],
+      [
+        ('About 40k.', 0.82),
+        ('Cut first.', 0.47),
+        ('No score.', null),
+        ('Odd score.', null),
+      ],
+    );
+    expect(cited.last.passages, isEmpty);
+  });
+
   test(
     'a web source keeps its page, once per address; a document once per title',
     () {

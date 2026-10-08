@@ -290,22 +290,37 @@ class ChatMessage {
   final bool? feedback;
 }
 
-/// A source an answer drew on: a document by its [title], or a web page an agent read, which
-/// also has its [url].
+/// A passage of a document an answer read: its [text], and how close it was to the question,
+/// [score] from 0 to 1, when the server said.
+class Passage {
+  const Passage(this.text, {this.score});
+
+  final String text;
+  final double? score;
+}
+
+/// A source an answer drew on: a document by its [title], with the [passages] the answer read
+/// from it, or a web page an agent read, which also has its [url].
 class Citation {
-  const Citation(this.title, {this.url});
+  const Citation(this.title, {this.url, this.passages = const []});
 
   final String title;
   final Uri? url;
+
+  /// Closest first, those with a score before those without.
+  final List<Passage> passages;
 }
 
 /// The sources in a `sources` list, each once: a web page once per address, and a source with
-/// no address only when its title is not cited yet. A web page's address is its `chunkSource`
-/// after `link://`, as `link://https://example.com/page`; a document has none.
+/// no address once per title, holding each passage of it the list has. A web page's address is
+/// its `chunkSource` after `link://`, as `link://https://example.com/page`; a document has
+/// none. A passage's `text` starts with a `<document_metadata>` block, which is dropped, and
+/// its `score` is kept only from 0 to 1.
 List<Citation> citationsOf(Object? sources) {
-  final cited = <Citation>[];
-  final titles = <String>{};
+  final cited = <({String title, Uri? url, List<Passage> passages})>[];
+  final byTitle = <String, List<Passage>>{};
   final pages = <Uri>{};
+  final pageTitles = <String>{};
   for (final source in jsonObjects(sources)) {
     final title = _known(source, 'title');
     if (title == null) continue;
@@ -317,11 +332,45 @@ List<Citation> citationsOf(Object? sources) {
         page != null &&
         page.host.isNotEmpty &&
         (page.scheme == 'http' || page.scheme == 'https');
-    if (web ? !pages.add(page) : titles.contains(title)) continue;
-    titles.add(title);
-    cited.add(Citation(title, url: web ? page : null));
+    final text = source['text'] is String
+        ? (source['text'] as String).replaceFirst(_metadataBlock, '').trim()
+        : '';
+    final score = switch (source['score']) {
+      final num n when n >= 0 && n <= 1 => n.toDouble(),
+      _ => null,
+    };
+    final passage = text.isEmpty ? null : Passage(text, score: score);
+    if (web) {
+      if (!pages.add(page)) continue;
+      pageTitles.add(title);
+      cited.add((title: title, url: page, passages: const []));
+      continue;
+    }
+    if (pageTitles.contains(title)) continue;
+    if (byTitle[title] case final passages?) {
+      if (passage != null) passages.add(passage);
+      continue;
+    }
+    final passages = [?passage];
+    byTitle[title] = passages;
+    cited.add((title: title, url: null, passages: passages));
   }
-  return cited;
+  return [
+    for (final c in cited)
+      Citation(c.title, url: c.url, passages: _closestFirst(c.passages)),
+  ];
+}
+
+/// [passages] with a score, highest first, then those without, each in the order given.
+List<Passage> _closestFirst(List<Passage> passages) {
+  final ranked = passages.indexed.toList()
+    ..sort((a, b) {
+      final (x, y) = (a.$2.score, b.$2.score);
+      if (x != null && y != null && x != y) return y.compareTo(x);
+      if ((x == null) != (y == null)) return x == null ? 1 : -1;
+      return a.$1.compareTo(b.$1);
+    });
+  return List.unmodifiable([for (final (_, p) in ranked) p]);
 }
 
 /// A document a workspace holds.

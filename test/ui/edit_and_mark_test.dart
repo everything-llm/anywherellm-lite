@@ -34,10 +34,14 @@ void main() {
     expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
   });
 
-  testWidgets('thumbs mark an answer, a second tap clears it, and a refusal '
-      'puts it back', (tester) async {
+  testWidgets('thumbs in More mark an answer, a second tap clears it, and a '
+      'refusal puts it back', (tester) async {
     final llm = withChatIds();
     await pumpApp(tester, llm: llm);
+    expect(find.byTooltip('Good answer'), findsNothing);
+    await tester.tap(control('More for this answer'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rate this answer'), findsOneWidget);
     await tester.tap(find.byTooltip('Good answer'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Good answer'));

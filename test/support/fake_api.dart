@@ -120,6 +120,9 @@ class FakeAnythingLlm implements AnythingLlmApi {
   /// What [answerImage] answers for a live image, by address: a broadcast stream the test adds
   /// frames to, whose `hasListener` says whether the app is following it.
   final Map<Uri, StreamController<Uint8List>> liveImages = {};
+
+  /// Every address [answerImage] was asked for, as the app asked it.
+  final List<Uri> imageAsks = [];
   bool hold = false;
   StreamController<ChatEvent>? chat;
 
@@ -642,13 +645,22 @@ class FakeAnythingLlm implements AnythingLlmApi {
   Future<int> vectorCount() => _run('vectorCount', () => vectors);
 
   @override
-  Stream<Uint8List> answerImage(Uri url) {
-    calls.add('answerImage:$url');
+  Stream<Uint8List> answerImage(Uri asked) {
+    imageAsks.add(asked);
+    // The test's images are kept by their address as the answer gives it, whatever theme the
+    // app asks for.
+    final rest = {...asked.queryParameters}..remove('theme');
+    final bare = !asked.queryParameters.containsKey('theme')
+        ? asked
+        : rest.isEmpty
+        ? Uri.parse(asked.toString().split('?').first)
+        : asked.replace(queryParameters: rest);
+    calls.add('answerImage:$bare');
     if (errors['answerImage'] case final Object error) {
       return Stream.error(error);
     }
-    if (liveImages[url] case final live?) return live.stream;
-    if (images[url] case final frames?) {
+    if (liveImages[bare] case final live?) return live.stream;
+    if (images[bare] case final frames?) {
       return Stream.fromIterable(frames.map(Uint8List.fromList));
     }
     return Stream.error(

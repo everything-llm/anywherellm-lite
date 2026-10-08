@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
 import '../icons.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
@@ -194,15 +195,42 @@ class _Header extends StatelessWidget {
         final chat = scope.chat;
         final workspace = chat.active;
         final title = PaneHeader.chatTitleStyle(context);
+        // A phone names the workspace small over the chat, and refreshes with a pull down on
+        // the chat rather than a button.
+        final phone = ScreenClass.ofContext(context).isPhone;
         return PaneHeader(
           showMenu: showMenu,
           onMenu: scope.shell.toggleSide,
-          title: Text.rich(
-            TextSpan(
-              style: title,
-              children: workspace == null
-                  ? const [TextSpan(text: 'AnywhereLLM')]
-                  : [
+          title: workspace == null
+              ? Text(
+                  'AnywhereLLM',
+                  style: title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                )
+              : phone
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      workspace.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Type.sans(12, color: t.muted, height: 1.3),
+                    ),
+                    Text(
+                      chat.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: title.copyWith(fontSize: 16),
+                    ),
+                  ],
+                )
+              : Text.rich(
+                  TextSpan(
+                    style: title,
+                    children: [
                       TextSpan(
                         text: workspace.name,
                         style: title.copyWith(
@@ -219,21 +247,22 @@ class _Header extends StatelessWidget {
                       ),
                       TextSpan(text: chat.title),
                     ],
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
           actions: workspace == null
               ? null
               : (compact) => [
                   const SizedBox(width: 12),
-                  _HeaderButton(
-                    label: 'Refresh',
-                    heard: 'Read this chat again from the server',
-                    icon: 'refresh',
-                    compact: true,
-                    onTap: chat.refreshing ? null : chat.refresh,
-                  ),
+                  if (!phone)
+                    _HeaderButton(
+                      label: 'Refresh',
+                      heard: 'Read this chat again from the server',
+                      icon: 'refresh',
+                      compact: true,
+                      onTap: chat.refreshing ? null : chat.refresh,
+                    ),
                   // New chat sits at the top of the sidebar while it is in the layout.
                   if (showMenu) ...[
                     const SizedBox(width: 8),

@@ -14,17 +14,21 @@ import '../icons.dart';
 import '../layout.dart';
 import '../state/chat_controller.dart';
 import '../state/prefs_controller.dart';
+import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
+import '../widgets/pull_refresh.dart';
 import '../widgets/rise.dart';
+import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
 import 'answer_body.dart';
 import 'answer_menu.dart';
 import 'browser_chip.dart';
 import 'generated_files.dart';
+import 'passages_sheet.dart';
 import 'speaker.dart';
 
 /// The chat on screen, newest at the bottom. Empty, it invites a first question.
@@ -129,11 +133,15 @@ class _MessageListState extends State<MessageList> {
   Widget _turns(BuildContext context, List<Turn> turns) {
     final scope = AppScope.of(context);
     final chat = scope.chat;
-    return CustomScrollView(
+    // On a phone a pull down past the oldest turn reads the chat again, in place of the
+    // header's Refresh.
+    final phone = ScreenClass.ofContext(context).isPhone;
+    final list = CustomScrollView(
       // Another chat gets a list of its own, which starts at its newest turn.
       key: ValueKey((chat.activeSlug, chat.activeThread)),
       controller: _scroll,
       reverse: true,
+      physics: phone ? const AlwaysScrollableScrollPhysics() : null,
       slivers: [
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
@@ -154,6 +162,16 @@ class _MessageListState extends State<MessageList> {
           ),
         ),
       ],
+    );
+    if (!phone) return list;
+    return ListenableBuilder(
+      listenable: chat,
+      child: list,
+      builder: (context, list) => PullRefresh(
+        refreshing: chat.refreshing,
+        onRefresh: chat.refreshing ? null : chat.refresh,
+        child: list!,
+      ),
     );
   }
 
@@ -587,6 +605,7 @@ class _AnswerState extends State<_Answer> {
     final reasoned = !turn.streaming && split.reasoning.isNotEmpty;
     final failure = turn.streaming ? null : modelFailure(split.answer);
     final answered = split.answer.isNotEmpty && failure == null;
+    final rate = answered ? _feedbackOf(context, turn) : null;
     // An answer cut short shows what came in the second ink, under why it stopped.
     final cut = !turn.streaming && (turn.stopped || turn.error != null);
     // The red box asks again itself, so Retry does not show twice.
@@ -686,22 +705,11 @@ class _AnswerState extends State<_Answer> {
                   box: 30,
                   size: IconSize.xs,
                 ),
-              if (_feedbackOf(context, turn) case final chat?
-                  when answered) ...[
-                for (final good in const [true, false])
-                  IconBtn(
-                    good ? 'thumb-up' : 'thumb-down',
-                    tooltip: good ? 'Good answer' : 'Bad answer',
-                    active: turn.feedback == good,
-                    onPressed: () => chat.mark(turn, good),
-                    box: 30,
-                    size: IconSize.xs,
-                  ),
-              ],
-              if (turn.metrics != null || reasoned)
+              if (turn.metrics != null || reasoned || rate != null)
                 AnswerMore(
                   turn,
                   turn.metrics,
+                  rate: rate,
                   reasoning: reasoned
                       ? (shown: _reasoning, toggle: _toggleReasoning)
                       : null,
@@ -883,33 +891,77 @@ class _CitationsState extends State<_Citations> {
   }
 }
 
-/// One source. A file in Sources lights up there when tapped, and a web page an agent read opens
-/// in the browser; anything else, such as a file since removed, only shows its title.
-class _Citation extends StatelessWidget {
+/// One source. A file in Sources lights up there when tapped, or on a phone, where Documents
+/// is a sheet, opens the passages the answer read from it, when the server sent them; a web
+/// page an agent read opens in the browser; anything else, such as a file since removed, only
+/// shows its title.
+class _Citation extends StatefulWidget {
   const _Citation({required this.number, required this.citation});
 
   final int number;
   final Citation citation;
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: AppScope.of(context).sources,
-    builder: _build,
-  );
+  State<_Citation> createState() => _CitationState();
+}
+
+class _CitationState extends State<_Citation> {
+  late final ShellController _shell;
+
+  @override
+  void initState() {
+    super.initState();
+    _shell = AppScope.of(context).shell;
+  }
+
+  @override
+  void dispose() {
+    // A citation that leaves the screen takes its sheet with it, after the frame.
+    final (shell, citation) = (_shell, widget.citation);
+    if (identical(shell.popup.value, citation)) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => shell.closePopup(citation),
+      );
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    return ListenableBuilder(
+      listenable: Listenable.merge([scope.sources, scope.shell.popup]),
+      builder: _build,
+    );
+  }
 
   Widget _build(BuildContext context, Widget? _) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
+    final citation = widget.citation;
+    final number = widget.number;
     final title = citation.title;
     final url = citation.url;
     final present = scope.sources.byTitle(title) != null;
     final live = present || url != null;
-    return Tappable(
+    final passages =
+        present &&
+        citation.passages.isNotEmpty &&
+        ScreenClass.ofContext(context).isPhone;
+    void close() => scope.shell.closePopup(citation);
+    final chip = Tappable(
       label: present || url == null
           ? 'Source $number: $title'
           : 'Source $number: $title, opens in the browser',
-      tooltip: present ? 'Show in Documents' : url?.toString(),
-      onTap: present
+      tooltip: passages
+          ? 'Passages read'
+          : present
+          ? 'Show in Documents'
+          : url?.toString(),
+      expanded: passages ? identical(scope.shell.popup.value, citation) : null,
+      onTap: passages
+          ? () => scope.shell.togglePopup(citation)
+          : present
           ? () {
               scope.shell.openSources();
               scope.sources.flash(title);
@@ -955,6 +1007,15 @@ class _Citation extends StatelessWidget {
           ],
         ),
       ),
+    );
+    if (!passages) return chip;
+    return PopupSheet(
+      open: identical(scope.shell.popup.value, citation),
+      onClose: close,
+      title: 'Passages read',
+      sheet: (context) =>
+          PassagesView(number: number, citation: citation, onClose: close),
+      child: chip,
     );
   }
 }

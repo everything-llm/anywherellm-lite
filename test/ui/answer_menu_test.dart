@@ -1,6 +1,7 @@
 import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
+import 'package:anywherellm/ui/widgets/sheet.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -29,7 +30,9 @@ FakeAnythingLlm measured() => planningServer()
   );
 
 void main() {
-  testWidgets('an answer not measured has no More', (tester) async {
+  testWidgets('an answer not measured says nothing of how it ran', (
+    tester,
+  ) async {
     await pumpApp(tester, llm: planningServer());
     await ask(tester, 'First');
     expect(control(_more), findsNothing);
@@ -62,7 +65,7 @@ void main() {
   });
 
   testWidgets(
-    'More follows Copy, Retry and the thumbs, and lists what was measured',
+    'More follows Copy and Retry, and lists what was measured and the thumbs',
     (tester) async {
       await pumpApp(tester, llm: measured());
       await ask(tester, 'Second');
@@ -75,13 +78,9 @@ void main() {
           .evaluate()
           .map((e) => tester.getTopLeft(find.byElementPredicate((x) => x == e)))
           .reduce((a, b) => a.dy >= b.dy ? a : b);
-      final row = [
-        'Copy answer',
-        'Retry',
-        'Good answer',
-        'Bad answer',
-        _more,
-      ].map(at).toList();
+      // The thumbs are in the menu, not the row.
+      expect(control('Good answer'), findsNothing);
+      final row = ['Copy answer', 'Retry', _more].map(at).toList();
       expect(row.map((o) => o.dy).toSet(), hasLength(1));
       final left = [for (final o in row) o.dx];
       expect(left, orderedEquals([...left]..sort()));
@@ -99,6 +98,9 @@ void main() {
       }
       // No price, no Cost row.
       expect(find.text('Cost'), findsNothing);
+      expect(find.text('Rate this answer'), findsOneWidget);
+      expect(control('Good answer'), findsOneWidget);
+      expect(control('Bad answer'), findsOneWidget);
       expect(control(_always), findsOneWidget);
       // The menu opens over the button.
       expect(
@@ -133,6 +135,42 @@ void main() {
     await tester.tapAt(const Offset(700, 120));
     await tester.pumpAndSettle();
     expect(find.text('THIS ANSWER'), findsNothing);
+    expect(h.shell.answerMenu, isNull);
+  });
+
+  testWidgets('on a phone More is a sheet, closed by Back and the scrim', (
+    tester,
+  ) async {
+    final h = await pumpApp(
+      tester,
+      llm: measured(),
+      size: const Size(390, 844),
+    );
+    await ask(tester, 'Second');
+    await tester.tap(control(_more));
+    await tester.pumpAndSettle();
+    final sheet = find.byType(SheetFrame);
+    expect(
+      find.descendant(of: sheet, matching: find.text('This answer')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: sheet, matching: find.text('glm-5.3')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: sheet, matching: control('Good answer')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(h.shell.answerMenu, isNull);
+    expect(find.byType(SheetFrame), findsNothing);
+    await tester.tap(control(_more));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(195, 30));
+    await tester.pumpAndSettle();
     expect(h.shell.answerMenu, isNull);
   });
 

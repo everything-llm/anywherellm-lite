@@ -30,9 +30,10 @@ bool _canChoose(AppScope scope) {
 
 /// The open workspace's chat mode in the composer, in plain words: what answers draw on. Tapped,
 /// it opens the Answer from menu over the composer ([AnswerFromAnchor]). Files only tints it,
-/// since that mode is the one that makes an answer decline. It shows once the workspace is read,
-/// and reads Answer from when the server's mode is none the app knows. It is off while an answer
-/// runs in the workspace.
+/// since that mode is the one that makes an answer decline. It shows once the workspace is read
+/// and only while its mode is not the default, Files, knowledge & tools, and reads Answer from
+/// when the server's mode is none the app knows. It is off while an answer runs in the
+/// workspace.
 class AnswerFromChip extends StatefulWidget {
   const AnswerFromChip({super.key});
 
@@ -80,6 +81,11 @@ class _AnswerFromChipState extends State<AnswerFromChip> {
           return const SizedBox.shrink();
         }
         final mode = scope.sources.chatMode.value;
+        // The default needs no saying: the chip shows only for another mode, and the choice
+        // otherwise lives in the workspace's Answer settings.
+        if (mode == ChatMode.automatic && !scope.shell.answerFromOpen) {
+          return const SizedBox.shrink();
+        }
         final text = mode?.title ?? 'Answer from';
         return TapRegion(
           groupId: _group,
