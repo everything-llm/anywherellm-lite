@@ -31,8 +31,34 @@ void main() {
       words: 1204,
     );
     expect(file.tile, 'MD');
-    expect(file.meta, '1204 words');
+    expect(file.meta, '1,204 words');
+    expect(file.filesMeta, '1,204 words');
     expect(const SourceFile(path: 'p', title: 'README', on: true).meta, '');
+  });
+
+  test('a switched-off file says it is not used', () {
+    const off = SourceFile(path: 'p', title: 'Pricing', on: false, words: 1040);
+    expect(off.meta, 'Not used · 1,040 words');
+    expect(off.filesMeta, '1,040 words · Not used in answers');
+    const uncounted = SourceFile(path: 'p', title: 'Pricing', on: false);
+    expect(uncounted.meta, 'Not used');
+    expect(uncounted.filesMeta, 'Not used in answers');
+  });
+
+  test('a title loses the extension of the file it came from', () {
+    expect(shortTitle('Q3 roadmap.pdf'), 'Q3 roadmap');
+    expect(shortTitle('Pricing page'), 'Pricing page');
+    expect(shortTitle('notes.v2-final'), 'notes.v2-final');
+    expect(shortTitle('.md'), '.md');
+  });
+
+  test('an empty chat suggests from the documents\' names', () {
+    expect(suggestionsFor([]), ['What can I do here?']);
+    expect(suggestionsFor(['Q3 roadmap.pdf']), ['Summarise Q3 roadmap']);
+    expect(
+      suggestionsFor(['Q3 roadmap.pdf', 'Customer interviews.docx', 'x.md']),
+      ['Summarise Q3 roadmap', 'Compare Q3 roadmap with Customer interviews'],
+    );
   });
 
   test('the type comes from the stored name, whatever the title', () {
@@ -44,5 +70,13 @@ void main() {
     expect(tile('url-example.com_pricing-$id.json', 'Node.js 22'), 'WEB');
     expect(tile('raw-meeting-notes-$id.json', 'Meeting notes.md'), 'FILE');
     expect(tile('README.json', 'README.md'), 'FILE');
+  });
+
+  test('a pinned document stays pinned among the merged ones', () {
+    final files = mergeSources(
+      [const WorkspaceDoc(path: 'a', title: 'A', pinned: true)],
+      const [OffDoc(path: 'b', title: 'B')],
+    );
+    expect([for (final f in files) f.pinned], [true, false]);
   });
 }

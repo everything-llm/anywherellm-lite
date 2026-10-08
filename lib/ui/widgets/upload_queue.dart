@@ -1,3 +1,4 @@
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/copy.dart';
@@ -19,10 +20,19 @@ class _Pending {
 /// A [DropZone] whose files wait in a list, each with its own details and a remove button,
 /// until Add sends them all through [onSend].
 class UploadQueue extends StatefulWidget {
-  const UploadQueue({super.key, required this.onSend, required this.onProblem});
+  const UploadQueue({
+    super.key,
+    required this.onSend,
+    required this.onProblem,
+    this.trigger,
+  });
 
   final Future<void> Function(List<UploadFile> files) onSend;
   final void Function(String title, String text) onProblem;
+
+  /// What stands in place of the [DropZone], given the way to open the file picker, such as an
+  /// Add a file button among others. Files dropped on it wait as well.
+  final Widget Function(VoidCallback browse)? trigger;
 
   @override
   State<UploadQueue> createState() => _UploadQueueState();
@@ -70,11 +80,21 @@ class _UploadQueueState extends State<UploadQueue> {
     await widget.onSend(files);
   }
 
+  Widget _trigger(Widget Function(VoidCallback browse) trigger) => DropTarget(
+    onDragDone: (details) => _add(details.files.map(uploadOf).toList()),
+    child: trigger(
+      () => browseFiles(this, onFiles: _add, onProblem: widget.onProblem),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      DropZone(onFiles: _add, onProblem: widget.onProblem),
+      switch (widget.trigger) {
+        final trigger? => _trigger(trigger),
+        null => DropZone(onFiles: _add, onProblem: widget.onProblem),
+      },
       if (_pending.isNotEmpty) ...[
         const SizedBox(height: 10),
         for (final p in _pending)

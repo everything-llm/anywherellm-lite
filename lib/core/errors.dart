@@ -20,6 +20,12 @@ class AnswerStillRunning extends ApiException {
       );
 }
 
+/// A message the relay refused because its chat already has an answer running, which may have
+/// been started on another device. The relay answers it with 409, in its own words.
+class AlreadyAnswering extends ApiException {
+  const AlreadyAnswering(super.message) : super(status: 409);
+}
+
 /// A call made before any server was set up in Settings.
 class NotConfigured extends ApiException {
   const NotConfigured()

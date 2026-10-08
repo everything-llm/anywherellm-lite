@@ -13,20 +13,25 @@ import '../widgets/fields.dart';
 import 'rows.dart';
 import 'server_settings.dart';
 
-/// A page of the server's providers: each of [settings]' choosers and the settings of the
-/// provider chosen, saved together to the server's `.env`. [before] and [after] go above and
-/// below them.
+/// A page of the server's providers: each of [settings]' choosers in its own card, and the
+/// settings of the provider chosen in a card under it, saved together to the server's `.env`.
+/// [before] and [after] go above and below them, [lead] are rows above the first chooser in
+/// its card, and [fieldsNote] is a line between a chooser and its provider's settings.
 class ProviderPage extends StatelessWidget {
   const ProviderPage(
     this.settings, {
     super.key,
     this.before = const [],
     this.after = const [],
+    this.lead = const [],
+    this.fieldsNote,
   });
 
   final List<ProviderSetting> settings;
   final List<Widget> before;
   final List<Widget> after;
+  final List<Widget> lead;
+  final String? fieldsNote;
 
   @override
   Widget build(BuildContext context) => ServerSettings(
@@ -36,6 +41,8 @@ class ProviderPage extends StatelessWidget {
       key: ValueKey(revision),
       settings: settings,
       values: values,
+      lead: lead,
+      fieldsNote: fieldsNote,
     ),
   );
 }
@@ -47,10 +54,14 @@ class _ProviderForm extends StatefulWidget {
     super.key,
     required this.settings,
     required this.values,
+    required this.lead,
+    required this.fieldsNote,
   });
 
   final List<ProviderSetting> settings;
   final Map<String, Object?> values;
+  final List<Widget> lead;
+  final String? fieldsNote;
 
   @override
   State<_ProviderForm> createState() => _ProviderFormState();
@@ -136,17 +147,13 @@ class _ProviderFormState extends State<_ProviderForm> with SettingsSaving {
     final tag = recommended
         ? const AppBadge('Recommended', kind: BadgeKind.accent, pill: true)
         : null;
+    final help = s.recommended == null || recommended ? s.help : '';
     if (!s.writable) {
-      return FieldRow(
-        label: s.label,
-        help: s.help,
-        tag: tag,
-        control: Text(s.labelOf(value), textAlign: TextAlign.end),
-      );
+      return ReadOnlyRow(label: s.label, help: help, value: s.labelOf(value));
     }
     return FieldRow(
       label: s.label,
-      help: s.help,
+      help: help,
       tag: tag,
       control: Semantics(
         label: s.label,
@@ -174,9 +181,9 @@ class _ProviderFormState extends State<_ProviderForm> with SettingsSaving {
           spacing: 8,
           runSpacing: 8,
           children: [
-            const AppBadge('Set, not shown', kind: BadgeKind.ok),
+            const AppBadge('Saved, not shown', kind: BadgeKind.ok),
             AppButton(
-              'Replace',
+              'Change',
               onPressed: saving
                   ? null
                   : () => setState(() => _replacing.add(field.key)),
@@ -212,28 +219,31 @@ class _ProviderFormState extends State<_ProviderForm> with SettingsSaving {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       spacing: 20,
       children: [
-        for (final (s, of) in shown)
-          FieldCard([
-            _chooser(s, saving),
-            for (final field in of) _field(field, saving),
-          ]),
+        for (final (i, (s, of)) in shown.indexed) ...[
+          FieldCard([if (i == 0) ...widget.lead, _chooser(s, saving)]),
+          if (of.isNotEmpty) ...[
+            if (widget.fieldsNote case final note?) PageNote(note),
+            FieldCard([for (final field in of) _field(field, saving)]),
+          ],
+        ],
         if (confirmBox(() => _draft(fields)) case final box?)
           box
         else if (widget.settings.any((s) => s.writable) || fields.isNotEmpty)
-          ActionRow([
-            AppButton('Revert', onPressed: dirty && !saving ? _revert : null),
+          PageActions([
             AppButton(
               saving ? 'Saving…' : 'Save',
               primary: true,
               onPressed: dirty && !saving ? () => save(_draft(fields)) : null,
             ),
+            AppButton('Revert', onPressed: dirty && !saving ? _revert : null),
           ]),
       ],
     );
   }
 }
 
-/// How many passages the server's database holds, across every workspace, read when it shows.
+/// How many passages the server's database holds, across every workspace, read when it shows:
+/// a row of a [FieldCard].
 class StoredPassages extends StatefulWidget {
   const StoredPassages({super.key});
 
@@ -253,22 +263,51 @@ class _StoredPassagesState extends State<StoredPassages> {
     final system = AppScope.of(context).system;
     return ListenableBuilder(
       listenable: system,
-      builder: (context, _) => FieldCard([
-        ReadOnlyRow(
-          label: 'Stored passages',
-          help: 'Across every workspace. AnythingLLM calls them vectors.',
-          value: switch (system) {
-            SystemController(problem: final problem?) =>
-              '${problem.title}: ${problem.text}',
-            SystemController(vectors: final count?) => plural(
-              count,
-              'passage',
-              'passages',
-            ),
-            _ => 'Counting…',
-          },
-        ),
-      ]),
+      builder: (context, _) => ReadOnlyRow(
+        label: 'Stored passages',
+        value: switch (system) {
+          SystemController(problem: final problem?) =>
+            '${problem.title}: ${problem.text}',
+          SystemController(vectors: final count?) =>
+            '${grouped(count)} across every workspace',
+          _ => 'Counting…',
+        },
+      ),
+    );
+  }
+}
+
+/// The warning over the document search model: a change clears every document's searchable
+/// copy, with how many passages that is once the server has counted them.
+class SearchModelWarning extends StatefulWidget {
+  const SearchModelWarning({super.key});
+
+  @override
+  State<SearchModelWarning> createState() => _SearchModelWarningState();
+}
+
+class _SearchModelWarningState extends State<SearchModelWarning> {
+  @override
+  void initState() {
+    super.initState();
+    AppScope.of(context).system.readVectors();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final system = AppScope.of(context).system;
+    return ListenableBuilder(
+      listenable: system,
+      builder: (context, _) {
+        final count = system.vectors;
+        final all = count == null
+            ? ''
+            : ', ${grouped(count)} ${count == 1 ? 'passage' : 'passages'} in all';
+        return PageWarning(
+          'Changing this model clears the searchable copy of every document$all. Each '
+          'document has to be prepared again before answers can use it.',
+        );
+      },
     );
   }
 }

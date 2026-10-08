@@ -1,9 +1,14 @@
+import 'dart:async';
 import 'dart:ui' show Size;
 
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/chat_log.dart';
 import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/connection.dart';
+import 'package:anywherellm/core/embeds.dart';
+import 'package:anywherellm/core/files.dart';
+import 'package:anywherellm/core/outputs.dart';
+import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/upload.dart';
@@ -19,6 +24,7 @@ import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
+import '../support/fake_settings.dart';
 import '../support/pump.dart';
 
 /// One width per shell layout, and the window's own minimum (see my_application.cc).
@@ -105,6 +111,15 @@ void main() {
             question: longWord,
             at: DateTime(2026, 10, 7),
           ),
+        ]
+        ..embedList = [
+          Embed(
+            uuid: 'e-$longWord',
+            workspace: 'name-$longWord',
+            mode: EmbedMode.query,
+            enabled: true,
+            chats: 123456,
+          ),
         ];
       final h = await pumpApp(
         tester,
@@ -144,14 +159,14 @@ void main() {
       );
       h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Show QR code'));
+      await tester.ensureVisible(find.text('Connect a phone'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Show QR code'));
+      await tester.tap(find.text('Connect a phone'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      await tester.ensureVisible(find.text('Replace'));
+      await tester.ensureVisible(find.text('Edit connection'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Replace'));
+      await tester.tap(find.text('Edit connection'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Scan QR code'));
       await tester.pumpAndSettle();
@@ -341,6 +356,74 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('an answer\'s More menu and its details fit at $at', (
+      tester,
+    ) async {
+      final llm = awkward()
+        ..measured = AnswerMetrics(
+          model: 'model-$longWord',
+          tokens: 1642,
+          seconds: 73.852,
+          speed: 22.2,
+          cost: 0.0049,
+        );
+      final h = await pumpApp(
+        tester,
+        llm: llm,
+        size: size,
+        prefsStore: FakePrefsStore(
+          const Prefs().withSwitch(ChatSwitch.answerDetails, true),
+        ),
+      );
+      await h.chat.send('measured');
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tapVisible(
+        tester,
+        find.bySemanticsLabel(
+          'More for this answer: model, time, tokens, speed and cost',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('THIS ANSWER'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a message refused as the chat answers fits at $at', (
+      tester,
+    ) async {
+      final llm = awkward();
+      final h = await pumpApp(tester, llm: llm, size: size);
+      final events = StreamController<ChatEvent>();
+      addTearDown(() => unawaited(events.close()));
+      llm
+        ..running['t'] = (question: 'phone-$longWord', events: events)
+        ..errors['streamChat'] = const AlreadyAnswering('Busy.');
+      await h.chat.send('question-$longWord');
+      // The answer streams, and its caret never settles.
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.textContaining('maybe on another device'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('an app beside the chat, or in its sheet, fits at $at', (
+      tester,
+    ) async {
+      final h = await pumpApp(tester, llm: awkward(), size: size);
+      h.shell.showApp(
+        appCardOf(
+          Uri.parse('https://h:8455/_live/apps/w/$longWord.png'),
+          Uri.parse('https://h:8447/w/apps/$longWord/'),
+          'app-$longWord',
+          Uri.parse('https://h:3001'),
+        )!,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('app-$longWord'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('the Ctrl K switcher fits at $at', (tester) async {
       final h = await pumpApp(tester, llm: awkward(), size: size);
       h.shell.toggleSwitcher();
@@ -413,6 +496,39 @@ void main() {
       await tester.tap(find.text('Delete folder…'));
       await tester.pumpAndSettle();
       expect(find.bySemanticsLabel('Cancel'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final size in sizes) {
+    final at = '${size.width.toInt()}x${size.height.toInt()}';
+
+    testWidgets('Files\' Essentials and each section fit at $at', (
+      tester,
+    ) async {
+      final llm = awkward();
+      final path = 'custom-documents/file-$longWord.pdf.json';
+      await llm.pinDocument('w', path, pinned: true);
+      final h = await pumpApp(tester, llm: llm, size: size);
+      h.shell
+        ..showPane(Pane.files)
+        ..toggleSide();
+      await tester.pumpAndSettle();
+      expect(h.files.essentials, isTrue);
+      expect(tester.takeException(), isNull);
+      for (final section in FilesSection.values) {
+        await h.files.openSection(section);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: section.name);
+      }
+      h.shell.closeSide();
+      await h.files.openSection(FilesSection.documents);
+      await tester.pumpAndSettle();
+      await h.sources.toggle(h.sources.files.first);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await h.files.viewText(path, 'file-$longWord.pdf');
+      await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });
   }

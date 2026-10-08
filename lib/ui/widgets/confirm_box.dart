@@ -52,7 +52,7 @@ class _ConfirmBoxState extends State<ConfirmBox> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          AlertBox(AlertKind.warn, widget.text),
+          AlertBox(AlertKind.warn, widget.text, plain: true),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,

@@ -16,7 +16,7 @@ String _hint(TargetPlatform platform) => switch (platform) {
 
 /// A picked or dropped file, for [DropZone.onFiles]. Nothing is read until it is sent, and a
 /// folder or an unreadable file becomes a reason instead of an error.
-UploadFile _upload(XFile file) {
+UploadFile uploadOf(XFile file) {
   Future<T> reading<T>(Future<T> Function() read) async {
     if (file is DropItemDirectory) {
       throw const UnreadableFile('it is a folder; upload the files inside it');
@@ -29,6 +29,25 @@ UploadFile _upload(XFile file) {
   }
 
   return UploadFile(name: file.name, read: () => reading(file.readAsBytes));
+}
+
+/// Opens the system's file picker for [state]'s widget and sends what is picked to [onFiles], or
+/// to [onProblem] why the picker would not open.
+Future<void> browseFiles(
+  State state, {
+  required Future<void> Function(List<UploadFile> files) onFiles,
+  required void Function(String title, String text) onProblem,
+}) async {
+  final List<XFile> picked;
+  try {
+    picked = await openFiles();
+  } catch (error) {
+    if (state.mounted) onProblem('Could not open the file picker', '$error');
+    return;
+  }
+  // The picker may outlast the place it was opened for, as when the server changes.
+  if (!state.mounted) return;
+  await onFiles(picked.map(uploadOf).toList());
 }
 
 /// Drop files here, or click to browse.
@@ -50,22 +69,12 @@ class _DropZoneState extends State<DropZone> {
   bool _hover = false;
   bool _focused = false;
 
-  Future<void> _browse() async {
-    final List<XFile> picked;
-    try {
-      picked = await openFiles();
-    } catch (error) {
-      if (mounted) widget.onProblem('Could not open the file picker', '$error');
-      return;
-    }
-    // The picker may outlast the place it was opened for, as when the server changes.
-    if (!mounted) return;
-    await widget.onFiles(picked.map(_upload).toList());
-  }
+  Future<void> _browse() =>
+      browseFiles(this, onFiles: widget.onFiles, onProblem: widget.onProblem);
 
   Future<void> _dropped(DropDoneDetails details) async {
     setState(() => _over = false);
-    await widget.onFiles(details.files.map(_upload).toList());
+    await widget.onFiles(details.files.map(uploadOf).toList());
   }
 
   @override

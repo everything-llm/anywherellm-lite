@@ -380,8 +380,6 @@ class SystemField {
   final bool secret;
 }
 
-/// Setting [key] of [settings] as text: empty when it has none, or for a secret, which the server
-/// shows only as whether it is set.
 /// The provider the system answers with and its model, as GET /v1/system gives them in
 /// [values], each empty while not known.
 ({String provider, String model}) systemChatModel(
@@ -394,6 +392,8 @@ class SystemField {
   );
 }
 
+/// Setting [key] of [settings] as text: empty when it has none, or for a secret, which the server
+/// shows only as whether it is set.
 String settingText(Map<String, Object?>? settings, String key) =>
     switch (settings?[key]) {
       null || bool() => '',

@@ -66,15 +66,31 @@ void main() {
     expect(find.text('Ollama'), findsOneWidget);
     expect(text(tester, 'Model'), 'qwen3:8b');
     expect(text(tester, 'Base URL'), 'http://127.0.0.1:11434');
-    expect(find.text('Set, not shown'), findsOneWidget);
+    expect(find.text('Saved, not shown'), findsOneWidget);
   });
+
+  testWidgets(
+    'the chooser has a card, the provider\'s fields another, then Save',
+    (tester) async {
+      await openPage(tester, server(), SettingsPage.chatModel);
+      final note = find.text('These fields change with the provider.');
+      expect(note, findsOneWidget);
+      final y = tester.getTopLeft;
+      expect(y(find.text('Provider')).dy, lessThan(y(note).dy));
+      expect(y(note).dy, lessThan(y(find.text('Base URL')).dy));
+      expect(
+        tester.getTopLeft(control('Save')).dx,
+        lessThan(tester.getTopLeft(control('Revert')).dx),
+      );
+    },
+  );
 
   testWidgets('a changed model is saved alone, and read again', (tester) async {
     final llm = server();
     await openPage(tester, llm, SettingsPage.chatModel);
     await tester.enterText(field('Model'), 'qwen3:14b');
     await tester.pump();
-    await tester.tap(control('Save'));
+    await tapVisible(tester, control('Save'));
     await tester.pumpAndSettle();
     expect(llm.calls, contains('updateSystem:OllamaLLMModelPref'));
     expect(llm.system['OllamaLLMModelPref'], 'qwen3:14b');
@@ -92,7 +108,7 @@ void main() {
     await tester.enterText(field('Model'), 'claude-sonnet-5-5');
     await tester.enterText(field('API key'), _secret);
     await tester.pump();
-    await tester.tap(control('Save'));
+    await tapVisible(tester, control('Save'));
     await tester.pumpAndSettle();
     expect(llm.system['LLMProvider'], 'anthropic');
     expect(llm.system['AnthropicModelPref'], 'claude-sonnet-5-5');
@@ -106,15 +122,15 @@ void main() {
     final llm = server();
     await openPage(tester, llm, SettingsPage.chatModel);
     expect(field('Auth token'), findsNothing);
-    await tester.tap(control('Replace'));
+    await tapVisible(tester, control('Change'));
     await tester.pumpAndSettle();
     await tester.enterText(field('Auth token'), _secret);
     await tester.pump();
-    await tester.tap(control('Save'));
+    await tapVisible(tester, control('Save'));
     await tester.pumpAndSettle();
     expect(llm.calls, contains('updateSystem:OllamaLLMAuthToken'));
     expect(find.textContaining(_secret), findsNothing);
-    expect(find.text('Set, not shown'), findsOneWidget);
+    expect(find.text('Saved, not shown'), findsOneWidget);
   });
 
   testWidgets('Revert puts back what the server has, and sends nothing', (
@@ -124,7 +140,7 @@ void main() {
     await openPage(tester, llm, SettingsPage.chatModel);
     await pick(tester, 'Oobabooga Web UI');
     expect(field('Model'), findsNothing);
-    await tester.tap(control('Revert'));
+    await tapVisible(tester, control('Revert'));
     await tester.pumpAndSettle();
     expect(text(tester, 'Model'), 'qwen3:8b');
     expect(llm.calls.where((c) => c.startsWith('updateSystem')), isEmpty);
@@ -138,7 +154,7 @@ void main() {
     await openPage(tester, llm, SettingsPage.chatModel);
     await tester.enterText(field('Model'), 'nope');
     await tester.pump();
-    await tester.tap(control('Save'));
+    await tapVisible(tester, control('Save'));
     await tester.pumpAndSettle();
     expect(find.text('Could not save the settings'), findsOneWidget);
     expect(find.text('Invalid model'), findsOneWidget);
@@ -150,25 +166,42 @@ void main() {
   ) async {
     final llm = server();
     final h = await openPage(tester, llm, SettingsPage.searchModel);
-    expect(h.system.vectors, isNull);
+    expect(
+      find.text(
+        'Changing this model clears the searchable copy of every document, 796 passages in '
+        'all. Each document has to be prepared again before answers can use it.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Built in, no setup.'), findsOneWidget);
     await tester.enterText(field('Model'), 'nomic-embed-text');
     await tester.pump();
-    await tester.tap(control('Save'));
+    await tapVisible(tester, control('Save'));
     await tester.pumpAndSettle();
     expect(llm.calls.where((c) => c.startsWith('updateSystem')), isEmpty);
     expect(
       find.textContaining('makes the server delete all 796 passages'),
       findsOneWidget,
     );
-    await tester.tap(control('Cancel'));
+    await tapVisible(tester, control('Cancel'));
     await tester.pumpAndSettle();
     expect(llm.calls.where((c) => c.startsWith('updateSystem')), isEmpty);
-    await tester.tap(control('Save'));
+    await tapVisible(tester, control('Save'));
     await tester.pumpAndSettle();
-    await tester.tap(control('Change and delete'));
+    await tapVisible(tester, control('Change and delete'));
     await tester.pumpAndSettle();
     expect(llm.calls, contains('updateSystem:EmbeddingModelPref'));
     expect(h.system.vectors, isNull, reason: 'the count went with the reset');
+  });
+
+  testWidgets('a recommended provider\'s line shows only while it is chosen', (
+    tester,
+  ) async {
+    await openPage(tester, server(), SettingsPage.searchModel);
+    expect(find.text('Recommended'), findsOneWidget);
+    await pick(tester, 'OpenAI');
+    expect(find.text('Recommended'), findsNothing);
+    expect(find.text('Built in, no setup.'), findsNothing);
   });
 
   testWidgets('storage shows the database and its passages, never a picker', (
@@ -177,7 +210,8 @@ void main() {
     final llm = server();
     await openPage(tester, llm, SettingsPage.storage);
     expect(find.text('LanceDB'), findsOneWidget);
-    expect(find.text('796 passages'), findsOneWidget);
+    expect(find.text('796 across every workspace'), findsOneWidget);
+    expect(find.textContaining('Shown, not changed here'), findsOneWidget);
     expect(find.byType(DropdownButton<String>), findsNothing);
     expect(control('Save'), findsNothing);
   });
@@ -190,10 +224,15 @@ void main() {
         'SpeechToTextProvider': 'native',
       };
     await openPage(tester, llm, SettingsPage.voice);
-    await pick(tester, 'OpenAI');
+    final y = tester.getTopLeft;
+    expect(
+      y(find.text('Speech to text')).dy,
+      lessThan(y(find.text('Text to speech')).dy),
+    );
+    await pick(tester, 'OpenAI', which: 1);
     await tester.enterText(field('Voice'), 'nova');
     await tester.pump();
-    await tester.tap(control('Save'));
+    await tapVisible(tester, control('Save'));
     await tester.pumpAndSettle();
     expect(llm.system['TextToSpeechProvider'], 'openai');
     expect(llm.system['TTSOpenAIVoiceModel'], 'nova');
@@ -216,7 +255,7 @@ void main() {
     expect(json, isNot(contains('OllamaLLMAuthToken')));
     await tester.enterText(editor, '{"VectorDB": "pgvector"}');
     await tester.pump();
-    await tester.tap(control('Save'));
+    await tapVisible(tester, control('Save'));
     await tester.pumpAndSettle();
     expect(
       find.textContaining('switching it deletes every vector'),
@@ -230,9 +269,19 @@ void main() {
   ) async {
     final llm = server();
     await openPage(tester, llm, SettingsPage.privacy);
-    expect(find.text('Ollama, qwen3:8b'), findsOneWidget);
-    expect(find.text('AnythingLLM Embedder'), findsOneWidget);
-    await tester.tap(control('Anonymous telemetry'));
+    expect(
+      find.text('Ollama at 127.0.0.1:11434. Runs on the server.'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('AnythingLLM Embedder. Runs on the server.'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('LanceDB. Passages and text stay on the server.'),
+      findsOneWidget,
+    );
+    await tapVisible(tester, control('Anonymous telemetry'));
     await tester.pumpAndSettle();
     expect(llm.system['DisableTelemetry'], 'true');
   });

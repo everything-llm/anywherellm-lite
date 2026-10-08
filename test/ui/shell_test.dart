@@ -11,6 +11,7 @@ import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/widgets/confirm_box.dart';
 import 'package:anywherellm/ui/widgets/controls.dart';
 import 'package:anywherellm/ui/widgets/fields.dart';
+import 'package:anywherellm/ui/widgets/pane_header.dart';
 import 'package:anywherellm/ui/widgets/qr_mark.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:anywherellm/core/server_models.dart';
@@ -47,7 +48,13 @@ void main() {
       expect(inSidebar('2 docs'), findsOneWidget);
       expect(inSidebar('Budget questions'), findsOneWidget);
       expect(inSidebar('Quarter priorities'), findsOneWidget);
-      expect(inSidebar('Connected to AnythingLLM'), findsOneWidget);
+      expect(inSidebar('Connected to h'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is Tappable && w.tooltip == 'https://h:3001',
+        ),
+        findsOneWidget,
+      );
       expect(find.text('About 40k.'), findsOneWidget);
       expect(inSources(find.text('Q3 roadmap.pdf')), findsOneWidget);
       expect(find.byTooltip('Workspaces'), findsNothing);
@@ -60,7 +67,7 @@ void main() {
         );
       await pumpApp(tester, llm: llm);
       expect(inSidebar('Connection problem'), findsOneWidget);
-      expect(inSidebar('Connected to AnythingLLM'), findsNothing);
+      expect(inSidebar('Connected to h'), findsNothing);
     });
 
     testWidgets('a workspace with no chats invites a first question', (
@@ -68,7 +75,10 @@ void main() {
     ) async {
       await pumpApp(tester, llm: planningServer());
       await fromMenu(tester, 'Household');
-      expect(find.textContaining('Ask anything about what'), findsOneWidget);
+      expect(
+        find.text('Ask about Household.', findRichText: true),
+        findsOneWidget,
+      );
       expect(find.text('No files yet.'), findsOneWidget);
       await tester.tap(control('What can I do here?'));
       await tester.pump();
@@ -85,7 +95,7 @@ void main() {
         await typeAndEnter(tester, 'What is due?');
         expect(find.text('What is due?'), findsOneWidget);
         expect(find.byType(Caret), findsOneWidget);
-        expect(control('Stop'), findsOneWidget);
+        expect(control('Stop the answer'), findsOneWidget);
 
         llm.chat!.add(const TextChunk('The roadmap.'));
         llm.chat!.add(const ChatDone([Citation('Q3 roadmap.pdf')]));
@@ -138,7 +148,7 @@ void main() {
       final llm = planningServer()..hold = true;
       final h = await pumpApp(tester, llm: llm);
       await typeAndEnter(tester, 'Go');
-      await tester.tap(control('Stop'));
+      await tester.tap(control('Stop the answer'));
       await tester.pumpAndSettle();
       expect(find.text('Stopped.'), findsOneWidget);
       expect(h.chat.busy, isFalse);
@@ -292,51 +302,39 @@ void main() {
       expect(control('Cancel'), findsNothing);
     });
 
-    testWidgets('the chat mode chooser shows and changes the workspace mode', (
-      tester,
-    ) async {
-      final llm = planningServer();
-      final h = await pumpApp(tester, llm: llm);
-      bool chosen(ChatMode mode) =>
-          tester.widget<Tappable>(inSources(control(mode.label))).selected!;
-      for (final mode in ChatMode.values) {
-        expect(inSources(find.text(mode.title)), findsOneWidget);
-        expect(inSources(find.text(mode.detail)), findsOneWidget);
-      }
-      expect(chosen(ChatMode.automatic), isTrue);
-      await tester.tap(inSources(control('Query')));
-      await tester.pumpAndSettle();
-      expect(llm.spaces.first.settings['chatMode'], 'query');
-      expect(h.sources.chatMode.value, ChatMode.query);
-      expect(chosen(ChatMode.query), isTrue);
-      expect(chosen(ChatMode.automatic), isFalse);
-    });
-
-    testWidgets('an empty chat and the composer follow the chat mode', (
-      tester,
-    ) async {
-      final h = await pumpApp(tester, llm: planningServer());
-      h.chat.newChat();
-      await tester.pumpAndSettle();
-      expect(inChat(find.text(ChatMode.automatic.about)), findsOneWidget);
-      expect(find.text('Ask anything…'), findsOneWidget);
-      await tester.tap(inSources(control('Query')));
-      await tester.pumpAndSettle();
-      expect(inChat(find.text(ChatMode.query.about)), findsOneWidget);
-      expect(find.text('Ask about your files…'), findsOneWidget);
-    });
+    testWidgets(
+      'an empty chat names its workspace and suggests from its documents',
+      (tester) async {
+        final h = await pumpApp(tester, llm: planningServer());
+        h.chat.newChat();
+        await tester.pumpAndSettle();
+        expect(
+          inChat(find.text('Ask about Q3 planning.', findRichText: true)),
+          findsOneWidget,
+        );
+        expect(control('Summarise Q3 roadmap'), findsOneWidget);
+        expect(
+          control('Compare Q3 roadmap with Customer interviews'),
+          findsOneWidget,
+        );
+        expect(find.text('Ask anything…'), findsOneWidget);
+        // A document switched off is not suggested.
+        await tester.tap(find.byType(AppSwitch).first);
+        await tester.pumpAndSettle();
+        expect(control('Summarise Customer interviews'), findsOneWidget);
+        expect(control('Summarise Q3 roadmap'), findsNothing);
+      },
+    );
 
     testWidgets(
-      'an empty chat follows the chat mode before the server answers',
+      'the composer follows the chat mode before the server answers',
       (tester) async {
         final llm = planningServer();
         final h = await pumpApp(tester, llm: llm);
-        h.chat.newChat();
-        await tester.pumpAndSettle();
         final gate = llm.gates['updateWorkspace'] = Completer<void>();
-        await tester.tap(inSources(control('Query')));
+        unawaited(h.sources.setChatMode(ChatMode.query));
         await tester.pump();
-        expect(inChat(find.text(ChatMode.query.about)), findsOneWidget);
+        expect(find.text('Ask about your files…'), findsOneWidget);
         gate.complete();
         await tester.pumpAndSettle();
       },
@@ -351,7 +349,6 @@ void main() {
       h.chat.newChat();
       await tester.pumpAndSettle();
       expect(h.sources.chatMode.value, isNull);
-      expect(inChat(find.text(everyModeDrawsOn)), findsOneWidget);
       expect(find.text('Ask about your files…'), findsOneWidget);
     });
 
@@ -368,15 +365,6 @@ void main() {
         findsOneWidget,
       );
       expect(find.textContaining('This server has a password'), findsOneWidget);
-    });
-
-    testWidgets('the composer names the server and opens Settings', (
-      tester,
-    ) async {
-      final h = await pumpApp(tester, llm: planningServer());
-      await tester.tap(control('AnythingLLM settings, server h'));
-      await tester.pumpAndSettle();
-      expect(h.shell.settingsOpen, isTrue);
     });
 
     testWidgets(
@@ -414,15 +402,6 @@ void main() {
       },
     );
 
-    testWidgets('the chat mode waits while an answer runs', (tester) async {
-      final llm = planningServer()..hold = true;
-      await pumpApp(tester, llm: llm);
-      await typeAndEnter(tester, 'Go');
-      await tester.tap(inSources(control('Chat')));
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(llm.calls, isNot(contains('updateWorkspace:q3')));
-    });
-
     testWidgets(
       'an agent answer shows its status, then folds its many sources',
       (tester) async {
@@ -447,7 +426,24 @@ void main() {
       },
     );
 
-    testWidgets('a file switched off is dimmed and counted out', (
+    testWidgets('the panel beside the chat is named Documents', (tester) async {
+      await pumpApp(tester, llm: planningServer());
+      expect(inSources(find.text('Documents')), findsOneWidget);
+      expect(
+        inSources(find.text('Answers draw on the ones switched on.')),
+        findsOneWidget,
+      );
+      expect(inSources(find.text('Sources')), findsNothing);
+      expect(
+        find.descendant(
+          of: control('Documents, 2 on'),
+          matching: find.text('2 on'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a file switched off fades only its type and is counted out', (
       tester,
     ) async {
       final llm = planningServer();
@@ -456,9 +452,20 @@ void main() {
       await tester.pumpAndSettle();
       expect(h.sources.onCount, 1);
       expect(
-        find.descendant(of: control('Sources'), matching: find.text('1')),
+        find.descendant(
+          of: control('Documents, 1 on'),
+          matching: find.text('1 on'),
+        ),
         findsOneWidget,
       );
+      expect(inSources(find.text('Not used · 120 words')), findsOneWidget);
+      double opacityOf(Finder finder) => tester
+          .widgetList<Opacity>(
+            find.ancestor(of: finder, matching: find.byType(Opacity)),
+          )
+          .fold(1, (all, o) => all * o.opacity);
+      expect(opacityOf(inSources(find.text('Q3 roadmap.pdf'))), 1);
+      expect(opacityOf(inSources(find.text('PDF'))), 0.5);
     });
 
     testWidgets('removing a file can be undone from the toast', (tester) async {
@@ -478,7 +485,7 @@ void main() {
       await tester.tap(control('Close'));
       await tester.pumpAndSettle();
       expect(h.shell.sourcesOpen, isFalse);
-      await tester.tap(control('Sources'));
+      await tester.tap(control('Documents, 2 on'));
       await tester.pumpAndSettle();
       expect(h.shell.sourcesOpen, isTrue);
     });
@@ -514,7 +521,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(h.store.saved?.apiKey, 'K9');
       expect(find.text('The key was saved.'), findsOneWidget);
-      expect(find.text('Set'), findsOneWidget);
+      expect(find.text('Saved'), findsOneWidget);
       expect(inSidebar('Q3 planning'), findsOneWidget);
     });
 
@@ -631,7 +638,7 @@ void main() {
         expect(h.store.saved?.password, 'PASS-WORD');
         expect(find.text('The password was saved.'), findsOneWidget);
         expect(control('Save password'), findsNothing);
-        await tester.tap(control('Forget').last);
+        await tester.tap(control('Forget password'));
         await tester.pumpAndSettle();
         expect(h.store.saved?.password, isNull);
         expect(h.store.saved?.apiKey, 'K9');
@@ -682,7 +689,7 @@ void main() {
       final h = await pumpApp(tester, llm: planningServer());
       h.shell.openSettings();
       await tester.pumpAndSettle();
-      await tester.tap(control('Replace'));
+      await tester.tap(control('Edit connection'));
       await tester.pumpAndSettle();
       await tester.tap(control('Paste a key'));
       await tester.pumpAndSettle();
@@ -694,17 +701,17 @@ void main() {
       await tester.pumpAndSettle();
       expect(h.store.saved?.apiKey, 'K9');
       expect(control('Save key'), findsNothing);
-      expect(control('Replace'), findsOneWidget);
+      expect(control('Edit connection'), findsOneWidget);
     });
 
     testWidgets('Forget asks once more, then deletes the key', (tester) async {
       final h = await pumpApp(tester, llm: planningServer());
       h.shell.openSettings();
       await tester.pumpAndSettle();
-      await tester.tap(control('Forget'));
+      await tester.tap(control('Forget this server'));
       await tester.pumpAndSettle();
-      expect(control('Delete it?'), findsOneWidget);
-      await tester.tap(control('Delete it?'));
+      expect(control('Really forget it?'), findsOneWidget);
+      await tester.tap(control('Really forget it?'));
       await tester.pumpAndSettle();
       expect(h.settings.configured, isFalse);
       expect(find.text('The saved key was deleted.'), findsOneWidget);
@@ -716,7 +723,7 @@ void main() {
       final h = await pumpApp(tester, llm: planningServer());
       h.shell.openSettings();
       await tester.pumpAndSettle();
-      await tester.tap(control('Replace'));
+      await tester.tap(control('Edit connection'));
       await tester.pumpAndSettle();
       await tester.tap(
         find
@@ -749,12 +756,12 @@ void main() {
       h.shell.openSettings();
       await tester.pumpAndSettle();
       expect(find.byType(QrMark), findsNothing);
-      await tester.tap(control('Show QR code'));
+      await tester.tap(control('Connect a phone'));
       await tester.pumpAndSettle();
       final mark = tester.widget<QrMark>(find.byType(QrMark));
       expect(mark.data, pairingCode(sampleConnection));
       expect(find.text('Your phone cannot use this address'), findsNothing);
-      await tester.tap(control('Hide QR code'));
+      await tester.tap(control('Hide the code'));
       await tester.pumpAndSettle();
       expect(find.byType(QrMark), findsNothing);
     });
@@ -772,7 +779,7 @@ void main() {
       );
       h.shell.openSettings();
       await tester.pumpAndSettle();
-      await tester.tap(control('Show QR code'));
+      await tester.tap(control('Connect a phone'));
       await tester.pumpAndSettle();
       expect(find.text('Your phone cannot use this address'), findsOneWidget);
       expect(find.textContaining('is the phone itself'), findsOneWidget);
@@ -899,6 +906,35 @@ void main() {
   });
 
   group('a narrow window', () {
+    testWidgets(
+      'a phone\'s chat header keeps 4 px at its left and 6 at its right',
+      (tester) async {
+        await pumpApp(
+          tester,
+          llm: planningServer(),
+          size: const Size(390, 844),
+        );
+        final bar = tester.widget<Container>(
+          find
+              .descendant(
+                of: find.byType(PaneHeader),
+                matching: find.byType(Container),
+              )
+              .first,
+        );
+        expect(bar.padding, const EdgeInsets.only(left: 4, right: 6));
+        expect(find.byTooltip('Refresh'), findsOneWidget);
+        // Documents shows its count alone where the header is narrow.
+        expect(
+          find.descendant(
+            of: control('Documents, 2 on'),
+            matching: find.text('2'),
+          ),
+          findsOneWidget,
+        );
+      },
+    );
+
     testWidgets('below 1120, Sources is a drawer over the chat', (
       tester,
     ) async {
@@ -912,7 +948,7 @@ void main() {
         tester.getTopLeft(find.byType(SourcesPanel)).dx,
         greaterThanOrEqualTo(1000),
       );
-      await tester.tap(control('Sources'));
+      await tester.tap(control('Documents, 2 on'));
       await tester.pumpAndSettle();
       expect(tester.getTopRight(find.byType(SourcesPanel)).dx, 1000);
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);

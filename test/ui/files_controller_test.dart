@@ -344,4 +344,68 @@ void main() {
     await rig.sources.toggle(file);
     expect(rig.files.usersOf(roadmap), isEmpty);
   });
+
+  group('Essentials', () {
+    test(
+      'starts on, and once shown holds the open workspace\'s documents',
+      () async {
+        final rig = await started(planningServer());
+        expect(rig.files.essentials, isTrue);
+        expect(rig.files.selected, isNull);
+        await rig.files.ensureLoaded();
+        expect(rig.files.selected, docsPath('q3'));
+      },
+    );
+
+    test('a section of another workspace follows it', () async {
+      final rig = await started(planningServer());
+      await rig.files.ensureLoaded();
+      await rig.files.openSection(FilesSection.answers);
+      expect(rig.files.text, contains('"chatMode"'));
+      await rig.chat.select('household');
+      await pumpEventQueue();
+      expect(rig.files.selected, settingsPath('household'));
+      await rig.files.openSection(FilesSection.created);
+      expect(rig.files.selected, isNull);
+    });
+
+    test('selecting a node shows the whole tree around it', () async {
+      final rig = await started(planningServer());
+      await rig.files.ensureLoaded();
+      await rig.files.select(promptPath('household'));
+      expect(rig.files.essentials, isFalse);
+      expect(rig.files.expanded, contains('/workspaces/household'));
+    });
+
+    test('a save keeps Essentials on', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.files.ensureLoaded();
+      await rig.files.openSection(FilesSection.instructions);
+      expect(await rig.files.save('Be brief.'), isTrue);
+      expect(rig.files.essentials, isTrue);
+      expect(rig.files.text, 'Be brief.');
+    });
+
+    test('a document\'s text is read for viewing and put away', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.files.ensureLoaded();
+      await rig.files.viewText(roadmap, 'Q3 roadmap.pdf');
+      expect(rig.files.reading?.title, 'Q3 roadmap.pdf');
+      expect(rig.files.doc?.text, 'The text of Q3 roadmap.pdf.');
+      expect(llm.calls, contains('document:$roadmap'));
+      rig.files.closeText();
+      expect(rig.files.reading, isNull);
+      expect(rig.files.doc, isNull);
+    });
+
+    test('another section puts the text away', () async {
+      final rig = await started(planningServer());
+      await rig.files.ensureLoaded();
+      await rig.files.viewText(roadmap, 'Q3 roadmap.pdf');
+      await rig.files.openSection(FilesSection.instructions);
+      expect(rig.files.reading, isNull);
+    });
+  });
 }

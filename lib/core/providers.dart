@@ -53,6 +53,7 @@ final _numberName = RegExp(
   'ChromaApiHeader' => ('API header', 'The header the key is sent in.'),
   'ChromaApiKey' => ('API header value', ''),
   'ModelRouterId' => ('Router', 'The id of a router made in AnythingLLM.'),
+  'WhisperModelPref' => ('Model', 'Downloads on first use.'),
   _ when key.endsWith('ConnectionString') => ('Connection string', ''),
   _ when key.endsWith('ApplicationToken') => ('Application token', ''),
   _ when key.endsWith('ApiToken') => ('API token', ''),
@@ -149,7 +150,8 @@ class ProviderSetting {
   /// The value that needs no setup, which Settings marks as recommended.
   final String? recommended;
 
-  /// A line under the chooser, or empty.
+  /// A line under the chooser, or empty. With a [recommended] value it is about that value, and
+  /// shows only while that value is chosen, beside its badge.
   final String help;
 
   Provider? named(String value) {
@@ -163,14 +165,20 @@ class ProviderSetting {
   String labelOf(String value) =>
       value.isEmpty ? 'None' : named(value)?.label ?? value;
 
-  /// The values the chooser offers while the server has [current]: those the server takes, and
-  /// [current] as well when it is none of them, so a provider newer than the app still shows.
-  List<String> choices(String current) => [
-    ...systemChoices[chooser] ?? [for (final p in providers) p.value],
-    if (!(systemChoices[chooser] ?? const []).contains(current) &&
-        named(current) == null)
-      current,
-  ];
+  /// The values the chooser offers while the server has [current]: those the server takes, in
+  /// [providers]' order and then any the app has no name for, and [current] as well when it is
+  /// none of them, so a provider newer than the app still shows.
+  List<String> choices(String current) {
+    final taken = systemChoices[chooser];
+    return [
+      for (final p in providers)
+        if (taken == null || taken.contains(p.value)) p.value,
+      for (final value in taken ?? const <String>[])
+        if (named(value) == null) value,
+      if (!(taken ?? const []).contains(current) && named(current) == null)
+        current,
+    ];
+  }
 }
 
 const _embedLocal = [
@@ -319,7 +327,7 @@ const embedderProviders = ProviderSetting(
   'EmbeddingEngine',
   'Provider',
   recommended: 'native',
-  help: 'AnythingLLM Embedder is built in and needs no setup.',
+  help: 'Built in, no setup.',
   [
     Provider('native', 'AnythingLLM Embedder', ['EmbeddingModelPref']),
     Provider('openai', 'OpenAI', ['OpenAiKey', 'EmbeddingModelPref']),
@@ -356,33 +364,43 @@ const embedderProviders = ProviderSetting(
 );
 
 /// Shown, never switched: switching deletes every vector in the old database.
-const vectorProviders = ProviderSetting('VectorDB', 'Database', [
-  Provider('lancedb', 'LanceDB'),
-  Provider('pgvector', 'PGVector', [
-    'PGVectorConnectionString',
-    'PGVectorTableName',
-  ]),
-  Provider('chroma', 'Chroma', [
-    'ChromaEndpoint',
-    'ChromaApiHeader',
-    'ChromaApiKey',
-  ]),
-  Provider('chromacloud', 'Chroma Cloud', [
-    'ChromaCloudApiKey',
-    'ChromaCloudTenant',
-    'ChromaCloudDatabase',
-  ]),
-  Provider('pinecone', 'Pinecone', ['PineConeKey', 'PineConeIndex']),
-  Provider('zilliz', 'Zilliz Cloud', ['ZillizEndpoint', 'ZillizApiToken']),
-  Provider('qdrant', 'QDrant', ['QdrantEndpoint', 'QdrantApiKey']),
-  Provider('weaviate', 'Weaviate', ['WeaviateEndpoint', 'WeaviateApiKey']),
-  Provider('milvus', 'Milvus', [
-    'MilvusAddress',
-    'MilvusUsername',
-    'MilvusPassword',
-  ]),
-  Provider('astra', 'AstraDB', ['AstraDBEndpoint', 'AstraDBApplicationToken']),
-]);
+const vectorProviders = ProviderSetting(
+  'VectorDB',
+  'Database',
+  help:
+      'Shown, not changed here: switching it deletes every stored passage, and every '
+      'document would have to be read again.',
+  [
+    Provider('lancedb', 'LanceDB'),
+    Provider('pgvector', 'PGVector', [
+      'PGVectorConnectionString',
+      'PGVectorTableName',
+    ]),
+    Provider('chroma', 'Chroma', [
+      'ChromaEndpoint',
+      'ChromaApiHeader',
+      'ChromaApiKey',
+    ]),
+    Provider('chromacloud', 'Chroma Cloud', [
+      'ChromaCloudApiKey',
+      'ChromaCloudTenant',
+      'ChromaCloudDatabase',
+    ]),
+    Provider('pinecone', 'Pinecone', ['PineConeKey', 'PineConeIndex']),
+    Provider('zilliz', 'Zilliz Cloud', ['ZillizEndpoint', 'ZillizApiToken']),
+    Provider('qdrant', 'QDrant', ['QdrantEndpoint', 'QdrantApiKey']),
+    Provider('weaviate', 'Weaviate', ['WeaviateEndpoint', 'WeaviateApiKey']),
+    Provider('milvus', 'Milvus', [
+      'MilvusAddress',
+      'MilvusUsername',
+      'MilvusPassword',
+    ]),
+    Provider('astra', 'AstraDB', [
+      'AstraDBEndpoint',
+      'AstraDBApplicationToken',
+    ]),
+  ],
+);
 
 const _imageModel = 'ImageGenerationModelPref';
 
@@ -391,11 +409,6 @@ const imageProviders = ProviderSetting('ImageGenerationProvider', 'Provider', [
     'ImageGenerationOpenAiKey',
     _imageModel,
     'ImageGenerationDimensions',
-  ]),
-  Provider('gemini', 'Gemini', ['ImageGenerationGeminiApiKey', _imageModel]),
-  Provider('openrouter', 'OpenRouter', [
-    'ImageGenerationOpenRouterApiKey',
-    _imageModel,
   ]),
   Provider('ollama', 'Ollama (macOS only)', [
     'ImageGenerationOllamaBasePath',
@@ -412,6 +425,11 @@ const imageProviders = ProviderSetting('ImageGenerationProvider', 'Provider', [
     _imageModel,
     'ImageGenerationLocalAiApiKey',
   ]),
+  Provider('openrouter', 'OpenRouter', [
+    'ImageGenerationOpenRouterApiKey',
+    _imageModel,
+  ]),
+  Provider('gemini', 'Gemini', ['ImageGenerationGeminiApiKey', _imageModel]),
   Provider('llmman', 'llmman', [
     'ImageGenerationLlmmanBasePath',
     _imageModel,
@@ -423,7 +441,7 @@ const speechToTextProviders = ProviderSetting(
   'SpeechToTextProvider',
   'Speech to text',
   recommended: 'native',
-  help: 'System native uses the browser or device. No setup.',
+  help: 'System native uses the device. No setup.',
   [
     Provider('native', 'System native'),
     Provider('openai', 'OpenAI (Whisper API)', ['STTOpenAIModel']),
@@ -445,7 +463,7 @@ const textToSpeechProviders = ProviderSetting(
   'TextToSpeechProvider',
   'Text to speech',
   recommended: 'native',
-  help: 'System native uses the browser or device. No setup.',
+  help: 'System native uses the device. No setup.',
   [
     Provider('native', 'System native'),
     Provider('openai', 'OpenAI', ['TTSOpenAIKey', 'TTSOpenAIVoiceModel']),
@@ -458,7 +476,7 @@ const textToSpeechProviders = ProviderSetting(
       'TTSKokoroKey',
       'TTSKokoroVoiceModel',
     ]),
-    Provider('generic-openai', 'OpenAI compatible', [
+    Provider('generic-openai', 'OpenAI Compatible', [
       'TTSOpenAICompatibleEndpoint',
       'TTSOpenAICompatibleKey',
       'TTSOpenAICompatibleModel',
@@ -471,11 +489,11 @@ const transcriptionProviders = ProviderSetting(
   'WhisperProvider',
   'Provider',
   recommended: 'local',
-  help: 'The built-in one runs a Whisper model privately on the server.',
+  help: 'Runs a Whisper model privately on the server.',
   [
-    Provider('local', 'AnythingLLM built-in', ['WhisperModelPref']),
+    Provider('local', 'AnythingLLM Built-In', ['WhisperModelPref']),
     Provider('openai', 'OpenAI', ['OpenAiKey']),
-    Provider('generic-openai', 'OpenAI compatible', [
+    Provider('generic-openai', 'OpenAI Compatible', [
       'WhisperGenericOpenAiBaseUrl',
       'WhisperGenericOpenAiApiKey',
       'WhisperGenericOpenAiModel',
@@ -493,3 +511,72 @@ const providerSettings = [
   textToSpeechProviders,
   transcriptionProviders,
 ];
+
+/// What Privacy and data says of the server's chat model in [values]: its provider, the host it
+/// answers at when the provider is reached at an address, and where questions go.
+String chatModelPrivacy(Map<String, Object?> values) {
+  final provider = settingText(values, 'LLMProvider');
+  final label = chatProviders.labelOf(provider);
+  final address = chatProviders
+      .named(provider)
+      ?.keys
+      .where(_addressName.hasMatch)
+      .firstOrNull;
+  final host = Uri.tryParse(settingText(values, address ?? '')) ?? Uri();
+  final where = host.host.isEmpty ? label : '$label at ${host.authority}';
+  return switch (_reach(host.host)) {
+    _Reach.server => '$where. Runs on the server.',
+    _Reach.network => '$where. Questions go to that machine.',
+    _Reach.service => '$where. Shared under that service\'s terms.',
+  };
+}
+
+/// What Privacy and data says of the server's document search model in [values].
+String searchModelPrivacy(Map<String, Object?> values) {
+  final engine = settingText(values, 'EmbeddingEngine');
+  final label = embedderProviders.labelOf(engine);
+  return engine == 'native'
+      ? '$label. Runs on the server.'
+      : '$label. Your documents\' text goes to it to be prepared.';
+}
+
+/// What Privacy and data says of the server's document storage in [values].
+String storagePrivacy(Map<String, Object?> values) {
+  final store = settingText(values, 'VectorDB');
+  final label = vectorProviders.labelOf(store);
+  return store == 'lancedb'
+      ? '$label. Passages and text stay on the server.'
+      : '$label. Passages and their text are kept there.';
+}
+
+final _addressName = RegExp(r'(BasePath|BaseUrl|Endpoint|Address)$');
+
+/// Where an address answers, as seen from the server.
+enum _Reach {
+  /// The server's own machine.
+  server,
+
+  /// A machine on a private network.
+  network,
+
+  /// A service on the internet, or a provider with no address.
+  service,
+}
+
+final _privateHost = RegExp(
+  r'^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)'
+  r'|\.(local|lan|internal|home\.arpa|ts\.net)$'
+  r'|^[^.:]+$',
+);
+
+_Reach _reach(String host) {
+  if (host.isEmpty) return _Reach.service;
+  if (host == 'localhost' ||
+      host.startsWith('127.') ||
+      host == '::1' ||
+      host == '0.0.0.0' ||
+      host == 'host.docker.internal') {
+    return _Reach.server;
+  }
+  return _privateHost.hasMatch(host) ? _Reach.network : _Reach.service;
+}

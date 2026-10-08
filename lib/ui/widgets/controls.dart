@@ -62,10 +62,6 @@ class AppSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    final (width, height, knob) = large
-        ? (38.0, 22.0, 18.0)
-        : (34.0, 20.0, 16.0);
     final change = onChanged;
     return Tappable(
       label: label,
@@ -78,32 +74,51 @@ class AppSwitch extends StatelessWidget {
         width: 44,
         height: 40,
         child: Center(
-          child: AnimatedContainer(
-            duration: motion(context, const Duration(milliseconds: 150)),
-            width: width,
-            height: height,
-            padding: const EdgeInsets.all(2),
-            alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-            decoration: BoxDecoration(
-              color: value ? t.accent : t.off,
-              borderRadius: BorderRadius.circular(99),
+          child: SwitchTrack(value: value, large: large),
+        ),
+      ),
+    );
+  }
+}
+
+/// The look of an [AppSwitch] alone, for a row that is itself the switch, as a menu's is.
+class SwitchTrack extends StatelessWidget {
+  const SwitchTrack({super.key, required this.value, this.large = false});
+
+  final bool value;
+
+  /// The 38 by 22 track of a settings row, rather than the 34 by 20 of a file row.
+  final bool large;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final (width, height, knob) = large
+        ? (38.0, 22.0, 18.0)
+        : (34.0, 20.0, 16.0);
+    return AnimatedContainer(
+      duration: motion(context, const Duration(milliseconds: 150)),
+      width: width,
+      height: height,
+      padding: const EdgeInsets.all(2),
+      alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+      decoration: BoxDecoration(
+        color: value ? t.accent : t.off,
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Container(
+        width: knob,
+        height: knob,
+        decoration: const BoxDecoration(
+          color: Color(0xFFFFFFFF),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x33000000),
+              blurRadius: 2,
+              offset: Offset(0, 1),
             ),
-            child: Container(
-              width: knob,
-              height: knob,
-              decoration: const BoxDecoration(
-                color: Color(0xFFFFFFFF),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Color(0x33000000),
-                    blurRadius: 2,
-                    offset: Offset(0, 1),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          ],
         ),
       ),
     );

@@ -41,9 +41,13 @@ class AppButton extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                label,
-                style: Type.sans(14, weight: FontWeight.w500, color: fg),
+              // A label wider than the space wraps rather than overflows.
+              Flexible(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: Type.sans(14, weight: FontWeight.w500, color: fg),
+                ),
               ),
             ],
           ),

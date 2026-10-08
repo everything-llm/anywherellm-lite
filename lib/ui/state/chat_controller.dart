@@ -252,6 +252,27 @@ class ChatController extends ChangeNotifier {
   /// The answer running. Only one runs at a time.
   _Running? _running;
 
+  /// The chat whose last message the relay refused because it was already answering, maybe on
+  /// another device, while that answer may still run.
+  String? _refusedIn;
+
+  /// The message the relay refused, which the composer takes back with [takeRefused].
+  ({String thread, String text, List<Attachment> attachments})? _refused;
+
+  /// Whether the chat on screen refused the last message because it was already answering,
+  /// maybe on another device: its answer is followed here, and the message waits in the
+  /// composer to be sent when it ends.
+  bool get alreadyAnswering => _refusedIn != null && _refusedIn == activeThread;
+
+  /// The message the relay refused in the chat on screen, with its files, for the composer to
+  /// put back; null once taken, or when it was refused in another chat.
+  ({String text, List<Attachment> attachments})? takeRefused() {
+    final refused = _refused;
+    if (refused == null || refused.thread != activeThread) return null;
+    _refused = null;
+    return (text: refused.text, attachments: refused.attachments);
+  }
+
   /// How many messages have been sent, so the chat can bring each new one into view.
   int get sends => _sends;
   int _sends = 0;
@@ -435,6 +456,8 @@ class ChatController extends ChangeNotifier {
     editing = null;
     _running?.stream?.cancel();
     _running = null;
+    _refusedIn = null;
+    _refused = null;
     workspaces = const [];
     _threads.clear();
     _turns.clear();
@@ -580,6 +603,8 @@ class ChatController extends ChangeNotifier {
   Future<void> open(String? threadSlug, {bool again = false}) async {
     activeThread = threadSlug;
     if (threadSlug != null) _ready.remove(threadSlug);
+    // A refused message goes back to the composer only in its own chat.
+    if (_refused?.thread != threadSlug) _refused = null;
     editing = null;
     _clearLinkNotice();
     _rememberChat();
@@ -869,18 +894,20 @@ class ChatController extends ChangeNotifier {
       answer,
       _api.streamChat(slug, thread, text, attachments: attachments),
       user: user,
+      sent: (text: text, attachments: attachments),
     );
     return true;
   }
 
   /// Reads [events] into [answer], the answer [running] is, until it ends or fails. [user] is
-  /// the question just sent, whose id the server's closing event also carries; null for an
-  /// answer found again, whose chat is read once it ends.
+  /// the question just sent, whose id the server's closing event also carries, and [sent] its
+  /// message as typed; both null for an answer found again, whose chat is read once it ends.
   void _follow(
     _Running running,
     Turn answer,
     Stream<ChatEvent> events, {
     Turn? user,
+    ({String text, List<Attachment> attachments})? sent,
   }) {
     final slug = running.slug;
     final thread = running.thread!;
@@ -908,6 +935,14 @@ class ChatController extends ChangeNotifier {
         }
       },
       onError: (Object error) {
+        if ((error, user, sent) case (
+          AlreadyAnswering(),
+          final user?,
+          final sent?,
+        )) {
+          _refuse(running, user, sent);
+          return;
+        }
         if (error is AnswerStillRunning) answer.stillRunning = true;
         _finish(
           running,
@@ -926,12 +961,53 @@ class ChatController extends ChangeNotifier {
     );
   }
 
+  /// Takes back the message [running] was to answer, which the relay refused because its chat
+  /// already has an answer running, maybe started on another device: the question [user] leaves
+  /// the chat with the answer, [sent] waits for the composer to take it back, and the answer
+  /// already running is followed in their place, so Stop stops it and a message held for its end
+  /// goes when it ends.
+  void _refuse(
+    _Running running,
+    Turn user,
+    ({String text, List<Attachment> attachments}) sent,
+  ) {
+    if (!identical(_running, running)) return;
+    _running = null;
+    final slug = running.slug;
+    final thread = running.thread!;
+    if (_turns[thread] case final turns?) {
+      _turns[thread] = [
+        for (final turn in turns)
+          if (!identical(turn, user) && !identical(turn, running.answer)) turn,
+      ];
+    }
+    _refusedIn = thread;
+    _refused = (thread: thread, text: sent.text, attachments: sent.attachments);
+    notifyListeners();
+    final server = _server;
+    unawaited(
+      _rejoin(slug, thread, server, elsewhere: true).then((_) {
+        // Nothing found running: it ended meanwhile, and the message can simply be sent.
+        if (_disposed || _server != server || _refusedIn != thread) return;
+        if (isAnswering(thread)) return;
+        _refusedIn = null;
+        notifyListeners();
+      }),
+    );
+  }
+
   /// Follows the answer the relay is still writing in chat [thread], if there is one that this
-  /// run of the app did not start, as when it was closed meanwhile or lost touch with it. The
-  /// answer the app let go of, which the chat shows as unfinished, is the one followed again. Only
-  /// a chat whose history was read, and that nothing changed while the relay was asked: a
-  /// message sent, a clear or a read meanwhile is newer than what the relay listed.
-  Future<void> _rejoin(String slug, String thread, Connection? server) async {
+  /// run of the app did not start, as when it was closed meanwhile or lost touch with it, or when
+  /// it was started [elsewhere], on another device. The answer the app let go of, which the chat
+  /// shows as unfinished, is the one followed again. Only a chat whose history was read, and that
+  /// nothing changed while the relay was asked: a message sent, a clear or a read meanwhile is
+  /// newer than what the relay listed.
+  Future<void> _rejoin(
+    String slug,
+    String thread,
+    Connection? server, {
+    bool elsewhere = false,
+  }) async {
     final shown = _turns[thread];
     if (shown == null || busy) return;
     final RejoinedAnswer? found;
@@ -959,7 +1035,7 @@ class ChatController extends ChangeNotifier {
             turns.last.text != question) {
       turns.add(Turn.user(question));
     }
-    final answer = Turn.answer()..rejoined = true;
+    final answer = Turn.answer()..rejoined = !elsewhere;
     _turns[thread] = [...turns, answer];
     final running = _running = _Running(answer, slug)..thread = thread;
     editing = null;
@@ -1175,6 +1251,7 @@ class ChatController extends ChangeNotifier {
   void _finish(_Running running, {String? error}) {
     if (!identical(_running, running)) return;
     _running = null;
+    if (running.thread == _refusedIn) _refusedIn = null;
     if ((running.thread, running.nameAs) case (final thread?, final message?)
         when !_named.contains(thread)) {
       unawaited(_nameAfter(running.slug, thread, message));

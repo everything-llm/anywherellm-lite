@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../core/chat.dart';
-import '../../core/outputs.dart';
 import '../../core/prefs.dart';
 import '../../core/server_models.dart';
+import '../../core/sources.dart';
 import '../app_scope.dart';
 import '../links.dart';
 import '../icons.dart';
@@ -22,6 +22,7 @@ import '../widgets/controls.dart';
 import '../widgets/rise.dart';
 import '../widgets/tappable.dart';
 import 'answer_body.dart';
+import 'answer_menu.dart';
 import 'browser_chip.dart';
 import 'generated_files.dart';
 import 'speaker.dart';
@@ -341,7 +342,7 @@ class _Empty extends StatelessWidget {
                   TextSpan(
                     style: headline,
                     children: [
-                      const TextSpan(text: 'Ask anything about what’s in '),
+                      const TextSpan(text: 'Ask about '),
                       TextSpan(
                         text: workspace,
                         style: headline.copyWith(fontStyle: FontStyle.italic),
@@ -352,36 +353,19 @@ class _Empty extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 22),
               ListenableBuilder(
-                listenable: Listenable.merge([sources, sources.chatMode]),
-                builder: (context, _) => Column(
-                  mainAxisSize: MainAxisSize.min,
+                listenable: sources,
+                builder: (context, _) => Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 480),
-                      child: Text(
-                        sources.chatMode.value?.about ?? everyModeDrawsOn,
-                        textAlign: TextAlign.center,
-                        style: Type.sans(15.5, color: t.muted, height: 1.5),
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    Wrap(
-                      alignment: WrapAlignment.center,
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final s
-                            in sources.files.isEmpty
-                                ? const ['What can I do here?']
-                                : const [
-                                    'Summarise my files',
-                                    'What are the key points?',
-                                  ])
-                          _Suggestion(s, onTap: () => onSuggest(s)),
-                      ],
-                    ),
+                    for (final s in suggestionsFor([
+                      for (final f in sources.files)
+                        if (f.on) f.title,
+                    ]))
+                      _Suggestion(s, onTap: () => onSuggest(s)),
                   ],
                 ),
               ),
@@ -585,6 +569,11 @@ class _Answer extends StatelessWidget {
     final thinking = turn.streaming && split.thinking;
     final failure = turn.streaming ? null : modelFailure(split.answer);
     final answered = split.answer.isNotEmpty && failure == null;
+    // An answer cut short shows what came in the second ink, under why it stopped.
+    final cut = !turn.streaming && (turn.stopped || turn.error != null);
+    // The red box asks again itself, so Retry does not show twice.
+    final askAgain =
+        turn.error != null && !turn.stillRunning && retry?.onPressed != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -613,6 +602,7 @@ class _Answer extends StatelessWidget {
           AnswerBody(
             split.answer,
             label: AppScope.of(context).labelAnswers && !turn.streaming,
+            muted: cut,
           ),
         if (turn.browsing)
           Padding(
@@ -631,16 +621,16 @@ class _Answer extends StatelessWidget {
               'Still being written',
               text:
                   'The connection dropped, but the answer keeps going on the server. It will '
-                  'appear here when it\'s done; Refresh checks for it sooner.',
+                  'appear here when it’s done; Refresh checks for it sooner.',
             )
           else
             AlertBox(
               AlertKind.bad,
               'The answer stopped',
               text: error,
-              action: retry?.onPressed == null
-                  ? null
-                  : AppButton('Ask again', onPressed: retry!.onPressed),
+              action: askAgain
+                  ? AppButton('Ask again', onPressed: retry!.onPressed)
+                  : null,
             ),
         ],
         if (!turn.streaming &&
@@ -657,7 +647,7 @@ class _Answer extends StatelessWidget {
           const SizedBox(height: 12),
           GeneratedFiles(turn.files),
         ],
-        if (!turn.streaming && (answered || retry != null)) ...[
+        if (!turn.streaming && (answered || (retry != null && !askAgain))) ...[
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,
@@ -667,7 +657,7 @@ class _Answer extends StatelessWidget {
               if (AppScope.of(context).readAloud case final aloud?
                   when answered)
                 _ReadAloudButton(aloud, turn),
-              if (retry case final retry?)
+              if (retry case final retry? when !askAgain)
                 IconBtn(
                   'refresh',
                   tooltip: retry.tooltip,
@@ -687,7 +677,7 @@ class _Answer extends StatelessWidget {
                     size: IconSize.xs,
                   ),
               ],
-              if (turn.metrics case final metrics?) _Metrics(metrics),
+              if (turn.metrics case final metrics?) AnswerMore(turn, metrics),
               if (turn.stopped)
                 Text(
                   'Stopped · not saved in the chat',
@@ -696,55 +686,6 @@ class _Answer extends StatelessWidget {
             ],
           ),
         ],
-      ],
-    );
-  }
-}
-
-/// How an answer ran: the model and the time, and Details for the rest when there is more.
-class _Metrics extends StatefulWidget {
-  const _Metrics(this.metrics);
-
-  final AnswerMetrics metrics;
-
-  @override
-  State<_Metrics> createState() => _MetricsState();
-}
-
-class _MetricsState extends State<_Metrics> {
-  bool _open = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    final metrics = widget.metrics;
-    final more = metrics.hasMore;
-    final shown = _open || !more ? metrics.text : metrics.brief;
-    final style = Type.sans(12, color: t.muted);
-    const hide = 'Hide details';
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (shown.isNotEmpty) Flexible(child: Text(shown, style: style)),
-        if (more)
-          Tappable(
-            label: _open ? hide : 'Answer details: tokens, speed and cost',
-            expanded: _open,
-            onTap: () => setState(() => _open = !_open),
-            radius: BorderRadius.circular(6),
-            child: Container(
-              height: 30,
-              alignment: Alignment.center,
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: Text(
-                _open ? hide : 'Details',
-                style: style.copyWith(
-                  decoration: TextDecoration.underline,
-                  decorationColor: t.muted,
-                ),
-              ),
-            ),
-          ),
       ],
     );
   }
@@ -950,7 +891,7 @@ class _Citation extends StatelessWidget {
       label: present || url == null
           ? 'Source $number: $title'
           : 'Source $number: $title, opens in the browser',
-      tooltip: present ? 'Show in Sources' : url?.toString(),
+      tooltip: present ? 'Show in Documents' : url?.toString(),
       onTap: present
           ? () {
               scope.shell.openSources();

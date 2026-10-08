@@ -84,20 +84,28 @@ class AnswerMetrics {
   /// The parts in words, such as `glm-5.3 · 1,642 tokens · 22 tok/s · 73.9 s · $0.0049`.
   String get text => [
     ?model,
-    if (tokens case final tokens?) '${_grouped(tokens)} tokens',
-    if (speed case final speed?) '${speed.round()} tok/s',
+    if (_tokens case final tokens?) '$tokens tokens',
+    ?_speed,
     ?_seconds,
-    if (cost case final cost?) '\$${cost.toStringAsFixed(cost < 1 ? 4 : 2)}',
+    ?_cost,
   ].join(' · ');
 
-  /// The model and the time alone, such as `glm-5.3 · 73.9 s`.
-  String get brief => [?model, ?_seconds].join(' · ');
+  /// The parts the server measured, each named, in the order an answer's More menu lists them:
+  /// Model, Time, Tokens, Speed and Cost.
+  List<(String, String)> get named => [
+    if (model case final model?) ('Model', model),
+    if (_seconds case final seconds?) ('Time', seconds),
+    if (_tokens case final tokens?) ('Tokens', tokens),
+    if (_speed case final speed?) ('Speed', speed),
+    if (_cost case final cost?) ('Cost', cost),
+  ];
 
-  /// Whether [text] says more than [brief].
-  bool get hasMore => tokens != null || speed != null || cost != null;
-
+  String? get _tokens => tokens == null ? null : _grouped(tokens!);
+  String? get _speed => speed == null ? null : '${speed!.round()} tok/s';
   String? get _seconds =>
       seconds == null ? null : '${seconds!.toStringAsFixed(1)} s';
+  String? get _cost =>
+      cost == null ? null : '\$${cost!.toStringAsFixed(cost! < 1 ? 4 : 2)}';
 }
 
 /// The `metrics` of an answer, or null when it has none: the server sends `{}` for an answer it

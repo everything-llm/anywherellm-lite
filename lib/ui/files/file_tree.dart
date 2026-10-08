@@ -5,12 +5,15 @@ import '../app_scope.dart';
 import '../icons.dart';
 import '../tokens.dart';
 import '../type.dart';
+import 'essentials.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
+import '../widgets/segmented.dart';
 import '../widgets/tappable.dart';
 
-/// The server's data as a folder tree, in the sidebar while Files is on screen.
+/// The server's data as a folder tree, in the sidebar while Files is on screen, or the
+/// Essentials view's sections, as the switch under the heading says.
 class FileTree extends StatefulWidget {
   const FileTree({super.key});
 
@@ -57,20 +60,31 @@ class _FileTreeState extends State<FileTree> {
                 onPressed: files.loading ? null : files.load,
               ),
             ),
-            Expanded(
-              child: ListView.builder(
-                itemCount: rows.length,
-                itemBuilder: (context, i) {
-                  final (node, depth) = rows[i];
-                  return _Row(
-                    node,
-                    depth: depth,
-                    open: files.expanded.contains(node.path),
-                    selected: files.selected == node.path,
-                  );
-                },
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Segmented<bool>(
+                options: const [(true, 'Essentials'), (false, 'All files')],
+                value: files.essentials,
+                onChanged: files.showEssentials,
               ),
             ),
+            if (files.essentials)
+              const Expanded(child: EssentialsList())
+            else
+              Expanded(
+                child: ListView.builder(
+                  itemCount: rows.length,
+                  itemBuilder: (context, i) {
+                    final (node, depth) = rows[i];
+                    return _Row(
+                      node,
+                      depth: depth,
+                      open: files.expanded.contains(node.path),
+                      selected: files.selected == node.path,
+                    );
+                  },
+                ),
+              ),
           ],
         );
       },

@@ -13,10 +13,24 @@ import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/fields.dart';
-import '../widgets/tappable.dart';
+import 'composer_chip.dart';
+
+/// The model the open workspace answers with: its own, its own provider's name when it names no
+/// model, the system's, or `Chat model` while none is known.
+String workspaceModel(AppScope scope) {
+  final sources = scope.sources;
+  final system = systemChatModel(scope.system.settings);
+  return switch ((sources.chatModel, sources.chatProvider)) {
+    (final own?, _) => own,
+    (_, final provider?) => chatProviders.labelOf(provider),
+    _ when system.model.isNotEmpty => system.model,
+    _ => 'Chat model',
+  };
+}
 
 /// The model the open workspace answers with, its own or the system's, in the composer after
-/// the server's name. Tapped, it opens the [ModelPicker].
+/// the Answer from chip on a desktop. Tapped, it opens the [ModelPicker]. It asks for the
+/// system's settings once a server, for the system's model.
 class ModelChip extends StatefulWidget {
   const ModelChip({super.key, required this.open, required this.onTap});
 
@@ -36,13 +50,11 @@ class _ModelChipState extends State<ModelChip> {
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
-    final t = Tokens.of(context);
     return ListenableBuilder(
       listenable: Listenable.merge([scope.sources, scope.chat, scope.system]),
       builder: (context, _) {
-        final sources = scope.sources;
         final slug = scope.chat.activeSlug;
-        if (sources.read == null || slug == null) {
+        if (scope.sources.read == null || slug == null) {
           return const SizedBox.shrink();
         }
         final server = scope.chat.server;
@@ -52,41 +64,13 @@ class _ModelChipState extends State<ModelChip> {
             (_) => unawaited(scope.system.wantSettings()),
           );
         }
-        final system = systemChatModel(scope.system.settings);
-        final model = switch ((sources.chatModel, sources.chatProvider)) {
-          (final own?, _) => own,
-          (_, final provider?) => chatProviders.labelOf(provider),
-          _ when system.model.isNotEmpty => system.model,
-          _ => 'Chat model',
-        };
-        final busy = scope.chat.answeringIn(slug);
-        return Tappable(
-          touchTarget: true,
+        final model = workspaceModel(scope);
+        return ComposerChip(
+          text: model,
           label: 'Chat model, $model',
           tooltip: 'The model this workspace answers with',
-          expanded: widget.open,
-          onTap: busy ? null : widget.onTap,
-          dimWhenDisabled: 0.4,
-          radius: BorderRadius.circular(6),
-          color: widget.open ? t.hover : null,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                  child: Text(
-                    model,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Type.sans(13, color: t.muted),
-                  ),
-                ),
-                const SizedBox(width: 2),
-                AppIcon('unfold', size: IconSize.xs, color: t.muted),
-              ],
-            ),
-          ),
+          open: widget.open,
+          onTap: scope.chat.answeringIn(slug) ? null : widget.onTap,
         );
       },
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/copy.dart';
 import '../../core/files.dart';
+import '../../core/sources.dart';
 import '../app_scope.dart';
 import '../icons.dart';
 import '../tokens.dart';
@@ -59,12 +60,16 @@ class FolderView extends StatelessWidget {
           ],
           const SizedBox(height: 16),
         ],
-        if (node.children.isEmpty)
-          Text(
-            files.loading ? 'Loading…' : 'Empty.',
-            style: Type.sans(13.5, color: t.muted),
-          ),
-        for (final child in node.children) _ChildRow(child),
+        if (node.kind == NodeKind.docs)
+          _Docs(node)
+        else ...[
+          if (node.children.isEmpty)
+            Text(
+              files.loading ? 'Loading…' : 'Empty.',
+              style: Type.sans(13.5, color: t.muted),
+            ),
+          for (final child in node.children) _ChildRow(child),
+        ],
         if (node.kind == NodeKind.docs) ...[
           const SizedBox(height: 24),
           _Attach(node.slug!),
@@ -123,35 +128,108 @@ class _DeleteFolderState extends State<_DeleteFolder> {
   }
 }
 
-class _ChildRow extends StatelessWidget {
-  const _ChildRow(this.node);
+/// A workspace's documents: those it answers from, each a link to open, and after them those
+/// switched off on this device, which open in the library. Each says its size, and a switched-off
+/// one that it is not used; only its icon fades.
+class _Docs extends StatelessWidget {
+  const _Docs(this.node);
 
   final FileNode node;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final files = scope.files;
+    final t = Tokens.of(context);
+    final slug = node.slug!;
+    return ListenableBuilder(
+      listenable: scope.prefs,
+      builder: (context, _) {
+        final links = {for (final child in node.children) child.ref: child};
+        final docs = mergeSources(
+          files.detail(slug)?.documents ?? const [],
+          scope.prefs.offIn(slug),
+        );
+        if (docs.isEmpty) {
+          return Text(
+            files.loading ? 'Loading…' : 'Empty.',
+            style: Type.sans(13.5, color: t.muted),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final doc in docs)
+              if (links[doc.path] case final link?)
+                _ChildRow(link, subtitle: doc.filesMeta)
+              else if (!doc.on)
+                _ChildRow(
+                  FileNode(
+                    path: libraryPath(doc.path),
+                    name: doc.title,
+                    kind: NodeKind.libraryDoc,
+                    ref: doc.path,
+                  ),
+                  subtitle: doc.filesMeta,
+                  faded: true,
+                ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ChildRow extends StatelessWidget {
+  const _ChildRow(this.node, {this.subtitle = '', this.faded = false});
+
+  final FileNode node;
+
+  /// A line under the name, such as a document's size, or empty for none.
+  final String subtitle;
+
+  /// Fades the icon, for a document switched off.
+  final bool faded;
 
   @override
   Widget build(BuildContext context) {
     final files = AppScope.of(context).files;
     final t = Tokens.of(context);
     return Tappable(
-      label: node.name,
+      label: subtitle.isEmpty ? node.name : '${node.name}, $subtitle',
       onTap: () => files.reveal(node.path),
       radius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
         child: Row(
           children: [
-            AppIcon(
-              node.kind.isFolder ? 'folder' : 'doc',
-              size: IconSize.xs,
-              color: t.muted,
+            Opacity(
+              opacity: faded ? 0.5 : 1,
+              child: AppIcon(
+                node.kind.isFolder ? 'folder' : 'doc',
+                size: IconSize.xs,
+                color: t.muted,
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                node.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Type.sans(14, color: t.ink),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    node.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Type.sans(14, color: t.ink),
+                  ),
+                  if (subtitle.isNotEmpty)
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Type.sans(12, color: t.muted),
+                    ),
+                ],
               ),
             ),
           ],

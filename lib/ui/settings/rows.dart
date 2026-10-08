@@ -159,23 +159,47 @@ class ReadOnlyRow extends StatelessWidget {
   }
 }
 
-/// A smaller heading inside a page.
+/// A section's heading inside a page, in the sans face, with a line under it when there is
+/// [about].
 class SubHead extends StatelessWidget {
-  const SubHead(this.title, {super.key});
+  const SubHead(this.title, {super.key, this.about = ''});
 
   final String title;
+  final String about;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return Padding(
       padding: const EdgeInsets.only(top: 10),
-      child: Semantics(
-        header: true,
-        child: Text(title, style: Type.serif(24, color: t.ink2)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: 2,
+        children: [
+          Semantics(
+            header: true,
+            child: Text(
+              title,
+              style: Type.sans(17, weight: FontWeight.w600, color: t.ink),
+            ),
+          ),
+          if (about.isNotEmpty)
+            Text(about, style: Type.sans(13.5, color: t.muted, height: 1.45)),
+        ],
       ),
     );
   }
+}
+
+/// A page's own buttons, under its cards, from the start of the line.
+class PageActions extends StatelessWidget {
+  const PageActions(this.children, {super.key});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) =>
+      Wrap(spacing: 8, runSpacing: 8, children: children);
 }
 
 /// A line of muted text between a page's cards.
@@ -209,4 +233,28 @@ class PageWarning extends StatelessWidget {
       child: Text(text, style: Type.sans(14, color: t.warnfg, height: 1.5)),
     );
   }
+}
+
+/// The name of a column over a card's rows, set small and in capitals.
+class ColumnLabel extends StatelessWidget {
+  const ColumnLabel(this.text, {super.key, this.end = false});
+
+  final String text;
+
+  /// Whether it sits at the column's end, over values aligned there.
+  final bool end;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text.toUpperCase(),
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+    textAlign: end ? TextAlign.end : TextAlign.start,
+    style: Type.sans(
+      12,
+      weight: FontWeight.w500,
+      color: Tokens.of(context).muted,
+      letterSpacing: 12 * 0.04,
+    ),
+  );
 }

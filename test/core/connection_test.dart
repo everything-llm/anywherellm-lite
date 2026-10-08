@@ -94,15 +94,6 @@ void main() {
     expect(pairingCode(signed), isNot(contains('PASS')));
   });
 
-  test(
-    'a server\'s short name is its first label, or the whole IP address',
-    () {
-      expect(serverName('owen.tail30d4c5.ts.net'), 'owen');
-      expect(serverName('localhost'), 'localhost');
-      expect(serverName('100.89.16.22'), '100.89.16.22');
-    },
-  );
-
   group('pairing code', () {
     test('carries the address and key there and back', () {
       const connection = Connection(

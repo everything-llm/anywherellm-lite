@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/chat.dart';
-import '../../core/connection.dart';
 import '../../core/commands.dart';
 import '../../core/prefs.dart';
 import '../app_scope.dart';
@@ -19,6 +18,7 @@ import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/tappable.dart';
+import 'answer_from.dart';
 import 'dictation.dart';
 import 'model_picker.dart';
 import 'slash_menu.dart';
@@ -170,7 +170,8 @@ class _ComposerState extends State<Composer> {
       (_scope.chat.server, _scope.chat.activeSlug, _scope.chat.activeThread);
 
   /// Drops the attachments when another chat, workspace or server is shown, so they never go
-  /// with a message they were not picked for.
+  /// with a message they were not picked for. Puts back a message the relay refused because the
+  /// chat was already answering, with its files, unless something else was typed meanwhile.
   void _chatChanged() {
     final shown = _chatOnScreen();
     if (shown != _chatShown && (_held != null || _picking)) {
@@ -180,13 +181,20 @@ class _ComposerState extends State<Composer> {
       });
     }
     _sendHeld();
-    if (shown == _chatShown) return;
-    _chatShown = shown;
-    if (_attached.isEmpty && _problem == null) return;
-    setState(() {
-      _attached = const [];
-      _problem = null;
-    });
+    if (shown != _chatShown) {
+      _chatShown = shown;
+      if (_attached.isNotEmpty || _problem != null) {
+        setState(() {
+          _attached = const [];
+          _problem = null;
+        });
+      }
+    }
+    if (_scope.chat.takeRefused() case final refused?
+        when widget.draft.text.isEmpty && _attached.isEmpty) {
+      _setDraft(refused.text);
+      setState(() => _attached = refused.attachments);
+    }
   }
 
   void _changed() {
@@ -373,7 +381,7 @@ class _ComposerState extends State<Composer> {
                   ? const <SlashCommand>[]
                   : commandsFor(draft.text, scope.chat.commands);
               final read = scope.pasteImage;
-              return DropTarget(
+              final form = DropTarget(
                 enable: !scope.chat.busy,
                 onDragEntered: (_) => setState(() => _over = true),
                 onDragExited: (_) => setState(() => _over = false),
@@ -415,6 +423,15 @@ class _ComposerState extends State<Composer> {
                     null => false,
                   },
                 ),
+              );
+              if (!scope.chat.alreadyAnswering) return form;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const _AlreadyAnswering(),
+                  const SizedBox(height: 8),
+                  form,
+                ],
               );
             },
           ),
@@ -526,8 +543,11 @@ class _Form extends StatelessWidget {
       if (sendable) onSend(draft.text);
     }
 
-    // While this chat answers, a message typed is held to go when the answer ends.
+    // While this chat answers, a message typed is held to go when the answer ends. On a phone
+    // Send when done takes the chips' room, as they are off while the chat answers.
     final holdable = here && !held && draft.text.trim().isNotEmpty;
+    final phone = ScreenClass.ofContext(context).isPhone;
+    final holdInRow = holdable && phone;
 
     /// Enter picks the highlighted command, or sends the message once it is that command.
     void enter() {
@@ -559,228 +579,210 @@ class _Form extends StatelessWidget {
       },
     };
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 12, 10),
-      decoration: BoxDecoration(
-        color: t.panel,
-        borderRadius: BorderRadius.circular(Sizes.card),
-        border: Border.all(color: over ? t.accent : t.line),
-        boxShadow: [
-          BoxShadow(
-            color: t.shadow,
-            // Flutter blurs a radius more than CSS does; 20 here is CSS's 24.
-            blurRadius: 20,
-            spreadRadius: -12,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (problem case final problem?) ...[
-            AlertBox(AlertKind.bad, 'Could not attach', text: problem),
-            const SizedBox(height: 8),
-          ],
-          if (micProblem case final problem?) ...[
-            AlertBox(AlertKind.bad, 'Could not listen', text: problem),
-            const SizedBox(height: 8),
-          ],
-          if (chat.editing != null)
-            _FormNote(
-              'Editing a sent message: sending replaces it and everything after it.',
-              action: 'Send as new',
-              onAction: chat.cancelEdit,
+    return AnswerFromAnchor(
+      onPickModel: () {
+        if (!picking) onPickModel();
+      },
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 10),
+        decoration: BoxDecoration(
+          color: t.panel,
+          borderRadius: BorderRadius.circular(Sizes.card),
+          border: Border.all(color: over ? t.accent : t.line),
+          boxShadow: [
+            BoxShadow(
+              color: t.shadow,
+              // Flutter blurs a radius more than CSS does; 20 here is CSS's 24.
+              blurRadius: 20,
+              spreadRadius: -12,
+              offset: const Offset(0, 8),
             ),
-          if (held)
-            _FormNote(
-              'Sends when this answer ends.',
-              action: "Don't send",
-              onAction: onRelease,
-            ),
-          if (picking) ...[
-            ModelPicker(onClose: onPickModel),
-            Divider(height: 21, thickness: 1, color: t.line),
           ],
-          if (menu) ...[
-            SlashMenu(
-              commands: matches,
-              highlight: highlight,
-              onPick: onPick,
-              note: chat.commandsNote,
-            ),
-            Divider(height: 13, thickness: 1, color: t.line),
-          ],
-          if (attached.isNotEmpty) ...[
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final a in attached)
-                  _AttachedChip(a, onRemove: () => onRemove(a)),
-              ],
-            ),
-            const SizedBox(height: 8),
-          ],
-          ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 26, maxHeight: 140),
-            child: CallbackShortcuts(
-              bindings: bindings,
-              child: Semantics(
-                label: 'Message',
-                textField: true,
-                // Only the field follows the prefs, for its spellcheck.
-                child: ListenableBuilder(
-                  listenable: scope.prefs,
-                  builder: (context, _) => _pasting(
-                    TextField(
-                      controller: draft,
-                      focusNode: focus,
-                      // Open while this chat answers, for the next message.
-                      enabled: !chat.busy || here,
-                      spellCheckConfiguration:
-                          scope.canSpellcheck &&
-                              scope.prefs.prefs.isOn(ChatSwitch.spellcheck)
-                          ? const SpellCheckConfiguration()
-                          : const SpellCheckConfiguration.disabled(),
-                      minLines: 1,
-                      maxLines: null,
-                      keyboardType: TextInputType.multiline,
-                      textInputAction: TextInputAction.newline,
-                      // A phone's keyboard starts each sentence with a capital.
-                      textCapitalization: TextCapitalization.sentences,
-                      style: Type.sans(15.5, color: t.ink, height: 1.5),
-                      cursorColor: t.accent,
-                      // A picture from a phone keyboard's clipboard; the rest goes in as text.
-                      contentInsertionConfiguration:
-                          ContentInsertionConfiguration(
-                            allowedMimeTypes: imageMimes.toList(),
-                            onContentInserted: onInserted,
-                          ),
-                      decoration: InputDecoration(
-                        isCollapsed: true,
-                        border: InputBorder.none,
-                        hintText: hint,
-                        hintStyle: Type.sans(15.5, color: t.fade, height: 1.5),
-                      ),
-                    ),
-                  ),
-                ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (problem case final problem?) ...[
+              AlertBox(AlertKind.bad, 'Could not attach', text: problem),
+              const SizedBox(height: 8),
+            ],
+            if (micProblem case final problem?) ...[
+              AlertBox(AlertKind.bad, 'Could not listen', text: problem),
+              const SizedBox(height: 8),
+            ],
+            if (chat.editing != null)
+              _FormNote(
+                'Editing a sent message: sending replaces it and everything after it.',
+                action: 'Send as new',
+                onAction: chat.cancelEdit,
               ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              IconBtn(
-                'attach',
-                tooltip: 'Attach files to this message',
-                onPressed: chat.busy ? null : onAttach,
-                box: 30,
-                size: IconSize.small,
+            if (held)
+              _FormNote(
+                'Sends when this answer ends.',
+                action: "Don't send",
+                onAction: onRelease,
               ),
-              IconBtn(
-                'slash',
-                tooltip: 'Commands',
-                onPressed: chat.busy ? null : onSlash,
-                box: 30,
-                size: IconSize.small,
+            if (picking) ...[
+              ModelPicker(onClose: onPickModel),
+              Divider(height: 21, thickness: 1, color: t.line),
+            ],
+            if (menu) ...[
+              SlashMenu(
+                commands: matches,
+                highlight: highlight,
+                onPick: onPick,
+                note: chat.commandsNote,
               ),
-              const SizedBox(width: 4),
-              if (scope.settings.connection case final server?)
-                // Takes all the room left, so Send sits at the right edge.
-                Expanded(
-                  child: Row(
-                    children: [
-                      Flexible(
-                        child: Tappable(
-                          touchTarget: true,
-                          label:
-                              'AnythingLLM settings, server ${serverName(server.host)}',
-                          tooltip: 'AnythingLLM settings: ${server.baseUrl}',
-                          onTap: () =>
-                              scope.shell.openSettings(SettingsPage.connection),
-                          radius: BorderRadius.circular(6),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 4,
+              Divider(height: 13, thickness: 1, color: t.line),
+            ],
+            if (attached.isNotEmpty) ...[
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final a in attached)
+                    _AttachedChip(a, onRemove: () => onRemove(a)),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 26, maxHeight: 140),
+              child: CallbackShortcuts(
+                bindings: bindings,
+                child: Semantics(
+                  label: 'Message',
+                  textField: true,
+                  // Only the field follows the prefs, for its spellcheck.
+                  child: ListenableBuilder(
+                    listenable: scope.prefs,
+                    builder: (context, _) => _pasting(
+                      TextField(
+                        controller: draft,
+                        focusNode: focus,
+                        // Open while this chat answers, for the next message.
+                        enabled: !chat.busy || here,
+                        spellCheckConfiguration:
+                            scope.canSpellcheck &&
+                                scope.prefs.prefs.isOn(ChatSwitch.spellcheck)
+                            ? const SpellCheckConfiguration()
+                            : const SpellCheckConfiguration.disabled(),
+                        minLines: 1,
+                        maxLines: null,
+                        keyboardType: TextInputType.multiline,
+                        textInputAction: TextInputAction.newline,
+                        // A phone's keyboard starts each sentence with a capital.
+                        textCapitalization: TextCapitalization.sentences,
+                        style: Type.sans(15.5, color: t.ink, height: 1.5),
+                        cursorColor: t.accent,
+                        // A picture from a phone keyboard's clipboard; the rest goes in as text.
+                        contentInsertionConfiguration:
+                            ContentInsertionConfiguration(
+                              allowedMimeTypes: imageMimes.toList(),
+                              onContentInserted: onInserted,
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                AppIcon(
-                                  'settings',
-                                  size: IconSize.xs,
-                                  color: t.muted,
-                                ),
-                                const SizedBox(width: 6),
-                                Flexible(
-                                  child: Text(
-                                    serverName(server.host),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Type.sans(13, color: t.muted),
-                                  ),
-                                ),
-                              ],
-                            ),
+                        decoration: InputDecoration(
+                          isCollapsed: true,
+                          border: InputBorder.none,
+                          hintText: hint,
+                          hintStyle: Type.sans(
+                            15.5,
+                            color: t.fade,
+                            height: 1.5,
                           ),
                         ),
                       ),
-                      // The model this workspace answers with, after the server's name.
-                      Flexible(
-                        child: ModelChip(open: picking, onTap: onPickModel),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                const Spacer(),
-              if (onDictate != null)
-                Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: IconBtn(
-                    'mic',
-                    tooltip: listening ? 'Stop dictating' : 'Dictate',
-                    active: listening,
-                    onPressed: chat.busy ? null : onDictate,
-                    box: 34,
-                    size: IconSize.small,
-                  ),
-                ),
-              if (holdable) ...[
-                _SendWhenDone(onTap: onHold),
-                const SizedBox(width: 8),
-              ],
-              if (here)
-                _RoundButton(
-                  label: 'Stop',
-                  color: t.ink,
-                  onTap: chat.stop,
-                  child: Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: t.bg,
-                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                )
-              else
-                _RoundButton(
-                  label: 'Send',
-                  color: sendable ? t.accent : t.off,
-                  onTap: sendable ? send : null,
-                  child: AppIcon(
-                    'send',
-                    size: IconSize.small,
-                    color: t.onaccent,
-                  ),
                 ),
-            ],
-          ),
-        ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                IconBtn(
+                  'attach',
+                  tooltip: 'Attach files to this message',
+                  onPressed: chat.busy ? null : onAttach,
+                  box: 30,
+                  size: IconSize.small,
+                ),
+                IconBtn(
+                  'slash',
+                  tooltip: 'Commands',
+                  onPressed: chat.busy ? null : onSlash,
+                  box: 30,
+                  size: IconSize.small,
+                ),
+                const SizedBox(width: 4),
+                // Takes all the room left, so Send sits at the right edge. On a phone the model is
+                // a row in the Answer from menu, since the row has room for one chip.
+                Expanded(
+                  child: holdInRow
+                      ? Align(
+                          alignment: Alignment.centerRight,
+                          child: _SendWhenDone(onTap: onHold),
+                        )
+                      : Row(
+                          children: [
+                            const Flexible(child: AnswerFromChip()),
+                            if (!phone) ...[
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: ModelChip(
+                                  open: picking,
+                                  onTap: onPickModel,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                ),
+                if (onDictate != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: IconBtn(
+                      'mic',
+                      tooltip: listening ? 'Stop dictating' : 'Dictate',
+                      active: listening,
+                      onPressed: chat.busy ? null : onDictate,
+                      box: 34,
+                      size: IconSize.small,
+                    ),
+                  ),
+                if (holdable) ...[
+                  if (!holdInRow) _SendWhenDone(onTap: onHold),
+                  const SizedBox(width: 8),
+                ],
+                if (here)
+                  _RoundButton(
+                    label: 'Stop the answer',
+                    color: t.ink,
+                    onTap: chat.stop,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: t.bg,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  )
+                else
+                  _RoundButton(
+                    label: 'Send',
+                    color: sendable ? t.accent : t.off,
+                    onTap: sendable ? send : null,
+                    child: AppIcon(
+                      'send',
+                      size: IconSize.small,
+                      color: t.onaccent,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -938,11 +940,40 @@ class _SendWhenDone extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Center(
+            widthFactor: 1,
             child: Text(
               'Send when done',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: Type.sans(13.5, weight: FontWeight.w500, color: t.accent),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Over the composer while the chat on screen answers a message sent elsewhere, after the relay
+/// refused the one sent here.
+class _AlreadyAnswering extends StatelessWidget {
+  const _AlreadyAnswering();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: t.warnbg,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          'This chat is still answering, maybe on another device. Send when it ends, or stop '
+          'it.',
+          style: Type.sans(13.5, color: t.warnfg, height: 1.45),
         ),
       ),
     );

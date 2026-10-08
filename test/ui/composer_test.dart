@@ -264,7 +264,7 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pump();
       expect(find.text('Sends when this answer ends.'), findsOneWidget);
-      await tester.tap(find.byTooltip('Stop'));
+      await tester.tap(find.byTooltip('Stop the answer'));
       await tester.pump(const Duration(milliseconds: 300));
       expect(sent(llm, 'Second'), 1);
       await llm.chat!.close();

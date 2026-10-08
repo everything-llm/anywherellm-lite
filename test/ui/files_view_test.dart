@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:anywherellm/core/chat.dart';
+import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/ui/chat/chat_view.dart';
 import 'package:anywherellm/ui/files/file_tree.dart';
 import 'package:anywherellm/ui/files/files_view.dart';
@@ -23,7 +24,13 @@ Finder inTree(String label) =>
 Finder inPane(Finder finder) =>
     find.descendant(of: find.byType(FilesView), matching: finder);
 
+/// Taps the tree's row [label], switching the sidebar from Essentials to All files first when
+/// the tree is not showing.
 Future<void> tapTree(WidgetTester tester, String label) async {
+  if (inTree(label).evaluate().isEmpty) {
+    await tester.tap(inTree('All files'));
+    await tester.pumpAndSettle();
+  }
   await tester.tap(inTree(label));
   await tester.pumpAndSettle();
 }
@@ -38,6 +45,10 @@ void main() {
       expect(find.byType(FileTree), findsOneWidget);
       expect(find.byType(SourcesPanel).hitTestable(), findsNothing);
       expect(find.byType(ChatView).hitTestable(), findsNothing);
+      expect(inTree('Documents, 2 on'), findsOneWidget);
+      expect(inTree('Q3 planning'), findsNothing);
+      await tester.tap(inTree('All files'));
+      await tester.pumpAndSettle();
       expect(inTree('Q3 planning'), findsOneWidget);
       expect(inTree('custom-documents'), findsOneWidget);
       await tester.tap(control('Back to chats'));
@@ -394,6 +405,42 @@ void main() {
     await tester.pumpAndSettle();
     expect(llm.calls, contains('removeFolder:custom-documents'));
     expect(inTree('custom-documents'), findsNothing);
+  });
+
+  testWidgets('a delete question reads at regular weight', (tester) async {
+    final h = await pumpApp(tester, llm: planningServer());
+    h.shell.showPane(Pane.files);
+    await tester.pumpAndSettle();
+    await tapTree(tester, 'custom-documents');
+    await tapTree(tester, 'Q3 roadmap.pdf');
+    await tester.tap(inPane(control('Delete…')));
+    await tester.pumpAndSettle();
+    final question = tester.widget<Text>(
+      find.textContaining('Delete Q3 roadmap.pdf'),
+    );
+    expect(question.style!.fontWeight, isNot(FontWeight.w600));
+    expect(question.style!.fontSize, 14);
+  });
+
+  testWidgets('a workspace\'s documents say which are not used in answers', (
+    tester,
+  ) async {
+    final h = await pumpApp(tester, llm: planningServer());
+    await h.sources.toggle(h.sources.files.first);
+    h.shell.showPane(Pane.files);
+    await tester.pumpAndSettle();
+    await h.files.reveal(docsPath('q3'));
+    await tester.pumpAndSettle();
+    expect(inPane(find.text('120 words')), findsOneWidget);
+    expect(
+      inPane(find.text('120 words · Not used in answers')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      inPane(control('Q3 roadmap.pdf, 120 words · Not used in answers')),
+    );
+    await tester.pumpAndSettle();
+    expect(h.files.selected, '/library/custom-documents/Q3 roadmap.pdf.json');
   });
 }
 

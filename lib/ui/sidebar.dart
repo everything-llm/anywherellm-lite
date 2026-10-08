@@ -14,7 +14,7 @@ import 'type.dart';
 import 'widgets/basics.dart';
 import 'widgets/brand.dart';
 import 'widgets/buttons.dart';
-import 'widgets/fields.dart';
+import 'widgets/rise.dart';
 import 'widgets/inline_input.dart';
 import 'widgets/menu.dart';
 import 'widgets/min_height.dart';
@@ -182,12 +182,9 @@ class _ChatsState extends State<_Chats> {
               ),
             Padding(
               padding: const EdgeInsets.only(top: 4, bottom: 4),
-              child: AppField(
+              child: _SearchRow(
                 controller: _search,
-                focusNode: scope.shell.searchFocus,
-                label: 'Search workspaces and chats',
-                hint: 'Search chats',
-                icon: 'search',
+                focus: scope.shell.searchFocus,
                 suffix: searching
                     ? IconBtn(
                         'close',
@@ -295,6 +292,64 @@ class _ChatsState extends State<_Chats> {
 }
 
 /// The keys that move to a field, drawn small inside it.
+/// The search, drawn as one of the sidebar's rows: no border, 40 px tall, the search icon before
+/// the text and [suffix] after it. It fills while it has the focus.
+class _SearchRow extends StatelessWidget {
+  const _SearchRow({
+    required this.controller,
+    required this.focus,
+    required this.suffix,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focus;
+  final Widget? suffix;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return ListenableBuilder(
+      listenable: focus,
+      builder: (context, child) => AnimatedContainer(
+        duration: motion(context, const Duration(milliseconds: 150)),
+        height: 40,
+        padding: EdgeInsets.only(left: 10, right: suffix == null ? 8 : 0),
+        decoration: BoxDecoration(
+          color: focus.hasFocus ? t.hover : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: child,
+      ),
+      child: Row(
+        children: [
+          AppIcon('search', size: IconSize.small, color: t.muted),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Semantics(
+              label: 'Search workspaces and chats',
+              textField: true,
+              child: TextField(
+                controller: controller,
+                focusNode: focus,
+                autocorrect: false,
+                style: Type.sans(14, color: t.ink),
+                cursorColor: t.accent,
+                decoration: InputDecoration(
+                  isCollapsed: true,
+                  border: InputBorder.none,
+                  hintText: 'Search chats',
+                  hintStyle: Type.sans(14, color: t.fade),
+                ),
+              ),
+            ),
+          ),
+          ?suffix,
+        ],
+      ),
+    );
+  }
+}
+
 class _KeyHint extends StatelessWidget {
   const _KeyHint(this.keys);
 

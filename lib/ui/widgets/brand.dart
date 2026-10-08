@@ -4,8 +4,8 @@ import '../tokens.dart';
 import '../type.dart';
 import 'robin_mark.dart';
 
-/// The logo tile and the wordmark: sans 19 beside the sidebar's chats, or [serif] 34 on a screen
-/// of its own.
+/// The logo tile, the robin in [iconInk] on [iconGround] as on the launcher icon, and the
+/// wordmark: sans 19 beside the sidebar's chats, or [serif] 34 on a screen of its own.
 class Brand extends StatelessWidget {
   const Brand({super.key, this.serif = false, this.logo = true});
 
@@ -22,11 +22,12 @@ class Brand extends StatelessWidget {
           Container(
             width: 26,
             height: 26,
+            // The launcher icon's colours, the same in both themes.
             decoration: BoxDecoration(
-              color: t.accent,
+              color: iconGround,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: RobinMark(size: 26, color: t.onaccent),
+            child: const RobinMark(size: 26, color: iconInk),
           ),
           const SizedBox(width: 10),
         ],

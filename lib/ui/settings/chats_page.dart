@@ -67,7 +67,17 @@ class _ChatsPageState extends State<ChatsPage> {
             else if (chats.isEmpty)
               const HelpText('No chats yet.', status: true)
             else
-              FieldCard([for (final chat in chats) _ChatRow(chat)]),
+              LayoutBuilder(
+                builder: (context, box) {
+                  // As wide as a row needs to show its columns, inside the card's border and
+                  // padding.
+                  final wide = box.maxWidth - 34 >= FieldRow.sideBySide;
+                  return FieldCard([
+                    if (wide) const _Columns(),
+                    for (final chat in chats) _ChatRow(chat, wide: wide),
+                  ]);
+                },
+              ),
             if (system.chatsMore)
               ActionRow([
                 AppButton(
@@ -76,22 +86,17 @@ class _ChatsPageState extends State<ChatsPage> {
                 ),
               ]),
             const SubHead('Export'),
-            const PageNote(
-              'Every chat on the server, from every workspace, saved to a file in one of these '
-              'formats.',
-            ),
             if (system.exportProblem case final problem?)
               AlertBox(AlertKind.bad, problem.title, text: problem.text),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final format in ChatExport.values)
-                  AppButton(
-                    format.label,
-                    onPressed: system.exporting ? null : () => _export(format),
-                  ),
-              ],
+            PageActions([
+              for (final format in ChatExport.values)
+                AppButton(
+                  format.label,
+                  onPressed: system.exporting ? null : () => _export(format),
+                ),
+            ]),
+            const PageNote(
+              'Every chat on the server, from every workspace, in one file.',
             ),
             if (system.exporting)
               const HelpText('Exporting…', status: true)
@@ -104,11 +109,32 @@ class _ChatsPageState extends State<ChatsPage> {
   }
 }
 
-/// One recorded chat: its workspace, question and when it was sent, in columns where they fit.
+/// The names of the columns over the chats, where they show side by side.
+class _Columns extends StatelessWidget {
+  const _Columns();
+
+  @override
+  Widget build(BuildContext context) => const ExcludeSemantics(
+    child: Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        spacing: 12,
+        children: [
+          SizedBox(width: 140, child: ColumnLabel('Workspace')),
+          Expanded(child: ColumnLabel('Prompt')),
+          SizedBox(width: 110, child: ColumnLabel('Sent', end: true)),
+        ],
+      ),
+    ),
+  );
+}
+
+/// One recorded chat: its workspace, question and when it was sent, in columns when [wide].
 class _ChatRow extends StatelessWidget {
-  const _ChatRow(this.chat);
+  const _ChatRow(this.chat, {required this.wide});
 
   final LoggedChat chat;
+  final bool wide;
 
   @override
   Widget build(BuildContext context) {
@@ -129,41 +155,39 @@ class _ChatRow extends StatelessWidget {
     final muted = Type.sans(13.5, color: t.muted, height: 1.45);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: LayoutBuilder(
-        builder: (context, box) => box.maxWidth < FieldRow.sideBySide
-            ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                spacing: 2,
-                children: [
-                  question,
-                  Text(
-                    [workspace, sent].where((s) => s.isNotEmpty).join(' · '),
+      child: !wide
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: 2,
+              children: [
+                question,
+                Text(
+                  [workspace, sent].where((s) => s.isNotEmpty).join(' · '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: muted,
+                ),
+              ],
+            )
+          : Row(
+              spacing: 12,
+              children: [
+                SizedBox(
+                  width: 140,
+                  child: Text(
+                    workspace,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: muted,
                   ),
-                ],
-              )
-            : Row(
-                spacing: 12,
-                children: [
-                  SizedBox(
-                    width: 140,
-                    child: Text(
-                      workspace,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: muted,
-                    ),
-                  ),
-                  Expanded(child: question),
-                  SizedBox(
-                    width: 110,
-                    child: Text(sent, textAlign: TextAlign.end, style: muted),
-                  ),
-                ],
-              ),
-      ),
+                ),
+                Expanded(child: question),
+                SizedBox(
+                  width: 110,
+                  child: Text(sent, textAlign: TextAlign.end, style: muted),
+                ),
+              ],
+            ),
     );
   }
 }

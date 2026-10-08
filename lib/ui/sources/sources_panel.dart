@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/chat.dart';
 import '../../core/sources.dart';
 import '../app_scope.dart';
 import '../icons.dart';
@@ -14,10 +13,10 @@ import '../widgets/upload_queue.dart';
 import '../widgets/rise.dart';
 import '../widgets/side_panel.dart';
 import 'add_source.dart';
-import 'chat_mode_chooser.dart';
 import 'test_question.dart';
 
-/// The active workspace's files: add them, switch them on and off, remove them.
+/// The active workspace's files, which people see as Documents: add them, switch them on and
+/// off, remove them, and test what a question finds in them.
 class SourcesPanel extends StatelessWidget {
   const SourcesPanel({super.key});
 
@@ -26,23 +25,21 @@ class SourcesPanel extends StatelessWidget {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
     return SidePanel(
-      title: 'Sources',
-      about: everyModeDrawsOn,
+      title: 'Documents',
+      about: 'Answers draw on the ones switched on.',
       onClose: scope.shell.closeSources,
       child: ListenableBuilder(
         listenable: scope.sources,
         builder: (context, _) {
           final sources = scope.sources;
-          // Everything below the heading scrolls together, so the chat mode, an open
-          // form or a long list of files waiting to be added never pushes past the panel.
+          // Everything below the heading scrolls together, so an open form or a long list of
+          // files waiting to be added never pushes past the panel.
           return CustomScrollView(
             slivers: [
               SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const ChatModeChooser(),
-                    const SizedBox(height: 14),
                     // Keyed by workspace, so what waits to be added stays with it.
                     UploadQueue(
                       key: ValueKey(('queue', scope.chat.activeSlug)),
@@ -122,57 +119,38 @@ class _FileRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
+    // A citation's flash fills the row and rings it in the accent; the ring is always there,
+    // clear, so the flash moves nothing.
     return AnimatedContainer(
       duration: motion(context, const Duration(milliseconds: 300)),
       padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
       decoration: BoxDecoration(
         color: flashed ? t.accentbg : Colors.transparent,
+        border: Border.all(color: flashed ? t.accent : Colors.transparent),
         borderRadius: BorderRadius.circular(Sizes.control),
       ),
       child: Row(
         children: [
-          Opacity(
-            opacity: file.on ? 1 : 0.5,
-            child: Container(
-              width: 32,
-              height: 38,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: t.accentbg,
-                borderRadius: BorderRadius.circular(5),
-              ),
-              child: Text(
-                file.tile,
-                style: Type.sans(
-                  9.5,
-                  weight: FontWeight.w600,
-                  color: t.accent,
-                  letterSpacing: 9.5 * 0.03,
-                ),
-              ),
-            ),
-          ),
+          TypeTile(file),
           const SizedBox(width: 10),
           Expanded(
-            child: Opacity(
-              opacity: file.on ? 1 : 0.5,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  file.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Type.sans(13.5, weight: FontWeight.w500, color: t.ink),
+                ),
+                if (file.meta.isNotEmpty)
                   Text(
-                    file.title,
+                    file.meta,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Type.sans(
-                      13.5,
-                      weight: FontWeight.w500,
-                      color: t.ink,
-                    ),
+                    style: Type.sans(12, color: t.muted),
                   ),
-                  if (file.meta.isNotEmpty)
-                    Text(file.meta, style: Type.sans(12, color: t.muted)),
-                ],
-              ),
+              ],
             ),
           ),
           const SizedBox(width: 10),
@@ -192,6 +170,40 @@ class _FileRow extends StatelessWidget {
             onPressed: () => scope.sources.remove(file),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A document's type on a small tile, such as `PDF`. Switched off, only the tile fades: the name
+/// beside it stays at full strength.
+class TypeTile extends StatelessWidget {
+  const TypeTile(this.file, {super.key});
+
+  final SourceFile file;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Opacity(
+      opacity: file.on ? 1 : 0.5,
+      child: Container(
+        width: 32,
+        height: 38,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: t.accentbg,
+          borderRadius: BorderRadius.circular(5),
+        ),
+        child: Text(
+          file.tile,
+          style: Type.sans(
+            9.5,
+            weight: FontWeight.w600,
+            color: t.accent,
+            letterSpacing: 9.5 * 0.03,
+          ),
+        ),
       ),
     );
   }

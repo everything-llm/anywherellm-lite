@@ -79,7 +79,7 @@ class _PasswordCardState extends State<PasswordCard> {
                         auth == ServerAuth.multiUser && !set
                             ? 'This server has several users. Signing in with a user name is not supported, so its own commands, feedback, and Retry and Edit that replace the old exchange stay off.'
                             : set
-                            ? 'Saved in your system keyring. Never shown.'
+                            ? 'Stored in this device\'s keyring and never shown.'
                             : 'Optional. This server has a password. With it, the app lists the server\'s own commands, marks answers good or bad, and Retry and Edit replace the old exchange.',
                         style: Type.sans(12.5, color: t.muted, height: 1.45),
                       ),
@@ -89,7 +89,7 @@ class _PasswordCardState extends State<PasswordCard> {
                 if (auth != ServerAuth.multiUser || set) ...[
                   const SizedBox(width: 10),
                   AppBadge(
-                    set ? 'Set' : 'Not set',
+                    set ? 'Saved' : 'Not set',
                     kind: set ? BadgeKind.ok : BadgeKind.accent,
                   ),
                 ],
@@ -98,10 +98,13 @@ class _PasswordCardState extends State<PasswordCard> {
             if (set)
               ActionRow([
                 AppButton(
-                  _replacing ? 'Cancel' : 'Replace',
+                  _replacing ? 'Cancel' : 'Change password',
                   onPressed: () => setState(() => _replacing = !_replacing),
                 ),
-                AppButton('Forget', onPressed: _settings.forgetPassword),
+                AppButton(
+                  'Forget password',
+                  onPressed: _settings.forgetPassword,
+                ),
               ]),
             if (editing && auth != ServerAuth.multiUser) ...[
               AppField(

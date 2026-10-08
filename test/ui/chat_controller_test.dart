@@ -560,6 +560,98 @@ void main() {
     });
   });
 
+  group('a message refused as the chat is already answering', () {
+    const refusal = AlreadyAnswering(
+      'That thread already has an answer running.',
+    );
+
+    /// The answer running in the chat on another device, which the relay lists.
+    StreamController<ChatEvent> elsewhere(FakeAnythingLlm llm) {
+      final events = StreamController<ChatEvent>();
+      llm.running['budget'] = (question: 'Asked on the phone', events: events);
+      addTearDown(() => unawaited(events.close()));
+      return events;
+    }
+
+    test('is given back, and the answer running is followed', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await pumpEventQueue();
+      final events = elsewhere(llm);
+      llm.errors['streamChat'] = refusal;
+      final notes = Attachment.of('notes.txt', utf8.encode('Notes'));
+      expect(
+        await rig.chat.send('And a shorter one?', attachments: [notes]),
+        isTrue,
+      );
+      await pumpEventQueue();
+      expect(rig.chat.alreadyAnswering, isTrue);
+      expect(rig.chat.problem, isNull);
+      expect(rig.chat.turns.map((t) => t.text), [
+        'What is the budget?',
+        'About 40k.',
+        'Asked on the phone',
+        '',
+      ]);
+      final answer = rig.chat.turns.last;
+      expect(answer.error, isNull);
+      expect(answer.rejoined, isFalse);
+      expect(rig.chat.runningHere, same(answer));
+      final back = rig.chat.takeRefused()!;
+      expect(back.text, 'And a shorter one?');
+      expect(back.attachments.single.name, 'notes.txt');
+      expect(rig.chat.takeRefused(), isNull);
+      events.add(const TextChunk('Short.'));
+      await events.close();
+      await pumpEventQueue();
+      expect(answer.text, 'Short.');
+      expect(rig.chat.busy, isFalse);
+      expect(rig.chat.alreadyAnswering, isFalse);
+    });
+
+    test('Stop stops the answer running', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await pumpEventQueue();
+      elsewhere(llm);
+      llm.errors['streamChat'] = refusal;
+      await rig.chat.send('And a shorter one?');
+      await pumpEventQueue();
+      rig.chat.stop();
+      await pumpEventQueue();
+      expect(llm.calls, contains('stopChat:budget'));
+      expect(rig.chat.busy, isFalse);
+      expect(rig.chat.alreadyAnswering, isFalse);
+      expect(rig.chat.turns.last.stopped, isTrue);
+    });
+
+    test('with nothing found running, can simply be sent again', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await pumpEventQueue();
+      llm.errors['streamChat'] = refusal;
+      await rig.chat.send('And a shorter one?');
+      await pumpEventQueue();
+      expect(rig.chat.alreadyAnswering, isFalse);
+      expect(rig.chat.busy, isFalse);
+      expect(rig.chat.turns, hasLength(2));
+      expect(rig.chat.takeRefused()!.text, 'And a shorter one?');
+    });
+
+    test('is given back only in its own chat', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await pumpEventQueue();
+      llm.errors['streamChat'] = refusal;
+      await rig.chat.send('And a shorter one?');
+      await pumpEventQueue();
+      await rig.chat.open('priorities');
+      expect(rig.chat.takeRefused(), isNull);
+      await rig.chat.open('budget');
+      expect(rig.chat.takeRefused(), isNull);
+    });
+  });
+
   test('a finished answer\'s chat is not read again', () async {
     final llm = planningServer();
     final rig = await started(llm);

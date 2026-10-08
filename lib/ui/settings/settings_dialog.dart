@@ -150,7 +150,7 @@ class _Header extends StatelessWidget {
     final t = Tokens.of(context);
     final page = this.page;
     return Padding(
-      padding: EdgeInsets.fromLTRB(page == null ? 24 : 10, 12, 16, 12),
+      padding: EdgeInsets.fromLTRB(page == null ? 24 : 10, 16, 24, 16),
       child: Row(
         children: [
           if (page != null) ...[
@@ -168,9 +168,7 @@ class _Header extends StatelessWidget {
                 page?.label ?? 'Settings',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: page == null
-                    ? Type.serif(30, color: t.ink)
-                    : Type.sans(17, weight: FontWeight.w600, color: t.ink),
+                style: Type.serif(28, color: t.ink, letterSpacing: -0.4),
               ),
             ),
           ),
@@ -202,7 +200,6 @@ class _Nav extends StatelessWidget {
   Widget build(BuildContext context) {
     final shell = AppScope.of(context).shell;
     final t = Tokens.of(context);
-    final more = SettingsPage.values.where((p) => !p.essential).length;
     SettingsGroup? group;
     return ColoredBox(
       color: wide ? t.side : t.panel2,
@@ -226,24 +223,6 @@ class _Nav extends StatelessWidget {
               ),
             _NavItem(page, current: page == current, wide: wide),
           ],
-          if (canShowAll && !all)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Tappable(
-                label: 'All settings ($more more)',
-                onTap: () => shell.showAllSettings(true),
-                radius: BorderRadius.circular(8),
-                child: Container(
-                  constraints: const BoxConstraints(minHeight: 36),
-                  alignment: Alignment.centerLeft,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Text(
-                    'All settings ($more more)',
-                    style: Type.sans(13.5, color: t.accent),
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -324,7 +303,12 @@ class _PageView extends StatelessWidget {
                   header: true,
                   child: Text(
                     page.label,
-                    style: Type.serif(34, color: t.ink, height: 1.15),
+                    style: Type.serif(
+                      32,
+                      color: t.ink,
+                      height: 1.15,
+                      letterSpacing: -0.5,
+                    ),
                   ),
                 ),
               const SizedBox(height: 6),
@@ -345,23 +329,20 @@ class _PageView extends StatelessWidget {
     SettingsPage.connection => const ConnectionPage(),
     SettingsPage.appearance => const AppearancePage(),
     SettingsPage.chat => const ChatPage(),
-    SettingsPage.chatModel => const ProviderPage([chatProviders]),
+    SettingsPage.chatModel => const ProviderPage([
+      chatProviders,
+    ], fieldsNote: 'These fields change with the provider.'),
     SettingsPage.searchModel => const ProviderPage(
       [embedderProviders],
-      before: [
-        PageWarning(
-          'Changing the provider or model clears the searchable copy of every document. '
-          'Each document has to be prepared again before answers can use it.',
-        ),
-      ],
+      before: [SearchModelWarning()],
     ),
     SettingsPage.storage => const ProviderPage(
       [vectorProviders],
-      before: [StoredPassages()],
+      lead: [StoredPassages()],
     ),
     SettingsPage.images => const ProviderPage([imageProviders]),
     SettingsPage.voice => const ProviderPage(
-      [textToSpeechProviders, speechToTextProviders],
+      [speechToTextProviders, textToSpeechProviders],
       after: [
         PageNote(
           'Read aloud and dictation in AnywhereLLM use the device\'s own engines, whatever '

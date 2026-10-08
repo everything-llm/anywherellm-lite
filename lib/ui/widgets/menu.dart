@@ -6,9 +6,9 @@ import '../tokens.dart';
 import '../type.dart';
 import 'tappable.dart';
 
-/// [child], with the menu [menu] builds under it while [open], level with its left edge, or
-/// its right one when [alignRight]. A tap outside both, or Esc, calls [onClose]. The menu is
-/// drawn in the app's overlay and inherits what [child] does.
+/// [child], with the menu [menu] builds under it while [open], or over it when [above], level
+/// with its left edge, or its right one when [alignRight]. A tap outside both, or Esc, calls
+/// [onClose]. The menu is drawn in the app's overlay and inherits what [child] does.
 class PopupAnchor extends StatefulWidget {
   const PopupAnchor({
     super.key,
@@ -17,6 +17,7 @@ class PopupAnchor extends StatefulWidget {
     required this.menu,
     required this.child,
     this.alignRight = false,
+    this.above = false,
   });
 
   final bool open;
@@ -24,6 +25,7 @@ class PopupAnchor extends StatefulWidget {
   final WidgetBuilder menu;
   final Widget child;
   final bool alignRight;
+  final bool above;
 
   @override
   State<PopupAnchor> createState() => _PopupAnchorState();
@@ -54,14 +56,16 @@ class _PopupAnchorState extends State<PopupAnchor> {
   Widget _overlay(BuildContext context) {
     if (!widget.open) return const SizedBox.shrink();
     final right = widget.alignRight;
+    final above = widget.above;
+    final near = Alignment(right ? 1 : -1, above ? 1 : -1);
     return CompositedTransformFollower(
       link: _link,
-      targetAnchor: right ? Alignment.bottomRight : Alignment.bottomLeft,
-      followerAnchor: right ? Alignment.topRight : Alignment.topLeft,
-      offset: const Offset(0, 6),
+      targetAnchor: Alignment(right ? 1 : -1, above ? -1 : 1),
+      followerAnchor: near,
+      offset: Offset(0, above ? -4 : 6),
       showWhenUnlinked: false,
       child: Align(
-        alignment: right ? Alignment.topRight : Alignment.topLeft,
+        alignment: near,
         child: TapRegion(
           groupId: _group,
           onTapOutside: (_) => widget.onClose(),

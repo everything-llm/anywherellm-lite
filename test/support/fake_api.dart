@@ -75,6 +75,9 @@ class FakeAnythingLlm implements AnythingLlmApi {
   /// Every document the server holds, by path, embedded or not.
   final Map<String, WorkspaceDoc> library = {};
 
+  /// The library documents, by path, whose text `document` leaves out, as the server may.
+  final Set<String> textless = {};
+
   /// Library folders made with [createFolder], which show even while empty.
   final Set<String> folders = {};
 
@@ -475,7 +478,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
     if (doc == null) throw ApiException('There is no document $path.');
     return DocBody(
       title: doc.title,
-      text: 'The text of ${doc.title}.',
+      text: textless.contains(path) ? null : 'The text of ${doc.title}.',
       details: {'docAuthor': 'Ada'},
     );
   }, path);

@@ -3,6 +3,7 @@ import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -30,7 +31,8 @@ void main() {
     expect(control('Chat model'), findsOneWidget);
     expect(control('Privacy and data'), findsOneWidget);
     expect(control('Document storage'), findsNothing);
-    await tester.tap(control('All settings (8 more)'));
+    expect(find.textContaining('more)'), findsNothing);
+    await tester.tap(control('All settings'));
     await tester.pumpAndSettle();
     expect(control('Document storage'), findsOneWidget);
     expect(control('Website chat widgets'), findsOneWidget);
@@ -79,18 +81,6 @@ void main() {
     expect(h.shell.settingsOpen, isFalse);
   });
 
-  testWidgets('the composer opens Connection, even on a phone', (tester) async {
-    final h = await pumpApp(tester, llm: planningServer(), size: phone);
-    await tester.tap(
-      find.byWidgetPredicate(
-        (w) => w is Tappable && w.label == 'AnythingLLM settings, server h',
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(h.shell.settingsPage, SettingsPage.connection);
-    expect(find.text('AnythingLLM server'), findsOneWidget);
-  });
-
   testWidgets('Connection says how the server signs in and finds the relay', (
     tester,
   ) async {
@@ -100,19 +90,72 @@ void main() {
     final h = await pumpApp(tester, llm: llm);
     h.shell.openSettings(SettingsPage.connection);
     await tester.pumpAndSettle();
+    expect(find.text('Background answers'), findsOneWidget);
     expect(
-      find.text('Found. Answers keep running after the app lets go of them.'),
+      find.text('Provided by the everythingllm relay on the server.'),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'Available. Answers keep running after the app lets go of them.',
+      ),
       findsOneWidget,
     );
     expect(find.text('AnythingLLM, single user, password on'), findsOneWidget);
+    expect(find.text('Connected'), findsNothing);
     llm.verifyError = const ApiException('The server rejected the key.');
     await tapVisible(tester, control('Test connection'));
     await tester.pumpAndSettle();
     expect(find.text('The server rejected the key.'), findsOneWidget);
+    expect(find.text('Connected'), findsNothing);
     llm.verifyError = null;
     await tapVisible(tester, control('Test connection'));
     await tester.pumpAndSettle();
     expect(find.text('Connected to h.'), findsOneWidget);
+    expect(find.text('Connected'), findsOneWidget);
+    // Another page and back starts again from Saved.
+    h.shell.showSettingsPage(SettingsPage.appearance);
+    await tester.pumpAndSettle();
+    h.shell.showSettingsPage(SettingsPage.connection);
+    await tester.pumpAndSettle();
+    expect(find.text('Connected'), findsNothing);
+    expect(find.text('Saved'), findsWidgets);
+  });
+
+  testWidgets('a relay that is not there says answers come straight', (
+    tester,
+  ) async {
+    final h = await pumpApp(tester, llm: planningServer()..relay = false);
+    h.shell.openSettings(SettingsPage.connection);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Not available. Answers come straight from AnythingLLM.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('titles are in the serif, section heads in the sans', (
+    tester,
+  ) async {
+    final h = await pumpApp(tester, llm: planningServer());
+    h.shell.openSettings(SettingsPage.chats);
+    await tester.pumpAndSettle();
+    // The last of a name is the page's own title, after the list of pages.
+    TextStyle style(String text) => tester
+        .widget<Text>(
+          find
+              .descendant(
+                of: find.byType(SettingsDialog),
+                matching: find.text(text),
+              )
+              .last,
+        )
+        .style!;
+    expect(style('Settings').fontFamily, 'Instrument Serif');
+    expect(style('Settings').fontSize, 28);
+    expect(style('Workspace chats').fontFamily, 'Instrument Serif');
+    expect(style('Workspace chats').fontSize, 32);
+    expect(style('Export').fontFamily, 'Instrument Sans');
   });
 
   testWidgets('a relay that cannot be asked says so', (tester) async {
@@ -138,6 +181,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Question 25'), findsOneWidget);
     expect(find.text('Question 1'), findsNothing);
+    expect(find.text('PROMPT'), findsOneWidget);
+    final xs = [
+      for (final label in ['CSV', 'JSON', 'JSONL', 'JSON (Alpaca)'])
+        tester.getTopLeft(control(label)).dx,
+    ];
+    expect(xs, [...xs]..sort(), reason: 'the export buttons in that order');
     await tapVisible(tester, control('Show more'));
     await tester.pumpAndSettle();
     expect(find.text('Question 1'), findsOneWidget);

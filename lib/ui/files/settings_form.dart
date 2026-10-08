@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import '../../core/chat.dart';
 import '../../core/server_models.dart';
 import '../app_scope.dart';
 import '../tokens.dart';
@@ -27,13 +28,26 @@ const _modeHelp = {
   'query': 'Query answers only from the workspace documents.',
 };
 
+/// What each chat mode does, in the words of the composer's Answer from chip.
+const _plainModeHelp =
+    'The same choice as the chip in the message box. It applies to every chat in this workspace.';
+
 /// A workspace's answer settings as a form, in place of `settings.json`. Saving sends only what
 /// changed, through the same checks as the JSON editor. Its key changes each time the settings
 /// are read afresh, which drops the draft.
 class SettingsForm extends StatefulWidget {
-  const SettingsForm({super.key, required this.slug, required this.onJson});
+  const SettingsForm({
+    super.key,
+    required this.slug,
+    required this.onJson,
+    this.plain = false,
+  });
 
   final String slug;
+
+  /// Names the chat mode and the refusal as the Essentials view does, in the composer's words,
+  /// rather than AnythingLLM's.
+  final bool plain;
 
   /// Switches to the JSON editor.
   final VoidCallback onJson;
@@ -206,15 +220,19 @@ class _SettingsFormState extends State<SettingsForm> {
                 const SectionLabel('Answers'),
                 const SizedBox(height: 12),
                 SettingRow(
-                  label: 'Chat mode',
-                  help: _modeHelp[_mode] ?? 'The workspace has no chat mode.',
+                  label: widget.plain ? 'Answer from' : 'Chat mode',
+                  help: widget.plain
+                      ? _plainModeHelp
+                      : _modeHelp[_mode] ?? 'The workspace has no chat mode.',
                   child: Segmented<String>(
-                    options: const [
-                      ('automatic', 'Agent'),
-                      ('chat', 'Chat'),
-                      ('query', 'Query'),
+                    // AnythingLLM's own names, or the plain words of the composer's Answer
+                    // from chip.
+                    options: [
+                      for (final m in ChatMode.values)
+                        (m.name, widget.plain ? m.title : m.label),
                     ],
                     value: _mode,
+                    maxLines: widget.plain ? 3 : 1,
                     onChanged: (mode) => setState(() => _mode = mode),
                   ),
                 ),
@@ -238,8 +256,12 @@ class _SettingsFormState extends State<SettingsForm> {
                 ),
                 _field(
                   'queryRefusalResponse',
-                  'Query refusal response',
-                  'What Query mode says when no document matches.',
+                  widget.plain
+                      ? 'When the files do not cover it'
+                      : 'Query refusal response',
+                  widget.plain
+                      ? 'What Files only says when no document matches.'
+                      : 'What Query mode says when no document matches.',
                   hint: system,
                   maxLines: 4,
                 ),

@@ -7,7 +7,8 @@ import '../tokens.dart';
 import '../type.dart';
 import 'tappable.dart';
 
-/// The way to Settings at the foot of the sidebar, with whether a server is set and answers.
+/// The way to Settings at the foot of the sidebar, with whether a server is set and answers: the
+/// server's host while it does, with its whole address as the tooltip.
 class SidebarSettingsButton extends StatelessWidget {
   const SidebarSettingsButton({super.key});
 
@@ -20,8 +21,15 @@ class SidebarSettingsButton extends StatelessWidget {
       builder: (context, _) {
         final set = scope.settings.configured;
         final ok = set && !scope.chat.unreachable.value;
+        final server = scope.settings.connection;
+        final state = switch (server) {
+          final server? when ok => 'Connected to ${server.host}',
+          _ when set => 'Connection problem',
+          _ => 'Not connected',
+        };
         return Tappable(
-          label: 'Settings',
+          label: 'Settings, $state',
+          tooltip: ok ? server?.baseUrl : null,
           onTap: scope.shell.openSettings,
           radius: BorderRadius.circular(Sizes.control),
           child: Padding(
@@ -50,11 +58,9 @@ class SidebarSettingsButton extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        ok
-                            ? 'Connected to AnythingLLM'
-                            : set
-                            ? 'Connection problem'
-                            : 'Not connected',
+                        state,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: Type.sans(12, color: t.muted),
                       ),
                     ],

@@ -12,14 +12,18 @@ import '../widgets/tappable.dart';
 /// Tests what a question finds in the switched-on files: the passages an answer would get, each
 /// with how close it is. Tapping one shows all of it and lights up its file.
 class TestQuestion extends StatefulWidget {
-  const TestQuestion({super.key});
+  const TestQuestion({super.key, this.onDone});
+
+  /// Starts with the question open, for a place that has its own Test a question, and is
+  /// called when Done puts it away. Null starts on a Test a question of its own.
+  final VoidCallback? onDone;
 
   @override
   State<TestQuestion> createState() => _TestQuestionState();
 }
 
 class _TestQuestionState extends State<TestQuestion> {
-  bool _open = false;
+  late bool _open = widget.onDone != null;
   final _question = TextEditingController();
 
   @override
@@ -31,6 +35,7 @@ class _TestQuestionState extends State<TestQuestion> {
   void _close() {
     _question.clear();
     AppScope.of(context).sources.clearSearch();
+    if (widget.onDone case final done?) return done();
     setState(() => _open = false);
   }
 
@@ -55,7 +60,7 @@ class _TestQuestionState extends State<TestQuestion> {
         children: [
           AppField(
             controller: _question,
-            label: 'Question to test',
+            label: 'Test a question',
             hint: 'Ask what an answer would find',
             onSubmitted: sources.search,
           ),
@@ -84,6 +89,13 @@ class _TestQuestionState extends State<TestQuestion> {
                   : 'What an answer would read, closest first:',
               status: true,
             ),
+            if (hits.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              const HelpText(
+                'Match is how close a passage is to the question, not how sure the answer is. '
+                'Passages under this workspace’s Minimum relevance are left out.',
+              ),
+            ],
             for (final hit in hits) ...[
               const SizedBox(height: 6),
               _Hit(hit, key: ObjectKey(hit)),
@@ -115,7 +127,7 @@ class _HitState extends State<_Hit> {
     final hit = widget.hit;
     final percent = (hit.score * 100).round();
     return Tappable(
-      label: '${hit.title}, $percent% close',
+      label: '${hit.title}, $percent% match',
       onTap: () {
         setState(() => _whole = !_whole);
         AppScope.of(context).sources.flash(hit.title);
@@ -146,7 +158,7 @@ class _HitState extends State<_Hit> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text('$percent%', style: Type.sans(12.5, color: t.muted)),
+                Text('$percent% match', style: Type.sans(12.5, color: t.muted)),
               ],
             ),
             const SizedBox(height: 4),

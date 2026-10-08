@@ -553,10 +553,10 @@ class SearchHit {
 
 /// The formats the server exports every chat in, with the extension of each.
 enum ChatExport {
-  jsonl('JSON Lines', 'jsonl'),
-  json('JSON', 'json'),
   csv('CSV', 'csv'),
-  jsonAlpaca('Alpaca JSON', 'json');
+  json('JSON', 'json'),
+  jsonl('JSONL', 'jsonl'),
+  jsonAlpaca('JSON (Alpaca)', 'json');
 
   const ChatExport(this.label, this.extension);
 

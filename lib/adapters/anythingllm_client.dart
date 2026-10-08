@@ -425,7 +425,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
 
   /// Starts the run of [body] and follows it until it ends or [gone] completes. The chat's run
   /// is known before the relay answers, so a stop sent meanwhile cancels it once it has an id.
-  /// The relay answers a chat that already has a run going with 409 and says so.
+  /// A chat that already has a run going fails with [AlreadyAnswering].
   Stream<ChatEvent> _startRun(
     Connection connection,
     String slug,
@@ -449,7 +449,8 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     return _followRun(connection, (slug, thread), started, id, gone);
   }
 
-  /// Asks the relay to run [body], and gives the run's id.
+  /// Asks the relay to run [body], and gives the run's id. The relay answers a chat that already
+  /// has a run going with 409 and says so, which fails with [AlreadyAnswering].
   Future<String> _beginRun(
     Connection connection,
     String slug,
@@ -457,21 +458,27 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     Map<String, Object?> body,
     Duration limit,
   ) async {
-    final run = await _call(
-      connection,
-      limit,
-      () async => http.Response.fromStream(
-        await _client.send(
-          _request(connection, 'POST', '$relayPath/v1/runs', {
-            'workspace': slug,
-            'thread': thread,
-            'clientId': _clientId(),
-            'body': body,
-          }),
+    final Object? run;
+    try {
+      run = await _call(
+        connection,
+        limit,
+        () async => http.Response.fromStream(
+          await _client.send(
+            _request(connection, 'POST', '$relayPath/v1/runs', {
+              'workspace': slug,
+              'thread': thread,
+              'clientId': _clientId(),
+              'body': body,
+            }),
+          ),
         ),
-      ),
-      refused: 'The relay did not start the answer.',
-    );
+        refused: 'The relay did not start the answer.',
+      );
+    } on ApiException catch (error) {
+      if (error.status == 409) throw AlreadyAnswering(error.message);
+      rethrow;
+    }
     final id = _field(run, 'id');
     if (id is! String) {
       throw const ApiException('The relay did not start the answer.');

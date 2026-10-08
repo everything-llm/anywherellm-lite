@@ -12,12 +12,14 @@ import '../widgets/controls.dart';
 import '../widgets/min_height.dart';
 import '../widgets/pane_header.dart';
 import 'doc_views.dart';
+import 'essentials.dart';
 import 'file_tree.dart';
 import 'folder_view.dart';
 import 'settings_form.dart';
 
 /// The node picked in the file tree: a folder's contents and actions, a file's text, an editor
-/// for a workspace's prompt and settings, or a document.
+/// for a workspace's prompt and settings, or a document. In the Essentials view, the open
+/// workspace's section picked in the sidebar, or the text of one of its documents.
 class FilesView extends StatelessWidget {
   const FilesView({super.key, required this.showMenu});
 
@@ -32,6 +34,7 @@ class FilesView extends StatelessWidget {
       listenable: Listenable.merge([files, scope.settings]),
       builder: (context, _) {
         final node = files.node;
+        final essentials = files.essentials && scope.settings.configured;
         // Short, as with the keyboard up, the whole pane scrolls: the header and problems
         // as well as the open file.
         return MinHeight(
@@ -43,12 +46,18 @@ class FilesView extends StatelessWidget {
                 showMenu: showMenu,
                 onMenu: scope.shell.toggleSide,
                 title: Text(
-                  node == null ? 'Files' : node.name,
+                  essentials
+                      ? files.reading?.title ?? files.section.title
+                      : node == null
+                      ? 'Files'
+                      : node.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: PaneHeader.titleStyle(context),
                 ),
-                actions: switch (node == null ? null : badgeText(node.badge)) {
+                actions: switch (node == null || essentials
+                    ? null
+                    : badgeText(node.badge)) {
                   final text? => (_) => [
                     const SizedBox(width: 12),
                     AppBadge(text, kind: BadgeKind.warn),
@@ -65,12 +74,41 @@ class FilesView extends StatelessWidget {
                     text: problem.text,
                   ),
                 ),
-              Expanded(child: _body(context, node)),
+              Expanded(
+                child: essentials
+                    ? _essential(context, node)
+                    : _body(context, node),
+              ),
             ],
           ),
         );
       },
     );
+  }
+
+  /// The Essentials view's section of the open workspace, each but Created files the same node
+  /// as in the tree.
+  Widget _essential(BuildContext context, FileNode? node) {
+    final scope = AppScope.of(context);
+    final files = scope.files;
+    final workspace = scope.chat.active;
+    if (workspace == null) return const Blank('No workspace is open.');
+    if (files.reading != null) return const TextViewer();
+    final section = files.section;
+    final key = ValueKey('${node?.path}#${files.revision}');
+    return switch (section) {
+      // Keyed by workspace, so what waits to be added stays with it.
+      FilesSection.documents => EssentialDocs(key: ValueKey(workspace.slug)),
+      FilesSection.created => CreatedFiles(workspace: workspace.name),
+      _ when files.contentLoading || (node == null && files.loading) =>
+        const Blank('Loading…'),
+      _ when node == null => Blank(
+        'The server did not send this workspace\'s '
+        '${section == FilesSection.instructions ? 'prompt' : 'settings'}.',
+      ),
+      FilesSection.instructions => _Editor(key: key, node: node),
+      FilesSection.answers => _SettingsPage(key: key, node: node, plain: true),
+    };
   }
 
   Widget _body(BuildContext context, FileNode? node) {
@@ -147,9 +185,12 @@ class TextPage extends StatelessWidget {
 /// A workspace's `settings.json`: the form, or the JSON itself when asked for. Its key changes
 /// each time the settings are read afresh, which drops the draft.
 class _SettingsPage extends StatelessWidget {
-  const _SettingsPage({super.key, required this.node});
+  const _SettingsPage({super.key, required this.node, this.plain = false});
 
   final FileNode node;
+
+  /// Names the form's fields as the Essentials view does.
+  final bool plain;
 
   @override
   Widget build(BuildContext context) {
@@ -158,6 +199,7 @@ class _SettingsPage extends StatelessWidget {
         ? _Editor(node: node, onForm: () => files.showSettingsAsJson(false))
         : SettingsForm(
             slug: node.slug!,
+            plain: plain,
             onJson: () => files.showSettingsAsJson(true),
           );
   }

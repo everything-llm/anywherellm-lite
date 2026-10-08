@@ -60,7 +60,7 @@ enum SettingsPage {
   voice(
     SettingsGroup.providers,
     'Voice and speech',
-    'The server\'s own listening and speaking, used by its web UI.',
+    'The server\'s own listening and speaking, used by the web UI.',
   ),
   transcription(
     SettingsGroup.providers,
@@ -70,7 +70,7 @@ enum SettingsPage {
   chats(
     SettingsGroup.data,
     'Workspace chats',
-    'Every chat recorded on the server, from every workspace.',
+    'Every chat recorded on the server.',
   ),
   embeds(
     SettingsGroup.tools,

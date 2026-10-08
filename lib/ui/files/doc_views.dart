@@ -6,6 +6,7 @@ import '../../core/copy.dart';
 import '../../core/files.dart';
 import '../../core/server_models.dart';
 import '../app_scope.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
@@ -186,7 +187,18 @@ class DocBodyView extends StatelessWidget {
         if (doc.text case final text?) ...[
           _DownloadText(doc, key: ObjectKey(doc)),
           const SizedBox(height: 12),
-          SelectableText(text, style: Type.mono(13, color: t.ink, height: 1.5)),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: t.panel,
+              borderRadius: BorderRadius.circular(Sizes.control),
+              border: Border.all(color: t.line2),
+            ),
+            child: SelectableText(
+              text,
+              style: Type.mono(13, color: t.ink, height: 1.55),
+            ),
+          ),
         ] else
           Text(
             'The server did not send this document\'s text.',

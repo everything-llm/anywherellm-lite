@@ -89,13 +89,6 @@ String normalizeBaseUrl(String raw) {
       .toString();
 }
 
-/// A short name for the server at [host]: its first label, as `owen` for
-/// `owen.tail30d4c5.ts.net`, or the whole host when it is an IP address.
-String serverName(String host) {
-  final ip = RegExp(r'^[\d.]+$').hasMatch(host) || host.contains(':');
-  return ip ? host : host.split('.').first;
-}
-
 /// The text a QR code carries to hand [connection] to another device:
 /// `anywherellm://connect?url=...&key=...`, with both values percent-encoded. The password
 /// stays behind: each device signs in for itself.

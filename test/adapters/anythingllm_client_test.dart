@@ -2017,9 +2017,9 @@ void main() {
       expect(
         [for (final f in ChatExport.values) f.fileName],
         [
-          'anythingllm-chats.jsonl',
-          'anythingllm-chats.json',
           'anythingllm-chats.csv',
+          'anythingllm-chats.json',
+          'anythingllm-chats.jsonl',
           'anythingllm-chats-alpaca.json',
         ],
       );
@@ -2483,6 +2483,7 @@ void main() {
       );
       expect(error.message, 'That thread already has an answer running.');
       expect(error.status, 409);
+      expect(error, isA<AlreadyAnswering>());
     });
 
     group('rejoining a running answer', () {
@@ -2638,6 +2639,44 @@ void main() {
           ).rejoinChat('w', 't'),
           isNull,
         );
+      });
+
+      test('a message refused with 409 leaves the chat\'s run to be found and stopped', () async {
+        final seen = <http.Request>[];
+        final held = StreamController<List<int>>();
+        final api = relay(
+          (_) => held.stream,
+          seen: seen,
+          startStatus: 409,
+          start: {'error': 'That thread already has an answer running.'},
+          running: {
+            'runs': [
+              listed(
+                'r_1',
+                more: {
+                  'body': {'message': 'Asked on the phone'},
+                },
+              ),
+            ],
+          },
+        );
+        await _failure(api.streamChat('w', 't', 'Hi').drain<void>());
+        final found = await api.rejoinChat('w', 't');
+        expect(found!.question, 'Asked on the phone');
+        final first = Completer<void>();
+        final subscription = found.events.listen((_) {
+          if (!first.isCompleted) first.complete();
+        });
+        held.add(
+          utf8.encode(
+            chunk(1, {'type': 'textResponseChunk', 'textResponse': 'H'}),
+          ),
+        );
+        await first.future;
+        await api.stopChat('w', 't');
+        await subscription.cancel();
+        expect(seen.last.method, 'POST');
+        expect(seen.last.url.path, '/everythingllm/v1/runs/r_1/cancel');
       });
 
       test('stop cancels a run found again', () async {

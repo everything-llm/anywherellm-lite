@@ -25,6 +25,7 @@ const _small = {
   'hamburger': 'M2 4h12M2 8h12M2 12h12',
   'folder': 'M2 4h4l1.5 1.5H14v7.5H2z',
   'chevron': 'M6 4l4 4-4 4',
+  'down': 'M4 6l4 4 4-4',
   'back': 'M10 4 6 8l4 4',
   'lock': 'M4.5 7.5h7v6h-7z M6 7.5V5.5a2 2 0 0 1 4 0v2',
   'refresh': 'M13 8a5 5 0 1 1-1.5-3.5 M13 2.5v3h-3',
@@ -34,6 +35,7 @@ const _small = {
   'stop': 'M4.5 4.5h7v7h-7z',
   'download': 'M8 2.5v8 M4.5 7 8 10.5 11.5 7 M3 13.5h10',
   'globe': 'M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2z M2 8h12 M8 2c-2.2 2.2-2.2 9.8 0 12 M8 2c2.2 2.2 2.2 9.8 0 12',
+  'external': 'M9.5 2.5h4v4 M13.5 2.5 7.5 8.5 M11.5 9.5v4h-9v-9h4',
   'link': 'M7 9a2.5 2.5 0 0 0 3.5 0l2.3-2.3a2.5 2.5 0 0 0-3.5-3.5L8.5 4 M9 7a2.5 2.5 0 0 0-3.5 0L3.2 9.3a2.5 2.5 0 0 0 3.5 3.5l.8-.8',
   'thumb-up': 'M5 7v6.5H2.5V7z M5 7l2.5-4.5a1.3 1.3 0 0 1 2.4.8L9.5 6h3.2a1.2 1.2 0 0 1 1.2 1.4l-.9 5a1.2 1.2 0 0 1-1.2 1H5',
   'thumb-down': 'M5 9V2.5H2.5V9z M5 9l2.5 4.5a1.3 1.3 0 0 0 2.4-.8L9.5 10h3.2a1.2 1.2 0 0 0 1.2-1.4l-.9-5a1.2 1.2 0 0 0-1.2-1H5',
@@ -51,6 +53,7 @@ double _box(String name) => _small.containsKey(name) ? 16 : 24;
 
 /// Icon sizes in logical pixels.
 enum IconSize {
+  tiny(12),
   xs(14),
   small(16),
   sm(15),

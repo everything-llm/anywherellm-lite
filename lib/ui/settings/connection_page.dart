@@ -17,20 +17,40 @@ import 'password_card.dart';
 import 'rows.dart';
 
 /// How this device reaches the server: the address and key, the server's password, and what
-/// the server and the relay say.
-class ConnectionPage extends StatelessWidget {
+/// the server and the relay say. The server reads Connected once Test connection passes here,
+/// until the page closes or the connection changes or fails a test.
+class ConnectionPage extends StatefulWidget {
   const ConnectionPage({super.key});
 
   @override
-  Widget build(BuildContext context) => const Column(
+  State<ConnectionPage> createState() => _ConnectionPageState();
+}
+
+class _ConnectionPageState extends State<ConnectionPage> {
+  /// Whether Test connection was asked on this page.
+  bool _tested = false;
+
+  void _test() {
+    setState(() => _tested = true);
+    AppScope.of(context).settings.testSaved();
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [_KeyCard(), PasswordCard(), _ServerStatus()],
+    children: [
+      _KeyCard(tested: _tested),
+      const PasswordCard(),
+      _ServerStatus(onTest: _test),
+    ],
   );
 }
 
 /// The relay and how the server signs in, and a test of the saved connection, once one is saved.
 class _ServerStatus extends StatefulWidget {
-  const _ServerStatus();
+  const _ServerStatus({required this.onTest});
+
+  final VoidCallback onTest;
 
   @override
   State<_ServerStatus> createState() => _ServerStatusState();
@@ -61,11 +81,12 @@ class _ServerStatusState extends State<_ServerStatus> {
           children: [
             FieldCard([
               ReadOnlyRow(
-                label: 'everythingllm relay',
+                label: 'Background answers',
+                help: 'Provided by the everythingllm relay on the server.',
                 value: switch (_settings.relay) {
-                  RelayState.found => 'Found. Answers keep running after the app lets go of them.',
+                  RelayState.found => 'Available. Answers keep running after the app lets go of them.',
                   RelayState.absent =>
-                    'Not found. Answers come straight from AnythingLLM.',
+                    'Not available. Answers come straight from AnythingLLM.',
                   RelayState.unreachable => 'Could not check.',
                   RelayState.unknown => 'Checking…',
                 },
@@ -81,10 +102,10 @@ class _ServerStatusState extends State<_ServerStatus> {
                 },
               ),
             ]),
-            ActionRow([
+            PageActions([
               AppButton(
                 testing ? 'Testing…' : 'Test connection',
-                onPressed: testing ? null : _settings.testSaved,
+                onPressed: testing ? null : widget.onTest,
               ),
             ]),
           ],
@@ -97,7 +118,10 @@ class _ServerStatusState extends State<_ServerStatus> {
 /// The address and key: saved, replaced or forgotten, shown as a QR code for a phone, or read
 /// from one. A key is saved only once the server takes it.
 class _KeyCard extends StatefulWidget {
-  const _KeyCard();
+  const _KeyCard({required this.tested});
+
+  /// Whether Test connection was asked on this page, so a pass reads Connected.
+  final bool tested;
 
   @override
   State<_KeyCard> createState() => _KeyCardState();
@@ -233,7 +257,7 @@ class _KeyCardState extends State<_KeyCard> {
                       ),
                       Text(
                         set
-                            ? 'Saved in your system keyring. Never shown.'
+                            ? 'The address is shown below. The key is stored in this device\'s keyring and never shown.'
                             : _pasteKey
                             ? 'Create a key in AnythingLLM under Settings → Developer API, then paste it here.'
                             : 'Sign in with the password AnythingLLM\'s web page asks for. The app makes its own developer key.',
@@ -244,7 +268,11 @@ class _KeyCardState extends State<_KeyCard> {
                 ),
                 const SizedBox(width: 10),
                 AppBadge(
-                  set ? 'Set' : 'Missing',
+                  !set
+                      ? 'Missing'
+                      : widget.tested && _settings.check == ConnectionCheck.ok
+                      ? 'Connected'
+                      : 'Saved',
                   kind: set ? BadgeKind.ok : BadgeKind.warn,
                 ),
               ],
@@ -254,7 +282,7 @@ class _KeyCardState extends State<_KeyCard> {
             if (set)
               ActionRow([
                 AppButton(
-                  _replacing ? 'Cancel' : 'Replace',
+                  _replacing ? 'Cancel' : 'Edit connection',
                   onPressed: () => setState(() {
                     _replacing = !_replacing;
                     _scanning = false;
@@ -262,11 +290,11 @@ class _KeyCardState extends State<_KeyCard> {
                 ),
                 if (!_replacing)
                   AppButton(
-                    _showCode ? 'Hide QR code' : 'Show QR code',
+                    _showCode ? 'Hide the code' : 'Connect a phone',
                     onPressed: () => setState(() => _showCode = !_showCode),
                   ),
                 AppButton(
-                  _confirmForget ? 'Delete it?' : 'Forget',
+                  _confirmForget ? 'Really forget it?' : 'Forget this server',
                   onPressed: _forget,
                 ),
               ]),

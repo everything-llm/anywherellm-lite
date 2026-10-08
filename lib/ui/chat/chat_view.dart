@@ -144,7 +144,7 @@ class _Body extends StatelessWidget {
             ? ('Loading…', '')
             : (
                 'No workspaces yet',
-                'Make one with + beside Workspaces in the sidebar.',
+                'Make one with New workspace, in the workspace menu at the top of the sidebar.',
               );
         return Center(
           child: SingleChildScrollView(
@@ -247,13 +247,16 @@ class _Header extends StatelessWidget {
                   _BrowserButton(compact: compact),
                   const SizedBox(width: 8),
                   _HeaderButton(
-                    label: 'Sources',
+                    label: 'Documents',
+                    heard: 'Documents, ${scope.sources.onCount} on',
                     icon: 'doc',
                     compact: compact,
                     pressed: scope.shell.sourcesOpen,
                     onTap: scope.shell.toggleSources,
                     trailing: AppBadge(
-                      '${scope.sources.onCount}',
+                      compact
+                          ? '${scope.sources.onCount}'
+                          : '${scope.sources.onCount} on',
                       kind: BadgeKind.accent,
                       pill: true,
                     ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../icons.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import 'buttons.dart';
@@ -40,10 +41,14 @@ class PaneHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    // A phone's buttons have their own 44 px to be tapped in, so the edges need little more.
+    final phone = ScreenClass.ofContext(context).isPhone;
     return Container(
       // As tall as the phone header when the sidebar is a drawer, shorter beside it.
       height: showMenu ? 60 : 52,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: phone
+          ? const EdgeInsets.only(left: 4, right: 6)
+          : const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: t.line2)),
       ),
@@ -58,7 +63,7 @@ class PaneHeader extends StatelessWidget {
                 size: IconSize.small,
                 onPressed: onMenu,
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: phone ? 4 : 8),
             ],
             Expanded(child: Semantics(header: true, child: title)),
             ...?actions?.call(box.maxWidth < 560),

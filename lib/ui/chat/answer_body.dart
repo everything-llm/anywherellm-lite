@@ -9,6 +9,7 @@ import '../../core/browser.dart';
 import '../../core/chat.dart';
 import '../../core/markdown.dart';
 import '../app_scope.dart';
+import '../layout.dart';
 import '../links.dart';
 import '../tokens.dart';
 import '../type.dart';
@@ -24,11 +25,20 @@ import '../icons.dart';
 /// card does, and only over https or the server's own scheme where plain http is allowed:
 /// loading any other would send its address, which a model could have filled with what it read,
 /// to that site. Any other image shows as its description, which reads as a link: a tap opens
-/// the link around the image, or else the image's own address.
+/// the link around the image, or else the image's own address. A linked app card opens its app
+/// beside the chat, or in a sheet on a phone, rather than its page.
 class AnswerBody extends StatelessWidget {
-  const AnswerBody(this.text, {super.key, this.label = false});
+  const AnswerBody(
+    this.text, {
+    super.key,
+    this.label = false,
+    this.muted = false,
+  });
 
   final String text;
+
+  /// Draws the words in the second ink, for an answer that stopped before its end.
+  final bool muted;
 
   /// Whether the answer carries its words as a semantics label, for a screen reader where the
   /// selectable text is missing from the semantics tree ([AppScope.labelAnswers]).
@@ -37,24 +47,35 @@ class AnswerBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final body = Type.sans(15.5, color: t.ink, height: 1.65);
-    final code = Type.mono(13.5, color: t.ink, height: 1.5);
+    final ink = muted ? t.ink2 : t.ink;
+    final body = Type.sans(15.5, color: ink, height: 1.65);
+    final code = Type.mono(13.5, color: ink, height: 1.5);
     TextStyle heading(double size) =>
-        Type.sans(size, weight: FontWeight.w600, color: t.ink, height: 1.35);
+        Type.sans(size, weight: FontWeight.w600, color: ink, height: 1.35);
     final border = BorderSide(color: t.line);
     final settings = AppScope.of(context).settings;
     final server = settings.connection?.uri;
     final allowHttp = settings.allowHttp;
-    final linked = linkedImages(text);
+    final linkedIn = linkedImagesIn(text);
+    final linked = {for (final l in linkedIn) l.image};
+    // The apps whose cards the answer links, by the link a tap on the card follows.
+    final apps = {
+      for (final l in linkedIn)
+        l.link: ?appCardOf(l.image, l.link, l.alt, server),
+    };
     final markdown = MarkdownBody(
       data: text,
       selectable: true,
       extensionSet: answerMarkdown,
       onTapLink: (_, href, _) {
         if (href == null) return;
-        // A browser card opens the chat's browser beside it, where Take over leaves the app.
+        final shell = AppScope.of(context).shell;
+        // A browser card opens the chat's browser beside it, where Take over leaves the app,
+        // and an app's card its app.
         if (isBrowserPage(href, server)) {
-          AppScope.of(context).shell.showBrowser();
+          shell.showBrowser();
+        } else if (apps[Uri.tryParse(href)] case final app?) {
+          shell.showApp(app);
         } else {
           openLink(context, href);
         }
@@ -68,10 +89,8 @@ class AnswerBody extends StatelessWidget {
           linked: linked.contains(uri),
         );
         if (!isAppCard(uri, server)) return card;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [card, if (linked.contains(uri)) _LiveCaption()],
-        );
+        if (!linked.contains(uri)) return card;
+        return _AppCardShown(uri, card: card);
       },
       builders: {
         'pre': _CodeBlockBuilder(),
@@ -98,7 +117,7 @@ class AnswerBody extends StatelessWidget {
         strong: Type.sans(
           15.5,
           weight: FontWeight.w600,
-          color: t.ink,
+          color: ink,
           height: 1.65,
         ),
         del: body.copyWith(decoration: TextDecoration.lineThrough),
@@ -113,10 +132,10 @@ class AnswerBody extends StatelessWidget {
         tableHead: Type.sans(
           14,
           weight: FontWeight.w600,
-          color: t.ink,
+          color: ink,
           height: 1.4,
         ),
-        tableBody: Type.sans(14, color: t.ink, height: 1.4),
+        tableBody: Type.sans(14, color: ink, height: 1.4),
         tableBorder: TableBorder.all(color: t.line),
         tableColumnWidth: const IntrinsicColumnWidth(),
         tableCellsPadding: const EdgeInsets.symmetric(
@@ -273,25 +292,67 @@ class _CopyButtonState extends State<CopyButton> {
   }
 }
 
-/// Under an app card whose link opens its page: the card is live, and a tap opens the app.
-class _LiveCaption extends StatelessWidget {
+/// A linked app card, ringed in the accent while its app shows beside the chat, over a caption
+/// that says the card is live and what a tap does: on a phone it opens a sheet, elsewhere the
+/// panel beside the chat.
+class _AppCardShown extends StatelessWidget {
+  const _AppCardShown(this.uri, {required this.card});
+
+  final Uri uri;
+  final Widget card;
+
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 7,
-            height: 7,
-            decoration: BoxDecoration(color: t.okdot, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 6),
-          Text('Live · tap to open', style: Type.sans(12.5, color: t.muted)),
-        ],
-      ),
+    final shell = AppScope.of(context).shell;
+    final phone = ScreenClass.ofContext(context).isPhone;
+    return ListenableBuilder(
+      listenable: shell,
+      child: card,
+      builder: (context, card) {
+        final beside = !phone && shell.appOpen && shell.app?.card == uri;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  if (beside) BoxShadow(color: t.accent, spreadRadius: 2),
+                ],
+              ),
+              child: card,
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: t.okdot,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      phone
+                          ? 'Live · tap to open'
+                          : beside
+                          ? 'Live · open beside the chat'
+                          : 'Live · click to open beside the chat',
+                      style: Type.sans(12.5, color: t.muted),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

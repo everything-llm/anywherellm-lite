@@ -21,6 +21,7 @@ void main() {
     final h = await pumpApp(tester, llm: llm);
     await tapVisible(tester, control('Test a question'));
     await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('Test a question'), findsOneWidget);
     await tester.enterText(inSources(find.byType(TextField)).first, 'roadmap');
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
@@ -30,9 +31,27 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('A passage of Q3 roadmap.pdf.'), findsOneWidget);
-    await tapVisible(tester, control('Q3 roadmap.pdf, 90% close'));
+    expect(find.text('90% match'), findsOneWidget);
+    expect(
+      find.textContaining('Match is how close a passage is to the question'),
+      findsOneWidget,
+    );
+    await tapVisible(tester, control('Q3 roadmap.pdf, 90% match'));
     await tester.pump();
     expect(h.sources.flashed, isNotNull);
+    // The flash fills the file's row and rings it in the accent.
+    final ring = tester
+        .widgetList<AnimatedContainer>(
+          find.ancestor(
+            of: inSources(find.text('Q3 roadmap.pdf')),
+            matching: find.byType(AnimatedContainer),
+          ),
+        )
+        .map((row) => (row.decoration as BoxDecoration?)?.border)
+        .whereType<Border>()
+        .single;
+    expect(ring.top.color, isNot(Colors.transparent));
+    expect(ring.top.width, 1);
     await tester.pumpAndSettle(const Duration(seconds: 2));
     await tapVisible(tester, control('Done'));
     await tester.pumpAndSettle();

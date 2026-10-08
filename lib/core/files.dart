@@ -65,6 +65,33 @@ String docsPath(String slug) => '/workspaces/$slug/docs';
 /// The tree path of workspace [slug]'s link to library document [ref].
 String docLinkPath(String slug, String ref) => '${docsPath(slug)}/$ref';
 
+/// The tree path of workspace [slug]'s prompt.
+String promptPath(String slug) => '/workspaces/$slug/PROMPT.md';
+
+/// The tree path of workspace [slug]'s answer settings.
+String settingsPath(String slug) => '/workspaces/$slug/settings.json';
+
+/// What the Files pane's Essentials view lists for the open workspace. Each but [created] shows
+/// a node of the tree under a plain name.
+enum FilesSection {
+  documents('Documents'),
+  instructions('Instructions'),
+  answers('Answer settings'),
+  created('Created files');
+
+  const FilesSection(this.title);
+
+  final String title;
+
+  /// The tree path of what the section shows in workspace [slug], or null when it shows no node.
+  String? pathIn(String slug) => switch (this) {
+    documents => docsPath(slug),
+    instructions => promptPath(slug),
+    answers => settingsPath(slug),
+    created => null,
+  };
+}
+
 /// Every folder path above [path], outermost first.
 Iterable<String> ancestorsOf(String path) sync* {
   for (
@@ -165,14 +192,14 @@ FileNode _workspace(Workspace w, List<Thread> threads, Workspace? detail) {
     children: [
       if (detail != null) ...[
         FileNode(
-          path: '$base/PROMPT.md',
+          path: promptPath(w.slug),
           name: 'PROMPT.md',
           kind: NodeKind.prompt,
           slug: w.slug,
         ),
         if (detail.settings != null)
           FileNode(
-            path: '$base/settings.json',
+            path: settingsPath(w.slug),
             name: 'settings.json',
             kind: NodeKind.settings,
             slug: w.slug,

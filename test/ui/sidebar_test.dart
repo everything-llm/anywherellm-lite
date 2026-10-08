@@ -2,6 +2,7 @@ import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/quick_switcher.dart';
 import 'package:anywherellm/ui/sidebar.dart';
+import 'package:anywherellm/ui/widgets/robin_mark.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -454,6 +455,50 @@ void main() {
       await tester.tap(control('New chat'));
       await tester.pumpAndSettle();
       expect(h.chat.activeThread, isNull);
+    });
+  });
+
+  group('as drawn', () {
+    testWidgets(
+      'the logo tile has the launcher icon\'s colours in both themes',
+      (tester) async {
+        for (final theme in [ThemePref.light, ThemePref.dark]) {
+          final prefs = FakePrefsStore(Prefs(theme: theme));
+          await pumpApp(tester, llm: planningServer(), prefsStore: prefs);
+          final tile = tester.widget<Container>(
+            find
+                .ancestor(
+                  of: find.byType(RobinMark),
+                  matching: find.byType(Container),
+                )
+                .first,
+          );
+          expect((tile.decoration! as BoxDecoration).color, iconGround);
+          expect(
+            tester.widget<RobinMark>(find.byType(RobinMark)).color,
+            iconInk,
+          );
+        }
+      },
+    );
+
+    testWidgets('the search is a borderless row 40 px tall', (tester) async {
+      await pumpApp(tester, llm: planningServer());
+      expect(inSidebar(find.byType(OutlineInputBorder)), findsNothing);
+      final row = find
+          .ancestor(of: search, matching: find.byType(AnimatedContainer))
+          .first;
+      expect(tester.getSize(row).height, 40);
+    });
+
+    testWidgets('Settings names the server it is connected to', (tester) async {
+      await pumpApp(tester, llm: planningServer());
+      expect(inSidebar(find.text('Connected to h')), findsOneWidget);
+      expect(control('Settings, Connected to h'), findsOneWidget);
+      expect(
+        tester.widget<Tappable>(control('Settings, Connected to h')).tooltip,
+        'https://h:3001',
+      );
     });
   });
 }

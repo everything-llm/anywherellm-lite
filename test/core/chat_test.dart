@@ -169,6 +169,13 @@ void main() {
       );
     });
 
+    test('each is named in plain words where people choose it', () {
+      expect(
+        [for (final m in ChatMode.values) m.title],
+        ['Files, knowledge & tools', 'Files & knowledge', 'Files only'],
+      );
+    });
+
     test('an agent\'s thoughts read as plain status lines', () {
       expect(
         agentStatus('@agent is executing `web-browsing` tool {\n "q": 1\n}'),
@@ -281,6 +288,21 @@ void main() {
       expect(card('$other/_live/apps/a/b/c.png', from: server), isFalse);
       expect(card('$other/_live/browser/bw-1.jpg', from: server), isFalse);
       expect(card('$other/_cards/groceries.png', from: server), isFalse);
+    });
+
+    test('names the app by its description, or else by its address', () {
+      final page = Uri.parse('https://owen.example.ts.net:8447/home/apps/a/');
+      AppCard? of(String image, String alt) =>
+          appCardOf(Uri.parse(image), page, alt, server);
+      const host = 'https://owen.example.ts.net:8455/_live/apps';
+      final named = of('$host/home/groceries.png', ' Groceries ')!;
+      expect(named.name, 'Groceries');
+      expect(named.workspace, 'home');
+      expect(named.page, page);
+      expect(named.card.path, '/_live/apps/home/groceries.png');
+      expect(of('$host/home/weekend_to-do.png', '')!.name, 'Weekend to do');
+      expect(of('$host/q3%20plan/list.png', '')!.workspace, 'q3 plan');
+      expect(of('https://evil.test/_live/apps/home/a.png', 'A'), isNull);
     });
   });
 }

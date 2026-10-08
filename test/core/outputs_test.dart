@@ -27,7 +27,7 @@ void main() {
       );
     });
 
-    test('the brief line is the model and the time alone', () {
+    test('names each part in the More menu\'s order', () {
       const metrics = AnswerMetrics(
         model: 'glm-5.3',
         tokens: 1642,
@@ -35,8 +35,14 @@ void main() {
         seconds: 73.852,
         cost: 0.0049,
       );
-      expect(metrics.brief, 'glm-5.3 · 73.9 s');
-      expect(const AnswerMetrics(tokens: 12).brief, '');
+      expect(metrics.named, [
+        ('Model', 'glm-5.3'),
+        ('Time', '73.9 s'),
+        ('Tokens', '1,642'),
+        ('Speed', '22 tok/s'),
+        ('Cost', '\$0.0049'),
+      ]);
+      expect(const AnswerMetrics(tokens: 12).named, [('Tokens', '12')]);
     });
 
     test('an unmeasured answer has none', () {

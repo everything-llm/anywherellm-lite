@@ -43,35 +43,71 @@ class _EmbedsPageState extends State<EmbedsPage> {
         final embeds = system.embeds;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 20,
           children: [
-            const PageNote(
-              'Visitors ask without a key, so an embed answers only in Chat or Query mode, '
-              'never as an agent.',
-            ),
-            if (system.embedProblem case final problem?) ...[
-              const SizedBox(height: 12),
+            if (system.embedProblem case final problem?)
               AlertBox(AlertKind.bad, problem.title, text: problem.text),
-            ],
-            const SizedBox(height: 16),
-            const _NewEmbed(),
-            const SizedBox(height: 24),
             if (embeds == null)
               HelpText(
                 system.changing ? 'Loading…' : 'The embeds could not be read.',
                 status: true,
               )
-            else if (embeds.isEmpty)
-              const HelpText('No embeds yet.', status: true)
             else
-              for (final embed in embeds) ...[
-                _EmbedCard(embed, key: ValueKey(embed.uuid)),
-                const SizedBox(height: 12),
-              ],
+              LayoutBuilder(
+                builder: (context, box) {
+                  final wide = box.maxWidth >= _EmbedRow.columnsFrom;
+                  return FieldCard([
+                    if (wide) const _Columns(),
+                    if (embeds.isEmpty)
+                      const _NoEmbeds()
+                    else
+                      for (final embed in embeds)
+                        _EmbedRow(embed, wide: wide, key: ValueKey(embed.uuid)),
+                  ]);
+                },
+              ),
+            const _NewEmbed(),
           ],
         );
       },
     );
   }
+}
+
+/// The names of the columns over the embeds, where they show side by side.
+class _Columns extends StatelessWidget {
+  const _Columns();
+
+  @override
+  Widget build(BuildContext context) => const ExcludeSemantics(
+    child: Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        spacing: _EmbedRow.gap,
+        children: [
+          Expanded(child: ColumnLabel('Workspace')),
+          SizedBox(width: _EmbedRow.modeWidth, child: ColumnLabel('Mode')),
+          SizedBox(width: _EmbedRow.chatsWidth, child: ColumnLabel('Chats')),
+          SizedBox(width: _EmbedRow.onWidth, child: ColumnLabel('On')),
+          SizedBox(width: _EmbedRow.actionsWidth),
+        ],
+      ),
+    ),
+  );
+}
+
+class _NoEmbeds extends StatelessWidget {
+  const _NoEmbeds();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
+    child: Text(
+      'No embeds yet.',
+      textAlign: TextAlign.center,
+      style: Type.sans(13.5, color: Tokens.of(context).muted),
+    ),
+  );
 }
 
 /// The form that makes an embed: its workspace, mode, sites and limits.
@@ -83,8 +119,9 @@ class _NewEmbed extends StatefulWidget {
 }
 
 class _NewEmbedState extends State<_NewEmbed> {
+  /// The workspace picked, or null for the first.
   String? _slug;
-  EmbedMode _mode = EmbedMode.query;
+  EmbedMode _mode = EmbedMode.chat;
   final _sites = TextEditingController();
   final _perDay = TextEditingController();
   final _perSession = TextEditingController();
@@ -100,9 +137,7 @@ class _NewEmbedState extends State<_NewEmbed> {
     super.dispose();
   }
 
-  Future<void> _make() async {
-    final slug = _slug;
-    if (slug == null) return;
+  Future<void> _make(String slug) async {
     if (!_isLimit(_perDay.text) || !_isLimit(_perSession.text)) {
       setState(
         () => _limitProblem =
@@ -121,7 +156,6 @@ class _NewEmbedState extends State<_NewEmbed> {
       ),
     );
     if (made && mounted) {
-      setState(() => _slug = null);
       _sites.clear();
       _perDay.clear();
       _perSession.clear();
@@ -151,70 +185,78 @@ class _NewEmbedState extends State<_NewEmbed> {
     final scope = AppScope.of(context);
     final workspaces = scope.chat.workspaces;
     final changing = scope.system.changing;
+    final names = {for (final w in workspaces) w.slug: w.name};
+    final slug = names.containsKey(_slug)
+        ? _slug
+        : workspaces.firstOrNull?.slug;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 20,
       children: [
-        const SectionLabel('New embed'),
-        const SizedBox(height: 8),
-        const HelpText('The workspace it answers from'),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            for (final w in workspaces)
-              _Pick(
-                w.name,
-                selected: _slug == w.slug,
-                onTap: () => setState(() => _slug = w.slug),
-              ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Segmented<EmbedMode>(
-          options: [for (final m in EmbedMode.values) (m, m.label)],
-          value: _mode,
-          onChanged: (m) => setState(() => _mode = m),
-        ),
-        const SizedBox(height: 12),
-        AppField(
-          controller: _sites,
-          label: 'Sites it answers on',
-          hint: 'Sites it answers on, such as example.com; empty for any',
-          keyboardType: TextInputType.url,
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: AppField(
-                controller: _perDay,
-                label: 'Chats a day',
-                hint: 'Chats a day; empty for no limit',
-                keyboardType: TextInputType.number,
+        const SubHead('New embed'),
+        FieldCard([
+          FieldRow(
+            label: 'Workspace',
+            control: Semantics(
+              label: 'Workspace',
+              child: AppSelect(
+                value: slug,
+                choices: [for (final w in workspaces) w.slug],
+                labelOf: (s) => names[s] ?? s,
+                onChanged: (s) => setState(() => _slug = s),
               ),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: AppField(
-                controller: _perSession,
-                label: 'Chats a visit',
-                hint: 'Chats a visit; empty for no limit',
-                keyboardType: TextInputType.number,
-              ),
+          ),
+          FieldRow(
+            label: 'Answers',
+            help: 'Query answers only from documents.',
+            control: Segmented<EmbedMode>(
+              options: [for (final m in EmbedMode.values) (m, m.label)],
+              value: _mode,
+              onChanged: (m) => setState(() => _mode = m),
             ),
-          ],
+          ),
+          FieldRow(
+            label: 'Allowed sites',
+            help: 'Comma-separated. Empty allows any site.',
+            control: AppField(
+              controller: _sites,
+              label: 'Allowed sites',
+              hint: 'example.com',
+              keyboardType: TextInputType.url,
+            ),
+          ),
+          FieldRow(
+            label: 'Chats per day',
+            help: 'Empty means no limit.',
+            control: AppField(
+              controller: _perDay,
+              label: 'Chats per day',
+              hint: 'No limit',
+              keyboardType: TextInputType.number,
+            ),
+          ),
+          FieldRow(
+            label: 'Chats per visit',
+            help: 'Empty means no limit.',
+            control: AppField(
+              controller: _perSession,
+              label: 'Chats per visit',
+              hint: 'No limit',
+              keyboardType: TextInputType.number,
+            ),
+          ),
+        ]),
+        const PageNote(
+          'Allowed sites and limits are set when the embed is made and cannot be changed '
+          'after.',
         ),
-        if (_limitProblem case final problem?) ...[
-          const SizedBox(height: 6),
-          HelpText(problem, status: true),
-        ],
-        const SizedBox(height: 10),
-        ActionRow([
+        if (_limitProblem case final problem?) HelpText(problem, status: true),
+        PageActions([
           AppButton(
-            'Make embed',
+            'Create embed',
             primary: true,
-            onPressed: _slug == null || changing ? null : _make,
+            onPressed: slug == null || changing ? null : () => _make(slug),
           ),
         ]),
       ],
@@ -222,45 +264,29 @@ class _NewEmbedState extends State<_NewEmbed> {
   }
 }
 
-/// A workspace to pick, drawn as a chip that fills when picked.
-class _Pick extends StatelessWidget {
-  const _Pick(this.name, {required this.selected, required this.onTap});
-
-  final String name;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Tappable(
-      label: name,
-      selected: selected,
-      onTap: onTap,
-      radius: BorderRadius.circular(99),
-      color: selected ? t.accent : t.hover,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Text(
-          name,
-          style: Type.sans(13, color: selected ? t.onaccent : t.ink),
-        ),
-      ),
-    );
-  }
-}
-
-/// One embed: its workspace, whether it is on, its mode, its HTML, its chats and Delete.
-class _EmbedCard extends StatefulWidget {
-  const _EmbedCard(this.embed, {super.key});
+/// One embed: its workspace, mode, chats and whether it is on, in columns when [wide], and its
+/// HTML, its chats and Delete, each opening under it.
+class _EmbedRow extends StatefulWidget {
+  const _EmbedRow(this.embed, {super.key, required this.wide});
 
   final Embed embed;
+  final bool wide;
+
+  /// The least width of the list with its columns side by side.
+  static const columnsFrom = 600.0;
+
+  static const gap = 12.0;
+  static const modeWidth = 110.0;
+  static const chatsWidth = 56.0;
+  static const onWidth = 52.0;
+  static const actionsWidth = 200.0;
 
   @override
-  State<_EmbedCard> createState() => _EmbedCardState();
+  State<_EmbedRow> createState() => _EmbedRowState();
 }
 
-class _EmbedCardState extends State<_EmbedCard> {
+class _EmbedRowState extends State<_EmbedRow> {
+  bool _showHtml = false;
   bool _confirming = false;
   Future<List<EmbedChat>?>? _chats;
 
@@ -273,46 +299,93 @@ class _EmbedCardState extends State<_EmbedCard> {
     final changing = system.changing;
     final server = scope.settings.connection?.uri;
     final snippet = server == null ? null : embedSnippet(server, embed.uuid);
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        border: Border.all(color: t.line),
-        borderRadius: BorderRadius.circular(10),
+    final name = Text(
+      embed.workspace,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: Type.sans(14, weight: FontWeight.w500, color: t.ink),
+    );
+    final chats = embed.chats == 1 ? '1 chat' : '${embed.chats} chats';
+    final on = AppSwitch(
+      value: embed.enabled,
+      large: true,
+      label: 'Embed for ${embed.workspace} on',
+      onChanged: changing ? null : (on) => system.setEnabled(embed.uuid, on),
+    );
+    final mode = Semantics(
+      label: 'Mode of the embed for ${embed.workspace}',
+      child: AppSelect(
+        value: embed.mode.name,
+        choices: [for (final m in EmbedMode.values) m.name],
+        labelOf: (m) => EmbedMode.fromServer(m).label,
+        onChanged: changing
+            ? null
+            : (m) => system.setMode(embed.uuid, EmbedMode.fromServer(m)),
       ),
+    );
+    final actions = Wrap(
+      alignment: widget.wide ? WrapAlignment.end : WrapAlignment.start,
+      spacing: 4,
+      runSpacing: 4,
+      children: [
+        if (snippet != null)
+          _SmallButton(
+            'HTML',
+            open: _showHtml,
+            onTap: () => setState(() => _showHtml = !_showHtml),
+          ),
+        _SmallButton(
+          'Chats',
+          open: _chats != null,
+          onTap: () => setState(() {
+            _chats = _chats == null ? system.embedChats(embed.uuid) : null;
+          }),
+        ),
+        _SmallButton(
+          'Delete',
+          onTap: changing ? null : () => setState(() => _confirming = true),
+        ),
+      ],
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 10,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  embed.workspace,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Type.sans(15, weight: FontWeight.w600, color: t.ink),
+          if (widget.wide)
+            Row(
+              spacing: _EmbedRow.gap,
+              children: [
+                Expanded(child: name),
+                SizedBox(width: _EmbedRow.modeWidth, child: mode),
+                SizedBox(
+                  width: _EmbedRow.chatsWidth,
+                  child: Text(
+                    '${embed.chats}',
+                    style: Type.sans(13.5, color: t.ink, height: 1.45),
+                  ),
                 ),
-              ),
-              AppSwitch(
-                value: embed.enabled,
-                label: 'Embed for ${embed.workspace} on',
-                onChanged: changing
-                    ? null
-                    : (on) => system.setEnabled(embed.uuid, on),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          HelpText(
-            '${embed.chats == 1 ? '1 chat' : '${embed.chats} chats'} · ${embed.uuid}',
-          ),
-          const SizedBox(height: 10),
-          Segmented<EmbedMode>(
-            options: [for (final m in EmbedMode.values) (m, m.label)],
-            value: embed.mode,
-            onChanged: changing ? null : (m) => system.setMode(embed.uuid, m),
-          ),
-          if (snippet != null) ...[
-            const SizedBox(height: 10),
+                SizedBox(
+                  width: _EmbedRow.onWidth,
+                  child: Align(alignment: Alignment.centerLeft, child: on),
+                ),
+                SizedBox(width: _EmbedRow.actionsWidth, child: actions),
+              ],
+            )
+          else ...[
+            Row(
+              spacing: 12,
+              children: [
+                Expanded(child: name),
+                on,
+              ],
+            ),
+            HelpText(chats),
+            mode,
+            actions,
+          ],
+          if (_showHtml && snippet != null)
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -325,8 +398,7 @@ class _EmbedCardState extends State<_EmbedCard> {
                 CopyButton(snippet, tooltip: 'Copy the HTML'),
               ],
             ),
-          ],
-          const SizedBox(height: 10),
+          if (_chats case final chats?) _Chats(chats),
           if (_confirming)
             ConfirmBox(
               text:
@@ -336,27 +408,43 @@ class _EmbedCardState extends State<_EmbedCard> {
                 setState(() => _confirming = false);
                 system.deleteEmbed(embed.uuid);
               },
-            )
-          else
-            ActionRow([
-              AppButton(
-                _chats == null ? 'Show chats' : 'Hide chats',
-                onPressed: () {
-                  final open = _chats == null;
-                  setState(() {
-                    _chats = open ? system.embedChats(embed.uuid) : null;
-                  });
-                },
-              ),
-              AppButton(
-                'Delete',
-                onPressed: changing
-                    ? null
-                    : () => setState(() => _confirming = true),
-              ),
-            ]),
-          if (_chats case final chats?) _Chats(chats),
+            ),
         ],
+      ),
+    );
+  }
+}
+
+/// A small bordered button in an embed's row; [open] marks one that shows something under the
+/// row while it does.
+class _SmallButton extends StatelessWidget {
+  const _SmallButton(this.label, {required this.onTap, this.open});
+
+  final String label;
+  final VoidCallback? onTap;
+  final bool? open;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Tappable(
+      label: label,
+      onTap: onTap,
+      toggled: open,
+      touchTarget: true,
+      radius: BorderRadius.circular(8),
+      color: open == true ? t.sel : t.panel,
+      side: BorderSide(color: t.line),
+      dimWhenDisabled: 0.5,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 32),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Center(
+            widthFactor: 1,
+            child: Text(label, style: Type.sans(12.5, color: t.ink)),
+          ),
+        ),
       ),
     );
   }

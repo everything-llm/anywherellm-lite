@@ -15,7 +15,8 @@ import 'settings_controller.dart';
 import 'sources_controller.dart';
 
 /// Files: the server's data as one folder tree, the node on screen and its text, and the changes
-/// a node allows.
+/// a node allows. Its Essentials view shows the open workspace's documents, prompt and settings
+/// under plain names, each the same node as in the tree.
 ///
 /// The workspaces and their chats come from [ChatController]; this reads each workspace's prompt,
 /// settings and documents and the library itself; the server's own settings belong to
@@ -71,8 +72,26 @@ class FilesController extends ChangeNotifier {
   /// The selected file's text, or null while it loads or when it has none.
   String? text;
 
-  /// The selected library document, or the one a workspace link points at.
+  /// The selected library document, the one a workspace link points at, or the one whose text
+  /// [reading] shows.
   DocBody? doc;
+
+  /// Whether the sidebar lists the Essentials view's sections rather than the whole tree. It
+  /// starts on, and holds for this run only.
+  bool get essentials => _essentials;
+  bool _essentials = true;
+
+  /// The section the Essentials view shows.
+  FilesSection get section => _section;
+  FilesSection _section = FilesSection.documents;
+
+  /// The workspace the Essentials view last showed, so it follows when another one opens.
+  String? _essentialSlug;
+
+  /// The document whose extracted text the Essentials view shows in place of its documents,
+  /// or null for the list.
+  ({String path, String title})? get reading => _reading;
+  ({String path, String title})? _reading;
 
   /// Counts each time [text] is read afresh, so an editor knows to drop its draft.
   int revision = 0;
@@ -140,6 +159,7 @@ class FilesController extends ChangeNotifier {
     _library = null;
     _accepted = null;
     _tree = null;
+    _essentialSlug = null;
     _loaded = false;
     loading = false;
     sending = null;
@@ -154,6 +174,7 @@ class FilesController extends ChangeNotifier {
   /// forgotten.
   void _chatChanged() {
     _tree = null;
+    _followWorkspace();
     final gone = _details.keys.followedBy(_asked).toSet().difference({
       for (final w in _chat.workspaces) w.slug,
     });
@@ -227,7 +248,79 @@ class FilesController extends ChangeNotifier {
   /// Reads every workspace and the library, unless already read.
   Future<void> ensureLoaded() async {
     _wanted = true;
+    _followWorkspace();
     if (!_loaded && !loading) await load();
+  }
+
+  /// Shows the Essentials view, on the section last shown, or the whole tree, on the node the
+  /// Essentials view showed.
+  void showEssentials(bool on) {
+    if (on == _essentials) return;
+    _essentials = on;
+    if (on) {
+      _essentialSlug = _chat.activeSlug;
+      unawaited(_openSection());
+      return;
+    }
+    _reading = null;
+    if (selected case final path?) _expanded.addAll(ancestorsOf(path));
+    notifyListeners();
+  }
+
+  /// Shows [section] of the open workspace in the Essentials view.
+  Future<void> openSection(FilesSection section) {
+    _section = section;
+    _essentialSlug = _chat.activeSlug;
+    return _openSection();
+  }
+
+  Future<void> _openSection() {
+    final path = switch (_essentialSlug) {
+      final slug? => _section.pathIn(slug),
+      null => null,
+    };
+    if (path != null) return _select(path);
+    _reading = null;
+    selected = null;
+    _clearContent();
+    notifyListeners();
+    return Future.value();
+  }
+
+  /// Keeps the Essentials view on the open workspace once Files has been shown.
+  void _followWorkspace() {
+    if (!_essentials || !_wanted || _chat.activeSlug == _essentialSlug) return;
+    _essentialSlug = _chat.activeSlug;
+    unawaited(_openSection());
+  }
+
+  /// Reads the text the server keeps of the document at [path], called [title], and shows it in
+  /// place of the Essentials view's documents.
+  Future<void> viewText(String path, String title) async {
+    final reading = _reading = (path: path, title: title);
+    doc = null;
+    contentLoading = true;
+    notifyListeners();
+    final server = _server;
+    try {
+      final read = await _api.document(path);
+      if (_reading != reading || _server != server) return;
+      doc = read;
+      problems = const [];
+    } on ApiException catch (error) {
+      if (_reading != reading || _server != server) return;
+      problems = [Notice('Could not read $title', error.message)];
+    }
+    contentLoading = false;
+    notifyListeners();
+  }
+
+  /// Puts the extracted text away, back to the documents.
+  void closeText() {
+    if (_reading == null) return;
+    _reading = null;
+    _clearContent();
+    notifyListeners();
   }
 
   /// Reads every workspace on its own and the library, all at once. A workspace that cannot be
@@ -247,7 +340,7 @@ class FilesController extends ChangeNotifier {
     _loaded = true;
     // Showing the node clears the problems, so the failed reads are added after it.
     if (selected != null) {
-      await select(selected!);
+      await _select(selected!);
       if (_server != server) return;
     }
     problems = [...failed.nonNulls, if (selected != null) ...problems];
@@ -265,9 +358,18 @@ class FilesController extends ChangeNotifier {
     return select(path);
   }
 
-  /// Shows the node at [path], reading its text or document.
-  Future<void> select(String path) async {
+  /// Shows the node at [path] in the whole tree, reading its text or document.
+  Future<void> select(String path) {
+    if (_essentials) {
+      _essentials = false;
+      _expanded.addAll(ancestorsOf(path));
+    }
+    return _select(path);
+  }
+
+  Future<void> _select(String path) async {
     if (path != selected) _settingsAsJson = false;
+    _reading = null;
     selected = path;
     _clearContent();
     final node = this.node;
@@ -345,7 +447,7 @@ class FilesController extends ChangeNotifier {
       slug: slug,
     );
     // When the workspace could not be read again, the draft stays on screen with why.
-    if (changed == _Changed.done) await select(node.path);
+    if (changed == _Changed.done) await _select(node.path);
     return changed != _Changed.failed;
   }
 

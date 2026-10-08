@@ -28,57 +28,104 @@ Future<Harness> openEmbeds(
   return h;
 }
 
+Future<void> pickWorkspace(WidgetTester tester, String name) async {
+  await tapVisible(
+    tester,
+    find
+        .descendant(
+          of: find.byType(EmbedsPage),
+          matching: find.byType(DropdownButton<String>),
+        )
+        .last,
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(name).last);
+  await tester.pumpAndSettle();
+}
+
+const _embed = Embed(
+  uuid: 'e-1',
+  workspace: 'Q3 planning',
+  mode: EmbedMode.query,
+  enabled: true,
+  chats: 3,
+);
+
 void main() {
-  testWidgets('an embed shows its workspace, chats and HTML', (tester) async {
-    final llm = planningServer()
-      ..embedList = [
-        const Embed(
-          uuid: 'e-1',
-          workspace: 'Q3 planning',
-          mode: EmbedMode.chat,
-          enabled: true,
-          chats: 3,
-        ),
-      ];
+  testWidgets('an embed shows as a row of columns, its HTML on asking', (
+    tester,
+  ) async {
+    final llm = planningServer()..embedList = [_embed];
     await openEmbeds(tester, llm);
-    expect(find.text('3 chats · e-1'), findsOneWidget);
+    for (final column in ['WORKSPACE', 'MODE', 'CHATS', 'ON']) {
+      expect(find.text(column), findsOneWidget);
+    }
+    Finder onPage(String text) =>
+        find.descendant(of: find.byType(EmbedsPage), matching: find.text(text));
+    final row = tester.getCenter(onPage('3')).dy;
+    expect(tester.getCenter(onPage('Q3 planning').first).dy, row);
+    expect(find.textContaining('data-embed-id="e-1"'), findsNothing);
+    await tapVisible(tester, control('HTML'));
+    await tester.pumpAndSettle();
     expect(find.textContaining('data-embed-id="e-1"'), findsOneWidget);
   });
 
-  testWidgets('a new embed is made for the workspace picked', (tester) async {
+  testWidgets('on a phone an embed stacks, with no columns', (tester) async {
+    final llm = planningServer()..embedList = [_embed];
+    await openEmbeds(tester, llm, size: const Size(360, 640));
+    expect(find.text('WORKSPACE'), findsNothing);
+    expect(find.text('3 chats'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a new embed answers in Chat, from the workspace picked', (
+    tester,
+  ) async {
     final llm = planningServer();
     await openEmbeds(tester, llm);
     expect(find.text('No embeds yet.'), findsOneWidget);
-    await tester.tap(control('Household'));
-    await tester.pump();
-    await tester.tap(control('Make embed'));
+    final y = tester.getTopLeft;
+    expect(
+      y(find.text('No embeds yet.')).dy,
+      lessThan(y(find.text('New embed')).dy),
+    );
+    await pickWorkspace(tester, 'Household');
+    await tapVisible(tester, control('Create embed'));
     await tester.pumpAndSettle();
     expect(llm.calls, contains('createEmbed:household'));
-    expect(find.text('0 chats · embed-1'), findsOneWidget);
+    expect(llm.embedList.single.mode, EmbedMode.chat);
+    expect(find.text('0'), findsOneWidget);
+  });
+
+  testWidgets('a limit of 0 is refused, and empty means none', (tester) async {
+    final llm = planningServer();
+    await openEmbeds(tester, llm);
+    await tester.enterText(find.bySemanticsLabel('Chats per day').last, '0');
+    await tapVisible(tester, control('Create embed'));
+    await tester.pumpAndSettle();
+    expect(llm.calls, isNot(contains(startsWith('createEmbed'))));
+    expect(
+      find.text('A limit is a whole number above 0, or empty for no limit.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('a workspace made after the page opens can be picked', (
     tester,
   ) async {
     final h = await openEmbeds(tester, planningServer());
-    expect(control('Travel'), findsNothing);
     await h.chat.createWorkspace('Travel');
     await tester.pump();
-    expect(control('Travel'), findsOneWidget);
+    await pickWorkspace(tester, 'Travel');
+    await tapVisible(tester, control('Create embed'));
+    await tester.pumpAndSettle();
+    expect(h.llm.calls, contains('createEmbed:travel'));
   });
 
   testWidgets('an embed turns off, and is deleted after asking', (
     tester,
   ) async {
-    final llm = planningServer()
-      ..embedList = [
-        const Embed(
-          uuid: 'e-1',
-          workspace: 'Q3 planning',
-          mode: EmbedMode.query,
-          enabled: true,
-        ),
-      ];
+    final llm = planningServer()..embedList = [_embed];
     await openEmbeds(tester, llm);
     await tapVisible(
       tester,
@@ -96,7 +143,7 @@ void main() {
       find.textContaining('Delete the embed for Q3 planning?'),
       findsOneWidget,
     );
-    await tapVisible(tester, control('Delete'));
+    await tapVisible(tester, control('Delete').last);
     await tester.pumpAndSettle();
     expect(llm.calls, contains('deleteEmbed:e-1'));
     expect(find.text('No embeds yet.'), findsOneWidget);
@@ -104,15 +151,7 @@ void main() {
 
   testWidgets('an embed\'s chats show on asking', (tester) async {
     final llm = planningServer()
-      ..embedList = [
-        const Embed(
-          uuid: 'e-1',
-          workspace: 'Q3 planning',
-          mode: EmbedMode.query,
-          enabled: true,
-          chats: 1,
-        ),
-      ]
+      ..embedList = [_embed]
       ..embedChatsOf['e-1'] = [
         const EmbedChat(
           session: 's',
@@ -121,7 +160,7 @@ void main() {
         ),
       ];
     await openEmbeds(tester, llm);
-    await tapVisible(tester, control('Show chats'));
+    await tapVisible(tester, control('Chats'));
     await tester.pumpAndSettle();
     expect(find.text('Opening hours?'), findsOneWidget);
     expect(find.text('9 to 5.'), findsOneWidget);

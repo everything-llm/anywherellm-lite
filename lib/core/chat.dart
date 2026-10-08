@@ -13,44 +13,28 @@ import 'upload.dart';
 enum ChatMode {
   automatic(
     'Agent',
-    'Answers from general knowledge, the switched-on files and tools such as web search.',
-    'Files, knowledge and tools',
+    'Files, knowledge & tools',
     'Can also search the web and use skills.',
   ),
-  chat(
-    'Chat',
-    'Answers from general knowledge and the switched-on files, without tools.',
-    'Files and general knowledge',
-    'No tools: no web search or skills.',
-  ),
-  query(
-    'Query',
-    'Answers only from the switched-on files, and says so when they do not cover it.',
-    'Files only',
-    'Says so when the files do not cover it.',
-  );
+  chat('Chat', 'Files & knowledge', 'No tools: no web search or skills.'),
+  query('Query', 'Files only', 'Says so when the files do not cover it.');
 
-  const ChatMode(this.label, this.about, this.title, this.detail);
+  const ChatMode(this.label, this.title, this.detail);
 
-  /// The server's own name for the mode, as AnythingLLM's web UI shows it.
+  /// The server's own name for the mode, as AnythingLLM's web UI and the Files pane's
+  /// settings.json form show it.
   final String label;
 
-  /// What the mode answers from, in one sentence.
-  final String about;
-
-  /// What the mode answers from, as a choice in Sources.
+  /// What the mode answers from, in plain words, as the composer's Answer from chip names it.
   final String title;
 
-  /// The line under [title].
+  /// The line under [title] in the Answer from menu.
   final String detail;
 
   /// The mode the server calls [value], or null for none it knows.
   static ChatMode? fromServer(Object? value) =>
       values.where((m) => m.name == value).firstOrNull;
 }
-
-/// What answers draw on in every [ChatMode], for when the mode is not known.
-const everyModeDrawsOn = 'Answers draw on the switched-on files.';
 
 /// What a new chat is called until its first message names it.
 const newChatName = 'New chat';
@@ -148,6 +132,38 @@ bool isAppCard(Uri uri, Uri? server) =>
 
 final _appCard = RegExp(r'^/_live/apps/[^/]+/[^/]+\.png$');
 
+/// An app's live card in an answer and the page its link opens: [name] is what the card's
+/// description calls the app, and [workspace] the slug of the workspace its data is in.
+typedef AppCard = ({Uri card, Uri page, String name, String workspace});
+
+/// [image], described as [alt] and linked to [page], as an app's card, or null when it is not
+/// one ([isAppCard]). An empty description names the app after its address: `groceries.png` is
+/// Groceries.
+AppCard? appCardOf(Uri image, Uri page, String alt, Uri? server) {
+  if (!isAppCard(image, server)) return null;
+  if (image.pathSegments case [_, _, final workspace, final file]) {
+    return (
+      card: image,
+      page: page,
+      name: _appName(alt, file),
+      workspace: workspace,
+    );
+  }
+  return null;
+}
+
+/// What the description [alt] calls an app, or else its card's [file] name in words.
+String _appName(String alt, String file) {
+  final named = alt.trim();
+  final words = file
+      .substring(0, file.length - '.png'.length)
+      .replaceAll(RegExp('[-_]+'), ' ')
+      .trim();
+  if (named.isNotEmpty) return named;
+  if (words.isEmpty) return 'App';
+  return '${words[0].toUpperCase()}${words.substring(1)}';
+}
+
 /// The failure an agent's [answer] reports in place of an answer, or null when it is an answer.
 /// AnythingLLM's agent sends a model's failure as the answer's text, starting with
 /// `The agent model failed to respond`, and stores it so.
@@ -220,7 +236,7 @@ String? pastedImageName(String mime, Iterable<String> taken) {
 /// Why [name], of [size] bytes, cannot go with a message, or null.
 String? attachmentProblem(String name, int size) => size > maxAttachmentBytes
     ? '$name is ${(size / (1024 * 1024)).toStringAsFixed(1)} MB; a message takes '
-          '${maxAttachmentBytes ~/ (1024 * 1024)} MB at most. Add it in Sources instead.'
+          '${maxAttachmentBytes ~/ (1024 * 1024)} MB at most. Add it in Documents instead.'
     : null;
 
 /// An answer split into the model's reasoning and the answer itself.

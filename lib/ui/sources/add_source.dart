@@ -8,9 +8,22 @@ import '../widgets/fields.dart';
 enum _Adding { none, link, text }
 
 /// Adds a source that is not a file: a web page the server reads in, or text pasted here, each
-/// with optional details.
+/// with optional details. Its form takes the place of its row of ways to add one.
 class AddSource extends StatefulWidget {
-  const AddSource({super.key});
+  const AddSource({
+    super.key,
+    this.buttons = false,
+    this.leading,
+    this.trailing,
+  });
+
+  /// Draws Add a link and Paste text as buttons rather than small text actions.
+  final bool buttons;
+
+  /// What the row holds before Add a link, such as an Add a file button, and at its end. Both
+  /// give way to an open form.
+  final Widget? leading;
+  final Widget? trailing;
 
   @override
   State<AddSource> createState() => _AddSourceState();
@@ -58,16 +71,36 @@ class _AddSourceState extends State<AddSource> {
     AppScope.of(context).sources.addText(title, text, meta: meta);
   }
 
+  Widget _row() {
+    final ways = Wrap(
+      spacing: widget.buttons ? 8 : 4,
+      runSpacing: widget.buttons ? 8 : 4,
+      children: [
+        ?widget.leading,
+        if (widget.buttons) ...[
+          AppButton('Add a link', onPressed: () => _open(_Adding.link)),
+          AppButton('Paste text', onPressed: () => _open(_Adding.text)),
+        ] else ...[
+          TextAction('link', 'Add a link', () => _open(_Adding.link)),
+          TextAction('doc', 'Paste text', () => _open(_Adding.text)),
+        ],
+      ],
+    );
+    final trailing = widget.trailing;
+    if (trailing == null) return ways;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: ways),
+        const SizedBox(width: 8),
+        trailing,
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) => switch (_adding) {
-    _Adding.none => Wrap(
-      spacing: 4,
-      runSpacing: 4,
-      children: [
-        TextAction('link', 'Add a link', () => _open(_Adding.link)),
-        TextAction('doc', 'Paste text', () => _open(_Adding.text)),
-      ],
-    ),
+    _Adding.none => _row(),
     _Adding.link => _Form(
       ready: _link,
       canAdd: () => _link.text.trim().isNotEmpty,

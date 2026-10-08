@@ -10,11 +10,22 @@ import 'tappable.dart';
 enum AlertKind { warn, bad, info }
 
 class AlertBox extends StatelessWidget {
-  const AlertBox(this.kind, this.title, {super.key, this.text, this.action});
+  const AlertBox(
+    this.kind,
+    this.title, {
+    super.key,
+    this.text,
+    this.action,
+    this.plain = false,
+  });
 
   final AlertKind kind;
   final String title;
   final String? text;
+
+  /// Draws [title] at regular weight, for a box whose title is its whole message, such as a
+  /// question asked before a delete.
+  final bool plain;
 
   /// A button under the text, such as the one that asks again.
   final Widget? action;
@@ -29,7 +40,9 @@ class AlertBox extends StatelessWidget {
     };
     final heading = Text(
       title,
-      style: Type.sans(14, weight: FontWeight.w600, color: ink),
+      style: plain
+          ? Type.sans(14, color: ink, height: 1.45)
+          : Type.sans(14, weight: FontWeight.w600, color: ink),
     );
     return Semantics(
       liveRegion: kind != AlertKind.warn,

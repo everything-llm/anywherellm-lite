@@ -48,42 +48,6 @@ void main() {
     expect(h.saved['report.pdf'], [37, 80, 68, 70]);
   });
 
-  testWidgets(
-    'an answer shows how it ran, the rest behind Details, and one not measured shows nothing',
-    (tester) async {
-      final llm = planningServer();
-      await pumpApp(tester, llm: llm);
-      await ask(tester, 'First');
-      expect(find.textContaining('tokens'), findsNothing);
-      expect(control('Answer details: tokens, speed and cost'), findsNothing);
-      llm.measured = const AnswerMetrics(
-        model: 'glm-5.3',
-        tokens: 1642,
-        seconds: 4.3,
-      );
-      await ask(tester, 'Second');
-      expect(find.text('glm-5.3 · 4.3 s'), findsOneWidget);
-      expect(find.textContaining('tokens'), findsNothing);
-      await tester.tap(control('Answer details: tokens, speed and cost'));
-      await tester.pumpAndSettle();
-      expect(find.text('glm-5.3 · 1,642 tokens · 4.3 s'), findsOneWidget);
-      await tester.tap(control('Hide details'));
-      await tester.pumpAndSettle();
-      expect(find.text('glm-5.3 · 4.3 s'), findsOneWidget);
-    },
-  );
-
-  testWidgets('an answer measured no further than its time has no Details', (
-    tester,
-  ) async {
-    final llm = planningServer()
-      ..measured = const AnswerMetrics(model: 'glm-5.3', seconds: 2);
-    await pumpApp(tester, llm: llm);
-    await ask(tester, 'Quick');
-    expect(find.text('glm-5.3 · 2.0 s'), findsOneWidget);
-    expect(control('Answer details: tokens, speed and cost'), findsNothing);
-  });
-
   testWidgets('a file the server no longer has says so', (tester) async {
     final llm = planningServer()..made = const [_report];
     final h = await pumpApp(tester, llm: llm);
