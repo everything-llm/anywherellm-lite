@@ -50,9 +50,9 @@ Future<void> _loadFonts() async {
     final loader = FontLoader(family);
     for (final file in files) {
       loader.addFont(
-        File(
-          'assets/fonts/$file',
-        ).readAsBytes().then((bytes) => ByteData.sublistView(bytes)),
+        File('assets/fonts/$file')
+            .readAsBytes()
+            .then((bytes) => ByteData.sublistView(bytes)),
       );
     }
     await loader.load();
@@ -206,26 +206,46 @@ void main() {
         baseUrl: 'https://anythingllm.example.ts.net',
         apiKey: 'K1',
       ),
-      prefsStore: FakePrefsStore(const Prefs(theme: ThemePref.dark)),
+      // A pinned chat, so the sidebar shows its groups: Pinned, Recent and All chats.
+      prefsStore: FakePrefsStore(
+        Prefs(
+          theme: ThemePref.dark,
+          pinned: {
+            Prefs.offKey('https://anythingllm.example.ts.net', 'q3'): const [
+              'priorities',
+            ],
+          },
+          recent: {
+            Prefs.offKey('https://anythingllm.example.ts.net', 'q3'): const [
+              'budget',
+              'hiring',
+            ],
+          },
+        ),
+      ),
     );
     await _capture(tester, 'phoneScreenshots/1_chat.png');
 
+    // The sidebar with the workspace's chats, then its workspace menu open over them.
     h.shell.toggleSide();
     await tester.pumpAndSettle();
-    await _capture(tester, 'phoneScreenshots/2_workspaces.png');
+    await _capture(tester, 'phoneScreenshots/2_chats.png');
+    h.shell.toggleMenu();
+    await tester.pumpAndSettle();
+    await _capture(tester, 'phoneScreenshots/3_workspaces.png');
 
     h.shell.closeSide();
     h.shell.openSources();
     await tester.pumpAndSettle();
-    await _capture(tester, 'phoneScreenshots/3_sources.png');
+    await _capture(tester, 'phoneScreenshots/4_sources.png');
 
     h.shell.closeSources();
     h.shell.openSettings();
     await tester.pumpAndSettle();
-    await _capture(tester, 'phoneScreenshots/4_settings.png');
+    await _capture(tester, 'phoneScreenshots/5_settings.png');
 
     h.shell.showSettingsPage(SettingsPage.connection);
     await tester.pumpAndSettle();
-    await _capture(tester, 'phoneScreenshots/5_connection.png');
+    await _capture(tester, 'phoneScreenshots/6_connection.png');
   });
 }
