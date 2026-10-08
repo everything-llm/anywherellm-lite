@@ -6,6 +6,7 @@ import 'commands.dart';
 import 'connection.dart';
 import 'embeds.dart';
 import 'prefs.dart';
+import 'schedule.dart';
 import 'server_models.dart';
 
 export 'errors.dart';
@@ -86,6 +87,10 @@ abstract interface class AnythingLlmApi {
   /// finished: it keeps one for 7 days. Empty when the server has no such relay or it cannot be
   /// asked.
   Future<List<RelayRun>> relayRuns();
+
+  /// The jobs AnythingLLM runs on a schedule. It takes the server's web login, as the presets
+  /// do: on a server with a password it needs one saved.
+  Future<List<ScheduledJob>> scheduledJobs();
 
   /// Stops the answer [streamChat] is running in the chat, on a server that keeps answers going
   /// without the app. Does nothing when there is none. Call it before cancelling the

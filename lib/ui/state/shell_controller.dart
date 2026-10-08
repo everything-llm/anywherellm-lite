@@ -82,6 +82,24 @@ class ShellController extends ChangeNotifier {
   bool _sourcesDrawer = false;
   FilesSection? _workspacePage;
   bool _scanning = false;
+  bool _upcoming = false;
+
+  /// Whether a phone's Upcoming page shows over the chat.
+  bool get upcomingOpen => _upcoming;
+
+  void openUpcoming() {
+    if (_upcoming) return;
+    _upcoming = true;
+    _popup.value = null;
+    notifyListeners();
+  }
+
+  void closeUpcoming() {
+    if (!_upcoming) return;
+    _upcoming = false;
+    notifyListeners();
+  }
+
   SharedItem? _shared;
 
   /// What another app shared with AnywhereLLM, which the shell offers to add or ask about, or

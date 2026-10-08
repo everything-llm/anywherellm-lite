@@ -20,6 +20,7 @@ import 'widgets/menu.dart';
 import 'widgets/min_height.dart';
 import 'widgets/settings_button.dart';
 import 'widgets/tappable.dart';
+import 'upcoming.dart';
 import 'workspace_switcher.dart';
 
 /// The open workspace's switcher, its chats or the server's files, and the way to Settings.
@@ -204,6 +205,11 @@ class _ChatsState extends State<_Chats> {
                     : null,
               ),
             ),
+            // A phone's drawer also has the server's scheduled jobs.
+            if (!searching &&
+                ScreenClass.ofContext(context).isPhone &&
+                scope.settings.configured)
+              const UpcomingRow(),
             Expanded(
               child: searching ? _found(context, query) : _groups(context),
             ),

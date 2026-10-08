@@ -1140,6 +1140,34 @@ void main() {
     });
   });
 
+  group('scheduled jobs', () {
+    test('reads them from the web route, signed in', () async {
+      final server = _SignInServer()
+        ..routes['/api/scheduled-jobs'] = {
+          'jobs': [
+            {
+              'name': 'Morning brief',
+              'schedule': '0 7 * * *',
+              'enabled': true,
+              'nextRunAt': '2026-10-09T07:00:00Z',
+            },
+          ],
+        };
+      final jobs = await server.api().scheduledJobs();
+      expect(server.seen.last.url.path, '/api/scheduled-jobs');
+      expect(server.seen.last.headers['Authorization'], 'Bearer TOKEN-1');
+      expect(jobs.single.name, 'Morning brief');
+      expect(jobs.single.nextRun, DateTime.utc(2026, 10, 9, 7));
+    });
+
+    test('a protected server without a saved password asks for one', () async {
+      final server = _SignInServer();
+      final error = await _failure(server.api(password: null).scheduledJobs());
+      expect(error.status, 401);
+      expect(error.message, contains('Add it in Settings'));
+    });
+  });
+
   group('slash commands', () {
     test('reads the presets from the system route, signed in', () async {
       final server = _SignInServer()

@@ -12,6 +12,7 @@ import '../core/commands.dart';
 import '../core/connection.dart';
 import '../core/embeds.dart';
 import '../core/ports.dart';
+import '../core/schedule.dart';
 import '../core/server_models.dart';
 import '../core/upload.dart';
 import 'anythingllm_stream.dart';
@@ -591,6 +592,10 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     ))
       ?SlashCommand.fromJson(json),
   ];
+
+  @override
+  Future<List<ScheduledJob>> scheduledJobs() async =>
+      scheduledJobsOf(await _session('GET', '/api/scheduled-jobs'));
 
   /// The server answers a bare `OK`.
   @override

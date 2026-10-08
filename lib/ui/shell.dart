@@ -19,6 +19,7 @@ import 'share/share_sheet.dart';
 import 'share/shared_item.dart';
 import 'sidebar.dart';
 import 'sources/sources_panel.dart';
+import 'upcoming.dart';
 import 'state/shell_controller.dart';
 import 'tokens.dart';
 import 'widgets/rise.dart';
@@ -83,6 +84,8 @@ class AppShell extends StatelessWidget {
         shell.closePopup();
       } else if (shell.scanning) {
         shell.setScanning(false);
+      } else if (shell.upcomingOpen && !shell.settingsOpen) {
+        shell.closeUpcoming();
       } else if (shell.settingsOpen &&
           !settingsSideBySide &&
           shell.settingsPage != null) {
@@ -156,6 +159,7 @@ class AppShell extends StatelessWidget {
                   sourcesDrawer ||
                   sheetOpen ||
                   shell.scanning ||
+                  shell.upcomingOpen ||
                   shell.shared != null ||
                   (screen.isPhone && files) ||
                   shell.appOpen ||
@@ -275,6 +279,8 @@ class AppShell extends StatelessWidget {
                               ),
                             // The sheet's own scrim closes it.
                             if (sheetOpen) Positioned.fill(child: right),
+                            if (shell.upcomingOpen)
+                              const Positioned.fill(child: UpcomingPage()),
                             // A phone's Settings is a page over the window.
                             if (shell.settingsOpen && screen.isPhone)
                               const Positioned.fill(

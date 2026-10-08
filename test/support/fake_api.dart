@@ -8,6 +8,7 @@ import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/embeds.dart';
 import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/core/server_models.dart';
 
 /// A connection for tests that need a server set up.
@@ -330,6 +331,13 @@ class FakeAnythingLlm implements AnythingLlmApi {
         if (found == null) return null;
         return (question: found.question, events: found.events.stream);
       }, thread);
+
+  /// What [scheduledJobs] answers.
+  List<ScheduledJob> jobs = const [];
+
+  @override
+  Future<List<ScheduledJob>> scheduledJobs() =>
+      _run('scheduledJobs', () => jobs);
 
   /// What [relayRuns] answers: every run the relay holds.
   List<RelayRun> runs = const [];
