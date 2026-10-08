@@ -1,3 +1,4 @@
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -44,6 +45,9 @@ class _ComposerState extends State<Composer> {
 
   /// Why the last pick added nothing, or null.
   String? _problem;
+
+  /// Whether files are being dragged over the composer.
+  bool _over = false;
 
   /// The command in the menu that Enter picks.
   int _highlight = 0;
@@ -210,9 +214,27 @@ class _ComposerState extends State<Composer> {
       setState(() => _problem = 'The file picker did not open: $error');
       return;
     }
+    await _addFiles(picked, shown);
+  }
+
+  /// Attaches the files dropped on the composer. Nothing is taken while a chat answers, as the
+  /// Attach button is off then.
+  Future<void> _dropped(DropDoneDetails details) async {
+    setState(() => _over = false);
+    if (_scope.chat.busy) return;
+    await _addFiles(details.files, _chatShown);
+  }
+
+  /// Attaches [files], unless another chat than [shown] is on screen once they are read. A file
+  /// that is too big, a folder or one that cannot be read is named in [_problem] instead.
+  Future<void> _addFiles(List<XFile> files, Object shown) async {
     final added = <Attachment>[];
     final problems = <String>[];
-    for (final file in picked) {
+    for (final file in files) {
+      if (file is DropItemDirectory) {
+        problems.add('${file.name} is a folder; attach the files inside it.');
+        continue;
+      }
       try {
         final wrong = attachmentProblem(file.name, await file.length());
         if (wrong != null) {
@@ -224,11 +246,43 @@ class _ComposerState extends State<Composer> {
         problems.add('${file.name} could not be read.');
       }
     }
+    _add(added, problems, shown);
+  }
+
+  /// Attaches a picture of type [mime] pasted into the message, unless another chat than
+  /// [shown] is on screen by then. Says whether [mime] is a picture a message can carry.
+  bool _pasted(Uint8List bytes, String mime, Object shown) {
+    final name = pastedImageName(mime, [for (final a in _attached) a.name]);
+    if (name == null) return false;
+    final wrong = attachmentProblem(name, bytes.length);
+    _add([if (wrong == null) Attachment.of(name, bytes)], [?wrong], shown);
+    return true;
+  }
+
+  void _add(List<Attachment> added, List<String> problems, Object shown) {
     if (!mounted || _chatShown != shown) return;
     setState(() {
       _attached = [..._attached, ...added];
       _problem = problems.isEmpty ? null : problems.join(' ');
     });
+  }
+
+  /// Ctrl+V: attaches the picture on the clipboard, or pastes its text when it holds none.
+  Future<void> _pasteImage(ImagePaster read, VoidCallback pasteText) async {
+    final shown = _chatShown;
+    final Uint8List? image;
+    try {
+      image = await read();
+    } on Exception {
+      if (mounted) pasteText();
+      return;
+    }
+    if (!mounted) return;
+    if (image == null) {
+      pasteText();
+    } else {
+      _pasted(image, 'image/png', shown);
+    }
   }
 
   void _remove(Attachment attachment) => setState(() {
@@ -275,25 +329,44 @@ class _ComposerState extends State<Composer> {
               final matches = scope.chat.busy || _menuClosed
                   ? const <SlashCommand>[]
                   : commandsFor(draft.text, scope.chat.commands);
-              return _Form(
-                draft: draft,
-                focus: widget.focus,
-                attached: _attached,
-                problem: _problem,
-                matches: matches,
-                highlight: matches.isEmpty
-                    ? 0
-                    : _highlight.clamp(0, matches.length - 1),
-                onHighlight: (i) => setState(() => _highlight = i),
-                onPick: _pick,
-                onDismiss: () => setState(() => _menuClosed = true),
-                onSlash: _slash,
-                onAttach: _attach,
-                onRemove: _remove,
-                onSend: _send,
-                onDictate: scope.dictation == null ? null : _dictate,
-                listening: _listening,
-                micProblem: _micProblem,
+              final read = scope.pasteImage;
+              return DropTarget(
+                enable: !scope.chat.busy,
+                onDragEntered: (_) => setState(() => _over = true),
+                onDragExited: (_) => setState(() => _over = false),
+                onDragDone: _dropped,
+                child: _Form(
+                  draft: draft,
+                  focus: widget.focus,
+                  attached: _attached,
+                  problem: _problem,
+                  matches: matches,
+                  highlight: matches.isEmpty
+                      ? 0
+                      : _highlight.clamp(0, matches.length - 1),
+                  onHighlight: (i) => setState(() => _highlight = i),
+                  onPick: _pick,
+                  onDismiss: () => setState(() => _menuClosed = true),
+                  onSlash: _slash,
+                  onAttach: _attach,
+                  onRemove: _remove,
+                  onSend: _send,
+                  onDictate: scope.dictation == null ? null : _dictate,
+                  listening: _listening,
+                  micProblem: _micProblem,
+                  over: _over,
+                  onPaste: read == null
+                      ? null
+                      : (pasteText) => _pasteImage(read, pasteText),
+                  onInserted: (content) => switch (content.data) {
+                    final bytes? => _pasted(
+                      bytes,
+                      content.mimeType,
+                      _chatShown,
+                    ),
+                    null => false,
+                  },
+                ),
               );
             },
           ),
@@ -321,6 +394,9 @@ class _Form extends StatelessWidget {
     required this.onDictate,
     required this.listening,
     required this.micProblem,
+    required this.over,
+    required this.onPaste,
+    required this.onInserted,
   });
 
   final TextEditingController draft;
@@ -345,6 +421,26 @@ class _Form extends StatelessWidget {
 
   /// Why dictation could not start, or null.
   final String? micProblem;
+
+  /// Whether files are being dragged over the composer, which lights its edge.
+  final bool over;
+
+  /// Ctrl+V, given the field's own paste of text, or null where the platform's paste is left
+  /// as it is.
+  final void Function(VoidCallback pasteText)? onPaste;
+
+  /// Attaches content a phone's keyboard inserts, such as a copied picture. Says whether it
+  /// was a picture a message can carry.
+  final bool Function(KeyboardInsertedContent content) onInserted;
+
+  /// The message [field], with Ctrl+V handed to [onPaste] when there is one.
+  Widget _pasting(Widget field) => switch (onPaste) {
+    final onPaste? => Actions(
+      actions: {PasteTextIntent: _PasteImage(onPaste)},
+      child: field,
+    ),
+    null => field,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -400,7 +496,7 @@ class _Form extends StatelessWidget {
       decoration: BoxDecoration(
         color: t.panel,
         borderRadius: BorderRadius.circular(Sizes.card),
-        border: Border.all(color: t.line),
+        border: Border.all(color: over ? t.accent : t.line),
         boxShadow: [
           BoxShadow(
             color: t.shadow,
@@ -466,28 +562,36 @@ class _Form extends StatelessWidget {
                 // Only the field follows the prefs, for its spellcheck.
                 child: ListenableBuilder(
                   listenable: scope.prefs,
-                  builder: (context, _) => TextField(
-                    controller: draft,
-                    focusNode: focus,
-                    enabled: !chat.busy,
-                    spellCheckConfiguration:
-                        scope.canSpellcheck &&
-                            scope.prefs.prefs.isOn(ChatSwitch.spellcheck)
-                        ? const SpellCheckConfiguration()
-                        : const SpellCheckConfiguration.disabled(),
-                    minLines: 1,
-                    maxLines: null,
-                    keyboardType: TextInputType.multiline,
-                    textInputAction: TextInputAction.newline,
-                    // A phone's keyboard starts each sentence with a capital.
-                    textCapitalization: TextCapitalization.sentences,
-                    style: Type.sans(15.5, color: t.ink, height: 1.5),
-                    cursorColor: t.accent,
-                    decoration: InputDecoration(
-                      isCollapsed: true,
-                      border: InputBorder.none,
-                      hintText: hint,
-                      hintStyle: Type.sans(15.5, color: t.fade, height: 1.5),
+                  builder: (context, _) => _pasting(
+                    TextField(
+                      controller: draft,
+                      focusNode: focus,
+                      enabled: !chat.busy,
+                      spellCheckConfiguration:
+                          scope.canSpellcheck &&
+                              scope.prefs.prefs.isOn(ChatSwitch.spellcheck)
+                          ? const SpellCheckConfiguration()
+                          : const SpellCheckConfiguration.disabled(),
+                      minLines: 1,
+                      maxLines: null,
+                      keyboardType: TextInputType.multiline,
+                      textInputAction: TextInputAction.newline,
+                      // A phone's keyboard starts each sentence with a capital.
+                      textCapitalization: TextCapitalization.sentences,
+                      style: Type.sans(15.5, color: t.ink, height: 1.5),
+                      cursorColor: t.accent,
+                      // A picture from a phone keyboard's clipboard; the rest goes in as text.
+                      contentInsertionConfiguration:
+                          ContentInsertionConfiguration(
+                            allowedMimeTypes: imageMimes.toList(),
+                            onContentInserted: onInserted,
+                          ),
+                      decoration: InputDecoration(
+                        isCollapsed: true,
+                        border: InputBorder.none,
+                        hintText: hint,
+                        hintStyle: Type.sans(15.5, color: t.fade, height: 1.5),
+                      ),
                     ),
                   ),
                 ),
@@ -596,6 +700,26 @@ class _Form extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Paste in the message field, which hands [onPaste] the field's own paste of text, for a
+/// clipboard that holds no picture.
+class _PasteImage extends ContextAction<PasteTextIntent> {
+  _PasteImage(this.onPaste);
+
+  final void Function(VoidCallback pasteText) onPaste;
+
+  @override
+  bool isEnabled(PasteTextIntent intent, [BuildContext? context]) =>
+      callingAction?.isEnabled(intent) ?? true;
+
+  @override
+  Object? invoke(PasteTextIntent intent, [BuildContext? context]) {
+    // The field's own paste is known only while this runs.
+    final own = callingAction;
+    onPaste(() => own?.invoke(intent));
+    return null;
   }
 }
 

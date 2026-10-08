@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/widgets.dart';
 
 import 'chat/dictation.dart';
@@ -25,6 +27,9 @@ typedef FileSaver = Future<String?> Function(
 /// A camera view that reads QR codes and calls [onCode] with the first one's text.
 typedef CodeScanner = Widget Function(void Function(String code) onCode);
 
+/// Reads the picture on the system clipboard as PNG bytes, or null when it holds none.
+typedef ImagePaster = Future<Uint8List?> Function();
+
 /// The app's controllers, put in the tree once by `main.dart`. Controllers are listenable, so
 /// this never notifies: widgets listen to the controller they read.
 class AppScope extends InheritedWidget {
@@ -41,6 +46,7 @@ class AppScope extends InheritedWidget {
     required this.save,
     this.scanner,
     this.dictation,
+    this.pasteImage,
     this.readAloud,
     this.labelAnswers = false,
     this.canSpellcheck = false,
@@ -62,6 +68,10 @@ class AppScope extends InheritedWidget {
 
   /// Writes what the person says in the composer, or null where the device cannot listen.
   final Dictation? dictation;
+
+  /// Reads a copied picture for the composer's paste, or null where the platform's own paste
+  /// brings pictures, through the keyboard on Android, or none, in a browser.
+  final ImagePaster? pasteImage;
 
   /// Reads an answer aloud, or null where the device has no speech to read with.
   final ReadAloud? readAloud;

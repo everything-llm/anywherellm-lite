@@ -99,6 +99,7 @@ class Harness extends Rig {
     bool canSpeak = false,
     this.labelAnswers = false,
     this.canSpellcheck = false,
+    this.canPasteImages = false,
   }) : dictation = canDictate ? FakeDictation() : null,
        speaker = canSpeak ? FakeSpeaker() : null,
        shell = ShellController(sourcesPinned: sourcesOpen);
@@ -110,6 +111,12 @@ class Harness extends Rig {
 
   /// Whether the message box may spellcheck, as on Android.
   final bool canSpellcheck;
+
+  /// Whether Ctrl+V reads a picture off the clipboard, as on Linux. It reads [clipboardImage].
+  final bool canPasteImages;
+
+  /// The picture on the fake clipboard, or null when it holds none.
+  Uint8List? clipboardImage;
 
   /// What the microphone does, or null when the device cannot listen.
   final FakeDictation? dictation;
@@ -177,6 +184,7 @@ class Harness extends Rig {
         return '/saved/$name';
       },
       dictation: dictation,
+      pasteImage: canPasteImages ? () async => clipboardImage : null,
       readAloud: readAloud,
       labelAnswers: labelAnswers,
       canSpellcheck: canSpellcheck,
@@ -194,7 +202,8 @@ class Harness extends Rig {
 /// Sizes the test window, builds the app on [llm] and lets the first loads finish. With no
 /// [connection], no server is set up. With [canScan], Settings offers a fake QR scanner, with
 /// [canDictate] the composer a microphone, with [canSpeak] each answer Read aloud, and with
-/// [labelAnswers] each finished answer a semantics label, as in a browser.
+/// [labelAnswers] each finished answer a semantics label, as in a browser. With
+/// [canPasteImages], Ctrl+V in the composer reads [Harness.clipboardImage].
 Future<Harness> pumpApp(
   WidgetTester tester, {
   FakeAnythingLlm? llm,
@@ -207,6 +216,7 @@ Future<Harness> pumpApp(
   bool canSpeak = false,
   bool labelAnswers = false,
   bool canSpellcheck = false,
+  bool canPasteImages = false,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -221,6 +231,7 @@ Future<Harness> pumpApp(
     canSpeak: canSpeak,
     labelAnswers: labelAnswers,
     canSpellcheck: canSpellcheck,
+    canPasteImages: canPasteImages,
   );
   addTearDown(harness.dispose);
   await harness.prefs.load();

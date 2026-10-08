@@ -56,6 +56,26 @@ void main() {
         startsWith('a.pdf is 20.0 MB'),
       );
     });
+
+    test('a pasted picture is named by its type, apart from those taken', () {
+      expect(pastedImageName('image/png', const []), 'Pasted image.png');
+      expect(
+        pastedImageName('image/JPEG', [
+          'Pasted image.jpg',
+          'Pasted image 2.jpg',
+        ]),
+        'Pasted image 3.jpg',
+      );
+      expect(
+        attachmentMime(pastedImageName('image/webp', const [])!),
+        'image/webp',
+      );
+    });
+
+    test('a pasted file that is no picture the server takes has no name', () {
+      expect(pastedImageName('image/heic', const []), isNull);
+      expect(pastedImageName('text/plain', const []), isNull);
+    });
   });
 
   group('splitReasoning', () {

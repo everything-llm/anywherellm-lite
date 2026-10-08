@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:anywherellm/ui/chat/composer.dart';
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -34,6 +36,47 @@ XFile photo() => XFile.fromData(pixel, path: 'photo.png', length: pixel.length);
 /// A one-byte `contract.pdf`.
 XFile contract() =>
     XFile.fromData(Uint8List.fromList([1]), path: 'contract.pdf', length: 1);
+
+/// The composer's drop target; Sources has its own.
+final _composerDrop = find.descendant(
+  of: find.byType(Composer),
+  matching: find.byType(DropTarget),
+);
+
+/// Drops [files] on the composer, as a file manager does.
+Future<void> drop(WidgetTester tester, List<DropItem> files) async {
+  tester.widget<DropTarget>(_composerDrop).onDragDone!(
+    DropDoneDetails(
+      files: files,
+      localPosition: Offset.zero,
+      globalPosition: Offset.zero,
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+/// Ctrl+V in the composer, with [text] as the clipboard's text.
+Future<void> paste(WidgetTester tester, {String text = ''}) async {
+  tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+    SystemChannels.platform,
+    (call) async => switch (call.method) {
+      'Clipboard.getData' => {'text': text},
+      'Clipboard.hasStrings' => {'value': text.isNotEmpty},
+      _ => null,
+    },
+  );
+  addTearDown(
+    () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      null,
+    ),
+  );
+  await tester.tap(composerField);
+  await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+  await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
+  await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+  await tester.pumpAndSettle();
+}
 
 void main() {
   testWidgets("a phone's keyboard starts the message with a capital", (
@@ -102,5 +145,79 @@ void main() {
     picked.complete();
     await tester.pumpAndSettle();
     expect(find.text('contract.pdf'), findsNothing);
+  });
+
+  testWidgets('files dropped on the composer go with the next message', (
+    tester,
+  ) async {
+    final llm = planningServer();
+    await pumpApp(tester, llm: llm);
+    await drop(tester, [
+      DropItemFile.fromData(pixel, path: 'photo.png', length: pixel.length),
+      DropItemDirectory('/home/me/notes', const [], name: 'notes'),
+    ]);
+    expect(find.byType(Image), findsOneWidget);
+    expect(find.textContaining('notes is a folder'), findsOneWidget);
+    await tester.enterText(composerField, 'What is this?');
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(llm.lastAttachments.map((a) => a.name), ['photo.png']);
+  });
+
+  testWidgets('nothing dropped is taken while a chat answers', (tester) async {
+    final llm = planningServer()..hold = true;
+    await pumpApp(tester, llm: llm);
+    await tester.enterText(composerField, 'Hi');
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(tester.widget<DropTarget>(_composerDrop).enable, isFalse);
+  });
+
+  testWidgets('Ctrl+V attaches a copied picture and leaves the message alone', (
+    tester,
+  ) async {
+    final llm = planningServer();
+    final h = await pumpApp(tester, llm: llm, canPasteImages: true)
+      ..clipboardImage = pixel;
+    await tester.enterText(composerField, 'Look');
+    await paste(tester, text: 'not this');
+    await paste(tester, text: 'not this');
+    expect(find.text('Pasted image.png'), findsOneWidget);
+    expect(find.text('Pasted image 2.png'), findsOneWidget);
+    expect(h.chat.problem, isNull);
+    expect(tester.widget<EditableText>(composerField).controller.text, 'Look');
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(llm.lastAttachments.map((a) => a.mime), ['image/png', 'image/png']);
+  });
+
+  testWidgets('Ctrl+V pastes text when the clipboard holds no picture', (
+    tester,
+  ) async {
+    await pumpApp(tester, canPasteImages: true);
+    await paste(tester, text: 'copied words');
+    expect(
+      tester.widget<EditableText>(composerField).controller.text,
+      'copied words',
+    );
+    expect(find.textContaining('Pasted image'), findsNothing);
+  });
+
+  testWidgets("a picture from a phone keyboard's clipboard is attached", (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    final field = tester.state<EditableTextState>(composerField);
+    field.insertContent(
+      KeyboardInsertedContent(
+        mimeType: 'image/gif',
+        uri: 'content://keyboard/1',
+        data: pixel,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Pasted image.gif'), findsOneWidget);
   });
 }

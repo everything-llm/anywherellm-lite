@@ -191,6 +191,24 @@ String attachmentMime(String name) {
   return _imageTypes[extensionOf(name)] ?? documentMime;
 }
 
+/// The picture types a message can carry, such as `image/png`.
+final imageMimes = _imageTypes.values.toSet();
+
+/// A name for a pasted picture of type [mime] that none of [taken] has, such as
+/// `Pasted image 2.png`, or null when [mime] is not one of [imageMimes].
+String? pastedImageName(String mime, Iterable<String> taken) {
+  final extension = _imageTypes.entries
+      .where((e) => e.value == mime.toLowerCase())
+      .firstOrNull
+      ?.key;
+  if (extension == null) return null;
+  final names = taken.toSet();
+  for (var n = 1; ; n++) {
+    final name = 'Pasted image${n == 1 ? '' : ' $n'}$extension';
+    if (!names.contains(name)) return name;
+  }
+}
+
 /// Why [name], of [size] bytes, cannot go with a message, or null.
 String? attachmentProblem(String name, int size) => size > maxAttachmentBytes
     ? '$name is ${(size / (1024 * 1024)).toStringAsFixed(1)} MB; a message takes '

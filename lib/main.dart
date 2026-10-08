@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:pasteboard/pasteboard.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -74,6 +75,7 @@ Future<void> main() async {
 
 /// Whether the app runs on Android. `Platform` throws in a browser, so it is asked only outside one.
 final _android = !kIsWeb && Platform.isAndroid;
+final _linux = !kIsWeb && Platform.isLinux;
 
 /// Saves a file: a download in a browser, the system's save dialog elsewhere.
 final FileSaver _save = kIsWeb
@@ -198,6 +200,7 @@ class _SessionHostState extends State<SessionHost> {
         save: _save,
         scanner: _android ? cameraScanner : null,
         dictation: _dictation,
+        pasteImage: _linux ? () => Pasteboard.image : null,
         readAloud: _readAloud,
         labelAnswers: kIsWeb,
         canSpellcheck: WidgetsBinding
