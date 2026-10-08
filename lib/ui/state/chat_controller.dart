@@ -314,6 +314,17 @@ class ChatController extends ChangeNotifier {
   /// The answer that runs, or null.
   Turn? get runningAnswer => _running?.answer;
 
+  /// The chats whose answer ended, neither failed nor stopped, while another chat was on
+  /// screen, until they are opened. Kept for this run only.
+  final _ready = <String>{};
+
+  /// Whether chat [thread]'s answer is ready and not yet seen.
+  bool isReady(String thread) => _ready.contains(thread);
+
+  /// Whether a chat of workspace [slug] has an answer ready.
+  bool readyIn(String slug) =>
+      threadsOf(slug).any((t) => _ready.contains(t.slug));
+
   bool isAnswering(String thread) => _running?.thread == thread;
 
   /// The answer running in the chat on screen, or null. It notifies on each chunk, which this
@@ -427,6 +438,7 @@ class ChatController extends ChangeNotifier {
     workspaces = const [];
     _threads.clear();
     _turns.clear();
+    _ready.clear();
     _draft = [];
     _madeFiles.clear();
     _images.clear();
@@ -567,6 +579,7 @@ class ChatController extends ChangeNotifier {
   /// what the server saved since shows.
   Future<void> open(String? threadSlug, {bool again = false}) async {
     activeThread = threadSlug;
+    if (threadSlug != null) _ready.remove(threadSlug);
     editing = null;
     _clearLinkNotice();
     _rememberChat();
@@ -1054,7 +1067,13 @@ class ChatController extends ChangeNotifier {
         when !_named.contains(thread)) {
       unawaited(_nameAfter(running.slug, thread, message));
     }
-    if (error == null && !running.answer.stopped) _finished = running.answer;
+    if (error == null && !running.answer.stopped) {
+      _finished = running.answer;
+      if (running.thread case final thread?
+          when thread != activeThread || running.slug != activeSlug) {
+        _ready.add(thread);
+      }
+    }
     // An answer in a chat, however it ended, is a use of it, for Recent.
     if (running.thread case final thread?) {
       unawaited(_prefs.useChat(running.slug, thread));

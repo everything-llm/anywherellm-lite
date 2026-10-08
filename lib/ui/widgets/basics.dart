@@ -102,6 +102,25 @@ class StatusBox extends StatelessWidget {
   }
 }
 
+/// The accent dot beside a chat or workspace whose answer finished while it was not on
+/// screen.
+class ReadyDot extends StatelessWidget {
+  const ReadyDot({super.key});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 6),
+    child: Container(
+      width: 7,
+      height: 7,
+      decoration: BoxDecoration(
+        color: Tokens.of(context).accent,
+        shape: BoxShape.circle,
+      ),
+    ),
+  );
+}
+
 /// A dark bar saying what was just done, with Undo, as after a file is removed or a chat is
 /// deleted.
 class UndoBar extends StatelessWidget {

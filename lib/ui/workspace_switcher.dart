@@ -10,6 +10,7 @@ import 'state/chat_controller.dart';
 import 'state/shell_controller.dart';
 import 'tokens.dart';
 import 'type.dart';
+import 'widgets/basics.dart';
 import 'widgets/confirm_box.dart';
 import 'widgets/inline_input.dart';
 import 'widgets/tappable.dart';
@@ -220,8 +221,13 @@ class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
     final active = _chat.active;
     final open = _shell.menuOpen;
     final count = active == null ? null : _chat.docCounts[active.slug];
+    // Another workspace has an answer ready.
+    final elsewhere = _chat.workspaces.any(
+      (w) => w.slug != active?.slug && _chat.readyIn(w.slug),
+    );
+    final name = active == null ? 'Workspaces' : 'Workspaces: ${active.name}';
     return Tappable(
-      label: active == null ? 'Workspaces' : 'Workspaces: ${active.name}',
+      label: elsewhere ? '$name, an answer is ready in another' : name,
       tooltip: 'Switch workspace',
       expanded: open,
       onTap: _shell.toggleMenu,
@@ -253,6 +259,7 @@ class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
                   style: Type.sans(12, color: t.muted),
                 ),
               ],
+              if (elsewhere) const ReadyDot(),
               const SizedBox(width: 8),
               AppIcon('unfold', size: IconSize.xs, color: t.muted),
             ],
@@ -466,10 +473,11 @@ class _WorkspaceItem extends StatelessWidget {
     final chat = scope.chat;
     final t = Tokens.of(context);
     final active = chat.activeSlug == workspace.slug;
+    final ready = !active && chat.readyIn(workspace.slug);
     return _Draggable(
       index: index,
       child: Tappable(
-        label: workspace.name,
+        label: ready ? '${workspace.name}, answer ready' : workspace.name,
         selected: active,
         onTap: () {
           scope.shell.closeMenu();
@@ -502,6 +510,7 @@ class _WorkspaceItem extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (ready) const ReadyDot(),
                 if (shortcut != null)
                   Text(shortcut!, style: Type.sans(12, color: t.muted)),
               ],

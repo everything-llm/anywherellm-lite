@@ -478,6 +478,7 @@ class _ChatRowState extends State<_ChatRow> {
     final t = Tokens.of(context);
     final rename = _rename;
     final left = widget.indent ? 36.0 : 10.0;
+    final ready = scope.chat.isReady(widget.thread.slug);
     if (rename != null) {
       return Padding(
         padding: EdgeInsets.fromLTRB(left - 6, 2, 0, 2),
@@ -501,7 +502,9 @@ class _ChatRowState extends State<_ChatRow> {
         children: [
           Expanded(
             child: Tappable(
-              label: widget.thread.name,
+              label: ready
+                  ? '${widget.thread.name}, answer ready'
+                  : widget.thread.name,
               selected: widget.current,
               tooltip: widget.current ? 'Double-click to rename' : null,
               onTap: () async {
@@ -547,6 +550,7 @@ class _ChatRowState extends State<_ChatRow> {
                         ),
                       ),
                     ),
+                    if (ready) const ReadyDot(),
                   ],
                 ),
               ),

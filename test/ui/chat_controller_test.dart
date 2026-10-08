@@ -457,6 +457,36 @@ void main() {
     },
   );
 
+  group('an answer ready', () {
+    test('marks a chat whose answer ended while another showed', () async {
+      final llm = planningServer()..hold = true;
+      final rig = await started(llm);
+      await rig.chat.send('And next quarter?');
+      await rig.chat.open('priorities');
+      await llm.chat!.close();
+      await pumpEventQueue();
+      expect(rig.chat.isReady('budget'), isTrue);
+      expect(rig.chat.readyIn('q3'), isTrue);
+      await rig.chat.open('budget');
+      expect(rig.chat.isReady('budget'), isFalse);
+      expect(rig.chat.readyIn('q3'), isFalse);
+    });
+
+    test('not when it ended on screen, failed or was stopped', () async {
+      final llm = planningServer()..hold = true;
+      final rig = await started(llm);
+      await rig.chat.send('One');
+      await llm.chat!.close();
+      await pumpEventQueue();
+      expect(rig.chat.isReady('budget'), isFalse);
+      await rig.chat.send('Two');
+      await rig.chat.open('priorities');
+      llm.chat!.addError(const ApiException('No.'));
+      await pumpEventQueue();
+      expect(rig.chat.isReady('budget'), isFalse);
+    });
+  });
+
   group('undoing a delete', () {
     test('puts the chat back where it was, on screen again', () async {
       final llm = planningServer();

@@ -332,6 +332,26 @@ void main() {
       expect(inSidebar(find.text('Pinned')), findsNothing);
     });
 
+    testWidgets('a dot marks a chat whose answer ended elsewhere', (
+      tester,
+    ) async {
+      final llm = planningServer()..hold = true;
+      final h = await pumpApp(tester, llm: llm);
+      await h.chat.send('And next quarter?');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(inSidebar(control('Quarter priorities')));
+      await tester.pump(const Duration(milliseconds: 300));
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(
+        inSidebar(control('Budget questions, answer ready')),
+        findsOneWidget,
+      );
+      await tester.tap(inSidebar(control('Budget questions, answer ready')));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(inSidebar(control('Budget questions')), findsOneWidget);
+    });
+
     testWidgets('New chat sits in the sidebar, not the header, when wide', (
       tester,
     ) async {

@@ -72,7 +72,10 @@ class SourcesPanel extends StatelessWidget {
                     ],
                     if (sources.removed case final file?) ...[
                       const SizedBox(height: 10),
-                      UndoBar('Removed ${file.title}', onUndo: scope.sources.undo),
+                      UndoBar(
+                        'Removed ${file.title}',
+                        onUndo: scope.sources.undo,
+                      ),
                     ],
                     const SizedBox(height: 14),
                   ],
@@ -194,4 +197,3 @@ class _FileRow extends StatelessWidget {
     );
   }
 }
-
