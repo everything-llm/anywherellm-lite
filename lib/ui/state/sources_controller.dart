@@ -352,6 +352,33 @@ class SourcesController extends ChangeNotifier {
     await refresh();
   }
 
+  /// The provider and model the workspace answers with, null where it uses the system's.
+  String? get chatProvider => _own('chatProvider');
+  String? get chatModel => _own('chatModel');
+
+  String? _own(String key) => switch (read?.settings?.values[key]) {
+    final String text when text.trim().isNotEmpty => text.trim(),
+    _ => null,
+  };
+
+  /// Makes the workspace answer with [provider] and [model], null for the system's, the same
+  /// columns the Files pane's settings.json writes. Says why the server refused, or null.
+  Future<String?> setChatModel(String? provider, String? model) async {
+    final slug = _slug;
+    final server = _chat.server;
+    if (slug == null) return 'No workspace is open.';
+    try {
+      await _api.updateWorkspace(slug, {
+        'chatProvider': provider,
+        'chatModel': model,
+      });
+    } on ApiException catch (error) {
+      return error.message;
+    }
+    if (server == _chat.server && slug == _slug) await refresh();
+    return null;
+  }
+
   /// Lights up the file titled [title] for a moment.
   void flash(String title) {
     final file = byTitle(title);

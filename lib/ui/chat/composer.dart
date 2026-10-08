@@ -20,6 +20,7 @@ import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/tappable.dart';
 import 'dictation.dart';
+import 'model_picker.dart';
 import 'slash_menu.dart';
 
 /// Whether [text] can be sent in the chat on screen: nothing runs, the chat is ready, a workspace
@@ -71,6 +72,9 @@ class _ComposerState extends State<Composer> {
   /// answer ends, however it ends, while it is still on screen and the message unchanged.
   Turn? _held;
   String _heldText = '';
+
+  /// Whether the workspace's chat model picker shows over the field.
+  bool _picking = false;
 
   /// Whether the microphone is listening, and what the message held when it began, which what
   /// is heard follows.
@@ -170,7 +174,12 @@ class _ComposerState extends State<Composer> {
   /// with a message they were not picked for.
   void _chatChanged() {
     final shown = _chatOnScreen();
-    if (shown != _chatShown && _held != null) setState(() => _held = null);
+    if (shown != _chatShown && (_held != null || _picking)) {
+      setState(() {
+        _held = null;
+        _picking = false;
+      });
+    }
     _sendHeld();
     if (shown == _chatShown) return;
     _chatShown = shown;
@@ -392,6 +401,8 @@ class _ComposerState extends State<Composer> {
                   held: _held != null,
                   onHold: _hold,
                   onRelease: _release,
+                  picking: _picking,
+                  onPickModel: () => setState(() => _picking = !_picking),
                   onDictate: scope.dictation == null ? null : _dictate,
                   listening: _listening,
                   micProblem: _micProblem,
@@ -435,6 +446,8 @@ class _Form extends StatelessWidget {
     required this.held,
     required this.onHold,
     required this.onRelease,
+    required this.picking,
+    required this.onPickModel,
     required this.onDictate,
     required this.listening,
     required this.micProblem,
@@ -463,6 +476,10 @@ class _Form extends StatelessWidget {
   final bool held;
   final VoidCallback onHold;
   final VoidCallback onRelease;
+
+  /// Whether the workspace's chat model picker shows, which [onPickModel] opens and closes.
+  final bool picking;
+  final VoidCallback onPickModel;
 
   /// Starts or ends dictation, or null where the device cannot listen.
   final VoidCallback? onDictate;
@@ -607,6 +624,10 @@ class _Form extends StatelessWidget {
             ),
             const SizedBox(height: 8),
           ],
+          if (picking) ...[
+            ModelPicker(onClose: onPickModel),
+            Divider(height: 21, thickness: 1, color: t.line),
+          ],
           if (menu) ...[
             SlashMenu(
               commands: matches,
@@ -695,41 +716,48 @@ class _Form extends StatelessWidget {
               if (scope.settings.connection case final server?)
                 // Takes all the room left, so Send sits at the right edge.
                 Expanded(
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Tappable(
-                      label:
-                          'AnythingLLM settings, server ${serverName(server.host)}',
-                      tooltip: 'AnythingLLM settings: ${server.baseUrl}',
-                      onTap: () =>
-                          scope.shell.openSettings(SettingsPage.connection),
-                      radius: BorderRadius.circular(6),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 4,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            AppIcon(
-                              'settings',
-                              size: IconSize.xs,
-                              color: t.muted,
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Tappable(
+                          label:
+                              'AnythingLLM settings, server ${serverName(server.host)}',
+                          tooltip: 'AnythingLLM settings: ${server.baseUrl}',
+                          onTap: () =>
+                              scope.shell.openSettings(SettingsPage.connection),
+                          radius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 4,
                             ),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                serverName(server.host),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Type.sans(13, color: t.muted),
-                              ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                AppIcon(
+                                  'settings',
+                                  size: IconSize.xs,
+                                  color: t.muted,
+                                ),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    serverName(server.host),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Type.sans(13, color: t.muted),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
+                      // The model this workspace answers with, after the server's name.
+                      Flexible(
+                        child: ModelChip(open: picking, onTap: onPickModel),
+                      ),
+                    ],
                   ),
                 )
               else
