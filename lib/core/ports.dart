@@ -82,6 +82,11 @@ abstract interface class AnythingLlmApi {
   /// chat never fails to open for this.
   Future<RejoinedAnswer?> rejoinChat(String slug, String thread);
 
+  /// Every answer the server that keeps answers going without the app holds, running or
+  /// finished: it keeps one for 7 days. Empty when the server has no such relay or it cannot be
+  /// asked.
+  Future<List<RelayRun>> relayRuns();
+
   /// Stops the answer [streamChat] is running in the chat, on a server that keeps answers going
   /// without the app. Does nothing when there is none. Call it before cancelling the
   /// subscription.

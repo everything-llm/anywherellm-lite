@@ -121,6 +121,7 @@ class Prefs {
     this.switches = const {},
     this.pinned = const {},
     this.recent = const {},
+    this.seen = const {},
   });
 
   /// How many chats [recent] keeps for a workspace.
@@ -151,6 +152,29 @@ class Prefs {
   /// The chats this device used last in each workspace, by [offKey], last used first, at most
   /// [recentMax] a workspace. The server sends no time for a chat.
   final Map<String, List<String>> recent;
+
+  /// When each chat was last on screen on this device, in milliseconds since the epoch, by
+  /// [offKey] and then the chat's slug. An answer the relay finished after it shows as ready.
+  final Map<String, Map<String, int>> seen;
+
+  /// When chat [thread] of workspace [slug] on [server] was last on screen, or null when it
+  /// never was on this device.
+  DateTime? seenAt(String server, String slug, String thread) =>
+      switch (seen[offKey(server, slug)]?[thread]) {
+        final ms? => DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true),
+        null => null,
+      };
+
+  /// These prefs with chat [thread] of workspace [slug] on [server] seen [at].
+  Prefs withSeen(String server, String slug, String thread, DateTime at) {
+    final key = offKey(server, slug);
+    return _copy(
+      seen: {
+        ...seen,
+        key: {...?seen[key], thread: at.millisecondsSinceEpoch},
+      },
+    );
+  }
 
   /// The chats pinned in workspace [slug] on [server].
   List<String> pinnedIn(String server, String slug) =>
@@ -221,6 +245,7 @@ class Prefs {
     Map<ChatSwitch, bool>? switches,
     Map<String, List<String>>? pinned,
     Map<String, List<String>>? recent,
+    Map<String, Map<String, int>>? seen,
   }) => Prefs(
     switchedOff: switchedOff ?? this.switchedOff,
     workspaceOrder: workspaceOrder ?? this.workspaceOrder,
@@ -230,6 +255,7 @@ class Prefs {
     switches: switches ?? this.switches,
     pinned: pinned ?? this.pinned,
     recent: recent ?? this.recent,
+    seen: seen ?? this.seen,
   );
 
   /// [map] with [key] set to [list], or without it when [list] is empty.
@@ -273,6 +299,12 @@ class Prefs {
         recent: _with(recent, offKey(server, slug), [
           ...recentIn(server, slug).where((t) => t != thread),
         ]),
+        seen: {
+          for (final MapEntry(:key, :value) in seen.entries)
+            key: key == offKey(server, slug)
+                ? ({...value}..remove(thread))
+                : value,
+        },
       );
 
   /// Whether chat [thread] of workspace [slug] on [server] is pinned or recent.
@@ -337,6 +369,11 @@ class Prefs {
           : lastChat,
       pinned: _moved(pinned, fromKey, toKey),
       recent: _moved(recent, fromKey, toKey),
+      seen: {
+        for (final MapEntry(:key, :value) in seen.entries)
+          if (key != fromKey) key: value,
+        toKey: ?seen[fromKey],
+      },
     );
   }
 
@@ -356,6 +393,7 @@ class Prefs {
     lastChat: () => lastChatIn(server, slug) ? null : lastChat,
     pinned: _with(pinned, offKey(server, slug), const []),
     recent: _with(recent, offKey(server, slug), const []),
+    seen: {...seen}..remove(offKey(server, slug)),
   );
 
   /// These prefs with chat [thread] of workspace [slug] on [server] as the last on screen; a
@@ -384,6 +422,7 @@ class Prefs {
     },
     if (pinned.isNotEmpty) 'pinned': pinned,
     if (recent.isNotEmpty) 'recent': recent,
+    if (seen.isNotEmpty) 'seen': seen,
   });
 
   /// Reads what [encode] wrote. Anything it cannot read falls back to the default, and keys it
@@ -426,6 +465,15 @@ class Prefs {
       },
       pinned: _chatsOf(json['pinned']),
       recent: _chatsOf(json['recent']),
+      seen: {
+        if (json['seen'] case final Map byWorkspace)
+          for (final MapEntry(:key, :value) in byWorkspace.entries)
+            if (key is String && value is Map)
+              key: {
+                for (final MapEntry(key: thread, value: ms) in value.entries)
+                  if (thread is String && ms is int) thread: ms,
+              },
+      },
     );
   }
 

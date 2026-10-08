@@ -331,6 +331,24 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     return null;
   }
 
+  /// Every run the relay holds, from `GET /everythingllm/v1/runs` with no status, read as JSON
+  /// holding runs, or an object with them under `runs`. A server with no relay, or one that
+  /// cannot be asked, has none.
+  @override
+  Future<List<RelayRun>> relayRuns() async {
+    try {
+      final connection = _current;
+      if (!await _isRelay(connection)) return const [];
+      final listed = await _get(connection, '$relayPath/v1/runs');
+      return [
+        for (final run in jsonObjects(listed is Map ? listed['runs'] : listed))
+          ?RelayRun.fromJson(run),
+      ];
+    } on ApiException {
+      return const [];
+    }
+  }
+
   /// The question a listed [run] was started with, or null when it does not say.
   String? _questionOf(Map<String, dynamic> run) {
     final body = run['body'];

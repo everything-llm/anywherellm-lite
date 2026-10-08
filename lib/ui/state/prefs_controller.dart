@@ -72,6 +72,17 @@ class PrefsController extends ChangeNotifier {
     }
   }
 
+  /// Notes that chat [thread] of workspace [slug] was on screen [at].
+  Future<void> setSeen(String slug, String thread, DateTime at) async {
+    if (_server case final server?) {
+      await _change(prefs.withSeen(server, slug, thread, at));
+    }
+  }
+
+  /// When chat [thread] of workspace [slug] was last on screen, or null when it never was.
+  DateTime? seenAt(String slug, String thread) =>
+      _server == null ? null : prefs.seenAt(_server!, slug, thread);
+
   /// The chats pinned in workspace [slug] of the server in use.
   List<String> pinnedIn(String slug) =>
       _server == null ? const [] : prefs.pinnedIn(_server!, slug);

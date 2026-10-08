@@ -616,3 +616,44 @@ enum ChatExport {
   String get fileName =>
       'anythingllm-chats${this == jsonAlpaca ? '-alpaca' : ''}.$extension';
 }
+
+/// An answer the relay ran: its [workspace] and [thread], its [status] (`running`, `done`,
+/// `failed` or `cancelled`), and when it [finished], once it has.
+class RelayRun {
+  const RelayRun({
+    required this.workspace,
+    required this.thread,
+    required this.status,
+    this.finished,
+  });
+
+  /// One run as the relay lists it, or null when it names no workspace or chat. A time is an
+  /// ISO 8601 text or milliseconds since the epoch.
+  static RelayRun? fromJson(Map<String, dynamic> json) {
+    final workspace = json['workspace'];
+    final thread = json['thread'];
+    final status = json['status'];
+    if (workspace is! String || thread is! String) return null;
+    final body = json['body'];
+    // A reset clears a chat and is no answer.
+    if (body is Map && body['reset'] == true) return null;
+    return RelayRun(
+      workspace: workspace,
+      thread: thread,
+      status: status is String ? status : '',
+      finished: switch (json['finishedAt']) {
+        final String text => DateTime.tryParse(text),
+        final int ms => DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true),
+        _ => null,
+      },
+    );
+  }
+
+  final String workspace;
+  final String thread;
+  final String status;
+  final DateTime? finished;
+
+  /// Whether the answer ran to its end, neither failing nor stopped.
+  bool get done => status == 'done';
+}

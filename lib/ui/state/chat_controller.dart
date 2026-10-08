@@ -536,6 +536,7 @@ class ChatController extends ChangeNotifier {
     }
     unawaited(_countDocs());
     unawaited(_readCommands());
+    unawaited(readFinishedRuns());
   }
 
   /// Reads the server's presets. Best effort: a server that will not list them leaves `/reset`
@@ -605,6 +606,54 @@ class ChatController extends ChangeNotifier {
     if (activeSlug case final slug?) {
       unawaited(_prefs.setLastChat(slug, activeThread));
     }
+    final now = DateTime.now().toUtc();
+    final shown = switch ((activeSlug, activeThread)) {
+      (final slug?, final thread?) => (slug: slug, thread: thread),
+      _ => null,
+    };
+    // The chat that leaves the screen was seen until now, and so was the one that comes.
+    if (_onScreen case final left? when left != shown) {
+      unawaited(_prefs.setSeen(left.slug, left.thread, now));
+    }
+    if (shown != null) unawaited(_prefs.setSeen(shown.slug, shown.thread, now));
+    _onScreen = shown;
+  }
+
+  /// The chat on screen as [_rememberChat] last noted it.
+  ({String slug, String thread})? _onScreen;
+
+  /// Notes that the chat on screen was seen until now, as when the app hides.
+  void noteSeen() {
+    if (_onScreen case final shown?) {
+      unawaited(
+        _prefs.setSeen(shown.slug, shown.thread, DateTime.now().toUtc()),
+      );
+    }
+  }
+
+  /// Reads the answers the relay holds, and marks ready each chat whose answer it finished,
+  /// neither failed nor stopped, after the chat was last on screen on this device, as when the
+  /// app had let go of it or was closed. A chat never seen here, and the chat on screen, get
+  /// none.
+  Future<void> readFinishedRuns() async {
+    final server = _server;
+    if (server == null) return;
+    final runs = await _api.relayRuns();
+    if (_server != server) return;
+    var marked = false;
+    for (final run in runs) {
+      final finished = run.finished;
+      if (!run.done || finished == null) continue;
+      if (run.thread == activeThread || _ready.containsKey(run.thread)) {
+        continue;
+      }
+      if (!threadsOf(run.workspace).any((t) => t.slug == run.thread)) continue;
+      final seen = _prefs.seenAt(run.workspace, run.thread);
+      if (seen == null || !finished.isAfter(seen)) continue;
+      _ready[run.thread] = run.workspace;
+      marked = true;
+    }
+    if (marked) notifyListeners();
   }
 
   void setDocCount(String slug, int count) {

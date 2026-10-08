@@ -2558,6 +2558,42 @@ void main() {
         },
       );
 
+      test(
+        'lists every run the relay holds, with when each finished',
+        () async {
+          final seen = <http.Request>[];
+          final api = relay(
+            (_) => lines([]),
+            seen: seen,
+            running: {
+              'runs': [
+                {
+                  'id': 'r_1',
+                  'workspace': 'w',
+                  'thread': 't',
+                  'status': 'done',
+                  'finishedAt': '2026-10-08T12:00:00Z',
+                },
+                listed('r_2'),
+                {'id': 'r_3', 'status': 'done'},
+              ],
+            },
+          );
+          final runs = await api.relayRuns();
+          expect(
+            [for (final r in runs) (r.thread, r.status, r.finished)],
+            [
+              ('t', 'done', DateTime.utc(2026, 10, 8, 12)),
+              ('t', 'running', null),
+            ],
+          );
+          final list = seen.firstWhere(
+            (r) => r.url.path == '/everythingllm/v1/runs',
+          );
+          expect(list.url.queryParameters, isEmpty);
+        },
+      );
+
       test('no running run in the chat is no answer', () async {
         final api = relay(
           (_) => lines([]),

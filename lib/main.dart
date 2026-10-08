@@ -173,9 +173,15 @@ class _SessionHostState extends State<SessionHost> {
     // A deleted chat waiting to be undone is deleted before the app may be closed: Android can
     // end a hidden app without a word.
     _lifecycle = AppLifecycleListener(
-      onHide: () => unawaited(_chat.flushDelete()),
+      onHide: () {
+        unawaited(_chat.flushDelete());
+        _chat.noteSeen();
+      },
+      // An answer the relay finished while the app was hidden gets its dot.
+      onShow: () => unawaited(_chat.readFinishedRuns()),
       onExitRequested: () async {
         await _chat.flushDelete();
+        _chat.noteSeen();
         return AppExitResponse.exit;
       },
     );

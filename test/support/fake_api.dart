@@ -331,6 +331,12 @@ class FakeAnythingLlm implements AnythingLlmApi {
         return (question: found.question, events: found.events.stream);
       }, thread);
 
+  /// What [relayRuns] answers: every run the relay holds.
+  List<RelayRun> runs = const [];
+
+  @override
+  Future<List<RelayRun>> relayRuns() => _run('relayRuns', () => runs);
+
   @override
   Future<void> stopChat(String slug, String thread) =>
       _run('stopChat', () {}, thread);
