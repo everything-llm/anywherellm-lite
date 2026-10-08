@@ -3,7 +3,7 @@ flutter_launcher_icons:
   android: true
   ios: false
   image_path: assets/icon/icon.png
-  adaptive_icon_background: "#a1b4f8"
+  adaptive_icon_background: "#4B5DC3"
   adaptive_icon_foreground: assets/icon/icon-foreground.png
   # The foreground is drawn to the safe zone already, so the plugin adds no inset of its own.
   adaptive_icon_foreground_inset: 0

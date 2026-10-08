@@ -28,10 +28,6 @@ import '../test/support/pump.dart';
 const _phone = Size(412, 892);
 const _density = 2.625;
 
-/// The dark theme's colours, as the launcher icon uses them.
-const _ground = Color(0xFFA1B4F8);
-const _ink = Color(0xFF131423);
-
 final _out = Directory(
   Platform.environment['STORE_GRAPHICS'] ?? 'build/store/en-US',
 );
@@ -151,12 +147,12 @@ class _FeatureGraphic extends StatelessWidget {
   Widget build(BuildContext context) => Directionality(
     textDirection: TextDirection.ltr,
     child: ColoredBox(
-      color: _ground,
+      color: iconGround,
       child: Center(
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const RobinMark(size: 300, color: _ink),
+            const RobinMark(size: 300, color: iconInk),
             const SizedBox(width: 16),
             Column(
               mainAxisSize: MainAxisSize.min,
@@ -164,7 +160,7 @@ class _FeatureGraphic extends StatelessWidget {
               children: [
                 Text(
                   'AnywhereLLM',
-                  style: Type.serif(104, color: _ink, height: 1),
+                  style: Type.serif(104, color: iconInk, height: 1),
                 ),
                 const SizedBox(height: 14),
                 Text(
@@ -172,7 +168,7 @@ class _FeatureGraphic extends StatelessWidget {
                   style: Type.sans(
                     30,
                     weight: FontWeight.w500,
-                    color: _ink.withValues(alpha: 0.8),
+                    color: iconInk.withValues(alpha: 0.8),
                     height: 1.25,
                   ),
                 ),
