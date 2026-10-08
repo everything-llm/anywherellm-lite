@@ -29,11 +29,13 @@ Agree these with the user before the first probe.
 
 1. Ask the user to sign in at `http://localhost:8765`, and wait for their answer.
 
+1. Check that the AnywhereLLM window is visible: `document.visibilityState` must be `visible`. In a minimised or covered window Chrome runs no animation frames, so Flutter paints only when a screenshot forces a frame: fade-ins look stuck and clicks after a layout change can be lost. Ask the user to bring the window forward.
+
 1. Before opening the reference app's activity or history panels, close them: they may list the outcomes of an earlier run of these probes. Read them only after this run's own probes.
 
 1. In AnywhereLLM, create the `parity-scratch` workspace with the sidebar's +. A new workspace gets the server's default prompt, so copy the prompt of the workspace the user names (Files > workspaces > `<name>` > `PROMPT.md`) into `parity-scratch`'s `PROMPT.md` with the value-setting snippet below, save, and confirm the two `settings.json` files match (Edit as JSON). Set Agent mode in Sources.
 
-1. Turn on Flutter's semantics tree once per page load, so controls get labelled refs for `find`:
+1. Turn on Flutter's semantics tree once per page load, so controls get labelled refs for `find`. If a click on the composer then leaves `document.activeElement` on `FLUTTER-VIEW`, reload and drive by coordinates instead:
 
    ```js
    document.querySelector('flt-semantics-placeholder')?.click()
@@ -70,7 +72,7 @@ Agree these with the user before the first probe.
 
 | Task | How |
 | --- | --- |
-| New chat | Click the sidebar's "New chat" under `parity-scratch`, then zoom on the header and confirm it reads "parity-scratch / New chat" before typing. The sidebar scrolls as chats are added, so re-find the button each time. |
+| New chat | Click the sidebar's "New chat" under `parity-scratch`, then zoom on the header and confirm it reads "parity-scratch / New chat" before typing. The sidebar scrolls as chats are added, so re-find the button each time. A reload reopens the last chat, and a query in the sidebar search hides New chat; clear it with its x after C6. |
 | Type | Click the composer, `type` one character, then the rest. The first keystroke after a field opens can be lost. Check a field's text with `document.activeElement.value`. |
 | Send | Take a screenshot first, so the window has painted, then click the `Send` ref from `find`. Enter from automation does not send. |
 | Set a long text field | Focus the field, then run the snippet below. Ctrl+C in a Flutter field does not reach the system clipboard under automation. |
