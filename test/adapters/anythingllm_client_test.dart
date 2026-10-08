@@ -2607,7 +2607,7 @@ void main() {
               ],
             },
           );
-          final runs = await api.relayRuns();
+          final runs = await api.finishedRuns();
           expect(
             [for (final r in runs) (r.thread, r.status, r.finished)],
             [
@@ -2618,7 +2618,7 @@ void main() {
           final list = seen.firstWhere(
             (r) => r.url.path == '/everythingllm/v1/runs',
           );
-          expect(list.url.queryParameters, isEmpty);
+          expect(list.url.queryParameters, {'status': 'done'});
         },
       );
 

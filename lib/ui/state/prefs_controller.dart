@@ -52,17 +52,6 @@ class PrefsController extends ChangeNotifier {
   Future<void> setWorkspaceOrder(List<String> slugs) =>
       _change(prefs.withOrder(slugs));
 
-  /// Remembers chat [thread] of workspace [slug] as the one to open at start; a null [thread]
-  /// is a draft.
-  /// It is used too, as [useChat] says, in the same write.
-  Future<void> setLastChat(String slug, String? thread) async {
-    final server = _server;
-    if (server != null && prefs.lastChat != LastChat(slug, thread, server)) {
-      final next = prefs.withLastChat(server, slug, thread);
-      await _change(thread == null ? next : next.withUse(server, slug, thread));
-    }
-  }
-
   /// Notes that this device used chat [thread] of workspace [slug] now, for Recent.
   Future<void> useChat(String slug, String thread) async {
     final server = _server;
@@ -70,6 +59,28 @@ class PrefsController extends ChangeNotifier {
     if (server != null && prefs.recentIn(server, slug).firstOrNull != thread) {
       await _change(prefs.withUse(server, slug, thread));
     }
+  }
+
+  /// Notes the chat on screen in one write: chat [thread] of workspace [slug] as the last chat
+  /// and, when it is no draft, the last used, as a chat opened is, and each chat of [seen]
+  /// on screen until [at].
+  Future<void> showChat(
+    String slug,
+    String? thread, {
+    required Iterable<({String slug, String thread})> seen,
+    required DateTime at,
+  }) async {
+    final server = _server;
+    if (server == null) return;
+    var next = prefs;
+    if (prefs.lastChat != LastChat(slug, thread, server)) {
+      next = next.withLastChat(server, slug, thread);
+      if (thread != null) next = next.withUse(server, slug, thread);
+    }
+    for (final chat in seen) {
+      next = next.withSeen(server, chat.slug, chat.thread, at);
+    }
+    if (!identical(next, prefs)) await _change(next);
   }
 
   /// Notes that chat [thread] of workspace [slug] was on screen [at].

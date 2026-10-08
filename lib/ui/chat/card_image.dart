@@ -67,11 +67,10 @@ class _CardImageState extends State<CardImage> {
   StreamSubscription<Uint8List>? _reading;
   late final AppLifecycleListener _lifecycle;
 
-  Uri _sourceIn(BuildContext context) => themedCard(
-    widget.uri,
-    widget.server,
-    light: Theme.of(context).brightness == Brightness.light,
-  );
+  /// Whether the theme is light, as the dependencies last said.
+  bool _light = false;
+
+  Uri get _sourceNow => themedCard(widget.uri, widget.server, light: _light);
 
   @override
   void initState() {
@@ -86,7 +85,8 @@ class _CardImageState extends State<CardImage> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _onstage = TickerMode.valuesOf(context).enabled;
-    final source = _sourceIn(context);
+    _light = Theme.of(context).brightness == Brightness.light;
+    final source = _sourceNow;
     if (source != _source) {
       _source = source;
       _stop();
@@ -98,9 +98,13 @@ class _CardImageState extends State<CardImage> {
   @override
   void didUpdateWidget(CardImage old) {
     super.didUpdateWidget(old);
-    final source = _sourceIn(context);
-    if (source == _source && old.loadable == widget.loadable) return;
-    _source = source;
+    // An answer's cards rebuild with each chunk of it, mostly unchanged.
+    if (old.uri == widget.uri &&
+        old.server == widget.server &&
+        old.loadable == widget.loadable) {
+      return;
+    }
+    _source = _sourceNow;
     _stop();
     _reset();
     _follow();

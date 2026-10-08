@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/chat.dart';
 import '../../core/outputs.dart';
 import '../../core/upload.dart';
+import '../sources/sources_panel.dart';
 import '../app_scope.dart';
 import '../settings/settings_pages.dart';
 import '../state/shell_controller.dart';
@@ -13,10 +14,13 @@ import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/fields.dart';
-import '../widgets/phone_page.dart';
 import '../widgets/sheet.dart';
-import '../widgets/tappable.dart';
 import 'shared_item.dart';
+import '../widgets/radio_card.dart';
+
+/// [bytes] as they are when they are already a [Uint8List], copied otherwise.
+Uint8List _bytesOf(List<int> bytes) =>
+    bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
 
 /// What to do with a shared item.
 enum _Use { add, ask }
@@ -56,18 +60,11 @@ class _ShareSheetState extends State<ShareSheet> {
     ),
     SharedText(:final text) => ('TXT', 'Text you selected', text),
     SharedFile(:final name, :final size) => (
-      _tileOf(name),
+      sourceExt(name),
       name,
       sizeText(size),
     ),
   };
-
-  static String _tileOf(String name) {
-    final dot = name.lastIndexOf('.');
-    if (dot < 0 || dot == name.length - 1) return 'FILE';
-    final ext = name.substring(dot + 1).toUpperCase();
-    return ext.length > 4 ? 'FILE' : ext;
-  }
 
   /// What happens to the item, under the button.
   String get _foot => switch ((_use, widget.item)) {
@@ -133,7 +130,7 @@ class _ShareSheetState extends State<ShareSheet> {
           ),
           SharedFile(:final name, :final read) => (
             question,
-            [Attachment.of(name, Uint8List.fromList(await read()))],
+            [Attachment.of(name, _bytesOf(await read()))],
           ),
         };
         chat.newChat();
@@ -181,24 +178,7 @@ class _ShareSheetState extends State<ShareSheet> {
                   ),
                   child: Row(
                     children: [
-                      Container(
-                        width: 32,
-                        height: 38,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: t.accentbg,
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: Text(
-                          tile,
-                          style: Type.sans(
-                            9.5,
-                            weight: FontWeight.w600,
-                            color: t.accent,
-                            letterSpacing: 0.28,
-                          ),
-                        ),
-                      ),
+                      TypeTile.label(tile),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
@@ -228,7 +208,7 @@ class _ShareSheetState extends State<ShareSheet> {
                 ),
                 if (!scope.settings.configured) ...[
                   const SizedBox(height: 16),
-                  const Footnote(
+                  const HelpText(
                     'Connect to your AnythingLLM server first, then share it again.',
                   ),
                   const SizedBox(height: 12),
@@ -245,9 +225,10 @@ class _ShareSheetState extends State<ShareSheet> {
                   const SectionLabel('Workspace'),
                   const SizedBox(height: 4),
                   for (final w in workspaces)
-                    _Choice(
+                    RadioCard(
                       title: w.name,
                       hint: w.slug == active ? 'Open now' : null,
+                      card: false,
                       selected: w == chosen,
                       onTap: () => setState(() => _slug = w.slug),
                     ),
@@ -268,11 +249,10 @@ class _ShareSheetState extends State<ShareSheet> {
                   ])
                     Padding(
                       padding: const EdgeInsets.only(bottom: 6),
-                      child: _Choice(
+                      child: RadioCard(
                         title: title,
                         about: detail,
                         selected: _use == use,
-                        card: true,
                         onTap: () => setState(() {
                           _use = use;
                           _problem = null;
@@ -302,99 +282,11 @@ class _ShareSheetState extends State<ShareSheet> {
                     onPressed: _working || chosen == null ? null : _go,
                   ),
                   const SizedBox(height: 10),
-                  Footnote(_foot),
+                  HelpText(_foot),
                 ],
               ],
             );
           },
-        ),
-      ),
-    );
-  }
-}
-
-/// One choice of several: a radio ring and [title], with [hint] after it or the line [about]
-/// under it; as a [card], in a box filled while chosen.
-class _Choice extends StatelessWidget {
-  const _Choice({
-    required this.title,
-    required this.selected,
-    required this.onTap,
-    this.hint,
-    this.about,
-    this.card = false,
-  });
-
-  final String title;
-  final String? hint;
-  final String? about;
-  final bool selected;
-  final bool card;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Tappable(
-      label: [title, ?hint, ?about].join('. '),
-      selected: selected,
-      onTap: onTap,
-      radius: BorderRadius.circular(12),
-      color: card ? (selected ? t.sel : t.panel) : null,
-      side: card
-          ? BorderSide(color: selected ? Colors.transparent : t.line)
-          : null,
-      child: Container(
-        constraints: BoxConstraints(minHeight: card ? 56 : 48),
-        padding: EdgeInsets.symmetric(horizontal: card ? 12 : 0, vertical: 6),
-        child: Row(
-          children: [
-            Container(
-              width: 18,
-              height: 18,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: selected ? t.accent : t.fade,
-                  width: 1.5,
-                ),
-              ),
-              child: selected
-                  ? Container(
-                      width: 9,
-                      height: 9,
-                      decoration: BoxDecoration(
-                        color: t.accent,
-                        shape: BoxShape.circle,
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Type.sans(
-                      15,
-                      weight: selected ? FontWeight.w600 : FontWeight.w400,
-                      color: t.ink,
-                    ),
-                  ),
-                  if (about case final about?)
-                    Text(
-                      about,
-                      style: Type.sans(12.5, color: t.muted, height: 1.4),
-                    ),
-                ],
-              ),
-            ),
-            if (hint case final hint?)
-              Text(hint, style: Type.sans(12.5, color: t.muted)),
-          ],
         ),
       ),
     );

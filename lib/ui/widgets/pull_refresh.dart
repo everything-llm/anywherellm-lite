@@ -7,7 +7,7 @@ import '../tokens.dart';
 
 /// [child], a scroll view from the newest item up ([ScrollView.reverse]), with a pull down past
 /// its oldest end calling [onRefresh]: a pull of [reach] or more, let go, refreshes. A refresh
-/// icon follows the pull at the top and turns while [refreshing].
+/// icon follows the pull at the top and turns while [refreshing], when a pull does nothing.
 ///
 /// [child]'s physics must let it overscroll its oldest end even when it is too short to scroll,
 /// as [AlwaysScrollableScrollPhysics] does on a platform that clamps.
@@ -78,7 +78,9 @@ class _PullRefreshState extends State<PullRefresh>
         // Scrolling back towards the newest takes the pull back first.
         _pull.value = math.max(0, _pull.value + scrollDelta);
       case ScrollEndNotification():
-        if (_pull.value >= PullRefresh.reach) widget.onRefresh?.call();
+        if (_pull.value >= PullRefresh.reach && !widget.refreshing) {
+          widget.onRefresh?.call();
+        }
         _pull.value = 0;
       default:
         break;

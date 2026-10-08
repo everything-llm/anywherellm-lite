@@ -11,6 +11,7 @@ import '../widgets/buttons.dart';
 import '../widgets/phone_page.dart';
 import 'server_settings.dart';
 import 'settings_pages.dart';
+import 'rows.dart';
 
 /// What [setting] is set to in [values], by its name.
 String _chosen(ProviderSetting setting, Map<String, Object?> values) =>
@@ -73,49 +74,40 @@ class _ServerPageState extends State<ServerPage> {
           children: [
             const SectionLabel('Answers'),
             const SizedBox(height: 6),
-            GroupCard(
-              children: [
-                row(SettingsPage.chatModel, _chatModel(values)),
-                row(
-                  SettingsPage.searchModel,
-                  _chosen(embedderProviders, values),
-                ),
-                row(
-                  SettingsPage.storage,
-                  [
-                    _chosen(vectorProviders, values),
-                    if (vectors != null) plural(vectors, 'passage', 'passages'),
-                  ].join(' · '),
-                ),
-                row(SettingsPage.images, _chosen(imageProviders, values)),
-              ],
-            ),
+            FieldCard([
+              row(SettingsPage.chatModel, _chatModel(values)),
+              row(SettingsPage.searchModel, _chosen(embedderProviders, values)),
+              row(
+                SettingsPage.storage,
+                [
+                  _chosen(vectorProviders, values),
+                  if (vectors != null) plural(vectors, 'passage', 'passages'),
+                ].join(' · '),
+              ),
+              row(SettingsPage.images, _chosen(imageProviders, values)),
+            ]),
             const SizedBox(height: 18),
             const SectionLabel('Files and voice'),
             const SizedBox(height: 6),
-            GroupCard(
-              children: [
-                row(
-                  SettingsPage.transcription,
-                  _chosen(transcriptionProviders, values),
-                ),
-                row(SettingsPage.voice, _chosen(textToSpeechProviders, values)),
-              ],
-            ),
+            FieldCard([
+              row(
+                SettingsPage.transcription,
+                _chosen(transcriptionProviders, values),
+              ),
+              row(SettingsPage.voice, _chosen(textToSpeechProviders, values)),
+            ]),
             const SizedBox(height: 18),
             const SectionLabel('Data'),
             const SizedBox(height: 6),
-            GroupCard(
-              children: [
-                row(SettingsPage.chats),
-                row(SettingsPage.embeds),
-                row(SettingsPage.privacy),
-              ],
-            ),
+            FieldCard([
+              row(SettingsPage.chats),
+              row(SettingsPage.embeds),
+              row(SettingsPage.privacy),
+            ]),
             const SizedBox(height: 18),
             const SectionLabel('Advanced'),
             const SizedBox(height: 6),
-            GroupCard(children: [row(SettingsPage.json)]),
+            FieldCard([row(SettingsPage.json)]),
             const SizedBox(height: 20),
             if (scope.settings.connection case final connection?)
               Align(

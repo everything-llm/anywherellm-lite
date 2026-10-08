@@ -18,12 +18,9 @@ import 'card_image.dart';
 /// card is followed only while it can be seen, since a watched card keeps the server's browser
 /// from being stopped.
 class BrowserPanel extends StatelessWidget {
-  const BrowserPanel({super.key, required this.width, this.sheet = false});
+  const BrowserPanel({super.key, required this.width});
 
   final double width;
-
-  /// Whether it is a sheet over the chat, as on a phone.
-  final bool sheet;
 
   @override
   Widget build(BuildContext context) => BrowserStateBuilder(builder: _build);
@@ -49,7 +46,6 @@ class BrowserPanel extends StatelessWidget {
       live: true,
       onClose: scope.shell.closeBrowser,
       width: width,
-      sheet: sheet,
       // A Column, not a ListView: a live card is no height until its first frame, and a list
       // drops a child of no height at its start and never builds it again.
       child: SingleChildScrollView(

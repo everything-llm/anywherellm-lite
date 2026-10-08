@@ -280,11 +280,43 @@ class SheetHeader extends StatelessWidget {
   }
 }
 
+/// [child], with what [overlay] builds over the whole window while [open]. The overlay
+/// inherits from where [child] is, so it reads the app's scope. Its place in the window's
+/// overlay is always taken and empty while closed, since a portal cannot be shown or hidden
+/// while the tree builds.
+class OverlayWhile extends StatefulWidget {
+  const OverlayWhile({
+    super.key,
+    required this.open,
+    required this.overlay,
+    required this.child,
+  });
+
+  final bool open;
+  final WidgetBuilder overlay;
+  final Widget child;
+
+  @override
+  State<OverlayWhile> createState() => _OverlayWhileState();
+}
+
+class _OverlayWhileState extends State<OverlayWhile> {
+  final _portal = OverlayPortalController()..show();
+
+  @override
+  Widget build(BuildContext context) => OverlayPortal(
+    controller: _portal,
+    overlayChildBuilder: (context) =>
+        widget.open ? widget.overlay(context) : const SizedBox.shrink(),
+    child: widget.child,
+  );
+}
+
 /// [child], with a [SheetFrame] over the whole window while [open], holding what [sheet]
 /// builds under [title]: the phone's form of a popup, such as an answer's More menu. Esc, the
 /// scrim, Close and a drag down call [onClose]; Back reaches the shell, which closes the popup
-/// open. The sheet inherits from where [child] is, so it reads the app's scope.
-class PopupSheet extends StatefulWidget {
+/// open.
+class PopupSheet extends StatelessWidget {
   const PopupSheet({
     super.key,
     required this.open,
@@ -292,52 +324,33 @@ class PopupSheet extends StatefulWidget {
     required this.title,
     required this.sheet,
     required this.child,
-    this.about,
-    this.height = SheetHeight.fit,
     this.maxFraction = 0.78,
   });
 
   final bool open;
   final VoidCallback onClose;
   final String title;
-  final String? about;
   final WidgetBuilder sheet;
   final Widget child;
-  final SheetHeight height;
   final double maxFraction;
 
   @override
-  State<PopupSheet> createState() => _PopupSheetState();
-}
-
-class _PopupSheetState extends State<PopupSheet> {
-  // Always showing: the overlay draws nothing while the sheet is closed.
-  final _portal = OverlayPortalController()..show();
-
-  @override
-  Widget build(BuildContext context) => OverlayPortal(
-    controller: _portal,
-    overlayChildBuilder: (context) {
-      if (!widget.open) return const SizedBox.shrink();
-      return CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.escape): widget.onClose,
-        },
-        child: Focus(
-          autofocus: true,
-          child: SafeArea(
-            child: SheetFrame(
-              title: widget.title,
-              about: widget.about,
-              onClose: widget.onClose,
-              height: widget.height,
-              maxFraction: widget.maxFraction,
-              child: Builder(builder: widget.sheet),
-            ),
+  Widget build(BuildContext context) => OverlayWhile(
+    open: open,
+    overlay: (context) => CallbackShortcuts(
+      bindings: {const SingleActivator(LogicalKeyboardKey.escape): onClose},
+      child: Focus(
+        autofocus: true,
+        child: SafeArea(
+          child: SheetFrame(
+            title: title,
+            onClose: onClose,
+            maxFraction: maxFraction,
+            child: Builder(builder: sheet),
           ),
         ),
-      );
-    },
-    child: widget.child,
+      ),
+    ),
+    child: child,
   );
 }

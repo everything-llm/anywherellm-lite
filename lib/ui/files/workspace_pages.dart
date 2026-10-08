@@ -13,6 +13,8 @@ import '../widgets/basics.dart';
 import '../widgets/min_height.dart';
 import '../widgets/phone_page.dart';
 import 'files_view.dart';
+import '../settings/rows.dart';
+import '../widgets/fields.dart';
 
 /// Files on a phone: the open workspace's pages rather than the server's tree. It opens on the
 /// list of them, Documents, Instructions and Answer settings, each with a line of what it
@@ -126,38 +128,36 @@ class _WorkspacePagesState extends State<WorkspacePages> {
               style: Type.sans(14.5, color: t.ink2),
             ),
             const SizedBox(height: 14),
-            GroupCard(
-              children: [
-                NavRow(
-                  title: 'Documents',
-                  about: docs.isEmpty
-                      ? 'None yet'
-                      : '${plural(docs.length, 'document', 'documents')}, '
-                            '$on used in answers',
-                  onTap: () => _open(shell, FilesSection.documents),
-                ),
-                NavRow(
-                  title: 'Instructions',
-                  about: prompt == null || prompt.isEmpty
-                      ? 'The server\'s default'
-                      : prompt,
-                  onTap: () => _open(shell, FilesSection.instructions),
-                ),
-                NavRow(
-                  title: 'Answer settings',
-                  about: [
-                    mode?.title ?? ChatMode.automatic.title,
-                    if (scope.sources.chatModel case final own?)
-                      own
-                    else
-                      'system model',
-                  ].join(' · '),
-                  onTap: () => _open(shell, FilesSection.answers),
-                ),
-              ],
-            ),
+            FieldCard([
+              NavRow(
+                title: 'Documents',
+                about: docs.isEmpty
+                    ? 'None yet'
+                    : '${plural(docs.length, 'document', 'documents')}, '
+                          '$on used in answers',
+                onTap: () => _open(shell, FilesSection.documents),
+              ),
+              NavRow(
+                title: 'Instructions',
+                about: prompt == null || prompt.isEmpty
+                    ? 'The server\'s default'
+                    : prompt,
+                onTap: () => _open(shell, FilesSection.instructions),
+              ),
+              NavRow(
+                title: 'Answer settings',
+                about: [
+                  mode?.title ?? ChatMode.automatic.title,
+                  if (scope.sources.chatModel case final own?)
+                    own
+                  else
+                    'system model',
+                ].join(' · '),
+                onTap: () => _open(shell, FilesSection.answers),
+              ),
+            ]),
             const SizedBox(height: 12),
-            const Footnote(
+            const HelpText(
               'Created files and the file tree are in the desktop app.',
             ),
           ],

@@ -1,3 +1,4 @@
+import 'copy.dart';
 import 'server_models.dart' show jsonObjects;
 
 /// A job AnythingLLM runs on a schedule: its [name], the [workspace] it runs in when the server
@@ -63,23 +64,6 @@ List<ScheduledJob> scheduledJobsOf(Object? json) => [
 ];
 
 const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const _months = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
-
-String _clock(DateTime t) =>
-    '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
 /// [cron], which runs in UTC, in plain words in local time, as [now] gives it: every few
 /// minutes, every hour, every day, every weekday or one day a week. Any other schedule is the
@@ -92,7 +76,7 @@ String describeSchedule(String cron, DateTime now) {
   if (RegExp(r'^\*/(\d+)$').firstMatch(minute) case final every?
       when hour == '*' && weekday == '*') {
     final n = int.parse(every.group(1)!);
-    return n == 1 ? 'Every minute' : 'Every $n minutes';
+    return n == 1 ? 'Every minute' : 'Every ${plural(n, 'minute', 'minutes')}';
   }
   final m = int.tryParse(minute);
   if (m == null || m > 59) return '$cron (UTC)';
@@ -110,7 +94,7 @@ String describeSchedule(String cron, DateTime now) {
     local.month,
     local.day,
   ).difference(DateTime(at.year, at.month, at.day)).inDays;
-  final time = _clock(local);
+  final time = clockText(local);
   switch (weekday) {
     case '*':
       return 'Every day at $time';
@@ -130,13 +114,13 @@ String whenText(DateTime at, DateTime now) {
   final today = DateTime(now.year, now.month, now.day);
   final day = DateTime(local.year, local.month, local.day);
   final days = day.difference(today).inDays;
-  final time = _clock(local);
+  final time = clockText(local);
   return switch (days) {
     0 => 'today $time',
     1 => 'tomorrow $time',
     -1 => 'yesterday $time',
     _ =>
-      '${_days[local.weekday - 1]} ${local.day} ${_months[local.month - 1]}, '
+      '${_days[local.weekday - 1]} ${local.day} ${monthNames[local.month - 1]}, '
           '$time',
   };
 }

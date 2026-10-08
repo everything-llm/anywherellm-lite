@@ -14,6 +14,7 @@ import 'widgets/basics.dart';
 import 'widgets/buttons.dart';
 import 'widgets/phone_page.dart';
 import 'widgets/tappable.dart';
+import 'widgets/fields.dart';
 
 /// Upcoming in a phone's drawer: the jobs the server runs on a schedule, with how many once
 /// read. It reads them the first time it shows on a server. Tapped, it opens [UpcomingPage].
@@ -176,7 +177,7 @@ class _UpcomingPageState extends State<UpcomingPage> {
                         ),
                       ),
                     const SizedBox(height: 10),
-                    const Footnote(
+                    const HelpText(
                       'Read only here. Jobs are made and changed in AnythingLLM\'s web page.',
                     ),
                   ],

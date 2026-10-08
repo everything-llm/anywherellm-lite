@@ -83,10 +83,9 @@ abstract interface class AnythingLlmApi {
   /// chat never fails to open for this.
   Future<RejoinedAnswer?> rejoinChat(String slug, String thread);
 
-  /// Every answer the server that keeps answers going without the app holds, running or
-  /// finished: it keeps one for 7 days. Empty when the server has no such relay or it cannot be
-  /// asked.
-  Future<List<RelayRun>> relayRuns();
+  /// The answers the server that keeps answers going without the app ran to their end, in the
+  /// 7 days it keeps them. Empty when the server has no such relay or it cannot be asked.
+  Future<List<RelayRun>> finishedRuns();
 
   /// The jobs AnythingLLM runs on a schedule. It takes the server's web login, as the presets
   /// do: on a server with a password it needs one saved.

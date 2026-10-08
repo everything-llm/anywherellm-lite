@@ -317,7 +317,8 @@ class Citation {
 /// none. A passage's `text` starts with a `<document_metadata>` block, which is dropped, and
 /// its `score` is kept only from 0 to 1.
 List<Citation> citationsOf(Object? sources) {
-  final cited = <({String title, Uri? url, List<Passage> passages})>[];
+  // Each title's passages, filled as the list is read; a page's stays empty.
+  final cited = <(String, Uri?, List<Passage>)>[];
   final byTitle = <String, List<Passage>>{};
   final pages = <Uri>{};
   final pageTitles = <String>{};
@@ -328,49 +329,58 @@ List<Citation> citationsOf(Object? sources) {
     final page = chunk is String && chunk.startsWith('link://')
         ? Uri.tryParse(chunk.substring('link://'.length))
         : null;
-    final web =
-        page != null &&
+    if (page != null &&
         page.host.isNotEmpty &&
-        (page.scheme == 'http' || page.scheme == 'https');
-    final text = source['text'] is String
-        ? (source['text'] as String).replaceFirst(_metadataBlock, '').trim()
-        : '';
-    final score = switch (source['score']) {
-      final num n when n >= 0 && n <= 1 => n.toDouble(),
-      _ => null,
-    };
-    final passage = text.isEmpty ? null : Passage(text, score: score);
-    if (web) {
-      if (!pages.add(page)) continue;
-      pageTitles.add(title);
-      cited.add((title: title, url: page, passages: const []));
+        (page.scheme == 'http' || page.scheme == 'https')) {
+      if (pages.add(page)) {
+        pageTitles.add(title);
+        cited.add((title, page, const []));
+      }
       continue;
     }
     if (pageTitles.contains(title)) continue;
-    if (byTitle[title] case final passages?) {
-      if (passage != null) passages.add(passage);
-      continue;
-    }
-    final passages = [?passage];
-    byTitle[title] = passages;
-    cited.add((title: title, url: null, passages: passages));
+    final passages = byTitle.putIfAbsent(title, () {
+      final passages = <Passage>[];
+      cited.add((title, null, passages));
+      return passages;
+    });
+    final text = source['text'] is String
+        ? (source['text'] as String).replaceFirst(_metadataBlock, '').trim()
+        : '';
+    if (text.isEmpty) continue;
+    passages.add(
+      Passage(
+        text,
+        score: switch (source['score']) {
+          final num n when n >= 0 && n <= 1 => n.toDouble(),
+          _ => null,
+        },
+      ),
+    );
   }
   return [
-    for (final c in cited)
-      Citation(c.title, url: c.url, passages: _closestFirst(c.passages)),
+    for (final (title, url, passages) in cited)
+      Citation(title, url: url, passages: _closestFirst(passages)),
   ];
 }
 
 /// [passages] with a score, highest first, then those without, each in the order given.
 List<Passage> _closestFirst(List<Passage> passages) {
-  final ranked = passages.indexed.toList()
-    ..sort((a, b) {
-      final (x, y) = (a.$2.score, b.$2.score);
-      if (x != null && y != null && x != y) return y.compareTo(x);
-      if ((x == null) != (y == null)) return x == null ? 1 : -1;
-      return a.$1.compareTo(b.$1);
-    });
-  return List.unmodifiable([for (final (_, p) in ranked) p]);
+  final scored = [
+    for (final p in passages)
+      if (p.score != null) p,
+  ];
+  // List.sort is not stable, so ties keep their order through their index.
+  final order = {for (final (i, p) in scored.indexed) p: i};
+  scored.sort((a, b) {
+    final by = b.score!.compareTo(a.score!);
+    return by != 0 ? by : order[a]!.compareTo(order[b]!);
+  });
+  return List.unmodifiable([
+    ...scored,
+    for (final p in passages)
+      if (p.score == null) p,
+  ]);
 }
 
 /// A document a workspace holds.
@@ -634,9 +644,6 @@ class RelayRun {
     final thread = json['thread'];
     final status = json['status'];
     if (workspace is! String || thread is! String) return null;
-    final body = json['body'];
-    // A reset clears a chat and is no answer.
-    if (body is Map && body['reset'] == true) return null;
     return RelayRun(
       workspace: workspace,
       thread: thread,

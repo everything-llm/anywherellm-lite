@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/outputs.dart';
+import '../../core/upload.dart';
 import '../app_scope.dart';
 import '../files/save_file.dart';
+import '../sources/sources_panel.dart';
 import '../icons.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';
+import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
 
 /// The files and images an agent made with an answer. An image shows, read from the server with
@@ -58,14 +61,6 @@ Future<void> _share(BuildContext context, GeneratedFile file) async {
   } on Exception catch (error) {
     scope.chat.report('Could not share ${file.name}', '$error');
   }
-}
-
-/// The type on a file's tile: its extension, as `PDF`, or `FILE`.
-String _typeOf(String name) {
-  final dot = name.lastIndexOf('.');
-  if (dot < 0 || dot == name.length - 1) return 'FILE';
-  final ext = name.substring(dot + 1).toUpperCase();
-  return ext.length > 4 ? 'FILE' : ext;
 }
 
 /// Save, which reads Saved once the file is saved.
@@ -143,24 +138,7 @@ class _MadeFile extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 28,
-              height: 34,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: t.accentbg,
-                borderRadius: BorderRadius.circular(5),
-              ),
-              child: Text(
-                _typeOf(file.name),
-                style: Type.sans(
-                  9,
-                  weight: FontWeight.w600,
-                  color: t.accent,
-                  letterSpacing: 0.27,
-                ),
-              ),
-            ),
+            TypeTile.label(sourceExt(file.name)),
             const SizedBox(width: 10),
             Flexible(
               child: Column(
@@ -228,13 +206,13 @@ class _MadeImageState extends State<_MadeImage> {
         final bytes = snapshot.data;
         if (bytes == null) return _MadeFile(file);
         final size = file.size ?? bytes.length;
-        return Column(
+        final image = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             Tappable(
               label: 'Open ${file.name}',
-              onTap: () => scope.shell.togglePopup(ImageView(file, bytes)),
+              onTap: () => scope.shell.togglePopup(file),
               radius: BorderRadius.circular(8),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
@@ -256,7 +234,7 @@ class _MadeImageState extends State<_MadeImage> {
               spacing: 4,
               children: [
                 Text(
-                  'Image · ${_typeOf(file.name)} · ${sizeText(size)}',
+                  'Image · ${sourceExt(file.name)} · ${sizeText(size)}',
                   style: Type.sans(12.5, color: t.muted),
                 ),
                 _SaveButton(file),
@@ -272,26 +250,34 @@ class _MadeImageState extends State<_MadeImage> {
             ),
           ],
         );
+        // Open, it is the popup, keyed by the file, so Esc and Back close it.
+        return ValueListenableBuilder(
+          valueListenable: scope.shell.popup,
+          child: image,
+          builder: (context, popup, image) => OverlayWhile(
+            open: identical(popup, file),
+            overlay: (context) => SafeArea(
+              child: ImageViewer(
+                file,
+                bytes,
+                onClose: () => scope.shell.closePopup(file),
+              ),
+            ),
+            child: image!,
+          ),
+        );
       },
     );
   }
 }
 
-/// An image an agent made, open over the window: the popup the shell draws as an
-/// [ImageViewer].
-class ImageView {
-  const ImageView(this.file, this.bytes);
+/// An image an agent made, [file] holding [bytes], over the whole window on a dark ground, to
+/// pinch and pan: its name and Close, then Save and, where the device can share, Share.
+class ImageViewer extends StatelessWidget {
+  const ImageViewer(this.file, this.bytes, {super.key, required this.onClose});
 
   final GeneratedFile file;
   final Uint8List bytes;
-}
-
-/// [view]'s image over the whole window, on a dark ground, to pinch and pan: its name and
-/// Close, then Save and, where the device can share, Share.
-class ImageViewer extends StatelessWidget {
-  const ImageViewer(this.view, {super.key, required this.onClose});
-
-  final ImageView view;
   final VoidCallback onClose;
 
   static const _ground = Color(0xFF101018);
@@ -299,7 +285,6 @@ class ImageViewer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
-    final file = view.file;
     final light = Colors.white;
     Widget button(
       String label,
@@ -396,7 +381,7 @@ class ImageViewer extends StatelessWidget {
                     maxScale: 5,
                     child: Center(
                       child: Image.memory(
-                        view.bytes,
+                        bytes,
                         gaplessPlayback: true,
                         fit: BoxFit.contain,
                         semanticLabel: file.name,

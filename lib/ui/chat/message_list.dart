@@ -164,14 +164,11 @@ class _MessageListState extends State<MessageList> {
       ],
     );
     if (!phone) return list;
-    return ListenableBuilder(
-      listenable: chat,
+    // MessageList is built afresh as the chat changes, so this follows refreshing.
+    return PullRefresh(
+      refreshing: chat.refreshing,
+      onRefresh: chat.refresh,
       child: list,
-      builder: (context, list) => PullRefresh(
-        refreshing: chat.refreshing,
-        onRefresh: chat.refreshing ? null : chat.refresh,
-        child: list!,
-      ),
     );
   }
 
@@ -927,13 +924,10 @@ class _CitationState extends State<_Citation> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    return ListenableBuilder(
-      listenable: Listenable.merge([scope.sources, scope.shell.popup]),
-      builder: _build,
-    );
-  }
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: AppScope.of(context).sources,
+    builder: _build,
+  );
 
   Widget _build(BuildContext context, Widget? _) {
     final scope = AppScope.of(context);
@@ -958,7 +952,6 @@ class _CitationState extends State<_Citation> {
           : present
           ? 'Show in Documents'
           : url?.toString(),
-      expanded: passages ? identical(scope.shell.popup.value, citation) : null,
       onTap: passages
           ? () => scope.shell.togglePopup(citation)
           : present
@@ -976,24 +969,7 @@ class _CitationState extends State<_Citation> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 16,
-              height: 16,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: live ? t.accent : t.muted,
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                '$number',
-                style: Type.sans(
-                  10,
-                  weight: FontWeight.w600,
-                  color: t.onaccent,
-                  height: 1,
-                ),
-              ),
-            ),
+            CitationNumber(number, live: live),
             const SizedBox(width: 6),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 240),
@@ -1009,13 +985,18 @@ class _CitationState extends State<_Citation> {
       ),
     );
     if (!passages) return chip;
-    return PopupSheet(
-      open: identical(scope.shell.popup.value, citation),
-      onClose: close,
-      title: 'Passages read',
-      sheet: (context) =>
-          PassagesView(number: number, citation: citation, onClose: close),
+    // Only a citation that opens a sheet follows the popup.
+    return ValueListenableBuilder(
+      valueListenable: scope.shell.popup,
       child: chip,
+      builder: (context, popup, chip) => PopupSheet(
+        open: identical(popup, citation),
+        onClose: close,
+        title: 'Passages read',
+        sheet: (context) =>
+            PassagesView(number: number, citation: citation, onClose: close),
+        child: chip!,
+      ),
     );
   }
 }

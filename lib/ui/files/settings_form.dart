@@ -12,9 +12,10 @@ import '../widgets/buttons.dart';
 import '../chat/model_picker.dart';
 import '../widgets/fields.dart';
 import '../widgets/phone_page.dart';
+import '../widgets/radio_card.dart';
 import '../widgets/setting_row.dart';
 import '../widgets/segmented.dart';
-import '../widgets/tappable.dart';
+import '../settings/rows.dart';
 
 /// The similarity thresholds the web UI offers, with the score each one stands for.
 const similarityPresets = [
@@ -401,17 +402,15 @@ class _SettingsFormState extends State<SettingsForm> {
           builder: (context, _) {
             final own = scope.sources.chatModel;
             final model = workspaceModel(scope);
-            return GroupCard(
-              children: [
-                NavRow(
-                  title: 'Chat model',
-                  about:
-                      own ??
-                      (model == 'Chat model' ? null : 'The server\'s: $model'),
-                  onTap: () => setState(() => _picking = !_picking),
-                ),
-              ],
-            );
+            return FieldCard([
+              NavRow(
+                title: 'Chat model',
+                about:
+                    own ??
+                    (model == 'Chat model' ? null : 'The server\'s: $model'),
+                onTap: () => setState(() => _picking = !_picking),
+              ),
+            ]);
           },
         ),
         if (_picking) ...[
@@ -429,90 +428,13 @@ class _SettingsFormState extends State<SettingsForm> {
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 8),
-        Footnote(
+        HelpText(
           'What Files only says when no document matches. These apply to every chat in '
           '$workspace. Chat history, temperature and document search are in the desktop app.',
         ),
         const SizedBox(height: 16),
         buttons,
       ],
-    );
-  }
-}
-
-/// One choice of several, as a card: a radio ring, [title] and the line [about] under it, the
-/// chosen one filled.
-class RadioCard extends StatelessWidget {
-  const RadioCard({
-    super.key,
-    required this.title,
-    required this.about,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String title;
-  final String about;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Tappable(
-      label: '$title. $about',
-      selected: selected,
-      onTap: onTap,
-      radius: BorderRadius.circular(12),
-      color: selected ? t.sel : t.panel,
-      side: BorderSide(color: selected ? Colors.transparent : t.line),
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 56),
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-        child: Row(
-          children: [
-            Container(
-              width: 18,
-              height: 18,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: selected ? t.accent : t.fade,
-                  width: 1.5,
-                ),
-              ),
-              child: selected
-                  ? Container(
-                      width: 9,
-                      height: 9,
-                      decoration: BoxDecoration(
-                        color: t.accent,
-                        shape: BoxShape.circle,
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Type.sans(
-                      15,
-                      weight: selected ? FontWeight.w600 : FontWeight.w500,
-                      color: t.ink,
-                    ),
-                  ),
-                  Text(about, style: Type.sans(12.5, color: t.muted)),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

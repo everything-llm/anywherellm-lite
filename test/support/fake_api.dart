@@ -339,11 +339,11 @@ class FakeAnythingLlm implements AnythingLlmApi {
   Future<List<ScheduledJob>> scheduledJobs() =>
       _run('scheduledJobs', () => jobs);
 
-  /// What [relayRuns] answers: every run the relay holds.
+  /// What [finishedRuns] answers.
   List<RelayRun> runs = const [];
 
   @override
-  Future<List<RelayRun>> relayRuns() => _run('relayRuns', () => runs);
+  Future<List<RelayRun>> finishedRuns() => _run('finishedRuns', () => runs);
 
   @override
   Future<void> stopChat(String slug, String thread) =>

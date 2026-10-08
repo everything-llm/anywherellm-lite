@@ -489,6 +489,8 @@ class ChatController extends ChangeNotifier {
     _threads.clear();
     _turns.clear();
     _ready.clear();
+    _runsRead = false;
+    _onScreen = null;
     _draft = [];
     _madeFiles.clear();
     _images.clear();
@@ -536,8 +538,15 @@ class ChatController extends ChangeNotifier {
     }
     unawaited(_countDocs());
     unawaited(_readCommands());
-    unawaited(readFinishedRuns());
+    // Once a server here; the app showing again asks again.
+    if (!_runsRead) {
+      _runsRead = true;
+      unawaited(readFinishedRuns());
+    }
   }
+
+  /// Whether this server's finished runs were read at its first load.
+  bool _runsRead = false;
 
   /// Reads the server's presets. Best effort: a server that will not list them leaves `/reset`
   /// alone in the menu with [commandsNote] saying why, and a preset typed in full still runs,
@@ -603,20 +612,23 @@ class ChatController extends ChangeNotifier {
 
   /// Remembers the chat on screen as the one to open at start.
   void _rememberChat() {
-    if (activeSlug case final slug?) {
-      unawaited(_prefs.setLastChat(slug, activeThread));
-    }
-    final now = DateTime.now().toUtc();
     final shown = switch ((activeSlug, activeThread)) {
       (final slug?, final thread?) => (slug: slug, thread: thread),
       _ => null,
     };
     // The chat that leaves the screen was seen until now, and so was the one that comes.
-    if (_onScreen case final left? when left != shown) {
-      unawaited(_prefs.setSeen(left.slug, left.thread, now));
-    }
-    if (shown != null) unawaited(_prefs.setSeen(shown.slug, shown.thread, now));
+    final left = _onScreen;
     _onScreen = shown;
+    if (activeSlug case final slug?) {
+      unawaited(
+        _prefs.showChat(
+          slug,
+          activeThread,
+          seen: [if (left != null && left != shown) left, ?shown],
+          at: DateTime.now().toUtc(),
+        ),
+      );
+    }
   }
 
   /// The chat on screen as [_rememberChat] last noted it.
@@ -638,8 +650,12 @@ class ChatController extends ChangeNotifier {
   Future<void> readFinishedRuns() async {
     final server = _server;
     if (server == null) return;
-    final runs = await _api.relayRuns();
+    final runs = await _api.finishedRuns();
     if (_server != server) return;
+    final threads = {
+      for (final MapEntry(:key, :value) in _threads.entries)
+        for (final t in value) (key, t.slug),
+    };
     var marked = false;
     for (final run in runs) {
       final finished = run.finished;
@@ -647,7 +663,7 @@ class ChatController extends ChangeNotifier {
       if (run.thread == activeThread || _ready.containsKey(run.thread)) {
         continue;
       }
-      if (!threadsOf(run.workspace).any((t) => t.slug == run.thread)) continue;
+      if (!threads.contains((run.workspace, run.thread))) continue;
       final seen = _prefs.seenAt(run.workspace, run.thread);
       if (seen == null || !finished.isAfter(seen)) continue;
       _ready[run.thread] = run.workspace;

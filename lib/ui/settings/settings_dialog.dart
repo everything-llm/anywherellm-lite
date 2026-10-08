@@ -169,44 +169,40 @@ class _PhoneNav extends StatelessWidget {
           children: [
             const SectionLabel('This app'),
             const SizedBox(height: 6),
-            GroupCard(
-              children: [
-                NavRow(
-                  title: SettingsPage.connection.label,
-                  about: connection == null
-                      ? 'Not connected'
-                      : 'Connected to ${connection.uri.host}',
-                  onTap: () => shell.showSettingsPage(SettingsPage.connection),
-                ),
-                NavRow(
-                  title: SettingsPage.appearance.label,
-                  about: switch (prefs.theme) {
-                    ThemePref.system => 'System theme',
-                    ThemePref.light => 'Light theme',
-                    ThemePref.dark => 'Dark theme',
-                  },
-                  onTap: () => shell.showSettingsPage(SettingsPage.appearance),
-                ),
-                NavRow(
-                  title: SettingsPage.chat.label,
-                  about: chatSummary(scope),
-                  onTap: () => shell.showSettingsPage(SettingsPage.chat),
-                ),
-              ],
-            ),
+            FieldCard([
+              NavRow(
+                title: SettingsPage.connection.label,
+                about: connection == null
+                    ? 'Not connected'
+                    : 'Connected to ${connection.uri.host}',
+                onTap: () => shell.showSettingsPage(SettingsPage.connection),
+              ),
+              NavRow(
+                title: SettingsPage.appearance.label,
+                about: switch (prefs.theme) {
+                  ThemePref.system => 'System theme',
+                  ThemePref.light => 'Light theme',
+                  ThemePref.dark => 'Dark theme',
+                },
+                onTap: () => shell.showSettingsPage(SettingsPage.appearance),
+              ),
+              NavRow(
+                title: SettingsPage.chat.label,
+                about: chatSummary(scope),
+                onTap: () => shell.showSettingsPage(SettingsPage.chat),
+              ),
+            ]),
             if (connection != null) ...[
               const SizedBox(height: 18),
               const SectionLabel('AnythingLLM'),
               const SizedBox(height: 6),
-              GroupCard(
-                children: [
-                  NavRow(
-                    title: SettingsPage.server.label,
-                    about: serverSummary(scope.system),
-                    onTap: () => shell.showSettingsPage(SettingsPage.server),
-                  ),
-                ],
-              ),
+              FieldCard([
+                NavRow(
+                  title: SettingsPage.server.label,
+                  about: serverSummary(scope.system),
+                  onTap: () => shell.showSettingsPage(SettingsPage.server),
+                ),
+              ]),
             ],
           ],
         );

@@ -7,7 +7,12 @@ import 'package:share_plus/share_plus.dart';
 Future<void> shareBytes(String name, List<int> bytes) async {
   await SharePlus.instance.share(
     ShareParams(
-      files: [XFile.fromData(Uint8List.fromList(bytes), name: name)],
+      files: [
+        XFile.fromData(
+          bytes is Uint8List ? bytes : Uint8List.fromList(bytes),
+          name: name,
+        ),
+      ],
       fileNameOverrides: [name],
     ),
   );

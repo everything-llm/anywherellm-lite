@@ -18,6 +18,7 @@ import 'pairing_code.dart';
 import 'password_card.dart';
 import 'rows.dart';
 import 'scan_view.dart';
+import '../widgets/sheet.dart';
 
 /// How this device reaches the server: the address and key, the server's password, and what
 /// the server and the relay say. The server reads Connected once Test connection passes here,
@@ -198,11 +199,6 @@ class _KeyCardState extends State<_KeyCard> {
 
   /// The shell, which holds whether the camera reads a code, so Back can stop it.
   late final ShellController _shell = AppScope.of(context).shell;
-  bool get _scanning => _shell.scanning;
-  set _scanning(bool on) => _shell.setScanning(on);
-
-  /// Shows the phone's camera view over the window while it reads a code.
-  final _scanView = OverlayPortalController()..show();
 
   /// Why the last scanned code could not be used.
   String? _scanProblem;
@@ -262,13 +258,13 @@ class _KeyCardState extends State<_KeyCard> {
       connection = parsePairingCode(code);
     } on ApiException catch (error) {
       setState(() {
-        _scanning = false;
+        _shell.setScanning(false);
         _scanProblem = error.message;
       });
       return;
     }
     setState(() {
-      _scanning = false;
+      _shell.setScanning(false);
       _scanProblem = null;
       // A key the server refuses then shows in its field, under why.
       _pasteKey = true;
@@ -303,7 +299,7 @@ class _KeyCardState extends State<_KeyCard> {
         final editing = !set || _replacing;
         final saving = _settings.check == ConnectionCheck.testing;
         void startScan() => setState(() {
-          _scanning = true;
+          _shell.setScanning(true);
           _scanProblem = null;
         });
         if (phone && !set) return _firstRun(context, saving, startScan);
@@ -354,7 +350,7 @@ class _KeyCardState extends State<_KeyCard> {
                   _replacing ? 'Cancel' : 'Edit connection',
                   onPressed: () => setState(() {
                     _replacing = !_replacing;
-                    _scanning = false;
+                    _shell.setScanning(false);
                   }),
                 ),
                 // A phone shows its code to no other phone.
@@ -369,7 +365,7 @@ class _KeyCardState extends State<_KeyCard> {
                 ),
               ]),
             if (set && !_replacing && _showCode) PairingCode(connection),
-            if (_scanner case final scan? when editing && _scanning)
+            if (_scanner case final scan? when editing && _shell.scanning)
               if (phone)
                 _phoneScan(scan)
               else ...[
@@ -377,11 +373,11 @@ class _KeyCardState extends State<_KeyCard> {
                 ActionRow([
                   AppButton(
                     'Cancel',
-                    onPressed: () => setState(() => _scanning = false),
+                    onPressed: () => _shell.setScanning(false),
                   ),
                 ]),
               ],
-            if (editing && !_scanning) ...[
+            if (editing && !_shell.scanning) ...[
               AppField(
                 controller: _url,
                 label: 'AnythingLLM server address',
@@ -448,10 +444,12 @@ class _KeyCardState extends State<_KeyCard> {
   }
 
   /// The phone's camera view over the window, which keeps this card's scope.
-  Widget _phoneScan(CodeScanner scan) => OverlayPortal(
-    controller: _scanView,
-    overlayChildBuilder: (context) =>
-        ScanView(camera: scan(_scanned), onCancel: () => _scanning = false),
+  Widget _phoneScan(CodeScanner scan) => OverlayWhile(
+    open: _shell.scanning,
+    overlay: (context) => ScanView(
+      camera: scan(_scanned),
+      onCancel: () => _shell.setScanning(false),
+    ),
     child: const SizedBox.shrink(),
   );
 
@@ -465,7 +463,7 @@ class _KeyCardState extends State<_KeyCard> {
       spacing: 14,
       children: [
         if (scanner != null) ...[
-          if (_scanning) _phoneScan(scanner),
+          _phoneScan(scanner),
           AppButton(
             'Scan QR code',
             primary: true,

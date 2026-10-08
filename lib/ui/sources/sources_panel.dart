@@ -19,10 +19,7 @@ import 'test_question.dart';
 /// The active workspace's files, which people see as Documents: add them, switch them on and
 /// off, remove them, and test what a question finds in them.
 class SourcesPanel extends StatelessWidget {
-  const SourcesPanel({super.key, this.sheet = false});
-
-  /// Whether it is a sheet over the chat, as on a phone.
-  final bool sheet;
+  const SourcesPanel({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +29,6 @@ class SourcesPanel extends StatelessWidget {
       title: 'Documents',
       about: 'Answers draw on the ones switched on.',
       onClose: scope.shell.closeSources,
-      sheet: sheet,
       sheetHeight: SheetHeight.fit,
       child: ListenableBuilder(
         listenable: scope.sources,
@@ -220,15 +216,20 @@ class SourceRow extends StatelessWidget {
 /// A document's type on a small tile, such as `PDF`. Switched off, only the tile fades: the name
 /// beside it stays at full strength.
 class TypeTile extends StatelessWidget {
-  const TypeTile(this.file, {super.key});
+  /// [file]'s type, faded while it is switched off.
+  TypeTile(SourceFile file, {super.key}) : label = file.tile, on = file.on;
 
-  final SourceFile file;
+  /// The type [label], such as `PDF`, of a file that is not a document.
+  const TypeTile.label(this.label, {super.key}) : on = true;
+
+  final String label;
+  final bool on;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return Opacity(
-      opacity: file.on ? 1 : 0.5,
+      opacity: on ? 1 : 0.5,
       child: Container(
         width: 32,
         height: 38,
@@ -238,7 +239,7 @@ class TypeTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(5),
         ),
         child: Text(
-          file.tile,
+          label,
           style: Type.sans(
             9.5,
             weight: FontWeight.w600,

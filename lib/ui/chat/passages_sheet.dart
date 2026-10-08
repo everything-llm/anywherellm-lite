@@ -40,24 +40,7 @@ class PassagesView extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 17,
-                height: 17,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: t.accent,
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  '$number',
-                  style: Type.sans(
-                    10.5,
-                    weight: FontWeight.w600,
-                    color: t.onaccent,
-                    height: 1,
-                  ),
-                ),
-              ),
+              CitationNumber(number),
               const SizedBox(width: 8),
               Expanded(
                 child: Column(
@@ -133,6 +116,37 @@ class PassagesView extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// A citation's [number] in a small circle, in the accent while it leads somewhere ([live]).
+class CitationNumber extends StatelessWidget {
+  const CitationNumber(this.number, {super.key, this.live = true});
+
+  final int number;
+  final bool live;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Container(
+      width: 16,
+      height: 16,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: live ? t.accent : t.muted,
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        '$number',
+        style: Type.sans(
+          10,
+          weight: FontWeight.w600,
+          color: t.onaccent,
+          height: 1,
+        ),
       ),
     );
   }

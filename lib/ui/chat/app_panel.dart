@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/chat.dart';
 import '../app_scope.dart';
 import '../icons.dart';
+import '../layout.dart';
 import '../links.dart';
 import '../widgets/buttons.dart';
 import '../widgets/side_panel.dart';
@@ -32,36 +33,29 @@ Widget _card(BuildContext context, AppCard app) {
   );
 }
 
-/// The app an answer's card opened, beside the chat in the browser's place, or as a [sheet] over
+/// The app an answer's card opened, beside the chat in the browser's place, or as a sheet over
 /// the chat on a phone: its name and kind, its live card drawn large, Open in the browser, which
 /// opens its page, and Close, which puts back what the panel showed. Beside the chat it only
 /// shows the app; changing it happens on its page. The sheet shows that page itself where the
 /// device has a web view ([AppScope.appView]). Dragging the sheet down, or a tap on the scrim,
 /// closes it.
 class AppPanel extends StatelessWidget {
-  const AppPanel({
-    super.key,
-    required this.app,
-    required this.width,
-    this.sheet = false,
-  });
+  const AppPanel({super.key, required this.app, required this.width});
 
   final AppCard app;
   final double width;
 
-  /// Whether it is a sheet over the chat, as on a phone.
-  final bool sheet;
-
   @override
   Widget build(BuildContext context) {
     final shell = AppScope.of(context).shell;
+    // A phone's is a sheet over the chat.
+    final sheet = ScreenClass.ofContext(context).isPhone;
     return SidePanel(
       title: app.name,
       about: _kindOf(context, app),
       aboutBeside: true,
       width: width,
       onClose: shell.closeApp,
-      sheet: sheet,
       actions: [
         IconBtn(
           'external',

@@ -165,13 +165,23 @@ class Prefs {
         null => null,
       };
 
-  /// These prefs with chat [thread] of workspace [slug] on [server] seen [at].
+  /// How many chats [seen] keeps for a workspace.
+  static const seenMax = 50;
+
+  /// These prefs with chat [thread] of workspace [slug] on [server] seen [at], keeping the
+  /// [seenMax] seen last.
   Prefs withSeen(String server, String slug, String thread, DateTime at) {
     final key = offKey(server, slug);
+    final kept = {...?seen[key]}..remove(thread);
+    final newest = kept.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
     return _copy(
       seen: {
         ...seen,
-        key: {...?seen[key], thread: at.millisecondsSinceEpoch},
+        key: {
+          thread: at.millisecondsSinceEpoch,
+          for (final e in newest.take(seenMax - 1)) e.key: e.value,
+        },
       },
     );
   }

@@ -9,7 +9,6 @@ import 'app_scope.dart';
 import 'chat/app_panel.dart';
 import 'chat/browser_panel.dart';
 import 'chat/chat_view.dart';
-import 'chat/generated_files.dart';
 import 'files/files_view.dart';
 import 'files/workspace_pages.dart';
 import 'layout.dart';
@@ -70,47 +69,38 @@ class AppShell extends StatelessWidget {
     final t = Tokens.of(context);
     final duration = motion(context, const Duration(milliseconds: 250));
 
-    /// Closes what is on top; where Settings shows one page at a time, a page goes back to the
-    /// list first. The sidebar counts only while it is a drawer, since an inline one has nothing
-    /// to close.
-    bool closeTop({
+    /// What closes the thing on top, or null when nothing is open that Esc or Back closes:
+    /// where Settings shows one page at a time, a page goes back first. The sidebar counts only
+    /// while it is a drawer, and the panel to the right only while it is a drawer or a sheet,
+    /// since one in the layout has nothing to close.
+    VoidCallback? topClose({
       required bool settingsSideBySide,
       required bool sidebarDrawer,
       required bool phone,
+      required bool rightClosable,
     }) {
-      if (shell.shared != null) {
-        shell.closeShared();
-      } else if (shell.popup.value != null) {
-        shell.closePopup();
-      } else if (shell.scanning) {
-        shell.setScanning(false);
-      } else if (shell.upcomingOpen && !shell.settingsOpen) {
-        shell.closeUpcoming();
-      } else if (shell.settingsOpen &&
-          !settingsSideBySide &&
-          shell.settingsPage != null) {
-        shell.settingsBack(phone: phone);
-      } else if (shell.settingsOpen) {
-        shell.closeSettings();
-      } else if (sidebarDrawer && shell.sideOpen) {
-        shell.closeSide();
-      } else if (shell.appOpen) {
-        shell.closeApp();
-      } else if (shell.browserOpen) {
-        shell.closeBrowser();
-      } else if (phone && shell.pane == Pane.files) {
-        // A phone's workspace pages step back: a document's text, a page, then the chat.
-        if (scope.files.reading != null) {
-          scope.files.closeText();
-        } else if (shell.workspacePage != null) {
-          shell.showWorkspacePage(null);
-        } else {
-          shell.showPane(Pane.chats);
-        }
-      } else {
-        return false;
+      if (shell.shared != null) return shell.closeShared;
+      if (shell.popup.value != null) return shell.closePopup;
+      if (shell.scanning) return () => shell.setScanning(false);
+      if (shell.upcomingOpen && !shell.settingsOpen) return shell.closeUpcoming;
+      if (shell.settingsOpen) {
+        return !settingsSideBySide && shell.settingsPage != null
+            ? () => shell.settingsBack(phone: phone)
+            : shell.closeSettings;
       }
-      return true;
+      if (sidebarDrawer && shell.sideOpen) return shell.closeSide;
+      if (shell.appOpen) return shell.closeApp;
+      if (shell.browserOpen) return shell.closeBrowser;
+      if (rightClosable && shell.rightOpen) return shell.closeSources;
+      // A phone's workspace pages step back: a document's text, a page, then the chat.
+      if (phone && shell.pane == Pane.files) {
+        if (scope.files.reading != null) return scope.files.closeText;
+        if (shell.workspacePage != null) {
+          return () => shell.showWorkspacePage(null);
+        }
+        return () => shell.showPane(Pane.chats);
+      }
+      return null;
     }
 
     return LayoutBuilder(
@@ -142,37 +132,21 @@ class AppShell extends StatelessWidget {
             final right = TickerMode(
               enabled: shell.rightOpen,
               child: switch (shell.beside) {
-                Beside.sources => SourcesPanel(sheet: sheet),
-                Beside.browser => BrowserPanel(width: rightWidth, sheet: sheet),
-                Beside.app => AppPanel(
-                  app: shell.app!,
-                  width: rightWidth,
-                  sheet: sheet,
-                ),
+                Beside.sources => const SourcesPanel(),
+                Beside.browser => BrowserPanel(width: rightWidth),
+                Beside.app => AppPanel(app: shell.app!, width: rightWidth),
               },
+            );
+            VoidCallback? close() => topClose(
+              settingsSideBySide: settingsSideBySide,
+              sidebarDrawer: screen.sidebarDrawer,
+              phone: screen.isPhone,
+              rightClosable: sourcesDrawer || sheetOpen,
             );
             return _BackGuard(
               popup: shell.popup,
-              open:
-                  shell.settingsOpen ||
-                  sideDrawer ||
-                  sourcesDrawer ||
-                  sheetOpen ||
-                  shell.scanning ||
-                  shell.upcomingOpen ||
-                  shell.shared != null ||
-                  (screen.isPhone && files) ||
-                  shell.appOpen ||
-                  shell.browserOpen,
-              onBack: () {
-                if (!closeTop(
-                  settingsSideBySide: settingsSideBySide,
-                  sidebarDrawer: screen.sidebarDrawer,
-                  phone: screen.isPhone,
-                )) {
-                  shell.closeSources();
-                }
-              },
+              open: close() != null,
+              onBack: () => close()?.call(),
               child: CallbackShortcuts(
                 bindings: {
                   // The browser takes these keys before a page sees them.
@@ -185,16 +159,8 @@ class AppShell extends StatelessWidget {
                       SingleActivator(key, control: true): () =>
                           _openWorkspace(scope, i),
                   },
-                  const SingleActivator(LogicalKeyboardKey.escape): () {
-                    if (!closeTop(
-                          settingsSideBySide: settingsSideBySide,
-                          sidebarDrawer: screen.sidebarDrawer,
-                          phone: screen.isPhone,
-                        ) &&
-                        (sourcesDrawer || sheetOpen)) {
-                      shell.closeSources();
-                    }
-                  },
+                  const SingleActivator(LogicalKeyboardKey.escape): () =>
+                      close()?.call(),
                 },
                 child: Focus(
                   autofocus: true,
@@ -307,14 +273,6 @@ class AppShell extends StatelessWidget {
                                 valueListenable: shell.popup,
                                 builder: (context, popup, _) => Stack(
                                   children: [
-                                    // An agent's image, open over everything.
-                                    if (popup case final ImageView view)
-                                      Positioned.fill(
-                                        child: ImageViewer(
-                                          view,
-                                          onClose: () => shell.closePopup(view),
-                                        ),
-                                      ),
                                     if (popup == Popup.switcher) ...[
                                       _Scrim(
                                         onTap: () =>

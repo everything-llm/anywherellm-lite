@@ -252,7 +252,21 @@ class _ChatsState extends State<_Chats> {
         groups.rest.isNotEmpty;
     return ListView(
       children: [
-        if (any) const _GroupLabel('Chats'),
+        if (any)
+          Semantics(
+            header: true,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 14, 10, 4),
+              child: Text(
+                'Chats',
+                style: Type.sans(
+                  12,
+                  weight: FontWeight.w500,
+                  color: Tokens.of(context).muted,
+                ),
+              ),
+            ),
+          ),
         ...rows(groups.pinned, pinned: true),
         ...rows(groups.recent),
         ...rows(groups.rest),
@@ -376,28 +390,6 @@ class _KeyHint extends StatelessWidget {
             borderRadius: BorderRadius.circular(5),
           ),
           child: Text(keys, style: Type.sans(11, color: t.muted)),
-        ),
-      ),
-    );
-  }
-}
-
-/// The name over the chats.
-class _GroupLabel extends StatelessWidget {
-  const _GroupLabel(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Semantics(
-      header: true,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 14, 10, 4),
-        child: Text(
-          label,
-          style: Type.sans(12, weight: FontWeight.w500, color: t.muted),
         ),
       ),
     );

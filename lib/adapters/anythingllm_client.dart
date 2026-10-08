@@ -302,19 +302,13 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     try {
       final connection = _current;
       if (!await _isRelay(connection)) return null;
-      final listed = await _get(
-        connection,
-        '$relayPath/v1/runs?status=running',
-      );
-      for (final run in jsonObjects(listed is Map ? listed['runs'] : listed)) {
+      for (final run in await _listRuns(connection, 'running')) {
         final id = run['id'];
         final status = run['status'];
-        final body = run['body'];
         if (id is! String ||
             run['workspace'] != slug ||
             run['thread'] != thread ||
-            (status is String && status != 'running') ||
-            (body is Map && body['reset'] == true)) {
+            (status is String && status != 'running')) {
           continue;
         }
         final known = Future<String>.value(id);
@@ -332,22 +326,36 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     return null;
   }
 
-  /// Every run the relay holds, from `GET /everythingllm/v1/runs` with no status, read as JSON
-  /// holding runs, or an object with them under `runs`. A server with no relay, or one that
-  /// cannot be asked, has none.
+  /// The answers the relay ran to their end, from `GET /everythingllm/v1/runs?status=done`. A
+  /// server with no relay, or one that cannot be asked, has none.
   @override
-  Future<List<RelayRun>> relayRuns() async {
+  Future<List<RelayRun>> finishedRuns() async {
     try {
       final connection = _current;
       if (!await _isRelay(connection)) return const [];
-      final listed = await _get(connection, '$relayPath/v1/runs');
       return [
-        for (final run in jsonObjects(listed is Map ? listed['runs'] : listed))
+        for (final run in await _listRuns(connection, 'done'))
           ?RelayRun.fromJson(run),
       ];
     } on ApiException {
       return const [];
     }
+  }
+
+  /// The relay's runs of [status], read as JSON holding runs or an object with them under
+  /// `runs`, less those whose body is a `reset`, which clears a chat and is no answer.
+  Future<List<Map<String, dynamic>>> _listRuns(
+    Connection connection,
+    String status,
+  ) async {
+    final listed = await _get(connection, '$relayPath/v1/runs?status=$status');
+    return [
+      for (final run in jsonObjects(listed is Map ? listed['runs'] : listed))
+        if (run['body'] case final Map body when body['reset'] == true)
+          ...const <Map<String, dynamic>>[]
+        else
+          run,
+    ];
   }
 
   /// The question a listed [run] was started with, or null when it does not say.

@@ -1,5 +1,6 @@
 // The chats the server has recorded across every workspace, as its admin list gives them.
 
+import 'copy.dart';
 import 'server_models.dart';
 
 /// One exchange the server recorded: the question, where and when it was asked.
@@ -44,19 +45,13 @@ class ChatLog {
   final bool more;
 }
 
-const _months = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', //
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
-
 /// When [at] was, said briefly against [now], both local: `Today 10:42`, `Yesterday`, `3 Oct`,
 /// or `3 Oct 2025` in another year.
 String sentText(DateTime at, DateTime now) {
   final day = DateTime(at.year, at.month, at.day);
   final today = DateTime(now.year, now.month, now.day);
-  String two(int n) => n.toString().padLeft(2, '0');
-  if (day == today) return 'Today ${two(at.hour)}:${two(at.minute)}';
+  if (day == today) return 'Today ${clockText(at)}';
   if (day == DateTime(now.year, now.month, now.day - 1)) return 'Yesterday';
-  final date = '${at.day} ${_months[at.month - 1]}';
+  final date = '${at.day} ${monthNames[at.month - 1]}';
   return at.year == now.year ? date : '$date ${at.year}';
 }
