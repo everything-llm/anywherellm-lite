@@ -55,9 +55,11 @@ class _DropZoneState extends State<DropZone> {
     try {
       picked = await openFiles();
     } catch (error) {
-      widget.onProblem('Could not open the file picker', '$error');
+      if (mounted) widget.onProblem('Could not open the file picker', '$error');
       return;
     }
+    // The picker may outlast the place it was opened for, as when the server changes.
+    if (!mounted) return;
     await widget.onFiles(picked.map(_upload).toList());
   }
 

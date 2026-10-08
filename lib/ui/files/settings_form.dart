@@ -93,6 +93,12 @@ class _SettingsFormState extends State<SettingsForm> {
     for (final key in _textKeys) {
       final text = _text[key]!.text.trim();
       final spec = workspaceSettingSpecs[key]!;
+      // A field left as the server had it keeps the server's value, even `""` or one with
+      // spaces around it, so it is not sent.
+      if (text == _show(_saved[key]).trim()) {
+        values[key] = _saved[key];
+        continue;
+      }
       if (text.isEmpty) {
         values[key] = null;
         continue;

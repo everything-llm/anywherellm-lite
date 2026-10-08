@@ -39,6 +39,7 @@ class _UploadQueueState extends State<UploadQueue> {
 
   /// Lists [files], each replacing a waiting file of the same name.
   Future<void> _add(List<UploadFile> files) async {
+    if (!mounted) return;
     setState(() {
       for (final file in files) {
         _remove(file.name);

@@ -18,10 +18,9 @@ Future<String?> saveWithPicker(
   if (place == null) return null;
   return switch (place.scheme) {
     'file' => place.toFilePath(),
-    // A document's id, such as `primary:Download/notes.txt`.
-    _ when place.pathSegments.isNotEmpty => Uri.decodeComponent(
-      place.pathSegments.last,
-    ),
+    // A document's id, such as `primary:Download/notes.txt`, already decoded: a name with `%`
+    // in it would not survive a second decoding.
+    _ when place.pathSegments.isNotEmpty => place.pathSegments.last,
     _ => suggestedName,
   };
 }

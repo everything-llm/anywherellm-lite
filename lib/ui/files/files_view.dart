@@ -101,8 +101,9 @@ class FilesView extends StatelessWidget {
         key: ValueKey('${node.path}#${files.revision}'),
         node: node,
       ),
-      NodeKind.libraryDoc => LibraryDocView(node),
-      NodeKind.docLink => DocLinkView(node),
+      // Keyed by path, so a question asked about one document never carries to the next.
+      NodeKind.libraryDoc => LibraryDocView(node, key: ValueKey(node.path)),
+      NodeKind.docLink => DocLinkView(node, key: ValueKey(node.path)),
       _ => TextPage(files.text ?? ''),
     };
   }

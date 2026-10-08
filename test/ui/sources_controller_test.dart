@@ -107,6 +107,25 @@ void main() {
     expect(rig.prefsStore.saved.offIn(rig.chat.server!.baseUrl, 'q3'), isEmpty);
   });
 
+  test(
+    'a file switched off as the server changes is not kept for the new one',
+    () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      final gate = llm.gates['updateEmbeddings'] = Completer<void>();
+      final switching = rig.sources.toggle(rig.sources.files.first);
+      await pumpEventQueue();
+      await rig.settings.save('https://other:3001', 'K2');
+      gate.complete();
+      await switching;
+      expect(rig.prefsStore.saved.offIn('https://other:3001', 'q3'), isEmpty);
+      expect(
+        rig.prefsStore.saved.offIn(sampleConnection.baseUrl, 'q3'),
+        isEmpty,
+      );
+    },
+  );
+
   test('an added file is uploaded and embedded', () async {
     final llm = planningServer();
     final rig = await started(llm);

@@ -130,6 +130,9 @@ class SourcesController extends ChangeNotifier {
   /// Shows [workspace], already read by someone else, when it is the active one.
   void show(Workspace workspace) {
     if (workspace.slug != _slug) return;
+    // A read of Sources' own still under way is older than this one.
+    _reads++;
+    loading = false;
     _apply(workspace);
     notifyListeners();
   }
@@ -149,7 +152,10 @@ class SourcesController extends ChangeNotifier {
         ? 'Could not switch ${file.title} off'
         : 'Could not switch ${file.title} on',
     (slug) async {
+      final server = _chat.server;
       await _embed(slug, file, on: !file.on);
+      // The switched-off list is kept by server: another one now has its own.
+      if (server != _chat.server) return;
       await _remember(slug, file, off: file.on);
     },
   );

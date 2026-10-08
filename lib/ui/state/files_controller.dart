@@ -189,6 +189,19 @@ class FilesController extends ChangeNotifier {
     final had = {for (final d in _details[read.slug]?.documents ?? []) d.path};
     _details[read.slug] = read;
     _tree = null;
+    // The workspace's prompt or settings on show are its new ones, so a save compares against
+    // what the editor shows.
+    if (node case final shown? when shown.slug == read.slug) {
+      switch (shown.kind) {
+        case NodeKind.prompt:
+          text = read.prompt ?? '';
+          revision++;
+        case NodeKind.settings when read.settings != null:
+          text = settingsText(read.settings!);
+          revision++;
+        default:
+      }
+    }
     notifyListeners();
     final added = [
       for (final d in read.documents)

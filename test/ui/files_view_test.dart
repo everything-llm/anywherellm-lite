@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/ui/chat/chat_view.dart';
 import 'package:anywherellm/ui/files/file_tree.dart';
 import 'package:anywherellm/ui/files/files_view.dart';
@@ -111,6 +112,27 @@ void main() {
     expect(llm.calls, isNot(contains('updateWorkspace:q3')));
   });
 
+  testWidgets('Edit as JSON shows a mode changed in Sources meanwhile', (
+    tester,
+  ) async {
+    final llm = planningServer();
+    final h = await pumpApp(tester, llm: llm);
+    h.shell.showPane(Pane.files);
+    await tester.pumpAndSettle();
+    await tapTree(tester, 'Q3 planning');
+    await tapTree(tester, 'settings.json');
+    await tester.tap(inPane(control('Edit as JSON')));
+    await tester.pumpAndSettle();
+    h.shell.showPane(Pane.chats);
+    await tester.pumpAndSettle();
+    await h.sources.setChatMode(ChatMode.query);
+    await tester.pumpAndSettle();
+    h.shell.showPane(Pane.files);
+    await tester.pumpAndSettle();
+    final shown = tester.widget<TextField>(inPane(find.byType(TextField)));
+    expect(shown.controller!.text, contains('"chatMode": "query"'));
+  });
+
   testWidgets('saving from Edit as JSON stays on the JSON', (tester) async {
     final llm = planningServer();
     final h = await pumpApp(tester, llm: llm);
@@ -134,8 +156,12 @@ void main() {
   });
 
   group('the settings form', () {
-    Future<FakeAnythingLlm> openSettings(WidgetTester tester) async {
+    Future<FakeAnythingLlm> openSettings(
+      WidgetTester tester, {
+      Map<String, Object?> settings = const {},
+    }) async {
       final llm = planningServer();
+      llm.spaces.first.settings.addAll(settings);
       // Tall, so the whole form is on screen.
       final h = await pumpApp(tester, llm: llm, size: const Size(1280, 1800));
       h.shell.showPane(Pane.files);
@@ -186,6 +212,26 @@ void main() {
       await tester.tap(inPane(control('Save')));
       await tester.pumpAndSettle();
       expect(llm.spaces.first.settings['chatModel'], 'gpt-4o');
+    });
+
+    testWidgets('a value left as the server had it is not sent', (
+      tester,
+    ) async {
+      final llm = await openSettings(
+        tester,
+        settings: {'queryRefusalResponse': '', 'chatModel': 'gpt-4o\n'},
+      );
+      expect(tester.widget<Tappable>(inPane(control('Save'))).onTap, isNull);
+      await tester.enterText(
+        inPane(find.widgetWithText(TextField, '4')).first,
+        '9',
+      );
+      await tester.pump();
+      await tester.tap(inPane(control('Save')));
+      await tester.pumpAndSettle();
+      expect(llm.spaces.first.settings['topN'], 9);
+      expect(llm.spaces.first.settings['queryRefusalResponse'], '');
+      expect(llm.spaces.first.settings['chatModel'], 'gpt-4o\n');
     });
 
     testWidgets('a bad number is flagged and nothing is sent', (tester) async {
@@ -274,6 +320,21 @@ void main() {
       isNot(contains(startsWith('custom-documents/Q3'))),
     );
     expect(inTree('Q3 roadmap.pdf'), findsNothing);
+  });
+
+  testWidgets('a delete question stays with its document', (tester) async {
+    final h = await pumpApp(tester, llm: planningServer());
+    h.shell.showPane(Pane.files);
+    await tester.pumpAndSettle();
+    await tapTree(tester, 'custom-documents');
+    await tapTree(tester, 'Q3 roadmap.pdf');
+    await tester.tap(inPane(control('Delete…')));
+    await tester.pumpAndSettle();
+    await tapTree(tester, 'Customer interviews.docx');
+    expect(
+      find.textContaining('Delete Customer interviews.docx'),
+      findsNothing,
+    );
   });
 
   testWidgets('a document\'s text downloads under its title', (tester) async {
