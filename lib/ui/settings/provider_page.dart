@@ -73,6 +73,9 @@ class _ProviderFormState extends State<_ProviderForm> with SettingsSaving {
   };
   final _text = <String, TextEditingController>{};
 
+  /// Whether the fields that are rarely changed show.
+  bool _advancedOpen = false;
+
   /// The secrets that are set and that the person asked to replace.
   final _replacing = <String>{};
 
@@ -85,6 +88,11 @@ class _ProviderFormState extends State<_ProviderForm> with SettingsSaving {
   }
 
   String _saved(String key) => settingText(widget.values, key);
+
+  /// Whether [field] is one that is rarely changed: how much a model can read, or how long a
+  /// piece of text is cut.
+  static bool _advanced(ProviderField field) =>
+      field.key.endsWith('TokenLimit') || field.key.endsWith('MaxChunkLength');
 
   /// Whether [field] is a secret, which the server shows only as whether it is set.
   static bool _secret(ProviderField field) => field.kind == FieldKind.secret;
@@ -221,10 +229,21 @@ class _ProviderFormState extends State<_ProviderForm> with SettingsSaving {
       children: [
         for (final (i, (s, of)) in shown.indexed) ...[
           FieldCard([if (i == 0) ...widget.lead, _chooser(s, saving)]),
-          if (of.isNotEmpty) ...[
+          if (of.where((f) => !_advanced(f)).toList() case final main
+              when main.isNotEmpty) ...[
             if (widget.fieldsNote case final note?) PageNote(note),
-            FieldCard([for (final field in of) _field(field, saving)]),
+            FieldCard([for (final field in main) _field(field, saving)]),
           ],
+        ],
+        if (fields.where(_advanced).toList() case final rare
+            when rare.isNotEmpty) ...[
+          Fold(
+            label: 'Advanced (${rare.length})',
+            open: _advancedOpen,
+            onToggle: () => setState(() => _advancedOpen = !_advancedOpen),
+          ),
+          if (_advancedOpen)
+            FieldCard([for (final field in rare) _field(field, saving)]),
         ],
         if (confirmBox(() => _draft(fields)) case final box?)
           box

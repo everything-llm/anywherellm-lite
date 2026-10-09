@@ -128,9 +128,7 @@ void main() {
         canDictate: true,
         canSpeak: true,
       );
-      h.shell
-        ..openSettings()
-        ..showAllSettings(true);
+      h.shell.openSettings();
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       for (final page in SettingsPage.values) {

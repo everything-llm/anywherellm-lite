@@ -160,7 +160,6 @@ class ShellController extends ChangeNotifier {
   bool _settingsOpen = false;
   Pane _pane = Pane.chats;
   SettingsPage? _settingsPage;
-  bool _allSettings = false;
 
   /// Whether Sources sits in the layout, as the shell last laid it out.
   bool _inline = true;
@@ -196,8 +195,6 @@ class ShellController extends ChangeNotifier {
   /// side; side by side, null is [SettingsPage.connection].
   SettingsPage? get settingsPage => _settingsPage;
 
-  /// Whether Settings lists every page rather than the essentials alone.
-  bool get allSettings => _allSettings;
   Pane get pane => _pane;
 
   /// Tells which layout Sources is in. The shell calls it as it lays out, so it does not notify.
@@ -256,7 +253,6 @@ class ShellController extends ChangeNotifier {
   /// Opens Settings on [page], or on its list.
   void openSettings([SettingsPage? page]) {
     _settingsPage = page;
-    _allSettings |= !(page?.essential ?? true);
     _settingsOpen = true;
     _sideOpen = false;
     _popup.value = null;
@@ -271,29 +267,18 @@ class ShellController extends ChangeNotifier {
   void showSettingsPage(SettingsPage? page) {
     if (page == _settingsPage) return;
     _settingsPage = page;
-    _allSettings |= !(page?.essential ?? true);
     notifyListeners();
   }
 
-  /// Goes back from the Settings page shown: on a [phone] to the page it was opened from, the
-  /// Server page or the list; elsewhere to the list. From the list, Settings closes.
-  void settingsBack({required bool phone}) {
+  /// Goes back from the Settings page shown to the page it is reached from, the Server page or
+  /// the list. From the list, Settings closes.
+  void settingsBack() {
     final page = _settingsPage;
     if (page == null) {
       closeSettings();
     } else {
-      showSettingsPage(phone ? page.phoneParent : null);
+      showSettingsPage(page.parent);
     }
-  }
-
-  /// Lists every page of Settings, or only the essentials, which leaves a page that is not one.
-  void showAllSettings(bool all) {
-    if (all == allSettings) return;
-    _allSettings = all;
-    if (!all && !(_settingsPage?.essential ?? true)) {
-      _settingsPage = SettingsPage.connection;
-    }
-    notifyListeners();
   }
 
   void closeDrawers() {

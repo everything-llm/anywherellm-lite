@@ -426,14 +426,14 @@ void main() {
               ),
             )
             .toList();
-        final [address, password] = fields();
+        final [_, address, password] = fields();
         expect(address.keyboardType, TextInputType.url);
         expect(address.autofillHints, [AutofillHints.url]);
         // Without suggestions, Flutter on Android would mark it a visible password.
         expect(address.enableSuggestions, isTrue);
         await tester.tap(control('Paste a key'));
         await tester.pumpAndSettle();
-        final [_, key] = fields();
+        final [_, _, key] = fields();
         for (final secret in [password, key]) {
           expect(secret.enableSuggestions, isFalse);
           expect(secret.keyboardType, TextInputType.visiblePassword);

@@ -5,12 +5,12 @@ import '../../core/providers.dart';
 import '../app_scope.dart';
 import '../icons.dart';
 import '../layout.dart';
+import '../links.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/phone_page.dart';
-import '../widgets/segmented.dart';
 import '../widgets/tappable.dart';
 import 'chats_page.dart';
 import 'connection_page.dart';
@@ -22,6 +22,7 @@ import 'provider_page.dart';
 import 'rows.dart';
 import 'server_page.dart';
 import 'settings_pages.dart';
+import 'settings_search.dart';
 
 /// Settings, drawn over the app by the shell: a list of pages beside the page chosen, or, where
 /// they do not fit side by side, the list and then the page with a way back.
@@ -130,7 +131,7 @@ class _PhoneFrame extends StatelessWidget {
     }
     final back = switch (page) {
       null => 'Back to the chat',
-      final page => 'Back to ${page.phoneParent?.label ?? 'Settings'}',
+      final page => 'Back to ${page.parent?.label ?? 'Settings'}',
     };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -138,7 +139,7 @@ class _PhoneFrame extends StatelessWidget {
         PhonePageHeader(
           title: page?.label ?? 'Settings',
           back: back,
-          onBack: () => shell.settingsBack(phone: true),
+          onBack: shell.settingsBack,
         ),
         Expanded(
           child: page == null
@@ -221,24 +222,12 @@ class _Frame extends StatelessWidget {
     final scope = AppScope.of(context);
     final shell = scope.shell;
     final configured = scope.settings.configured;
-    final all = shell.allSettings && configured;
-    final pages = [
-      for (final page in SettingsPage.values)
-        if (!page.phoneOnly &&
-            (configured || !page.needsServer) &&
-            (all || page.essential))
-          page,
-    ];
     var page = shell.settingsPage;
-    if (page != null && !pages.contains(page)) page = SettingsPage.connection;
+    if (page != null && page.needsServer && !configured) {
+      page = SettingsPage.connection;
+    }
     if (wide) page ??= SettingsPage.connection;
-    final nav = _Nav(
-      pages: pages,
-      current: page,
-      all: all,
-      canShowAll: configured,
-      wide: wide,
-    );
+    final nav = _Nav(current: page, configured: configured, wide: wide);
     final t = Tokens.of(context);
     final rule = Divider(height: 1, thickness: 1, color: t.line);
     if (wide) {
@@ -290,8 +279,10 @@ class _Header extends StatelessWidget {
           if (page != null) ...[
             IconBtn(
               'back',
-              tooltip: 'All settings',
-              onPressed: () => shell.showSettingsPage(null),
+              tooltip: page.parent == null
+                  ? 'All settings'
+                  : 'Back to ${page.parent!.label}',
+              onPressed: shell.settingsBack,
             ),
             const SizedBox(width: 6),
           ],
@@ -314,82 +305,201 @@ class _Header extends StatelessWidget {
   }
 }
 
-/// The pages, under their groups, with the switch between the essentials and every page.
-class _Nav extends StatelessWidget {
+/// The list of Settings: a search over the pages, then This app's pages and, once a server is
+/// saved, the Server page, with the page open beneath it when it is one of the server's. A
+/// search lists the pages it finds in their place.
+class _Nav extends StatefulWidget {
   const _Nav({
-    required this.pages,
     required this.current,
-    required this.all,
-    required this.canShowAll,
+    required this.configured,
     required this.wide,
   });
 
-  final List<SettingsPage> pages;
   final SettingsPage? current;
-  final bool all;
-  final bool canShowAll;
+  final bool configured;
   final bool wide;
 
   @override
+  State<_Nav> createState() => _NavState();
+}
+
+class _NavState extends State<_Nav> {
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final shell = AppScope.of(context).shell;
+    final scope = AppScope.of(context);
+    final shell = scope.shell;
     final t = Tokens.of(context);
-    SettingsGroup? group;
+    final current = widget.current;
+    final wide = widget.wide;
+    Widget item(
+      String label, {
+      SettingsPage? page,
+      String? hint,
+      double indent = 10,
+      VoidCallback? onTap,
+    }) => _NavItem(
+      label,
+      hint: hint,
+      current: page != null && page == current,
+      indent: indent,
+      wide: wide,
+      onTap:
+          onTap ??
+          () {
+            _search.clear();
+            shell.showSettingsPage(page);
+          },
+    );
+    Widget head(String label) => Padding(
+      padding: const EdgeInsets.fromLTRB(10, 16, 10, 4),
+      child: SectionLabel(label),
+    );
     return ColoredBox(
       color: wide ? t.side : t.panel2,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(10, 14, 10, 14),
-        children: [
-          if (canShowAll)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Segmented<bool>(
-                options: const [(false, 'Essentials'), (true, 'All settings')],
-                value: all,
-                onChanged: shell.showAllSettings,
+      child: ListenableBuilder(
+        listenable: _search,
+        builder: (context, _) {
+          final query = _search.text.trim();
+          final hits = searchSettings(query, configured: widget.configured);
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(10, 6, 10, 14),
+            children: [
+              _SearchBox(_search),
+              if (query.isNotEmpty) ...[
+                head(hits.isEmpty ? 'Nothing matches' : 'Results'),
+                for (final hit in hits)
+                  if (hit.page case final page?)
+                    item(page.label, page: page, hint: hit.field)
+                  else
+                    item(
+                      hit.label,
+                      hint: 'In the browser',
+                      onTap: () {
+                        if (scope.settings.connection case final connection?) {
+                          openLink(context, connection.uri.toString());
+                        }
+                      },
+                    ),
+              ] else ...[
+                head('This app'),
+                for (final page in const [
+                  SettingsPage.connection,
+                  SettingsPage.appearance,
+                  SettingsPage.chat,
+                ])
+                  item(page.label, page: page),
+                if (widget.configured) ...[
+                  head('AnythingLLM'),
+                  item(SettingsPage.server.label, page: SettingsPage.server),
+                  if (current != null && current.parent != null)
+                    item(current.label, page: current, indent: 22),
+                ],
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// The search over Settings' pages: a 40 px field with the search icon before the text.
+class _SearchBox extends StatelessWidget {
+  const _SearchBox(this.controller);
+
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 2),
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: t.panel,
+          border: Border.all(color: t.line),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            AppIcon('search', size: IconSize.small, color: t.muted),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Semantics(
+                label: 'Search settings',
+                textField: true,
+                child: TextField(
+                  controller: controller,
+                  autocorrect: false,
+                  style: Type.sans(14, color: t.ink),
+                  cursorColor: t.accent,
+                  decoration: InputDecoration(
+                    isCollapsed: true,
+                    border: InputBorder.none,
+                    hintText: 'Search settings',
+                    hintStyle: Type.sans(14, color: t.fade),
+                  ),
+                ),
               ),
             ),
-          for (final page in pages) ...[
-            if (page.group != group)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 16, 10, 4),
-                child: SectionLabel((group = page.group).label),
-              ),
-            _NavItem(page, current: page == current, wide: wide),
           ],
-        ],
+        ),
       ),
     );
   }
 }
 
 class _NavItem extends StatelessWidget {
-  const _NavItem(this.page, {required this.current, required this.wide});
+  const _NavItem(
+    this.label, {
+    required this.hint,
+    required this.current,
+    required this.indent,
+    required this.wide,
+    required this.onTap,
+  });
 
-  final SettingsPage page;
+  final String label;
+
+  /// The field a search matched, or where the page opens, small at the row's end.
+  final String? hint;
   final bool current;
+
+  /// How far in the label starts: more for the page open under Server.
+  final double indent;
   final bool wide;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final shell = AppScope.of(context).shell;
     final t = Tokens.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: Tappable(
-        label: page.label,
+        label: [label, ?hint].join(', '),
         selected: current,
-        onTap: () => shell.showSettingsPage(page),
+        onTap: onTap,
         radius: BorderRadius.circular(8),
         color: current ? t.sel : null,
         child: Container(
           constraints: BoxConstraints(minHeight: wide ? 36 : 48),
-          padding: const EdgeInsets.fromLTRB(10, 0, 8, 0),
+          padding: EdgeInsets.fromLTRB(indent, 0, 8, 0),
           child: Row(
+            spacing: 8,
             children: [
               Expanded(
                 child: Text(
-                  page.label,
+                  label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Type.sans(
@@ -399,6 +509,16 @@ class _NavItem extends StatelessWidget {
                   ),
                 ),
               ),
+              if (hint case final hint?)
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 110),
+                  child: Text(
+                    hint,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Type.sans(12, color: t.muted),
+                  ),
+                ),
               if (!wide) AppIcon('chevron', size: IconSize.xs, color: t.muted),
             ],
           ),
@@ -437,6 +557,8 @@ class _PageView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (wide)
+                if (page.parent case final parent?) _BackLink(parent),
+              if (wide)
                 Semantics(
                   header: true,
                   child: Text(
@@ -455,12 +577,17 @@ class _PageView extends StatelessWidget {
                 Text(
                   phone && page == SettingsPage.connection
                       ? 'How this phone reaches AnythingLLM.'
+                      : phone && page == SettingsPage.server
+                      ? 'What AnythingLLM runs with. Each row opens the page that changes it.'
                       : page.about,
                   style: Type.sans(15, color: t.ink2, height: 1.5),
                 ),
                 const SizedBox(height: 20),
               ],
-              KeyedSubtree(key: ValueKey((page, server)), child: _body(page)),
+              KeyedSubtree(
+                key: ValueKey((page, server)),
+                child: _body(page, phone: phone),
+              ),
             ],
           ),
         ),
@@ -468,36 +595,72 @@ class _PageView extends StatelessWidget {
     );
   }
 
-  static Widget _body(SettingsPage page) => switch (page) {
-    SettingsPage.connection => const ConnectionPage(),
-    SettingsPage.server => const ServerPage(),
-    SettingsPage.appearance => const AppearancePage(),
-    SettingsPage.chat => const ChatPage(),
-    SettingsPage.chatModel => const ProviderPage([
-      chatProviders,
-    ], fieldsNote: 'These fields change with the provider.'),
-    SettingsPage.searchModel => const ProviderPage(
-      [embedderProviders],
-      before: [SearchModelWarning()],
-    ),
-    SettingsPage.storage => const ProviderPage(
-      [vectorProviders],
-      lead: [StoredPassages()],
-    ),
-    SettingsPage.images => const ProviderPage([imageProviders]),
-    SettingsPage.voice => const ProviderPage(
-      [speechToTextProviders, textToSpeechProviders],
-      after: [
-        PageNote(
-          'Read aloud and dictation in AnywhereLLM use the device\'s own engines, whatever '
-          'is set here.',
+  static Widget _body(SettingsPage page, {required bool phone}) =>
+      switch (page) {
+        SettingsPage.connection => const ConnectionPage(),
+        SettingsPage.server => ServerPage(phone: phone),
+        SettingsPage.appearance => const AppearancePage(),
+        SettingsPage.chat => const ChatPage(),
+        SettingsPage.chatModel => const ProviderPage([
+          chatProviders,
+        ], fieldsNote: 'These fields change with the provider.'),
+        SettingsPage.searchModel => const ProviderPage(
+          [embedderProviders],
+          before: [SearchModelWarning()],
         ),
-      ],
-    ),
-    SettingsPage.transcription => const ProviderPage([transcriptionProviders]),
-    SettingsPage.chats => const ChatsPage(),
-    SettingsPage.embeds => const EmbedsPage(),
-    SettingsPage.privacy => const PrivacyPage(),
-    SettingsPage.json => const JsonPage(),
-  };
+        SettingsPage.storage => const ProviderPage(
+          [vectorProviders],
+          lead: [StoredPassages()],
+        ),
+        SettingsPage.images => const ProviderPage([imageProviders]),
+        SettingsPage.voice => const ProviderPage(
+          [speechToTextProviders, textToSpeechProviders],
+          after: [
+            PageNote(
+              'Read aloud and dictation in AnywhereLLM use the device\'s own engines, whatever '
+              'is set here.',
+            ),
+          ],
+        ),
+        SettingsPage.transcription => const ProviderPage([
+          transcriptionProviders,
+        ]),
+        SettingsPage.chats => const ChatsPage(),
+        SettingsPage.embeds => const EmbedsPage(),
+        SettingsPage.privacy => const PrivacyPage(),
+        SettingsPage.json => const JsonPage(),
+      };
+}
+
+/// A link over a server page's title back to the page it is reached from: a chevron turned
+/// back, then the page's name, in the accent.
+class _BackLink extends StatelessWidget {
+  const _BackLink(this.parent);
+
+  final SettingsPage parent;
+
+  @override
+  Widget build(BuildContext context) {
+    final shell = AppScope.of(context).shell;
+    final t = Tokens.of(context);
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Tappable(
+        label: 'Back to ${parent.label}',
+        onTap: () => shell.showSettingsPage(parent),
+        radius: BorderRadius.circular(8),
+        child: SizedBox(
+          height: 32,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            spacing: 4,
+            children: [
+              AppIcon('back', size: IconSize.xs, color: t.accent),
+              Text(parent.label, style: Type.sans(13.5, color: t.accent)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

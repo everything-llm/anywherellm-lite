@@ -87,7 +87,7 @@ class AppShell extends StatelessWidget {
       if (shell.activityOpen && !shell.settingsOpen) return shell.closeActivity;
       if (shell.settingsOpen) {
         return !settingsSideBySide && shell.settingsPage != null
-            ? () => shell.settingsBack(phone: phone)
+            ? shell.settingsBack
             : shell.closeSettings;
       }
       if (sidebarDrawer && shell.sideOpen) return shell.closeSide;

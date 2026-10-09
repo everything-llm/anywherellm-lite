@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../icons.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/fields.dart';
+import '../widgets/tappable.dart';
 
 /// A rounded panel holding [children] one above another, as Settings draws a card.
 class PanelCard extends StatelessWidget {
@@ -211,6 +213,52 @@ class PageWarning extends StatelessWidget {
         borderRadius: BorderRadius.circular(11),
       ),
       child: Text(text, style: Type.sans(14, color: t.warnfg, height: 1.5)),
+    );
+  }
+}
+
+/// A button that opens or closes what is under it: a chevron that turns, then [label]. Heard as
+/// expanded or collapsed.
+class Fold extends StatelessWidget {
+  const Fold({
+    super.key,
+    required this.label,
+    required this.open,
+    required this.onToggle,
+  });
+
+  final String label;
+  final bool open;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Tappable(
+        label: label,
+        expanded: open,
+        onTap: onToggle,
+        radius: BorderRadius.circular(8),
+        child: SizedBox(
+          height: 36,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            spacing: 6,
+            children: [
+              RotatedBox(
+                quarterTurns: open ? 1 : 0,
+                child: AppIcon('chevron', size: IconSize.xs, color: t.ink2),
+              ),
+              Text(
+                label,
+                style: Type.sans(14, weight: FontWeight.w500, color: t.ink2),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
