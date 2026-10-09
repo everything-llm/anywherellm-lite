@@ -20,6 +20,7 @@ import 'widgets/menu.dart';
 import 'widgets/min_height.dart';
 import 'widgets/settings_button.dart';
 import 'widgets/tappable.dart';
+import 'activity.dart';
 import 'upcoming.dart';
 import 'workspace_switcher.dart';
 
@@ -57,7 +58,8 @@ class _SidebarState extends State<Sidebar> {
       container: true,
       label: 'Workspaces',
       child: MinHeight(
-        min: Sizes.panelMin,
+        // A phone's drawer has Activity and Upcoming too, a row of 44 px each.
+        min: Sizes.panelMin + (ScreenClass.ofContext(context).isPhone ? 44 : 0),
         child: Container(
           width: widget.width,
           padding: const EdgeInsets.fromLTRB(12, 18, 12, 12),
@@ -205,11 +207,13 @@ class _ChatsState extends State<_Chats> {
                     : null,
               ),
             ),
-            // A phone's drawer also has the server's scheduled jobs.
+            // A phone's drawer also has what the relay is answering and the server's scheduled jobs.
             if (!searching &&
                 ScreenClass.ofContext(context).isPhone &&
-                scope.settings.configured)
-              const UpcomingRow(),
+                scope.settings.configured) ...const [
+              ActivityRow(),
+              UpcomingRow(),
+            ],
             Expanded(
               child: searching ? _found(context, query) : _groups(context),
             ),

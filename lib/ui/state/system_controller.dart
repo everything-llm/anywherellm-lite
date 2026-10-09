@@ -52,6 +52,47 @@ class SystemController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The answers the relay holds, oldest first, or null until read.
+  List<RelayRun>? activity;
+
+  /// Why the last read of the activity failed.
+  Notice? activityProblem;
+
+  /// How many answers the relay is writing, or null until the activity is read.
+  int? get running => activity?.where((r) => r.running).length;
+
+  /// Reads the answers the relay holds.
+  Future<void> readActivity() async {
+    final server = _server;
+    if (server == null) return;
+    try {
+      final read = await _api.relayRuns();
+      if (_server != server) return;
+      activity = read;
+      activityProblem = null;
+    } on ApiException catch (error) {
+      if (_server != server) return;
+      activityProblem = Notice('Could not read the activity', error.message);
+    }
+    notifyListeners();
+  }
+
+  /// Stops [run] on the relay, then reads the activity again.
+  Future<void> stopRun(RelayRun run) async {
+    final id = run.id;
+    if (id == null) return;
+    final server = _server;
+    try {
+      await _api.cancelRun(id);
+    } on ApiException catch (error) {
+      if (_server != server) return;
+      activityProblem = Notice('Could not stop the answer', error.message);
+      notifyListeners();
+      return;
+    }
+    await readActivity();
+  }
+
   /// The server's settings, with every secret replaced by whether it is set, or null until read.
   Map<String, Object?>? settings;
 
@@ -362,6 +403,8 @@ class SystemController extends ChangeNotifier {
     vectors = null;
     jobs = null;
     jobsProblem = null;
+    activity = null;
+    activityProblem = null;
     problem = null;
     settings = null;
     settingsProblem = null;

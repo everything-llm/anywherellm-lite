@@ -18,6 +18,7 @@ import 'share/share_sheet.dart';
 import 'share/shared_item.dart';
 import 'sidebar.dart';
 import 'sources/sources_panel.dart';
+import 'activity.dart';
 import 'upcoming.dart';
 import 'state/shell_controller.dart';
 import 'tokens.dart';
@@ -83,6 +84,7 @@ class AppShell extends StatelessWidget {
       if (shell.popup.value != null) return shell.closePopup;
       if (shell.scanning) return () => shell.setScanning(false);
       if (shell.upcomingOpen && !shell.settingsOpen) return shell.closeUpcoming;
+      if (shell.activityOpen && !shell.settingsOpen) return shell.closeActivity;
       if (shell.settingsOpen) {
         return !settingsSideBySide && shell.settingsPage != null
             ? () => shell.settingsBack(phone: phone)
@@ -247,6 +249,8 @@ class AppShell extends StatelessWidget {
                             if (sheetOpen) Positioned.fill(child: right),
                             if (shell.upcomingOpen)
                               const Positioned.fill(child: UpcomingPage()),
+                            if (shell.activityOpen)
+                              const Positioned.fill(child: ActivityPage()),
                             // A phone's Settings is a page over the window.
                             if (shell.settingsOpen && screen.isPhone)
                               const Positioned.fill(

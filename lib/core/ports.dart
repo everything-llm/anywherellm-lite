@@ -87,6 +87,15 @@ abstract interface class AnythingLlmApi {
   /// 7 days it keeps them. Empty when the server has no such relay or it cannot be asked.
   Future<List<RelayRun>> finishedRuns();
 
+  /// Every answer the server that keeps answers going without the app holds, running, finished,
+  /// failed or stopped, in the 7 days it keeps them, oldest first. Fails with [ApiException],
+  /// saying so, when the server has no such relay.
+  Future<List<RelayRun>> relayRuns();
+
+  /// Stops the relay's run [id], whichever chat it answers in. Does nothing for a run that has
+  /// ended.
+  Future<void> cancelRun(String id);
+
   /// The jobs AnythingLLM runs on a schedule. It takes the server's web login, as the presets
   /// do: on a server with a password it needs one saved.
   Future<List<ScheduledJob>> scheduledJobs();

@@ -100,6 +100,24 @@ class ShellController extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool _activity = false;
+
+  /// Whether a phone's Activity page shows over the chat.
+  bool get activityOpen => _activity;
+
+  void openActivity() {
+    if (_activity) return;
+    _activity = true;
+    _popup.value = null;
+    notifyListeners();
+  }
+
+  void closeActivity() {
+    if (!_activity) return;
+    _activity = false;
+    notifyListeners();
+  }
+
   SharedItem? _shared;
 
   /// What another app shared with AnywhereLLM, which the shell offers to add or ask about, or

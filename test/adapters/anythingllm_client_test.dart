@@ -2650,6 +2650,78 @@ void main() {
       test('a run that clears the chat is no answer', () async {
         final api = relay(
           (_) => lines([]),
+      test(
+        'lists every kept run with its question, why it failed and when',
+        () async {
+          final seen = <http.Request>[];
+          final api = relay(
+            (_) => lines([]),
+            seen: seen,
+            running: {
+              'runs': [
+                listed(
+                  'r_1',
+                  more: {'question': '  Why?  ', 'createdAt': 1000},
+                ),
+                listed(
+                  'r_2',
+                  more: {
+                    'status': 'failed',
+                    'question': 'When?',
+                    'error': 'The relay restarted during the answer.',
+                    'createdAt': '2026-10-08T12:00:00Z',
+                    'finishedAt': '2026-10-08T12:01:00Z',
+                  },
+                ),
+                listed('r_3', more: {'question': '/reset', 'status': 'done'}),
+                {'id': 'r_4', 'status': 'done'},
+              ],
+            },
+          );
+          final runs = await api.relayRuns();
+          expect(
+            [for (final r in runs) (r.id, r.status, r.question, r.error)],
+            [
+              ('r_1', 'running', 'Why?', null),
+              (
+                'r_2',
+                'failed',
+                'When?',
+                'The relay restarted during the answer.',
+              ),
+            ],
+          );
+          expect(runs.first.started, DateTime.utc(1970, 1, 1, 0, 0, 1));
+          expect(runs.last.finished, DateTime.utc(2026, 10, 8, 12, 1));
+          final list = seen.firstWhere(
+            (r) => r.url.path == '/everythingllm/v1/runs',
+          );
+          expect(list.url.queryParameters, isEmpty);
+        },
+      );
+
+      test('a server with no relay says so rather than listing none', () async {
+        final api = relay((_) => lines([]), health: {'service': 'other'});
+        await expectLater(
+          api.relayRuns(),
+          throwsA(
+            isA<ApiException>().having(
+              (e) => e.message,
+              'message',
+              contains('no everythingllm relay'),
+            ),
+          ),
+        );
+      });
+
+      test('cancels a run by its id, whichever chat it answers', () async {
+        final seen = <http.Request>[];
+        await relay((_) => lines([]), seen: seen).cancelRun('r_1');
+        final cancel = seen.single;
+        expect(cancel.method, 'POST');
+        expect(cancel.url.path, '/everythingllm/v1/runs/r_1/cancel');
+      });
+
           running: {
             'runs': [
               listed(

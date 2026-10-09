@@ -627,13 +627,18 @@ enum ChatExport {
       'anythingllm-chats${this == jsonAlpaca ? '-alpaca' : ''}.$extension';
 }
 
-/// An answer the relay ran: its [workspace] and [thread], its [status] (`running`, `done`,
-/// `failed` or `cancelled`), and when it [finished], once it has.
+/// An answer the relay ran: its [id], [workspace] and [thread], its [status] (`running`,
+/// `done`, `failed` or `cancelled`), the [question] it answers (the first 200 characters), why
+/// it [error]ed, when it [started] and, once it has, when it [finished].
 class RelayRun {
   const RelayRun({
     required this.workspace,
     required this.thread,
     required this.status,
+    this.id,
+    this.question,
+    this.error,
+    this.started,
     this.finished,
   });
 
@@ -644,22 +649,42 @@ class RelayRun {
     final thread = json['thread'];
     final status = json['status'];
     if (workspace is! String || thread is! String) return null;
+    DateTime? time(Object? value) => switch (value) {
+      final String text => DateTime.tryParse(text),
+      final int ms => DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true),
+      _ => null,
+    };
+    String? text(Object? value) =>
+        value is String && value.trim().isNotEmpty ? value.trim() : null;
     return RelayRun(
       workspace: workspace,
       thread: thread,
       status: status is String ? status : '',
-      finished: switch (json['finishedAt']) {
-        final String text => DateTime.tryParse(text),
-        final int ms => DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true),
-        _ => null,
-      },
+      id: text(json['id']),
+      question: text(json['question']),
+      error: text(json['error']),
+      started: time(json['createdAt']),
+      finished: time(json['finishedAt']),
     );
   }
 
+  final String? id;
   final String workspace;
   final String thread;
   final String status;
+  final String? question;
+  final String? error;
+  final DateTime? started;
   final DateTime? finished;
+
+  /// Whether the answer is still being written.
+  bool get running => status == 'running';
+
+  /// Whether the answer failed.
+  bool get failed => status == 'failed';
+
+  /// Whether the answer was stopped.
+  bool get stopped => status == 'cancelled';
 
   /// Whether the answer ran to its end, neither failing nor stopped.
   bool get done => status == 'done';

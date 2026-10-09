@@ -345,6 +345,31 @@ class FakeAnythingLlm implements AnythingLlmApi {
   @override
   Future<List<RelayRun>> finishedRuns() => _run('finishedRuns', () => runs);
 
+  /// What [relayRuns] answers.
+  List<RelayRun> allRuns = const [];
+
+  @override
+  Future<List<RelayRun>> relayRuns() => _run('relayRuns', () => allRuns);
+
+  @override
+  Future<void> cancelRun(String id) => _run('cancelRun', () {
+    allRuns = [
+      for (final run in allRuns)
+        if (run.id == id && run.running)
+          RelayRun(
+            id: run.id,
+            workspace: run.workspace,
+            thread: run.thread,
+            status: 'cancelled',
+            question: run.question,
+            started: run.started,
+            finished: DateTime.now().toUtc(),
+          )
+        else
+          run,
+    ];
+  }, id);
+
   @override
   Future<void> stopChat(String slug, String thread) =>
       _run('stopChat', () {}, thread);

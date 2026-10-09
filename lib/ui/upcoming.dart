@@ -54,11 +54,11 @@ class _UpcomingRowState extends State<UpcomingRow> {
               ..closeSide()
               ..openUpcoming();
           },
-          radius: BorderRadius.circular(8),
+          radius: BorderRadius.circular(10),
           child: SizedBox(
             height: 44,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
                 children: [
                   AppIcon('clock', size: IconSize.xs, color: t.ink2),
@@ -67,7 +67,7 @@ class _UpcomingRowState extends State<UpcomingRow> {
                     child: Text(
                       'Upcoming',
                       style: Type.sans(
-                        14,
+                        15,
                         weight: FontWeight.w500,
                         color: t.ink,
                       ),
