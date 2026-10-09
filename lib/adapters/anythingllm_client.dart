@@ -327,22 +327,6 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     return null;
   }
 
-  /// The answers the relay ran to their end, from `GET /everythingllm/v1/runs?status=done`. A
-  /// server with no relay, or one that cannot be asked, has none.
-  @override
-  Future<List<RelayRun>> finishedRuns() async {
-    try {
-      final connection = _current;
-      if (!await _isRelay(connection)) return const [];
-      return [
-        for (final run in await _listRuns(connection, 'done'))
-          ?RelayRun.fromJson(run),
-      ];
-    } on ApiException {
-      return const [];
-    }
-  }
-
   @override
   Future<List<RelayRun>> relayRuns() async {
     final connection = _current;

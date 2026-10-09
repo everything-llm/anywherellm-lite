@@ -84,10 +84,6 @@ abstract interface class AnythingLlmApi {
   /// chat never fails to open for this.
   Future<RejoinedAnswer?> rejoinChat(String slug, String thread);
 
-  /// The answers the server that keeps answers going without the app ran to their end, in the
-  /// 7 days it keeps them. Empty when the server has no such relay or it cannot be asked.
-  Future<List<RelayRun>> finishedRuns();
-
   /// Every answer the server that keeps answers going without the app holds, running, finished,
   /// failed or stopped, in the 7 days it keeps them, oldest first. Fails with [ApiException],
   /// saying so, when the server has no such relay.

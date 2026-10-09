@@ -650,7 +650,13 @@ class ChatController extends ChangeNotifier {
   Future<void> readFinishedRuns() async {
     final server = _server;
     if (server == null) return;
-    final runs = await _api.finishedRuns();
+    final List<RelayRun> runs;
+    try {
+      runs = await _api.relayRuns();
+    } on ApiException {
+      // A server with no relay, or one that cannot be asked, has none to mark.
+      return;
+    }
     if (_server != server) return;
     final threads = {
       for (final MapEntry(:key, :value) in _threads.entries)

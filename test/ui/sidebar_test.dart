@@ -445,7 +445,7 @@ void main() {
       (tester) async {
         final seen = DateTime.utc(2026, 10, 1, 9);
         final llm = planningServer()
-          ..runs = [
+          ..allRuns = [
             RelayRun(
               workspace: 'q3',
               thread: 'priorities',
@@ -488,7 +488,7 @@ void main() {
       (tester) async {
         final seen = DateTime.utc(2026, 10, 1, 9);
         final llm = planningServer()
-          ..runs = [
+          ..allRuns = [
             RelayRun(
               workspace: 'q3',
               thread: 'priorities',
@@ -518,7 +518,7 @@ void main() {
         expect(inSidebar(control('Quarter priorities')), findsOneWidget);
         // A chat this device never showed gets no dot.
         final never = planningServer()
-          ..runs = [
+          ..allRuns = [
             RelayRun(
               workspace: 'q3',
               thread: 'priorities',

@@ -352,12 +352,6 @@ class FakeAnythingLlm implements AnythingLlmApi {
   Future<List<ScheduledJob>> scheduledJobs() =>
       _run('scheduledJobs', () => jobs);
 
-  /// What [finishedRuns] answers.
-  List<RelayRun> runs = const [];
-
-  @override
-  Future<List<RelayRun>> finishedRuns() => _run('finishedRuns', () => runs);
-
   /// What [chatBrowser] answers, by thread: none for a chat with no browser.
   final Map<String, ChatBrowser> browsers = {};
 
