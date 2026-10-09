@@ -7,6 +7,7 @@ import 'package:anywherellm/ui/chat/speaker.dart';
 import 'package:anywherellm/ui/share/shared_item.dart';
 import 'package:anywherellm/ui/shell.dart';
 import 'package:anywherellm/ui/state/browser_controller.dart';
+import 'package:anywherellm/ui/state/created_controller.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 
@@ -143,6 +144,9 @@ class Harness extends Rig {
   /// How often the open panel reads the browser, or null for never.
   final Duration? browserEvery;
 
+  /// The open workspace's created files as the fake server lists them.
+  late final CreatedController created = CreatedController(llm, settings, chat);
+
   late final ReadAloud? readAloud = switch (speaker) {
     final speaker? => ReadAloud(speaker, chat, prefs),
     null => null,
@@ -150,6 +154,7 @@ class Harness extends Rig {
 
   @override
   void dispose() {
+    created.dispose();
     browser.dispose();
     readAloud?.dispose();
     super.dispose();
@@ -203,6 +208,7 @@ class Harness extends Rig {
       files: files,
       system: system,
       browser: browser,
+      created: created,
       launch: (url) async {
         opened.add(url);
         if (openThrows case final error?) throw error;

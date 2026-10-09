@@ -218,18 +218,22 @@ void main() {
     expect(inSidebar(control('settings.json')), findsOneWidget);
   });
 
-  testWidgets('Created files says where an answer\'s files are', (
-    tester,
-  ) async {
-    final h = await openFiles(tester);
-    await tapSection(tester, 'Created files');
-    expect(paneTitle(tester), 'Created files');
-    expect(h.files.selected, isNull);
-    expect(
-      inPane(find.textContaining('appear under the answer that made them')),
-      findsOneWidget,
-    );
-  });
+  testWidgets(
+    'Created files says where an answer\'s files are on a server that does not list them',
+    (tester) async {
+      final h = await openFiles(
+        tester,
+        llm: planningServer()..noCreatedRoute = true,
+      );
+      await tapSection(tester, 'Created files');
+      expect(paneTitle(tester), 'Created files');
+      expect(h.files.selected, isNull);
+      expect(
+        inPane(find.textContaining('appear under the answer that made them')),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('Essentials follows another workspace opened meanwhile', (
     tester,

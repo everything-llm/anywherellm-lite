@@ -12,6 +12,7 @@ import '../widgets/controls.dart';
 import '../widgets/min_height.dart';
 import '../widgets/pane_header.dart';
 import 'doc_views.dart';
+import 'created_files.dart';
 import 'essentials.dart';
 import 'file_tree.dart';
 import 'folder_view.dart';
@@ -339,7 +340,8 @@ Widget essentialSection(
   return switch (section) {
     // Keyed by workspace, so what waits to be added stays with it.
     FilesSection.documents => EssentialDocs(key: ValueKey(workspace.slug)),
-    FilesSection.created => CreatedFiles(workspace: workspace.name),
+    // Keyed by workspace, so another one's files are read afresh.
+    FilesSection.created => CreatedFiles(key: ValueKey(workspace.slug)),
     _ when files.contentLoading || (node == null && files.loading) =>
       const Blank('Loading…'),
     _ when node == null => Blank(

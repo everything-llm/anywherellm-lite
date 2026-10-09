@@ -101,8 +101,8 @@ class _SectionRow extends StatelessWidget {
 }
 
 /// A page of the Essentials view: its paragraphs at most 640 px wide, scrolling.
-class _Page extends StatelessWidget {
-  const _Page(this.children);
+class EssentialsPage extends StatelessWidget {
+  const EssentialsPage(this.children, {super.key});
 
   final List<Widget> children;
 
@@ -138,7 +138,7 @@ class EssentialDocs extends StatelessWidget {
       listenable: sources,
       builder: (context, _) {
         final docs = sources.files;
-        return _Page([
+        return EssentialsPage([
           Text(
             'Answers draw on the ones switched on. This is the same list as Documents beside a chat.',
             style: Type.sans(14, color: t.ink2, height: 1.5),
@@ -256,7 +256,7 @@ class TextViewer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final files = AppScope.of(context).files;
-    return _Page([
+    return EssentialsPage([
       Align(
         alignment: Alignment.centerLeft,
         child: TextAction('back', 'Documents', files.closeText),
@@ -269,32 +269,6 @@ class TextViewer extends StatelessWidget {
         )
       else if (files.doc case final doc?)
         DocBodyView(doc),
-    ]);
-  }
-}
-
-/// Where the files an agent made in the open workspace are: under the answers that made them.
-/// The server has no call that lists them, so nothing is listed here.
-class CreatedFiles extends StatelessWidget {
-  const CreatedFiles({super.key, required this.workspace});
-
-  /// The open workspace's name.
-  final String workspace;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return _Page([
-      Text(
-        'Files the agent makes while answering in $workspace appear under the answer that '
-        'made them, where each one can be saved.',
-        style: Type.sans(14, color: t.ink2, height: 1.5),
-      ),
-      const SizedBox(height: 12),
-      Text(
-        'The server has no list of them all, so they are not gathered here.',
-        style: Type.sans(12.5, color: t.muted, height: 1.45),
-      ),
     ]);
   }
 }
