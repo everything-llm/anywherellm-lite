@@ -14,6 +14,7 @@ String? _step(String thought) => switch (toolCall(thought)) {
 final _server = Uri.parse('https://owen.example:3001');
 
 void main() {
+  chatBrowserTests();
   group('browserStep', () {
     test('names each browser skill call in words', () {
       final steps = {
@@ -179,5 +180,71 @@ void main() {
       ),
       isFalse,
     );
+  });
+}
+
+void chatBrowserTests() {
+  const tab = {
+    'card': 'https://h:8445/_live/browser/bw-3aeecef2b460eeb7.jpg',
+    'page': 'https://h:8445/_live/browser/bw-3aeecef2b460eeb7',
+    'frame': 'https://h:8445/_live/browser/chat/q3/budget/card.jpg',
+    'state': 'user',
+    'title': 'Hacker News',
+    'site': 'ycombinator.com',
+    'last': 'Opened the front page',
+  };
+
+  group('a chat\'s browser as the server says it', () {
+    test('reads its tab and its login requests', () {
+      final browser = ChatBrowser.fromJson({
+        'tab': tab,
+        'logins': [
+          {
+            'card': 'https://h:8445/_live/browser/login/lr-1.png',
+            'page': 'https://h:8445/_live/browser/login/lr-1',
+            'site': 'github.com',
+            'state': 'saved',
+          },
+          {
+            'card': 'https://h:8445/_live/browser/login/lr-2.png',
+            'page': 'https://h:8445/_live/browser/login/lr-2',
+            'site': 'github.com',
+            'state': 'waiting',
+          },
+          {'card': 'x'},
+        ],
+      })!;
+      expect(browser.tab!.title, 'Hacker News');
+      expect(browser.tab!.site, 'ycombinator.com');
+      expect(browser.tab!.yours, isTrue);
+      expect(browser.tab!.says, 'You have the browser.');
+      expect(browser.tab!.frame!.path, endsWith('/card.jpg'));
+      expect(browser.logins, hasLength(2));
+      expect(browser.waitingLogin!.page.path, endsWith('lr-2'));
+    });
+
+    test('a chat with no tab says so, and anything else is not one', () {
+      expect(ChatBrowser.fromJson({'tab': null, 'logins': []})!.tab, isNull);
+      expect(ChatBrowser.fromJson('nope'), isNull);
+      expect(
+        ChatBrowser.fromJson({
+          'tab': {'card': 'x'},
+        })!.tab,
+        isNull,
+      );
+    });
+
+    test('a state is a sentence', () {
+      expect(browserStateText('working'), 'The agent is using it.');
+      expect(browserStateText('waiting'), 'The agent is waiting for you.');
+      expect(browserStateText('closed'), 'The browser is closed.');
+      expect(browserStateText('odd'), 'The browser is odd.');
+    });
+
+    test('the same words are the same browser', () {
+      ChatBrowser make() => ChatBrowser.fromJson({'tab': tab, 'logins': []})!;
+      expect(make(), make());
+      expect(make(), isNot(const ChatBrowser()));
+    });
   });
 }

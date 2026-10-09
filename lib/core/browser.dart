@@ -23,6 +23,170 @@ class BrowserCard {
   final bool login;
 }
 
+/// A chat's browser tab as the server reports it to a client with a developer key: [card] is
+/// the tab's live card, [page] its take-over view, [frame] the tab as one picture now, [state]
+/// who has it (`working`, `idle`, `waiting`, `user` or `closed`), [title] what the card names the
+/// page, [site] whose it is, never its address, and [last] what was done last.
+class BrowserTab {
+  const BrowserTab({
+    required this.card,
+    required this.page,
+    required this.state,
+    this.frame,
+    this.title,
+    this.site,
+    this.last,
+  });
+
+  /// The tab, or null when [json] is not one.
+  static BrowserTab? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final card = _address(json['card']);
+    final page = _address(json['page']);
+    final state = json['state'];
+    if (card == null || page == null || state is! String) return null;
+    return BrowserTab(
+      card: card,
+      page: page,
+      state: state,
+      frame: _address(json['frame']),
+      title: _text(json['title']),
+      site: _text(json['site']),
+      last: _text(json['last']),
+    );
+  }
+
+  final Uri card;
+  final Uri page;
+  final Uri? frame;
+  final String state;
+  final String? title;
+  final String? site;
+  final String? last;
+
+  /// Whether the user has the browser, so the agent's actions are refused.
+  bool get yours => state == 'user';
+
+  /// What [state] says, in a sentence.
+  String get says => browserStateText(state);
+
+  @override
+  bool operator ==(Object other) =>
+      other is BrowserTab &&
+      other.card == card &&
+      other.page == page &&
+      other.frame == frame &&
+      other.state == state &&
+      other.title == title &&
+      other.site == site &&
+      other.last == last;
+
+  @override
+  int get hashCode => Object.hash(card, page, frame, state, title, site, last);
+}
+
+/// A request for a login, as the server reports it: its [card], the [page] with the form that
+/// saves it, [site] it is for and [state] (`waiting`, `saving`, `saved`, `declined` or
+/// `expired`).
+class BrowserLogin {
+  const BrowserLogin({
+    required this.card,
+    required this.page,
+    required this.state,
+    this.site,
+  });
+
+  static BrowserLogin? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final card = _address(json['card']);
+    final page = _address(json['page']);
+    final state = json['state'];
+    if (card == null || page == null || state is! String) return null;
+    return BrowserLogin(
+      card: card,
+      page: page,
+      state: state,
+      site: _text(json['site']),
+    );
+  }
+
+  final Uri card;
+  final Uri page;
+  final String state;
+  final String? site;
+
+  /// Whether the agent is waiting for the person to enter it.
+  bool get waiting => state == 'waiting';
+
+  @override
+  bool operator ==(Object other) =>
+      other is BrowserLogin &&
+      other.card == card &&
+      other.page == page &&
+      other.state == state &&
+      other.site == site;
+
+  @override
+  int get hashCode => Object.hash(card, page, state, site);
+}
+
+/// What the server says of a chat's browser: its [tab], if it has one, and its [logins]
+/// requested, newest first.
+class ChatBrowser {
+  const ChatBrowser({this.tab, this.logins = const []});
+
+  /// The reply, or null when [json] is not one: an object with a `tab` or `logins`.
+  static ChatBrowser? fromJson(Object? json) {
+    if (json is! Map ||
+        !(json.containsKey('tab') || json.containsKey('logins'))) {
+      return null;
+    }
+    final logins = json['logins'];
+    return ChatBrowser(
+      tab: BrowserTab.fromJson(json['tab']),
+      logins: [
+        if (logins is List)
+          for (final login in logins) ?BrowserLogin.fromJson(login),
+      ],
+    );
+  }
+
+  final BrowserTab? tab;
+  final List<BrowserLogin> logins;
+
+  /// The newest login request that is still waiting for the person.
+  BrowserLogin? get waitingLogin => logins.where((l) => l.waiting).firstOrNull;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ChatBrowser &&
+      other.tab == tab &&
+      other.logins.length == logins.length &&
+      [for (final (i, l) in logins.indexed) l == other.logins[i]]
+          .every((e) => e);
+
+  @override
+  int get hashCode => Object.hash(tab, logins.length);
+}
+
+/// A tab's [state] in a sentence.
+String browserStateText(String state) => switch (state) {
+  'working' => 'The agent is using it.',
+  'idle' => 'The agent has it but is not using it now.',
+  'waiting' => 'The agent is waiting for you.',
+  'user' => 'You have the browser.',
+  'closed' => 'The browser is closed.',
+  _ => 'The browser is $state.',
+};
+
+Uri? _address(Object? value) => switch (value) {
+  final String text when text.isNotEmpty => Uri.tryParse(text),
+  _ => null,
+};
+
+String? _text(Object? value) =>
+    value is String && value.trim().isNotEmpty ? value.trim() : null;
+
 /// The browser's cards in the Markdown [markdown], in order: each linked image on the
 /// [server]'s host that is a tab's card, `/_live/browser/bw-<id>.jpg` linking to
 /// `/_live/browser/bw-<id>`, or a login request's, `/_live/browser/login/lr-<id>.png` linking

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:anywherellm/core/browser.dart';
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/chat_log.dart';
 import 'package:anywherellm/core/commands.dart';
@@ -154,6 +155,18 @@ class FakeAnythingLlm implements AnythingLlmApi {
   Future<T> _run<T>(String name, T Function() value, [String? arg]) async {
     calls.add(arg == null ? name : '$name:$arg');
     await gates[name]?.future;
+    final error = errors[name];
+    if (error != null) throw error;
+    return value();
+  }
+
+  /// Each read of a chat's browser or its picture, as `chatBrowser:<thread>` or
+  /// `browserFrame:<thread>`. They are kept apart from [calls]: the app reads them on its own
+  /// as an answer ends, which no test of what a chat asked the server wants between its calls.
+  final List<String> browserReads = [];
+
+  Future<T> _quiet<T>(String name, T Function() value, String thread) async {
+    browserReads.add('$name:$thread');
     final error = errors[name];
     if (error != null) throw error;
     return value();
@@ -344,6 +357,51 @@ class FakeAnythingLlm implements AnythingLlmApi {
 
   @override
   Future<List<RelayRun>> finishedRuns() => _run('finishedRuns', () => runs);
+
+  /// What [chatBrowser] answers, by thread: none for a chat with no browser.
+  final Map<String, ChatBrowser> browsers = {};
+
+  @override
+  Future<ChatBrowser?> chatBrowser(String slug, String thread) =>
+      _quiet('chatBrowser', () => browsers[thread], thread);
+
+  /// The picture [browserFrame] answers, by thread. Its etag is its length.
+  final Map<String, Uint8List> frames = {};
+
+  @override
+  Future<({Uint8List? bytes, String? etag})?> browserFrame(
+    String slug,
+    String thread, {
+    String? etag,
+    bool light = false,
+  }) => _quiet('browserFrame', () {
+    final frame = frames[thread];
+    if (frame == null) return null;
+    final tag = '"${frame.length}"';
+    return etag == tag ? (bytes: null, etag: etag) : (bytes: frame, etag: tag);
+  }, thread);
+
+  @override
+  Future<ChatBrowser> handBackBrowser(String slug, String thread) =>
+      _run('handBackBrowser', () {
+        final now = browsers[thread] ?? const ChatBrowser();
+        final tab = now.tab;
+        if (tab != null && tab.yours) {
+          browsers[thread] = ChatBrowser(
+            tab: BrowserTab(
+              card: tab.card,
+              page: tab.page,
+              frame: tab.frame,
+              state: 'idle',
+              title: tab.title,
+              site: tab.site,
+              last: tab.last,
+            ),
+            logins: now.logins,
+          );
+        }
+        return browsers[thread] ?? now;
+      }, thread);
 
   /// What [relayRuns] answers.
   List<RelayRun> allRuns = const [];

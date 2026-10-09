@@ -64,6 +64,125 @@ Future<ApiException> _failure(Future<void> call) async {
 }
 
 void main() {
+  group('a chat\'s browser', () {
+    const reply = {
+      'tab': {
+        'card': 'https://host.example.ts.net:8445/_live/browser/bw-1.jpg',
+        'page': 'https://host.example.ts.net:8445/_live/browser/bw-1',
+        'state': 'working',
+        'title': 'Hacker News',
+      },
+      'logins': [],
+    };
+
+    test('is asked of the host\'s cards port with the developer key', () async {
+      final seen = <http.Request>[];
+      final browser = await _answering(
+        reply,
+        seen: seen,
+      ).chatBrowser('q3', 'budget');
+      expect(browser!.tab!.title, 'Hacker News');
+      expect(
+        seen.single.url.toString(),
+        'https://host.example.ts.net:8445/_live/browser/chat/q3/budget',
+      );
+      expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
+    });
+
+    test('is nothing when the server has no such route or chat', () async {
+      for (final status in [404, 403, 502]) {
+        final api = _api((_) async => http.Response('No such chat.', status));
+        expect(
+          await api.chatBrowser('q3', 'budget'),
+          isNull,
+          reason: '$status',
+        );
+      }
+      final api = _api((_) async => http.Response('<html></html>', 200));
+      expect(await api.chatBrowser('q3', 'budget'), isNull);
+      final unreachable = _api((_) async => throw http.ClientException('no'));
+      expect(await unreachable.chatBrowser('q3', 'budget'), isNull);
+    });
+
+    test(
+      'is nothing with no server, or over http where it is not allowed',
+      () async {
+        final none = _api((_) async => http.Response('{}', 200), current: null);
+        expect(await none.chatBrowser('q3', 'budget'), isNull);
+        final http1 = HttpAnythingLlmApi(
+          holder: ConnectionHolder(
+            const Connection(
+              baseUrl: 'http://host.example.ts.net:3001',
+              apiKey: 'K',
+            ),
+          ),
+          allowHttp: false,
+          client: MockClient((_) async => throw StateError('must not ask')),
+        );
+        expect(await http1.chatBrowser('q3', 'budget'), isNull);
+      },
+    );
+
+    test(
+      'its picture is asked again with the last etag, and says when unchanged',
+      () async {
+        final seen = <http.Request>[];
+        final api = _api((request) async {
+          seen.add(request);
+          if (request.headers['If-None-Match'] == '"a"') {
+            return http.Response('', 304);
+          }
+          return http.Response.bytes([1, 2, 3], 200, headers: {'etag': '"a"'});
+        });
+        final first = await api.browserFrame('q3', 'budget');
+        expect(first!.bytes, [1, 2, 3]);
+        expect(first.etag, '"a"');
+        expect(
+          seen.last.url.toString(),
+          'https://host.example.ts.net:8445/_live/browser/chat/q3/budget/card.jpg',
+        );
+        expect(seen.last.headers['Accept'], 'image/jpeg');
+        expect(seen.last.headers['Authorization'], 'Bearer SECRET-KEY');
+        final again = await api.browserFrame('q3', 'budget', etag: first.etag);
+        expect(again!.bytes, isNull);
+        expect(again.etag, '"a"');
+      },
+    );
+
+    test('a chat with no tab has no picture', () async {
+      final api = _api((_) async => http.Response('{"error":"No tab."}', 404));
+      expect(await api.browserFrame('q3', 'budget'), isNull);
+    });
+
+    test(
+      'is handed back by a POST, and answers as the chat\'s browser does',
+      () async {
+        final seen = <http.Request>[];
+        final browser = await _answering(
+          reply,
+          seen: seen,
+        ).handBackBrowser('q3', 'budget');
+        expect(browser.tab!.state, 'working');
+        expect(seen.single.method, 'POST');
+        expect(seen.single.url.path, '/_live/browser/chat/q3/budget/give');
+      },
+    );
+
+    test('a hand back the server refuses says why', () async {
+      final error = await _failure(
+        _api(
+          (_) async =>
+              http.Response('{"error":"This chat has no browser tab."}', 404),
+        ).handBackBrowser('q3', 'budget'),
+      );
+      expect(error.message, 'This chat has no browser tab.');
+      final odd = await _failure(
+        _answering({'unrelated': true}).handBackBrowser('q3', 'budget'),
+      );
+      expect(odd.message, contains('did not answer like the browser'));
+    });
+  });
+
   group('verify', () {
     test('asks /api/v1/auth with the bearer key', () async {
       late http.Request seen;

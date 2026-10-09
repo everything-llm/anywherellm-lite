@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'browser.dart';
 import 'chat.dart';
 import 'chat_log.dart';
 import 'commands.dart';
@@ -95,6 +96,26 @@ abstract interface class AnythingLlmApi {
   /// Stops the relay's run [id], whichever chat it answers in. Does nothing for a run that has
   /// ended.
   Future<void> cancelRun(String id);
+
+  /// What the server says of the chat's everythingllm browser: its tab, with who has it and
+  /// what was done last, and its requests for logins. Null when the server does not say, as one
+  /// without the browser's route, or a chat it knows no tab of and no request for: the chat
+  /// never fails for this.
+  Future<ChatBrowser?> chatBrowser(String slug, String thread);
+
+  /// The chat's browser tab as one picture now, a JPEG, read again to follow it. [etag] is the
+  /// one the last picture came with: an unchanged picture answers with null [bytes]. Null when
+  /// the chat has no tab.
+  Future<({Uint8List? bytes, String? etag})?> browserFrame(
+    String slug,
+    String thread, {
+    String? etag,
+    bool light = false,
+  });
+
+  /// Gives the chat's browser back to the agent, when the person has it, and answers as
+  /// [chatBrowser] does. Fails with [ApiException].
+  Future<ChatBrowser> handBackBrowser(String slug, String thread);
 
   /// The jobs AnythingLLM runs on a schedule. It takes the server's web login, as the presets
   /// do: on a server with a password it needs one saved.

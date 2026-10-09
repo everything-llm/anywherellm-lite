@@ -6,6 +6,7 @@ import 'package:anywherellm/ui/chat/dictation.dart';
 import 'package:anywherellm/ui/chat/speaker.dart';
 import 'package:anywherellm/ui/share/shared_item.dart';
 import 'package:anywherellm/ui/shell.dart';
+import 'package:anywherellm/ui/state/browser_controller.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 
@@ -105,6 +106,7 @@ class Harness extends Rig {
     this.canShare = false,
     this.shares,
     this.canViewApps = false,
+    this.browserEvery,
   }) : dictation = canDictate ? FakeDictation() : null,
        speaker = canSpeak ? FakeSpeaker() : null,
        shell = ShellController(sourcesPinned: sourcesOpen);
@@ -129,6 +131,18 @@ class Harness extends Rig {
   /// What reads answers aloud, or null when the device cannot speak.
   final FakeSpeaker? speaker;
 
+  /// The chat on screen's browser as the fake server says it. It reads at the pace of
+  /// [browserEvery], or never on a timer, which a test that opens the panel need not wait out.
+  late final BrowserController browser = BrowserController(
+    llm,
+    chat,
+    shell,
+    every: browserEvery,
+  );
+
+  /// How often the open panel reads the browser, or null for never.
+  final Duration? browserEvery;
+
   late final ReadAloud? readAloud = switch (speaker) {
     final speaker? => ReadAloud(speaker, chat, prefs),
     null => null,
@@ -136,6 +150,7 @@ class Harness extends Rig {
 
   @override
   void dispose() {
+    browser.dispose();
     readAloud?.dispose();
     super.dispose();
   }
@@ -187,6 +202,7 @@ class Harness extends Rig {
       sources: sources,
       files: files,
       system: system,
+      browser: browser,
       launch: (url) async {
         opened.add(url);
         if (openThrows case final error?) throw error;
@@ -243,6 +259,7 @@ Future<Harness> pumpApp(
   bool canShare = false,
   StreamController<SharedItem>? shares,
   bool canViewApps = false,
+  Duration? browserEvery,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -261,6 +278,7 @@ Future<Harness> pumpApp(
     labelAnswers: labelAnswers,
     canSpellcheck: canSpellcheck,
     canPasteImages: canPasteImages,
+    browserEvery: browserEvery,
   );
   addTearDown(harness.dispose);
   await harness.prefs.load();

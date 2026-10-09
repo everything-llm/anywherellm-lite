@@ -107,8 +107,9 @@ class BrowserSteps extends StatelessWidget {
   );
 }
 
-/// Builds [builder] from the chat on screen and the answer running in it, again when the chat
-/// changes or that answer's status does, never for each piece of its text.
+/// Builds [builder] from the chat on screen, the server's word on its browser and the answer
+/// running in it, again when the chat changes or that answer's status does, never for each
+/// piece of its text.
 class BrowserStateBuilder extends StatelessWidget {
   const BrowserStateBuilder({super.key, required this.builder});
 
@@ -116,9 +117,10 @@ class BrowserStateBuilder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final chat = AppScope.of(context).chat;
+    final scope = AppScope.of(context);
+    final chat = scope.chat;
     return ListenableBuilder(
-      listenable: chat,
+      listenable: Listenable.merge([chat, scope.browser]),
       builder: (context, _) {
         final running = chat.runningHere;
         return running == null

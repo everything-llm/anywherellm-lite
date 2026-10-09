@@ -6,6 +6,7 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import '../core/browser.dart';
 import '../core/chat.dart';
 import '../core/chat_log.dart';
 import '../core/commands.dart';
@@ -373,6 +374,105 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
         ),
       ),
     );
+  }
+
+  /// The port the host serves its live cards on, and with them the browser's route for a chat
+  /// (`/_live/browser/chat/<workspace>/<thread>`): the machine's own route for `/_live`.
+  static const cardsPort = 8445;
+
+  /// The browser's route for the chat on [connection], with [tail] after it.
+  Uri _browserRoute(
+    Connection connection,
+    String slug,
+    String thread, [
+    String? tail,
+  ]) => connection.uri.replace(
+    port: cardsPort,
+    path:
+        '/_live/browser/chat/${Uri.encodeComponent(slug)}/'
+        '${Uri.encodeComponent(thread)}${tail ?? ''}',
+  );
+
+  @override
+  Future<ChatBrowser?> chatBrowser(String slug, String thread) async {
+    try {
+      final connection = _current;
+      final route = _browserRoute(connection, slug, thread);
+      if (!allowHttp && route.scheme == 'http') return null;
+      final response = await _fetch(
+        connection,
+        timeout,
+        () async => http.Response.fromStream(
+          await _client.send(
+            http.Request('GET', route)..headers.addAll(_headers(connection)),
+          ),
+        ),
+      );
+      if (response.statusCode != 200) return null;
+      return ChatBrowser.fromJson(_json(response));
+    } on ApiException {
+      return null;
+    }
+  }
+
+  @override
+  Future<({Uint8List? bytes, String? etag})?> browserFrame(
+    String slug,
+    String thread, {
+    String? etag,
+    bool light = false,
+  }) async {
+    final connection = _current;
+    final route = _browserRoute(connection, slug, thread, '/card.jpg');
+    if (!allowHttp && route.scheme == 'http') return null;
+    final response = await _fetch(
+      connection,
+      timeout,
+      () async => http.Response.fromStream(
+        await _client.send(
+          http.Request(
+              'GET',
+              light
+                  ? route.replace(queryParameters: {'theme': 'light'})
+                  : route,
+            )
+            ..headers.addAll({
+              ..._headers(connection),
+              'Accept': 'image/jpeg',
+              'If-None-Match': ?etag,
+            }),
+        ),
+      ),
+    );
+    return switch (response.statusCode) {
+      200 => (bytes: response.bodyBytes, etag: response.headers['etag']),
+      304 => (bytes: null, etag: etag),
+      _ => null,
+    };
+  }
+
+  @override
+  Future<ChatBrowser> handBackBrowser(String slug, String thread) async {
+    final connection = _current;
+    final route = _browserRoute(connection, slug, thread, '/give');
+    if (!allowHttp && route.scheme == 'http') {
+      throw const ApiException(
+        'This device does not load the browser over plain http.',
+      );
+    }
+    final answer = await _call(
+      connection,
+      timeout,
+      () async => http.Response.fromStream(
+        await _client.send(
+          http.Request('POST', route)..headers.addAll(_headers(connection)),
+        ),
+      ),
+    );
+    return ChatBrowser.fromJson(answer) ??
+        (throw const ApiException(
+          'The server did not answer like the browser.',
+        ));
   }
 
   /// The relay's runs of [status], or every kept run when it is null, read as JSON holding runs

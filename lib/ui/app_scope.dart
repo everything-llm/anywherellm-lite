@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'chat/dictation.dart';
 import 'chat/speaker.dart';
 import 'share/shared_item.dart';
+import 'state/browser_controller.dart';
 import 'state/chat_controller.dart';
 import 'state/files_controller.dart';
 import 'state/prefs_controller.dart';
@@ -54,6 +55,7 @@ class AppScope extends InheritedWidget {
     required this.sources,
     required this.files,
     required this.system,
+    required this.browser,
     required this.launch,
     required this.save,
     this.scanner,
@@ -75,6 +77,7 @@ class AppScope extends InheritedWidget {
   final SourcesController sources;
   final FilesController files;
   final SystemController system;
+  final BrowserController browser;
   final LinkOpener launch;
   final FileSaver save;
 
