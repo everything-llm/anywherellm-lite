@@ -37,10 +37,11 @@ String extensionOf(String name) {
   return dot <= 0 ? '' : name.substring(dot).toLowerCase();
 }
 
-final _extension = RegExp(r'^\.[A-Z0-9]+$');
+final _extension = RegExp(r'^\.(?=[0-9]*[A-Z])[A-Z0-9]+$');
 
 /// The file type on a file's tile: the extension of [name] in capitals, four letters at most, or
-/// `FILE` when it has none or what follows the last dot is not one, as in `notes.v2-final`.
+/// `FILE` when it has none or what follows the last dot is not one, as in `notes.v2-final` or
+/// `Version 2.0`.
 String sourceExt(String name) {
   final extension = extensionOf(name).toUpperCase();
   if (!_extension.hasMatch(extension)) return 'FILE';

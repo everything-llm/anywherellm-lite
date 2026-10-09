@@ -22,6 +22,16 @@ import '../widgets/radio_card.dart';
 Uint8List _bytesOf(List<int> bytes) =>
     bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
 
+/// The bytes of a shared file, or [UnreadableFile] when it cannot be read, as a revoked
+/// permission or a file deleted since it was shared would leave it.
+Future<List<int>> _readShared(Future<List<int>> Function() read) async {
+  try {
+    return await read();
+  } on Exception {
+    throw const UnreadableFile('The shared file could not be read.');
+  }
+}
+
 /// What to do with a shared item.
 enum _Use { add, ask }
 
@@ -99,43 +109,70 @@ class _ShareSheetState extends State<ShareSheet> {
     final shell = scope.shell;
     if (chat.activeSlug != slug) await chat.select(slug);
     if (!mounted) return;
+    // A workspace answers one chat at a time, so a question could not be sent.
+    if (_use == _Use.ask && (chat.workspaceAnswering || chat.atLimit)) {
+      setState(() {
+        _working = false;
+        _problem = 'This workspace is still answering. Ask when it ends.';
+      });
+      return;
+    }
     shell
       ..closeSettings()
       ..showPane(Pane.chats);
-    switch (_use) {
-      case _Use.add:
-        final sources = scope.sources;
-        switch (item) {
-          case SharedLink(:final url):
-            sources.addLink(url.toString());
-          case SharedText(:final text):
-            final first = text.trim().split('\n').first.trim();
-            await sources.addText(
-              first.length > 60 ? '${first.substring(0, 60)}…' : first,
-              text,
+    try {
+      switch (_use) {
+        case _Use.add:
+          final sources = scope.sources;
+          switch (item) {
+            case SharedLink(:final url):
+              sources.addLink(url.toString());
+            case SharedText(:final text):
+              final first = text.trim().split('\n').first.trim();
+              await sources.addText(
+                first.length > 60 ? '${first.substring(0, 60)}…' : first,
+                text,
+              );
+            case SharedFile(:final name, :final read):
+              await sources.upload([
+                UploadFile(name: name, read: () => _readShared(read)),
+              ]);
+          }
+          shell
+            ..closeShared()
+            ..openSources();
+        case _Use.ask:
+          final question = _question.text.trim();
+          final (message, attachments) = switch (item) {
+            SharedLink(:final url) => (
+              '$question\n\n$url',
+              const <Attachment>[],
+            ),
+            SharedText(:final text) => (
+              '$question\n\n> ${text.trim().replaceAll('\n', '\n> ')}',
+              const <Attachment>[],
+            ),
+            SharedFile(:final name, :final read) => (
+              question,
+              [Attachment.of(name, _bytesOf(await _readShared(read)))],
+            ),
+          };
+          chat.newChat();
+          shell.closeShared();
+          if (!await chat.send(message, attachments: attachments)) {
+            chat.report(
+              'Could not send the question',
+              'The chat could not take it just now. Ask again.',
             );
-          case SharedFile(:final name, :final read):
-            await sources.upload([UploadFile(name: name, read: read)]);
-        }
-        shell
-          ..closeShared()
-          ..openSources();
-      case _Use.ask:
-        final question = _question.text.trim();
-        final (message, attachments) = switch (item) {
-          SharedLink(:final url) => ('$question\n\n$url', const <Attachment>[]),
-          SharedText(:final text) => (
-            '$question\n\n> ${text.trim().replaceAll('\n', '\n> ')}',
-            const <Attachment>[],
-          ),
-          SharedFile(:final name, :final read) => (
-            question,
-            [Attachment.of(name, _bytesOf(await read()))],
-          ),
-        };
-        chat.newChat();
-        shell.closeShared();
-        await chat.send(message, attachments: attachments);
+          }
+      }
+    } on UnreadableFile catch (error) {
+      if (mounted) {
+        setState(() {
+          _working = false;
+          _problem = '$error';
+        });
+      }
     }
   }
 

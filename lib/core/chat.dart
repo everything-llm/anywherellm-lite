@@ -151,10 +151,15 @@ final _appCard = RegExp(r'^/_live/apps/[^/]+/[^/]+\.png$');
 typedef AppCard = ({Uri card, Uri page, String name, String workspace});
 
 /// [image], described as [alt] and linked to [page], as an app's card, or null when it is not
-/// one ([isAppCard]). An empty description names the app after its address: `groceries.png` is
-/// Groceries.
+/// one ([isAppCard]) or its [page] is not a web page on the [server]'s host, since an answer
+/// could otherwise open any address in the app's web view. An empty description names the app
+/// after its address: `groceries.png` is Groceries.
 AppCard? appCardOf(Uri image, Uri page, String alt, Uri? server) {
   if (!isAppCard(image, server)) return null;
+  if (page.host != server!.host ||
+      !(page.scheme == 'https' || page.scheme == 'http')) {
+    return null;
+  }
   if (image.pathSegments case [_, _, final workspace, final file]) {
     return (
       card: image,

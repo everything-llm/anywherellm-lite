@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:anywherellm/ui/share/share_sheet.dart';
 import 'package:anywherellm/ui/share/shared_item.dart';
@@ -123,6 +124,64 @@ void main() {
     await tester.tap(inSheet(control('Add to Documents')));
     await tester.pumpAndSettle();
     expect(llm.calls, contains('upload:quote.pdf'));
+    await shares.close();
+  });
+
+  testWidgets(
+    'a shared file that cannot be read stays in the sheet, with why',
+    (tester) async {
+      final shares = StreamController<SharedItem>();
+      final llm = planningServer();
+      await pumpApp(tester, llm: llm, size: phone, shares: shares);
+      await share(
+        tester,
+        shares,
+        SharedFile(
+          'gone.pdf',
+          4,
+          () async => throw const FileSystemException(),
+        ),
+      );
+      await tester.tap(inSheet(find.text('Ask about it')));
+      await tester.pumpAndSettle();
+      await tester.enterText(inSheet(find.byType(EditableText)), 'Cheaper?');
+      await tester.pump();
+      await tester.tap(inSheet(control('Ask')));
+      await tester.pumpAndSettle();
+      expect(
+        inSheet(find.text('The shared file could not be read.')),
+        findsOne,
+      );
+      expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
+      expect(find.byType(ShareSheet), findsOneWidget);
+      await shares.close();
+    },
+  );
+
+  testWidgets('asking where an answer is running says so and keeps the item', (
+    tester,
+  ) async {
+    final shares = StreamController<SharedItem>();
+    final llm = planningServer()..hold = true;
+    final h = await pumpApp(tester, llm: llm, size: phone, shares: shares);
+    await h.chat.send('And next quarter?');
+    await tester.pump();
+    shares.add(const SharedText('Service due in May.'));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(inSheet(find.text('Ask about it')));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.enterText(inSheet(find.byType(EditableText)), 'When?');
+    await tester.pump();
+    await tester.tap(inSheet(control('Ask')));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      inSheet(
+        find.text('This workspace is still answering. Ask when it ends.'),
+      ),
+      findsOneWidget,
+    );
+    expect(llm.calls.where((c) => c.startsWith('streamChat')), hasLength(1));
+    await llm.chat!.close();
     await shares.close();
   });
 

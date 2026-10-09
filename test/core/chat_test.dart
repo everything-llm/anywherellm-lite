@@ -339,5 +339,15 @@ void main() {
       expect(of('$host/q3%20plan/list.png', '')!.workspace, 'q3 plan');
       expect(of('https://evil.test/_live/apps/home/a.png', 'A'), isNull);
     });
+
+    test('only when its page is a web page on the server\'s host', () {
+      const image = 'https://owen.example.ts.net:8455/_live/apps/home/a.png';
+      AppCard? of(String page) =>
+          appCardOf(Uri.parse(image), Uri.parse(page), 'A', server);
+      expect(of('https://owen.example.ts.net:8447/home/apps/a/'), isNotNull);
+      expect(of('https://evil.example/login'), isNull);
+      expect(of('javascript:alert(1)'), isNull);
+      expect(of('file:///etc/passwd'), isNull);
+    });
   });
 }

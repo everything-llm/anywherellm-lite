@@ -190,10 +190,12 @@ class _ComposerState extends State<Composer> {
         });
       }
     }
-    if (_scope.chat.takeRefused() case final refused?
-        when widget.draft.text.isEmpty && _attached.isEmpty) {
-      _setDraft(refused.text);
-      setState(() => _attached = refused.attachments);
+    // Taken only when it can go back: a message taken and not put back would be lost.
+    if (widget.draft.text.isEmpty && _attached.isEmpty) {
+      if (_scope.chat.takeRefused() case final refused?) {
+        _setDraft(refused.text);
+        setState(() => _attached = refused.attachments);
+      }
     }
   }
 

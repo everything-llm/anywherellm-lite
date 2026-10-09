@@ -89,11 +89,12 @@ String describeSchedule(String cron, DateTime now) {
   // The time in local time, and how many days that moves the day.
   final at = DateTime.utc(utcNow.year, utcNow.month, utcNow.day, h, m);
   final local = at.toLocal();
-  final shift = DateTime(
+  // Compared as UTC dates, so a clock change between the two days cannot make a day 23 hours.
+  final shift = DateTime.utc(
     local.year,
     local.month,
     local.day,
-  ).difference(DateTime(at.year, at.month, at.day)).inDays;
+  ).difference(DateTime.utc(at.year, at.month, at.day)).inDays;
   final time = clockText(local);
   switch (weekday) {
     case '*':

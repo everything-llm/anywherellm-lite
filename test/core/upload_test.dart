@@ -38,6 +38,9 @@ void main() {
       expect(sourceExt('.bashrc'), 'FILE');
       expect(sourceExt('Q3 roadmap.pdf'), 'PDF');
       expect(sourceExt('notes.v2-final'), 'FILE');
+      expect(sourceExt('Version 2.0'), 'FILE');
+      expect(sourceExt('Notes 1.5'), 'FILE');
+      expect(sourceExt('data.7z'), '7Z');
     },
   );
 

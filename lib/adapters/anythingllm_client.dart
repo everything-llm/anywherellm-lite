@@ -657,8 +657,11 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
                         ? plain
                         : 'The relay could not finish the answer.'),
               );
-            case 'done' || 'cancelled':
+            case 'done':
               return;
+            case 'cancelled':
+              // Stopped elsewhere: this app's own Stop cancels the subscription instead.
+              throw const ApiException('The answer was stopped on the server.');
           }
         }
       } on ApiException catch (error) {
@@ -1326,7 +1329,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     String refused = _refused,
     Connection? on,
   }) async {
-    final connection = on ?? _current;
+    final connection = on == null ? _current : _secure(on);
     return _call(
       connection,
       limit ?? timeout,

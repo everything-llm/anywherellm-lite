@@ -49,6 +49,7 @@ void main() {
     expect(shortTitle('Q3 roadmap.pdf'), 'Q3 roadmap');
     expect(shortTitle('Pricing page'), 'Pricing page');
     expect(shortTitle('notes.v2-final'), 'notes.v2-final');
+    expect(shortTitle('Version 2.0'), 'Version 2.0');
     expect(shortTitle('.md'), '.md');
   });
 

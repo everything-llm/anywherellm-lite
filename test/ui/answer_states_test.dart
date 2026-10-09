@@ -121,4 +121,33 @@ void main() {
       );
     },
   );
+
+  testWidgets(
+    'a refused message is not discarded when the field has been typed in meanwhile',
+    (tester) async {
+      const message = 'And a shorter one for the team call?';
+      final llm = planningServer()..hold = true;
+      final h = await pumpApp(tester, llm: llm);
+      final events = StreamController<ChatEvent>();
+      addTearDown(() => unawaited(events.close()));
+      llm.running['budget'] = (question: 'Asked on the phone', events: events);
+      await tester.enterText(composerField, message);
+      await tester.pump();
+      await tester.tap(find.byTooltip('Send'));
+      await tester.pump();
+      await tester.enterText(composerField, 'Something else');
+      await tester.pump();
+      llm.chat!.addError(
+        const AlreadyAnswering('That thread already has an answer running.'),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(h.chat.alreadyAnswering, isTrue);
+      expect(
+        tester.widget<EditableText>(composerField).controller.text,
+        'Something else',
+      );
+      expect(h.chat.takeRefused()?.text, message);
+    },
+  );
 }

@@ -526,6 +526,14 @@ class ChatController extends ChangeNotifier {
         ..addAll({
           for (final w in workspaces) w.slug: [...w.threads],
         });
+      // A chat deleted in the list but not yet on the server is still in the server's list.
+      if (_deleted case final deleted?
+          when _threads.containsKey(deleted.slug)) {
+        _threads[deleted.slug] = [
+          for (final t in _threads[deleted.slug]!)
+            if (t.slug != deleted.chat.slug) t,
+        ];
+      }
     });
     if (_server != server) return;
     loading = false;

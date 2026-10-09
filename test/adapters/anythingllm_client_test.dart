@@ -384,6 +384,24 @@ void main() {
       expect(sent, 0);
     });
 
+    test(
+      'a saved http connection fails before a delete sends the key',
+      () async {
+        var sent = 0;
+        final api = HttpAnythingLlmApi(
+          holder: ConnectionHolder(_connection),
+          allowHttp: false,
+          client: MockClient((_) async {
+            sent++;
+            return http.Response('', 200);
+          }),
+        );
+        final error = await _failure(api.deleteThread('w', 't', on: plain));
+        expect(error.message, contains('https://'));
+        expect(sent, 0);
+      },
+    );
+
     test('an https address is used', () async {
       final api = HttpAnythingLlmApi(
         holder: ConnectionHolder(_connection),
@@ -2618,6 +2636,16 @@ void main() {
       expect(error.message, 'The model crashed.');
     });
 
+    test('a run cancelled elsewhere fails rather than finishing', () async {
+      final error = await _failure(
+        relay((_) => lines(['id: 1\nevent: cancelled\ndata:\n\n']))
+            .streamChat('w', 't', 'Hi')
+            .toList(),
+      );
+      expect(error.message, 'The answer was stopped on the server.');
+      expect(error, isNot(isA<AnswerStillRunning>()));
+    });
+
     test('a run that cannot be rejoined says the answer goes on', () async {
       final error = await _failure(
         relay(
@@ -2799,6 +2827,34 @@ void main() {
         expect(cancel.url.path, '/everythingllm/v1/runs/r_1/cancel');
       });
 
+      test('no running run in the chat is no answer', () async {
+        final api = relay(
+          (_) => lines([]),
+          running: {
+            'runs': [
+              listed('r_1', thread: 'other'),
+              listed('r_2', workspace: 'x'),
+            ],
+          },
+        );
+        expect(await api.rejoinChat('w', 't'), isNull);
+      });
+
+      test('a run that is not running is not followed', () async {
+        final api = relay(
+          (_) => lines([]),
+          running: {
+            'runs': [
+              {'id': 'r_1', 'workspace': 'w', 'thread': 't', 'status': 'done'},
+            ],
+          },
+        );
+        expect(await api.rejoinChat('w', 't'), isNull);
+      });
+
+      test('a run that clears the chat is no answer', () async {
+        final api = relay(
+          (_) => lines([]),
           running: {
             'runs': [
               listed(
