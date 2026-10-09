@@ -1,4 +1,4 @@
-import 'browser.dart';
+import 'host_routes.dart';
 
 /// Where in the workspace's sandbox a created file is.
 enum CreatedArea {
@@ -152,8 +152,8 @@ String _goes(Duration left) {
 /// The host's route for a workspace's created files, `/_live/sandbox/files/WORKSPACE`, with
 /// [tail] after it, as `/download`, and the created file [path] it is about, when it has one.
 Uri createdRoute(Uri server, String slug, [String tail = '', String? path]) =>
-    server.replace(
-      port: cardsPort,
-      path: '/_live/sandbox/files/${Uri.encodeComponent(slug)}$tail',
-      queryParameters: path == null ? null : {'path': path},
+    liveRoute(
+      server,
+      'sandbox/files/${Uri.encodeComponent(slug)}$tail',
+      path == null ? null : {'path': path},
     );

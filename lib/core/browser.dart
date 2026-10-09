@@ -4,6 +4,7 @@
 import 'dart:convert';
 
 import 'copy.dart';
+import 'host_routes.dart';
 import 'markdown.dart';
 
 /// A card of the everythingllm browser in an answer: a tab's live card, whose [page] is the
@@ -125,19 +126,19 @@ class ChatBrowser {
   BrowserLogin? get waitingLogin => logins.where((l) => l.waiting).firstOrNull;
 }
 
-/// The port the host serves its live cards on, and with them the browser's route for a chat:
-/// the machine's own route for `/_live`.
-const cardsPort = 8445;
-
 /// The browser's route for a chat on the [server]'s host, `/_live/browser/chat/WORKSPACE/
-/// THREAD`, with [tail] after it, as `/card.jpg` or `/give`.
-Uri browserRoute(Uri server, String slug, String thread, [String tail = '']) =>
-    server.replace(
-      port: cardsPort,
-      path:
-          '/_live/browser/chat/${Uri.encodeComponent(slug)}/'
-          '${Uri.encodeComponent(thread)}$tail',
-    );
+/// THREAD`, with [tail] after it, as `/card.jpg` or `/give`, and [query].
+Uri browserRoute(
+  Uri server,
+  String slug,
+  String thread, [
+  String tail = '',
+  Map<String, String>? query,
+]) => liveRoute(
+  server,
+  'browser/chat/${Uri.encodeComponent(slug)}/${Uri.encodeComponent(thread)}$tail',
+  query,
+);
 
 /// A tab's [state] in a sentence.
 String browserStateText(String state) => switch (state) {

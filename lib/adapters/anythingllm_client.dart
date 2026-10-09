@@ -348,31 +348,42 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     ),
   );
 
-  /// The connections whose host answered the browser's route as no route at all, as a server
-  /// without it does, so it is not asked again until Test connection asks about the relay again.
-  final _noBrowser = <Connection>{};
+  /// The routes, by connection and kind (`browser` or `created`), whose host answered as no route
+  /// at all, as a server without it does, so they are not asked again until Test connection asks
+  /// about the relay again.
+  final _noRoute = <(Connection, String)>{};
 
-  /// The response to [method] on the browser's route for a chat on the connection in use, with
-  /// [tail] after it, [headers] beside the key's and [query]; null where this device may not use
-  /// plain http.
-  Future<http.Response?> _browser(
+  /// Whether [response], to a [kind] route of [connection]'s host, shows the host has no such
+  /// route, which is remembered: a 404 that is not JSON. JSON, even an error, is the route itself
+  /// answering, as when it knows no such chat.
+  bool _routeMissing(
+    Connection connection,
+    String kind,
+    http.Response response,
+    Object? body,
+  ) {
+    final missing = response.statusCode == 404 && body == null;
+    if (missing) _noRoute.add((connection, kind));
+    return missing;
+  }
+
+  /// The response to [method] on a route of the everythingllm host on the connection in use,
+  /// which [route] makes from the server's address, with [headers] beside the key's, within
+  /// [limit].
+  Future<http.Response> _host(
     String method,
-    String slug,
-    String thread, {
-    String tail = '',
+    Uri Function(Uri server) route, {
     Map<String, String> headers = const {},
-    Map<String, String>? query,
+    Duration? limit,
   }) async {
     final connection = _current;
-    var route = browserRoute(connection.uri, slug, thread, tail);
-    if (!allowHttp && route.scheme == 'http') return null;
-    if (query != null) route = route.replace(queryParameters: query);
+    final url = route(connection.uri);
     return _fetch(
       connection,
-      timeout,
+      limit ?? timeout,
       () async => http.Response.fromStream(
         await _client.send(
-          http.Request(method, route)
+          http.Request(method, url)
             ..headers.addAll({..._headers(connection), ...headers}),
         ),
       ),
@@ -383,15 +394,13 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   Future<ChatBrowser?> chatBrowser(String slug, String thread) async {
     try {
       final connection = _current.withPassword(null);
-      if (_noBrowser.contains(connection)) return null;
-      final response = await _browser('GET', slug, thread);
-      if (response == null) return null;
+      if (_noRoute.contains((connection, 'browser'))) return null;
+      final response = await _host(
+        'GET',
+        (server) => browserRoute(server, slug, thread),
+      );
       final body = _json(response);
-      // Not JSON, as a host without the route answers, is no route; JSON, even an error, is
-      // the route saying there is no such chat.
-      if (response.statusCode == 404 && body == null) {
-        _noBrowser.add(connection);
-      }
+      if (_routeMissing(connection, 'browser', response, body)) return null;
       return response.statusCode == 200 ? ChatBrowser.fromJson(body) : null;
     } on ApiException {
       return null;
@@ -405,16 +414,19 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     String? etag,
     bool light = false,
   }) async {
-    final response = await _browser(
+    final response = await _host(
       'GET',
-      slug,
-      thread,
-      tail: '/card.jpg',
+      (server) => browserRoute(
+        server,
+        slug,
+        thread,
+        '/card.jpg',
+        light ? {'theme': 'light'} : null,
+      ),
       headers: {'Accept': 'image/jpeg', 'If-None-Match': ?etag},
-      query: light ? {'theme': 'light'} : null,
     );
-    return switch (response?.statusCode) {
-      200 => (bytes: response!.bodyBytes, etag: response.headers['etag']),
+    return switch (response.statusCode) {
+      200 => (bytes: response.bodyBytes, etag: response.headers['etag']),
       304 => (bytes: null, etag: etag),
       _ => null,
     };
@@ -422,60 +434,39 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
 
   @override
   Future<ChatBrowser> handBackBrowser(String slug, String thread) async {
-    final response = await _browser('POST', slug, thread, tail: '/give');
-    if (response == null) {
-      throw const ApiException(
-        'This device does not load the browser over plain http.',
-      );
-    }
-    final answer = _decode(response);
-    return ChatBrowser.fromJson(answer) ??
+    final response = await _host(
+      'POST',
+      (server) => browserRoute(server, slug, thread, '/give'),
+    );
+    return ChatBrowser.fromJson(_decode(response)) ??
         (throw const ApiException(
           'The server did not answer like the browser.',
         ));
   }
 
-  /// The connections whose host answered the created files' route as no route at all, so it is
-  /// not asked again until Test connection asks about the relay again.
-  final _noCreated = <Connection>{};
-
-  /// The response to [method] on the created files' route for [slug] on the connection in use,
-  /// with [tail] and the created file [path] as [createdRoute] takes them, within [limit].
+  /// The response to [method] on the created files' route for [slug], with [tail] and the created
+  /// file [path] as [createdRoute] takes them.
   Future<http.Response> _created(
     String method,
     String slug, {
     String tail = '',
     String? path,
     Duration? limit,
-  }) async {
-    final connection = _current;
-    final route = createdRoute(connection.uri, slug, tail, path);
-    return _fetch(
-      connection,
-      limit ?? timeout,
-      () async => http.Response.fromStream(
-        await _client.send(
-          http.Request(method, route)..headers.addAll(_headers(connection)),
-        ),
-      ),
-    );
-  }
+  }) => _host(
+    method,
+    (server) => createdRoute(server, slug, tail, path),
+    limit: limit,
+  );
 
   @override
   Future<CreatedList?> createdFiles(String slug) async {
     final connection = _current.withPassword(null);
-    if (_noCreated.contains(connection)) return null;
+    if (_noRoute.contains((connection, 'created'))) return null;
     final response = await _created('GET', slug);
     final body = _json(response);
-    if (response.statusCode == 404) {
-      // Not JSON, as a host without the route answers, is no route; JSON is the route saying
-      // the workspace has no sandbox yet.
-      if (body == null) {
-        _noCreated.add(connection);
-        return null;
-      }
-      return const CreatedList();
-    }
+    if (_routeMissing(connection, 'created', response, body)) return null;
+    // JSON that says no, as the route does for a workspace with no sandbox yet, is an empty list.
+    if (response.statusCode == 404) return const CreatedList();
     return CreatedList.fromJson(_decode(response)) ??
         (throw const ApiException(
           'The server did not answer like the sandbox.',
@@ -1175,8 +1166,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   Future<bool> relayFound({bool again = false}) {
     if (again) {
       _relays.remove(_current.withPassword(null));
-      _noBrowser.clear();
-      _noCreated.clear();
+      _noRoute.clear();
     }
     return _isRelay(_current);
   }
