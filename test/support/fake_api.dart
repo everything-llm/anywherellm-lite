@@ -152,8 +152,13 @@ class FakeAnythingLlm implements AnythingLlmApi {
   final Map<String, Completer<void>> gates = {};
   var _made = 0;
 
-  Future<T> _run<T>(String name, T Function() value, [String? arg]) async {
-    calls.add(arg == null ? name : '$name:$arg');
+  Future<T> _run<T>(
+    String name,
+    T Function() value, [
+    String? arg,
+    List<String>? log,
+  ]) async {
+    (log ?? calls).add(arg == null ? name : '$name:$arg');
     await gates[name]?.future;
     final error = errors[name];
     if (error != null) throw error;
@@ -164,13 +169,6 @@ class FakeAnythingLlm implements AnythingLlmApi {
   /// `browserFrame:<thread>`. They are kept apart from [calls]: the app reads them on its own
   /// as an answer ends, which no test of what a chat asked the server wants between its calls.
   final List<String> browserReads = [];
-
-  Future<T> _quiet<T>(String name, T Function() value, String thread) async {
-    browserReads.add('$name:$thread');
-    final error = errors[name];
-    if (error != null) throw error;
-    return value();
-  }
 
   FakeWorkspace _space(String slug) => spaces.firstWhere(
     (w) => w.slug == slug,
@@ -357,7 +355,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
 
   @override
   Future<ChatBrowser?> chatBrowser(String slug, String thread) =>
-      _quiet('chatBrowser', () => browsers[thread], thread);
+      _run('chatBrowser', () => browsers[thread], thread, browserReads);
 
   /// The picture [browserFrame] answers, by thread. Its etag is its length.
   final Map<String, Uint8List> frames = {};
@@ -368,12 +366,19 @@ class FakeAnythingLlm implements AnythingLlmApi {
     String thread, {
     String? etag,
     bool light = false,
-  }) => _quiet('browserFrame', () {
-    final frame = frames[thread];
-    if (frame == null) return null;
-    final tag = '"${frame.length}"';
-    return etag == tag ? (bytes: null, etag: etag) : (bytes: frame, etag: tag);
-  }, thread);
+  }) => _run(
+    'browserFrame',
+    () {
+      final frame = frames[thread];
+      if (frame == null) return null;
+      final tag = '"${frame.length}"';
+      return etag == tag
+          ? (bytes: null, etag: etag)
+          : (bytes: frame, etag: tag);
+    },
+    thread,
+    browserReads,
+  );
 
   @override
   Future<ChatBrowser> handBackBrowser(String slug, String thread) =>
@@ -383,9 +388,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
         if (tab != null && tab.yours) {
           browsers[thread] = ChatBrowser(
             tab: BrowserTab(
-              card: tab.card,
               page: tab.page,
-              frame: tab.frame,
               state: 'idle',
               title: tab.title,
               site: tab.site,

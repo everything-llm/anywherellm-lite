@@ -372,11 +372,11 @@ class _BrowserButton extends StatelessWidget {
   Widget _build(BuildContext context, Turn? running) {
     final scope = AppScope.of(context);
     final shell = scope.shell;
-    if (!scope.chat.usedBrowser && !scope.browser.hasTab) {
+    if (!scope.chat.usedBrowser && scope.browser.tab == null) {
       return const SizedBox.shrink();
     }
     final browsing =
-        (running?.browsing ?? false) || scope.browser.tab?.state == 'working';
+        (running?.browsing ?? false) || (scope.browser.tab?.working ?? false);
     return Padding(
       padding: const EdgeInsets.only(left: 8),
       child: _HeaderButton(

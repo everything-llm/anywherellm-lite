@@ -1,19 +1,15 @@
 import '../../core/providers.dart';
 import 'settings_pages.dart';
 
-/// A page that matched a search of Settings: an app page, or one of [webPages], and the field
-/// that matched when the page's own name and line did not.
+/// A page that matched a search of Settings: an app [page], or, when it is null, one of the
+/// [webPages] called [label], and the [field] that matched when the page's own name and line
+/// did not.
 class SettingsHit {
-  const SettingsHit.page(SettingsPage this.page, {this.field}) : web = null;
-  const SettingsHit.web(WebPage this.web, {this.field}) : page = null;
+  const SettingsHit(this.label, {this.page, this.field});
 
+  final String label;
   final SettingsPage? page;
-  final WebPage? web;
-
-  /// The name of the field that matched, or null when the page's name or line did.
   final String? field;
-
-  String get label => page?.label ?? web!.label;
 }
 
 /// The names of the fields on each page that is not a provider's, as a search sees them.
@@ -37,20 +33,10 @@ const _fields = {
   SettingsPage.privacy: ['Anonymous telemetry'],
 };
 
-/// The providers each provider page chooses among.
-const _providers = {
-  SettingsPage.chatModel: [chatProviders],
-  SettingsPage.searchModel: [embedderProviders],
-  SettingsPage.storage: [vectorProviders],
-  SettingsPage.images: [imageProviders],
-  SettingsPage.voice: [speechToTextProviders, textToSpeechProviders],
-  SettingsPage.transcription: [transcriptionProviders],
-};
-
 /// The names of [page]'s fields: its choosers, and what each provider it offers reads.
 Iterable<String> fieldNames(SettingsPage page) sync* {
   yield* _fields[page] ?? const [];
-  for (final setting in _providers[page] ?? const <ProviderSetting>[]) {
+  for (final setting in providerPages[page] ?? const <ProviderSetting>[]) {
     yield setting.label;
     for (final provider in setting.providers) {
       for (final field in provider.fields) {
@@ -73,14 +59,16 @@ List<SettingsHit> searchSettings(String query, {required bool configured}) {
       continue;
     }
     if (holds(page.label) || holds(page.about)) {
-      hits.add(SettingsHit.page(page));
+      hits.add(SettingsHit(page.label, page: page));
     } else if (fieldNames(page).where(holds).firstOrNull case final field?) {
-      hits.add(SettingsHit.page(page, field: field));
+      hits.add(SettingsHit(page.label, page: page, field: field));
     }
   }
   if (configured) {
     for (final web in webPages) {
-      if (holds(web.label) || holds(web.about)) hits.add(SettingsHit.web(web));
+      if (holds(web.label) || holds(web.about)) {
+        hits.add(SettingsHit(web.label));
+      }
     }
   }
   return hits;

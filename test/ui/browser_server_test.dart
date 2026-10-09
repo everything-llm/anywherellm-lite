@@ -11,9 +11,7 @@ import '../support/pump.dart';
 const _page = 'https://h:8445/_live/browser/bw-3aeecef2b460eeb7';
 
 BrowserTab _tab(String state) => BrowserTab(
-  card: Uri.parse('$_page.jpg'),
   page: Uri.parse(_page),
-  frame: Uri.parse('https://h:8445/_live/browser/chat/q3/budget/card.jpg'),
   state: state,
   title: 'Hacker News',
   site: 'ycombinator.com',
@@ -120,7 +118,6 @@ void main() {
               'https://h:8445/_live/browser/login/lr-${'a' * 32}',
             ),
             state: 'waiting',
-            site: 'github.com',
           ),
         ],
       )

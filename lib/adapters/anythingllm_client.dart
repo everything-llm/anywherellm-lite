@@ -277,19 +277,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     final (connection, started) = run;
     final id = await started;
     if (id == null) return;
-    await _call(
-      connection,
-      timeout,
-      () async => http.Response.fromStream(
-        await _client.send(
-          _request(
-            connection,
-            'POST',
-            '$relayPath/v1/runs/${Uri.encodeComponent(id)}/cancel',
-          ),
-        ),
-      ),
-    );
+    await _cancel(connection, id);
   }
 
   /// The running run of the chat on the relay, which `GET /everythingllm/v1/runs?status=running`
@@ -337,63 +325,73 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     }
     return [
       for (final run in await _listRuns(connection, null))
-        // A reset clears a chat and is no answer; the relay names it `/reset`.
-        if (run['question'] != '/reset') ?RelayRun.fromJson(run),
+        ?RelayRun.fromJson(run),
     ];
   }
 
   @override
-  Future<void> cancelRun(String id) async {
+  Future<void> cancelRun(String id) => _cancel(_current, id);
+
+  /// Cancels the relay's run [id] on [connection]: the run ends `cancelled`.
+  Future<void> _cancel(Connection connection, String id) => _call(
+    connection,
+    timeout,
+    () async => http.Response.fromStream(
+      await _client.send(
+        _request(
+          connection,
+          'POST',
+          '$relayPath/v1/runs/${Uri.encodeComponent(id)}/cancel',
+        ),
+      ),
+    ),
+  );
+
+  /// The connections whose host answered the browser's route as no route at all, as a server
+  /// without it does, so it is not asked again until Test connection asks about the relay again.
+  final _noBrowser = <Connection>{};
+
+  /// The response to [method] on the browser's route for a chat on the connection in use, with
+  /// [tail] after it, [headers] beside the key's and [query]; null where this device may not use
+  /// plain http.
+  Future<http.Response?> _browser(
+    String method,
+    String slug,
+    String thread, {
+    String tail = '',
+    Map<String, String> headers = const {},
+    Map<String, String>? query,
+  }) async {
     final connection = _current;
-    await _call(
+    var route = browserRoute(connection.uri, slug, thread, tail);
+    if (!allowHttp && route.scheme == 'http') return null;
+    if (query != null) route = route.replace(queryParameters: query);
+    return _fetch(
       connection,
       timeout,
       () async => http.Response.fromStream(
         await _client.send(
-          _request(
-            connection,
-            'POST',
-            '$relayPath/v1/runs/${Uri.encodeComponent(id)}/cancel',
-          ),
+          http.Request(method, route)
+            ..headers.addAll({..._headers(connection), ...headers}),
         ),
       ),
     );
   }
 
-  /// The port the host serves its live cards on, and with them the browser's route for a chat
-  /// (`/_live/browser/chat/<workspace>/<thread>`): the machine's own route for `/_live`.
-  static const cardsPort = 8445;
-
-  /// The browser's route for the chat on [connection], with [tail] after it.
-  Uri _browserRoute(
-    Connection connection,
-    String slug,
-    String thread, [
-    String? tail,
-  ]) => connection.uri.replace(
-    port: cardsPort,
-    path:
-        '/_live/browser/chat/${Uri.encodeComponent(slug)}/'
-        '${Uri.encodeComponent(thread)}${tail ?? ''}',
-  );
-
   @override
   Future<ChatBrowser?> chatBrowser(String slug, String thread) async {
     try {
-      final connection = _current;
-      final route = _browserRoute(connection, slug, thread);
-      if (!allowHttp && route.scheme == 'http') return null;
-      final response = await _fetch(
-        connection,
-        timeout,
-        () async => http.Response.fromStream(
-          await _client.send(
-            http.Request('GET', route)..headers.addAll(_headers(connection)),
-          ),
-        ),
-      );
-      if (response.statusCode != 200) return null;
-      return ChatBrowser.fromJson(_json(response));
+      final connection = _current.withPassword(null);
+      if (_noBrowser.contains(connection)) return null;
+      final response = await _browser('GET', slug, thread);
+      if (response == null) return null;
+      final body = _json(response);
+      // Not JSON, as a host without the route answers, is no route; JSON, even an error, is
+      // the route saying there is no such chat.
+      if (response.statusCode == 404 && body == null) {
+        _noBrowser.add(connection);
+      }
+      return response.statusCode == 200 ? ChatBrowser.fromJson(body) : null;
     } on ApiException {
       return null;
     }
@@ -406,30 +404,16 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     String? etag,
     bool light = false,
   }) async {
-    final connection = _current;
-    final route = _browserRoute(connection, slug, thread, '/card.jpg');
-    if (!allowHttp && route.scheme == 'http') return null;
-    final response = await _fetch(
-      connection,
-      timeout,
-      () async => http.Response.fromStream(
-        await _client.send(
-          http.Request(
-              'GET',
-              light
-                  ? route.replace(queryParameters: {'theme': 'light'})
-                  : route,
-            )
-            ..headers.addAll({
-              ..._headers(connection),
-              'Accept': 'image/jpeg',
-              'If-None-Match': ?etag,
-            }),
-        ),
-      ),
+    final response = await _browser(
+      'GET',
+      slug,
+      thread,
+      tail: '/card.jpg',
+      headers: {'Accept': 'image/jpeg', 'If-None-Match': ?etag},
+      query: light ? {'theme': 'light'} : null,
     );
-    return switch (response.statusCode) {
-      200 => (bytes: response.bodyBytes, etag: response.headers['etag']),
+    return switch (response?.statusCode) {
+      200 => (bytes: response!.bodyBytes, etag: response.headers['etag']),
       304 => (bytes: null, etag: etag),
       _ => null,
     };
@@ -437,22 +421,13 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
 
   @override
   Future<ChatBrowser> handBackBrowser(String slug, String thread) async {
-    final connection = _current;
-    final route = _browserRoute(connection, slug, thread, '/give');
-    if (!allowHttp && route.scheme == 'http') {
+    final response = await _browser('POST', slug, thread, tail: '/give');
+    if (response == null) {
       throw const ApiException(
         'This device does not load the browser over plain http.',
       );
     }
-    final answer = await _call(
-      connection,
-      timeout,
-      () async => http.Response.fromStream(
-        await _client.send(
-          http.Request('POST', route)..headers.addAll(_headers(connection)),
-        ),
-      ),
-    );
+    final answer = _decode(response);
     return ChatBrowser.fromJson(answer) ??
         (throw const ApiException(
           'The server did not answer like the browser.',
@@ -460,8 +435,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   }
 
   /// The relay's runs of [status], or every kept run when it is null, read as JSON holding runs
-  /// or an object with them under `runs`, less those whose body is a `reset`, which clears a chat
-  /// and is no answer.
+  /// or an object with them under `runs`, less those that clear a chat.
   Future<List<Map<String, dynamic>>> _listRuns(
     Connection connection,
     String? status,
@@ -474,12 +448,15 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     );
     return [
       for (final run in jsonObjects(listed is Map ? listed['runs'] : listed))
-        if (run['body'] case final Map body when body['reset'] == true)
-          ...const <Map<String, dynamic>>[]
-        else
-          run,
+        if (!_isReset(run)) run,
     ];
   }
+
+  /// Whether [run] clears its chat, which the relay lists with the question `/reset`, and which
+  /// is no answer.
+  static bool _isReset(Map<String, dynamic> run) =>
+      run['question'] == '/reset' ||
+      (run['body'] is Map && (run['body'] as Map)['reset'] == true);
 
   /// The question a listed [run] was started with, or null when it does not say.
   String? _questionOf(Map<String, dynamic> run) {
@@ -1114,7 +1091,10 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
 
   @override
   Future<bool> relayFound({bool again = false}) {
-    if (again) _relays.remove(_current.withPassword(null));
+    if (again) {
+      _relays.remove(_current.withPassword(null));
+      _noBrowser.clear();
+    }
     return _isRelay(_current);
   }
 

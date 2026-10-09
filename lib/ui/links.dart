@@ -31,3 +31,10 @@ Future<void> openLink(BuildContext context, String href) async {
     );
   }
 }
+
+/// Opens AnythingLLM's own web page, at the connected server's address.
+Future<void> openServerPage(BuildContext context) async {
+  if (AppScope.of(context).settings.connection case final connection?) {
+    await openLink(context, connection.uri.toString());
+  }
+}

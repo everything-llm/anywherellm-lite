@@ -5,15 +5,14 @@ import 'package:flutter/material.dart';
 import '../core/copy.dart';
 import '../core/schedule.dart';
 import 'app_scope.dart';
-import 'icons.dart';
 import 'links.dart';
 import 'settings/settings_pages.dart';
 import 'tokens.dart';
 import 'type.dart';
 import 'widgets/basics.dart';
 import 'widgets/buttons.dart';
+import 'widgets/drawer_row.dart';
 import 'widgets/phone_page.dart';
-import 'widgets/tappable.dart';
 import 'widgets/fields.dart';
 
 /// Upcoming in a phone's drawer: the jobs the server runs on a schedule, with how many once
@@ -47,38 +46,18 @@ class _UpcomingRowState extends State<UpcomingRow> {
       builder: (context, _) {
         final jobs = scope.system.jobs;
         final count = jobs == null ? null : plural(jobs.length, 'job', 'jobs');
-        return Tappable(
-          label: count == null ? 'Upcoming' : 'Upcoming, $count',
+        return DrawerRow(
+          icon: 'clock',
+          title: 'Upcoming',
+          heard: count == null ? 'Upcoming' : 'Upcoming, $count',
+          trailing: count == null
+              ? null
+              : Text(count, style: Type.sans(12.5, color: t.muted)),
           onTap: () {
             scope.shell
               ..closeSide()
               ..openUpcoming();
           },
-          radius: BorderRadius.circular(10),
-          child: SizedBox(
-            height: 44,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                children: [
-                  AppIcon('clock', size: IconSize.xs, color: t.ink2),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Upcoming',
-                      style: Type.sans(
-                        15,
-                        weight: FontWeight.w500,
-                        color: t.ink,
-                      ),
-                    ),
-                  ),
-                  if (count != null)
-                    Text(count, style: Type.sans(12.5, color: t.muted)),
-                ],
-              ),
-            ),
-          ),
         );
       },
     );
@@ -167,13 +146,12 @@ class _UpcomingPageState extends State<UpcomingPage> {
                         const SizedBox(height: 8),
                       ],
                     const SizedBox(height: 12),
-                    if (scope.settings.connection case final connection?)
+                    if (scope.settings.configured)
                       Align(
                         alignment: Alignment.centerLeft,
                         child: AppButton(
                           'Edit in AnythingLLM\'s web page',
-                          onPressed: () =>
-                              openLink(context, connection.uri.toString()),
+                          onPressed: () => openServerPage(context),
                         ),
                       ),
                     const SizedBox(height: 10),

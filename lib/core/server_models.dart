@@ -4,6 +4,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'copy.dart';
 import 'outputs.dart';
 
 /// A string or number field as text, trimmed, or empty when it is missing.
@@ -654,15 +655,13 @@ class RelayRun {
       final int ms => DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true),
       _ => null,
     };
-    String? text(Object? value) =>
-        value is String && value.trim().isNotEmpty ? value.trim() : null;
     return RelayRun(
       workspace: workspace,
       thread: thread,
       status: status is String ? status : '',
-      id: text(json['id']),
-      question: text(json['question']),
-      error: text(json['error']),
+      id: textOrNull(json['id']),
+      question: textOrNull(json['question']),
+      error: textOrNull(json['error']),
       started: time(json['createdAt']),
       finished: time(json['finishedAt']),
     );
@@ -677,14 +676,14 @@ class RelayRun {
   final DateTime? started;
   final DateTime? finished;
 
+  /// When the answer ended, or else when it started.
+  DateTime? get endedAt => finished ?? started;
+
   /// Whether the answer is still being written.
   bool get running => status == 'running';
 
   /// Whether the answer failed.
   bool get failed => status == 'failed';
-
-  /// Whether the answer was stopped.
-  bool get stopped => status == 'cancelled';
 
   /// Whether the answer ran to its end, neither failing nor stopped.
   bool get done => status == 'done';

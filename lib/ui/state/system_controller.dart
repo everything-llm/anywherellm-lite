@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 
+import '../../core/activity.dart';
 import '../../core/chat_log.dart';
 import '../../core/connection.dart';
 import '../../core/embeds.dart';
@@ -52,27 +53,34 @@ class SystemController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// The answers the relay holds, oldest first, or null until read.
-  List<RelayRun>? activity;
+  /// The answers the relay holds, those running and those that ended, each newest first, or null
+  /// until read.
+  ({List<RelayRun> running, List<RelayRun> ended})? activity;
 
   /// Why the last read of the activity failed.
   Notice? activityProblem;
 
-  /// How many answers the relay is writing, or null until the activity is read.
-  int? get running => activity?.where((r) => r.running).length;
+  Future<void>? _readingActivity;
 
-  /// Reads the answers the relay holds.
-  Future<void> readActivity() async {
+  /// How many answers the relay is writing, or null until the activity is read.
+  int? get running => activity?.running.length;
+
+  /// Reads the answers the relay holds; a second ask joins the read going.
+  Future<void> readActivity() =>
+      _server == null ? Future.value() : _readingActivity ??= _readActivity();
+
+  Future<void> _readActivity() async {
     final server = _server;
-    if (server == null) return;
     try {
-      final read = await _api.relayRuns();
+      final read = activityGroups(await _api.relayRuns());
       if (_server != server) return;
       activity = read;
       activityProblem = null;
     } on ApiException catch (error) {
       if (_server != server) return;
       activityProblem = Notice('Could not read the activity', error.message);
+    } finally {
+      _readingActivity = null;
     }
     notifyListeners();
   }

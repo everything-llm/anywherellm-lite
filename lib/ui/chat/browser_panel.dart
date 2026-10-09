@@ -138,7 +138,7 @@ class BrowserPanel extends StatelessWidget {
         const SizedBox(height: 12),
         AlertBox(AlertKind.warn, problem.title, text: problem.text),
       ],
-      if (tab.state != 'closed') ...[
+      if (!tab.closed) ...[
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,

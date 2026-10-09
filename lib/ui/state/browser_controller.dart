@@ -8,13 +8,11 @@ import 'chat_controller.dart';
 import 'notice.dart';
 import 'shell_controller.dart';
 
-/// The everythingllm browser of the chat on screen as the server says it: its tab, with who has
-/// it and what was done last, and its requests for logins. It reads when a chat comes on screen,
-/// to know whether the chat has a browser at all; each time the status of the answer running in
-/// it changes, so the card shows from the agent's first step; when that
-/// answer ends; and every [every] while the Browser panel is open, so the state follows. A
-/// server that does not say, such as one without the browser's route, leaves [browser] null,
-/// and the chat's browser is then only what its answers show.
+/// The everythingllm browser of the chat on screen as the server says it. It reads when a chat
+/// comes on screen, to learn whether the chat has a tab; each time the status of the answer
+/// running in it changes, so the card shows from the agent's first step; when that answer ends;
+/// and every [every] while the Browser panel is open. A server that does not say leaves
+/// [browser] null, and the chat's browser is then only what its answers show.
 class BrowserController extends ChangeNotifier {
   BrowserController(
     this._api,
@@ -59,9 +57,6 @@ class BrowserController extends ChangeNotifier {
   /// The newest login request waiting for the person, or null.
   BrowserLogin? get waitingLogin => browser?.waitingLogin;
 
-  /// Whether the server says the chat on screen has a browser tab.
-  bool get hasTab => tab != null;
-
   ({String slug, String thread})? get _here {
     final slug = _chat.activeSlug;
     final thread = _chat.activeThread;
@@ -96,8 +91,6 @@ class BrowserController extends ChangeNotifier {
     }
   }
 
-  /// The running answer's status changed, as when the agent took a browser step. A read still
-  /// going counts for this one.
   void _status() => unawaited(read());
 
   /// Reads the browser of the chat on screen again.
@@ -107,11 +100,9 @@ class BrowserController extends ChangeNotifier {
     _reading = true;
     try {
       final read = await _api.chatBrowser(here.slug, here.thread);
-      if (_of != here) return;
-      if (read != browser) {
-        browser = read;
-        notifyListeners();
-      }
+      if (_of != here || (read == null && browser == null)) return;
+      browser = read;
+      notifyListeners();
     } finally {
       _reading = false;
     }

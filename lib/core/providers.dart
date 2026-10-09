@@ -40,6 +40,11 @@ class ProviderField {
 
   /// A line under the field, or empty.
   final String help;
+
+  /// Whether it is rarely changed, how much a model can read or how long a piece of text is
+  /// cut, so Settings folds it away.
+  bool get advanced =>
+      key.endsWith('TokenLimit') || key.endsWith('MaxChunkLength');
 }
 
 final _numberName = RegExp(

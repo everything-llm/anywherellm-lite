@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../core/prefs.dart';
-import '../../core/providers.dart';
 import '../app_scope.dart';
 import '../icons.dart';
 import '../layout.dart';
@@ -382,11 +381,7 @@ class _NavState extends State<_Nav> {
                     item(
                       hit.label,
                       hint: 'In the browser',
-                      onTap: () {
-                        if (scope.settings.connection case final connection?) {
-                          openLink(context, connection.uri.toString());
-                        }
-                      },
+                      onTap: () => openServerPage(context),
                     ),
               ] else ...[
                 head('This app'),
@@ -601,30 +596,29 @@ class _PageView extends StatelessWidget {
         SettingsPage.server => ServerPage(phone: phone),
         SettingsPage.appearance => const AppearancePage(),
         SettingsPage.chat => const ChatPage(),
-        SettingsPage.chatModel => const ProviderPage([
-          chatProviders,
-        ], fieldsNote: 'These fields change with the provider.'),
-        SettingsPage.searchModel => const ProviderPage(
-          [embedderProviders],
-          before: [SearchModelWarning()],
+        SettingsPage.chatModel => ProviderPage(
+          providerPages[page]!,
+          fieldsNote: 'These fields change with the provider.',
         ),
-        SettingsPage.storage => const ProviderPage(
-          [vectorProviders],
-          lead: [StoredPassages()],
+        SettingsPage.searchModel => ProviderPage(
+          providerPages[page]!,
+          before: const [SearchModelWarning()],
         ),
-        SettingsPage.images => const ProviderPage([imageProviders]),
-        SettingsPage.voice => const ProviderPage(
-          [speechToTextProviders, textToSpeechProviders],
-          after: [
+        SettingsPage.storage => ProviderPage(
+          providerPages[page]!,
+          lead: const [StoredPassages()],
+        ),
+        SettingsPage.voice => ProviderPage(
+          providerPages[page]!,
+          after: const [
             PageNote(
               'Read aloud and dictation in AnywhereLLM use the device\'s own engines, whatever '
               'is set here.',
             ),
           ],
         ),
-        SettingsPage.transcription => const ProviderPage([
-          transcriptionProviders,
-        ]),
+        SettingsPage.images ||
+        SettingsPage.transcription => ProviderPage(providerPages[page]!),
         SettingsPage.chats => const ChatsPage(),
         SettingsPage.embeds => const EmbedsPage(),
         SettingsPage.privacy => const PrivacyPage(),

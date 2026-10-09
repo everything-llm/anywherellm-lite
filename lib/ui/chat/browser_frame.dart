@@ -7,34 +7,27 @@ import '../app_scope.dart';
 import '../tokens.dart';
 import '../type.dart';
 
-/// The chat's browser tab as the server shows it now, one picture read again every [every]
-/// while it can be seen, never while the chat is offstage behind Files ([TickerMode]) or the
-/// app is hidden, since reading it counts as watching the tab, which keeps the host's browser
-/// from being stopped. A picture that has not changed is not drawn again. It is read through
-/// the developer key, so a browser build can draw it too, which the tab's own card does not
-/// allow.
+/// The chat's browser tab as the server shows it now, one picture read again every second while
+/// it can be seen, never while the chat is offstage behind Files ([TickerMode]) or the app is
+/// hidden, since reading it counts as watching the tab, which keeps the host's browser from
+/// being stopped. A picture that has not changed is not drawn again. It is read through the
+/// developer key, so a browser build can draw it too, which the tab's own card does not allow.
 class BrowserFrame extends StatefulWidget {
-  const BrowserFrame({
-    super.key,
-    this.every = const Duration(seconds: 1),
-    this.maxHeight = 520,
-  });
-
-  final Duration every;
-
-  /// The tallest it is drawn.
-  final double maxHeight;
+  const BrowserFrame({super.key});
 
   @override
   State<BrowserFrame> createState() => _BrowserFrameState();
 }
 
 class _BrowserFrameState extends State<BrowserFrame> {
+  static const _every = Duration(seconds: 1);
+  static const _tallest = 520.0;
+
   Uint8List? _bytes;
   String? _etag;
 
-  /// Whether the last read found no picture, as when the tab closed.
-  bool _gone = false;
+  /// Whether a read has finished, so a missing picture is one the server has not got.
+  bool _asked = false;
 
   Timer? _timer;
   bool _reading = false;
@@ -74,7 +67,7 @@ class _BrowserFrameState extends State<BrowserFrame> {
   void _follow() {
     if (_onstage && _appShown) {
       if (_timer == null) {
-        _timer = Timer.periodic(widget.every, (_) => unawaited(_read()));
+        _timer = Timer.periodic(_every, (_) => unawaited(_read()));
         unawaited(_read());
       }
     } else {
@@ -90,17 +83,19 @@ class _BrowserFrameState extends State<BrowserFrame> {
       final got = await AppScope.of(context).browser.frame(etag: _etag);
       if (!mounted) return;
       if (got == null) {
-        if (!_gone) setState(() => _gone = true);
+        setState(() {
+          _bytes = null;
+          _etag = null;
+          _asked = true;
+        });
       } else if (got.bytes case final bytes?) {
         // Each picture is its own [MemoryImage], so the last is let go of.
         if (_bytes case final last?) unawaited(MemoryImage(last).evict());
         setState(() {
           _bytes = bytes;
           _etag = got.etag;
-          _gone = false;
+          _asked = true;
         });
-      } else if (_gone) {
-        setState(() => _gone = false);
       }
     } finally {
       _reading = false;
@@ -110,6 +105,12 @@ class _BrowserFrameState extends State<BrowserFrame> {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    Widget note(String text) => AspectRatio(
+      aspectRatio: 16 / 9,
+      child: Center(
+        child: Text(text, style: Type.sans(13, color: t.muted)),
+      ),
+    );
     final bytes = _bytes;
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
@@ -119,38 +120,25 @@ class _BrowserFrameState extends State<BrowserFrame> {
           border: Border.all(color: t.line),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: bytes == null || _gone
-            ? AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Center(
-                  child: Text(
-                    _gone
-                        ? 'The browser has no picture now.'
-                        : 'Reading the browser…',
-                    style: Type.sans(13, color: t.muted),
-                  ),
-                ),
+        child: bytes == null
+            ? note(
+                _asked
+                    ? 'The browser has no picture now.'
+                    : 'Reading the browser…',
               )
             : Semantics(
                 label: 'The browser, as it looks now',
                 image: true,
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: widget.maxHeight),
+                  constraints: const BoxConstraints(maxHeight: _tallest),
                   child: Image.memory(
                     bytes,
                     fit: BoxFit.contain,
                     gaplessPlayback: true,
                     width: double.infinity,
                     // A picture that cannot be read is no picture; the next one may be.
-                    errorBuilder: (context, error, stack) => AspectRatio(
-                      aspectRatio: 16 / 9,
-                      child: Center(
-                        child: Text(
-                          'The browser\'s picture could not be shown.',
-                          style: Type.sans(13, color: t.muted),
-                        ),
-                      ),
-                    ),
+                    errorBuilder: (context, error, stack) =>
+                        note('The browser\'s picture could not be shown.'),
                   ),
                 ),
               ),

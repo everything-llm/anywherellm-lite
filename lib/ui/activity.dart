@@ -11,12 +11,13 @@ import 'tokens.dart';
 import 'type.dart';
 import 'widgets/basics.dart';
 import 'widgets/buttons.dart';
+import 'widgets/drawer_row.dart';
 import 'widgets/fields.dart';
 import 'widgets/phone_page.dart';
 import 'widgets/tappable.dart';
 
 /// Activity in a phone's drawer: how many answers the relay is writing, once read. It reads
-/// them the first time it shows on a server. Tapped, it opens [ActivityPage].
+/// them when the drawer first opens on a server. Tapped, it opens [ActivityPage].
 class ActivityRow extends StatefulWidget {
   const ActivityRow({super.key});
 
@@ -25,18 +26,27 @@ class ActivityRow extends StatefulWidget {
 }
 
 class _ActivityRowState extends State<ActivityRow> {
+  late final _shell = AppScope.of(context).shell;
+
   @override
   void initState() {
     super.initState();
+    _shell.addListener(_drawerChanged);
+  }
+
+  @override
+  void dispose() {
+    _shell.removeListener(_drawerChanged);
+    super.dispose();
+  }
+
+  void _drawerChanged() {
     final system = AppScope.of(context).system;
-    // A read tells the controller's listeners at once, so it waits for the frame.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted &&
-          system.activity == null &&
-          system.activityProblem == null) {
-        unawaited(system.readActivity());
-      }
-    });
+    if (_shell.sideOpen &&
+        system.activity == null &&
+        system.activityProblem == null) {
+      unawaited(system.readActivity());
+    }
   }
 
   @override
@@ -47,48 +57,28 @@ class _ActivityRowState extends State<ActivityRow> {
       listenable: scope.system,
       builder: (context, _) {
         final running = scope.system.running ?? 0;
-        return Tappable(
-          label: running == 0 ? 'Activity' : 'Activity, $running running',
+        return DrawerRow(
+          icon: 'activity',
+          title: 'Activity',
+          heard: running == 0 ? 'Activity' : 'Activity, $running running',
+          trailing: running == 0
+              ? null
+              : Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: t.accentbg,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text(
+                    '$running running',
+                    style: Type.sans(12, color: t.accent, height: 1.5),
+                  ),
+                ),
           onTap: () {
             scope.shell
               ..closeSide()
               ..openActivity();
           },
-          radius: BorderRadius.circular(10),
-          child: SizedBox(
-            height: 44,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                children: [
-                  AppIcon('activity', size: IconSize.xs, color: t.ink2),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Activity',
-                      style: Type.sans(
-                        15,
-                        weight: FontWeight.w500,
-                        color: t.ink,
-                      ),
-                    ),
-                  ),
-                  if (running > 0)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      decoration: BoxDecoration(
-                        color: t.accentbg,
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                      child: Text(
-                        '$running running',
-                        style: Type.sans(12, color: t.accent, height: 1.5),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
         );
       },
     );
@@ -154,7 +144,7 @@ class _ActivityPageState extends State<ActivityPage> {
           Expanded(
             child: ListenableBuilder(
               listenable: Listenable.merge([scope.system, scope.chat]),
-              builder: (context, _) => _body(context, scope, t),
+              builder: (context, _) => _body(scope, t),
             ),
           ),
         ],
@@ -162,62 +152,71 @@ class _ActivityPageState extends State<ActivityPage> {
     );
   }
 
-  Widget _body(BuildContext context, AppScope scope, Tokens t) {
+  Widget _body(AppScope scope, Tokens t) {
     final system = scope.system;
-    final runs = system.activity;
+    final chat = scope.chat;
+    final groups = system.activity;
     final now = DateTime.now();
-    final running = [
-      for (final run in runs ?? const <RelayRun>[])
-        if (run.running) run,
-    ]..sort((a, b) => _at(b.started).compareTo(_at(a.started)));
-    final finished =
-        [
-          for (final run in runs ?? const <RelayRun>[])
-            if (!run.running) run,
-        ]..sort(
-          (a, b) =>
-              _at(b.finished ?? b.started)
-                  .compareTo(_at(a.finished ?? a.started)),
-        );
+    // What each run's chat is called, looked up once for every row.
+    final workspaces = {for (final w in chat.workspaces) w.slug: w.name};
+    final threads = {
+      for (final w in chat.workspaces)
+        for (final c in chat.threadsOf(w.slug)) (w.slug, c.slug): c.name,
+    };
+    Widget row(RelayRun run, int i) {
+      final thread = threads[(run.workspace, run.thread)];
+      return _RunRow(
+        run,
+        first: i == 0,
+        now: now,
+        where: [
+          ?workspaces[run.workspace],
+          thread ?? 'A chat that is gone',
+        ].join(' · '),
+        canOpen: thread != null,
+        fresh: run.done && chat.isReady(run.thread),
+      );
+    }
+
     return CustomScrollView(
       slivers: [
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           sliver: SliverList.list(
             children: [
               if (system.activityProblem case final problem?) ...[
                 const SizedBox(height: 18),
                 AlertBox(AlertKind.warn, problem.title, text: problem.text),
-              ] else if (runs == null) ...[
+              ] else if (groups == null) ...[
                 const SizedBox(height: 18),
                 Text('Reading…', style: Type.sans(14, color: t.muted)),
-              ] else if (runs.isEmpty) ...[
+              ] else if (groups.running.isEmpty && groups.ended.isEmpty) ...[
                 const SizedBox(height: 18),
                 Text(
                   'Nothing has been answered in the last 7 days.',
                   style: Type.sans(14, color: t.muted),
                 ),
               ],
-              if (running.isNotEmpty) ...[
-                _Heading('Running now'),
-                for (final (i, run) in running.indexed)
-                  _RunRow(run, first: i == 0, now: now),
-              ],
-              if (finished.isNotEmpty) ...[
-                _Heading('Finished, last 7 days'),
-                for (final (i, run) in finished.indexed)
-                  _RunRow(run, first: i == 0, now: now),
+              if (groups != null) ...[
+                if (groups.running.isNotEmpty) ...[
+                  const _Heading('Running now'),
+                  for (final (i, run) in groups.running.indexed) row(run, i),
+                ],
+                if (groups.ended.isNotEmpty) ...[
+                  const _Heading('Finished, last 7 days'),
+                  for (final (i, run) in groups.ended.indexed) row(run, i),
+                ],
               ],
             ],
           ),
         ),
-        SliverFillRemaining(
+        const SliverFillRemaining(
           hasScrollBody: false,
           child: Align(
             alignment: Alignment.bottomLeft,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-              child: const HelpText(
+              padding: EdgeInsets.fromLTRB(20, 12, 20, 20),
+              child: HelpText(
                 'Answers the server has run, in every workspace. Research and delegation show as cards in their chats.',
               ),
             ),
@@ -226,9 +225,6 @@ class _ActivityPageState extends State<ActivityPage> {
       ],
     );
   }
-
-  static DateTime _at(DateTime? time) =>
-      time ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
 }
 
 class _Heading extends StatelessWidget {
@@ -243,44 +239,41 @@ class _Heading extends StatelessWidget {
   );
 }
 
-/// One answer: where it was asked, the question, and how it stands.
+/// One answer: where it was asked ([where]), the question, and how it stands. A row [canOpen]
+/// while its chat is still there, and is [fresh] while its answer has not been seen.
 class _RunRow extends StatelessWidget {
-  const _RunRow(this.run, {required this.first, required this.now});
+  const _RunRow(
+    this.run, {
+    required this.first,
+    required this.now,
+    required this.where,
+    required this.canOpen,
+    required this.fresh,
+  });
 
   final RelayRun run;
   final bool first;
   final DateTime now;
+  final String where;
+  final bool canOpen;
+  final bool fresh;
 
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
-    final chat = scope.chat;
-    final workspace = chat.workspaces
-        .where((w) => w.slug == run.workspace)
-        .firstOrNull;
-    final thread = chat
-        .threadsOf(run.workspace)
-        .where((c) => c.slug == run.thread)
-        .firstOrNull;
-    final where = [
-      ?workspace?.name,
-      thread?.name ?? 'A chat that is gone',
-    ].join(' · ');
     final question = run.question ?? 'A question the relay did not keep';
-    final (label, color, ended) = _state(t);
-    final fresh = run.done && chat.isReady(run.thread);
+    final (label, color) = switch (run) {
+      RelayRun(running: true) => ('Answering', t.accent),
+      RelayRun(done: true) => ('Done', t.okfg),
+      RelayRun(failed: true) => ('Failed', t.badfg),
+      _ => (run.status == 'cancelled' ? 'Stopped' : run.status, t.muted),
+    };
     final started = run.started;
-    final took = run.running && started != null
-        ? elapsedText(now.difference(started))
-        : null;
-    final heard = [
-      where,
-      question,
-      label,
-      ?(took ?? ended),
-      if (fresh) 'not opened yet',
-    ].join(', ');
+    final ended = run.endedAt;
+    final tail = run.running
+        ? (started == null ? null : elapsedText(now.difference(started)))
+        : (ended == null ? null : agoText(ended, now));
     return Container(
       decoration: BoxDecoration(
         border: first ? null : Border(top: BorderSide(color: t.line2)),
@@ -290,8 +283,14 @@ class _RunRow extends StatelessWidget {
         children: [
           Expanded(
             child: Tappable(
-              label: heard,
-              onTap: thread == null ? null : () => _open(scope),
+              label: [
+                where,
+                question,
+                label,
+                ?tail,
+                if (fresh) 'not opened yet',
+              ].join(', '),
+              onTap: canOpen ? () => _open(scope) : null,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minHeight: 64),
                 child: Padding(
@@ -311,15 +310,7 @@ class _RunRow extends StatelessWidget {
                               style: Type.sans(12.5, color: t.muted),
                             ),
                           ),
-                          if (fresh)
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: t.accent,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
+                          if (fresh) const ReadyDot(gap: false),
                         ],
                       ),
                       Text(
@@ -339,8 +330,7 @@ class _RunRow extends StatelessWidget {
                                 color: color,
                               ),
                             ),
-                            if (took ?? ended case final tail?)
-                              TextSpan(text: ' · $tail'),
+                            if (tail != null) TextSpan(text: ' · $tail'),
                           ],
                         ),
                         style: Type.sans(12.5, color: t.muted),
@@ -357,49 +347,10 @@ class _RunRow extends StatelessWidget {
             ),
           ),
           if (run.running)
-            Tappable(
-              label: 'Stop this answer',
-              onTap: () => unawaited(scope.system.stopRun(run)),
-              radius: BorderRadius.circular(9),
-              child: SizedBox.square(
-                dimension: 44,
-                child: Center(
-                  child: Container(
-                    width: 30,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: t.ink,
-                      borderRadius: BorderRadius.circular(9),
-                    ),
-                    alignment: Alignment.center,
-                    child: Container(
-                      width: 9,
-                      height: 9,
-                      decoration: BoxDecoration(
-                        color: t.bg,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            _StopButton(() => unawaited(scope.system.stopRun(run))),
         ],
       ),
     );
-  }
-
-  /// The word for how the answer stands, its colour, and when it ended.
-  (String, Color, String?) _state(Tokens t) {
-    final ended = run.finished ?? run.started;
-    final ago = ended == null ? null : agoText(ended, now);
-    return switch (run.status) {
-      'running' => ('Answering', t.accent, null),
-      'done' => ('Done', t.okfg, ago),
-      'failed' => ('Failed', t.badfg, ago),
-      'cancelled' => ('Stopped', t.muted, ago),
-      _ => (run.status, t.muted, ago),
-    };
   }
 
   /// Opens the chat the answer belongs to.
@@ -409,5 +360,44 @@ class _RunRow extends StatelessWidget {
       ..closeSide()
       ..showPane(Pane.chats);
     unawaited(scope.chat.select(run.workspace, thread: run.thread));
+  }
+}
+
+/// Stops a running answer: a dark square holding a small one, in a 44 px place to tap.
+class _StopButton extends StatelessWidget {
+  const _StopButton(this.onTap);
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Tappable(
+      label: 'Stop this answer',
+      onTap: onTap,
+      radius: BorderRadius.circular(9),
+      child: SizedBox.square(
+        dimension: 44,
+        child: Center(
+          child: Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: t.ink,
+              borderRadius: BorderRadius.circular(9),
+            ),
+            alignment: Alignment.center,
+            child: Container(
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(
+                color: t.bg,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

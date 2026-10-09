@@ -89,11 +89,6 @@ class _ProviderFormState extends State<_ProviderForm> with SettingsSaving {
 
   String _saved(String key) => settingText(widget.values, key);
 
-  /// Whether [field] is one that is rarely changed: how much a model can read, or how long a
-  /// piece of text is cut.
-  static bool _advanced(ProviderField field) =>
-      field.key.endsWith('TokenLimit') || field.key.endsWith('MaxChunkLength');
-
   /// Whether [field] is a secret, which the server shows only as whether it is set.
   static bool _secret(ProviderField field) => field.kind == FieldKind.secret;
 
@@ -229,13 +224,13 @@ class _ProviderFormState extends State<_ProviderForm> with SettingsSaving {
       children: [
         for (final (i, (s, of)) in shown.indexed) ...[
           FieldCard([if (i == 0) ...widget.lead, _chooser(s, saving)]),
-          if (of.where((f) => !_advanced(f)).toList() case final main
+          if (of.where((f) => !f.advanced).toList() case final main
               when main.isNotEmpty) ...[
             if (widget.fieldsNote case final note?) PageNote(note),
             FieldCard([for (final field in main) _field(field, saving)]),
           ],
         ],
-        if (fields.where(_advanced).toList() case final rare
+        if (fields.where((f) => f.advanced).toList() case final rare
             when rare.isNotEmpty) ...[
           Fold(
             label: 'Advanced (${rare.length})',

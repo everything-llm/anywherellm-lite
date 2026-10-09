@@ -4,6 +4,10 @@
 String plural(int count, String one, String many) =>
     '${grouped(count)} ${count == 1 ? one : many}';
 
+/// [value] trimmed, or null when it is not text or holds only space.
+String? textOrNull(Object? value) =>
+    value is String && value.trim().isNotEmpty ? value.trim() : null;
+
 /// [n] with commas between thousands: `1,284`.
 String grouped(int n) =>
     n.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+$)'), (_) => ',');

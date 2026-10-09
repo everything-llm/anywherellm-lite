@@ -124,6 +124,28 @@ void main() {
     );
 
     test(
+      'a host with no route at all is not asked again until the relay is',
+      () async {
+        final seen = <http.Request>[];
+        final api = _api((request) async {
+          seen.add(request);
+          return http.Response('<html>Not found</html>', 404);
+        });
+        expect(await api.chatBrowser('q3', 'budget'), isNull);
+        expect(await api.chatBrowser('q3', 'other'), isNull);
+        expect(seen, hasLength(1));
+        // A JSON error is the route itself saying there is no such chat, so it is asked again.
+        final route = _api((request) async {
+          seen.add(request);
+          return http.Response('{"error":"No such chat."}', 404);
+        });
+        await route.chatBrowser('q3', 'a');
+        await route.chatBrowser('q3', 'b');
+        expect(seen, hasLength(3));
+      },
+    );
+
+    test(
       'its picture is asked again with the last etag, and says when unchanged',
       () async {
         final seen = <http.Request>[];

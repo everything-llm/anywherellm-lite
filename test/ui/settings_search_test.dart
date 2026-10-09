@@ -26,7 +26,8 @@ void main() {
 
   test('a page of AnythingLLM\'s web page is found, after the app\'s', () {
     final hits = searchSettings('security', configured: true);
-    expect(hits.last.web?.label, 'Security');
+    expect(hits.last.label, 'Security');
+    expect(hits.last.page, isNull);
     expect(labels('scheduled jobs'), ['Scheduled jobs']);
   });
 

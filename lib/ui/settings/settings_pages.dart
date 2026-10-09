@@ -1,3 +1,5 @@
+import '../../core/providers.dart';
+
 /// The pages of Settings. Connection, Appearance and Chat are about this device; Server lists
 /// the pages about AnythingLLM, which open from it.
 enum SettingsPage {
@@ -114,3 +116,14 @@ const webPages = [
   ),
   WebPage('Security', 'Who can open this server.'),
 ];
+
+/// The providers each provider page chooses among, which the page draws and a search reads the
+/// names of.
+const providerPages = {
+  SettingsPage.chatModel: [chatProviders],
+  SettingsPage.searchModel: [embedderProviders],
+  SettingsPage.storage: [vectorProviders],
+  SettingsPage.images: [imageProviders],
+  SettingsPage.voice: [speechToTextProviders, textToSpeechProviders],
+  SettingsPage.transcription: [transcriptionProviders],
+};

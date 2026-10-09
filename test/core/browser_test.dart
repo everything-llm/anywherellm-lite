@@ -218,7 +218,6 @@ void chatBrowserTests() {
       expect(browser.tab!.site, 'ycombinator.com');
       expect(browser.tab!.yours, isTrue);
       expect(browser.tab!.says, 'You have the browser.');
-      expect(browser.tab!.frame!.path, endsWith('/card.jpg'));
       expect(browser.logins, hasLength(2));
       expect(browser.waitingLogin!.page.path, endsWith('lr-2'));
     });
@@ -239,12 +238,6 @@ void chatBrowserTests() {
       expect(browserStateText('waiting'), 'The agent is waiting for you.');
       expect(browserStateText('closed'), 'The browser is closed.');
       expect(browserStateText('odd'), 'The browser is odd.');
-    });
-
-    test('the same words are the same browser', () {
-      ChatBrowser make() => ChatBrowser.fromJson({'tab': tab, 'logins': []})!;
-      expect(make(), make());
-      expect(make(), isNot(const ChatBrowser()));
     });
   });
 }

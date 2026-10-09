@@ -3,6 +3,7 @@
 
 import 'dart:convert';
 
+import 'copy.dart';
 import 'markdown.dart';
 
 /// A card of the everythingllm browser in an answer: a tab's live card, whose [page] is the
@@ -23,16 +24,14 @@ class BrowserCard {
   final bool login;
 }
 
-/// A chat's browser tab as the server reports it to a client with a developer key: [card] is
-/// the tab's live card, [page] its take-over view, [frame] the tab as one picture now, [state]
-/// who has it (`working`, `idle`, `waiting`, `user` or `closed`), [title] what the card names the
-/// page, [site] whose it is, never its address, and [last] what was done last.
+/// A chat's browser tab as the server reports it to a client with a developer key: [page] is
+/// its take-over view, [state] who has it (`working`, `idle`, `waiting`, `user` or `closed`),
+/// [title] what the card names the page, [site] whose it is, never its address, and [last] what
+/// was done last.
 class BrowserTab {
   const BrowserTab({
-    required this.card,
     required this.page,
     required this.state,
-    this.frame,
     this.title,
     this.site,
     this.last,
@@ -41,59 +40,44 @@ class BrowserTab {
   /// The tab, or null when [json] is not one.
   static BrowserTab? fromJson(Object? json) {
     if (json is! Map) return null;
-    final card = _address(json['card']);
     final page = _address(json['page']);
     final state = json['state'];
-    if (card == null || page == null || state is! String) return null;
+    if (page == null || state is! String) return null;
     return BrowserTab(
-      card: card,
       page: page,
       state: state,
-      frame: _address(json['frame']),
-      title: _text(json['title']),
-      site: _text(json['site']),
-      last: _text(json['last']),
+      title: textOrNull(json['title']),
+      site: textOrNull(json['site']),
+      last: textOrNull(json['last']),
     );
   }
 
-  final Uri card;
   final Uri page;
-  final Uri? frame;
   final String state;
   final String? title;
   final String? site;
   final String? last;
 
+  /// Whether the agent is using it.
+  bool get working => state == 'working';
+
   /// Whether the user has the browser, so the agent's actions are refused.
   bool get yours => state == 'user';
 
+  /// Whether the tab is closed.
+  bool get closed => state == 'closed';
+
   /// What [state] says, in a sentence.
   String get says => browserStateText(state);
-
-  @override
-  bool operator ==(Object other) =>
-      other is BrowserTab &&
-      other.card == card &&
-      other.page == page &&
-      other.frame == frame &&
-      other.state == state &&
-      other.title == title &&
-      other.site == site &&
-      other.last == last;
-
-  @override
-  int get hashCode => Object.hash(card, page, frame, state, title, site, last);
 }
 
 /// A request for a login, as the server reports it: its [card], the [page] with the form that
-/// saves it, [site] it is for and [state] (`waiting`, `saving`, `saved`, `declined` or
-/// `expired`).
+/// saves it, and [state] (`waiting`, `saving`, `saved`, `declined` or `expired`).
 class BrowserLogin {
   const BrowserLogin({
     required this.card,
     required this.page,
     required this.state,
-    this.site,
   });
 
   static BrowserLogin? fromJson(Object? json) {
@@ -102,32 +86,15 @@ class BrowserLogin {
     final page = _address(json['page']);
     final state = json['state'];
     if (card == null || page == null || state is! String) return null;
-    return BrowserLogin(
-      card: card,
-      page: page,
-      state: state,
-      site: _text(json['site']),
-    );
+    return BrowserLogin(card: card, page: page, state: state);
   }
 
   final Uri card;
   final Uri page;
   final String state;
-  final String? site;
 
   /// Whether the agent is waiting for the person to enter it.
   bool get waiting => state == 'waiting';
-
-  @override
-  bool operator ==(Object other) =>
-      other is BrowserLogin &&
-      other.card == card &&
-      other.page == page &&
-      other.state == state &&
-      other.site == site;
-
-  @override
-  int get hashCode => Object.hash(card, page, state, site);
 }
 
 /// What the server says of a chat's browser: its [tab], if it has one, and its [logins]
@@ -156,18 +123,21 @@ class ChatBrowser {
 
   /// The newest login request that is still waiting for the person.
   BrowserLogin? get waitingLogin => logins.where((l) => l.waiting).firstOrNull;
-
-  @override
-  bool operator ==(Object other) =>
-      other is ChatBrowser &&
-      other.tab == tab &&
-      other.logins.length == logins.length &&
-      [for (final (i, l) in logins.indexed) l == other.logins[i]]
-          .every((e) => e);
-
-  @override
-  int get hashCode => Object.hash(tab, logins.length);
 }
+
+/// The port the host serves its live cards on, and with them the browser's route for a chat:
+/// the machine's own route for `/_live`.
+const cardsPort = 8445;
+
+/// The browser's route for a chat on the [server]'s host, `/_live/browser/chat/WORKSPACE/
+/// THREAD`, with [tail] after it, as `/card.jpg` or `/give`.
+Uri browserRoute(Uri server, String slug, String thread, [String tail = '']) =>
+    server.replace(
+      port: cardsPort,
+      path:
+          '/_live/browser/chat/${Uri.encodeComponent(slug)}/'
+          '${Uri.encodeComponent(thread)}$tail',
+    );
 
 /// A tab's [state] in a sentence.
 String browserStateText(String state) => switch (state) {
@@ -183,9 +153,6 @@ Uri? _address(Object? value) => switch (value) {
   final String text when text.isNotEmpty => Uri.tryParse(text),
   _ => null,
 };
-
-String? _text(Object? value) =>
-    value is String && value.trim().isNotEmpty ? value.trim() : null;
 
 /// The browser's cards in the Markdown [markdown], in order: each linked image on the
 /// [server]'s host that is a tab's card, `/_live/browser/bw-<id>.jpg` linking to
