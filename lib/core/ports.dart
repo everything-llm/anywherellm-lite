@@ -5,6 +5,7 @@ import 'chat.dart';
 import 'chat_log.dart';
 import 'commands.dart';
 import 'connection.dart';
+import 'created.dart';
 import 'embeds.dart';
 import 'prefs.dart';
 import 'schedule.dart';
@@ -112,6 +113,24 @@ abstract interface class AnythingLlmApi {
   /// Gives the chat's browser back to the agent, when the person has it, and answers as
   /// [chatBrowser] does. Fails with [ApiException].
   Future<ChatBrowser> handBackBrowser(String slug, String thread);
+
+  /// The files the agent's code left in the workspace's sandbox, newest first, with how much
+  /// room the workspace uses. An empty list for a workspace that has no sandbox yet; null when
+  /// the server does not say, as one without the everythingllm host's route. Fails with
+  /// [ApiException].
+  Future<CreatedList?> createdFiles(String slug);
+
+  /// The bytes of the created file [id] (as [CreatedFile.id] has it). Fails with
+  /// [ApiException].
+  Future<List<int>> downloadCreated(String slug, String id);
+
+  /// Moves the working file [id] into the workspace's project folder, where it stays, and
+  /// answers the file's id there. Fails with [ApiException], as when a run holds the workspace
+  /// or the project folder has a file of that name.
+  Future<String> keepCreated(String slug, String id);
+
+  /// Deletes the created file [id]. Fails with [ApiException].
+  Future<void> deleteCreated(String slug, String id);
 
   /// The jobs AnythingLLM runs on a schedule. It takes the server's web login, as the presets
   /// do: on a server with a password it needs one saved.

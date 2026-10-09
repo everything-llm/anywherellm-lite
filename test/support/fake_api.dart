@@ -6,6 +6,7 @@ import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/chat_log.dart';
 import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/connection.dart';
+import 'package:anywherellm/core/created.dart';
 import 'package:anywherellm/core/embeds.dart';
 import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/ports.dart';
@@ -349,6 +350,91 @@ class FakeAnythingLlm implements AnythingLlmApi {
   @override
   Future<List<ScheduledJob>> scheduledJobs() =>
       _run('scheduledJobs', () => jobs);
+
+  /// What [createdFiles] answers, by workspace slug: an empty list for one not here.
+  final Map<String, CreatedList> created = {};
+
+  /// Whether the server has no route for created files, as one without the everythingllm host.
+  bool noCreatedRoute = false;
+
+  /// The bytes [downloadCreated] answers, by file id; a file without any is empty.
+  final Map<String, List<int>> createdBytes = {};
+
+  @override
+  Future<CreatedList?> createdFiles(String slug) => _run(
+    'createdFiles',
+    () => noCreatedRoute ? null : created[slug] ?? const CreatedList(),
+    slug,
+  );
+
+  @override
+  Future<List<int>> downloadCreated(String slug, String id) =>
+      _run('downloadCreated', () {
+        _need(slug, id);
+        return createdBytes[id] ?? const [];
+      }, id);
+
+  /// Moves a working file to the same path in the project, as the server does, and refuses a
+  /// file that is not a working file or a path the project has.
+  @override
+  Future<String> keepCreated(String slug, String id) => _run('keepCreated', () {
+    final file = _need(slug, id);
+    if (file.area != CreatedArea.work) {
+      throw const ApiException(
+        'only a working file needs keeping',
+        status: 409,
+      );
+    }
+    final kept = 'project/${id.split('/').skip(2).join('/')}';
+    if (_createdFile(slug, kept) != null) {
+      throw ApiException("/project already has '$kept'", status: 409);
+    }
+    _createdSet(slug, [
+      for (final f in created[slug]!.files)
+        if (f.id == id)
+          CreatedFile(
+            id: kept,
+            name: f.name,
+            dir: f.dir,
+            size: f.size,
+            modified: f.modified,
+            area: CreatedArea.project,
+          )
+        else
+          f,
+    ]);
+    createdBytes[kept] = createdBytes.remove(id) ?? const [];
+    return kept;
+  }, id);
+
+  @override
+  Future<void> deleteCreated(String slug, String id) =>
+      _run('deleteCreated', () {
+        _need(slug, id);
+        _createdSet(slug, [
+          for (final f in created[slug]!.files)
+            if (f.id != id) f,
+        ]);
+        createdBytes.remove(id);
+      }, id);
+
+  CreatedFile? _createdFile(String slug, String id) =>
+      created[slug]?.files.where((f) => f.id == id).firstOrNull;
+
+  CreatedFile _need(String slug, String id) =>
+      _createdFile(slug, id) ??
+      (throw ApiException("There's no '$id'", status: 404));
+
+  void _createdSet(String slug, List<CreatedFile> files) {
+    final was = created[slug]!;
+    created[slug] = CreatedList(
+      files: files,
+      used: was.used,
+      warn: was.warn,
+      limit: was.limit,
+      truncated: was.truncated,
+    );
+  }
 
   /// What [chatBrowser] answers, by thread: none for a chat with no browser.
   final Map<String, ChatBrowser> browsers = {};

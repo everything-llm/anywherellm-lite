@@ -54,11 +54,12 @@ List<GeneratedFile> generatedFilesOf(Object? outputs) {
 
 final _storageName = RegExp(r'^(?!\.+$)[\w.-]+$');
 
-/// [bytes] in words: `812 B`, `14.2 KB` or `3.1 MB`.
+/// [bytes] in words: `812 B`, `14.2 KB`, `3.1 MB` or `4.0 GB`.
 String sizeText(int bytes) => switch (bytes) {
   < 1024 => '$bytes B',
   < 1024 * 1024 => '${(bytes / 1024).toStringAsFixed(1)} KB',
-  _ => '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB',
+  < 1024 * 1024 * 1024 => '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB',
+  _ => '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB',
 };
 
 /// How an answer ran, as the server measured it. Any part may be missing.

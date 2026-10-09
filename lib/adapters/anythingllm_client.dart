@@ -11,6 +11,7 @@ import '../core/chat.dart';
 import '../core/chat_log.dart';
 import '../core/commands.dart';
 import '../core/connection.dart';
+import '../core/created.dart';
 import '../core/embeds.dart';
 import '../core/ports.dart';
 import '../core/schedule.dart';
@@ -432,6 +433,84 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
         (throw const ApiException(
           'The server did not answer like the browser.',
         ));
+  }
+
+  /// The connections whose host answered the created files' route as no route at all, so it is
+  /// not asked again until Test connection asks about the relay again.
+  final _noCreated = <Connection>{};
+
+  /// The response to [method] on the created files' route for [slug] on the connection in use,
+  /// with [tail] and the created file [path] as [createdRoute] takes them, within [limit].
+  Future<http.Response> _created(
+    String method,
+    String slug, {
+    String tail = '',
+    String? path,
+    Duration? limit,
+  }) async {
+    final connection = _current;
+    final route = createdRoute(connection.uri, slug, tail, path);
+    return _fetch(
+      connection,
+      limit ?? timeout,
+      () async => http.Response.fromStream(
+        await _client.send(
+          http.Request(method, route)..headers.addAll(_headers(connection)),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Future<CreatedList?> createdFiles(String slug) async {
+    final connection = _current.withPassword(null);
+    if (_noCreated.contains(connection)) return null;
+    final response = await _created('GET', slug);
+    final body = _json(response);
+    if (response.statusCode == 404) {
+      // Not JSON, as a host without the route answers, is no route; JSON is the route saying
+      // the workspace has no sandbox yet.
+      if (body == null) {
+        _noCreated.add(connection);
+        return null;
+      }
+      return const CreatedList();
+    }
+    return CreatedList.fromJson(_decode(response)) ??
+        (throw const ApiException(
+          'The server did not answer like the sandbox.',
+        ));
+  }
+
+  @override
+  Future<List<int>> downloadCreated(String slug, String id) async {
+    final response = await _created(
+      'GET',
+      slug,
+      tail: '/download',
+      path: id,
+      limit: uploadTimeout,
+    );
+    if (response.statusCode != 200) {
+      _decode(response);
+      throw const ApiException(_refused);
+    }
+    return response.bodyBytes;
+  }
+
+  @override
+  Future<String> keepCreated(String slug, String id) async {
+    final response = await _created('POST', slug, tail: '/keep', path: id);
+    final kept = _field(_decode(response), 'id');
+    return kept is String
+        ? kept
+        : throw const ApiException('The server did not say where it kept it.');
+  }
+
+  @override
+  Future<void> deleteCreated(String slug, String id) async {
+    final response = await _created('POST', slug, tail: '/delete', path: id);
+    _decode(response);
   }
 
   /// The relay's runs of [status], or every kept run when it is null, read as JSON holding runs
@@ -1097,6 +1176,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     if (again) {
       _relays.remove(_current.withPassword(null));
       _noBrowser.clear();
+      _noCreated.clear();
     }
     return _isRelay(_current);
   }
