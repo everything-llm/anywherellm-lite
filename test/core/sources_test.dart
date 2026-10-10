@@ -54,12 +54,37 @@ void main() {
   });
 
   test('an empty chat suggests from the documents\' names', () {
-    expect(suggestionsFor([]), ['What can I do here?']);
-    expect(suggestionsFor(['Q3 roadmap.pdf']), ['Summarise Q3 roadmap']);
+    List<String> labels(List<String> titles) => [
+      for (final s in suggestionsFor(titles)) s.label,
+    ];
+    expect(labels([]), ['What can I do here?']);
+    expect(labels(['Q3 roadmap.pdf']), ['Summarise Q3 roadmap']);
+    expect(labels(['Q3 roadmap.pdf', 'Customer interviews.docx', 'x.md']), [
+      'Summarise Q3 roadmap',
+      'Compare Q3 roadmap with Customer interviews',
+    ]);
     expect(
-      suggestionsFor(['Q3 roadmap.pdf', 'Customer interviews.docx', 'x.md']),
-      ['Summarise Q3 roadmap', 'Compare Q3 roadmap with Customer interviews'],
+      suggestionsFor(['Q3 roadmap.pdf']).single.prompt,
+      'Summarise Q3 roadmap',
     );
+  });
+
+  test('a long name is cut in the label and whole in the prompt', () {
+    const long =
+        'Evidence-Based Gamification Design: What Works, When, and Why.pdf';
+    const longer =
+        'Open Software Engineering Jobs and Market Outlook in Sweden for a .NET Candidate';
+    final [summary, compare] = suggestionsFor([long, longer]);
+    // A subtitle after a colon goes first.
+    expect(summary.label, 'Summarise Evidence-Based Gamification Design');
+    expect(
+      summary.prompt,
+      'Summarise Evidence-Based Gamification Design: What Works, When, and Why',
+    );
+    expect(compare.label, 'Compare the first two documents');
+    expect(compare.prompt, endsWith('for a .NET Candidate'));
+    final [cut] = suggestionsFor([longer]);
+    expect(cut.label, 'Summarise Open Software Engineering Jobs and\u2026');
   });
 
   test('the type comes from the stored name, whatever the title', () {

@@ -390,7 +390,7 @@ class _Empty extends StatelessWidget {
                           .map((f) => f.title)
                           .take(2),
                     ]))
-                      _Suggestion(s, onTap: () => onSuggest(s)),
+                      _Suggestion(s.label, onTap: () => onSuggest(s.prompt)),
                   ],
                 ),
               ),
@@ -425,13 +425,19 @@ class _SuggestionState extends State<_Suggestion> {
       child: Tappable(
         label: widget.text,
         onTap: widget.onTap,
-        radius: BorderRadius.circular(99),
+        // A pill on one line; a label that wraps keeps its corners rather than bulging.
+        radius: BorderRadius.circular(19),
         color: t.panel,
         side: BorderSide(color: lit ?? t.line),
         hoverColor: Colors.transparent,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          child: Text(widget.text, style: Type.sans(14, color: lit ?? t.ink)),
+          child: Text(
+            widget.text,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Type.sans(14, color: lit ?? t.ink),
+          ),
         ),
       ),
     );

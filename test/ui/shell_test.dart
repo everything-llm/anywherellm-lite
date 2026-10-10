@@ -373,6 +373,28 @@ void main() {
     );
 
     testWidgets(
+      'a long document is named short in a suggestion and whole in the message',
+      (tester) async {
+        const title =
+            'Evidence-Based Gamification Design: What Works, When, and Why.pdf';
+        final llm = planningServer();
+        llm.spaces.first.docs.insert(0, libraryDoc(llm, title));
+        final h = await pumpApp(tester, llm: llm, size: const Size(360, 720));
+        h.chat.newChat();
+        await tester.pumpAndSettle();
+        expect(control('Compare the first two documents'), findsOneWidget);
+        await tester.tap(
+          control('Summarise Evidence-Based Gamification Design'),
+        );
+        await tester.pump();
+        expect(
+          tester.widget<EditableText>(composerField).controller.text,
+          'Summarise Evidence-Based Gamification Design: What Works, When, and Why',
+        );
+      },
+    );
+
+    testWidgets(
       'the composer follows the chat mode before the server answers',
       (tester) async {
         final llm = planningServer();

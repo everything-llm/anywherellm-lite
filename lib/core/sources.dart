@@ -57,17 +57,51 @@ String shortTitle(String title) {
   return short.trim().isEmpty ? title : short;
 }
 
+/// One question an empty chat offers: the [label] its button shows, and the [prompt] it puts in
+/// the message, which names each document in full.
+typedef Suggestion = ({String label, String prompt});
+
+/// The most characters a document's name takes in a suggestion's label.
+const suggestionNameMax = 40;
+
+/// [title] as a suggestion's label names it: [shortTitle], less a subtitle after a colon, cut at
+/// a word to [suggestionNameMax] characters with an ellipsis, and whether it was cut.
+({String name, bool cut}) _labelName(String title) {
+  var name = shortTitle(title).trim();
+  final colon = name.indexOf(': ');
+  if (colon >= 3) name = name.substring(0, colon).trim();
+  if (name.length <= suggestionNameMax) return (name: name, cut: false);
+  final head = name.substring(0, suggestionNameMax);
+  final space = head.lastIndexOf(' ');
+  final kept = space >= 12 ? head.substring(0, space) : head;
+  return (name: '${kept.trimRight()}\u2026', cut: true);
+}
+
 /// What an empty chat offers to ask, built from the [titles] of the documents it answers
 /// from, so it needs no model call: one to summarise the first, and with two or more one to
-/// compare the first two. With none, the one question that needs no documents.
-List<String> suggestionsFor(List<String> titles) {
+/// compare the first two. With none, the one question that needs no documents. A label names a
+/// long document by its start, and a comparison names the two only when both together fit in
+/// [suggestionNameMax] characters.
+List<Suggestion> suggestionsFor(List<String> titles) {
   final names = [for (final t in titles) shortTitle(t)];
+  final labels = [for (final t in titles.take(2)) _labelName(t)];
   return switch (names) {
-    [] => const ['What can I do here?'],
-    [final only] => ['Summarise $only'],
+    [] => const [(label: 'What can I do here?', prompt: 'What can I do here?')],
+    [final only] => [
+      (label: 'Summarise ${labels[0].name}', prompt: 'Summarise $only'),
+    ],
     [final first, final second, ...] => [
-      'Summarise $first',
-      'Compare $first with $second',
+      (label: 'Summarise ${labels[0].name}', prompt: 'Summarise $first'),
+      (
+        label:
+            labels[0].cut ||
+                labels[1].cut ||
+                labels[0].name.length + labels[1].name.length >
+                    suggestionNameMax
+            ? 'Compare the first two documents'
+            : 'Compare ${labels[0].name} with ${labels[1].name}',
+        prompt: 'Compare $first with $second',
+      ),
     ],
   };
 }
