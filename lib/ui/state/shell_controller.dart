@@ -15,6 +15,9 @@ enum Pane { chats, files }
 /// passages an answer read from one file.
 enum Beside { sources, browser, app, passages }
 
+/// A citation whose passages the panel to the right shows, with its [number] in its answer.
+typedef CitedPassages = ({int number, Citation citation});
+
 /// A popup over the window or a part of it, at most one open at a time: the sidebar's workspace
 /// menu, the Ctrl+K switcher, or the composer's Answer from menu. An answer's More menu is
 /// keyed by its [Turn] instead.
@@ -180,11 +183,10 @@ class ShellController extends ChangeNotifier {
   /// The app the panel to the right shows, or showed last.
   AppCard? get app => _app;
 
-  ({int number, Citation citation})? _passages;
+  CitedPassages? _passages;
 
-  /// The citation, with its number in its answer, whose passages the panel to the right shows,
-  /// or showed last.
-  ({int number, Citation citation})? get passages => _passages;
+  /// The citation whose passages the panel to the right shows, or showed last.
+  CitedPassages? get passages => _passages;
 
   bool get sideOpen => _sideOpen;
 

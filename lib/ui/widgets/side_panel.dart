@@ -9,7 +9,7 @@ import 'min_height.dart';
 import 'sheet.dart';
 
 /// A panel beside the chat, such as Sources: [title] with [actions] and a close button, the line
-/// [about] under it, unless it is empty, or after the title when [aboutBeside], and [child]
+/// [about], when there is one, under it or after the title when [aboutBeside], and [child]
 /// filling the rest. It
 /// scrolls whole below [Sizes.panelMin]. A [live] [about] is read out when it changes.
 ///
@@ -18,7 +18,7 @@ class SidePanel extends StatelessWidget {
   const SidePanel({
     super.key,
     required this.title,
-    required this.about,
+    this.about,
     required this.onClose,
     required this.child,
     this.width = Sizes.sources,
@@ -29,7 +29,7 @@ class SidePanel extends StatelessWidget {
   });
 
   final String title;
-  final String about;
+  final String? about;
   final VoidCallback onClose;
   final Widget child;
   final double width;
@@ -64,15 +64,18 @@ class SidePanel extends StatelessWidget {
         style: Type.sans(15, weight: FontWeight.w600, color: t.ink),
       ),
     );
-    final line = Semantics(
-      liveRegion: live,
-      child: Text(
-        about,
-        maxLines: aboutBeside ? 1 : null,
-        overflow: aboutBeside ? TextOverflow.ellipsis : null,
-        style: Type.sans(aboutBeside ? 12.5 : 13, color: t.muted),
+    final line = switch (about) {
+      final about? => Semantics(
+        liveRegion: live,
+        child: Text(
+          about,
+          maxLines: aboutBeside ? 1 : null,
+          overflow: aboutBeside ? TextOverflow.ellipsis : null,
+          style: Type.sans(aboutBeside ? 12.5 : 13, color: t.muted),
+        ),
       ),
-    );
+      null => null,
+    };
     return Semantics(
       container: true,
       label: title,
@@ -97,8 +100,10 @@ class SidePanel extends StatelessWidget {
                             textBaseline: TextBaseline.alphabetic,
                             children: [
                               Flexible(child: heading),
-                              const SizedBox(width: 8),
-                              Flexible(child: line),
+                              if (line != null) ...[
+                                const SizedBox(width: 8),
+                                Flexible(child: line),
+                              ],
                             ],
                           )
                         : heading,
@@ -113,7 +118,7 @@ class SidePanel extends StatelessWidget {
                   ),
                 ],
               ),
-              if (!aboutBeside && about.isNotEmpty) ...[
+              if (!aboutBeside && line != null) ...[
                 const SizedBox(height: 4),
                 line,
               ],

@@ -903,7 +903,6 @@ class _CitationState extends State<_Citation> {
     final present = scope.sources.byTitle(title) != null;
     final live = present || url != null;
     final passages = present && citation.passages.isNotEmpty;
-    final phone = ScreenClass.ofContext(context).isPhone;
     void close() => scope.shell.closePopup(citation);
     final chip = Tappable(
       label: present || url == null
@@ -916,7 +915,7 @@ class _CitationState extends State<_Citation> {
           : url?.toString(),
       // A phone shows the passages in a sheet over the chat, a desktop beside it.
       onTap: passages
-          ? () => phone
+          ? () => ScreenClass.ofContext(context).isPhone
                 ? scope.shell.togglePopup(citation)
                 : scope.shell.togglePassages(number, citation)
           : present

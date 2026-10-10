@@ -10,6 +10,22 @@ Color fieldEdge(BuildContext context) => ScreenClass.ofContext(context).isPhone
     ? Tokens.of(context).line2
     : Tokens.of(context).line;
 
+/// The look of a text area that fills its space, such as the prompt editor: [fill] behind it,
+/// [fieldEdge] round it, and the accent, 2 px, while it has the focus.
+InputDecoration editorDecoration(BuildContext context, Color fill) {
+  OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
+    borderRadius: BorderRadius.circular(Sizes.control),
+    borderSide: BorderSide(color: color, width: width),
+  );
+  return InputDecoration(
+    filled: true,
+    fillColor: fill,
+    contentPadding: const EdgeInsets.all(14),
+    enabledBorder: border(fieldEdge(context), 1),
+    focusedBorder: border(Tokens.of(context).accent, 2),
+  );
+}
+
 /// The input: one line 44px tall, or [maxLines] lines, rounded, a ring in the accent on focus.
 class AppField extends StatelessWidget {
   const AppField({

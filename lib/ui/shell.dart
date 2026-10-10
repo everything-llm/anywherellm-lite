@@ -140,10 +140,7 @@ class AppShell extends StatelessWidget {
                 Beside.sources => const SourcesPanel(),
                 Beside.browser => BrowserPanel(width: rightWidth),
                 Beside.app => AppPanel(app: shell.app!, width: rightWidth),
-                Beside.passages => PassagesPanel(
-                  number: shell.passages!.number,
-                  citation: shell.passages!.citation,
-                ),
+                Beside.passages => const PassagesPanel(),
               },
             );
             VoidCallback? close() => topClose(

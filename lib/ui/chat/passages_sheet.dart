@@ -14,21 +14,14 @@ import '../widgets/side_panel.dart';
 /// What an answer read from one file, beside the chat on a desktop, as the design canvas draws
 /// it. Close, Esc and Back put back what the panel showed.
 class PassagesPanel extends StatelessWidget {
-  const PassagesPanel({
-    super.key,
-    required this.number,
-    required this.citation,
-  });
-
-  final int number;
-  final Citation citation;
+  const PassagesPanel({super.key});
 
   @override
   Widget build(BuildContext context) {
     final shell = AppScope.of(context).shell;
+    final (:number, :citation) = shell.passages!;
     return SidePanel(
       title: 'Passages read from this file',
-      about: '',
       onClose: shell.closePassages,
       child: PassagesView(
         number: number,
@@ -40,8 +33,7 @@ class PassagesPanel extends StatelessWidget {
 }
 
 /// What an answer read from one file, in the sheet a citation opens on a phone or the panel
-/// beside the chat on a desktop: the citation's
-/// [number] and the file, how many passages, then each passage, closest first, with how close
+/// beside the chat on a desktop: the citation's [number] and the file, how many passages, then each passage, closest first, with how close
 /// it was to the question when the server said, and View extracted text, which shows the
 /// file's whole text in the workspace's pages.
 class PassagesView extends StatelessWidget {

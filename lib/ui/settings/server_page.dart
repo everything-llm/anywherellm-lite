@@ -19,7 +19,6 @@ import 'rows.dart';
 import 'server_settings.dart';
 import 'settings_pages.dart';
 
-/// What [setting] is set to in [values], by its name.
 /// The website chat widgets in a line: how many, and the workspaces they answer from while there
 /// are one or two.
 String _widgets(List<Embed> embeds) {
@@ -33,6 +32,7 @@ String _widgets(List<Embed> embeds) {
   };
 }
 
+/// What [setting] is set to in [values], by its name.
 String _chosen(ProviderSetting setting, Map<String, Object?> values) =>
     setting.labelOf(settingText(values, setting.chooser));
 

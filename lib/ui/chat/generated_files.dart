@@ -65,32 +65,65 @@ Future<void> _share(BuildContext context, GeneratedFile file) async {
   }
 }
 
+/// The tap both of a made file's buttons share: it asks where to save [file] and saves it, named
+/// by [verb] until then and Saved after. [builder] draws the button from whether it is saved.
+class _Saving extends StatefulWidget {
+  const _Saving(
+    this.file, {
+    required this.verb,
+    required this.radius,
+    required this.builder,
+    this.color,
+    this.touchTarget = false,
+  });
+
+  final GeneratedFile file;
+  final String verb;
+  final BorderRadius radius;
+  final Widget Function(bool saved) builder;
+  final Color? color;
+  final bool touchTarget;
+
+  @override
+  State<_Saving> createState() => _SavingState();
+}
+
+class _SavingState extends State<_Saving> {
+  bool _saved = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = widget.file.name;
+    return Tappable(
+      touchTarget: widget.touchTarget,
+      label: _saved ? 'Saved $name' : '${widget.verb} $name',
+      tooltip: _saved ? null : widget.verb,
+      onTap: () async {
+        final saved = await _download(context, widget.file);
+        if (mounted && saved) setState(() => _saved = true);
+      },
+      radius: widget.radius,
+      color: widget.color,
+      child: widget.builder(_saved),
+    );
+  }
+}
+
 /// Save, which reads Saved once the file is saved.
-class _SaveButton extends StatefulWidget {
+class _SaveButton extends StatelessWidget {
   const _SaveButton(this.file);
 
   final GeneratedFile file;
 
   @override
-  State<_SaveButton> createState() => _SaveButtonState();
-}
-
-class _SaveButtonState extends State<_SaveButton> {
-  bool _saved = false;
-
-  @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    return Tappable(
+    return _Saving(
+      file,
+      verb: 'Save',
       touchTarget: true,
-      label: _saved ? 'Saved ${widget.file.name}' : 'Save ${widget.file.name}',
-      tooltip: _saved ? null : 'Save',
-      onTap: () async {
-        final saved = await _download(context, widget.file);
-        if (mounted && saved) setState(() => _saved = true);
-      },
       radius: BorderRadius.circular(8),
-      child: SizedBox(
+      builder: (saved) => SizedBox(
         height: 32,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -98,13 +131,13 @@ class _SaveButtonState extends State<_SaveButton> {
             mainAxisSize: MainAxisSize.min,
             children: [
               AppIcon(
-                _saved ? 'check' : 'download',
+                saved ? 'check' : 'download',
                 size: IconSize.xs,
                 color: t.accent,
               ),
               const SizedBox(width: 6),
               Text(
-                _saved ? 'Saved' : 'Save',
+                saved ? 'Saved' : 'Save',
                 style: Type.sans(
                   13.5,
                   weight: FontWeight.w500,
@@ -121,44 +154,29 @@ class _SaveButtonState extends State<_SaveButton> {
 
 /// A file an agent made on a desktop: a pill with the download mark, its name and its size,
 /// as the design canvas draws it. Its mark turns to a tick once the file is saved.
-class _DownloadPill extends StatefulWidget {
+class _DownloadPill extends StatelessWidget {
   const _DownloadPill(this.file);
 
   final GeneratedFile file;
 
   @override
-  State<_DownloadPill> createState() => _DownloadPillState();
-}
-
-class _DownloadPillState extends State<_DownloadPill> {
-  bool _saved = false;
-
-  @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final file = widget.file;
     final size = file.size;
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 420),
-      child: Tappable(
-        label: _saved ? 'Saved ${file.name}' : 'Download ${file.name}',
-        tooltip: _saved ? null : 'Download',
-        onTap: () async {
-          final saved = await _download(context, file);
-          if (mounted && saved) setState(() => _saved = true);
-        },
+      child: _Saving(
+        file,
+        verb: 'Download',
         radius: BorderRadius.circular(99),
-        child: Container(
+        color: t.accentbg,
+        builder: (saved) => Padding(
           padding: const EdgeInsets.fromLTRB(10, 5, 12, 5),
-          decoration: BoxDecoration(
-            color: t.accentbg,
-            borderRadius: BorderRadius.circular(99),
-          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               AppIcon(
-                _saved ? 'check' : 'download',
+                saved ? 'check' : 'download',
                 size: IconSize.xs,
                 color: t.accent,
               ),

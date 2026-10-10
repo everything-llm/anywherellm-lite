@@ -194,12 +194,17 @@ class _SettingsPage extends StatelessWidget {
 /// The editor for a workspace's `PROMPT.md`, or for its `settings.json` as raw JSON. Its key
 /// changes each time the text is read afresh, which drops the draft.
 class _Editor extends StatefulWidget {
-  const _Editor({super.key, required this.node, this.onForm, this.phoneFor});
+  const _Editor({
+    super.key,
+    required this.node,
+    this.onForm,
+    this.phone = false,
+  });
 
   final FileNode node;
 
-  /// On a phone, the workspace whose prompt this is, which the note over it names.
-  final String? phoneFor;
+  /// Whether this is a phone's Instructions page, whose note names the workspace in one line.
+  final bool phone;
 
   /// Switches back to the form, for settings.
   final VoidCallback? onForm;
@@ -242,26 +247,27 @@ class _EditorState extends State<_Editor> {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final prompt = widget.node.kind == NodeKind.prompt;
-    final phone = widget.phoneFor;
     final block = _everythingllmBlock.hasMatch(_saved);
-    final notes = !prompt
-        ? [
-            'null means the system default. chatMode is the workspace\'s chat mode: automatic (Agent), chat or query.',
-          ]
-        : _saved.trim().isEmpty
-        ? ['Empty: the server\'s default system prompt applies.']
-        : phone != null
-        // A phone says it in one line, as the design canvas does.
-        ? [
-            [
-              'What every answer in $phone is told first.',
-              if (block) 'Write outside the <everythingllm> block; the server keeps that part.',
-            ].join(' '),
-          ]
-        : [
-            'This prompt replaces the default system prompt in this workspace.',
-            if (block) 'Write your own instructions outside the <everythingllm> block; the server\'s update-prompt skill replaces that block.',
-          ];
+    final List<String> notes;
+    if (!prompt) {
+      notes = [
+        'null means the system default. chatMode is the workspace\'s chat mode: automatic (Agent), chat or query.',
+      ];
+    } else if (_saved.trim().isEmpty) {
+      notes = ['Empty: the server\'s default system prompt applies.'];
+    } else if (widget.phone) {
+      // A phone says it in one line, as the design canvas does.
+      final name = AppScope.of(context).chat.active?.name ?? 'this workspace';
+      notes = [
+        'What every answer in $name is told first.'
+            '${block ? ' Write outside the <everythingllm> block; the server keeps that part.' : ''}',
+      ];
+    } else {
+      notes = [
+        'This prompt replaces the default system prompt in this workspace.',
+        if (block) 'Write your own instructions outside the <everythingllm> block; the server\'s update-prompt skill replaces that block.',
+      ];
+    }
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyS, control: true): _save,
@@ -295,19 +301,7 @@ class _EditorState extends State<_Editor> {
                   enableSuggestions: false,
                   style: Type.mono(13, color: t.ink, height: 1.5),
                   cursorColor: t.accent,
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: t.panel,
-                    contentPadding: const EdgeInsets.all(14),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: fieldEdge(context)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: t.accent, width: 2),
-                    ),
-                  ),
+                  decoration: editorDecoration(context, t.panel),
                 ),
               ),
             ),
@@ -362,11 +356,7 @@ Widget essentialSection(
       'The server did not send this workspace\'s '
       '${section == FilesSection.instructions ? 'prompt' : 'settings'}.',
     ),
-    FilesSection.instructions => _Editor(
-      key: key,
-      node: node,
-      phoneFor: phone ? workspace.name : null,
-    ),
+    FilesSection.instructions => _Editor(key: key, node: node, phone: phone),
     FilesSection.answers => _SettingsPage(
       key: key,
       node: node,

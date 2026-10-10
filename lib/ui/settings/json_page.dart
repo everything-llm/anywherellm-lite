@@ -65,19 +65,7 @@ class _JsonFormState extends State<_JsonForm> with SettingsSaving {
             enableSuggestions: false,
             style: Type.mono(13, color: t.ink, height: 1.5),
             cursorColor: t.accent,
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: t.bg,
-              contentPadding: const EdgeInsets.all(14),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: fieldEdge(context)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: t.accent, width: 2),
-              ),
-            ),
+            decoration: editorDecoration(context, t.bg),
           ),
         ),
         if (confirmBox(() => _draft.text) case final box?)

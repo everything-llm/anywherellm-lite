@@ -300,6 +300,16 @@ class _WorkspaceMenu extends StatelessWidget {
       accent: true,
       onTap: onCreate,
     );
+    final rename = active == null
+        ? null
+        : AppMenuItem('Rename workspace', onTap: onRename);
+    final delete = active == null
+        ? null
+        : AppMenuItem(
+            'Delete workspace…',
+            danger: true,
+            onTap: chat.answeringIn(active.slug) ? null : onDelete,
+          );
     final items = <Widget>[
       if (ordered.isNotEmpty)
         ConstrainedBox(
@@ -342,16 +352,10 @@ class _WorkspaceMenu extends StatelessWidget {
           shell.showPane(shell.pane == Pane.files ? Pane.chats : Pane.files);
         },
       ),
-      if (active != null) AppMenuItem('Rename workspace', onTap: onRename),
       // A phone's sheet puts New workspace before Delete, which comes last.
-      if (sheet) create,
-      if (active != null)
-        AppMenuItem(
-          'Delete workspace…',
-          danger: true,
-          onTap: chat.answeringIn(active.slug) ? null : onDelete,
-        ),
-      if (!sheet) ...[const MenuDivider(), create],
+      ...sheet
+          ? [?rename, create, ?delete]
+          : [?rename, ?delete, const MenuDivider(), create],
     ];
     if (sheet) {
       return Semantics(
