@@ -5,6 +5,11 @@ import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 
+/// A text field's outline: on a phone the fainter [Tokens.line2], as the design canvas draws it.
+Color fieldEdge(BuildContext context) => ScreenClass.ofContext(context).isPhone
+    ? Tokens.of(context).line2
+    : Tokens.of(context).line;
+
 /// The input: one line 44px tall, or [maxLines] lines, rounded, a ring in the accent on focus.
 class AppField extends StatelessWidget {
   const AppField({
@@ -115,7 +120,7 @@ class AppField extends StatelessWidget {
             vertical: 13,
           ),
           constraints: const BoxConstraints(minHeight: 44),
-          enabledBorder: border(t.line),
+          enabledBorder: border(fieldEdge(context)),
           focusedBorder: border(t.accent, 2),
         ),
       ),

@@ -17,6 +17,7 @@ import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
+import '../widgets/fields.dart';
 import '../widgets/tappable.dart';
 import 'answer_from.dart';
 import 'dictation.dart';
@@ -590,8 +591,10 @@ class _Form extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 12, 12, 10),
         decoration: BoxDecoration(
           color: t.panel,
-          borderRadius: BorderRadius.circular(Sizes.card),
-          border: Border.all(color: over ? t.accent : t.line),
+          borderRadius: BorderRadius.circular(
+            phone ? Sizes.phoneComposer : Sizes.card,
+          ),
+          border: Border.all(color: over ? t.accent : fieldEdge(context)),
           boxShadow: [
             BoxShadow(
               color: t.shadow,

@@ -44,6 +44,9 @@ abstract final class Sizes {
   /// The least height a pane in `MinHeight` is laid out at; shorter, it scrolls whole.
   static const panelMin = 360.0;
   static const card = 16.0;
+
+  /// The composer's corners on a phone, rounder than a card's.
+  static const phoneComposer = 20.0;
   static const control = 10.0;
 
   /// The least width at which Settings shows its list and a page side by side.

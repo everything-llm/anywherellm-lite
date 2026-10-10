@@ -5,6 +5,7 @@ import '../app_scope.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';
+import '../widgets/fields.dart';
 import 'rows.dart';
 import 'server_settings.dart';
 
@@ -70,7 +71,7 @@ class _JsonFormState extends State<_JsonForm> with SettingsSaving {
               contentPadding: const EdgeInsets.all(14),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: t.line),
+                borderSide: BorderSide(color: fieldEdge(context)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),

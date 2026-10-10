@@ -9,6 +9,7 @@ import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
+import '../widgets/fields.dart';
 import '../widgets/min_height.dart';
 import '../widgets/pane_header.dart';
 import 'doc_views.dart';
@@ -287,7 +288,7 @@ class _EditorState extends State<_Editor> {
                     contentPadding: const EdgeInsets.all(14),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: t.line),
+                      borderSide: BorderSide(color: fieldEdge(context)),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
