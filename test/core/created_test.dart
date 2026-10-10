@@ -121,6 +121,66 @@ void main() {
     });
   });
 
+  group('the line under a name', () {
+    final now = DateTime(2026, 10, 9, 12);
+    CreatedFile file(
+      String area, {
+      String name = 'x.txt',
+      String dir = '',
+      String? url,
+    }) => CreatedFile(
+      id: 'x',
+      name: name,
+      dir: dir,
+      size: 2048,
+      modified: now.subtract(const Duration(hours: 2)),
+      area: CreatedArea.named(area)!,
+      url: url,
+    );
+
+    test('gives the size, the folder and the age', () {
+      expect(createdMeta(file('project'), now), '2.0 KB · 2 h ago');
+      expect(
+        createdMeta(file('work', dir: 'scratch'), now),
+        '2.0 KB · scratch · 2 h ago',
+      );
+    });
+
+    test('says a kept file in downloads came from the browser', () {
+      for (final dir in ['downloads', 'downloads/2026']) {
+        expect(
+          createdMeta(file('project', dir: dir), now),
+          '2.0 KB · downloaded by the browser · 2 h ago',
+        );
+      }
+      expect(
+        createdMeta(file('work', dir: 'downloads'), now),
+        '2.0 KB · downloads · 2 h ago',
+      );
+    });
+
+    test('knows a file the browser downloaded only by where it is kept', () {
+      expect(file('project', dir: 'downloads').fromBrowser, isTrue);
+      expect(file('project', dir: 'downloads/2026').fromBrowser, isTrue);
+      expect(file('project', dir: 'downloadsx').fromBrowser, isFalse);
+      expect(file('work', dir: 'downloads').fromBrowser, isFalse);
+    });
+
+    test('gives a web page its address in place of its size', () {
+      expect(
+        createdMeta(
+          file(
+            'public',
+            name: 'index.html',
+            url: 'https://host.example.ts.net:8447/q3/index.html',
+          ),
+          now,
+        ),
+        'Page · host.example.ts.net:8447/q3/index.html · 2 h ago',
+      );
+    });
+  });
+
   test(
     'the route is on the cards port, the workspace and the file encoded',
     () {

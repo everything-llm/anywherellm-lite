@@ -159,16 +159,29 @@ class _FileRow extends StatelessWidget {
 /// each of [trailing], such as its switch. [roomy] is how the Files pane draws it: a larger
 /// title, wider gaps, and [meta] on up to two lines.
 class SourceRow extends StatelessWidget {
-  const SourceRow(
-    this.file, {
+  SourceRow(
+    SourceFile file, {
     super.key,
+    required this.meta,
+    required this.trailing,
+    this.below,
+    this.roomy = false,
+  }) : tile = TypeTile(file),
+       title = file.title;
+
+  /// A row of a file that is not a document, with its own [tile] and [title].
+  const SourceRow.label({
+    super.key,
+    required this.tile,
+    required this.title,
     required this.meta,
     required this.trailing,
     this.below,
     this.roomy = false,
   });
 
-  final SourceFile file;
+  final Widget tile;
+  final String title;
   final String meta;
   final List<Widget> trailing;
   final Widget? below;
@@ -180,14 +193,14 @@ class SourceRow extends StatelessWidget {
     final gap = roomy ? 12.0 : 10.0;
     return Row(
       children: [
-        TypeTile(file),
+        tile,
         SizedBox(width: gap),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                file.title,
+                title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Type.sans(

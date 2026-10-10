@@ -1,4 +1,6 @@
+import 'activity.dart';
 import 'host_routes.dart';
+import 'outputs.dart';
 
 /// Where in the workspace's sandbox a created file is.
 enum CreatedArea {
@@ -51,6 +53,11 @@ class CreatedFile {
       area == CreatedArea.public && url != null && _page.hasMatch(name);
 
   static final _page = RegExp(r'\.html?$', caseSensitive: false);
+
+  /// Whether the browser downloaded the file: the host keeps its downloads in `project/downloads`.
+  bool get fromBrowser =>
+      area == CreatedArea.project &&
+      (dir == 'downloads' || dir.startsWith('downloads/'));
 
   /// The file as the host lists it, or null for one that lacks what the app needs.
   static CreatedFile? fromJson(Object? json) {
@@ -142,6 +149,24 @@ String? createdMark(CreatedFile file, DateTime now) => switch (file.area) {
     null => 'Goes after a week',
   },
 };
+
+/// The line under a file's name: for a page `Page` and its address, which holds its folder;
+/// for any other file its size, then where it came from, the browser or its folder; then how
+/// long ago it changed.
+String createdMeta(CreatedFile file, DateTime now) => [
+  if (file.isPage)
+    'Page · ${file.url!.replaceFirst(_scheme, '')}'
+  else ...[
+    sizeText(file.size),
+    if (file.fromBrowser)
+      'downloaded by the browser'
+    else if (file.dir.isNotEmpty)
+      file.dir,
+  ],
+  agoText(file.modified, now),
+].join(' · ');
+
+final _scheme = RegExp(r'^https?://');
 
 String _goes(Duration left) {
   if (left <= Duration.zero) return 'Goes soon';

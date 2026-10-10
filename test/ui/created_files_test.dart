@@ -71,6 +71,7 @@ void main() {
   testWidgets('lists the files newest first, marking only those that differ', (
     tester,
   ) async {
+    final semantics = tester.ensureSemantics();
     final h = await openCreated(tester, [
       _file(
         'threads/12/scratch/out.txt',
@@ -96,8 +97,18 @@ void main() {
     // A kept file carries no mark of its own.
     expect(inPane(find.text('report.pdf')), findsOneWidget);
     expect(inPane(find.textContaining('3 days ago')), findsOneWidget);
-    expect(inPane(find.text('scratch · 5 B · 5 min ago')), findsOneWidget);
-    expect(inPane(find.text('31.6 KB of 5.0 GB used')), findsOneWidget);
+    expect(inPane(find.text('5 B · scratch · 5 min ago')), findsOneWidget);
+    expect(
+      inPane(
+        find.text(
+          'Page · host.example.ts.net:8447/q3/site/index.html · 5 h ago',
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(inPane(find.text('31.6 KB of 5.0 GB')), findsOneWidget);
+    expect(find.bySemanticsLabel('31.6 KB of 5.0 GB used'), findsOneWidget);
+    semantics.dispose();
   });
 
   testWidgets('says so when the room is nearly full', (tester) async {

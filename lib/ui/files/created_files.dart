@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/activity.dart';
 import '../../core/copy.dart';
 import '../../core/created.dart';
 import '../../core/outputs.dart';
@@ -31,6 +30,9 @@ class CreatedFiles extends StatefulWidget {
 }
 
 class _CreatedFilesState extends State<CreatedFiles> {
+  /// The narrowest list whose rows have their mark and actions beside the name.
+  static const _wideFrom = 580.0;
+
   /// The file whose Delete is asking once more.
   String? _deleting;
 
@@ -67,8 +69,8 @@ class _CreatedFilesState extends State<CreatedFiles> {
         };
         return EssentialsPage([
           Text(
-            'What the agent\'s code made in $name, newest first. A file that goes soon is '
-            'deleted then unless you keep it.',
+            'Files the agent made or downloaded in $name, newest first. A working file goes 7 '
+            'days after its chat last used it, unless you keep it.',
             style: Type.sans(14, color: t.ink2, height: 1.5),
           ),
           const SizedBox(height: 14),
@@ -89,35 +91,45 @@ class _CreatedFilesState extends State<CreatedFiles> {
             AlertBox(AlertKind.bad, problem.title, text: problem.text),
           ],
           const SizedBox(height: 10),
-          FieldCard([
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Text(summary, style: Type.sans(12, color: t.muted)),
-            ),
-            if (list != null)
-              for (final file in list.files)
-                _FileRow(
-                  file,
-                  key: ValueKey(file.id),
-                  now: now,
-                  working: created.working.contains(file.id),
-                  deleting: _deleting == file.id,
-                  onDelete: () => setState(() => _deleting = file.id),
-                  onCancel: () => setState(() => _deleting = null),
-                  onConfirm: () {
-                    setState(() => _deleting = null);
-                    created.remove(file);
-                  },
+          LayoutBuilder(
+            builder: (context, box) {
+              final wide = box.maxWidth >= _wideFrom;
+              return FieldCard([
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  child: Text(summary, style: Type.sans(12, color: t.muted)),
                 ),
-          ]),
+                if (list != null)
+                  for (final file in list.files)
+                    _FileRow(
+                      file,
+                      key: ValueKey(file.id),
+                      now: now,
+                      wide: wide,
+                      working: created.working.contains(file.id),
+                      deleting: _deleting == file.id,
+                      onDelete: () => setState(() => _deleting = file.id),
+                      onCancel: () => setState(() => _deleting = null),
+                      onConfirm: () {
+                        setState(() => _deleting = null);
+                        created.remove(file);
+                      },
+                    ),
+              ]);
+            },
+          ),
           if (list?.truncated ?? false) ...[
             const SizedBox(height: 10),
             const HelpText('Only the newest files are listed.'),
           ],
           const SizedBox(height: 14),
           Text(
-            'Deep research reports are in Documents, and files AnythingLLM\'s own tools make '
-            'are not kept here.',
+            'Not listed here: deep research reports, which are added to Documents, and files '
+            'written with the File System Access skill, which sit in one folder for the whole '
+            'server.',
             style: Type.sans(12.5, color: t.muted, height: 1.45),
           ),
         ]);
@@ -137,49 +149,52 @@ class _Meter extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final used = sizeText(list.used);
-    final text = list.limit > 0
-        ? '$used of ${sizeText(list.limit)} used'
-        : used;
+    final text = list.limit > 0 ? '$used of ${sizeText(list.limit)}' : used;
+    final full = list.nearFull ? '. Nearly full.' : '';
+    final color = list.nearFull ? t.warnfg : t.accent;
     return Semantics(
-      label: text,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(3),
-            child: SizedBox(
-              height: 6,
-              child: Stack(
-                children: [
-                  Positioned.fill(child: ColoredBox(color: t.line2)),
-                  FractionallySizedBox(
-                    widthFactor: list.fraction,
-                    child: ColoredBox(
-                      color: list.nearFull ? t.warnfg : t.accent,
-                    ),
+      container: true,
+      label: '$text used$full',
+      child: ExcludeSemantics(
+        child: Row(
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(3),
+                child: SizedBox(
+                  height: 6,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(child: ColoredBox(color: t.line2)),
+                      FractionallySizedBox(
+                        widthFactor: list.fraction,
+                        child: ColoredBox(color: color),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            list.nearFull ? '$text. Nearly full.' : text,
-            style: Type.sans(12, color: list.nearFull ? t.warnfg : t.muted),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Text(
+              '$text$full',
+              style: Type.sans(12.5, color: list.nearFull ? t.warnfg : t.muted),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// One file: its type, name, size and age, its mark when it has one, and what can be done with
-/// it, under the name so the row fits any width. Delete asks once more.
+/// One file: its type, name and [createdMeta], its mark when it has one, and what can be done
+/// with it, beside the name when [wide] and under it otherwise. Delete asks once more.
 class _FileRow extends StatelessWidget {
   const _FileRow(
     this.file, {
     super.key,
     required this.now,
+    required this.wide,
     required this.working,
     required this.deleting,
     required this.onDelete,
@@ -189,6 +204,7 @@ class _FileRow extends StatelessWidget {
 
   final CreatedFile file;
   final DateTime now;
+  final bool wide;
 
   /// Whether the file is being kept or deleted.
   final bool working;
@@ -199,9 +215,7 @@ class _FileRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    final created = scope.created;
-    final t = Tokens.of(context);
+    final created = AppScope.of(context).created;
     final mark = createdMark(file, now);
     Widget action(String label, VoidCallback onTap) => TextAction.plain(
       label,
@@ -209,81 +223,72 @@ class _FileRow extends StatelessWidget {
       semanticLabel: '$label ${file.name}',
       height: 32,
     );
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TypeTile.label(sourceExt(file.name)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+    final badge = mark == null
+        ? null
+        : AppBadge(
+            mark,
+            kind: file.area == CreatedArea.work
+                ? BadgeKind.warn
+                : BadgeKind.accent,
+          );
+    final actions = working
+        ? const HelpText('Working…', status: true)
+        : Wrap(
+            spacing: 16,
+            children: [
+              if (file.area == CreatedArea.work)
+                action('Keep', () => created.keep(file)),
+              action(
+                'Download',
+                () => saveFile(
+                  context,
                   file.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Type.sans(14, weight: FontWeight.w500, color: t.ink),
+                  () => created.bytes(file),
+                  failTitle: 'Could not save ${file.name}',
+                  report: created.report,
                 ),
-                Text(
-                  [
-                    if (file.dir.isNotEmpty) file.dir,
-                    sizeText(file.size),
-                    agoText(file.modified, now),
-                  ].join(' · '),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Type.sans(12, color: t.muted),
-                ),
-                if (mark != null) ...[
-                  const SizedBox(height: 4),
-                  AppBadge(
-                    mark,
-                    kind: file.area == CreatedArea.work
-                        ? BadgeKind.warn
-                        : BadgeKind.accent,
-                  ),
-                ],
-                const SizedBox(height: 2),
-                if (working)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 6),
-                    child: HelpText('Working…', status: true),
-                  )
-                else
-                  Wrap(
-                    spacing: 16,
+              ),
+              if (file.isPage)
+                action('Open page', () => openLink(context, file.url!)),
+              action('Delete', onDelete),
+            ],
+          );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SourceRow.label(
+            tile: TypeTile.label(sourceExt(file.name)),
+            title: file.name,
+            meta: createdMeta(file, now),
+            roomy: true,
+            below: wide
+                ? null
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      action(
-                        'Download',
-                        () => saveFile(
-                          context,
-                          file.name,
-                          () => created.bytes(file),
-                          failTitle: 'Could not save ${file.name}',
-                          report: created.report,
-                        ),
-                      ),
-                      if (file.isPage)
-                        action('Open page', () => openLink(context, file.url!)),
-                      if (file.area == CreatedArea.work)
-                        action('Keep', () => created.keep(file)),
-                      action('Delete', onDelete),
+                      if (badge != null) ...[const SizedBox(height: 4), badge],
+                      const SizedBox(height: 2),
+                      actions,
                     ],
                   ),
-                if (deleting) ...[
-                  const SizedBox(height: 8),
-                  ConfirmBox(
-                    text:
-                        'Delete ${file.name} from the workspace? It cannot be got back.',
-                    onCancel: onCancel,
-                    onConfirm: onConfirm,
-                  ),
-                ],
-              ],
-            ),
+            trailing: [
+              if (wide) ...[?badge, actions],
+            ],
           ),
+          if (deleting) ...[
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(left: 44, right: 4),
+              child: ConfirmBox(
+                text:
+                    'Delete ${file.name} from the workspace? It cannot be got back.',
+                onCancel: onCancel,
+                onConfirm: onConfirm,
+              ),
+            ),
+          ],
         ],
       ),
     );
