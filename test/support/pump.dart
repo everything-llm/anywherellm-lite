@@ -97,6 +97,8 @@ class Harness extends Rig {
     super.store,
     super.prefsStore,
     super.connection,
+    // Off, so no check is left waiting on the test's clock: its controllers outlive the tree.
+    super.checkEvery = const [],
     bool sourcesOpen = true,
     this.canScan = false,
     bool canDictate = false,

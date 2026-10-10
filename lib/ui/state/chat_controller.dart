@@ -207,10 +207,20 @@ class _Running {
 /// makes the thread on the server. Everything it knows is about the server in [_settings]; a new
 /// server starts it afresh.
 class ChatController extends ChangeNotifier {
-  ChatController(this._api, this._settings, this._prefs, {this.maxRuns})
-    : _server = _settings.connection?.withPassword(null),
-      _password = _settings.connection?.password,
-      _auth = _settings.auth {
+  ChatController(
+    this._api,
+    this._settings,
+    this._prefs, {
+    this.maxRuns,
+    this.checkEvery = const [
+      Duration(seconds: 10),
+      Duration(seconds: 20),
+      Duration(seconds: 40),
+      Duration(seconds: 60),
+    ],
+  }) : _server = _settings.connection?.withPassword(null),
+       _password = _settings.connection?.password,
+       _auth = _settings.auth {
     _settings.addListener(_serverChanged);
     unawaited(_prefs.useServer(_server?.baseUrl));
   }
@@ -222,6 +232,10 @@ class ChatController extends ChangeNotifier {
   /// How many answers may run at once across workspaces, or null for no limit. In a browser
   /// each holds a connection open, and the browser opens only a few to one server.
   final int? maxRuns;
+
+  /// The waits between checks on the answer the chat on screen lost touch with, while it shows;
+  /// the last one repeats.
+  final List<Duration> checkEvery;
 
   /// The server the fields below describe: its address and key, without the password, so
   /// saving or forgetting one does not start afresh.
@@ -477,6 +491,7 @@ class ChatController extends ChangeNotifier {
       running.stream?.cancel();
     }
     _linkTimer?.cancel();
+    _checkTimer?.cancel();
     unreachable.dispose();
     super.dispose();
   }
@@ -731,6 +746,7 @@ class ChatController extends ChangeNotifier {
   Future<void> open(String? threadSlug, {bool again = false}) async {
     activeThread = threadSlug;
     if (threadSlug != null) _ready.remove(threadSlug);
+    _watchLost(fresh: true);
     // A refused message goes back to the composer only in its own chat.
     _refused.removeWhere((thread, _) => thread != threadSlug);
     editing = null;
@@ -1081,6 +1097,7 @@ class ChatController extends ChangeNotifier {
           running,
           error: error is ApiException ? error.message : '$error',
         );
+        if (error is AnswerStillRunning) _watchLost(fresh: true);
       },
       onDone: () {
         _finish(running);
@@ -1178,6 +1195,161 @@ class ChatController extends ChangeNotifier {
     _sends++;
     notifyListeners();
     _follow(running, answer, found.events);
+  }
+
+  /// The last answer of the chat on screen when the app lost touch with it while the relay goes
+  /// on writing it, or null.
+  Turn? get _lost => switch (turns.lastOrNull) {
+    final last? when last.stillRunning => last,
+    _ => null,
+  };
+
+  /// Whether [checkAnswer] is asking about the answer the chat on screen lost touch with.
+  bool get checking => _checking;
+  bool _checking = false;
+
+  Timer? _checkTimer;
+
+  /// How many checks [_watchLost] has made since it started over.
+  int _checks = 0;
+
+  /// Checks after the next of [checkEvery] on the answer the chat on screen lost touch with,
+  /// while there is one, or stops checking when there is none; [fresh] starts the waits over.
+  void _watchLost({bool fresh = false}) {
+    if (fresh) _checks = 0;
+    _checkTimer?.cancel();
+    _checkTimer = null;
+    if (_disposed || _lost == null || checkEvery.isEmpty) return;
+    final wait = checkEvery[_checks.clamp(0, checkEvery.length - 1)];
+    _checks++;
+    _checkTimer = Timer(wait, () => unawaited(_check()));
+  }
+
+  /// Asks the relay now about the answer the chat on screen lost touch with, as when the app
+  /// shows again or the person asks, and checks on it from the first of [checkEvery] after.
+  Future<void> checkAnswer() {
+    _checks = 0;
+    return _check();
+  }
+
+  /// Shows the answer the chat on screen lost touch with as the relay has it: followed again
+  /// while it runs, read from the chat once it is saved, and failed, in the relay's words, when
+  /// it failed, was stopped or is not known to the relay. Stays as it is while the relay cannot
+  /// be asked or the chat does not have it yet.
+  Future<void> _check() async {
+    final (slug, thread, lost) = (activeSlug, activeThread, _lost);
+    if (slug == null || thread == null || lost == null || _checking) return;
+    final server = _server;
+    bool still() =>
+        !_disposed &&
+        _server == server &&
+        activeThread == thread &&
+        identical(_lost, lost);
+    _checking = true;
+    notifyListeners();
+    try {
+      final RelayRun? run;
+      try {
+        run = await _runOf(slug, thread);
+      } on ApiException {
+        return;
+      }
+      if (!still()) return;
+      if (run != null && run.running) {
+        await _rejoin(slug, thread, server);
+      } else if (!await _readSaved(slug, thread, lost) &&
+          still() &&
+          (run == null || !run.done)) {
+        lost
+          ..stillRunning = false
+          ..error =
+              run?.error ??
+              switch (run?.status) {
+                null => 'The relay has no record of this answer, so it will not finish.',
+                'cancelled' => 'The answer was stopped on the server.',
+                _ => 'The relay could not finish the answer.',
+              }
+          ..notifyListeners();
+      }
+    } finally {
+      _checking = false;
+      if (!_disposed) {
+        notifyListeners();
+        _watchLost();
+      }
+    }
+  }
+
+  /// The newest run the relay keeps for chat [thread] of workspace [slug], or null when it keeps
+  /// none. Fails when the relay cannot be asked.
+  Future<RelayRun?> _runOf(String slug, String thread) async {
+    RelayRun? newest;
+    for (final run in await _api.relayRuns()) {
+      if (run.workspace != slug || run.thread != thread) continue;
+      final (at, best) = (run.started, newest?.started);
+      if (newest == null ||
+          (at != null && (best == null || at.isAfter(best)))) {
+        newest = run;
+      }
+    }
+    return newest;
+  }
+
+  /// Reads chat [thread] and shows what the server saved in place of the turns on screen, once
+  /// it holds as many as they do, so [lost] is saved too. Whether it did.
+  Future<bool> _readSaved(String slug, String thread, Turn lost) async {
+    final server = _server;
+    final shown = _turns[thread];
+    if (shown == null) return false;
+    final List<ChatMessage> history;
+    try {
+      history = await _api.history(slug, thread);
+    } on ApiException {
+      return false;
+    }
+    if (_disposed ||
+        _server != server ||
+        !identical(_turns[thread], shown) ||
+        !identical(_lost, lost) ||
+        history.length < shown.length) {
+      return false;
+    }
+    _turns[thread] = [for (final m in history) Turn.saved(m)];
+    notifyListeners();
+    return true;
+  }
+
+  /// Stops on the relay the answer the chat on screen lost touch with, keeping what came so
+  /// far, or shows how it ended when it is no longer running there.
+  Future<void> stopLost() async {
+    final (slug, thread, lost) = (activeSlug, activeThread, _lost);
+    if (slug == null || thread == null || lost == null) return;
+    final server = _server;
+    try {
+      final run = await _runOf(slug, thread);
+      if (run == null || !run.running || run.id == null) {
+        await checkAnswer();
+        return;
+      }
+      await _api.cancelRun(run.id!);
+    } on ApiException catch (error) {
+      if (_server != server) return;
+      problem = Notice(
+        'Could not stop the answer on the server',
+        error.message,
+      );
+      notifyListeners();
+      return;
+    }
+    if (_disposed || _server != server || !identical(_lost, lost)) return;
+    lost
+      ..stillRunning = false
+      ..error = null
+      ..stopped = true;
+    if (lost.text.isEmpty) lost.text = 'Stopped.';
+    lost.notifyListeners();
+    _watchLost();
+    notifyListeners();
   }
 
   /// Whether chat [thread] is followed already, or is being cleared or its exchanges dropped,

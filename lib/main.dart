@@ -183,8 +183,12 @@ class _SessionHostState extends State<SessionHost> {
         unawaited(_chat.flushDelete());
         _chat.noteSeen();
       },
-      // An answer the relay finished while the app was hidden gets its dot.
-      onShow: () => unawaited(_chat.readFinishedRuns()),
+      // An answer the relay finished while the app was hidden gets its dot, and one the chat on
+      // screen lost touch with is asked about.
+      onShow: () {
+        unawaited(_chat.readFinishedRuns());
+        unawaited(_chat.checkAnswer());
+      },
       onExitRequested: () async {
         await _chat.flushDelete();
         _chat.noteSeen();

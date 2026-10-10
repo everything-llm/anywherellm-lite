@@ -50,6 +50,34 @@ void main() {
     expect(h.chat.turns.last.unfinished, isTrue);
   });
 
+  testWidgets('an answer the relay goes on writing can be checked or stopped', (
+    tester,
+  ) async {
+    final llm = planningServer()..hold = true;
+    final h = await pumpApp(tester, llm: llm);
+    await h.chat.send('And next quarter?');
+    await tester.pump();
+    llm.chat!.addError(const AnswerStillRunning());
+    await tester.pump(const Duration(milliseconds: 300));
+    llm.allRuns = [
+      RelayRun(
+        id: 'r1',
+        workspace: 'q3',
+        thread: 'budget',
+        status: 'running',
+        started: DateTime.utc(2026, 10, 10, 9),
+      ),
+    ];
+    await tester.tap(find.text('Check now'));
+    await tester.pump();
+    expect(llm.calls, contains('relayRuns'));
+    await tester.tap(find.text('Stop'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(llm.calls, contains('cancelRun:r1'));
+    expect(find.text('Still being written'), findsNothing);
+    expect(h.chat.turns.last.stopped, isTrue);
+  });
+
   testWidgets('any other failure is', (tester) async {
     final llm = planningServer()..hold = true;
     final h = await pumpApp(tester, llm: llm);

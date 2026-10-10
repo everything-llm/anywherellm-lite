@@ -209,7 +209,11 @@ class _MessageListState extends State<MessageList> {
                         widget.onSuggest(turn.text);
                       },
                     )
-                  : _Answer(turn, retry: i == 0 ? _retryOf(chat) : null),
+                  : _Answer(
+                      turn,
+                      last: i == 0,
+                      retry: i == 0 ? _retryOf(chat) : null,
+                    ),
             ),
           ),
         ),
@@ -573,10 +577,33 @@ class _Picture extends StatelessWidget {
   );
 }
 
+/// Check now and Stop, for the last answer when the app lost touch with it on the relay.
+class _LostActions extends StatelessWidget {
+  const _LostActions();
+
+  @override
+  Widget build(BuildContext context) {
+    final chat = AppScope.of(context).chat;
+    return ListenableBuilder(
+      listenable: chat,
+      builder: (context, _) => ActionRow(alignment: WrapAlignment.start, [
+        AppButton(
+          chat.checking ? 'Checking…' : 'Check now',
+          onPressed: chat.checking ? null : () => unawaited(chat.checkAnswer()),
+        ),
+        AppButton('Stop', onPressed: () => unawaited(chat.stopLost())),
+      ]),
+    );
+  }
+}
+
 class _Answer extends StatefulWidget {
-  const _Answer(this.turn, {this.retry});
+  const _Answer(this.turn, {this.last = false, this.retry});
 
   final Turn turn;
+
+  /// Whether [turn] is the chat's last answer.
+  final bool last;
 
   /// Retry, on the chat's last answer only.
   final _Retry? retry;
@@ -648,12 +675,13 @@ class _AnswerState extends State<_Answer> {
         if (turn.error case final error?) ...[
           const SizedBox(height: 10),
           if (turn.stillRunning)
-            const AlertBox(
+            AlertBox(
               AlertKind.info,
               'Still being written',
               text:
                   'The connection dropped, but the answer keeps going on the server. It will '
-                  'appear here when it’s done; Refresh checks for it sooner.',
+                  'appear here when it’s done.',
+              action: widget.last ? const _LostActions() : null,
             )
           else
             AlertBox(
