@@ -1074,6 +1074,7 @@ void main() {
               WholeAnswer(:final text) => 'whole $text',
               ChatDone(:final citations) =>
                 'done ${[for (final c in citations) '${c.title} ${c.url}']}',
+              ApprovalRequest() || ApprovalSettled() => 'approval',
             },
         ],
         [
@@ -2236,11 +2237,12 @@ void main() {
       Duration quiet = const Duration(seconds: 5),
       Object? running,
       int runningStatus = 200,
+      Connection? connection,
     }) {
       var attempt = 0;
       var probe = 0;
       return HttpAnythingLlmApi(
-        holder: ConnectionHolder(_connection),
+        holder: ConnectionHolder(connection ?? _connection),
         quiet: quiet,
         rejoinDelays: rejoinDelays,
         client: MockClient.streaming((request, body) async {
@@ -2302,6 +2304,12 @@ void main() {
           if (path == '/everythingllm/v1/runs/r_1/cancel') {
             return http.StreamedResponse(
               Stream.value(utf8.encode('{"id":"r_1","status":"cancelled"}')),
+              200,
+            );
+          }
+          if (path.startsWith('/everythingllm/v1/runs/r_1/approvals/')) {
+            return http.StreamedResponse(
+              Stream.value(utf8.encode('{"requestId":"q","approved":false}')),
               200,
             );
           }
@@ -2391,6 +2399,111 @@ void main() {
       expect((events[2] as WholeAnswer).text, 'Hello');
       final done = events[3] as ChatDone;
       expect(done.citations.single.url, Uri.parse('https://news.example/a'));
+    });
+
+    group('approvals', () {
+      final withApprovals = {
+        'ok': true,
+        'service': 'everythingllm',
+        'features': ['runs', 'approvals'],
+      };
+      final signedIn = _connection.withPassword('PASS-WORD');
+
+      Future<Map<String, dynamic>> startBody({
+        Object? health,
+        Connection? connection,
+      }) async {
+        final seen = <http.Request>[];
+        await relay(
+          (_) => lines([event(1, 'done', {})]),
+          seen: seen,
+          health: health,
+          connection: connection,
+        ).streamChat('w', 't', 'Hi').toList();
+        final start = seen.firstWhere((r) => r.url.path.endsWith('/v1/runs'));
+        return jsonDecode(start.body) as Map<String, dynamic>;
+      }
+
+      test('the password goes with a run only to a relay that asks', () async {
+        expect(
+          (await startBody(
+            health: withApprovals,
+            connection: signedIn,
+          ))['password'],
+          'PASS-WORD',
+        );
+        expect(
+          (await startBody(connection: signedIn)).containsKey('password'),
+          isFalse,
+          reason: 'a relay without approvals is not given it',
+        );
+        expect(
+          (await startBody(health: withApprovals)).containsKey('password'),
+          isFalse,
+          reason: 'there is none to give',
+        );
+      });
+
+      test('an approval is asked, and settled when answered', () async {
+        final events = await relay(
+          (_) => lines([
+            event(1, 'approval', {
+              'requestId': 'q1',
+              'skillName': 'create-text-file',
+              'description': 'Write hello.txt',
+              'payload': {'filename': 'hello.txt'},
+              'timeoutMs': 120000,
+              'expiresAt': 4000000000.0,
+            }),
+            event(2, 'approval-settled', {'requestId': 'q1', 'approved': true}),
+            event(3, 'done', {}),
+          ]),
+          health: withApprovals,
+          connection: signedIn,
+        ).streamChat('w', 't', 'Hi').toList();
+        final asked = events.whereType<ApprovalRequest>().single;
+        expect(asked.runId, 'r_1');
+        expect(asked.id, 'q1');
+        expect(asked.skill, 'create-text-file');
+        expect(asked.description, 'Write hello.txt');
+        expect(asked.payload, {'filename': 'hello.txt'});
+        expect(asked.expires.millisecondsSinceEpoch, 4000000000000);
+        expect(events.whereType<ApprovalSettled>().single.id, 'q1');
+      });
+
+      test('a request that names no id is ignored', () async {
+        final events = await relay(
+          (_) => lines([
+            event(1, 'approval', {'skillName': 'x', 'expiresAt': 1}),
+            event(2, 'done', {}),
+          ]),
+        ).streamChat('w', 't', 'Hi').toList();
+        expect(events.whereType<ApprovalRequest>(), isEmpty);
+      });
+
+      test('the answer goes to the run, by the key alone', () async {
+        final seen = <http.Request>[];
+        final api = relay(
+          (_) => lines([event(1, 'done', {})]),
+          seen: seen,
+          connection: signedIn,
+        );
+        final asked = ApprovalRequest(
+          runId: 'r_1',
+          id: 'q 1',
+          skill: 's',
+          expires: DateTime(2100),
+        );
+        await api.answerApproval(asked, false);
+        final answer = seen.single;
+        expect(
+          '${answer.method} ${answer.url.path}',
+          'POST /everythingllm/v1/runs/r_1/approvals/q%201',
+        );
+        expect(jsonDecode(answer.body), {'approved': false});
+        expect(answer.headers['Authorization'], 'Bearer SECRET-KEY');
+        expect(answer.body, isNot(contains('PASS-WORD')));
+      });
     });
 
     test('a chat answer ends at done after its closing chunk', () async {

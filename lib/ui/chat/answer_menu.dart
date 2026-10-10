@@ -16,24 +16,14 @@ import '../widgets/menu.dart';
 import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
 
-/// Whether an answer's reasoning shows above it, and what shows or hides it.
-typedef ReasoningToggle = ({bool shown, VoidCallback toggle});
-
-/// More, under a finished answer the server measured, that has reasoning or that can be rated:
+/// More, under a finished answer the server measured or that can be rated:
 /// its menu, This answer, names the answer's model, time, tokens, speed and cost, as far as
-/// [metrics] has them, then Rate this answer when [rate] can, then View reasoning when there is
-/// [reasoning], then Show details under every answer, [ChatSwitch.answerDetails], when there
+/// [metrics] has them, then Rate this answer when [rate] can, then Show details under every answer, [ChatSwitch.answerDetails], when there
 /// are [metrics]. With that switch on, the whole line of them follows the button. The menu opens
-/// over the button, or as a sheet over the chat on a phone, and closes on Esc, Back, a tap
-/// outside and View reasoning.
+/// over the button, or as a sheet over the chat on a phone, and closes on Esc, Back and a tap
+/// outside.
 class AnswerMore extends StatefulWidget {
-  const AnswerMore(
-    this.turn,
-    this.metrics, {
-    super.key,
-    this.reasoning,
-    this.rate,
-  });
+  const AnswerMore(this.turn, this.metrics, {super.key, this.rate});
 
   final Turn turn;
 
@@ -42,9 +32,6 @@ class AnswerMore extends StatefulWidget {
 
   /// How the answer ran, or null when the server did not measure it.
   final AnswerMetrics? metrics;
-
-  /// The answer's reasoning, or null when it has none.
-  final ReasoningToggle? reasoning;
 
   @override
   State<AnswerMore> createState() => _AnswerMoreState();
@@ -84,16 +71,6 @@ class _AnswerMoreState extends State<AnswerMore> {
         final metrics = widget.metrics;
         final details =
             metrics != null && scope.prefs.prefs.isOn(ChatSwitch.answerDetails);
-        final reasoning = switch (widget.reasoning) {
-          final r? => (
-            shown: r.shown,
-            toggle: () {
-              shell.closePopup(widget.turn);
-              r.toggle();
-            },
-          ),
-          null => null,
-        };
         void close() => shell.closePopup(widget.turn);
         final button = Tappable(
           touchTarget: true,
@@ -124,7 +101,6 @@ class _AnswerMoreState extends State<AnswerMore> {
                 sheet: (context) => _AnswerMenu(
                   widget.turn,
                   metrics,
-                  reasoning: reasoning,
                   rate: widget.rate,
                   sheet: true,
                 ),
@@ -135,12 +111,8 @@ class _AnswerMoreState extends State<AnswerMore> {
                 open: open,
                 above: true,
                 onClose: close,
-                menu: (context) => _AnswerMenu(
-                  widget.turn,
-                  metrics,
-                  reasoning: reasoning,
-                  rate: widget.rate,
-                ),
+                menu: (context) =>
+                    _AnswerMenu(widget.turn, metrics, rate: widget.rate),
                 child: button,
               ),
             if (details) ...[
@@ -156,20 +128,17 @@ class _AnswerMoreState extends State<AnswerMore> {
   }
 }
 
-/// The menu More opens, or the sheet on a phone: how the answer ran, Rate this answer, View or
-/// Hide reasoning, then the switch that shows how each answer ran under it.
+/// The menu More opens, or the sheet on a phone: how the answer ran, Rate this answer, then the switch that shows how each answer ran under it.
 class _AnswerMenu extends StatelessWidget {
   const _AnswerMenu(
     this.turn,
     this.metrics, {
-    required this.reasoning,
     required this.rate,
     this.sheet = false,
   });
 
   final Turn turn;
   final AnswerMetrics? metrics;
-  final ReasoningToggle? reasoning;
   final ChatController? rate;
 
   /// Drawn in a sheet, at a phone's sizes, rather than as a menu.
@@ -180,7 +149,6 @@ class _AnswerMenu extends StatelessWidget {
     final t = Tokens.of(context);
     final prefs = AppScope.of(context).prefs;
     final metrics = this.metrics;
-    final reasoning = this.reasoning;
     final rate = this.rate;
     final text = sheet ? 14.5 : 13.0;
     final row = sheet ? 44.0 : 40.0;
@@ -241,11 +209,6 @@ class _AnswerMenu extends StatelessWidget {
               ),
             ),
           ),
-        ),
-      if (reasoning != null)
-        AppMenuItem(
-          reasoning.shown ? 'Hide reasoning' : 'View reasoning',
-          onTap: reasoning.toggle,
         ),
       if (metrics != null)
         ListenableBuilder(

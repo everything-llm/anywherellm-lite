@@ -512,6 +512,13 @@ class FakeAnythingLlm implements AnythingLlmApi {
   }, id);
 
   @override
+  Future<void> answerApproval(ApprovalRequest request, bool allow) => _run(
+    'answerApproval',
+    () {},
+    '${request.id}:${allow ? 'allow' : 'deny'}',
+  );
+
+  @override
   Future<void> stopChat(String slug, String thread) =>
       _run('stopChat', () {}, thread);
 

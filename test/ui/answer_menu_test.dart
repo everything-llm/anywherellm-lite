@@ -39,9 +39,7 @@ void main() {
     expect(find.textContaining('tokens'), findsNothing);
   });
 
-  testWidgets('More shows a measured answer\'s reasoning above it', (
-    tester,
-  ) async {
+  testWidgets('More has no reasoning to show', (tester) async {
     await pumpApp(
       tester,
       llm: measured()..answer = '<think>Weighing the plan.</think>About 45k.',
@@ -51,17 +49,8 @@ void main() {
     await tester.tap(control(_more));
     await tester.pumpAndSettle();
     expect(find.text('glm-5.3'), findsOneWidget);
-    expect(control(_always), findsOneWidget);
-    await tester.tap(find.text('View reasoning'));
-    await tester.pumpAndSettle();
-    // The menu closes and the reasoning shows over the answer.
-    expect(control(_always), findsNothing);
-    final reasoning = find.textContaining('Weighing the plan.');
-    expect(reasoning, findsOneWidget);
-    expect(
-      tester.getTopLeft(reasoning).dy,
-      lessThan(tester.getTopLeft(find.textContaining('About 45k.')).dy),
-    );
+    expect(find.text('View reasoning'), findsNothing);
+    expect(find.textContaining('Weighing the plan.'), findsNothing);
   });
 
   testWidgets(

@@ -26,6 +26,7 @@ import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
 import 'answer_body.dart';
 import 'answer_menu.dart';
+import 'approval_card.dart';
 import 'browser_chip.dart';
 import 'generated_files.dart';
 import 'passages_sheet.dart';
@@ -585,12 +586,6 @@ class _Answer extends StatefulWidget {
 }
 
 class _AnswerState extends State<_Answer> {
-  /// Whether the model's reasoning shows above the answer: only once View reasoning in More
-  /// asks for it, until Hide reasoning puts it away.
-  bool _reasoning = false;
-
-  void _toggleReasoning() => setState(() => _reasoning = !_reasoning);
-
   @override
   Widget build(BuildContext context) =>
       ListenableBuilder(listenable: widget.turn, builder: _build);
@@ -598,8 +593,6 @@ class _AnswerState extends State<_Answer> {
   Widget _build(BuildContext context, Widget? _) {
     final (turn, retry) = (widget.turn, widget.retry);
     final split = splitReasoning(turn.text, streaming: turn.streaming);
-    final thinking = turn.streaming && split.thinking;
-    final reasoned = !turn.streaming && split.reasoning.isNotEmpty;
     final failure = turn.streaming ? null : modelFailure(split.answer);
     final answered = split.answer.isNotEmpty && failure == null;
     final rate = answered ? _feedbackOf(context, turn) : null;
@@ -626,13 +619,6 @@ class _AnswerState extends State<_Answer> {
           ),
           const SizedBox(height: 10),
         ],
-        if (thinking || (reasoned && _reasoning)) ...[
-          _Reasoning(
-            split.reasoning,
-            onHide: thinking ? null : _toggleReasoning,
-          ),
-          if (split.answer.isNotEmpty) const SizedBox(height: 10),
-        ],
         if (failure != null)
           AlertBox(AlertKind.bad, 'The model did not answer', text: failure)
         else if (split.answer.isNotEmpty)
@@ -648,8 +634,17 @@ class _AnswerState extends State<_Answer> {
           )
         else if (turn.streaming && turn.status != null)
           _Status(turn.status!),
-        if (turn.streaming && !thinking)
-          const Padding(padding: EdgeInsets.only(top: 6), child: Caret()),
+        if (turn.streaming)
+          for (final request in turn.approvals)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: ApprovalCard(turn, request),
+            ),
+        if (turn.streaming)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: split.answer.isEmpty ? const WaitingDots() : const Caret(),
+          ),
         if (turn.error case final error?) ...[
           const SizedBox(height: 10),
           if (turn.stillRunning)
@@ -702,15 +697,8 @@ class _AnswerState extends State<_Answer> {
                   box: 30,
                   size: IconSize.xs,
                 ),
-              if (turn.metrics != null || reasoned || rate != null)
-                AnswerMore(
-                  turn,
-                  turn.metrics,
-                  rate: rate,
-                  reasoning: reasoned
-                      ? (shown: _reasoning, toggle: _toggleReasoning)
-                      : null,
-                ),
+              if (turn.metrics != null || rate != null)
+                AnswerMore(turn, turn.metrics, rate: rate),
               // In Agent mode the server may go on to finish the answer and save it, which
               // shows when the chat is read again.
               if (turn.stopped)
@@ -781,63 +769,6 @@ class _Status extends StatelessWidget {
           ).copyWith(fontStyle: FontStyle.italic),
         ),
       ),
-    );
-  }
-}
-
-/// The model's reasoning before its answer. While the model is still reasoning it says Thinking…
-/// and shows none of it; afterwards, once asked for from More, it shows what the model wrote
-/// under Hide reasoning, [onHide].
-class _Reasoning extends StatelessWidget {
-  const _Reasoning(this.text, {required this.onHide});
-
-  final String text;
-
-  /// Puts the reasoning away, or null while the model is still reasoning.
-  final VoidCallback? onHide;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    final thinking = onHide == null;
-    final label = thinking ? 'Thinking…' : 'Hide reasoning';
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Tappable(
-          label: label,
-          expanded: thinking ? null : true,
-          onTap: onHide,
-          radius: BorderRadius.circular(6),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                RotatedBox(
-                  quarterTurns: thinking ? 0 : 1,
-                  child: AppIcon('chevron', size: IconSize.xs, color: t.muted),
-                ),
-                const SizedBox(width: 6),
-                Text(label, style: Type.sans(13.5, color: t.muted)),
-                if (thinking) ...[const SizedBox(width: 8), const Caret()],
-              ],
-            ),
-          ),
-        ),
-        if (!thinking)
-          Container(
-            margin: const EdgeInsets.only(top: 6, left: 6),
-            padding: const EdgeInsets.only(left: 12),
-            decoration: BoxDecoration(
-              border: Border(left: BorderSide(color: t.line, width: 2)),
-            ),
-            child: SelectableText(
-              text,
-              style: Type.sans(14, color: t.muted, height: 1.55),
-            ),
-          ),
-      ],
     );
   }
 }

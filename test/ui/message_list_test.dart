@@ -184,26 +184,6 @@ void main() {
     expect(find.text('And then?'), findsOneWidget);
   });
 
-  testWidgets('reasoning shown stays with its answer as the chat goes on', (
-    tester,
-  ) async {
-    final llm = answering('<think>Weighing the plan.</think>About 40k.');
-    await pumpApp(tester, llm: llm);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('More'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('View reasoning'));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('Weighing the plan.'), findsOneWidget);
-
-    await tester.enterText(composerField, 'And then?');
-    await tester.pump();
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    await tester.pumpAndSettle();
-    expect(find.text('And then?'), findsOneWidget);
-    expect(find.textContaining('Weighing the plan.'), findsOneWidget);
-  });
-
   testWidgets('another chat opens at its newest turn', (tester) async {
     final llm = answering(_long);
     final h = await pumpApp(tester, llm: llm);

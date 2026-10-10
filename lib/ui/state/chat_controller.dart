@@ -74,6 +74,27 @@ class Turn extends ChangeNotifier {
   /// What an agent is doing while the answer runs, such as a tool it runs, or null.
   String? status;
 
+  /// The tools the agent waits for the person to allow or refuse, oldest first.
+  List<ApprovalRequest> approvals = const [];
+
+  void _ask(ApprovalRequest request) {
+    approvals = [
+      for (final asked in approvals)
+        if (asked.id != request.id) asked,
+      request,
+    ];
+    notifyListeners();
+  }
+
+  void _settle(String id) {
+    if (!approvals.any((asked) => asked.id == id)) return;
+    approvals = [
+      for (final asked in approvals)
+        if (asked.id != id) asked,
+    ];
+    notifyListeners();
+  }
+
   /// The everythingllm browser's steps in this answer, in order, as the stream told them. A
   /// saved answer has none: its history keeps no status lines.
   List<String> browserSteps = const [];
@@ -1028,6 +1049,10 @@ class ChatController extends ChangeNotifier {
             answer._setStatus(text, tool: tool);
           case WholeAnswer(:final text):
             answer._replace(text);
+          case ApprovalRequest():
+            answer._ask(event);
+          case ApprovalSettled(:final id):
+            answer._settle(id);
           case ChatDone(
             :final citations,
             :final files,
@@ -1254,6 +1279,25 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Allows or refuses the tool [request] asks about in [answer]. The question goes at once; it
+  /// comes back with a [problem] when the server could not be told, unless it had been answered
+  /// already or stopped waiting, which no answer can change.
+  Future<void> approve(Turn answer, ApprovalRequest request, bool allow) async {
+    answer._settle(request.id);
+    final server = _server;
+    try {
+      await _api.answerApproval(request, allow);
+    } on ApiException catch (error) {
+      if (_server != server) return;
+      if (error.status != 409) answer._ask(request);
+      problem = Notice(
+        allow ? 'Could not allow the tool' : 'Could not refuse the tool',
+        error.message,
+      );
+      notifyListeners();
+    }
+  }
+
   /// Marks [answer] good or bad on the server, or neither when it is marked so already. Shows at
   /// once, and goes back with a [problem] when the server refuses.
   Future<void> mark(Turn answer, bool good) async {
@@ -1387,6 +1431,7 @@ class ChatController extends ChangeNotifier {
     running.answer
       ..streaming = false
       ..status = null
+      ..approvals = const []
       ..error = error
       ..notifyListeners();
     notifyListeners();

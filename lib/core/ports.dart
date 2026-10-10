@@ -136,6 +136,10 @@ abstract interface class AnythingLlmApi {
   /// do: on a server with a password it needs one saved.
   Future<List<ScheduledJob>> scheduledJobs();
 
+  /// Tells the server whether the tool [request] asks about may run. Fails with [ApiException]
+  /// when it was answered already, or the server stopped waiting.
+  Future<void> answerApproval(ApprovalRequest request, bool allow);
+
   /// Stops the answer [streamChat] is running in the chat, on a server that keeps answers going
   /// without the app. Does nothing when there is none. Call it before cancelling the
   /// subscription.

@@ -91,14 +91,19 @@ void main() {
         final h = await pumpApp(tester, llm: llm);
         await typeAndEnter(tester, 'What is due?');
         expect(find.text('What is due?'), findsOneWidget);
-        expect(find.byType(Caret), findsOneWidget);
+        expect(find.byType(WaitingDots), findsOneWidget);
+        expect(find.byType(Caret), findsNothing);
         expect(control('Stop the answer'), findsOneWidget);
 
         llm.chat!.add(const TextChunk('The roadmap.'));
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(find.byType(WaitingDots), findsNothing);
+        expect(find.byType(Caret), findsOneWidget);
         llm.chat!.add(const ChatDone([Citation('Q3 roadmap.pdf')]));
         await llm.chat!.close();
         await tester.pumpAndSettle();
         expect(find.byType(Caret), findsNothing);
+        expect(find.byType(WaitingDots), findsNothing);
         expect(control('Send'), findsOneWidget);
 
         h.shell.closeSources();
@@ -182,7 +187,7 @@ void main() {
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       await tester.pump();
       expect(find.text('What is due?'), findsOneWidget);
-      expect(find.byType(Caret), findsOneWidget);
+      expect(find.byType(WaitingDots), findsOneWidget);
     });
 
     testWidgets('Stop ends the answer', (tester) async {

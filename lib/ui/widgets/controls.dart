@@ -169,3 +169,71 @@ class _CaretState extends State<Caret> with SingleTickerProviderStateMixin {
     );
   }
 }
+
+/// Three dots that rise and fall in turn, for an answer whose text has not begun to arrive.
+/// Still when the system asks for reduced motion.
+class WaitingDots extends StatefulWidget {
+  const WaitingDots({super.key});
+
+  @override
+  State<WaitingDots> createState() => _WaitingDotsState();
+}
+
+class _WaitingDotsState extends State<WaitingDots>
+    with SingleTickerProviderStateMixin {
+  late final _wave = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _wave.stop();
+    } else if (!_wave.isAnimating) {
+      _wave.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _wave.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Semantics(
+      label: 'Waiting for the answer',
+      child: ExcludeSemantics(
+        child: AnimatedBuilder(
+          animation: _wave,
+          builder: (context, _) => Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < 3; i++) ...[
+                if (i > 0) const SizedBox(width: 5),
+                Opacity(
+                  opacity: 0.35 + 0.65 * _pulse((_wave.value - i * 0.18) % 1),
+                  child: Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: t.accent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 0 to 1 and back over the first half of [x], at rest for the second.
+  static double _pulse(double x) => x < 0.5 ? 1 - (2 * x - 1).abs() : 0;
+}

@@ -80,6 +80,9 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   /// Whether each connection asked so far is a relay.
   final _relays = <Connection, bool>{};
 
+  /// The servers whose relay takes a tool's approval, found with [_relays].
+  final _approvals = <Connection, bool>{};
+
   /// The run [streamChat] is following in each chat, by workspace and thread: its id once the
   /// relay answers the start, or null when it did not start it.
   final _runs = <(String, String), (Connection, Future<String?>)>{};
@@ -333,6 +336,26 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   @override
   Future<void> cancelRun(String id) => _cancel(_current, id);
 
+  @override
+  Future<void> answerApproval(ApprovalRequest request, bool allow) {
+    final connection = _current;
+    return _call(
+      connection,
+      timeout,
+      () async => http.Response.fromStream(
+        await _client.send(
+          _request(
+            connection,
+            'POST',
+            '$relayPath/v1/runs/${Uri.encodeComponent(request.runId)}'
+                '/approvals/${Uri.encodeComponent(request.id)}',
+            {'approved': allow},
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Cancels the relay's run [id] on [connection]: the run ends `cancelled`.
   Future<void> _cancel(Connection connection, String id) => _call(
     connection,
@@ -581,11 +604,14 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     }
     if (response.statusCode >= 500) return false;
     final health = response.statusCode == 200 ? _json(response) : null;
-    return _relays[server] =
+    final features = health is Map ? health['features'] : null;
+    final found =
         health is Map &&
         health['service'] == 'everythingllm' &&
-        health['features'] is List &&
-        (health['features'] as List).contains('runs');
+        features is List &&
+        features.contains('runs');
+    _approvals[server] = found && features.contains('approvals');
+    return _relays[server] = found;
   }
 
   /// The answer to [body] as a run on the relay at [connection].
@@ -667,6 +693,11 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
               'thread': thread,
               'clientId': _clientId(),
               'body': body,
+              // The relay asks for approvals through the web login, so it needs the password, for
+              // this run only; a relay without approvals is not given it.
+              if (connection.password case final password?
+                  when _approvals[connection.withPassword(null)] == true)
+                'password': password,
             }),
           ),
         ),
@@ -727,6 +758,15 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
                         ? plain
                         : 'The relay could not finish the answer.'),
               );
+            case 'approval':
+              if (jsonOrNull(event.data)
+                  case final Map<String, dynamic> asked) {
+                yield {'type': 'toolApproval', 'runId': id, 'approval': asked};
+              }
+            case 'approval-settled':
+              if (jsonOrNull(event.data) case final Map<String, dynamic> done) {
+                yield {'type': 'toolApprovalSettled', ...done};
+              }
             case 'done':
               return;
             case 'cancelled':

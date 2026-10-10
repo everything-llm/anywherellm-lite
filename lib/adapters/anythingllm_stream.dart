@@ -78,6 +78,17 @@ Stream<ChatEvent> chatEventsOf(Stream<Map<String, dynamic>> chunks) async* {
         return;
       case 'usageMetrics':
         break;
+      case 'toolApproval':
+        if (chunk case {
+          'runId': final String runId,
+          'approval': final Map<String, dynamic> asked,
+        }) {
+          if (ApprovalRequest.fromJson(runId, asked) case final request?) {
+            yield request;
+          }
+        }
+      case 'toolApprovalSettled':
+        if (chunk['requestId'] case final String id) yield ApprovalSettled(id);
       default:
         if (text is String && text.isNotEmpty) {
           final apart =

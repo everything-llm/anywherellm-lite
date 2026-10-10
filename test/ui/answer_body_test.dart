@@ -3,6 +3,7 @@ import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/chat/answer_body.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:anywherellm/ui/widgets/controls.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -263,9 +264,7 @@ $$\frac{a}{b}$$
     expect(find.bySemanticsLabel('Copy answer'), findsOneWidget);
   });
 
-  testWidgets('reasoning is hidden until More shows it, and left out of Copy', (
-    tester,
-  ) async {
+  testWidgets('reasoning never shows, and is left out of Copy', (tester) async {
     final copied = _clipboard(tester);
     final llm = planningServer();
     llm.histories['budget'] = [
@@ -276,28 +275,17 @@ $$\frac{a}{b}$$
       ),
     ];
     await pumpApp(tester, llm: llm);
-    expect(find.text('Show reasoning'), findsNothing);
     expect(find.text('It is a red square.'), findsNothing);
     expect(find.textContaining('think>', findRichText: true), findsNothing);
-    // An answer the server did not measure still has More, for its reasoning alone.
-    await tester.tap(find.byTooltip('More'));
-    await tester.pumpAndSettle();
-    expect(find.text('Show details under every answer'), findsNothing);
-    await tester.tap(find.text('View reasoning'));
-    await tester.pumpAndSettle();
-    expect(find.text('View reasoning'), findsNothing);
-    expect(find.text('It is a red square.'), findsOneWidget);
-    await tester.tap(find.text('Hide reasoning'));
-    await tester.pumpAndSettle();
-    expect(find.text('It is a red square.'), findsNothing);
-    expect(find.text('Hide reasoning'), findsNothing);
+    // An answer the server did not measure and cannot rate has no More.
+    expect(find.byTooltip('More'), findsNothing);
     await tester.tap(find.bySemanticsLabel('Copy answer').last);
     await tester.pump();
     expect(copied, ['**red**']);
     await tester.pump(const Duration(seconds: 2));
   });
 
-  testWidgets('a model still reasoning says Thinking', (tester) async {
+  testWidgets('a model still reasoning shows none of it', (tester) async {
     final llm = _server()..hold = true;
     final h = await pumpApp(tester, llm: llm);
     h.chat.newChat();
@@ -305,7 +293,8 @@ $$\frac{a}{b}$$
     await h.chat.send('Colour?');
     llm.chat!.add(const TextChunk('<think>Hmm, a red'));
     await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('Thinking…'), findsOneWidget);
+    expect(find.text('Thinking…'), findsNothing);
+    expect(find.byType(WaitingDots), findsOneWidget);
     expect(find.textContaining('Hmm', findRichText: true), findsNothing);
     llm.chat!.add(const TextChunk(' square.</think>red'));
     await tester.pump(const Duration(milliseconds: 100));
