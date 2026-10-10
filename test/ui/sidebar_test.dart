@@ -151,6 +151,23 @@ void main() {
       }
     });
 
+    testWidgets("a phone's sheet puts New workspace before Delete", (
+      tester,
+    ) async {
+      final h = await pumpApp(
+        tester,
+        llm: planningServer(),
+        size: const Size(390, 844),
+      );
+      h.shell.toggleSide();
+      await tester.pumpAndSettle();
+      await tester.tap(switcher);
+      await tester.pumpAndSettle();
+      double top(String label) => tester.getTopLeft(control(label).last).dy;
+      expect(top('Rename workspace'), lessThan(top('New workspace')));
+      expect(top('New workspace'), lessThan(top('Delete workspace…')));
+    });
+
     testWidgets('picking a workspace opens it and closes the menu', (
       tester,
     ) async {

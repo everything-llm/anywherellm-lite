@@ -9,6 +9,7 @@ import 'app_scope.dart';
 import 'chat/app_panel.dart';
 import 'chat/browser_panel.dart';
 import 'chat/chat_view.dart';
+import 'chat/passages_sheet.dart';
 import 'files/files_view.dart';
 import 'files/workspace_pages.dart';
 import 'layout.dart';
@@ -92,6 +93,7 @@ class AppShell extends StatelessWidget {
       }
       if (sidebarDrawer && shell.sideOpen) return shell.closeSide;
       if (shell.appOpen) return shell.closeApp;
+      if (shell.passagesOpen) return shell.closePassages;
       if (shell.browserOpen) return shell.closeBrowser;
       if (rightClosable && shell.rightOpen) return shell.closeSources;
       // A phone's workspace pages step back: a document's text, a page, then the chat.
@@ -126,9 +128,10 @@ class AppShell extends StatelessWidget {
                 : Sizes.sidebar;
             // The panel to the right: Sources, or the chat's browser or an app, wider and never
             // wider than the screen.
-            final rightWidth = shell.beside == Beside.sources
-                ? Sizes.sources
-                : min(Sizes.browser, box.maxWidth);
+            final rightWidth = switch (shell.beside) {
+              Beside.sources || Beside.passages => Sizes.sources,
+              _ => min(Sizes.browser, box.maxWidth),
+            };
             // Closed, the panel stays built for its closing animation; TickerMode, inside that
             // animation, tells a live card in it to let go.
             final right = TickerMode(
@@ -137,6 +140,10 @@ class AppShell extends StatelessWidget {
                 Beside.sources => const SourcesPanel(),
                 Beside.browser => BrowserPanel(width: rightWidth),
                 Beside.app => AppPanel(app: shell.app!, width: rightWidth),
+                Beside.passages => PassagesPanel(
+                  number: shell.passages!.number,
+                  citation: shell.passages!.citation,
+                ),
               },
             );
             VoidCallback? close() => topClose(

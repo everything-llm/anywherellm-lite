@@ -111,7 +111,7 @@ class _UpcomingPageState extends State<UpcomingPage> {
                   padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
                   children: [
                     Text(
-                      'What the server runs on a schedule.',
+                      'Jobs the server runs on a schedule.',
                       style: Type.sans(14.5, color: t.ink2),
                     ),
                     const SizedBox(height: 14),
@@ -156,7 +156,7 @@ class _UpcomingPageState extends State<UpcomingPage> {
                       ),
                     const SizedBox(height: 10),
                     const HelpText(
-                      'Read only here. Jobs are made and changed in AnythingLLM\'s web page.',
+                      'Read only here. A job\'s result goes to its workspace.',
                     ),
                   ],
                 );
@@ -187,7 +187,7 @@ class _JobCard extends StatelessWidget {
       else if (next != null)
         'Next: ${whenText(next, now)}',
       if (last != null)
-        'Last: ${[?job.lastStatus, whenText(last, now)].join(', ')}',
+        'Last run: ${[?job.lastStatus, whenText(last, now)].join(', ')}',
     ];
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),

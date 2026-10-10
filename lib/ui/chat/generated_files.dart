@@ -7,6 +7,7 @@ import '../app_scope.dart';
 import '../files/save_file.dart';
 import '../sources/sources_panel.dart';
 import '../icons.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';
@@ -15,8 +16,9 @@ import '../widgets/tappable.dart';
 
 /// The files and images an agent made with an answer. An image shows, read from the server with
 /// the key as any other call is, under a line naming its type and size, with Save and, where
-/// the device can share, Share; tapped, it opens over the window. A file is a card with its
-/// type, name and size and Save. Each saves through [AppScope.save], and a failure shows as the
+/// the device can share, Share; tapped, it opens over the window. A file is a Download pill
+/// with its name and size on a desktop, and on a phone a card with its type, name and size and
+/// Save. Each saves through [AppScope.save], and a failure shows as the
 /// chat's problem.
 class GeneratedFiles extends StatelessWidget {
   const GeneratedFiles(this.files, {super.key});
@@ -117,6 +119,70 @@ class _SaveButtonState extends State<_SaveButton> {
   }
 }
 
+/// A file an agent made on a desktop: a pill with the download mark, its name and its size,
+/// as the design canvas draws it. Its mark turns to a tick once the file is saved.
+class _DownloadPill extends StatefulWidget {
+  const _DownloadPill(this.file);
+
+  final GeneratedFile file;
+
+  @override
+  State<_DownloadPill> createState() => _DownloadPillState();
+}
+
+class _DownloadPillState extends State<_DownloadPill> {
+  bool _saved = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final file = widget.file;
+    final size = file.size;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 420),
+      child: Tappable(
+        label: _saved ? 'Saved ${file.name}' : 'Download ${file.name}',
+        tooltip: _saved ? null : 'Download',
+        onTap: () async {
+          final saved = await _download(context, file);
+          if (mounted && saved) setState(() => _saved = true);
+        },
+        radius: BorderRadius.circular(99),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(10, 5, 12, 5),
+          decoration: BoxDecoration(
+            color: t.accentbg,
+            borderRadius: BorderRadius.circular(99),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppIcon(
+                _saved ? 'check' : 'download',
+                size: IconSize.xs,
+                color: t.accent,
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  file.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Type.sans(12.5, color: t.accent),
+                ),
+              ),
+              if (size != null) ...[
+                const SizedBox(width: 6),
+                Text(sizeText(size), style: Type.sans(12, color: t.muted)),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _MadeFile extends StatelessWidget {
   const _MadeFile(this.file, {super.key});
 
@@ -124,6 +190,7 @@ class _MadeFile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!ScreenClass.ofContext(context).isPhone) return _DownloadPill(file);
     final t = Tokens.of(context);
     final size = file.size;
     return ConstrainedBox(

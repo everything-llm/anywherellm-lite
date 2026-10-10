@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/copy.dart';
+import '../../core/embeds.dart';
 import '../../core/providers.dart';
 import '../../core/system_settings.dart';
 import '../app_scope.dart';
@@ -19,6 +20,19 @@ import 'server_settings.dart';
 import 'settings_pages.dart';
 
 /// What [setting] is set to in [values], by its name.
+/// The website chat widgets in a line: how many, and the workspaces they answer from while there
+/// are one or two.
+String _widgets(List<Embed> embeds) {
+  final count = plural(embeds.length, 'widget', 'widgets');
+  final on = {for (final embed in embeds) embed.workspace}.toList();
+  return switch (on) {
+    [] => count,
+    [final one] => '$count, on $one',
+    [final one, final two] => '$count, on $one and $two',
+    _ => '$count, on ${on.length} workspaces',
+  };
+}
+
 String _chosen(ProviderSetting setting, Map<String, Object?> values) =>
     setting.labelOf(settingText(values, setting.chooser));
 
@@ -67,7 +81,7 @@ Map<SettingsPage, String?> _summaries(
         : _chosen(imageProviders, values),
     SettingsPage.chats: 'Browse and export',
     SettingsPage.embeds: switch (system.embeds) {
-      final embeds? => plural(embeds.length, 'widget', 'widgets'),
+      final embeds? => _widgets(embeds),
       null => '',
     },
     SettingsPage.privacy: switch (values['DisableTelemetry']) {

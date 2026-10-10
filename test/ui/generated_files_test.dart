@@ -40,17 +40,34 @@ void main() {
     expect(find.text('report.pdf'), findsOneWidget);
     expect(find.text('2.0 KB'), findsOneWidget);
     expect(llm.calls, isNot(contains('generatedFile:pdf-1.pdf')));
-    await tester.tap(control('Save report.pdf'));
+    await tester.tap(control('Download report.pdf'));
     await tester.pumpAndSettle();
     expect(h.saved['report.pdf'], [37, 80, 68, 70]);
     expect(control('Saved report.pdf'), findsOneWidget);
+  });
+
+  testWidgets('on a phone a file an agent made is a card with Save', (
+    tester,
+  ) async {
+    final llm = planningServer()
+      ..made = const [_report]
+      ..generated['pdf-1.pdf'] = [37, 80, 68, 70];
+    await pumpApp(
+      tester,
+      llm: llm,
+      size: const Size(390, 844),
+      sourcesOpen: false,
+    );
+    await ask(tester, 'Make me a report');
+    expect(control('Download report.pdf'), findsNothing);
+    expect(control('Save report.pdf'), findsOneWidget);
   });
 
   testWidgets('a file the server no longer has says so', (tester) async {
     final llm = planningServer()..made = const [_report];
     final h = await pumpApp(tester, llm: llm);
     await ask(tester, 'Make me a report');
-    await tester.tap(control('Save report.pdf'));
+    await tester.tap(control('Download report.pdf'));
     await tester.pumpAndSettle();
     expect(h.saved, isEmpty);
     expect(control('Saved report.pdf'), findsNothing);
@@ -134,7 +151,7 @@ void main() {
     final llm = planningServer()..made = const [_cat];
     await pumpApp(tester, llm: llm);
     await ask(tester, 'Draw a cat');
-    expect(control('Save cat.png'), findsOneWidget);
+    expect(control('Download cat.png'), findsOneWidget);
     expect(find.text('Could not get cat.png'), findsOneWidget);
   });
 

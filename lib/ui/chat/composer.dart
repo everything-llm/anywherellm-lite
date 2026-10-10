@@ -713,13 +713,16 @@ class _Form extends StatelessWidget {
                   box: 30,
                   size: IconSize.small,
                 ),
-                IconBtn(
-                  'slash',
-                  tooltip: 'Commands',
-                  onPressed: chat.busy ? null : onSlash,
-                  box: 30,
-                  size: IconSize.small,
-                ),
+                // Typing / opens the commands, so a desktop has no button for them; a phone
+                // keeps it, as the design canvas draws.
+                if (phone)
+                  IconBtn(
+                    'slash',
+                    tooltip: 'Commands',
+                    onPressed: chat.busy ? null : onSlash,
+                    box: 30,
+                    size: IconSize.small,
+                  ),
                 const SizedBox(width: 4),
                 // Takes all the room left, so Send sits at the right edge. On a phone the model is
                 // a row in the Answer from menu, since the row has room for one chip.

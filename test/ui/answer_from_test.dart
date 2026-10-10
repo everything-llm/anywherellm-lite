@@ -26,13 +26,13 @@ FakeAnythingLlm onChat() =>
     planningServer()..spaces.first.settings['chatMode'] = 'chat';
 
 void main() {
-  testWidgets('the default mode has no chip; the model chip still shows', (
+  testWidgets('the default mode and the system model have no chips', (
     tester,
   ) async {
     await pumpApp(tester, llm: planningServer());
     expect(chip, findsNothing);
     expect(inComposer(find.text('Files, knowledge & tools')), findsNothing);
-    expect(inComposer(find.text('qwen3:8b')), findsOneWidget);
+    expect(inComposer(find.text('qwen3:8b')), findsNothing);
   });
 
   testWidgets(
@@ -46,8 +46,8 @@ void main() {
       expect(inComposer(find.text('Files & knowledge')), findsOneWidget);
       expect(inComposer(find.textContaining('AnythingLLM')), findsNothing);
       expect(inComposer(find.text('Chat')), findsNothing);
-      // The model chip follows it on a desktop.
-      expect(inComposer(find.text('qwen3:8b')), findsOneWidget);
+      // The workspace answers with the system's model, so no model chip follows it.
+      expect(inComposer(find.text('qwen3:8b')), findsNothing);
     },
   );
 

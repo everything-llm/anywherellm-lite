@@ -3,6 +3,7 @@ import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
+import 'package:anywherellm/core/embeds.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -366,5 +367,24 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Could not save the chats'), findsOneWidget);
     expect(find.text('Disk full'), findsOneWidget);
+  });
+
+  testWidgets('the Server page names the workspace its widgets answer from', (
+    tester,
+  ) async {
+    final llm = planningServer()
+      ..embedList = const [
+        Embed(
+          uuid: 'a',
+          workspace: 'Q3 planning',
+          mode: EmbedMode.chat,
+          enabled: true,
+        ),
+      ];
+    final h = await pumpApp(tester, llm: llm);
+    await h.system.readEmbeds();
+    h.shell.openSettings(SettingsPage.server);
+    await tester.pumpAndSettle();
+    expect(find.text('1 widget, on Q3 planning'), findsOneWidget);
   });
 }

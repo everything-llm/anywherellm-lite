@@ -299,4 +299,29 @@ void main() {
     expect(find.byType(EssentialsList), findsOneWidget);
     expect(h.files.selected, docsPath('q3'));
   });
+
+  testWidgets("a phone's Instructions say whose answers they open", (
+    tester,
+  ) async {
+    final llm = planningServer()
+      ..spaces[0].prompt =
+          'Answer from the documents.\n<everythingllm>skills</everythingllm>';
+    final h = await pumpApp(tester, llm: llm, size: const Size(390, 844));
+    h.shell.showPane(Pane.files);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(WorkspacePages),
+        matching: find.text('Instructions'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'What every answer in Q3 planning is told first. Write outside the '
+        '<everythingllm> block; the server keeps that part.',
+      ),
+      findsOneWidget,
+    );
+  });
 }

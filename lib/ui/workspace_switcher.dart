@@ -294,6 +294,12 @@ class _WorkspaceMenu extends StatelessWidget {
     final ordered = scope.prefs.prefs.inOrder(chat.workspaces, (w) => w.slug);
     final active = chat.active;
     final keys = showsWorkspaceKeys(context);
+    final create = AppMenuItem(
+      'New workspace',
+      icon: 'plus',
+      accent: true,
+      onTap: onCreate,
+    );
     final items = <Widget>[
       if (ordered.isNotEmpty)
         ConstrainedBox(
@@ -336,16 +342,16 @@ class _WorkspaceMenu extends StatelessWidget {
           shell.showPane(shell.pane == Pane.files ? Pane.chats : Pane.files);
         },
       ),
-      if (active != null) ...[
-        AppMenuItem('Rename workspace', onTap: onRename),
+      if (active != null) AppMenuItem('Rename workspace', onTap: onRename),
+      // A phone's sheet puts New workspace before Delete, which comes last.
+      if (sheet) create,
+      if (active != null)
         AppMenuItem(
           'Delete workspace…',
           danger: true,
           onTap: chat.answeringIn(active.slug) ? null : onDelete,
         ),
-      ],
-      const MenuDivider(),
-      AppMenuItem('New workspace', icon: 'plus', accent: true, onTap: onCreate),
+      if (!sheet) ...[const MenuDivider(), create],
     ];
     if (sheet) {
       return Semantics(

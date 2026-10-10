@@ -674,10 +674,9 @@ class _AnswerState extends State<_Answer> {
               child: ApprovalCard(turn, request),
             ),
         if (turn.streaming)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: split.answer.isEmpty ? const WaitingDots() : const Caret(),
-          ),
+          // The caret alone, as the design canvas draws it, from the send on, while a
+          // model's reasoning is hidden too.
+          const Padding(padding: EdgeInsets.only(top: 6), child: Caret()),
         if (turn.error case final error?) ...[
           const SizedBox(height: 10),
           if (turn.stillRunning)
@@ -903,10 +902,8 @@ class _CitationState extends State<_Citation> {
     final url = citation.url;
     final present = scope.sources.byTitle(title) != null;
     final live = present || url != null;
-    final passages =
-        present &&
-        citation.passages.isNotEmpty &&
-        ScreenClass.ofContext(context).isPhone;
+    final passages = present && citation.passages.isNotEmpty;
+    final phone = ScreenClass.ofContext(context).isPhone;
     void close() => scope.shell.closePopup(citation);
     final chip = Tappable(
       label: present || url == null
@@ -917,8 +914,11 @@ class _CitationState extends State<_Citation> {
           : present
           ? 'Show in Documents'
           : url?.toString(),
+      // A phone shows the passages in a sheet over the chat, a desktop beside it.
       onTap: passages
-          ? () => scope.shell.togglePopup(citation)
+          ? () => phone
+                ? scope.shell.togglePopup(citation)
+                : scope.shell.togglePassages(number, citation)
           : present
           ? () {
               scope.shell.openSources();

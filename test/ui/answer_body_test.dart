@@ -294,7 +294,7 @@ $$\frac{a}{b}$$
     llm.chat!.add(const TextChunk('<think>Hmm, a red'));
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Thinking…'), findsNothing);
-    expect(find.byType(WaitingDots), findsOneWidget);
+    expect(find.byType(Caret), findsOneWidget);
     expect(find.textContaining('Hmm', findRichText: true), findsNothing);
     llm.chat!.add(const TextChunk(' square.</think>red'));
     await tester.pump(const Duration(milliseconds: 100));

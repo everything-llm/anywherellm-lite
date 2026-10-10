@@ -91,19 +91,16 @@ void main() {
         final h = await pumpApp(tester, llm: llm);
         await typeAndEnter(tester, 'What is due?');
         expect(find.text('What is due?'), findsOneWidget);
-        expect(find.byType(WaitingDots), findsOneWidget);
-        expect(find.byType(Caret), findsNothing);
+        expect(find.byType(Caret), findsOneWidget);
         expect(control('Stop the answer'), findsOneWidget);
 
         llm.chat!.add(const TextChunk('The roadmap.'));
         await tester.pump(const Duration(milliseconds: 100));
-        expect(find.byType(WaitingDots), findsNothing);
         expect(find.byType(Caret), findsOneWidget);
         llm.chat!.add(const ChatDone([Citation('Q3 roadmap.pdf')]));
         await llm.chat!.close();
         await tester.pumpAndSettle();
         expect(find.byType(Caret), findsNothing);
-        expect(find.byType(WaitingDots), findsNothing);
         expect(control('Send'), findsOneWidget);
 
         h.shell.closeSources();
@@ -160,6 +157,49 @@ void main() {
       expect(h.files.reading?.title, 'Q3 roadmap.pdf');
     });
 
+    testWidgets('on a desktop a citation opens its passages beside the chat', (
+      tester,
+    ) async {
+      final llm = planningServer()..hold = true;
+      final h = await pumpApp(tester, llm: llm);
+      await typeAndEnter(tester, 'What is the budget?');
+      llm.chat!.add(const TextChunk('About 40k.'));
+      llm.chat!.add(
+        const ChatDone([
+          Citation(
+            'Q3 roadmap.pdf',
+            passages: [
+              Passage('Customer research: about 40k.', score: 0.82),
+              Passage('Cut the study first.', score: 0.47),
+            ],
+          ),
+        ]),
+      );
+      await llm.chat!.close();
+      await tester.pumpAndSettle();
+      expect(h.shell.sourcesOpen, isTrue);
+      await tester.tap(find.byTooltip('Passages read'));
+      await tester.pumpAndSettle();
+      expect(h.shell.passagesOpen, isTrue);
+      expect(find.text('Passages read from this file'), findsOneWidget);
+      expect(find.text('2 passages, closest first'), findsOneWidget);
+      expect(find.text('82% match'), findsOneWidget);
+      expect(find.byType(SheetFrame), findsNothing);
+      // Esc puts Documents back, as it was.
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(h.shell.passagesOpen, isFalse);
+      expect(h.shell.sourcesOpen, isTrue);
+      // A second tap on the same citation closes the panel again.
+      await tester.tap(find.byTooltip('Passages read'));
+      await tester.pumpAndSettle();
+      expect(h.shell.passagesOpen, isTrue);
+      await tester.tap(find.byTooltip('Passages read'));
+      await tester.pumpAndSettle();
+      expect(h.shell.passagesOpen, isFalse);
+      expect(h.shell.sourcesOpen, isTrue);
+    });
+
     testWidgets('Shift+Enter starts a new line instead of sending', (
       tester,
     ) async {
@@ -187,7 +227,7 @@ void main() {
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       await tester.pump();
       expect(find.text('What is due?'), findsOneWidget);
-      expect(find.byType(WaitingDots), findsOneWidget);
+      expect(find.byType(Caret), findsOneWidget);
     });
 
     testWidgets('Stop ends the answer', (tester) async {

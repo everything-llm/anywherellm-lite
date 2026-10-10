@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/prefs.dart';
 import '../app_scope.dart';
+import '../layout.dart';
 import '../widgets/controls.dart';
 import '../widgets/fields.dart';
 import '../widgets/segmented.dart';
@@ -35,7 +36,10 @@ class AppearancePage extends StatelessWidget {
             ),
             FieldRow(
               label: 'Chat text size',
-              help: 'Scales the chat\'s turns, not the controls around them.',
+              // As the design canvas words it on each.
+              help: ScreenClass.ofContext(context).isPhone
+                  ? 'Text size scales the chat\'s turns, not the controls around them.'
+                  : 'Scales the chat\'s turns, not the controls around them.',
               control: Segmented<TextSize>(
                 options: const [
                   (TextSize.small, 'Small'),

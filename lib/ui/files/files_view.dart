@@ -194,9 +194,12 @@ class _SettingsPage extends StatelessWidget {
 /// The editor for a workspace's `PROMPT.md`, or for its `settings.json` as raw JSON. Its key
 /// changes each time the text is read afresh, which drops the draft.
 class _Editor extends StatefulWidget {
-  const _Editor({super.key, required this.node, this.onForm});
+  const _Editor({super.key, required this.node, this.onForm, this.phoneFor});
 
   final FileNode node;
+
+  /// On a phone, the workspace whose prompt this is, which the note over it names.
+  final String? phoneFor;
 
   /// Switches back to the form, for settings.
   final VoidCallback? onForm;
@@ -239,15 +242,25 @@ class _EditorState extends State<_Editor> {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final prompt = widget.node.kind == NodeKind.prompt;
-    final notes = prompt
+    final phone = widget.phoneFor;
+    final block = _everythingllmBlock.hasMatch(_saved);
+    final notes = !prompt
         ? [
-            _saved.trim().isEmpty
-                ? 'Empty: the server\'s default system prompt applies.'
-                : 'This prompt replaces the default system prompt in this workspace.',
-            if (_everythingllmBlock.hasMatch(_saved)) 'Write your own instructions outside the <everythingllm> block; the server\'s update-prompt skill replaces that block.',
+            'null means the system default. chatMode is the workspace\'s chat mode: automatic (Agent), chat or query.',
+          ]
+        : _saved.trim().isEmpty
+        ? ['Empty: the server\'s default system prompt applies.']
+        : phone != null
+        // A phone says it in one line, as the design canvas does.
+        ? [
+            [
+              'What every answer in $phone is told first.',
+              if (block) 'Write outside the <everythingllm> block; the server keeps that part.',
+            ].join(' '),
           ]
         : [
-            'null means the system default. chatMode is the workspace\'s chat mode: automatic (Agent), chat or query.',
+            'This prompt replaces the default system prompt in this workspace.',
+            if (block) 'Write your own instructions outside the <everythingllm> block; the server\'s update-prompt skill replaces that block.',
           ];
     return CallbackShortcuts(
       bindings: {
@@ -349,7 +362,11 @@ Widget essentialSection(
       'The server did not send this workspace\'s '
       '${section == FilesSection.instructions ? 'prompt' : 'settings'}.',
     ),
-    FilesSection.instructions => _Editor(key: key, node: node),
+    FilesSection.instructions => _Editor(
+      key: key,
+      node: node,
+      phoneFor: phone ? workspace.name : null,
+    ),
     FilesSection.answers => _SettingsPage(
       key: key,
       node: node,

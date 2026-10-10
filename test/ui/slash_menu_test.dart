@@ -75,10 +75,26 @@ void main() {
     expect(find.byType(SlashMenu), findsOneWidget);
   });
 
-  testWidgets('the slash button starts a command in an empty message', (
+  testWidgets(
+    'a desktop has no slash button, since typing / opens the commands',
+    (tester) async {
+      await pumpApp(tester, llm: planningServer());
+      expect(
+        find.byWidgetPredicate((w) => w is Tappable && w.label == 'Commands'),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets("a phone's slash button starts a command in an empty message", (
     tester,
   ) async {
-    await pumpApp(tester, llm: planningServer());
+    await pumpApp(
+      tester,
+      llm: planningServer(),
+      size: const Size(390, 844),
+      sourcesOpen: false,
+    );
     await tester.tap(
       find.byWidgetPredicate((w) => w is Tappable && w.label == 'Commands'),
     );

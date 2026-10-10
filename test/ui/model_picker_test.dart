@@ -16,29 +16,36 @@ Finder get chip => find.byWidgetPredicate(
 );
 
 void main() {
-  testWidgets('the chip names the model the system answers with', (
-    tester,
-  ) async {
+  /// A server whose first workspace answers with a model of its own.
+  FakeAnythingLlm ownModel() => planningServer()
+    ..spaces[0].settings.addAll({
+      'chatProvider': 'ollama',
+      'chatModel': 'llama3.1:8b',
+    });
+
+  testWidgets('a workspace on the system model has no chip', (tester) async {
     await pumpApp(tester, llm: planningServer());
     await tester.pumpAndSettle();
-    expect(inComposer(find.text('qwen3:8b')), findsOneWidget);
-    expect(tester.widget<Tappable>(chip).label, 'Chat model, qwen3:8b');
+    expect(chip, findsNothing);
+    expect(inComposer(find.text('qwen3:8b')), findsNothing);
   });
 
-  testWidgets('Save gives the workspace its own provider and model', (
+  testWidgets('the chip names a model of its own', (tester) async {
+    await pumpApp(tester, llm: ownModel());
+    await tester.pumpAndSettle();
+    expect(tester.widget<Tappable>(chip).label, 'Chat model, llama3.1:8b');
+  });
+
+  testWidgets('Save gives the workspace another provider and model', (
     tester,
   ) async {
-    final llm = planningServer();
+    final llm = ownModel();
     final h = await pumpApp(tester, llm: llm);
     await tester.pumpAndSettle();
     await tester.tap(chip);
     await tester.pumpAndSettle();
     expect(find.text('Chat model for Q3 planning'), findsOneWidget);
-    expect(
-      find.text('Empty uses the system default, qwen3:8b.'),
-      findsOneWidget,
-    );
-    await tester.tap(find.text('System default (Ollama)'));
+    await tester.tap(find.text('Ollama'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('OpenAI').last);
     await tester.pumpAndSettle();
@@ -67,11 +74,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(llm.spaces[0].settings['chatProvider'], isNull);
     expect(llm.spaces[0].settings['chatModel'], isNull);
-    expect(inComposer(find.text('qwen3:8b')), findsOneWidget);
+    expect(chip, findsNothing);
   });
 
   testWidgets('a refusal keeps the picker open with why', (tester) async {
-    final llm = planningServer();
+    final llm = ownModel();
     await pumpApp(tester, llm: llm);
     await tester.pumpAndSettle();
     await tester.tap(chip);
@@ -85,7 +92,7 @@ void main() {
   });
 
   testWidgets('the chip is off while the workspace answers', (tester) async {
-    final llm = planningServer()..hold = true;
+    final llm = ownModel()..hold = true;
     final h = await pumpApp(tester, llm: llm);
     await tester.pumpAndSettle();
     await h.chat.send('Go');

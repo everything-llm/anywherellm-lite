@@ -52,7 +52,7 @@ void main() {
     );
     expect(inSheet(find.text('Send to AnywhereLLM')), findsOneWidget);
     expect(inSheet(find.text('Prices')), findsOneWidget);
-    expect(inSheet(find.text('Open now')), findsOneWidget);
+    expect(inSheet(find.text('Used last')), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.tap(inSheet(find.text('Household')));
     await tester.pumpAndSettle();

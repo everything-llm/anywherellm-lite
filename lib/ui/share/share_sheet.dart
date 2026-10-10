@@ -264,7 +264,7 @@ class _ShareSheetState extends State<ShareSheet> {
                   for (final w in workspaces)
                     RadioCard(
                       title: w.name,
-                      hint: w.slug == active ? 'Open now' : null,
+                      hint: w.slug == active ? 'Used last' : null,
                       card: false,
                       selected: w == chosen,
                       onTap: () => setState(() => _slug = w.slug),

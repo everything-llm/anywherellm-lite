@@ -25,9 +25,10 @@ String workspaceModel(AppScope scope) {
   };
 }
 
-/// The model the open workspace answers with, its own or the system's, in the composer after
-/// the Answer from chip on a desktop. Tapped, it opens the [ModelPicker]. It asks for the
-/// system's settings once a server, for the system's model.
+/// The open workspace's own model, in the composer after the Answer from chip on a desktop, shown
+/// only while the workspace has a provider or model of its own, or while the picker shows; the
+/// choice is otherwise in the workspace's Answer settings. Tapped, it opens the [ModelPicker]. It
+/// asks for the system's settings once a server, for a provider chosen without a model.
 class ModelChip extends StatelessWidget {
   const ModelChip({super.key, required this.open, required this.onTap});
 
@@ -41,8 +42,10 @@ class ModelChip extends StatelessWidget {
     return ListenableBuilder(
       listenable: Listenable.merge([scope.sources, scope.chat, scope.system]),
       builder: (context, _) {
+        final sources = scope.sources;
         final slug = scope.chat.activeSlug;
-        if (scope.sources.read == null || slug == null) {
+        final own = sources.chatModel != null || sources.chatProvider != null;
+        if (sources.read == null || slug == null || !(own || open)) {
           return const SizedBox.shrink();
         }
         scope.system.wantSettingsOnce();

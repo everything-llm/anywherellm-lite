@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../core/chat.dart';
 import '../../core/files.dart';
+import '../../core/server_models.dart';
 import '../settings/settings_pages.dart';
 import '../share/shared_item.dart';
 import 'chat_controller.dart';
@@ -10,8 +11,9 @@ import 'chat_controller.dart';
 /// What the main pane shows: the chat, or the server's data as files.
 enum Pane { chats, files }
 
-/// What the panel to the right of the chat shows: Sources, the chat's browser, or an app.
-enum Beside { sources, browser, app }
+/// What the panel to the right of the chat shows: Sources, the chat's browser, an app, or the
+/// passages an answer read from one file.
+enum Beside { sources, browser, app, passages }
 
 /// A popup over the window or a part of it, at most one open at a time: the sidebar's workspace
 /// menu, the Ctrl+K switcher, or the composer's Answer from menu. An answer's More menu is
@@ -23,7 +25,8 @@ enum Popup { workspaces, switcher, answerFrom }
 /// only below desktop width; Sources sits in the layout at wide widths and is a drawer below
 /// that.
 ///
-/// The panel to the right of the chat shows Sources, the chat's browser or an app ([Beside]). It
+/// The panel to the right of the chat shows Sources, the chat's browser, an app or an answer's
+/// passages ([Beside]). It
 /// keeps one open flag per layout: the panel in the layout starts open ([sourcesPinned]), the
 /// drawer starts closed. [rightOpen] is the flag of the layout in use.
 class ShellController extends ChangeNotifier {
@@ -177,6 +180,12 @@ class ShellController extends ChangeNotifier {
   /// The app the panel to the right shows, or showed last.
   AppCard? get app => _app;
 
+  ({int number, Citation citation})? _passages;
+
+  /// The citation, with its number in its answer, whose passages the panel to the right shows,
+  /// or showed last.
+  ({int number, Citation citation})? get passages => _passages;
+
   bool get sideOpen => _sideOpen;
 
   /// Whether the panel to the right is open. It is never open while Files is on screen.
@@ -189,6 +198,7 @@ class ShellController extends ChangeNotifier {
   bool get sourcesOpen => rightOpen && _beside == Beside.sources;
   bool get browserOpen => rightOpen && _beside == Beside.browser;
   bool get appOpen => rightOpen && _beside == Beside.app;
+  bool get passagesOpen => rightOpen && _beside == Beside.passages;
   bool get settingsOpen => _settingsOpen;
 
   /// The page Settings shows, or null for its list where the list and a page do not fit side by
@@ -228,6 +238,20 @@ class ShellController extends ChangeNotifier {
 
   /// Takes the app out of the panel and puts back what was there, open or closed.
   void closeApp() => _giveBack(Beside.app);
+
+  /// Shows the passages an answer read from [citation]'s file in the panel to the right,
+  /// opening it, or closes it when it already shows them.
+  void togglePassages(int number, Citation citation) {
+    if (passagesOpen && _passages?.citation == citation) return closePassages();
+    if (citation != _passages?.citation) {
+      _passages = (number: number, citation: citation);
+      notifyListeners();
+    }
+    _take(Beside.passages);
+  }
+
+  /// Takes the passages out of the panel and puts back what was there, open or closed.
+  void closePassages() => _giveBack(Beside.passages);
 
   /// Opens the panel on [next], remembering what it showed.
   void _take(Beside next) {

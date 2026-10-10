@@ -9,7 +9,8 @@ import 'min_height.dart';
 import 'sheet.dart';
 
 /// A panel beside the chat, such as Sources: [title] with [actions] and a close button, the line
-/// [about] under it, or after the title when [aboutBeside], and [child] filling the rest. It
+/// [about] under it, unless it is empty, or after the title when [aboutBeside], and [child]
+/// filling the rest. It
 /// scrolls whole below [Sizes.panelMin]. A [live] [about] is read out when it changes.
 ///
 /// On a phone it is a [SheetFrame] over the chat instead, [sheetHeight] tall.
@@ -112,7 +113,10 @@ class SidePanel extends StatelessWidget {
                   ),
                 ],
               ),
-              if (!aboutBeside) ...[const SizedBox(height: 4), line],
+              if (!aboutBeside && about.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                line,
+              ],
               const SizedBox(height: 14),
               Expanded(child: child),
             ],
