@@ -87,62 +87,51 @@ List<Picture>? _picturesOn(String line) {
 /// it; those around it stay with the text.
 List<AnswerPart> answerParts(String markdown) {
   if (!markdown.contains('![')) return [TextPart(markdown)];
-  final lines = markdown.split('\n');
   final parts = <AnswerPart>[];
   final text = <String>[];
+  // The run being gathered: its pictures, and the blank lines met since its last picture,
+  // which go back to the text if the run ends there.
+  final run = <Picture>[];
+  final runLines = <String>[];
+  final blanks = <String>[];
   String? fence;
-  var i = 0;
 
-  void flushText() {
-    if (text.isEmpty) return;
-    parts.add(TextPart(text.join('\n')));
-    text.clear();
+  void endRun() {
+    if (run.length >= 2) {
+      if (text.isNotEmpty) parts.add(TextPart(text.join('\n')));
+      text.clear();
+      parts.add(GalleryPart([...run]));
+    } else {
+      text.addAll(runLines);
+    }
+    text.addAll(blanks);
+    run.clear();
+    runLines.clear();
+    blanks.clear();
   }
 
-  while (i < lines.length) {
-    final line = lines[i];
+  for (final line in markdown.split('\n')) {
     final trimmed = line.trimLeft();
-    if (fence != null) {
-      if (trimmed.startsWith(fence)) fence = null;
-      text.add(line);
-      i++;
-      continue;
-    }
-    if (trimmed.startsWith('```') || trimmed.startsWith('~~~')) {
-      fence = trimmed.substring(0, 3);
-      text.add(line);
-      i++;
-      continue;
-    }
-    final first = _picturesOn(line);
-    if (first == null) {
-      text.add(line);
-      i++;
-      continue;
-    }
-    // Gathers the run: picture lines, with blank lines between them.
-    final pictures = [...first];
-    var end = i + 1;
-    var j = i + 1;
-    while (j < lines.length) {
-      if (lines[j].trim().isEmpty) {
-        j++;
-        continue;
+    final pictures = fence == null ? _picturesOn(line) : null;
+    if (pictures != null) {
+      runLines
+        ..addAll(blanks)
+        ..add(line);
+      blanks.clear();
+      run.addAll(pictures);
+    } else if (run.isNotEmpty && line.trim().isEmpty) {
+      blanks.add(line);
+    } else {
+      if (run.isNotEmpty) endRun();
+      if (fence != null) {
+        if (trimmed.startsWith(fence)) fence = null;
+      } else if (trimmed.startsWith('```') || trimmed.startsWith('~~~')) {
+        fence = trimmed.substring(0, 3);
       }
-      final more = _picturesOn(lines[j]);
-      if (more == null) break;
-      pictures.addAll(more);
-      end = ++j;
-    }
-    if (pictures.length < 2) {
       text.add(line);
-      i++;
-      continue;
     }
-    flushText();
-    parts.add(GalleryPart(pictures));
-    i = end;
   }
-  flushText();
+  if (run.isNotEmpty) endRun();
+  if (text.isNotEmpty) parts.add(TextPart(text.join('\n')));
   return parts;
 }

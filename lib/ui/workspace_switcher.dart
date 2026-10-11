@@ -307,25 +307,31 @@ class PhoneWorkspaceSwitcher extends StatelessWidget {
                 child: Row(
                   spacing: 8,
                   children: [
-                    Flexible(
-                      child: Text(
-                        active?.name ?? 'No workspace yet',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Type.sans(
-                          19,
-                          weight: FontWeight.w600,
-                          color: active == null ? t.muted : t.ink,
-                        ),
+                    Expanded(
+                      child: Row(
+                        spacing: 8,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              active?.name ?? 'No workspace yet',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Type.sans(
+                                19,
+                                weight: FontWeight.w600,
+                                color: active == null ? t.muted : t.ink,
+                              ),
+                            ),
+                          ),
+                          if (count != null && count > 0)
+                            Text(
+                              plural(count, 'doc', 'docs'),
+                              style: Type.sans(13, color: t.muted),
+                            ),
+                          if (elsewhere) const ReadyDot(),
+                        ],
                       ),
                     ),
-                    if (count != null && count > 0)
-                      Text(
-                        plural(count, 'doc', 'docs'),
-                        style: Type.sans(13, color: t.muted),
-                      ),
-                    if (elsewhere) const ReadyDot(),
-                    const Spacer(),
                     AppIcon('down', color: t.muted),
                   ],
                 ),
