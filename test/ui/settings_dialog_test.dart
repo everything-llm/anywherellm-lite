@@ -286,7 +286,7 @@ void main() {
     );
   });
 
-  testWidgets('titles are in the serif, section heads in the sans', (
+  testWidgets('titles are semibold, larger than section heads', (
     tester,
   ) async {
     final h = await pumpApp(tester, llm: planningServer());
@@ -303,11 +303,11 @@ void main() {
               .last,
         )
         .style!;
-    expect(style('Settings').fontFamily, 'Instrument Serif');
-    expect(style('Settings').fontSize, 28);
-    expect(style('Workspace chats').fontFamily, 'Instrument Serif');
-    expect(style('Workspace chats').fontSize, 32);
-    expect(style('Export').fontFamily, 'Instrument Sans');
+    expect(style('Settings').fontWeight, FontWeight.w600);
+    expect(style('Settings').fontSize, 22);
+    expect(style('Workspace chats').fontWeight, FontWeight.w600);
+    expect(style('Workspace chats').fontSize, 26);
+    expect(style('Export').fontSize, lessThan(22));
   });
 
   testWidgets('a relay that cannot be asked says so', (tester) async {

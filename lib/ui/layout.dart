@@ -43,22 +43,40 @@ abstract final class Sizes {
 
   /// The least height a pane in `MinHeight` is laid out at; shorter, it scrolls whole.
   static const panelMin = 360.0;
-  static const card = 16.0;
 
-  /// The composer's corners on a phone, rounder than a card's.
-  static const phoneComposer = 20.0;
-  static const control = 10.0;
+  /// A card's or a panel's corners.
+  static const card = 20.0;
+
+  /// A grouped card's corners on a phone, rounder than [card].
+  static const phoneCard = 24.0;
+
+  /// The composer's corners.
+  static const composer = 24.0;
+
+  /// The composer's corners on a phone.
+  static const phoneComposer = 28.0;
+
+  /// A menu's corners.
+  static const menu = 16.0;
+
+  /// A row's corners in a list or a menu.
+  static const row = 10.0;
+  static const control = 12.0;
 
   /// A button's or a field's corners on a phone, rounder than [control].
-  static const phoneControl = 12.0;
+  static const phoneControl = 16.0;
 
   /// A button's or a field's corners in the window [context] is in.
   static double controlOf(BuildContext context) =>
       ScreenClass.ofContext(context).isPhone ? phoneControl : control;
 
+  /// A card's corners in the window [context] is in.
+  static double cardOf(BuildContext context) =>
+      ScreenClass.ofContext(context).isPhone ? phoneCard : card;
+
   /// A one-line field's height in the window [context] is in: taller on a phone.
   static double fieldOf(BuildContext context) =>
-      ScreenClass.ofContext(context).isPhone ? 48 : 44;
+      ScreenClass.ofContext(context).isPhone ? 52 : 44;
 
   /// The least width at which Settings shows its list and a page side by side.
   static const settingsSideBySide = 820.0;

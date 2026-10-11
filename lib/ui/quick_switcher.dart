@@ -235,7 +235,7 @@ class _Row extends StatelessWidget {
       label: thread?.name ?? entry.workspace.name,
       selected: selected,
       onTap: onTap,
-      radius: BorderRadius.circular(8),
+      radius: BorderRadius.circular(Sizes.row),
       color: selected ? t.sel : null,
       child: Padding(
         padding: EdgeInsets.only(left: thread == null ? 10 : 36, right: 10),

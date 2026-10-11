@@ -17,7 +17,6 @@ import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
-import '../widgets/fields.dart';
 import '../widgets/tappable.dart';
 import 'answer_from.dart';
 import 'dictation.dart';
@@ -596,9 +595,15 @@ class _Form extends StatelessWidget {
         decoration: BoxDecoration(
           color: t.panel,
           borderRadius: BorderRadius.circular(
-            phone ? Sizes.phoneComposer : Sizes.card,
+            phone ? Sizes.phoneComposer : Sizes.composer,
           ),
-          border: Border.all(color: over ? t.accent : fieldEdge(context)),
+          border: Border.all(
+            color: over
+                ? t.accent
+                : phone
+                ? t.line2
+                : t.line,
+          ),
           boxShadow: [
             BoxShadow(
               color: t.shadow,
@@ -707,7 +712,7 @@ class _Form extends StatelessWidget {
                                 hintText: hint,
                                 hintStyle: Type.sans(
                                   15.5,
-                                  color: t.fade,
+                                  color: t.muted,
                                   height: 1.5,
                                 ),
                               ),
@@ -910,9 +915,12 @@ class _RoundButton extends StatelessWidget {
     label: label,
     tooltip: label,
     onTap: onTap,
-    radius: BorderRadius.circular(Sizes.control),
+    shape: const CircleBorder(),
     color: color,
-    child: SizedBox.square(dimension: 34, child: Center(child: child)),
+    child: SizedBox.square(
+      dimension: ScreenClass.ofContext(context).isPhone ? 40 : 34,
+      child: Center(child: child),
+    ),
   );
 }
 

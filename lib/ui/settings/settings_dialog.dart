@@ -92,7 +92,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: t.panel2,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(Sizes.card),
             boxShadow: [
               BoxShadow(
                 color: t.shadow.withValues(alpha: 0.35),
@@ -296,7 +296,12 @@ class _Header extends StatelessWidget {
                 page?.label ?? 'Settings',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Type.serif(28, color: t.ink, letterSpacing: -0.4),
+                style: Type.sans(
+                  22,
+                  weight: FontWeight.w600,
+                  color: t.ink,
+                  letterSpacing: -0.3,
+                ),
               ),
             ),
           ),
@@ -427,7 +432,7 @@ class _SearchBox extends StatelessWidget {
         decoration: BoxDecoration(
           color: t.panel,
           border: Border.all(color: t.line),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(Sizes.control),
         ),
         child: Row(
           children: [
@@ -446,7 +451,7 @@ class _SearchBox extends StatelessWidget {
                     isCollapsed: true,
                     border: InputBorder.none,
                     hintText: 'Search settings',
-                    hintStyle: Type.sans(14, color: t.fade),
+                    hintStyle: Type.sans(14, color: t.muted),
                   ),
                 ),
               ),
@@ -488,7 +493,7 @@ class _NavItem extends StatelessWidget {
         label: [label, ?hint].join(', '),
         selected: current,
         onTap: onTap,
-        radius: BorderRadius.circular(8),
+        radius: BorderRadius.circular(Sizes.row),
         color: current ? t.sel : null,
         child: Container(
           constraints: BoxConstraints(minHeight: wide ? 36 : 48),
@@ -564,11 +569,12 @@ class _PageView extends StatelessWidget {
                   header: true,
                   child: Text(
                     page.label,
-                    style: Type.serif(
-                      32,
+                    style: Type.sans(
+                      26,
+                      weight: FontWeight.w600,
                       color: t.ink,
                       height: 1.15,
-                      letterSpacing: -0.5,
+                      letterSpacing: -0.3,
                     ),
                   ),
                 ),
@@ -657,7 +663,7 @@ class _BackLink extends StatelessWidget {
       child: Tappable(
         label: 'Back to ${parent.label}',
         onTap: () => shell.showSettingsPage(parent),
-        radius: BorderRadius.circular(8),
+        radius: BorderRadius.circular(Sizes.row),
         child: SizedBox(
           height: 32,
           child: Row(

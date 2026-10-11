@@ -100,7 +100,7 @@ class _InlineInputState extends State<InlineInput> {
               filled: true,
               fillColor: t.panel,
               hintText: widget.hint,
-              hintStyle: Type.sans(13.5, color: t.fade),
+              hintStyle: Type.sans(13.5, color: t.muted),
               semanticCounterText: '',
               contentPadding: const EdgeInsets.symmetric(horizontal: 10),
               border: border,

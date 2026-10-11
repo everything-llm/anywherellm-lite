@@ -142,7 +142,10 @@ void main() {
         find.descendant(of: sheet, matching: find.text('Passages read')),
         findsOneWidget,
       );
-      expect(find.text('2 passages, closest first'), findsOneWidget);
+      expect(
+        find.textContaining(' · 2 passages, closest first'),
+        findsOneWidget,
+      );
       expect(find.text('82% match'), findsOneWidget);
       expect(find.text('47% match'), findsOneWidget);
       expect(

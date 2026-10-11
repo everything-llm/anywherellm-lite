@@ -17,6 +17,7 @@ import '../state/prefs_controller.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
+import '../widgets/headline.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
@@ -367,14 +368,7 @@ class _Empty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Tokens.of(context);
     final sources = AppScope.of(context).sources;
-    final headline = Type.serif(
-      40,
-      color: t.ink,
-      height: 1.1,
-      letterSpacing: -0.6,
-    );
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -385,18 +379,10 @@ class _Empty extends StatelessWidget {
             children: [
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 520),
-                child: Text.rich(
-                  TextSpan(
-                    style: headline,
-                    children: [
-                      const TextSpan(text: 'Ask about '),
-                      TextSpan(
-                        text: workspace,
-                        style: headline.copyWith(fontStyle: FontStyle.italic),
-                      ),
-                      const TextSpan(text: '.'),
-                    ],
-                  ),
+                child: Headline(
+                  'Ask about ',
+                  name: workspace,
+                  after: '.',
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -551,15 +537,15 @@ class _UserBubble extends StatelessWidget {
     final phone = ScreenClass.ofContext(context).isPhone;
     return Container(
       padding: phone
-          ? const EdgeInsets.symmetric(horizontal: 14, vertical: 10)
+          ? const EdgeInsets.symmetric(horizontal: 16, vertical: 12)
           : const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
       decoration: BoxDecoration(
         color: t.bubble,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(Sizes.card),
-          topRight: Radius.circular(Sizes.card),
-          bottomLeft: Radius.circular(Sizes.card),
-          bottomRight: Radius.circular(4),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(phone ? 24 : 20),
+          topRight: Radius.circular(phone ? 24 : 20),
+          bottomLeft: Radius.circular(phone ? 24 : 20),
+          bottomRight: Radius.circular(phone ? 8 : 6),
         ),
       ),
       child: Column(

@@ -173,7 +173,7 @@ class _ChatsState extends State<_Chats> {
                   chat.newChat();
                   scope.shell.closeSide();
                 },
-                radius: BorderRadius.circular(phone ? 10 : 8),
+                radius: BorderRadius.circular(Sizes.row),
                 child: SizedBox(
                   height: phone ? 44 : 40,
                   child: Padding(
@@ -359,7 +359,7 @@ class _SearchRow extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: focus.hasFocus ? t.hover : Colors.transparent,
-          borderRadius: BorderRadius.circular(phone ? 10 : 8),
+          borderRadius: BorderRadius.circular(Sizes.row),
         ),
         child: child,
       ),
@@ -381,7 +381,7 @@ class _SearchRow extends StatelessWidget {
                   isCollapsed: true,
                   border: InputBorder.none,
                   hintText: 'Search chats',
-                  hintStyle: Type.sans(size, color: t.fade),
+                  hintStyle: Type.sans(size, color: t.muted),
                 ),
               ),
             ),
@@ -436,7 +436,7 @@ class _FoundWorkspace extends StatelessWidget {
       onTap: () {
         if (!active) chat.select(workspace.slug);
       },
-      radius: BorderRadius.circular(8),
+      radius: BorderRadius.circular(Sizes.row),
       color: active ? t.sel : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
@@ -555,7 +555,7 @@ class _ChatRowState extends State<_ChatRow> {
     return Container(
       decoration: BoxDecoration(
         color: widget.current ? t.sel : null,
-        borderRadius: BorderRadius.circular(phone ? 10 : 8),
+        borderRadius: BorderRadius.circular(Sizes.row),
       ),
       child: Row(
         children: [
@@ -581,7 +581,7 @@ class _ChatRowState extends State<_ChatRow> {
                 }
               },
               onDoubleTap: widget.current ? _startRename : null,
-              radius: BorderRadius.circular(phone ? 10 : 8),
+              radius: BorderRadius.circular(Sizes.row),
               child: Container(
                 constraints: BoxConstraints(minHeight: phone ? 44 : 0),
                 padding: EdgeInsets.fromLTRB(left, 8, 4, 8),

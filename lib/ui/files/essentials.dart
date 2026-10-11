@@ -4,6 +4,7 @@ import '../../core/copy.dart';
 import '../../core/files.dart';
 import '../../core/sources.dart';
 import '../app_scope.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
@@ -66,7 +67,7 @@ class _SectionRow extends StatelessWidget {
           scope.files.openSection(section);
           scope.shell.closeSide();
         },
-        radius: BorderRadius.circular(8),
+        radius: BorderRadius.circular(Sizes.row),
         color: selected ? t.sel : null,
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 40),

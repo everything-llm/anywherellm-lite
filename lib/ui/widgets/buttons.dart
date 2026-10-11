@@ -8,9 +8,9 @@ import '../tokens.dart';
 import '../type.dart';
 import 'tappable.dart';
 
-/// The button: bordered, with a filled `primary` form. On a phone it is 44 tall with its label
-/// at 14.5, and a primary one 48 with its label at 15.5, as the design canvas draws them. In an
-/// [ActionRow.even] it keeps 8 px either side of its label rather than 16.
+/// The button: bordered, with a filled `primary` form. On a phone it is 52 tall with its label
+/// at 16, as the design canvas draws it. In an [ActionRow.even] it keeps 8 px either side of its
+/// label rather than 16.
 class AppButton extends StatelessWidget {
   const AppButton(
     this.label, {
@@ -31,7 +31,7 @@ class AppButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final phone = ScreenClass.ofContext(context).isPhone;
-    final height = phone ? (primary ? 48.0 : 44.0) : 40.0;
+    final height = phone ? 52.0 : 40.0;
     final fg = primary ? t.onaccent : t.ink;
     return Tappable(
       label: label,
@@ -56,13 +56,11 @@ class AppButton extends StatelessWidget {
                 child: Text(
                   label,
                   textAlign: TextAlign.center,
-                  style: phone
-                      ? Type.sans(
-                          primary ? 15.5 : 14.5,
-                          weight: primary ? FontWeight.w600 : FontWeight.w500,
-                          color: fg,
-                        )
-                      : Type.sans(14, weight: FontWeight.w500, color: fg),
+                  style: Type.sans(
+                    phone ? 16 : 14,
+                    weight: FontWeight.w500,
+                    color: fg,
+                  ),
                 ),
               ),
               if (icon case final icon?) ...[
@@ -77,7 +75,8 @@ class AppButton extends StatelessWidget {
   }
 }
 
-/// A square icon button with a hover fill.
+/// A round icon button with a hover fill, or with [filled] a round button on the hover colour,
+/// as a phone's header draws them.
 class IconBtn extends StatelessWidget {
   const IconBtn(
     this.icon, {
@@ -88,6 +87,7 @@ class IconBtn extends StatelessWidget {
     this.size = IconSize.normal,
     this.dangerHover = false,
     this.active,
+    this.filled = false,
   });
 
   final String icon;
@@ -97,8 +97,11 @@ class IconBtn extends StatelessWidget {
   /// Whether a button that toggles something is on. Null for one that does not toggle.
   final bool? active;
 
-  /// The side of the square.
+  /// The button's diameter.
   final double box;
+
+  /// Whether it sits on [Tokens.hover] with its icon in [Tokens.ink].
+  final bool filled;
   final IconSize size;
 
   /// A destructive action: the bad colour fills it on hover.
@@ -113,8 +116,12 @@ class IconBtn extends StatelessWidget {
       tooltip: tooltip,
       onTap: onPressed,
       toggled: active,
-      radius: BorderRadius.circular(box <= 32 ? 6 : 8),
-      color: active == true ? t.accentbg : null,
+      shape: const CircleBorder(),
+      color: active == true
+          ? t.accentbg
+          : filled
+          ? t.hover
+          : null,
       hoverColor: dangerHover ? t.badbg : null,
       dimWhenDisabled: 0.4,
       child: SizedBox.square(
@@ -123,7 +130,11 @@ class IconBtn extends StatelessWidget {
           child: AppIcon(
             icon,
             size: size,
-            color: active == true ? t.accent : t.ink2,
+            color: active == true
+                ? t.accent
+                : filled
+                ? t.ink
+                : t.ink2,
           ),
         ),
       ),

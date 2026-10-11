@@ -5,11 +5,11 @@ import '../type.dart';
 import 'robin_mark.dart';
 
 /// The logo tile, the robin in [iconInk] on [iconGround] as on the launcher icon, and the
-/// wordmark: sans 19 beside the sidebar's chats, or [serif] 34 on a screen of its own.
+/// wordmark: 19 beside the sidebar's chats, or [large] 34 on a screen of its own.
 class Brand extends StatelessWidget {
-  const Brand({super.key, this.serif = false, this.logo = true});
+  const Brand({super.key, this.large = false, this.logo = true});
 
-  final bool serif;
+  final bool large;
   final bool logo;
 
   @override
@@ -38,14 +38,12 @@ class Brand extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Text(
               'AnywhereLLM',
-              style: serif
-                  ? Type.serif(34, color: t.ink, letterSpacing: -0.34)
-                  : Type.sans(
-                      19,
-                      weight: FontWeight.w600,
-                      color: t.ink,
-                      letterSpacing: -0.2,
-                    ),
+              style: Type.sans(
+                large ? 34 : 19,
+                weight: large ? FontWeight.w700 : FontWeight.w600,
+                color: t.ink,
+                letterSpacing: large ? -0.8 : -0.2,
+              ),
             ),
           ),
         ),

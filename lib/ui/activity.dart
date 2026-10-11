@@ -131,15 +131,14 @@ class _ActivityPageState extends State<ActivityPage> {
             title: 'Activity',
             back: 'Back to the chat',
             onBack: shell.closeActivity,
-            actions: [
-              IconBtn(
-                'refresh',
-                tooltip: 'Read the list again',
-                box: 44,
-                size: IconSize.small,
-                onPressed: () => unawaited(scope.system.readActivity()),
-              ),
-            ],
+            action: IconBtn(
+              'refresh',
+              tooltip: 'Read the list again',
+              box: 48,
+              filled: true,
+              size: IconSize.small,
+              onPressed: () => unawaited(scope.system.readActivity()),
+            ),
           ),
           Expanded(
             child: ListenableBuilder(

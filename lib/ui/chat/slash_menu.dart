@@ -40,7 +40,7 @@ class SlashMenu extends StatelessWidget {
               onTap: () => onPick(c),
               selected: i == highlight,
               color: i == highlight ? t.sel : null,
-              radius: BorderRadius.circular(6),
+              radius: BorderRadius.circular(8),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 child: Row(

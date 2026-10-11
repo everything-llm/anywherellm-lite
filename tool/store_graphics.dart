@@ -37,10 +37,6 @@ final _out = Directory(
 Future<void> _loadFonts() async {
   const fonts = {
     'Instrument Sans': ['InstrumentSans.ttf'],
-    'Instrument Serif': [
-      'InstrumentSerif-Regular.ttf',
-      'InstrumentSerif-Italic.ttf',
-    ],
     'JetBrains Mono': ['JetBrainsMono.ttf'],
   };
   for (final MapEntry(key: family, value: files) in fonts.entries) {
@@ -161,7 +157,13 @@ class _FeatureGraphic extends StatelessWidget {
               children: [
                 Text(
                   'AnywhereLLM',
-                  style: Type.serif(104, color: iconInk, height: 1),
+                  style: Type.sans(
+                    104,
+                    weight: FontWeight.w700,
+                    color: iconInk,
+                    height: 1,
+                    letterSpacing: -2,
+                  ),
                 ),
                 const SizedBox(height: 14),
                 Text(

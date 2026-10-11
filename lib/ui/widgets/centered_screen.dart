@@ -24,7 +24,7 @@ class CenteredScreen extends StatelessWidget {
                 children: [
                   const Align(
                     alignment: Alignment.centerLeft,
-                    child: Brand(serif: true),
+                    child: Brand(large: true),
                   ),
                   const SizedBox(height: 22),
                   ...children,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/files.dart';
 import '../app_scope.dart';
 import '../icons.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import 'essentials.dart';
@@ -131,7 +132,7 @@ class _Row extends StatelessWidget {
         files.select(node.path);
         if (!folder) scope.shell.closeSide();
       },
-      radius: BorderRadius.circular(8),
+      radius: BorderRadius.circular(Sizes.row),
       color: selected ? t.sel : null,
       child: Padding(
         padding: EdgeInsets.fromLTRB(6.0 + depth * 14, 6, 8, 6),

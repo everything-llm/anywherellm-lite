@@ -119,7 +119,7 @@ class AppMenu extends StatelessWidget {
       elevation: 8,
       shadowColor: t.shadow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(Sizes.menu),
         side: BorderSide(color: t.line),
       ),
       child: Semantics(
@@ -179,7 +179,7 @@ class AppMenuItem extends StatelessWidget {
     return Tappable(
       label: label,
       onTap: onTap,
-      radius: BorderRadius.circular(8),
+      radius: BorderRadius.circular(Sizes.row),
       dimWhenDisabled: 0.4,
       child: SizedBox(
         height: phone ? 48 : 38,

@@ -7,6 +7,7 @@ import '../icons.dart';
 import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
+import '../widgets/headline.dart';
 import '../widgets/basics.dart';
 import '../widgets/controls.dart';
 import '../widgets/pane_header.dart';
@@ -153,16 +154,7 @@ class _Body extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: Type.serif(
-                    40,
-                    color: t.ink,
-                    height: 1.1,
-                    letterSpacing: -0.6,
-                  ),
-                ),
+                Headline(title, textAlign: TextAlign.center),
                 if (text.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
@@ -336,7 +328,7 @@ class _HeaderButton extends StatelessWidget {
       tooltip: compact ? label : null,
       toggled: pressed,
       onTap: onTap,
-      radius: BorderRadius.circular(9),
+      radius: BorderRadius.circular(Sizes.row),
       color: pressed == true ? t.hover : null,
       child: Container(
         height: 36,

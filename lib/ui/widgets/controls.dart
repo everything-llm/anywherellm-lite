@@ -72,8 +72,8 @@ class AppSwitch extends StatelessWidget {
       radius: BorderRadius.circular(8),
       dimWhenDisabled: 0.5,
       child: SizedBox(
-        width: 44,
-        height: 40,
+        width: ScreenClass.ofContext(context).isPhone ? 52 : 44,
+        height: ScreenClass.ofContext(context).isPhone ? 44 : 40,
         child: Center(
           child: SwitchTrack(value: value, large: large),
         ),
@@ -115,17 +115,7 @@ class SwitchTrack extends StatelessWidget {
       child: Container(
         width: knob,
         height: knob,
-        decoration: const BoxDecoration(
-          color: Color(0xFFFFFFFF),
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x33000000),
-              blurRadius: 2,
-              offset: Offset(0, 1),
-            ),
-          ],
-        ),
+        decoration: BoxDecoration(color: t.panel, shape: BoxShape.circle),
       ),
     );
   }

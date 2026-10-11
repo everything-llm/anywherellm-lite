@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import 'tappable.dart';
@@ -30,19 +31,24 @@ class RadioCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    // A phone's card is roomier and rounder, rings itself in the selection colour when chosen,
+    // and marks the choice with a thick ring rather than a dot, as the design canvas draws it.
+    final phone = ScreenClass.ofContext(context).isPhone;
     return Tappable(
       label: [title, ?hint, ?about].join('. '),
       selected: selected,
       onTap: onTap,
-      radius: BorderRadius.circular(12),
+      radius: BorderRadius.circular(phone ? 20 : 12),
       color: card ? (selected ? t.sel : t.panel) : null,
       side: card
-          ? BorderSide(color: selected ? Colors.transparent : t.line)
+          ? BorderSide(
+              color: selected ? (phone ? t.sel : Colors.transparent) : t.line,
+            )
           : null,
       child: Container(
-        constraints: BoxConstraints(minHeight: card ? 56 : 48),
+        constraints: BoxConstraints(minHeight: card ? (phone ? 64 : 56) : 48),
         padding: EdgeInsets.symmetric(
-          horizontal: card ? 12 : 0,
+          horizontal: card ? (phone ? 18 : 12) : 0,
           vertical: card ? 8 : 6,
         ),
         child: Row(
@@ -54,11 +60,15 @@ class RadioCard extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: selected ? t.accent : t.fade,
-                  width: 1.5,
+                  color: selected
+                      ? t.accent
+                      : phone
+                      ? t.muted
+                      : t.fade,
+                  width: selected && phone ? 5 : 1.5,
                 ),
               ),
-              child: selected
+              child: selected && !phone
                   ? Container(
                       width: 9,
                       height: 9,
@@ -79,7 +89,11 @@ class RadioCard extends StatelessWidget {
                     title,
                     style: Type.sans(
                       15,
-                      weight: selected ? FontWeight.w600 : restWeight,
+                      weight: selected
+                          ? FontWeight.w600
+                          : phone
+                          ? FontWeight.w500
+                          : restWeight,
                       color: t.ink,
                     ),
                   ),

@@ -27,8 +27,12 @@ class PaneHeader extends StatelessWidget {
   /// The widgets after the title, given whether the bar is under 560 wide.
   final List<Widget> Function(bool compact)? actions;
 
-  static TextStyle titleStyle(BuildContext context) =>
-      Type.serif(20, color: Tokens.of(context).ink, height: 1.2);
+  static TextStyle titleStyle(BuildContext context) => Type.sans(
+    18,
+    weight: FontWeight.w600,
+    color: Tokens.of(context).ink,
+    height: 1.2,
+  );
 
   /// The chat's title, in sans: its workspace and the separator take [FontWeight.w400] over it.
   static TextStyle chatTitleStyle(BuildContext context) => Type.sans(

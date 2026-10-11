@@ -7,6 +7,7 @@ import '../../core/server_models.dart';
 import '../../core/sources.dart';
 import '../app_scope.dart';
 import '../icons.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
@@ -221,7 +222,7 @@ class _ChildRow extends StatelessWidget {
     return Tappable(
       label: subtitle.isEmpty ? node.name : '${node.name}, $subtitle',
       onTap: () => files.reveal(node.path),
-      radius: BorderRadius.circular(8),
+      radius: BorderRadius.circular(Sizes.row),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
         child: Row(

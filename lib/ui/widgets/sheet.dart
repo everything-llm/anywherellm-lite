@@ -29,9 +29,9 @@ class SheetFrame extends StatefulWidget {
     this.about,
     this.actions = const [],
     this.height = SheetHeight.fit,
-    this.maxFraction = 0.78,
+    this.maxFraction = 0.9,
     this.live = false,
-    this.padding = const EdgeInsets.fromLTRB(16, 4, 16, 20),
+    this.padding = const EdgeInsets.fromLTRB(16, 4, 16, 24),
   });
 
   final String title;
@@ -113,10 +113,10 @@ class _SheetFrameState extends State<SheetFrame>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.only(top: 10),
             child: Center(
               child: Container(
-                width: 36,
+                width: 40,
                 height: 4,
                 decoration: BoxDecoration(
                   color: t.line,
@@ -149,9 +149,9 @@ class _SheetFrameState extends State<SheetFrame>
             constraints: BoxConstraints(maxHeight: most),
             height: tall ? most : null,
             decoration: BoxDecoration(
-              color: t.panel2,
+              color: t.panel,
               borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20),
+                top: Radius.circular(28),
               ),
               boxShadow: [
                 BoxShadow(
@@ -202,7 +202,7 @@ class _SheetFrameState extends State<SheetFrame>
   }
 }
 
-/// A sheet's header: [title] at 17, the line [about] under it, [actions] and a 44 px Close, with
+/// A sheet's header: [title] at 19, the line [about] under it, [actions] and a 44 px Close, with
 /// a rule under it when [divided].
 class SheetHeader extends StatelessWidget {
   const SheetHeader({
@@ -226,7 +226,7 @@ class SheetHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 6, 16, divided ? 10 : 2),
+      padding: EdgeInsets.fromLTRB(24, 10, 12, divided ? 10 : 8),
       decoration: divided
           ? BoxDecoration(
               border: Border(bottom: BorderSide(color: t.line2)),
@@ -245,7 +245,7 @@ class SheetHeader extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Type.sans(
-                      17,
+                      19,
                       weight: FontWeight.w600,
                       color: t.ink,
                       height: 1.3,
@@ -271,6 +271,7 @@ class SheetHeader extends StatelessWidget {
             'close',
             tooltip: 'Close',
             box: 44,
+            filled: true,
             size: IconSize.small,
             onPressed: onClose,
           ),
@@ -324,7 +325,7 @@ class PopupSheet extends StatelessWidget {
     required this.title,
     required this.sheet,
     required this.child,
-    this.maxFraction = 0.78,
+    this.maxFraction = 0.9,
   });
 
   final bool open;

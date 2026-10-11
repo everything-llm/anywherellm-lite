@@ -52,7 +52,7 @@ void main() {
       final t = Tokens.of(tester.element(composerField));
       final phone = card(tester);
       expect((phone.border! as Border).top.color, t.line2);
-      expect(phone.borderRadius, BorderRadius.circular(20));
+      expect(phone.borderRadius, BorderRadius.circular(28));
     },
   );
 
@@ -63,6 +63,6 @@ void main() {
     final t = Tokens.of(tester.element(composerField));
     final desktop = card(tester);
     expect((desktop.border! as Border).top.color, t.line);
-    expect(desktop.borderRadius, BorderRadius.circular(16));
+    expect(desktop.borderRadius, BorderRadius.circular(24));
   });
 }

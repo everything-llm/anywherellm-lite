@@ -58,11 +58,11 @@ class Segmented<T> extends StatelessWidget {
               label: label,
               selected: value == option,
               onTap: onChanged == null ? null : () => onChanged(option),
-              radius: BorderRadius.circular(phone ? 9 : 8),
+              radius: BorderRadius.circular(phone ? 13 : 10),
               color: value == option ? t.panel : null,
               child: _centred(
                 Container(
-                  constraints: BoxConstraints(minHeight: phone ? 40 : 0),
+                  constraints: BoxConstraints(minHeight: phone ? 44 : 0),
                   alignment: phone ? Alignment.center : null,
                   padding: EdgeInsets.symmetric(
                     vertical: 6,

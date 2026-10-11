@@ -5,16 +5,11 @@ import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 
-/// A text field's outline: on a phone the fainter [Tokens.line2], as the design canvas draws it.
-Color fieldEdge(BuildContext context) => ScreenClass.ofContext(context).isPhone
-    ? Tokens.of(context).line2
-    : Tokens.of(context).line;
+/// A text field's outline.
+Color fieldEdge(BuildContext context) => Tokens.of(context).line;
 
-/// A text field's fill: on a phone [Tokens.panel], as the design canvas draws it, else
-/// [Tokens.bg].
-Color fieldFill(BuildContext context) => ScreenClass.ofContext(context).isPhone
-    ? Tokens.of(context).panel
-    : Tokens.of(context).bg;
+/// A text field's fill.
+Color fieldFill(BuildContext context) => Tokens.of(context).bg;
 
 /// The look of a text area that fills its space, such as the prompt editor: [fill] behind it,
 /// [fieldEdge] round it, and the accent, 2 px, while it has the focus. [padding] is round the
@@ -37,7 +32,7 @@ InputDecoration editorDecoration(
   );
 }
 
-/// The input: one line 44px tall, 48 on a phone, or [maxLines] lines, rounded, a ring in the
+/// The input: one line 44px tall, 52 on a phone, or [maxLines] lines, rounded, a ring in the
 /// accent on focus.
 class AppField extends StatelessWidget {
   const AppField({
@@ -93,7 +88,7 @@ class AppField extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final height = Sizes.fieldOf(context);
-    final size = ScreenClass.ofContext(context).isPhone ? 15.5 : 15.0;
+    final size = ScreenClass.ofContext(context).isPhone ? 16.0 : 15.0;
     OutlineInputBorder border(Color color, [double width = 1]) =>
         OutlineInputBorder(
           borderRadius: BorderRadius.circular(Sizes.controlOf(context)),
@@ -127,7 +122,7 @@ class AppField extends StatelessWidget {
           filled: true,
           fillColor: fieldFill(context),
           hintText: hint,
-          hintStyle: Type.sans(size, color: t.fade),
+          hintStyle: Type.sans(size, color: t.muted),
           prefixIcon: icon == null
               ? null
               : Center(
@@ -194,7 +189,7 @@ class AppSelect extends StatelessWidget {
         child: DropdownButton<String>(
           isExpanded: true,
           value: choices.contains(value) ? value : null,
-          hint: Text(hint, style: Type.sans(15, color: t.fade)),
+          hint: Text(hint, style: Type.sans(15, color: t.muted)),
           style: Type.sans(15, color: t.ink),
           dropdownColor: t.panel,
           borderRadius: radius,

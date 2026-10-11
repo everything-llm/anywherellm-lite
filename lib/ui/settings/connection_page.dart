@@ -10,6 +10,7 @@ import '../state/settings_controller.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
+import '../widgets/headline.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
@@ -68,28 +69,12 @@ class _Welcome extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final scan = AppScope.of(context).scanner != null;
-    final big = Type.serif(40, color: t.ink, height: 1.1, letterSpacing: -0.6);
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Semantics(
-            header: true,
-            child: Text.rich(
-              TextSpan(
-                style: big,
-                children: [
-                  const TextSpan(text: 'Connect to your '),
-                  TextSpan(
-                    text: 'AnythingLLM',
-                    style: big.copyWith(fontStyle: FontStyle.italic),
-                  ),
-                  const TextSpan(text: '.'),
-                ],
-              ),
-            ),
-          ),
+          const Headline('Connect to your ', name: 'AnythingLLM', after: '.'),
           const SizedBox(height: 12),
           Text(
             scan

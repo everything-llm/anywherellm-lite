@@ -75,31 +75,39 @@ class PassagesView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // A phone's sheet has the room to put the count at the line's end; the panel beside
-          // a desktop's chat puts it under the name.
-          Row(
-            children: [
-              CitationNumber(number),
-              const SizedBox(width: 8),
-              Expanded(
-                child: phone
-                    ? name
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [name, count],
-                      ),
+          // A phone's sheet says the file and its count in one line; the panel beside a
+          // desktop's chat numbers the file and puts the count under its name.
+          if (phone)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                '${citation.title} · ${count.data}',
+                style: Type.sans(13, color: t.muted, height: 1.4),
               ),
-              if (phone) ...[const SizedBox(width: 8), count],
-            ],
-          ),
-          const SizedBox(height: 10),
+            )
+          else
+            Row(
+              children: [
+                CitationNumber(number),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [name, count],
+                  ),
+                ),
+              ],
+            ),
+          SizedBox(height: phone ? 16 : 10),
           for (final passage in passages) ...[
             Container(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              padding: phone
+                  ? const EdgeInsets.symmetric(horizontal: 18, vertical: 16)
+                  : const EdgeInsets.fromLTRB(14, 12, 14, 12),
               decoration: BoxDecoration(
-                color: t.panel,
+                color: phone ? t.bg : t.panel,
                 border: Border.all(color: t.line2),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(phone ? 20 : 12),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -114,18 +122,17 @@ class PassagesView extends StatelessWidget {
                   ],
                   SelectableText(
                     passage.text,
-                    style: Type.sans(14, color: t.ink2, height: 1.55),
+                    style: Type.sans(14, color: t.ink2, height: 1.5),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: phone ? 16 : 8),
           ],
           if (file != null) ...[
             const SizedBox(height: 4),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: AppButton(
+            ActionRow(even: phone, alignment: WrapAlignment.start, [
+              AppButton(
                 'View extracted text',
                 onPressed: () {
                   onClose();
@@ -139,7 +146,7 @@ class PassagesView extends StatelessWidget {
                   scope.shell.showPane(Pane.files);
                 },
               ),
-            ),
+            ]),
           ],
         ],
       ),

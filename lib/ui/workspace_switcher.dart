@@ -417,7 +417,7 @@ class _WorkspaceItem extends StatelessWidget {
           scope.shell.closePopup(Popup.workspaces);
           if (!active) chat.select(workspace.slug);
         },
-        radius: BorderRadius.circular(8),
+        radius: BorderRadius.circular(Sizes.row),
         color: active ? t.sel : null,
         child: SizedBox(
           height: sheet ? 48 : 40,
@@ -476,7 +476,7 @@ class _DragGhost extends StatelessWidget {
       color: t.panel,
       elevation: 6,
       shadowColor: t.shadow,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(Sizes.row),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
         child: Text(

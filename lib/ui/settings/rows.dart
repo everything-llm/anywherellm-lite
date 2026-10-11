@@ -16,12 +16,15 @@ class PanelCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    final phone = ScreenClass.ofContext(context).isPhone;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: phone
+          ? const EdgeInsets.all(FieldCard.inset)
+          : const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: t.panel,
         borderRadius: BorderRadius.circular(_cardRadius(context)),
-        border: Border.all(color: t.line),
+        border: Border.all(color: phone ? t.line2 : t.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -32,31 +35,45 @@ class PanelCard extends StatelessWidget {
   }
 }
 
-/// A settings card's corners: 12 on a phone, 11 elsewhere, as the design canvas draws them.
-double _cardRadius(BuildContext context) =>
-    ScreenClass.ofContext(context).isPhone ? 12 : 11;
+/// A settings card's corners: [Sizes.phoneCard] on a phone, else [Sizes.card].
+double _cardRadius(BuildContext context) => Sizes.cardOf(context);
 
-/// A rounded panel of [rows], a hairline between each.
+/// A rounded panel of [rows], a hairline between each. On a phone it is a grouped card: its
+/// edge is [Tokens.line2] and its hairlines stop [inset] short of its sides, where its rows keep
+/// their text. [inSheet] fills it with [Tokens.bg], as a card in a sheet is.
 class FieldCard extends StatelessWidget {
-  const FieldCard(this.rows, {super.key});
+  const FieldCard(this.rows, {super.key, this.inSheet = false});
 
   final List<Widget> rows;
+  final bool inSheet;
+
+  /// How far a phone's rows keep their text from the card's sides.
+  static const inset = 20.0;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    final phone = ScreenClass.ofContext(context).isPhone;
+    final indent = phone ? inset : 0.0;
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: t.panel,
+        color: inSheet ? t.bg : t.panel,
         borderRadius: BorderRadius.circular(_cardRadius(context)),
-        border: Border.all(color: t.line),
+        border: Border.all(color: phone ? t.line2 : t.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (final (i, row) in rows.indexed) ...[
-            if (i > 0) Divider(height: 1, thickness: 1, color: t.line2),
+            if (i > 0)
+              Divider(
+                height: 1,
+                thickness: 1,
+                indent: indent,
+                endIndent: indent,
+                color: t.line2,
+              ),
             row,
           ],
         ],
@@ -106,7 +123,7 @@ class FieldRow extends StatelessWidget {
             Text(
               label,
               style: Type.sans(
-                phone ? 15 : 14.5,
+                phone ? 17 : 14.5,
                 weight: FontWeight.w500,
                 color: t.ink,
               ),
@@ -119,11 +136,14 @@ class FieldRow extends StatelessWidget {
     );
     final edge = phone && small;
     return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 56),
+      constraints: BoxConstraints(minHeight: phone ? 68 : 56),
       child: Padding(
         padding: edge
-            ? const EdgeInsets.fromLTRB(16, 6, 4, 6)
-            : const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ? const EdgeInsets.fromLTRB(FieldCard.inset, 6, 4, 6)
+            : EdgeInsets.symmetric(
+                horizontal: phone ? FieldCard.inset : 16,
+                vertical: 10,
+              ),
         child: LayoutBuilder(
           builder: (context, box) => small || box.maxWidth >= sideBySide
               ? Row(

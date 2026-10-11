@@ -87,7 +87,7 @@ class _AnswerMoreState extends State<AnswerMore> {
           tooltip: 'More',
           expanded: open,
           onTap: () => shell.togglePopup(widget.turn),
-          radius: BorderRadius.circular(6),
+          shape: const CircleBorder(),
           color: open ? t.hover : null,
           child: SizedBox.square(
             dimension: answerAction(context).box,
@@ -104,7 +104,6 @@ class _AnswerMoreState extends State<AnswerMore> {
                 open: open,
                 onClose: close,
                 title: 'This answer',
-                maxFraction: 0.7,
                 sheet: (context) => _AnswerMenu(
                   widget.turn,
                   metrics,
