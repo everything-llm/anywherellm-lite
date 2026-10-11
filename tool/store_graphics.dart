@@ -11,6 +11,7 @@ import 'dart:ui' as ui;
 
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/prefs.dart';
+import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
@@ -85,23 +86,62 @@ FakeAnythingLlm _server() {
         Thread(slug: 'budget', name: 'Budget questions'),
       ],
       docs: [
-        libraryDoc(llm, 'Q3 roadmap.pdf'),
-        libraryDoc(llm, 'Budget forecast.xlsx'),
-        libraryDoc(llm, 'Customer interviews.docx'),
-        libraryDoc(llm, 'Vendor quote.pdf'),
+        libraryDoc(llm, 'Q3 roadmap.pdf', words: 4210),
+        libraryDoc(llm, 'Budget forecast.xlsx', words: 1860),
+        libraryDoc(llm, 'Customer interviews.docx', words: 12880),
+        libraryDoc(llm, 'Vendor quote.pdf', words: 940),
       ],
     ),
     FakeWorkspace(
       'household',
       'Household',
       threads: const [Thread(slug: 'boiler', name: 'When is the boiler due?')],
+      docs: [
+        libraryDoc(llm, 'Boiler manual.pdf', words: 9300),
+        libraryDoc(llm, 'Home insurance.pdf', words: 6120),
+      ],
     ),
     FakeWorkspace(
       'reading',
       'Reading notes',
       threads: const [Thread(slug: 'essays', name: 'Themes across the essays')],
+      docs: [
+        libraryDoc(llm, 'Essays, volume one.epub', words: 48200),
+        libraryDoc(llm, 'Margin notes.md', words: 3150),
+        libraryDoc(llm, 'Reading list.txt', words: 410),
+      ],
     ),
-    FakeWorkspace('lisbon', 'Trip to Lisbon'),
+    FakeWorkspace(
+      'lisbon',
+      'Trip to Lisbon',
+      docs: [libraryDoc(llm, 'Itinerary.pdf', words: 1280)],
+    ),
+  ];
+  // The drawer counts what the relay is writing and the jobs the server runs.
+  final now = DateTime.now().toUtc();
+  llm.allRuns = [
+    RelayRun(
+      workspace: 'household',
+      thread: 'boiler',
+      status: 'running',
+      id: 'r1',
+      question: 'Compare the three boiler quotes and book the cheapest.',
+      started: now.subtract(const Duration(minutes: 2)),
+    ),
+  ];
+  llm.jobs = [
+    ScheduledJob(
+      name: 'Morning brief',
+      cron: '30 6 * * *',
+      workspace: 'Household',
+      nextRun: now.add(const Duration(hours: 9)),
+    ),
+    ScheduledJob(
+      name: 'Roadmap check',
+      cron: '0 8 * * 1',
+      workspace: 'Q3 planning',
+      nextRun: now.add(const Duration(days: 2)),
+    ),
   ];
   llm.histories['budget'] = const [
     ChatMessage(role: Role.user, text: 'How is the Q3 budget split?'),
