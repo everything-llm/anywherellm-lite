@@ -37,6 +37,9 @@ class Gallery extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, box) {
         final side = (box.maxWidth - _gap * (_columns - 1)) / _columns;
+        // Twice the tile's width, so a picture up to twice as wide as tall still covers it.
+        final decode = (side * 2 * MediaQuery.devicePixelRatioOf(context))
+            .round();
         return Row(
           spacing: _gap,
           children: [
@@ -45,6 +48,7 @@ class Gallery extends StatelessWidget {
                 dimension: side,
                 child: _Tile(
                   picture,
+                  decodeWidth: decode,
                   number: i + 1,
                   more: i == shown.length - 1 ? more : 0,
                   onTap: () => scope.shell.openGallery(
@@ -66,12 +70,14 @@ class Gallery extends StatelessWidget {
 class _Tile extends StatelessWidget {
   const _Tile(
     this.picture, {
+    required this.decodeWidth,
     required this.number,
     required this.more,
     required this.onTap,
   });
 
   final Picture picture;
+  final int decodeWidth;
   final int number;
   final int more;
   final VoidCallback onTap;
@@ -100,6 +106,7 @@ class _Tile extends StatelessWidget {
               allowHttp: scope.settings.allowHttp,
               linked: true,
               fit: BoxFit.cover,
+              decodeWidth: decodeWidth,
               unloaded: (context) => _Unloaded(picture, small: true),
             ),
             if (more > 0)
@@ -197,25 +204,6 @@ class _GalleryPageState extends State<GalleryPage> {
   /// The picture's bytes as last read, or null when it has not loaded.
   List<int>? _bytes(Picture picture) =>
       AppScope.of(context).chat.lastFrame(picture.image);
-
-  Future<void> _share(Picture picture) async {
-    final scope = AppScope.of(context);
-    final share = scope.share;
-    final bytes = _bytes(picture);
-    if (share == null) return;
-    if (bytes == null) {
-      scope.chat.report(
-        'Could not share ${picture.fileName}',
-        'The picture has not loaded.',
-      );
-      return;
-    }
-    try {
-      await share(picture.fileName, bytes);
-    } on Exception catch (error) {
-      scope.chat.report('Could not share ${picture.fileName}', '$error');
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -331,7 +319,18 @@ class _GalleryPageState extends State<GalleryPage> {
                           if (scope.share != null)
                             AppButton(
                               'Share',
-                              onPressed: () => unawaited(_share(picture)),
+                              onPressed: () => unawaited(
+                                shareFile(context, picture.fileName, () async {
+                                  final bytes = _bytes(picture);
+                                  if (bytes == null) {
+                                    scope.chat.report(
+                                      'Could not share ${picture.fileName}',
+                                      'The picture has not loaded.',
+                                    );
+                                  }
+                                  return bytes;
+                                }),
+                              ),
                             ),
                         ]),
                       ],

@@ -1,10 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'app_scope.dart';
-import 'icons.dart';
 import 'settings/rows.dart';
 import 'state/shell_controller.dart';
 import 'tokens.dart';
@@ -13,7 +11,6 @@ import 'widgets/buttons.dart';
 import 'widgets/controls.dart';
 import 'widgets/fields.dart';
 import 'widgets/sheet.dart';
-import 'widgets/tappable.dart';
 
 /// A phone's sheet for one chat of the workspace on screen, over the window: its name, which
 /// renames it as it is typed, Pin to the top and Delete chat, which asks first.
@@ -71,22 +68,15 @@ class _ChatSheetState extends State<ChatSheet> {
   @override
   Widget build(BuildContext context) {
     final of = widget.of;
-    return CallbackShortcuts(
-      bindings: {const SingleActivator(LogicalKeyboardKey.escape): _close},
-      child: Focus(
-        autofocus: true,
-        child: SheetFrame(
-          title: of.deleting ? 'Delete chat' : 'Chat',
-          onClose: _close,
-          child: of.deleting ? _Delete(of.thread.name, of) : _sheet(context),
-        ),
-      ),
+    return ModalSheet(
+      title: of.deleting ? 'Delete chat' : 'Chat',
+      onClose: _close,
+      child: of.deleting ? _Delete(of.thread.name, of) : _sheet(context),
     );
   }
 
   Widget _sheet(BuildContext context) {
     final scope = _scope;
-    final t = Tokens.of(context);
     final thread = widget.of.thread;
     final workspace = scope.chat.activeSlug ?? '';
     return ListenableBuilder(
@@ -99,23 +89,16 @@ class _ChatSheetState extends State<ChatSheet> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             spacing: 16,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                spacing: 6,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: ExcludeSemantics(
-                      child: Text('Name', style: Type.sans(13, color: t.muted)),
-                    ),
-                  ),
-                  AppField(
-                    controller: _name,
-                    label: 'Name',
-                    onChanged: _typed,
-                    onSubmitted: (_) => _save(),
-                  ),
-                ],
+              NamedControl(
+                'Name',
+                quiet: true,
+                labelled: true,
+                AppField(
+                  controller: _name,
+                  label: 'Name',
+                  onChanged: _typed,
+                  onSubmitted: (_) => _save(),
+                ),
               ),
               FieldCard(inSheet: true, [
                 FieldRow(
@@ -132,30 +115,13 @@ class _ChatSheetState extends State<ChatSheet> {
                 ),
               ]),
               FieldCard(inSheet: true, [
-                Tappable(
-                  label: 'Delete chat',
+                CardRow(
+                  'Delete chat',
+                  icon: 'trash',
+                  tone: RowTone.danger,
                   onTap: answering
                       ? null
                       : () => scope.shell.openChatSheet(thread, deleting: true),
-                  dimWhenDisabled: 0.5,
-                  child: Container(
-                    constraints: const BoxConstraints(minHeight: 64),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: FieldCard.inset,
-                    ),
-                    child: Row(
-                      spacing: 16,
-                      children: [
-                        AppIcon('trash', color: t.badfg),
-                        Flexible(
-                          child: Text(
-                            'Delete chat',
-                            style: Type.sans(17, color: t.badfg),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ),
               ]),
             ],

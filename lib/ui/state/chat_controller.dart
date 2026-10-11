@@ -311,36 +311,27 @@ class ChatController extends ChangeNotifier {
   /// on another device, while that answer may still run.
   final _refusedIn = <String>{};
 
-  /// The messages the relay refused, by chat, which the composer takes back with [takeRefused].
-  final _refused = <String, ({String text, List<Attachment> attachments})>{};
+  /// What waits for each chat's composer, by chat (null for a new one): a message the relay
+  /// refused, or what another app shared ([putInComposer]). The composer takes it with
+  /// [takeForComposer].
+  final _forComposer =
+      <String?, ({String text, List<Attachment> attachments})>{};
 
   /// Whether the chat on screen refused the last message because it was already answering,
   /// maybe on another device: its answer is followed here, and the message waits in the
   /// composer to be sent when it ends.
   bool get alreadyAnswering => _refusedIn.contains(activeThread);
 
-  /// The message the relay refused in the chat on screen, with its files, for the composer to
-  /// put back; null once taken, or when it was refused in another chat.
-  ({String text, List<Attachment> attachments})? takeRefused() =>
-      _refused.remove(activeThread);
-
-  /// What another app shared, for the composer of the chat it was put in.
-  ({String? thread, String text, List<Attachment> attachments})? _shared;
+  /// What waits for the chat on screen's composer, with its files; null once taken, or when it
+  /// waits in another chat.
+  ({String text, List<Attachment> attachments})? takeForComposer() =>
+      _forComposer.remove(activeThread);
 
   /// Puts [text] and [attachments] in the composer of the chat on screen, for the person to
   /// ask about them.
   void putInComposer(String text, List<Attachment> attachments) {
-    _shared = (thread: activeThread, text: text, attachments: attachments);
+    _forComposer[activeThread] = (text: text, attachments: attachments);
     notifyListeners();
-  }
-
-  /// What [putInComposer] put in the chat on screen, for the composer to take; null once
-  /// taken, or when it was put in another chat.
-  ({String text, List<Attachment> attachments})? takeShared() {
-    final shared = _shared;
-    if (shared == null || shared.thread != activeThread) return null;
-    _shared = null;
-    return (text: shared.text, attachments: shared.attachments);
   }
 
   /// How many messages have been sent, so the chat can bring each new one into view.
@@ -563,7 +554,7 @@ class ChatController extends ChangeNotifier {
     }
     _runs.clear();
     _refusedIn.clear();
-    _refused.clear();
+    _forComposer.clear();
     workspaces = const [];
     _threads.clear();
     _turns.clear();
@@ -790,9 +781,8 @@ class ChatController extends ChangeNotifier {
     activeThread = threadSlug;
     if (threadSlug != null) _ready.remove(threadSlug);
     _watchLost(fresh: true);
-    // A refused or shared message goes back to the composer only in its own chat.
-    _refused.removeWhere((thread, _) => thread != threadSlug);
-    if (_shared?.thread != threadSlug) _shared = null;
+    // What waits for the composer goes back only in its own chat.
+    _forComposer.removeWhere((thread, _) => thread != threadSlug);
     editing = null;
     _clearLinkNotice();
     _rememberChat();
@@ -1175,7 +1165,7 @@ class ChatController extends ChangeNotifier {
       ];
     }
     _refusedIn.add(thread);
-    _refused[thread] = (text: sent.text, attachments: sent.attachments);
+    _forComposer[thread] = (text: sent.text, attachments: sent.attachments);
     notifyListeners();
     final server = _server;
     unawaited(

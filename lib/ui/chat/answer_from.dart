@@ -109,9 +109,9 @@ class _AnswerFromChipState extends State<AnswerFromChip> {
 }
 
 /// [child], the composer's card, with the Answer from menu above it while
-/// [ShellController.answerFromOpen]: 348 px wide from the chip's edge on a desktop, the card's
-/// width on a phone, where it ends with the Model row that [onPickModel] answers. A tap outside,
-/// Esc or Back closes it, and so do another workspace and an answer starting in this one.
+/// [ShellController.answerFromOpen], 348 px wide from the chip's edge, or on a phone a sheet
+/// that ends with the Chat model row [onPickModel] answers. A tap outside, Esc or Back closes
+/// it, and so do another workspace and an answer starting in this one.
 class AnswerFromAnchor extends StatefulWidget {
   const AnswerFromAnchor({
     super.key,
@@ -156,42 +156,37 @@ class _AnswerFromAnchorState extends State<AnswerFromAnchor> {
   @override
   Widget build(BuildContext context) {
     final scope = _scope;
-    final phone = ScreenClass.ofContext(context).isPhone;
+    final listened = Listenable.merge([
+      scope.chat,
+      scope.sources,
+      scope.sources.chatMode,
+      scope.system,
+    ]);
+    // A phone's choice is a sheet over the window, its modes as cards.
+    if (ScreenClass.ofContext(context).isPhone) {
+      return ValueListenableBuilder(
+        valueListenable: scope.shell.popup,
+        builder: (context, popup, child) => PopupSheet(
+          open: popup == Popup.answerFrom,
+          onClose: _close,
+          title: 'Answer from',
+          sheet: (context) => ListenableBuilder(
+            listenable: listened,
+            builder: (context, _) {
+              if (!_canChoose(scope)) return const SizedBox.shrink();
+              scope.system.wantSettingsOnce();
+              return _Sheet(onPickModel: widget.onPickModel, onClose: _close);
+            },
+          ),
+          child: child!,
+        ),
+        child: widget.child,
+      );
+    }
     return LayoutBuilder(
       builder: (context, box) {
         final card = box.maxWidth;
-        final width = phone ? card : math.min(348.0, card);
-        final left = phone ? 0.0 : math.min(76.0, card - width);
-        final listened = Listenable.merge([
-          scope.chat,
-          scope.sources,
-          scope.sources.chatMode,
-          scope.system,
-        ]);
-        // A phone's choice is a sheet over the window, its modes as cards.
-        if (phone) {
-          return ValueListenableBuilder(
-            valueListenable: scope.shell.popup,
-            builder: (context, popup, child) => PopupSheet(
-              open: popup == Popup.answerFrom,
-              onClose: _close,
-              title: 'Answer from',
-              sheet: (context) => ListenableBuilder(
-                listenable: listened,
-                builder: (context, _) {
-                  if (!_canChoose(scope)) return const SizedBox.shrink();
-                  scope.system.wantSettingsOnce();
-                  return _Sheet(
-                    onPickModel: widget.onPickModel,
-                    onClose: _close,
-                  );
-                },
-              ),
-              child: child!,
-            ),
-            child: widget.child,
-          );
-        }
+        final width = math.min(348.0, card);
         return ValueListenableBuilder(
           valueListenable: scope.shell.popup,
           builder: (context, popup, child) => PopupAnchor(
@@ -200,14 +195,12 @@ class _AnswerFromAnchorState extends State<AnswerFromAnchor> {
             group: _group,
             above: true,
             width: width,
-            offset: Offset(left, -8),
+            offset: Offset(math.min(76.0, card - width), -8),
             menu: (context) => ListenableBuilder(
               listenable: listened,
-              builder: (context, _) {
-                if (!_canChoose(scope)) return const SizedBox.shrink();
-                if (phone) scope.system.wantSettingsOnce();
-                return _Menu(onClose: _close);
-              },
+              builder: (context, _) => _canChoose(scope)
+                  ? _Menu(onClose: _close)
+                  : const SizedBox.shrink(),
             ),
             child: child!,
           ),

@@ -32,6 +32,7 @@ class CardImage extends StatefulWidget {
     this.maxHeight = 360,
     this.fit = BoxFit.contain,
     this.unloaded,
+    this.decodeWidth,
   });
 
   final Uri uri;
@@ -52,6 +53,10 @@ class CardImage extends StatefulWidget {
   /// What shows in the image's place when it is not loaded or did not load, in place of its
   /// description.
   final WidgetBuilder? unloaded;
+
+  /// The width in pixels a [BoxFit.cover] image is decoded at, keeping its proportions, so a
+  /// small tile does not hold a large picture whole; null decodes it at its own size.
+  final int? decodeWidth;
 
   bool get loadable => loadableImage(uri, server, allowHttp: allowHttp);
 
@@ -226,6 +231,7 @@ class _CardImageState extends State<CardImage> {
       return Image.memory(
         frame,
         fit: widget.fit,
+        cacheWidth: widget.decodeWidth,
         gaplessPlayback: true,
         semanticLabel: widget.alt,
         errorBuilder: (_, _, _) => described,

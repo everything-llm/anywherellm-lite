@@ -6,7 +6,6 @@ import '../settings/rows.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';
-import '../widgets/tappable.dart';
 
 /// A phone's Attach sheet: the files [attached] to the next message, each with Remove, then
 /// where to add more from. [onPhotos] and [onCamera] are null where the device has no photos to
@@ -32,6 +31,7 @@ class AttachSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    final plus = AppIcon('plus', size: IconSize.small, color: t.ink2);
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -69,44 +69,15 @@ class AttachSheet extends StatelessWidget {
             ]),
           FieldCard(inSheet: true, [
             if (onPhotos case final onPhotos?)
-              _AddRow('Photo library', onPhotos),
+              CardRow('Photo library', onTap: onPhotos, trailing: plus),
             if (onCamera case final onCamera?)
-              _AddRow('Take a photo', onCamera),
-            _AddRow('Files', onFiles),
+              CardRow('Take a photo', onTap: onCamera, trailing: plus),
+            CardRow('Files', onTap: onFiles, trailing: plus),
           ]),
           ActionRow(even: true, [
             AppButton('Done', primary: true, onPressed: onDone),
           ]),
         ],
-      ),
-    );
-  }
-}
-
-/// A place to add files from, with a plus at its end.
-class _AddRow extends StatelessWidget {
-  const _AddRow(this.label, this.onTap);
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Tappable(
-      label: label,
-      onTap: onTap,
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 64),
-        padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(label, style: Type.sans(17, color: t.ink)),
-            ),
-            AppIcon('plus', size: IconSize.small, color: t.ink2),
-          ],
-        ),
       ),
     );
   }

@@ -211,9 +211,6 @@ class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
       (w) => w.slug != active?.slug && _chat.readyIn(w.slug),
     );
     final name = active == null ? 'Workspaces' : 'Workspaces: ${active.name}';
-    // A phone's is 48 tall, its name at 15 over a sheet that rises below, as the design canvas
-    // draws it.
-    final phone = ScreenClass.ofContext(context).isPhone;
     return Tappable(
       label: elsewhere ? '$name, an answer is ready in another' : name,
       tooltip: 'Switch workspace',
@@ -234,7 +231,7 @@ class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Type.sans(
-                    phone ? 15 : 14.5,
+                    14.5,
                     weight: FontWeight.w600,
                     color: active == null ? t.muted : t.ink,
                   ),
@@ -249,11 +246,7 @@ class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
               ],
               if (elsewhere) const ReadyDot(),
               const SizedBox(width: 8),
-              AppIcon(
-                phone ? 'down' : 'unfold',
-                size: IconSize.xs,
-                color: t.muted,
-              ),
+              AppIcon('unfold', size: IconSize.xs, color: t.muted),
             ],
           ),
         ),
@@ -291,8 +284,6 @@ class PhoneWorkspaceSwitcher extends StatelessWidget {
           sheet: (context) => SingleChildScrollView(
             child: _WorkspaceMenu(
               sheet: true,
-              onRename: () {},
-              onDelete: () {},
               onCreate: () => shell.togglePopup(WorkspaceSheet.create),
             ),
           ),
@@ -350,15 +341,17 @@ class PhoneWorkspaceSwitcher extends StatelessWidget {
 /// settings.
 class _WorkspaceMenu extends StatelessWidget {
   const _WorkspaceMenu({
-    required this.onRename,
-    required this.onDelete,
     required this.onCreate,
+    this.onRename,
+    this.onDelete,
     this.sheet = false,
   });
 
-  final VoidCallback onRename;
-  final VoidCallback onDelete;
   final VoidCallback onCreate;
+
+  /// The menu's Rename workspace and Delete workspace; a phone's [sheet] has neither.
+  final VoidCallback? onRename;
+  final VoidCallback? onDelete;
   final bool sheet;
 
   @override
@@ -366,74 +359,33 @@ class _WorkspaceMenu extends StatelessWidget {
     final scope = AppScope.of(context);
     final chat = scope.chat;
     final shell = scope.shell;
-    final t = Tokens.of(context);
     final ordered = scope.prefs.prefs.inOrder(chat.workspaces, (w) => w.slug);
     final active = chat.active;
     final keys = showsWorkspaceKeys(context);
-    // A phone's sheet draws it plain, as its other rows are, as the design canvas does.
-    final create = AppMenuItem(
-      'New workspace',
-      icon: sheet ? null : 'plus',
-      accent: !sheet,
-      onTap: onCreate,
-    );
-    final rename = active == null
-        ? null
-        : AppMenuItem('Rename workspace', onTap: onRename);
-    final delete = active == null
-        ? null
-        : AppMenuItem(
-            'Delete workspace…',
-            danger: true,
-            onTap: chat.answeringIn(active.slug) ? null : onDelete,
-          );
-    final items = <Widget>[
-      if (ordered.isNotEmpty)
-        ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: sheet ? 400 : 320),
-          child: ReorderableListView.builder(
-            shrinkWrap: true,
-            // The row starts a drag, not a handle beside it.
-            buildDefaultDragHandles: false,
-            itemCount: ordered.length,
-            onReorderItem: (from, to) {
-              final slugs = [for (final w in ordered) w.slug];
-              slugs.insert(to, slugs.removeAt(from));
-              scope.prefs.setWorkspaceOrder(slugs);
-            },
-            // The dragged row is drawn in the app's overlay, outside AppScope, so it is
-            // shown as a name alone.
-            proxyDecorator: (child, i, animation) =>
-                _DragGhost(ordered[i].name),
-            itemBuilder: (context, i) => _WorkspaceItem(
-              ordered[i],
-              key: ValueKey(ordered[i].slug),
-              index: i,
-              shortcut: keys && i < 9 ? 'Ctrl ${i + 1}' : null,
-              sheet: sheet,
-            ),
-          ),
-        ),
-      if (ordered.isNotEmpty) const MenuDivider(),
-      AppMenuItem(
-        shell.pane == Pane.files
-            ? 'Chats'
-            : sheet
-            ? 'Documents, instructions and settings'
-            : 'Files and settings',
-        onTap: () {
-          if (sheet) {
-            shell.closePopup(Popup.workspaces);
-            shell.closeSide();
-          }
-          shell.showPane(shell.pane == Pane.files ? Pane.chats : Pane.files);
+    final list = ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: sheet ? 400 : 320),
+      child: ReorderableListView.builder(
+        shrinkWrap: true,
+        // The row starts a drag, not a handle beside it.
+        buildDefaultDragHandles: false,
+        itemCount: ordered.length,
+        onReorderItem: (from, to) {
+          final slugs = [for (final w in ordered) w.slug];
+          slugs.insert(to, slugs.removeAt(from));
+          scope.prefs.setWorkspaceOrder(slugs);
         },
+        // The dragged row is drawn in the app's overlay, outside AppScope, so it is shown as
+        // a name alone.
+        proxyDecorator: (child, i, animation) => _DragGhost(ordered[i].name),
+        itemBuilder: (context, i) => _WorkspaceItem(
+          ordered[i],
+          key: ValueKey(ordered[i].slug),
+          index: i,
+          shortcut: keys && i < 9 ? 'Ctrl ${i + 1}' : null,
+          sheet: sheet,
+        ),
       ),
-      // A phone's sheet puts New workspace before Delete, which comes last.
-      ...sheet
-          ? [?rename, create, ?delete]
-          : [?rename, ?delete, const MenuDivider(), create],
-    ];
+    );
     if (sheet) {
       return Semantics(
         container: true,
@@ -442,38 +394,47 @@ class _WorkspaceMenu extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           spacing: 16,
           children: [
-            if (ordered.isNotEmpty) FieldCard(inSheet: true, [items.first]),
+            if (ordered.isNotEmpty) FieldCard(inSheet: true, [list]),
             FieldCard(inSheet: true, [
-              Tappable(
-                label: 'New workspace',
+              CardRow(
+                'New workspace',
+                icon: 'plus',
+                tone: RowTone.accent,
+                strong: true,
                 onTap: onCreate,
-                child: Container(
-                  constraints: const BoxConstraints(minHeight: 64),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: FieldCard.inset,
-                  ),
-                  child: Row(
-                    spacing: 14,
-                    children: [
-                      AppIcon('plus', color: t.accent),
-                      Text(
-                        'New workspace',
-                        style: Type.sans(
-                          17,
-                          weight: FontWeight.w600,
-                          color: t.accent,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ),
             ]),
           ],
         ),
       );
     }
-    return AppMenu(label: 'Workspaces', children: items);
+    return AppMenu(
+      label: 'Workspaces',
+      children: [
+        if (ordered.isNotEmpty) ...[list, const MenuDivider()],
+        AppMenuItem(
+          shell.pane == Pane.files ? 'Chats' : 'Files and settings',
+          onTap: () => shell.showPane(
+            shell.pane == Pane.files ? Pane.chats : Pane.files,
+          ),
+        ),
+        if (active != null) ...[
+          AppMenuItem('Rename workspace', onTap: onRename),
+          AppMenuItem(
+            'Delete workspace…',
+            danger: true,
+            onTap: chat.answeringIn(active.slug) ? null : onDelete,
+          ),
+        ],
+        const MenuDivider(),
+        AppMenuItem(
+          'New workspace',
+          icon: 'plus',
+          accent: true,
+          onTap: onCreate,
+        ),
+      ],
+    );
   }
 }
 

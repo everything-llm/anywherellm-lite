@@ -223,8 +223,8 @@ class _Heading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(FieldCard.inset, 20, FieldCard.inset, 8),
-    child: SectionLabel(text),
+    padding: const EdgeInsets.only(top: 20, bottom: 8),
+    child: CardHeading(text),
   );
 }
 

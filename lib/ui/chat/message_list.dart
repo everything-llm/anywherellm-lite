@@ -784,8 +784,8 @@ class _AnswerState extends State<_Answer> {
                   CopyButton(
                     split.answer,
                     tooltip: 'Copy answer',
-                    box: action.box,
-                    size: action.icon,
+                    box: action,
+                    size: IconSize.xs,
                   ),
                 if (AppScope.of(context).readAloud case final aloud?
                     when answered)
@@ -795,8 +795,8 @@ class _AnswerState extends State<_Answer> {
                     'refresh',
                     tooltip: retry.tooltip,
                     onPressed: retry.onPressed,
-                    box: action.box,
-                    size: action.icon,
+                    box: action,
+                    size: IconSize.xs,
                   ),
                 if (turn.metrics != null || rate != null)
                   AnswerMore(turn, turn.metrics, rate: rate),
@@ -840,8 +840,8 @@ class _ReadAloudButton extends StatelessWidget {
         reading ? 'stop' : 'speaker',
         tooltip: reading ? 'Stop reading' : 'Read aloud',
         onPressed: () => aloud.toggle(turn),
-        box: action.box,
-        size: action.icon,
+        box: action,
+        size: IconSize.xs,
       );
     },
   );

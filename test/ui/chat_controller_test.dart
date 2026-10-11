@@ -740,10 +740,10 @@ void main() {
       expect(answer.error, isNull);
       expect(answer.rejoined, isFalse);
       expect(rig.chat.runningHere, same(answer));
-      final back = rig.chat.takeRefused()!;
+      final back = rig.chat.takeForComposer()!;
       expect(back.text, 'And a shorter one?');
       expect(back.attachments.single.name, 'notes.txt');
-      expect(rig.chat.takeRefused(), isNull);
+      expect(rig.chat.takeForComposer(), isNull);
       events.add(const TextChunk('Short.'));
       await events.close();
       await pumpEventQueue();
@@ -778,7 +778,7 @@ void main() {
       expect(rig.chat.alreadyAnswering, isFalse);
       expect(rig.chat.busy, isFalse);
       expect(rig.chat.turns, hasLength(2));
-      expect(rig.chat.takeRefused()!.text, 'And a shorter one?');
+      expect(rig.chat.takeForComposer()!.text, 'And a shorter one?');
     });
 
     test('is given back only in its own chat', () async {
@@ -789,9 +789,9 @@ void main() {
       await rig.chat.send('And a shorter one?');
       await pumpEventQueue();
       await rig.chat.open('priorities');
-      expect(rig.chat.takeRefused(), isNull);
+      expect(rig.chat.takeForComposer(), isNull);
       await rig.chat.open('budget');
-      expect(rig.chat.takeRefused(), isNull);
+      expect(rig.chat.takeForComposer(), isNull);
     });
   });
 
@@ -1167,7 +1167,7 @@ void main() {
       await rig.chat.send('Plan the meals');
       await pumpEventQueue();
       await rig.chat.select('q3', thread: 'budget');
-      expect(rig.chat.takeRefused()!.text, 'And a shorter one?');
+      expect(rig.chat.takeForComposer()!.text, 'And a shorter one?');
     });
   });
 

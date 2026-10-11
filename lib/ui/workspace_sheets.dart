@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../core/copy.dart';
 import 'app_scope.dart';
+import 'settings/rows.dart';
 import 'state/shell_controller.dart';
 import 'tokens.dart';
 import 'type.dart';
@@ -60,45 +60,33 @@ class _WorkspaceSheetViewState extends State<WorkspaceSheetView> {
       WorkspaceSheet.rename => 'Rename workspace',
       WorkspaceSheet.delete => 'Delete workspace',
     };
-    return CallbackShortcuts(
-      bindings: {const SingleActivator(LogicalKeyboardKey.escape): _close},
-      child: Focus(
-        autofocus: widget.kind == WorkspaceSheet.delete,
-        child: SheetFrame(
-          title: title,
-          onClose: _close,
-          child: widget.kind == WorkspaceSheet.delete
-              ? _delete(context)
-              : _naming(context),
-        ),
-      ),
+    // A name's field takes the focus itself.
+    return ModalSheet(
+      title: title,
+      onClose: _close,
+      autofocus: widget.kind == WorkspaceSheet.delete,
+      child: widget.kind == WorkspaceSheet.delete
+          ? _delete(context)
+          : _naming(context),
     );
   }
 
   Widget _naming(BuildContext context) {
-    final t = Tokens.of(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       spacing: 16,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 6,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: ExcludeSemantics(
-                child: Text('Name', style: Type.sans(13, color: t.muted)),
-              ),
-            ),
-            AppField(
-              controller: _name,
-              label: 'Name',
-              autofocus: true,
-              onSubmitted: (_) => _named(),
-            ),
-          ],
+        NamedControl(
+          'Name',
+          quiet: true,
+          labelled: true,
+          AppField(
+            controller: _name,
+            label: 'Name',
+            autofocus: true,
+            onSubmitted: (_) => _named(),
+          ),
         ),
         ActionRow(even: true, [
           AppButton(

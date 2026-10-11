@@ -195,8 +195,7 @@ class _ComposerState extends State<Composer> {
     }
     // Taken only when it can go back: a message taken and not put back would be lost.
     if (widget.draft.text.isEmpty && _attached.isEmpty) {
-      if (_scope.chat.takeRefused() ?? _scope.chat.takeShared()
-          case final back?) {
+      if (_scope.chat.takeForComposer() case final back?) {
         _setDraft(back.text);
         setState(() => _attached = back.attachments);
         widget.focus.requestFocus();

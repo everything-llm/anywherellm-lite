@@ -41,12 +41,10 @@ class Headline extends StatelessWidget {
             if (name case final name?)
               TextSpan(
                 text: name,
-                style: Type.sans(
-                  32,
-                  weight: FontWeight.w700,
+                style: style.copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontVariations: const [FontVariation('wght', 700)],
                   color: Tokens.of(context).accent,
-                  height: 1.15,
-                  letterSpacing: -0.8,
                 ),
               ),
             TextSpan(text: after),

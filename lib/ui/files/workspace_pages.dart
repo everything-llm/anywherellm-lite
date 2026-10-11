@@ -12,7 +12,6 @@ import '../type.dart';
 import '../icons.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
-import '../widgets/tappable.dart';
 import '../widgets/min_height.dart';
 import '../widgets/phone_page.dart';
 import 'files_view.dart';
@@ -199,31 +198,15 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                   ],
                 ),
               ),
-              Tappable(
-                label: 'Rename',
+              CardRow(
+                'Rename',
+                tone: RowTone.accent,
+                height: 56,
                 onTap: () => shell.togglePopup(WorkspaceSheet.rename),
-                child: Container(
-                  constraints: const BoxConstraints(minHeight: 56),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: FieldCard.inset,
-                  ),
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Rename',
-                    style: Type.sans(
-                      17,
-                      weight: FontWeight.w500,
-                      color: t.accent,
-                    ),
-                  ),
-                ),
               ),
             ]),
             const SizedBox(height: 20),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: FieldCard.inset),
-              child: SectionLabel('How it answers'),
-            ),
+            const CardHeading('How it answers'),
             const SizedBox(height: 8),
             FieldCard([
               NavRow(
@@ -251,30 +234,13 @@ class _WorkspacePagesState extends State<WorkspacePages> {
             ]),
             const SizedBox(height: 20),
             FieldCard([
-              Tappable(
-                label: 'Delete workspace',
+              CardRow(
+                'Delete workspace',
+                icon: 'trash',
+                tone: RowTone.danger,
                 onTap: chat.answeringIn(slug)
                     ? null
                     : () => shell.togglePopup(WorkspaceSheet.delete),
-                dimWhenDisabled: 0.5,
-                child: Container(
-                  constraints: const BoxConstraints(minHeight: 64),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: FieldCard.inset,
-                  ),
-                  child: Row(
-                    spacing: 16,
-                    children: [
-                      AppIcon('trash', color: t.badfg),
-                      Flexible(
-                        child: Text(
-                          'Delete workspace',
-                          style: Type.sans(17, color: t.badfg),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ),
             ]),
             const SizedBox(height: 12),

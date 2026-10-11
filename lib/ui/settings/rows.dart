@@ -4,6 +4,7 @@ import '../icons.dart';
 import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
+import '../widgets/basics.dart';
 import '../widgets/fields.dart';
 import '../widgets/tappable.dart';
 
@@ -23,7 +24,7 @@ class PanelCard extends StatelessWidget {
           : const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: t.panel,
-        borderRadius: BorderRadius.circular(_cardRadius(context)),
+        borderRadius: BorderRadius.circular(Sizes.cardOf(context)),
         border: Border.all(color: phone ? t.line2 : t.line),
       ),
       child: Column(
@@ -34,9 +35,6 @@ class PanelCard extends StatelessWidget {
     );
   }
 }
-
-/// A settings card's corners: [Sizes.phoneCard] on a phone, else [Sizes.card].
-double _cardRadius(BuildContext context) => Sizes.cardOf(context);
 
 /// A rounded panel of [rows], a hairline between each. On a phone it is a grouped card: its
 /// edge is [Tokens.line2] and its hairlines stop [inset] short of its sides, where its rows keep
@@ -59,7 +57,7 @@ class FieldCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: inSheet ? t.bg : t.panel,
-        borderRadius: BorderRadius.circular(_cardRadius(context)),
+        borderRadius: BorderRadius.circular(Sizes.cardOf(context)),
         border: Border.all(color: phone ? t.line2 : t.line),
       ),
       child: Column(
@@ -296,7 +294,7 @@ class PageWarning extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: t.warnbg,
-        borderRadius: BorderRadius.circular(_cardRadius(context)),
+        borderRadius: BorderRadius.circular(Sizes.cardOf(context)),
       ),
       child: Text(text, style: Type.sans(14, color: t.warnfg, height: 1.5)),
     );
@@ -347,4 +345,89 @@ class Fold extends StatelessWidget {
       ),
     );
   }
+}
+
+/// How a [CardRow]'s words are drawn: as text, as an action in the accent, or as a destructive
+/// action in [Tokens.badfg].
+enum RowTone { plain, accent, danger }
+
+/// A row of a phone's [FieldCard] that does one thing when tapped: [icon], then [label] at 17
+/// in its [tone], then [trailing], kept [FieldCard.inset] from the card's sides.
+class CardRow extends StatelessWidget {
+  const CardRow(
+    this.label, {
+    super.key,
+    required this.onTap,
+    this.icon,
+    this.trailing,
+    this.tone = RowTone.plain,
+    this.strong = false,
+    this.height = 64,
+  });
+
+  final String label;
+
+  /// Null while the row can do nothing, which fades it.
+  final VoidCallback? onTap;
+  final String? icon;
+  final Widget? trailing;
+  final RowTone tone;
+
+  /// Semibold words, as New workspace is.
+  final bool strong;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final color = switch (tone) {
+      RowTone.plain => t.ink,
+      RowTone.accent => t.accent,
+      RowTone.danger => t.badfg,
+    };
+    return Tappable(
+      label: label,
+      onTap: onTap,
+      dimWhenDisabled: 0.5,
+      child: Container(
+        constraints: BoxConstraints(minHeight: height),
+        padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
+        child: Row(
+          spacing: 16,
+          children: [
+            if (icon case final icon?)
+              AppIcon(icon, color: tone == RowTone.plain ? t.ink2 : color),
+            Expanded(
+              child: Text(
+                label,
+                style: Type.sans(
+                  17,
+                  weight: strong
+                      ? FontWeight.w600
+                      : tone == RowTone.accent
+                      ? FontWeight.w500
+                      : FontWeight.w400,
+                  color: color,
+                ),
+              ),
+            ),
+            ?trailing,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A heading over a phone's [FieldCard], its words in line with the card's rows.
+class CardHeading extends StatelessWidget {
+  const CardHeading(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
+    child: SectionLabel(text),
+  );
 }

@@ -251,7 +251,7 @@ class AppShell extends StatelessWidget {
                                 duration: duration,
                                 child: screen.isPhone
                                     ? PhoneDrawer(width: drawerWidth)
-                                    : Sidebar(width: drawerWidth),
+                                    : const Sidebar(),
                               ),
                             if (!sourcesInline && !sheet)
                               _Drawer(

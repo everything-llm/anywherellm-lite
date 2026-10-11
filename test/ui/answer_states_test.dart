@@ -147,7 +147,7 @@ void main() {
         tester.widget<EditableText>(composerField).controller.text,
         'Something else',
       );
-      expect(h.chat.takeRefused()?.text, message);
+      expect(h.chat.takeForComposer()?.text, message);
     },
   );
 }

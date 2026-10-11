@@ -13,7 +13,6 @@ import '../settings/settings_pages.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
-import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/fields.dart';
 import '../widgets/sheet.dart';
@@ -221,12 +220,7 @@ class _ShareSheetState extends State<ShareSheet> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     spacing: 8,
                     children: [
-                      const Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: FieldCard.inset,
-                        ),
-                        child: SectionLabel('Workspace'),
-                      ),
+                      const CardHeading('Workspace'),
                       FieldCard(inSheet: true, [
                         for (final w in workspaces)
                           _WorkspaceRow(

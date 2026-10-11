@@ -96,6 +96,8 @@ class IconBtn extends StatelessWidget {
     this.dangerHover = false,
     this.active,
     this.filled = false,
+    this.heard,
+    this.expanded,
   });
 
   final String icon;
@@ -110,6 +112,13 @@ class IconBtn extends StatelessWidget {
 
   /// Whether it sits on [Tokens.hover] with its icon in [Tokens.ink].
   final bool filled;
+
+  /// What a screen reader hears, when it says more than [tooltip].
+  final String? heard;
+
+  /// Whether what the button opens is open, for one that opens a menu. Null for one that does
+  /// not.
+  final bool? expanded;
   final IconSize size;
 
   /// A destructive action: the bad colour fills it on hover.
@@ -120,10 +129,11 @@ class IconBtn extends StatelessWidget {
     final t = Tokens.of(context);
     return Tappable(
       touchTarget: true,
-      label: tooltip,
+      label: heard ?? tooltip,
       tooltip: tooltip,
       onTap: onPressed,
       toggled: active,
+      expanded: expanded,
       shape: const CircleBorder(),
       color: active == true
           ? t.accentbg

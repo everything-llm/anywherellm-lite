@@ -167,12 +167,7 @@ class _PhoneNav extends StatelessWidget {
     final shell = scope.shell;
     final settings = scope.settings;
     return ListenableBuilder(
-      listenable: Listenable.merge([
-        scope.prefs,
-        scope.system,
-        settings,
-        scope.chat.unreachable,
-      ]),
+      listenable: Listenable.merge([scope.system, settings]),
       builder: (context, _) {
         final connection = settings.connection;
         return ListView(
@@ -182,10 +177,7 @@ class _PhoneNav extends StatelessWidget {
               const _ServerCard(),
               const SizedBox(height: 20),
             ],
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: FieldCard.inset),
-              child: SectionLabel('This app'),
-            ),
+            const CardHeading('This app'),
             const SizedBox(height: 8),
             FieldCard([
               for (final (page, icon) in const [
@@ -201,10 +193,7 @@ class _PhoneNav extends StatelessWidget {
             ]),
             if (connection != null) ...[
               const SizedBox(height: 20),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: FieldCard.inset),
-                child: SectionLabel('AnythingLLM'),
-              ),
+              const CardHeading('AnythingLLM'),
               const SizedBox(height: 8),
               FieldCard([
                 NavRow(
@@ -229,6 +218,14 @@ class _ServerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    return ListenableBuilder(
+      listenable: Listenable.merge([scope.settings, scope.chat.unreachable]),
+      builder: _build,
+    );
+  }
+
+  Widget _build(BuildContext context, Widget? _) {
     final scope = AppScope.of(context);
     final settings = scope.settings;
     final t = Tokens.of(context);
@@ -282,20 +279,13 @@ class _ServerCard extends StatelessWidget {
           ],
         ),
       ),
-      Tappable(
-        label: 'Test connection',
+      CardRow(
+        'Test connection',
+        tone: RowTone.accent,
+        height: 56,
         onTap: settings.check == ConnectionCheck.testing
             ? null
             : () => unawaited(settings.testSaved()),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 56),
-          padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Test connection',
-            style: Type.sans(17, weight: FontWeight.w500, color: t.accent),
-          ),
-        ),
       ),
     ]);
   }

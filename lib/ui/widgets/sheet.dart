@@ -338,20 +338,48 @@ class PopupSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) => OverlayWhile(
     open: open,
-    overlay: (context) => CallbackShortcuts(
-      bindings: {const SingleActivator(LogicalKeyboardKey.escape): onClose},
-      child: Focus(
-        autofocus: true,
-        child: SafeArea(
-          child: SheetFrame(
-            title: title,
-            onClose: onClose,
-            maxFraction: maxFraction,
-            child: Builder(builder: sheet),
-          ),
+    overlay: (context) => ModalSheet(
+      title: title,
+      onClose: onClose,
+      maxFraction: maxFraction,
+      child: Builder(builder: sheet),
+    ),
+    child: child,
+  );
+}
+
+/// A [SheetFrame] over what holds it, under [title], that Esc closes as its scrim, Close and a
+/// drag down do: the body of a [PopupSheet], and of a sheet the shell shows over the window.
+/// It takes the focus unless [autofocus] is false, as when a field in it takes it instead.
+class ModalSheet extends StatelessWidget {
+  const ModalSheet({
+    super.key,
+    required this.title,
+    required this.onClose,
+    required this.child,
+    this.maxFraction = 0.9,
+    this.autofocus = true,
+  });
+
+  final String title;
+  final VoidCallback onClose;
+  final Widget child;
+  final double maxFraction;
+  final bool autofocus;
+
+  @override
+  Widget build(BuildContext context) => CallbackShortcuts(
+    bindings: {const SingleActivator(LogicalKeyboardKey.escape): onClose},
+    child: Focus(
+      autofocus: autofocus,
+      child: SafeArea(
+        child: SheetFrame(
+          title: title,
+          onClose: onClose,
+          maxFraction: maxFraction,
+          child: child,
         ),
       ),
     ),
-    child: child,
   );
 }

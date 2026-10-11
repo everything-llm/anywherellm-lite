@@ -34,9 +34,19 @@ class PhoneDrawer extends StatefulWidget {
 class _PhoneDrawerState extends State<PhoneDrawer> {
   final _search = TextEditingController();
 
+  /// What the search holds, trimmed: it changes only with the words, not with the cursor.
+  final _query = ValueNotifier('');
+
+  @override
+  void initState() {
+    super.initState();
+    _search.addListener(() => _query.value = _search.text.trim());
+  }
+
   @override
   void dispose() {
     _search.dispose();
+    _query.dispose();
     super.dispose();
   }
 
@@ -57,10 +67,10 @@ class _PhoneDrawerState extends State<PhoneDrawer> {
             chat,
             scope.prefs,
             scope.settings,
-            _search,
+            _query,
           ]),
           builder: (context, _) {
-            final query = _search.text.trim();
+            final query = _query.value;
             final searching = query.isNotEmpty;
             final active = chat.active;
             return ListView(
@@ -108,8 +118,8 @@ class _PhoneDrawerState extends State<PhoneDrawer> {
                   _Search(_search, focus: shell.searchFocus),
                   ...searching ? _found(context, query) : _chats(context),
                 ]),
+                const SizedBox(height: 14),
                 if (scope.settings.configured) ...[
-                  const SizedBox(height: 14),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
                     child: Semantics(
@@ -125,7 +135,6 @@ class _PhoneDrawerState extends State<PhoneDrawer> {
                     ),
                   ),
                 ],
-                if (!scope.settings.configured) const SizedBox(height: 14),
                 DrawerCard([
                   if (scope.settings.configured) ...const [
                     ActivityRow(),

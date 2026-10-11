@@ -51,20 +51,6 @@ Future<bool> _download(BuildContext context, GeneratedFile file) async {
   return where != null;
 }
 
-/// Hands [file] to the system's share sheet, reading it first.
-Future<void> _share(BuildContext context, GeneratedFile file) async {
-  final scope = AppScope.of(context);
-  final share = scope.share;
-  if (share == null) return;
-  final bytes = await scope.chat.fileBytes(file);
-  if (bytes == null) return;
-  try {
-    await share(file.name, bytes);
-  } on Exception catch (error) {
-    scope.chat.report('Could not share ${file.name}', '$error');
-  }
-}
-
 /// The tap both of a made file's buttons share: it asks where to save [file] and saves it, named
 /// by [verb] until then and Saved after. [builder] draws the button from whether it is saved.
 class _Saving extends StatefulWidget {
@@ -327,7 +313,11 @@ class _MadeImageState extends State<_MadeImage> {
                   IconBtn(
                     'share',
                     tooltip: 'Share ${file.name}',
-                    onPressed: () => _share(context, file),
+                    onPressed: () => shareFile(
+                      context,
+                      file.name,
+                      () => AppScope.of(context).chat.fileBytes(file),
+                    ),
                     box: 30,
                     size: IconSize.xs,
                   ),
@@ -489,7 +479,11 @@ class ImageViewer extends StatelessWidget {
                         button(
                           'Share',
                           'share',
-                          () => _share(context, file),
+                          () => shareFile(
+                            context,
+                            file.name,
+                            () => AppScope.of(context).chat.fileBytes(file),
+                          ),
                           filled: false,
                         ),
                     ],

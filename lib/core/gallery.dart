@@ -87,6 +87,19 @@ List<Picture>? _picturesOn(String line) {
 /// it; those around it stay with the text.
 List<AnswerPart> answerParts(String markdown) {
   if (!markdown.contains('![')) return [TextPart(markdown)];
+  // An answer's text is cut again on each rebuild, so the last ones cut are kept.
+  if (_cut.remove(markdown) case final parts?) return _cut[markdown] = parts;
+  final parts = _partsOf(markdown);
+  _cut[markdown] = parts;
+  if (_cut.length > _cutMax) _cut.remove(_cut.keys.first);
+  return parts;
+}
+
+/// The answers [answerParts] cut last, least recently used first.
+final _cut = <String, List<AnswerPart>>{};
+const _cutMax = 32;
+
+List<AnswerPart> _partsOf(String markdown) {
   final parts = <AnswerPart>[];
   final text = <String>[];
   // The run being gathered: its pictures, and the blank lines met since its last picture,

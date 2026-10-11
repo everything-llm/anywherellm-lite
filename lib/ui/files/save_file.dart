@@ -54,6 +54,26 @@ Future<String?> saveFile(
   }
 }
 
+/// Hands what [bytes] gives, named [name], to the system's share sheet through
+/// [AppScope.share], where the device has one. [bytes] gives null, having said why, when there
+/// is nothing to share; a share that fails shows through the chat's problem.
+Future<void> shareFile(
+  BuildContext context,
+  String name,
+  Future<List<int>?> Function() bytes,
+) async {
+  final scope = AppScope.of(context);
+  final share = scope.share;
+  if (share == null) return;
+  final title = 'Could not share $name';
+  try {
+    final data = await bytes();
+    if (data != null) await share(name, data);
+  } on Exception catch (error) {
+    scope.chat.report(title, _plain(error));
+  }
+}
+
 /// Saves what [text] gives, the text the server read from the document called [title], under
 /// [textFileName], as [saveFile] does.
 Future<String?> saveText(
