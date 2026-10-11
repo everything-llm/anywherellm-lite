@@ -53,7 +53,6 @@ class _ActivityRowState extends State<ActivityRow> {
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
-    final t = Tokens.of(context);
     return ListenableBuilder(
       listenable: scope.system,
       builder: (context, _) {
@@ -62,13 +61,11 @@ class _ActivityRowState extends State<ActivityRow> {
           icon: 'activity',
           title: 'Activity',
           heard: running == 0 ? 'Activity' : 'Activity, $running running',
-          trailing: running == 0
-              ? null
-              : Text('$running running', style: Type.sans(13, color: t.muted)),
+          trailing: running == 0 ? null : DrawerCount('$running running'),
           onTap: () {
             scope.shell
               ..closeSide()
-              ..openActivity();
+              ..openPhonePage(PhonePage.activity);
           },
         );
       },
@@ -121,7 +118,7 @@ class _ActivityPageState extends State<ActivityPage> {
           PhonePageHeader(
             title: 'Activity',
             back: 'Back to the chat',
-            onBack: shell.closeActivity,
+            onBack: shell.closePhonePage,
             action: IconBtn(
               'refresh',
               tooltip: 'Read the list again',
@@ -336,7 +333,7 @@ class _RunRow extends StatelessWidget {
   /// Opens the chat the answer belongs to.
   void _open(AppScope scope) {
     scope.shell
-      ..closeActivity()
+      ..closePhonePage()
       ..closeSide()
       ..showPane(Pane.chats);
     unawaited(scope.chat.select(run.workspace, thread: run.thread));

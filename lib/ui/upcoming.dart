@@ -8,6 +8,7 @@ import 'app_scope.dart';
 import 'links.dart';
 import 'settings/rows.dart';
 import 'settings/settings_pages.dart';
+import 'state/shell_controller.dart';
 import 'tokens.dart';
 import 'type.dart';
 import 'widgets/basics.dart';
@@ -41,7 +42,6 @@ class _UpcomingRowState extends State<UpcomingRow> {
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
-    final t = Tokens.of(context);
     return ListenableBuilder(
       listenable: scope.system,
       builder: (context, _) {
@@ -51,13 +51,11 @@ class _UpcomingRowState extends State<UpcomingRow> {
           icon: 'clock',
           title: 'Upcoming',
           heard: count == null ? 'Upcoming' : 'Upcoming, $count',
-          trailing: count == null
-              ? null
-              : Text(count, style: Type.sans(13, color: t.muted)),
+          trailing: count == null ? null : DrawerCount(count),
           onTap: () {
             scope.shell
               ..closeSide()
-              ..openUpcoming();
+              ..openPhonePage(PhonePage.upcoming);
           },
         );
       },
@@ -99,7 +97,7 @@ class _UpcomingPageState extends State<UpcomingPage> {
           PhonePageHeader(
             title: 'Upcoming',
             back: 'Back to the chat',
-            onBack: shell.closeUpcoming,
+            onBack: shell.closePhonePage,
           ),
           Expanded(
             child: ListenableBuilder(
@@ -124,7 +122,7 @@ class _UpcomingPageState extends State<UpcomingPage> {
                           'Open Connection',
                           onPressed: () {
                             shell
-                              ..closeUpcoming()
+                              ..closePhonePage()
                               ..openSettings(SettingsPage.connection);
                           },
                         ),

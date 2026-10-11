@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/copy.dart';
 import '../../core/created.dart';
-import '../../core/outputs.dart';
 import '../../core/upload.dart';
 import '../app_scope.dart';
 import '../links.dart';
@@ -74,7 +73,7 @@ class _CreatedFilesState extends State<CreatedFiles> {
             style: Type.sans(14, color: t.ink2, height: 1.5),
           ),
           const SizedBox(height: 14),
-          if (list != null) ...[_Meter(list), const SizedBox(height: 10)],
+          if (list != null) ...[CreatedMeter(list), const SizedBox(height: 10)],
           Align(
             alignment: Alignment.centerLeft,
             child: TextAction.plain(
@@ -138,50 +137,74 @@ class _CreatedFilesState extends State<CreatedFiles> {
   }
 }
 
+/// Saves [file] where the person chooses, a failure shown as the created files' problem.
+Future<String?> saveCreated(BuildContext context, CreatedFile file) {
+  final created = AppScope.of(context).created;
+  return saveFile(
+    context,
+    file.name,
+    () => created.bytes(file),
+    failTitle: 'Could not save ${file.name}',
+    report: created.report,
+  );
+}
+
 /// How much of the workspace's room is used, on a bar, in the warning colour once past the size
-/// the host warns at.
-class _Meter extends StatelessWidget {
-  const _Meter(this.list);
+/// the host warns at: the words beside the bar, or over a thicker one when [large], as a phone
+/// draws it.
+class CreatedMeter extends StatelessWidget {
+  const CreatedMeter(this.list, {super.key, this.large = false});
 
   final CreatedList list;
+  final bool large;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final used = sizeText(list.used);
-    final text = list.limit > 0 ? '$used of ${sizeText(list.limit)}' : used;
-    final full = list.nearFull ? '. Nearly full.' : '';
+    final text = list.usedText;
     final color = list.nearFull ? t.warnfg : t.accent;
-    return Semantics(
-      container: true,
-      label: '$text used$full',
-      child: ExcludeSemantics(
-        child: Row(
+    final words = Text(
+      list.nearFull ? '$text · Nearly full' : text,
+      style: Type.sans(
+        large ? 14.5 : 12.5,
+        color: list.nearFull ? t.warnfg : (large ? t.ink : t.muted),
+      ),
+    );
+    final bar = ClipRRect(
+      borderRadius: BorderRadius.circular(99),
+      child: SizedBox(
+        height: large ? 8 : 6,
+        child: Stack(
           children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(3),
-                child: SizedBox(
-                  height: 6,
-                  child: Stack(
-                    children: [
-                      Positioned.fill(child: ColoredBox(color: t.line2)),
-                      FractionallySizedBox(
-                        widthFactor: list.fraction,
-                        child: ColoredBox(color: color),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+            Positioned.fill(
+              child: ColoredBox(color: large ? t.hover : t.line2),
             ),
-            const SizedBox(width: 12),
-            Text(
-              '$text$full',
-              style: Type.sans(12.5, color: list.nearFull ? t.warnfg : t.muted),
+            FractionallySizedBox(
+              widthFactor: list.fraction,
+              heightFactor: 1,
+              child: ColoredBox(color: color),
             ),
           ],
         ),
+      ),
+    );
+    return Semantics(
+      container: true,
+      label: list.nearFull ? '$text used, nearly full' : '$text used',
+      child: ExcludeSemantics(
+        child: large
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: 8,
+                children: [words, bar],
+              )
+            : Row(
+                spacing: 12,
+                children: [
+                  Expanded(child: bar),
+                  words,
+                ],
+              ),
       ),
     );
   }
@@ -238,16 +261,7 @@ class _FileRow extends StatelessWidget {
             children: [
               if (file.area == CreatedArea.work)
                 action('Keep', () => created.keep(file)),
-              action(
-                'Download',
-                () => saveFile(
-                  context,
-                  file.name,
-                  () => created.bytes(file),
-                  failTitle: 'Could not save ${file.name}',
-                  report: created.report,
-                ),
-              ),
+              action('Download', () => saveCreated(context, file)),
               if (file.isPage)
                 action('Open page', () => openLink(context, file.url!)),
               action('Delete', onDelete),
@@ -282,8 +296,7 @@ class _FileRow extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(left: 44, right: 4),
               child: ConfirmBox(
-                text:
-                    'Delete ${file.name} from the workspace? It cannot be got back.',
+                text: deleteCreatedQuestion(file),
                 onCancel: onCancel,
                 onConfirm: onConfirm,
               ),

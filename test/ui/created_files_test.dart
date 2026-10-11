@@ -118,7 +118,7 @@ void main() {
       list: _list(const [], used: 4500 * 1024 * 1024),
     );
     expect(inPane(find.text('No files yet.')), findsOneWidget);
-    expect(inPane(find.textContaining('Nearly full.')), findsOneWidget);
+    expect(inPane(find.textContaining('· Nearly full')), findsOneWidget);
   });
 
   testWidgets('Download saves the file under its name', (tester) async {

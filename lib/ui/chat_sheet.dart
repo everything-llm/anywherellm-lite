@@ -5,9 +5,6 @@ import 'package:flutter/material.dart';
 import 'app_scope.dart';
 import 'settings/rows.dart';
 import 'state/shell_controller.dart';
-import 'tokens.dart';
-import 'type.dart';
-import 'widgets/buttons.dart';
 import 'widgets/controls.dart';
 import 'widgets/fields.dart';
 import 'widgets/sheet.dart';
@@ -132,7 +129,7 @@ class _ChatSheetState extends State<ChatSheet> {
   }
 }
 
-/// The question before a chat is deleted, with Keep and Delete side by side.
+/// The question before a chat is deleted.
 class _Delete extends StatelessWidget {
   const _Delete(this.name, this.of);
 
@@ -142,31 +139,13 @@ class _Delete extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
-    final t = Tokens.of(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 16,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Text(
-            'Delete $name? Its messages go with it.',
-            style: Type.sans(15.5, color: t.ink, height: 1.5),
-          ),
-        ),
-        ActionRow(even: true, [
-          AppButton('Keep', onPressed: scope.shell.closePopup),
-          AppButton(
-            'Delete',
-            danger: true,
-            onPressed: () {
-              scope.shell.closePopup();
-              unawaited(scope.chat.delete(of.thread.slug));
-            },
-          ),
-        ]),
-      ],
+    return SheetQuestion(
+      'Delete $name? Its messages go with it.',
+      onKeep: scope.shell.closePopup,
+      onDelete: () {
+        scope.shell.closePopup();
+        unawaited(scope.chat.delete(of.thread.slug));
+      },
     );
   }
 }

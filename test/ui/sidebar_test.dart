@@ -167,7 +167,7 @@ void main() {
           find.byWidgetPredicate(
             (w) =>
                 w is Tappable &&
-                w.label == 'Workspace: Q3 planning. Switch workspace',
+                w.label == 'Workspace: Q3 planning, 2 docs. Switch workspace',
           ),
         );
         await tester.pumpAndSettle();

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../core/chat.dart';
+import '../../core/created.dart';
 import '../../core/files.dart';
 import '../../core/gallery.dart';
 import '../../core/server_models.dart';
@@ -37,6 +38,19 @@ class ChatSheetFor {
   final Thread thread;
   final bool deleting;
 }
+
+/// A phone's sheet for one created file of the open workspace: Download, Open page, Keep and
+/// Delete file, or with [deleting] the question whether to delete it.
+class CreatedSheetFor {
+  const CreatedSheetFor(this.file, {this.deleting = false});
+
+  final CreatedFile file;
+  final bool deleting;
+}
+
+/// A page a phone shows over the chat, from its drawer: the workspace's created files, the
+/// server's scheduled jobs, or the answers the relay ran.
+enum PhonePage { artifacts, upcoming, activity }
 
 /// A phone's sheet about the open workspace: a new workspace's name, the open one's new name,
 /// or whether to delete it.
@@ -102,6 +116,10 @@ class ShellController extends ChangeNotifier {
   void openGallery(List<Picture> pictures, int index, {required String chat}) =>
       _popup.value = GalleryOpen(pictures, index, chat: chat);
 
+  /// Opens [file]'s sheet, closing any other popup.
+  void openCreatedSheet(CreatedFile file, {bool deleting = false}) =>
+      _popup.value = CreatedSheetFor(file, deleting: deleting);
+
   /// Opens [thread]'s sheet, closing any other popup and the drawer.
   void openChatSheet(Thread thread, {bool deleting = false}) {
     _popup.value = ChatSheetFor(thread, deleting: deleting);
@@ -128,39 +146,22 @@ class ShellController extends ChangeNotifier {
   bool _sourcesDrawer = false;
   FilesSection? _workspacePage;
   bool _scanning = false;
-  bool _upcoming = false;
+  PhonePage? _phonePage;
 
-  /// Whether a phone's Upcoming page shows over the chat.
-  bool get upcomingOpen => _upcoming;
+  /// The page a phone shows over the chat, or null: one at a time.
+  PhonePage? get phonePage => _phonePage;
 
-  void openUpcoming() {
-    if (_upcoming) return;
-    _upcoming = true;
+  /// Shows [page] over the chat in place of any other, closing the popup open.
+  void openPhonePage(PhonePage page) {
+    if (_phonePage == page) return;
+    _phonePage = page;
     _popup.value = null;
     notifyListeners();
   }
 
-  void closeUpcoming() {
-    if (!_upcoming) return;
-    _upcoming = false;
-    notifyListeners();
-  }
-
-  bool _activity = false;
-
-  /// Whether a phone's Activity page shows over the chat.
-  bool get activityOpen => _activity;
-
-  void openActivity() {
-    if (_activity) return;
-    _activity = true;
-    _popup.value = null;
-    notifyListeners();
-  }
-
-  void closeActivity() {
-    if (!_activity) return;
-    _activity = false;
+  void closePhonePage() {
+    if (_phonePage == null) return;
+    _phonePage = null;
     notifyListeners();
   }
 

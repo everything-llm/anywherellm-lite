@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app_scope.dart';
+import 'artifacts.dart';
 import 'chat/app_panel.dart';
 import 'chat/browser_panel.dart';
 import 'chat/chat_view.dart';
@@ -90,8 +91,9 @@ class AppShell extends StatelessWidget {
       if (shell.shared != null) return shell.closeShared;
       if (shell.popup.value != null) return shell.closePopup;
       if (shell.scanning) return () => shell.setScanning(false);
-      if (shell.upcomingOpen && !shell.settingsOpen) return shell.closeUpcoming;
-      if (shell.activityOpen && !shell.settingsOpen) return shell.closeActivity;
+      if (shell.phonePage != null && !shell.settingsOpen) {
+        return shell.closePhonePage;
+      }
       if (shell.settingsOpen) {
         return !settingsSideBySide && shell.settingsPage != null
             ? shell.settingsBack
@@ -131,7 +133,7 @@ class AppShell extends StatelessWidget {
             final sheetOpen = sheet && shell.rightOpen;
             // A phone's drawer is wider, leaving the chat a strip to tap to close it.
             final drawerWidth = screen.isPhone
-                ? max(Sizes.sidebar, min(360.0, box.maxWidth * 0.86))
+                ? max(Sizes.sidebar, min(360.0, box.maxWidth * 0.82))
                 : Sizes.sidebar;
             // The panel to the right: Sources, or the chat's browser or an app, wider and never
             // wider than the screen.
@@ -267,10 +269,14 @@ class AppShell extends StatelessWidget {
                             // drawer has closed.
                             if (screen.isPhone && !shell.settingsOpen)
                               const _PhoneUndo(),
-                            if (shell.upcomingOpen)
-                              const Positioned.fill(child: UpcomingPage()),
-                            if (shell.activityOpen)
-                              const Positioned.fill(child: ActivityPage()),
+                            if (shell.phonePage case final page?)
+                              Positioned.fill(
+                                child: switch (page) {
+                                  PhonePage.artifacts => const ArtifactsPage(),
+                                  PhonePage.upcoming => const UpcomingPage(),
+                                  PhonePage.activity => const ActivityPage(),
+                                },
+                              ),
                             // A phone's Settings is a page over the window.
                             if (shell.settingsOpen && screen.isPhone)
                               const Positioned.fill(
@@ -309,6 +315,16 @@ class AppShell extends StatelessWidget {
                                         child: WorkspaceSheetView(
                                           kind,
                                           key: ValueKey(kind),
+                                        ),
+                                      ),
+                                    if (popup case final CreatedSheetFor of)
+                                      Positioned.fill(
+                                        child: CreatedSheet(
+                                          of,
+                                          key: ValueKey((
+                                            of.file.id,
+                                            of.deleting,
+                                          )),
                                         ),
                                       ),
                                     if (popup case final ChatSheetFor of)

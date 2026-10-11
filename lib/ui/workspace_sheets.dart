@@ -6,8 +6,6 @@ import '../core/copy.dart';
 import 'app_scope.dart';
 import 'settings/rows.dart';
 import 'state/shell_controller.dart';
-import 'tokens.dart';
-import 'type.dart';
 import 'widgets/buttons.dart';
 import 'widgets/fields.dart';
 import 'widgets/sheet.dart';
@@ -101,39 +99,21 @@ class _WorkspaceSheetViewState extends State<WorkspaceSheetView> {
 
   Widget _delete(BuildContext context) {
     final chat = _scope.chat;
-    final t = Tokens.of(context);
     final active = chat.active;
     final chats = plural(
       chat.threadsOf(active?.slug ?? '').length,
       'chat',
       'chats',
     );
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 16,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Text(
-            'Delete ${active?.name} and its $chats? Its documents stay in the library.',
-            style: Type.sans(15.5, color: t.ink, height: 1.5),
-          ),
-        ),
-        ActionRow(even: true, [
-          AppButton('Keep', onPressed: _close),
-          AppButton(
-            'Delete',
-            danger: true,
-            onPressed: active == null || chat.answeringIn(active.slug)
-                ? null
-                : () {
-                    _close();
-                    unawaited(chat.deleteWorkspace(active.slug));
-                  },
-          ),
-        ]),
-      ],
+    return SheetQuestion(
+      'Delete ${active?.name} and its $chats? Its documents stay in the library.',
+      onKeep: _close,
+      onDelete: active == null || chat.answeringIn(active.slug)
+          ? null
+          : () {
+              _close();
+              unawaited(chat.deleteWorkspace(active.slug));
+            },
     );
   }
 }

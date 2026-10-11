@@ -255,8 +255,8 @@ class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
   }
 }
 
-/// A phone's switcher, the first row of its drawer: the open workspace, its documents and a
-/// chevron, which opens the Workspaces sheet.
+/// A phone's switcher, at the top of its drawer: the open workspace's name and a chevron, which
+/// open the Workspaces sheet. Its documents are heard, not shown.
 class PhoneWorkspaceSwitcher extends StatelessWidget {
   const PhoneWorkspaceSwitcher({super.key});
 
@@ -274,9 +274,12 @@ class PhoneWorkspaceSwitcher extends StatelessWidget {
         final elsewhere = chat.workspaces.any(
           (w) => w.slug != active?.slug && chat.readyIn(w.slug),
         );
+        final docs = count != null && count > 0
+            ? ', ${plural(count, 'doc', 'docs')}'
+            : '';
         final name = active == null
             ? 'Workspaces'
-            : 'Workspace: ${active.name}. Switch workspace';
+            : 'Workspace: ${active.name}$docs. Switch workspace';
         return PopupSheet(
           open: shell.menuOpen,
           onClose: () => shell.closePopup(Popup.workspaces),
@@ -290,40 +293,29 @@ class PhoneWorkspaceSwitcher extends StatelessWidget {
           child: Tappable(
             label: elsewhere ? '$name, an answer is ready in another' : name,
             expanded: shell.menuOpen,
+            radius: BorderRadius.circular(Sizes.control),
             onTap: () => shell.togglePopup(Popup.workspaces),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 64),
+              constraints: const BoxConstraints(minHeight: 44),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Row(
-                  spacing: 8,
+                  spacing: 6,
                   children: [
-                    Expanded(
-                      child: Row(
-                        spacing: 8,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              active?.name ?? 'No workspace yet',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Type.sans(
-                                19,
-                                weight: FontWeight.w600,
-                                color: active == null ? t.muted : t.ink,
-                              ),
-                            ),
-                          ),
-                          if (count != null && count > 0)
-                            Text(
-                              plural(count, 'doc', 'docs'),
-                              style: Type.sans(13, color: t.muted),
-                            ),
-                          if (elsewhere) const ReadyDot(),
-                        ],
+                    Flexible(
+                      child: Text(
+                        active?.name ?? 'No workspace yet',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Type.sans(
+                          17,
+                          weight: FontWeight.w600,
+                          color: active == null ? t.muted : t.ink,
+                        ),
                       ),
                     ),
-                    AppIcon('down', color: t.muted),
+                    AppIcon('down', size: IconSize.small, color: t.muted),
+                    if (elsewhere) const ReadyDot(),
                   ],
                 ),
               ),

@@ -1,6 +1,7 @@
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/activity.dart';
+import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -94,7 +95,7 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(h.shell.activityOpen, isFalse);
+    expect(h.shell.phonePage, isNull);
   });
 
   testWidgets('Stop ends a running answer and the row says Stopped', (
@@ -102,7 +103,7 @@ void main() {
   ) async {
     final llm = server();
     final h = await pumpApp(tester, llm: llm, size: phone);
-    h.shell.openActivity();
+    h.shell.openPhonePage(PhonePage.activity);
     await tester.pumpAndSettle();
     await tester.tap(control('Stop this answer'));
     await tester.pumpAndSettle();
@@ -114,7 +115,7 @@ void main() {
 
   testWidgets('a finished row opens its chat', (tester) async {
     final h = await pumpApp(tester, llm: server(), size: phone);
-    h.shell.openActivity();
+    h.shell.openPhonePage(PhonePage.activity);
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
@@ -123,7 +124,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(h.shell.activityOpen, isFalse);
+    expect(h.shell.phonePage, isNull);
     expect(h.chat.activeThread, 'budget');
   });
 
@@ -135,7 +136,7 @@ void main() {
         'This server has no everythingllm relay, so it keeps no list of answers.',
       );
     final h = await pumpApp(tester, llm: llm, size: phone);
-    h.shell.openActivity();
+    h.shell.openPhonePage(PhonePage.activity);
     await tester.pumpAndSettle();
     expect(find.textContaining('no everythingllm relay'), findsOneWidget);
     expect(find.text('RUNNING NOW'), findsNothing);
@@ -162,7 +163,7 @@ void main() {
         ),
       ];
     final h = await pumpApp(tester, llm: llm, size: const Size(360, 480));
-    h.shell.openActivity();
+    h.shell.openPhonePage(PhonePage.activity);
     await tester.pumpAndSettle();
     expect(find.byType(ActivityPage), findsOneWidget);
     expect(tester.takeException(), isNull);

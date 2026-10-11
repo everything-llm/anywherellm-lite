@@ -136,6 +136,10 @@ class CreatedList {
 
   /// Whether the workspace is past the size at which the host warns.
   bool get nearFull => warn > 0 && used >= warn;
+
+  /// How much is used, of the limit when the host gave one: `1.2 GB of 5.0 GB`.
+  String get usedText =>
+      limit > 0 ? '${sizeText(used)} of ${sizeText(limit)}' : sizeText(used);
 }
 
 /// What marks a file in the list, said only when it differs from a kept file: when a working
@@ -150,12 +154,12 @@ String? createdMark(CreatedFile file, DateTime now) => switch (file.area) {
   },
 };
 
-/// The line under a file's name: for a page `Page` and its address, which holds its folder;
-/// for any other file its size, then where it came from, the browser or its folder; then how
-/// long ago it changed.
-String createdMeta(CreatedFile file, DateTime now) => [
+/// The line under a file's name: for a page `Page` and its address, which holds its folder, or
+/// `Published page` alone without [address]; for any other file its size, then where it came
+/// from, the browser or its folder; then how long ago it changed.
+String createdMeta(CreatedFile file, DateTime now, {bool address = true}) => [
   if (file.isPage)
-    'Page · ${file.url!.replaceFirst(_scheme, '')}'
+    address ? 'Page · ${file.url!.replaceFirst(_scheme, '')}' : 'Published page'
   else ...[
     sizeText(file.size),
     if (file.fromBrowser)
@@ -167,6 +171,10 @@ String createdMeta(CreatedFile file, DateTime now) => [
 ].join(' · ');
 
 final _scheme = RegExp(r'^https?://');
+
+/// What is asked before [file] is deleted.
+String deleteCreatedQuestion(CreatedFile file) =>
+    'Delete ${file.name} from the workspace? It cannot be got back.';
 
 String _goes(Duration left) {
   if (left <= Duration.zero) return 'Goes soon';

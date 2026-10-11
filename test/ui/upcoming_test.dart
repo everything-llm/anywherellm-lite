@@ -1,6 +1,7 @@
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/ui/upcoming.dart';
+import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -45,7 +46,7 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(h.shell.upcomingOpen, isFalse);
+    expect(h.shell.phonePage, isNull);
   });
 
   testWidgets('without the password Upcoming says why and offers Connection', (
@@ -57,12 +58,12 @@ void main() {
         status: 401,
       );
     final h = await pumpApp(tester, llm: llm, size: phone);
-    h.shell.openUpcoming();
+    h.shell.openPhonePage(PhonePage.upcoming);
     await tester.pumpAndSettle();
     expect(find.textContaining('server password'), findsOneWidget);
     await tester.tap(control('Open Connection'));
     await tester.pumpAndSettle();
-    expect(h.shell.upcomingOpen, isFalse);
+    expect(h.shell.phonePage, isNull);
     expect(h.shell.settingsOpen, isTrue);
   });
 

@@ -179,6 +179,21 @@ void main() {
         'Page · host.example.ts.net:8447/q3/index.html · 2 h ago',
       );
     });
+
+    test('names a web page alone where there is no room for its address', () {
+      expect(
+        createdMeta(
+          file(
+            'public',
+            name: 'index.html',
+            url: 'https://host.example.ts.net:8447/q3/index.html',
+          ),
+          now,
+          address: false,
+        ),
+        'Published page · 2 h ago',
+      );
+    });
   });
 
   test(

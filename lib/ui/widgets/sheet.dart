@@ -383,3 +383,38 @@ class ModalSheet extends StatelessWidget {
     ),
   );
 }
+
+/// A sheet's question before something is deleted: [question], then Keep, which calls [onKeep],
+/// and Delete, which calls [onDelete] and is off while [onDelete] is null, side by side.
+class SheetQuestion extends StatelessWidget {
+  const SheetQuestion(
+    this.question, {
+    super.key,
+    required this.onKeep,
+    required this.onDelete,
+  });
+
+  final String question;
+  final VoidCallback onKeep;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    spacing: 16,
+    children: [
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Text(
+          question,
+          style: Type.sans(15.5, color: Tokens.of(context).ink, height: 1.5),
+        ),
+      ),
+      ActionRow(even: true, [
+        AppButton('Keep', onPressed: onKeep),
+        AppButton('Delete', danger: true, onPressed: onDelete),
+      ]),
+    ],
+  );
+}

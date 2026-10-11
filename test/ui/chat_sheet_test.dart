@@ -82,12 +82,12 @@ void main() {
   });
 
   testWidgets(
-    "the drawer's cards lead to the workspace, the chats and the app",
+    "the drawer's rows lead to the workspace, the chats and the app",
     (tester) async {
       final h = await pumpApp(tester, llm: planningServer(), size: _phone);
       h.shell.toggleSide();
       await tester.pumpAndSettle();
-      expect(find.text('All workspaces'), findsOneWidget);
+      expect(find.text('Chats'), findsOneWidget);
       expect(control('Activity'), findsOneWidget);
       // A chat's More opens its sheet, and closes the drawer.
       await tester.tap(control('Rename, pin or delete Budget questions'));
@@ -103,7 +103,7 @@ void main() {
       expect(h.shell.pane.name, 'files');
       h.shell.toggleSide();
       await tester.pumpAndSettle();
-      await tester.tap(control('App settings'));
+      await tester.tap(control('Settings'));
       await tester.pumpAndSettle();
       expect(h.shell.settingsOpen, isTrue);
     },

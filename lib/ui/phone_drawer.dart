@@ -5,6 +5,7 @@ import '../core/copy.dart';
 import '../core/find.dart';
 import '../core/server_models.dart';
 import 'activity.dart';
+import 'artifacts.dart';
 import 'app_scope.dart';
 import 'icons.dart';
 import 'layout.dart';
@@ -15,17 +16,23 @@ import 'upcoming.dart';
 import 'widgets/basics.dart';
 import 'widgets/buttons.dart';
 import 'widgets/drawer_row.dart';
+import 'widgets/min_height.dart';
 import 'widgets/tappable.dart';
 import 'workspace_switcher.dart';
 
-/// A phone's drawer, in cards as the design canvas draws it: the workspace switcher and
-/// Workspace settings; New chat, the search and the open workspace's chats, each with a More
-/// button that opens its sheet; then, under All workspaces, Activity, Upcoming and App
-/// settings. The whole drawer scrolls.
+/// A phone's drawer, in flat rows on its ground as the design canvas draws it: the workspace
+/// switcher beside Workspace settings; the search, New chat, Artifacts and the open workspace's
+/// chats under Chats, each with a More button that opens its sheet; then, under a hairline, Activity,
+/// Upcoming and Settings. Only the chats scroll, unless the drawer is shorter than
+/// [minHeight].
 class PhoneDrawer extends StatefulWidget {
   const PhoneDrawer({super.key, required this.width});
 
   final double width;
+
+  /// The least height the drawer is laid out at, room for its fixed rows and a few chats;
+  /// shorter, it scrolls whole. A fixed row added to the drawer needs it raised.
+  static const minHeight = 480.0;
 
   @override
   State<PhoneDrawer> createState() => _PhoneDrawerState();
@@ -62,94 +69,107 @@ class _PhoneDrawerState extends State<PhoneDrawer> {
       child: Container(
         width: widget.width,
         color: t.side,
-        child: ListenableBuilder(
-          listenable: Listenable.merge([
-            chat,
-            scope.prefs,
-            scope.settings,
-            _query,
-          ]),
-          builder: (context, _) {
-            final query = _query.value;
-            final searching = query.isNotEmpty;
-            final active = chat.active;
-            return ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
-                  child: Text(
-                    'AnywhereLLM',
-                    style: Type.sans(19, weight: FontWeight.w700, color: t.ink),
-                  ),
-                ),
-                DrawerCard([
-                  const PhoneWorkspaceSwitcher(),
-                  if (active != null)
-                    DrawerRow(
-                      icon: 'settings',
-                      title: 'Workspace settings',
-                      heard: 'Workspace settings',
-                      trailing: AppIcon(
-                        'chevron',
-                        size: IconSize.xs,
-                        color: t.muted,
+        child: MinHeight(
+          min: PhoneDrawer.minHeight,
+          child: ListenableBuilder(
+            listenable: Listenable.merge([
+              chat,
+              scope.prefs,
+              scope.settings,
+              _query,
+            ]),
+            builder: (context, _) {
+              final query = _query.value;
+              final searching = query.isNotEmpty;
+              final active = chat.active;
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  spacing: 2,
+                  children: [
+                    SizedBox(
+                      height: 52,
+                      child: Row(
+                        children: [
+                          const Expanded(child: PhoneWorkspaceSwitcher()),
+                          if (active != null)
+                            IconBtn(
+                              'settings',
+                              tooltip: 'Workspace settings',
+                              box: 44,
+                              onPressed: () {
+                                shell
+                                  ..closeSide()
+                                  ..showPane(Pane.files);
+                              },
+                            ),
+                        ],
                       ),
-                      onTap: () {
-                        shell
-                          ..closeSide()
-                          ..showPane(Pane.files);
-                      },
                     ),
-                ]),
-                const SizedBox(height: 14),
-                DrawerCard([
-                  if (!searching && active != null)
-                    DrawerRow(
-                      icon: 'plus',
-                      title: 'New chat',
-                      heard: 'New chat',
-                      accent: true,
-                      onTap: () {
-                        chat.newChat();
-                        shell.closeSide();
-                      },
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2, bottom: 6),
+                      child: _Search(_search, focus: shell.searchFocus),
                     ),
-                  _Search(_search, focus: shell.searchFocus),
-                  ...searching ? _found(context, query) : _chats(context),
-                ]),
-                const SizedBox(height: 14),
-                if (scope.settings.configured) ...[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
-                    child: Semantics(
-                      header: true,
-                      child: Text(
-                        'All workspaces',
-                        style: Type.sans(
-                          12,
-                          weight: FontWeight.w500,
-                          color: t.muted,
+                    if (!searching && active != null) ...[
+                      DrawerRow(
+                        icon: 'plus',
+                        title: 'New chat',
+                        heard: 'New chat',
+                        iconSize: IconSize.small,
+                        onTap: () {
+                          chat.newChat();
+                          shell.closeSide();
+                        },
+                      ),
+                      if (scope.settings.configured) const ArtifactsRow(),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 14, 12, 4),
+                        child: Semantics(
+                          header: true,
+                          child: Text(
+                            'Chats',
+                            style: Type.sans(12.5, color: t.muted),
+                          ),
                         ),
                       ),
+                    ],
+                    Expanded(
+                      child: ListView(
+                        padding: EdgeInsets.zero,
+                        children: searching
+                            ? _found(context, query)
+                            : _chats(context),
+                      ),
                     ),
-                  ),
-                ],
-                DrawerCard([
-                  if (scope.settings.configured) ...const [
-                    ActivityRow(),
-                    UpcomingRow(),
+                    Container(
+                      margin: const EdgeInsets.only(top: 6),
+                      padding: const EdgeInsets.only(top: 6),
+                      decoration: BoxDecoration(
+                        border: Border(top: BorderSide(color: t.line)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        spacing: 2,
+                        children: [
+                          if (scope.settings.configured) ...const [
+                            ActivityRow(),
+                            UpcomingRow(),
+                          ],
+                          DrawerRow(
+                            icon: 'settings',
+                            title: 'Settings',
+                            heard: 'Settings',
+                            onTap: () => shell.openSettings(),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
-                  DrawerRow(
-                    icon: 'settings',
-                    title: 'App settings',
-                    heard: 'App settings',
-                    onTap: () => shell.openSettings(),
-                  ),
-                ]),
-              ],
-            );
-          },
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
@@ -189,7 +209,7 @@ class _PhoneDrawerState extends State<PhoneDrawer> {
           padding: const EdgeInsets.all(12),
           child: Text(
             'Nothing matches "$query".',
-            style: Type.sans(15, color: t.muted),
+            style: Type.sans(15.5, color: t.muted),
           ),
         ),
       ];
@@ -208,38 +228,7 @@ class _PhoneDrawerState extends State<PhoneDrawer> {
   }
 }
 
-/// A card of a phone's drawer: its [rows] on the panel, a hairline between each.
-class DrawerCard extends StatelessWidget {
-  const DrawerCard(this.rows, {super.key});
-
-  final List<Widget> rows;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    if (rows.isEmpty) return const SizedBox.shrink();
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        color: t.panel,
-        border: Border.all(color: t.line2),
-        borderRadius: BorderRadius.circular(Sizes.phoneCard),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final (i, row) in rows.indexed) ...[
-            if (i > 0) Divider(height: 1, thickness: 1, color: t.line2),
-            row,
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// The search, as a row of the drawer's card.
+/// The search: a filled row of the drawer.
 class _Search extends StatelessWidget {
   const _Search(this.controller, {required this.focus});
 
@@ -250,43 +239,45 @@ class _Search extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final searching = controller.text.isNotEmpty;
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 56),
-      child: Padding(
-        padding: const EdgeInsets.only(left: 12),
-        child: Row(
-          spacing: 16,
-          children: [
-            AppIcon('search', color: t.muted),
-            Expanded(
-              child: Semantics(
-                label: 'Search workspaces and chats',
-                textField: true,
-                child: TextField(
-                  controller: controller,
-                  focusNode: focus,
-                  autocorrect: false,
-                  style: Type.sans(17, color: t.ink),
-                  cursorColor: t.accent,
-                  decoration: InputDecoration(
-                    isCollapsed: true,
-                    border: InputBorder.none,
-                    hintText: 'Search chats',
-                    hintStyle: Type.sans(17, color: t.muted),
-                  ),
+    return Container(
+      constraints: const BoxConstraints(minHeight: 44),
+      padding: EdgeInsets.only(left: 12, right: searching ? 0 : 12),
+      decoration: BoxDecoration(
+        color: t.hover,
+        borderRadius: BorderRadius.circular(Sizes.control),
+      ),
+      child: Row(
+        spacing: 10,
+        children: [
+          AppIcon('search', size: IconSize.small, color: t.muted),
+          Expanded(
+            child: Semantics(
+              label: 'Search workspaces and chats',
+              textField: true,
+              child: TextField(
+                controller: controller,
+                focusNode: focus,
+                autocorrect: false,
+                style: Type.sans(15.5, color: t.ink),
+                cursorColor: t.accent,
+                decoration: InputDecoration(
+                  isCollapsed: true,
+                  border: InputBorder.none,
+                  hintText: 'Search chats',
+                  hintStyle: Type.sans(15.5, color: t.muted),
                 ),
               ),
             ),
-            if (searching)
-              IconBtn(
-                'close',
-                tooltip: 'Clear search',
-                box: 44,
-                size: IconSize.xs,
-                onPressed: controller.clear,
-              ),
-          ],
-        ),
+          ),
+          if (searching)
+            IconBtn(
+              'close',
+              tooltip: 'Clear search',
+              box: 44,
+              size: IconSize.xs,
+              onPressed: controller.clear,
+            ),
+        ],
       ),
     );
   }
@@ -301,40 +292,21 @@ class _FoundWorkspace extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chat = AppScope.of(context).chat;
-    final t = Tokens.of(context);
     final active = chat.activeSlug == workspace.slug;
     final count = chat.docCounts[workspace.slug];
-    return Tappable(
-      label: workspace.name,
+    return DrawerRow(
+      icon: 'chat',
+      title: workspace.name,
+      heard: workspace.name,
+      iconSize: IconSize.small,
       selected: active,
+      strong: true,
+      trailing: count != null && count > 0
+          ? DrawerCount(plural(count, 'doc', 'docs'))
+          : null,
       onTap: () {
         if (!active) chat.select(workspace.slug);
       },
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 56),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Row(
-            spacing: 16,
-            children: [
-              AppIcon('chat', color: t.muted),
-              Expanded(
-                child: Text(
-                  workspace.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Type.sans(17, weight: FontWeight.w600, color: t.ink),
-                ),
-              ),
-              if (count != null && count > 0)
-                Text(
-                  plural(count, 'doc', 'docs'),
-                  style: Type.sans(13, color: t.muted),
-                ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -356,8 +328,12 @@ class _ChatRow extends StatelessWidget {
     final current =
         chat.activeSlug == workspace && chat.activeThread == thread.slug;
     final ready = chat.isReady(thread.slug);
-    return ColoredBox(
-      color: current ? t.sel : Colors.transparent,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 2),
+      decoration: BoxDecoration(
+        color: current ? t.sel : null,
+        borderRadius: BorderRadius.circular(Sizes.control),
+      ),
       child: Row(
         children: [
           Expanded(
@@ -368,6 +344,7 @@ class _ChatRow extends StatelessWidget {
                 if (ready) 'answer ready',
               ].join(', '),
               selected: current,
+              radius: BorderRadius.circular(Sizes.control),
               onTap: () async {
                 scope.shell.closeSide();
                 if (chat.activeSlug != workspace) {
@@ -377,11 +354,11 @@ class _ChatRow extends StatelessWidget {
                 }
               },
               child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 56),
+                constraints: const BoxConstraints(minHeight: 44),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Row(
-                    spacing: 8,
+                    spacing: 6,
                     children: [
                       Flexible(
                         child: Text(
@@ -389,14 +366,14 @@ class _ChatRow extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: Type.sans(
-                            17,
+                            15.5,
                             weight: current ? FontWeight.w600 : FontWeight.w400,
                             color: t.ink,
                           ),
                         ),
                       ),
                       if (pinned)
-                        AppIcon('pin', size: IconSize.small, color: t.muted),
+                        AppIcon('pin', size: IconSize.xs, color: t.muted),
                       if (ready) const ReadyDot(),
                     ],
                   ),
