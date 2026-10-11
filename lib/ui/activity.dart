@@ -63,17 +63,7 @@ class _ActivityRowState extends State<ActivityRow> {
           heard: running == 0 ? 'Activity' : 'Activity, $running running',
           trailing: running == 0
               ? null
-              : Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  decoration: BoxDecoration(
-                    color: t.accentbg,
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                  child: Text(
-                    '$running running',
-                    style: Type.sans(12, color: t.accent, height: 1.5),
-                  ),
-                ),
+              : Text('$running running', style: Type.sans(13, color: t.muted)),
           onTap: () {
             scope.shell
               ..closeSide()

@@ -15,13 +15,16 @@ import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/upload.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
+import 'package:anywherellm/ui/files/workspace_pages.dart';
+import 'package:anywherellm/ui/phone_drawer.dart';
 import 'package:anywherellm/ui/quick_switcher.dart';
 import 'package:anywherellm/ui/sidebar.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/drop_zone.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
-import 'package:flutter/material.dart' show EditableText, SingleChildScrollView;
+import 'package:flutter/material.dart'
+    show EditableText, Scrollable, SingleChildScrollView;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 
@@ -316,6 +319,31 @@ void main() {
 
     testWidgets('renaming and deleting a workspace fit at $at', (tester) async {
       final h = await pumpApp(tester, llm: awkward(), size: size);
+      if (size.width < 720) {
+        // A phone renames and deletes from the workspace's settings, in sheets.
+        h.shell.showPane(Pane.files);
+        await tester.pumpAndSettle();
+        await tester.tap(control('Rename'));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          control('Delete workspace'),
+          200,
+          scrollable: find
+              .descendant(
+                of: find.byType(WorkspacePages),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.tap(control('Delete workspace'));
+        await tester.pumpAndSettle();
+        expect(control('Keep'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        return;
+      }
       h.shell.toggleSide();
       await tester.pumpAndSettle();
       await tester.tap(switcher);
@@ -609,7 +637,9 @@ void main() {
         ..openSources();
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      final top = tester.getTopLeft(find.byType(Sidebar)).dy;
+      final top = tester
+          .getTopLeft(find.byType(size.width < 720 ? PhoneDrawer : Sidebar))
+          .dy;
       expect(top, greaterThanOrEqualTo(24));
     });
   }

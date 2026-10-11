@@ -80,4 +80,49 @@ void main() {
     expect(h.shell.chatSheet, isNull);
     expect(h.shell.pane.name, 'files');
   });
+
+  testWidgets(
+    "the drawer's cards lead to the workspace, the chats and the app",
+    (tester) async {
+      final h = await pumpApp(tester, llm: planningServer(), size: _phone);
+      h.shell.toggleSide();
+      await tester.pumpAndSettle();
+      expect(find.text('All workspaces'), findsOneWidget);
+      expect(control('Activity'), findsOneWidget);
+      // A chat's More opens its sheet, and closes the drawer.
+      await tester.tap(control('Rename, pin or delete Budget questions'));
+      await tester.pumpAndSettle();
+      expect(h.shell.chatSheet?.thread.slug, 'budget');
+      expect(h.shell.sideOpen, isFalse);
+      h.shell
+        ..closePopup()
+        ..toggleSide();
+      await tester.pumpAndSettle();
+      await tester.tap(control('Workspace settings'));
+      await tester.pumpAndSettle();
+      expect(h.shell.pane.name, 'files');
+      h.shell.toggleSide();
+      await tester.pumpAndSettle();
+      await tester.tap(control('App settings'));
+      await tester.pumpAndSettle();
+      expect(h.shell.settingsOpen, isTrue);
+    },
+  );
+
+  testWidgets('a chat deleted from its sheet can be put back over the chat', (
+    tester,
+  ) async {
+    final h = await pumpApp(tester, llm: planningServer(), size: _phone);
+    final thread = h.chat.activeThread!;
+    await _openSheet(tester);
+    await tester.tap(control('Delete chat'));
+    await tester.pumpAndSettle();
+    await tester.tap(control('Delete'));
+    await tester.pumpAndSettle();
+    expect(find.text('Chat deleted'), findsOneWidget);
+    await tester.tap(control('Undo'));
+    await tester.pumpAndSettle();
+    expect(h.chat.threadsOf('q3').map((t) => t.slug), contains(thread));
+    expect(find.text('Chat deleted'), findsNothing);
+  });
 }

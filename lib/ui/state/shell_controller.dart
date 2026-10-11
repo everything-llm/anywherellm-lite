@@ -38,6 +38,10 @@ class ChatSheetFor {
   final bool deleting;
 }
 
+/// A phone's sheet about the open workspace: a new workspace's name, the open one's new name,
+/// or whether to delete it.
+enum WorkspaceSheet { create, rename, delete }
+
 /// A popup over the window or a part of it, at most one open at a time: the sidebar's workspace
 /// menu, the Ctrl+K switcher, the composer's Answer from menu, or a phone's Attach sheet. An
 /// answer's More menu is keyed by its [Turn] instead.

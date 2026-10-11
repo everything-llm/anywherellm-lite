@@ -5,6 +5,8 @@ import 'package:anywherellm/ui/sidebar.dart';
 import 'package:anywherellm/ui/widgets/robin_mark.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/foundation.dart';
+import 'package:anywherellm/ui/widgets/sheet.dart';
+import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -151,22 +153,42 @@ void main() {
       }
     });
 
-    testWidgets("a phone's sheet puts New workspace before Delete", (
-      tester,
-    ) async {
-      final h = await pumpApp(
-        tester,
-        llm: planningServer(),
-        size: const Size(390, 844),
-      );
-      h.shell.toggleSide();
-      await tester.pumpAndSettle();
-      await tester.tap(switcher);
-      await tester.pumpAndSettle();
-      double top(String label) => tester.getTopLeft(control(label).last).dy;
-      expect(top('Rename workspace'), lessThan(top('New workspace')));
-      expect(top('New workspace'), lessThan(top('Delete workspace…')));
-    });
+    testWidgets(
+      "a phone's sheet lists the workspaces and makes a new one by name",
+      (tester) async {
+        final h = await pumpApp(
+          tester,
+          llm: planningServer(),
+          size: const Size(390, 844),
+        );
+        h.shell.toggleSide();
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byWidgetPredicate(
+            (w) =>
+                w is Tappable &&
+                w.label == 'Workspace: Q3 planning. Switch workspace',
+          ),
+        );
+        await tester.pumpAndSettle();
+        // Rename and Delete are in the workspace's settings.
+        expect(control('Rename workspace'), findsNothing);
+        expect(control('Delete workspace…'), findsNothing);
+        await tester.tap(control('New workspace').last);
+        await tester.pumpAndSettle();
+        expect(h.shell.popup.value, WorkspaceSheet.create);
+        await tester.enterText(
+          find.descendant(
+            of: find.byType(SheetFrame),
+            matching: find.byType(TextField),
+          ),
+          'Garden',
+        );
+        await tester.tap(control('Create'));
+        await tester.pumpAndSettle();
+        expect(h.chat.workspaces.map((w) => w.name), contains('Garden'));
+      },
+    );
 
     testWidgets('picking a workspace opens it and closes the menu', (
       tester,

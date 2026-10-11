@@ -19,12 +19,15 @@ import 'quick_switcher.dart';
 import 'settings/settings_dialog.dart';
 import 'share/share_sheet.dart';
 import 'share/shared_item.dart';
+import 'phone_drawer.dart';
 import 'sidebar.dart';
+import 'workspace_sheets.dart';
 import 'sources/sources_panel.dart';
 import 'activity.dart';
 import 'upcoming.dart';
 import 'state/shell_controller.dart';
 import 'tokens.dart';
+import 'widgets/basics.dart';
 import 'widgets/rise.dart';
 
 /// Ctrl and these open the workspaces in the sidebar's order.
@@ -126,7 +129,7 @@ class AppShell extends StatelessWidget {
             final sheetOpen = sheet && shell.rightOpen;
             // A phone's drawer is wider, leaving the chat a strip to tap to close it.
             final drawerWidth = screen.isPhone
-                ? max(Sizes.sidebar, min(320.0, box.maxWidth - 40))
+                ? max(Sizes.sidebar, min(360.0, box.maxWidth * 0.86))
                 : Sizes.sidebar;
             // The panel to the right: Sources, or the chat's browser or an app, wider and never
             // wider than the screen.
@@ -241,7 +244,9 @@ class AppShell extends StatelessWidget {
                                 left: true,
                                 width: drawerWidth,
                                 duration: duration,
-                                child: Sidebar(width: drawerWidth),
+                                child: screen.isPhone
+                                    ? PhoneDrawer(width: drawerWidth)
+                                    : Sidebar(width: drawerWidth),
                               ),
                             if (!sourcesInline && !sheet)
                               _Drawer(
@@ -253,6 +258,10 @@ class AppShell extends StatelessWidget {
                               ),
                             // The sheet's own scrim closes it.
                             if (sheetOpen) Positioned.fill(child: right),
+                            // A phone puts back a deleted chat from over the chat, as its
+                            // drawer has closed.
+                            if (screen.isPhone && !shell.settingsOpen)
+                              const _PhoneUndo(),
                             if (shell.upcomingOpen)
                               const Positioned.fill(child: UpcomingPage()),
                             if (shell.activityOpen)
@@ -290,6 +299,13 @@ class AppShell extends StatelessWidget {
                                           key: ObjectKey(open),
                                         ),
                                       ),
+                                    if (popup case final WorkspaceSheet kind)
+                                      Positioned.fill(
+                                        child: WorkspaceSheetView(
+                                          kind,
+                                          key: ValueKey(kind),
+                                        ),
+                                      ),
                                     if (popup case final ChatSheetFor of)
                                       Positioned.fill(
                                         child: ChatSheet(
@@ -325,6 +341,31 @@ class AppShell extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+/// Undo for a chat just deleted, over a phone's chat, while it can be put back.
+class _PhoneUndo extends StatelessWidget {
+  const _PhoneUndo();
+
+  @override
+  Widget build(BuildContext context) {
+    final chat = AppScope.of(context).chat;
+    return ListenableBuilder(
+      listenable: chat,
+      builder: (context, _) => chat.deletedChat == null
+          ? const SizedBox.shrink()
+          : Positioned(
+              left: 20,
+              right: 20,
+              bottom: 96,
+              child: UndoBar(
+                'Chat deleted',
+                onUndo: chat.undoDelete,
+                floating: true,
+              ),
+            ),
     );
   }
 }

@@ -5,8 +5,8 @@ import '../tokens.dart';
 import '../type.dart';
 import 'tappable.dart';
 
-/// A row of a phone's drawer that opens a page: an icon, [title] and, at the end, [trailing].
-/// A screen reader hears [heard].
+/// A row of a phone's drawer, in one of its cards: an icon, [title] and, at the end, [trailing].
+/// A screen reader hears [heard]. [accent] draws it in the accent, as New chat is.
 class DrawerRow extends StatelessWidget {
   const DrawerRow({
     super.key,
@@ -15,6 +15,7 @@ class DrawerRow extends StatelessWidget {
     required this.heard,
     required this.onTap,
     this.trailing,
+    this.accent = false,
   });
 
   final String icon;
@@ -22,6 +23,7 @@ class DrawerRow extends StatelessWidget {
   final String heard;
   final VoidCallback onTap;
   final Widget? trailing;
+  final bool accent;
 
   @override
   Widget build(BuildContext context) {
@@ -29,19 +31,22 @@ class DrawerRow extends StatelessWidget {
     return Tappable(
       label: heard,
       onTap: onTap,
-      radius: BorderRadius.circular(10),
-      child: SizedBox(
-        height: 44,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
+            spacing: 16,
             children: [
-              AppIcon(icon, size: IconSize.small, color: t.ink2),
-              const SizedBox(width: 10),
+              AppIcon(icon, color: accent ? t.accent : t.ink2),
               Expanded(
                 child: Text(
                   title,
-                  style: Type.sans(15, weight: FontWeight.w500, color: t.ink),
+                  style: Type.sans(
+                    17,
+                    weight: accent ? FontWeight.w600 : FontWeight.w400,
+                    color: accent ? t.accent : t.ink,
+                  ),
                 ),
               ),
               ?trailing,

@@ -54,7 +54,7 @@ class _UpcomingRowState extends State<UpcomingRow> {
           heard: count == null ? 'Upcoming' : 'Upcoming, $count',
           trailing: count == null
               ? null
-              : Text(count, style: Type.sans(12.5, color: t.muted)),
+              : Text(count, style: Type.sans(13, color: t.muted)),
           onTap: () {
             scope.shell
               ..closeSide()

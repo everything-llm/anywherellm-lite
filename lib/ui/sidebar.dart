@@ -20,11 +20,10 @@ import 'widgets/menu.dart';
 import 'widgets/min_height.dart';
 import 'widgets/settings_button.dart';
 import 'widgets/tappable.dart';
-import 'activity.dart';
-import 'upcoming.dart';
 import 'workspace_switcher.dart';
 
-/// The open workspace's switcher, its chats or the server's files, and the way to Settings.
+/// The open workspace's switcher, its chats or the server's files, and the way to Settings, in
+/// the layout or a tablet's drawer. A phone has its own drawer ([PhoneDrawer]).
 class Sidebar extends StatefulWidget {
   const Sidebar({super.key, this.width = Sizes.sidebar});
 
@@ -59,8 +58,7 @@ class _SidebarState extends State<Sidebar> {
       container: true,
       label: 'Workspaces',
       child: MinHeight(
-        // A phone's drawer has Activity and Upcoming too, a row of 44 px each.
-        min: Sizes.panelMin + (phone ? 44 : 0),
+        min: Sizes.panelMin,
         child: Container(
           width: widget.width,
           padding: const EdgeInsets.fromLTRB(12, 18, 12, 12),
@@ -217,13 +215,6 @@ class _ChatsState extends State<_Chats> {
                     : null,
               ),
             ),
-            // A phone's drawer also has what the relay is answering and the server's scheduled jobs.
-            if (!searching &&
-                ScreenClass.ofContext(context).isPhone &&
-                scope.settings.configured) ...const [
-              ActivityRow(),
-              UpcomingRow(),
-            ],
             Expanded(
               child: searching ? _found(context, query) : _groups(context),
             ),

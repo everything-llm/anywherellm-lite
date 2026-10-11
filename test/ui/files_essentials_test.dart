@@ -289,15 +289,21 @@ void main() {
       expect(pages, findsOneWidget);
       expect(find.byType(FileTree), findsNothing);
       Finder inPages(Finder f) => find.descendant(of: pages, matching: f);
+      expect(inPages(find.text('Workspace')), findsOneWidget);
       expect(inPages(find.text('Q3 planning')), findsOneWidget);
-      expect(inPages(find.textContaining('used in answers')), findsOneWidget);
+      expect(inPages(find.text('2 chats')), findsOneWidget);
+      expect(
+        inPages(find.text('2 documents, 2 used in answers')),
+        findsOneWidget,
+      );
+      expect(inPages(find.text('2 of 2 used in answers')), findsOneWidget);
       expect(
         inPages(
           find.text('Created files and the file tree are in the desktop app.'),
         ),
         findsOneWidget,
       );
-      await tester.tap(inPages(find.text('Answer settings')));
+      await tester.tap(inPages(find.text('Answer from')));
       await tester.pumpAndSettle();
       expect(h.shell.workspacePage, FilesSection.answers);
       // Three settings only, in the composer's words.

@@ -49,9 +49,13 @@ class AppField extends StatelessWidget {
     this.autofillHints,
     this.maxLines = 1,
     this.focusNode,
+    this.autofocus = false,
   });
 
   final TextEditingController controller;
+
+  /// Whether the field takes the focus when it first shows.
+  final bool autofocus;
 
   /// The field's focus, for something else to move to it, or null for its own.
   final FocusNode? focusNode;
@@ -100,6 +104,7 @@ class AppField extends StatelessWidget {
       textField: true,
       child: TextField(
         focusNode: focusNode,
+        autofocus: autofocus,
         controller: controller,
         autocorrect: false,
         // Flutter on Android marks a field without suggestions as a visible password, which

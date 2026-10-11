@@ -108,21 +108,42 @@ class ReadyDot extends StatelessWidget {
 /// A dark bar saying what was just done, with Undo, as after a file is removed or a chat is
 /// deleted.
 class UndoBar extends StatelessWidget {
-  const UndoBar(this.text, {super.key, required this.onUndo});
+  const UndoBar(
+    this.text, {
+    super.key,
+    required this.onUndo,
+    this.floating = false,
+  });
 
   final String text;
   final VoidCallback onUndo;
 
+  /// Over a phone's chat: rounder, its words at 14 and centred, Undo bold and underlined.
+  final bool floating;
+
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    final size = floating ? 14.0 : 13.0;
     return Semantics(
       liveRegion: true,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+        padding: floating
+            ? const EdgeInsets.fromLTRB(16, 6, 8, 6)
+            : const EdgeInsets.fromLTRB(12, 4, 4, 4),
         decoration: BoxDecoration(
           color: t.ink,
-          borderRadius: BorderRadius.circular(Sizes.control),
+          borderRadius: BorderRadius.circular(floating ? 16 : Sizes.control),
+          boxShadow: floating
+              ? [
+                  BoxShadow(
+                    color: t.shadow,
+                    blurRadius: 24,
+                    spreadRadius: -8,
+                    offset: const Offset(0, 8),
+                  ),
+                ]
+              : null,
         ),
         child: Row(
           children: [
@@ -131,7 +152,8 @@ class UndoBar extends StatelessWidget {
                 text,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Type.sans(13, color: t.bg),
+                textAlign: floating ? TextAlign.center : TextAlign.start,
+                style: Type.sans(size, color: t.bg),
               ),
             ),
             Tappable(
@@ -146,7 +168,15 @@ class UndoBar extends StatelessWidget {
                 ),
                 child: Text(
                   'Undo',
-                  style: Type.sans(13, weight: FontWeight.w600, color: t.bg),
+                  style:
+                      Type.sans(
+                        size,
+                        weight: floating ? FontWeight.w700 : FontWeight.w600,
+                        color: t.bg,
+                      ).copyWith(
+                        decoration: floating ? TextDecoration.underline : null,
+                        decorationColor: t.bg,
+                      ),
                 ),
               ),
             ),

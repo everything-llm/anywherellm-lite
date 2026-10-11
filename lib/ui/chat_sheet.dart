@@ -147,9 +147,11 @@ class _ChatSheetState extends State<ChatSheet> {
                       spacing: 16,
                       children: [
                         AppIcon('trash', color: t.badfg),
-                        Text(
-                          'Delete chat',
-                          style: Type.sans(17, color: t.badfg),
+                        Flexible(
+                          child: Text(
+                            'Delete chat',
+                            style: Type.sans(17, color: t.badfg),
+                          ),
                         ),
                       ],
                     ),

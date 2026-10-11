@@ -10,6 +10,7 @@ import 'state/chat_controller.dart';
 import 'state/shell_controller.dart';
 import 'tokens.dart';
 import 'type.dart';
+import 'settings/rows.dart';
 import 'widgets/basics.dart';
 import 'widgets/confirm_box.dart';
 import 'widgets/inline_input.dart';
@@ -183,22 +184,6 @@ class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
               onCancel: ask.reset,
               commitOnBlur: true,
             )
-          : ScreenClass.ofContext(context).isPhone
-          // A phone's menu is a sheet over the window.
-          ? PopupSheet(
-              open: _shell.menuOpen,
-              onClose: () => _shell.closePopup(Popup.workspaces),
-              title: 'Workspaces',
-              sheet: (context) => SingleChildScrollView(
-                child: _WorkspaceMenu(
-                  sheet: true,
-                  onRename: () => ask.ask(Asking.rename),
-                  onDelete: () => ask.ask(Asking.delete),
-                  onCreate: () => ask.ask(Asking.create),
-                ),
-              ),
-              child: _button(context),
-            )
           : PopupAnchor(
               open: _shell.menuOpen,
               onClose: () => _shell.closePopup(Popup.workspaces),
@@ -277,9 +262,86 @@ class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
   }
 }
 
+/// A phone's switcher, the first row of its drawer: the open workspace, its documents and a
+/// chevron, which opens the Workspaces sheet.
+class PhoneWorkspaceSwitcher extends StatelessWidget {
+  const PhoneWorkspaceSwitcher({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final chat = scope.chat;
+    final shell = scope.shell;
+    final t = Tokens.of(context);
+    return ListenableBuilder(
+      listenable: Listenable.merge([chat, scope.prefs, shell.popup]),
+      builder: (context, _) {
+        final active = chat.active;
+        final count = active == null ? null : chat.docCounts[active.slug];
+        final elsewhere = chat.workspaces.any(
+          (w) => w.slug != active?.slug && chat.readyIn(w.slug),
+        );
+        final name = active == null
+            ? 'Workspaces'
+            : 'Workspace: ${active.name}. Switch workspace';
+        return PopupSheet(
+          open: shell.menuOpen,
+          onClose: () => shell.closePopup(Popup.workspaces),
+          title: 'Workspaces',
+          sheet: (context) => SingleChildScrollView(
+            child: _WorkspaceMenu(
+              sheet: true,
+              onRename: () {},
+              onDelete: () {},
+              onCreate: () => shell.togglePopup(WorkspaceSheet.create),
+            ),
+          ),
+          child: Tappable(
+            label: elsewhere ? '$name, an answer is ready in another' : name,
+            expanded: shell.menuOpen,
+            onTap: () => shell.togglePopup(Popup.workspaces),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 64),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  spacing: 8,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        active?.name ?? 'No workspace yet',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Type.sans(
+                          19,
+                          weight: FontWeight.w600,
+                          color: active == null ? t.muted : t.ink,
+                        ),
+                      ),
+                    ),
+                    if (count != null && count > 0)
+                      Text(
+                        plural(count, 'doc', 'docs'),
+                        style: Type.sans(13, color: t.muted),
+                      ),
+                    if (elsewhere) const ReadyDot(),
+                    const Spacer(),
+                    AppIcon('down', color: t.muted),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// The workspaces, to open one or drag it to another place, then Files and settings, Rename,
-/// Delete and New workspace. In a phone's [sheet] each workspace says how many documents it
-/// has, and Files and settings is named for the workspace's pages.
+/// Delete and New workspace. In a phone's [sheet], the workspaces in one card, each with how
+/// many documents it has, and New workspace in another: the rest is in the workspace's
+/// settings.
 class _WorkspaceMenu extends StatelessWidget {
   const _WorkspaceMenu({
     required this.onRename,
@@ -298,6 +360,7 @@ class _WorkspaceMenu extends StatelessWidget {
     final scope = AppScope.of(context);
     final chat = scope.chat;
     final shell = scope.shell;
+    final t = Tokens.of(context);
     final ordered = scope.prefs.prefs.inOrder(chat.workspaces, (w) => w.slug);
     final active = chat.active;
     final keys = showsWorkspaceKeys(context);
@@ -371,7 +434,36 @@ class _WorkspaceMenu extends StatelessWidget {
         label: 'Workspaces',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: items,
+          spacing: 16,
+          children: [
+            if (ordered.isNotEmpty) FieldCard(inSheet: true, [items.first]),
+            FieldCard(inSheet: true, [
+              Tappable(
+                label: 'New workspace',
+                onTap: onCreate,
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 64),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: FieldCard.inset,
+                  ),
+                  child: Row(
+                    spacing: 14,
+                    children: [
+                      AppIcon('plus', color: t.accent),
+                      Text(
+                        'New workspace',
+                        style: Type.sans(
+                          17,
+                          weight: FontWeight.w600,
+                          color: t.accent,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ]),
+          ],
         ),
       );
     }
@@ -417,28 +509,34 @@ class _WorkspaceItem extends StatelessWidget {
           scope.shell.closePopup(Popup.workspaces);
           if (!active) chat.select(workspace.slug);
         },
-        radius: BorderRadius.circular(Sizes.row),
-        color: active ? t.sel : null,
+        radius: sheet ? null : BorderRadius.circular(Sizes.row),
+        color: active && !sheet ? t.sel : null,
         child: SizedBox(
-          height: sheet ? 48 : 40,
+          height: sheet ? 64 : 40,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            padding: EdgeInsets.symmetric(
+              horizontal: sheet ? FieldCard.inset : 10,
+            ),
             child: Row(
               children: [
                 SizedBox(
-                  width: 16,
+                  width: sheet ? 22 : 16,
                   child: active
-                      ? AppIcon('check', size: IconSize.xs, color: t.accent)
+                      ? AppIcon(
+                          'check',
+                          size: sheet ? IconSize.normal : IconSize.xs,
+                          color: sheet ? t.ink : t.accent,
+                        )
                       : null,
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: sheet ? 14 : 10),
                 Expanded(
                   child: Text(
                     workspace.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Type.sans(
-                      sheet ? 15.5 : 14,
+                      sheet ? 17 : 14,
                       weight: active ? FontWeight.w600 : FontWeight.w400,
                       color: t.ink,
                     ),
@@ -449,7 +547,7 @@ class _WorkspaceItem extends StatelessWidget {
                   const SizedBox(width: 8),
                   Text(
                     plural(count, 'doc', 'docs'),
-                    style: Type.sans(12.5, color: t.muted),
+                    style: Type.sans(13, color: t.muted),
                   ),
                 ],
                 if (shortcut != null)
