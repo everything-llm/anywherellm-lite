@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:characters/characters.dart';
 
+import 'markdown.dart';
 import 'outputs.dart';
 import 'server_models.dart';
 import 'upload.dart';
@@ -197,6 +198,13 @@ Uri themedCard(Uri uri, Uri? server, {required bool light}) {
   );
 }
 
+/// The address an app's [page] opens at in the app: with `theme` set to light when [light] and
+/// to dark otherwise, which everythingllm's card link passes on to the page, so the page keeps
+/// to the app's theme whatever the device's.
+Uri themedPage(Uri page, {required bool light}) => page.replace(
+  queryParameters: {...page.queryParameters, 'theme': light ? 'light' : 'dark'},
+);
+
 /// Whether [uri] is a live app card on the [server]'s host: everythingllm's sandbox draws an
 /// app's current state at `/_live/apps/<workspace>/<name>.png`. It is an ordinary live card; its
 /// page, which the link around it names, opens through the app's link opener.
@@ -229,6 +237,11 @@ AppCard? appCardOf(Uri image, Uri page, String alt, Uri? server) {
   }
   return null;
 }
+
+/// The apps' cards in the answer [text], in order, each a linked image [appCardOf] takes.
+List<AppCard> appCardsIn(String text, Uri? server) => [
+  for (final l in linkedImagesIn(text)) ?appCardOf(l.image, l.link, l.alt, server),
+];
 
 /// What the description [alt] calls an app, or else its card's [file] name in words.
 String _appName(String alt, String file) {

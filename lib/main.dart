@@ -144,6 +144,9 @@ class _SessionHostState extends State<SessionHost> {
   /// Listens for speech on Android, and is null where the device has no such service to use.
   final Dictation? _dictation = _android ? SpeechDictation() : null;
 
+  /// Apps' pages in web views on Android, kept for the app's life so a page stays loaded.
+  final AppView? _appView = _android ? AppWebViews() : null;
+
   /// What other apps share with AnywhereLLM on Android, read once for the app's life.
   final Stream<SharedItem>? _shares = _android
       ? androidShares().asBroadcastStream()
@@ -251,7 +254,7 @@ class _SessionHostState extends State<SessionHost> {
         scanner: _android ? cameraScanner : null,
         share: _android ? shareBytes : null,
         shares: _shares,
-        appView: _android ? appWebView : null,
+        appView: _appView,
         dictation: _dictation,
         pasteImage: _linux ? () => Pasteboard.image : null,
         readAloud: _readAloud,

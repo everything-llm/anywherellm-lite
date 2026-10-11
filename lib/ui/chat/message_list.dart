@@ -96,6 +96,21 @@ class _MessageListState extends State<MessageList> {
     });
   }
 
+  /// On a phone with a web view, starts loading the page of the chat's newest app card after
+  /// this frame, so the card's sheet opens on the page at once.
+  void _prefetchApp(BuildContext context, AppScope scope) {
+    final view = scope.appView;
+    if (view == null || !ScreenClass.ofContext(context).isPhone) return;
+    final app = scope.chat.appCard;
+    if (app == null) return;
+    // In the theme its sheet will show it in.
+    final page = themedPage(
+      app.page,
+      light: Theme.of(context).brightness == Brightness.light,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => view.prefetch(page));
+  }
+
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
@@ -104,6 +119,7 @@ class _MessageListState extends State<MessageList> {
     final turns = chat.turns;
     if (workspace == null) return const SizedBox.shrink();
     _follow(chat);
+    _prefetchApp(context, scope);
     if (turns.isEmpty) {
       return _Empty(workspace: workspace.name, onSuggest: widget.onSuggest);
     }

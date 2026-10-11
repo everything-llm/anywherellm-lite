@@ -30,13 +30,21 @@ typedef FileSaver = Future<String?> Function(
 /// Hands the file [name], holding [bytes], to the system's share sheet.
 typedef FileSharer = Future<void> Function(String name, List<int> bytes);
 
-/// An app's own page, [page], in a web view, with [placeholder] over it until it loads, and a
-/// link off its host handed to [onLeave].
-typedef AppView = Widget Function(
-  Uri page, {
-  required Widget placeholder,
-  required void Function(Uri url) onLeave,
-});
+/// Apps' own pages in a web view. It keeps one page loaded out of sight, the newest it was
+/// asked to fetch or show, so showing that page again is at once.
+abstract interface class AppView {
+  /// Starts loading [page] out of sight, in place of the page kept, unless that one is on
+  /// screen.
+  void prefetch(Uri page);
+
+  /// [page] in a web view, the one kept when it is [page], with [placeholder] over it until it
+  /// loads, and a link off its host handed to [onLeave].
+  Widget show(
+    Uri page, {
+    required Widget placeholder,
+    required void Function(Uri url) onLeave,
+  });
+}
 
 /// A camera view that reads QR codes and calls [onCode] with the first one's text.
 typedef CodeScanner = Widget Function(void Function(String code) onCode);

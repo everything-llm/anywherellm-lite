@@ -187,6 +187,9 @@ class Harness extends Rig {
   /// Whether an app's sheet shows its page, as on Android. The page is a line of text naming it.
   final bool canViewApps;
 
+  /// The web view an app's page shows in, with [canViewApps].
+  final appPages = FakeAppView();
+
   /// Every file the app shared, by name, with its bytes.
   final Map<String, List<int>> shared = {};
 
@@ -226,10 +229,7 @@ class Harness extends Rig {
       },
       share: canShare ? (name, bytes) async => shared[name] = bytes : null,
       shares: shares?.stream,
-      appView: canViewApps
-          ? (page, {required placeholder, required onLeave}) =>
-                Text('Web view of $page')
-          : null,
+      appView: canViewApps ? appPages : null,
       dictation: dictation,
       pasteImage: canPasteImages ? () async => clipboardImage : null,
       readAloud: readAloud,
@@ -370,4 +370,22 @@ Future<void> chatAction(WidgetTester tester, String item) async {
   await tester.pumpAndSettle();
   await tester.tap(control(item).last);
   await tester.pumpAndSettle();
+}
+
+/// A web view that draws an app's page as the text `Web view of <page>` and records each page
+/// prefetched, in order, without one asked again in a row.
+class FakeAppView implements AppView {
+  final prefetched = <Uri>[];
+
+  @override
+  void prefetch(Uri page) {
+    if (prefetched.lastOrNull != page) prefetched.add(page);
+  }
+
+  @override
+  Widget show(
+    Uri page, {
+    required Widget placeholder,
+    required void Function(Uri url) onLeave,
+  }) => Text('Web view of $page');
 }

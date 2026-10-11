@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/ui/chat/app_panel.dart';
 import 'package:anywherellm/ui/chat/card_image.dart';
 import 'package:anywherellm/ui/chat/message_list.dart';
@@ -151,7 +152,9 @@ void main() {
   testWidgets('beside the chat the app shows its card, web view or not', (
     tester,
   ) async {
-    await pumpApp(tester, llm: _withApp(), canViewApps: true);
+    final h = await pumpApp(tester, llm: _withApp(), canViewApps: true);
+    // Nor is its page fetched ahead.
+    expect(h.appPages.prefetched, isEmpty);
     await _tapCard(tester);
     expect(find.byType(AppPanel), findsOneWidget);
     expect(find.textContaining('Web view of'), findsNothing);
@@ -201,11 +204,26 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(SheetFrame),
-          matching: find.text('Web view of $_page'),
+          matching: find.text('Web view of $_page?theme=light'),
         ),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the newest app\'s page loads before its card is tapped', (
+      tester,
+    ) async {
+      final habits = Uri.parse('https://h:8447/q3/apps/habits/');
+      Uri light(Uri page) => themedPage(page, light: true);
+      final llm = _withApp();
+      final h = await pumpApp(tester, llm: llm, size: phone, canViewApps: true);
+      expect(h.appPages.prefetched, [light(_page)]);
+      llm.answer =
+          'Ticked.\n\n[![Habits](https://h:8455/_live/apps/q3/habits.png)]($habits)\n';
+      await h.chat.send('Tick reading');
+      await tester.pumpAndSettle();
+      expect(h.appPages.prefetched, [light(_page), light(habits)]);
     });
 
     testWidgets('Back and a drag down close the sheet', (tester) async {

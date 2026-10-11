@@ -68,8 +68,11 @@ class AppPanel extends StatelessWidget {
       ],
       child: switch (AppScope.of(context).appView) {
         // On a phone with a web view, the app's own page, which can change it.
-        final view? when sheet => view(
-          app.page,
+        final view? when sheet => view.show(
+          themedPage(
+            app.page,
+            light: Theme.of(context).brightness == Brightness.light,
+          ),
           placeholder: _card(context, app),
           onLeave: (url) => openLink(context, url.toString()),
         ),

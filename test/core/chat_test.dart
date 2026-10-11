@@ -259,6 +259,21 @@ void main() {
     });
   });
 
+  test('themedPage asks an app\'s page for the app\'s theme', () {
+    final page = Uri.parse('https://h:8445/_live/apps/q3/list');
+    expect(
+      themedPage(page, light: true).toString(),
+      'https://h:8445/_live/apps/q3/list?theme=light',
+    );
+    expect(
+      themedPage(
+        Uri.parse('https://h:8447/q3/apps/list/?theme=light&x=1'),
+        light: false,
+      ).toString(),
+      'https://h:8447/q3/apps/list/?theme=dark&x=1',
+    );
+  });
+
   group('loadableImage', () {
     final server = Uri.parse('https://owen.example.ts.net:3001');
     bool loads(String image, {Uri? from, bool allowHttp = true}) =>

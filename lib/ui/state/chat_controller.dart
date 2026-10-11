@@ -121,6 +121,19 @@ class Turn extends ChangeNotifier {
 
   (String, Uri?, List<BrowserCard>)? _cards;
 
+  /// The apps' cards in [text] on the [server] given, read again only when either changes.
+  List<AppCard> _appsOf(Uri? server) {
+    if (_apps case (final read, final on, final apps)
+        when identical(read, text) && on == server) {
+      return apps;
+    }
+    final apps = appCardsIn(text, server);
+    _apps = (text, server, apps);
+    return apps;
+  }
+
+  (String, Uri?, List<AppCard>)? _apps;
+
   void _grow(String more) {
     text += more;
     notifyListeners();
@@ -414,6 +427,17 @@ class ChatController extends ChangeNotifier {
       if (turn.role != Role.assistant || turn.streaming) continue;
       yield* turn._cardsOf(server).reversed;
     }
+  }
+
+  /// The newest app's card in the chat on screen's finished answers, or null. A running
+  /// answer's count once it ends, as the browser's do.
+  AppCard? get appCard {
+    final server = _server?.uri;
+    for (final turn in turns.reversed) {
+      if (turn.role != Role.assistant || turn.streaming) continue;
+      if (turn._appsOf(server).lastOrNull case final app?) return app;
+    }
+    return null;
   }
 
   /// The newest tab's card in the chat on screen, or null.
