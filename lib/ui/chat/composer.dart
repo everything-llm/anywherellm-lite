@@ -193,12 +193,17 @@ class _ComposerState extends State<Composer> {
         });
       }
     }
-    // Taken only when it can go back: a message taken and not put back would be lost.
+    // Taken only when it can go back: a message taken and not put back would be lost. One
+    // held is held here, as Send when done holds it, and is not focused.
     if (widget.draft.text.isEmpty && _attached.isEmpty) {
       if (_scope.chat.takeForComposer() case final back?) {
         _setDraft(back.text);
         setState(() => _attached = back.attachments);
-        widget.focus.requestFocus();
+        if (back.hold && _scope.chat.runningHere != null) {
+          _hold();
+        } else {
+          widget.focus.requestFocus();
+        }
       }
     }
   }

@@ -19,6 +19,7 @@ import 'ui/app.dart';
 import 'ui/app_scope.dart';
 import 'ui/boot_screen.dart';
 import 'ui/chat/app_web_view.dart';
+import 'ui/chat/takeover_web_view.dart';
 import 'ui/chat/device_speaker.dart';
 import 'ui/chat/device_photos.dart';
 import 'ui/chat/dictation.dart';
@@ -151,6 +152,7 @@ class _SessionHostState extends State<SessionHost> {
 
   /// Apps' pages in web views on Android, kept for the app's life so a page stays loaded.
   final AppView? _appView = _android ? AppWebViews() : null;
+  final TakeoverView? _takeover = _android ? const TakeoverWebView() : null;
 
   /// What other apps share with AnywhereLLM on Android, read once for the app's life.
   final Stream<SharedItem>? _shares = _android
@@ -260,6 +262,7 @@ class _SessionHostState extends State<SessionHost> {
         share: _android ? shareBytes : null,
         shares: _shares,
         appView: _appView,
+        takeover: _takeover,
         dictation: _dictation,
         photos: _photos,
         pasteImage: _linux ? () => Pasteboard.image : null,

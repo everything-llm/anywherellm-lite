@@ -47,6 +47,21 @@ abstract interface class AppView {
   });
 }
 
+/// The everythingllm browser's take-over view in a web view, as the chat's browser screen. The
+/// page, finding the app's channel, draws Back and a message bar: Back comes to `onBack`, and
+/// what the bar sends to `onSay`, whose answer, a line saying how the message went, the page
+/// shows over the bar. A link off the view goes to `onLeave`.
+abstract interface class TakeoverView {
+  /// [page] in a web view, with [placeholder] over it until it loads.
+  Widget show(
+    Uri page, {
+    required Widget placeholder,
+    required VoidCallback onBack,
+    required Future<String> Function(String text) onSay,
+    required void Function(Uri url) onLeave,
+  });
+}
+
 /// A camera view that reads QR codes and calls [onCode] with the first one's text.
 typedef CodeScanner = Widget Function(void Function(String code) onCode);
 
@@ -73,6 +88,7 @@ class AppScope extends InheritedWidget {
     this.share,
     this.shares,
     this.appView,
+    this.takeover,
     this.dictation,
     this.photos,
     this.pasteImage,
@@ -108,6 +124,10 @@ class AppScope extends InheritedWidget {
   /// Shows an app's page in its sheet, or null where the device has no web view, and the sheet
   /// shows the app's card.
   final AppView? appView;
+
+  /// Shows the chat's browser as the take-over view, full screen on a phone, or null where the
+  /// device has no web view, and the browser shows as its picture in a sheet.
+  final TakeoverView? takeover;
 
   /// Writes what the person says in the composer, or null where the device cannot listen.
   final Dictation? dictation;

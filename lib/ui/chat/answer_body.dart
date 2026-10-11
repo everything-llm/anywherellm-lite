@@ -17,6 +17,7 @@ import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/side_scroll.dart';
+import 'browser_item.dart';
 import 'card_image.dart';
 import 'gallery.dart';
 import 'highlight.dart';
@@ -106,6 +107,13 @@ class AnswerBody extends StatelessWidget {
     final server = settings.connection?.uri;
     final allowHttp = settings.allowHttp;
     final linkedIn = linkedImagesIn(text);
+    // A phone draws a browser tab's card as the app's item.
+    final browserItems = phone
+        ? {
+            for (final card in browserCards(text, server: server))
+              if (!card.login) card.image: card,
+          }
+        : const <Uri, BrowserCard>{};
     final linked = {for (final l in linkedIn) l.image};
     // The apps whose cards the answer links, by the link a tap on the card follows.
     final apps = {
@@ -130,6 +138,7 @@ class AnswerBody extends StatelessWidget {
         }
       },
       imageBuilder: (uri, _, alt) {
+        if (browserItems[uri] case final item?) return BrowserItem(item);
         final card = CardImage(
           uri,
           alt: alt,

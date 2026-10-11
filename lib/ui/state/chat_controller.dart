@@ -312,25 +312,34 @@ class ChatController extends ChangeNotifier {
   final _refusedIn = <String>{};
 
   /// What waits for each chat's composer, by chat (null for a new one): a message the relay
-  /// refused, or what another app shared ([putInComposer]). The composer takes it with
-  /// [takeForComposer].
+  /// refused, or what another app shared or the browser's message bar sent ([putInComposer]).
+  /// The composer takes it with [takeForComposer].
   final _forComposer =
-      <String?, ({String text, List<Attachment> attachments})>{};
+      <String?, ({String text, List<Attachment> attachments, bool hold})>{};
 
   /// Whether the chat on screen refused the last message because it was already answering,
   /// maybe on another device: its answer is followed here, and the message waits in the
   /// composer to be sent when it ends.
   bool get alreadyAnswering => _refusedIn.contains(activeThread);
 
-  /// What waits for the chat on screen's composer, with its files; null once taken, or when it
-  /// waits in another chat.
-  ({String text, List<Attachment> attachments})? takeForComposer() =>
+  /// What waits for the chat on screen's composer, with its files and whether it is held to go
+  /// when the answer running ends; null once taken, or when it waits in another chat.
+  ({String text, List<Attachment> attachments, bool hold})? takeForComposer() =>
       _forComposer.remove(activeThread);
 
   /// Puts [text] and [attachments] in the composer of the chat on screen, for the person to
-  /// ask about them.
-  void putInComposer(String text, List<Attachment> attachments) {
-    _forComposer[activeThread] = (text: text, attachments: attachments);
+  /// ask about them, or, with [hold], to go when the answer running in it ends, as Send when
+  /// done holds a message.
+  void putInComposer(
+    String text,
+    List<Attachment> attachments, {
+    bool hold = false,
+  }) {
+    _forComposer[activeThread] = (
+      text: text,
+      attachments: attachments,
+      hold: hold,
+    );
     notifyListeners();
   }
 
@@ -1165,7 +1174,11 @@ class ChatController extends ChangeNotifier {
       ];
     }
     _refusedIn.add(thread);
-    _forComposer[thread] = (text: sent.text, attachments: sent.attachments);
+    _forComposer[thread] = (
+      text: sent.text,
+      attachments: sent.attachments,
+      hold: false,
+    );
     notifyListeners();
     final server = _server;
     unawaited(

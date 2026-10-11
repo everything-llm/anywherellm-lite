@@ -51,6 +51,17 @@ class BrowserController extends ChangeNotifier {
   /// The answer whose status changes are read.
   Turn? _watching;
 
+  /// Whether the take-over view is on screen. It follows the browser itself, so the browser is
+  /// not read meanwhile, and is read once as it closes.
+  bool get viewShown => _viewShown;
+  bool _viewShown = false;
+  set viewShown(bool shown) {
+    if (shown == _viewShown) return;
+    _viewShown = shown;
+    if (!shown) unawaited(read());
+    _changed();
+  }
+
   /// The tab of the chat on screen, or null when it has none.
   BrowserTab? get tab => browser?.tab;
 
@@ -82,7 +93,8 @@ class BrowserController extends ChangeNotifier {
       if (running == null && here != null) unawaited(read());
     }
     final period = every;
-    final wanted = here != null && period != null && _shell.browserOpen;
+    final wanted =
+        here != null && period != null && _shell.browserOpen && !_viewShown;
     if (wanted && _timer == null) {
       _timer = Timer.periodic(period, (_) => unawaited(read()));
     } else if (!wanted) {

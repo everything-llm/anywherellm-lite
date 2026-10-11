@@ -20,10 +20,12 @@ String _kindOf(BuildContext context, AppCard app) {
 
 /// Where [app]'s page opens in the app: in the app's theme, so the page matches it whatever the
 /// device's. The sheet shows it and the chat fetches it ahead at this one address.
-Uri appPageOf(BuildContext context, AppCard app) => themedPage(
-  app.page,
-  light: Theme.of(context).brightness == Brightness.light,
-);
+Uri appPageOf(BuildContext context, AppCard app) =>
+    themedFor(context, app.page);
+
+/// [page] asked for in the app's theme, light or dark.
+Uri themedFor(BuildContext context, Uri page) =>
+    themedPage(page, light: Theme.of(context).brightness == Brightness.light);
 
 /// The app's live card, drawn large. It is followed only while it can be seen, as every card
 /// is.

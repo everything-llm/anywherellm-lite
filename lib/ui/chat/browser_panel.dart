@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/browser.dart';
 import '../app_scope.dart';
+import '../layout.dart';
 import '../links.dart';
 import '../state/browser_controller.dart';
 import '../state/chat_controller.dart';
@@ -12,6 +13,7 @@ import '../widgets/buttons.dart';
 import '../widgets/side_panel.dart';
 import 'browser_chip.dart';
 import 'browser_frame.dart';
+import 'browser_screen.dart';
 import 'card_image.dart';
 
 /// The chat on screen's everythingllm browser, beside the chat. Where the server says it
@@ -22,7 +24,8 @@ import 'card_image.dart';
 /// login request's, when no tab's card came after it. Under them, the steps of the answer
 /// running in it, or else of the last answer that used it. It follows the chat on screen. A card
 /// or picture is followed only while it can be seen, since watching keeps the server's browser
-/// from being stopped.
+/// from being stopped. A phone with a web view shows the take-over view full screen instead
+/// ([BrowserScreen]).
 class BrowserPanel extends StatelessWidget {
   const BrowserPanel({super.key, required this.width});
 
@@ -40,6 +43,16 @@ class BrowserPanel extends StatelessWidget {
     // Without the server's word, what the answers show.
     final login = known.browser == null ? scope.chat.loginCard : null;
     final card = known.browser == null ? scope.chat.browserCard : null;
+    // A phone with a web view shows the take-over view itself, full screen.
+    final page = tab?.page ?? card?.page;
+    if (scope.takeover case final view?
+        when page != null && ScreenClass.ofContext(context).isPhone) {
+      return BrowserScreen(
+        key: ValueKey((scope.chat.activeSlug, scope.chat.activeThread)),
+        view: view,
+        page: page,
+      );
+    }
     // The running answer comes first, since it is the chat's newest turn.
     final used = scope.chat.turns.reversed
         .where((turn) => turn.browserSteps.isNotEmpty)

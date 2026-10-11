@@ -129,6 +129,7 @@ class Harness extends Rig {
     this.canShare = false,
     this.shares,
     this.canViewApps = false,
+    this.canTakeOver = false,
     this.browserEvery,
   }) : dictation = canDictate ? FakeDictation() : null,
        photos = canPickPhotos ? FakePhotos() : null,
@@ -214,6 +215,12 @@ class Harness extends Rig {
   /// The web view an app's page shows in, with [canViewApps].
   final appPages = FakeAppView();
 
+  /// Whether the chat's browser shows as the take-over view, as on Android.
+  final bool canTakeOver;
+
+  /// The web view the take-over view shows in, with [canTakeOver].
+  final takeover = FakeTakeover();
+
   /// Every file the app shared, by name, with its bytes.
   final Map<String, List<int>> shared = {};
 
@@ -254,6 +261,7 @@ class Harness extends Rig {
       share: canShare ? (name, bytes) async => shared[name] = bytes : null,
       shares: shares?.stream,
       appView: canViewApps ? appPages : null,
+      takeover: canTakeOver ? takeover : null,
       dictation: dictation,
       photos: photos,
       pasteImage: canPasteImages ? () async => clipboardImage : null,
@@ -294,6 +302,7 @@ Future<Harness> pumpApp(
   bool canShare = false,
   StreamController<SharedItem>? shares,
   bool canViewApps = false,
+  bool canTakeOver = false,
   Duration? browserEvery,
 }) async {
   tester.view.physicalSize = size;
@@ -308,6 +317,7 @@ Future<Harness> pumpApp(
     canShare: canShare,
     shares: shares,
     canViewApps: canViewApps,
+    canTakeOver: canTakeOver,
     canDictate: canDictate,
     canPickPhotos: canPickPhotos,
     canSpeak: canSpeak,
@@ -416,4 +426,31 @@ class FakeAppView implements AppView {
     required Widget placeholder,
     required void Function(Uri url) onLeave,
   }) => Text('Web view of $page');
+}
+
+/// A web view that draws the take-over view as the text `Take-over view of <page>`, with the
+/// page's Back as a button heard as Page back. [say] sends a message as the page's message bar
+/// does.
+class FakeTakeover implements TakeoverView {
+  Future<String> Function(String text)? _say;
+
+  /// Sends [text] as the page's message bar does, and answers the line the app gives back.
+  Future<String> say(String text) => _say!(text);
+
+  @override
+  Widget show(
+    Uri page, {
+    required Widget placeholder,
+    required VoidCallback onBack,
+    required Future<String> Function(String text) onSay,
+    required void Function(Uri url) onLeave,
+  }) {
+    _say = onSay;
+    return Column(
+      children: [
+        Text('Take-over view of $page'),
+        Tappable(label: 'Page back', onTap: onBack, child: const Text('Back')),
+      ],
+    );
+  }
 }

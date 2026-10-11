@@ -17,12 +17,16 @@ class BrowserCard {
     required this.page,
     required this.title,
     this.login = false,
+    this.tab,
   });
 
   final Uri image;
   final Uri page;
   final String title;
   final bool login;
+
+  /// The id of the tab whose card this is; null for a login request's.
+  final String? tab;
 }
 
 /// A chat's browser tab as the server reports it to a client with a developer key: [page] is
@@ -70,6 +74,9 @@ class BrowserTab {
 
   /// What [state] says, in a sentence.
   String get says => browserStateText(state);
+
+  /// The tab's id, which its take-over view's address names.
+  String? get id => page.queryParameters['tab'];
 }
 
 /// A request for a login, as the server reports it: its [card], the [page] with the form that
@@ -150,6 +157,19 @@ String browserStateText(String state) => switch (state) {
   _ => 'The browser is $state.',
 };
 
+/// Who has [tab] and whose page it is, in the few words a chat's browser item says.
+String browserItemLine(BrowserTab tab) {
+  final who = switch (tab.state) {
+    'working' => 'The agent is browsing',
+    'idle' => 'The agent has the tab',
+    'waiting' => 'Waiting for you',
+    'user' => 'You have the tab',
+    'closed' => 'The tab is closed',
+    final state => 'The tab is $state',
+  };
+  return [who, ?tab.site].join(' · ');
+}
+
 Uri? _address(Object? value) => switch (value) {
   final String text when text.isNotEmpty => Uri.tryParse(text),
   _ => null,
@@ -165,7 +185,7 @@ List<BrowserCard> browserCards(String markdown, {required Uri? server}) {
     for (final (:image, :alt, :link) in linkedImagesIn(markdown))
       if (_id(image, server, _card) case final tab?
           when _id(link, server, _page) == tab)
-        BrowserCard(image: image, page: link, title: alt)
+        BrowserCard(image: image, page: link, title: alt, tab: tab)
       else if (_id(image, server, _loginCard) case final request?
           when _id(link, server, _loginPage) == request)
         BrowserCard(image: image, page: link, title: alt, login: true),
