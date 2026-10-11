@@ -13,6 +13,7 @@ import '../type.dart';
 import '../widgets/headline.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
+import '../widgets/tappable.dart';
 import '../widgets/controls.dart';
 import '../widgets/fields.dart';
 import 'pairing_code.dart';
@@ -76,11 +77,14 @@ class _Welcome extends StatelessWidget {
         children: [
           const Headline('Connect to your ', name: 'AnythingLLM', after: '.'),
           const SizedBox(height: 12),
-          Text(
-            scan
-                ? 'Already set up on your computer? Scan its code and this phone is connected.'
-                : 'Sign in with the address and password of your AnythingLLM server.',
-            style: Type.sans(15, color: t.ink2, height: 1.5),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              scan
+                  ? 'Already set up on your computer? Scan its code and this phone is connected.'
+                  : 'Sign in with the address and password of your AnythingLLM server.',
+              style: Type.sans(13, color: t.muted, height: 1.45),
+            ),
           ),
         ],
       ),
@@ -115,13 +119,14 @@ class _ServerStatusState extends State<_ServerStatus> {
     builder: (context, _) {
       if (_settings.connection == null) return const SizedBox.shrink();
       final testing = _settings.check == ConnectionCheck.testing;
-      final test = ActionRow(alignment: WrapAlignment.start, [
+      final phone = ScreenClass.ofContext(context).isPhone;
+      // A phone's Test connection takes the line, as the design canvas draws it.
+      final test = ActionRow(even: phone, alignment: WrapAlignment.start, [
         AppButton(
           testing ? 'Testing…' : 'Test connection',
           onPressed: testing ? null : widget.onTest,
         ),
       ]);
-      final phone = ScreenClass.ofContext(context).isPhone;
       return Padding(
         padding: const EdgeInsets.only(top: 10),
         child: Column(
@@ -165,7 +170,7 @@ class _ServerStatusState extends State<_ServerStatus> {
   );
 }
 
-/// Background answers on a phone: the word for whether answers keep running, under its name.
+/// Background answers on a phone: its name, and under it whether answers keep running.
 class _PhoneRelayRow extends StatelessWidget {
   const _PhoneRelayRow(this.relay);
 
@@ -175,15 +180,21 @@ class _PhoneRelayRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return Container(
-      constraints: const BoxConstraints(minHeight: 52),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      constraints: const BoxConstraints(minHeight: 68),
+      padding: const EdgeInsets.symmetric(
+        horizontal: FieldCard.inset,
+        vertical: 10,
+      ),
       alignment: Alignment.centerLeft,
       child: Semantics(
         container: true,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Background answers', style: Type.sans(12.5, color: t.muted)),
+            Text(
+              'Background answers',
+              style: Type.sans(17, weight: FontWeight.w500, color: t.ink),
+            ),
             Text(
               switch (relay) {
                 RelayState.found => 'Available',
@@ -193,7 +204,7 @@ class _PhoneRelayRow extends StatelessWidget {
               },
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: Type.sans(15, color: t.ink),
+              style: Type.sans(13, color: t.muted),
             ),
           ],
         ),
@@ -514,24 +525,17 @@ class _KeyCardState extends State<_KeyCard> {
           ),
           Padding(
             padding: const EdgeInsets.only(top: 24, bottom: 16),
-            child: Row(
-              children: [
-                Expanded(child: Divider(color: t.line)),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                    _pasteKey ? 'or paste a key' : 'or sign in',
-                    style: Type.sans(12.5, color: t.muted),
-                  ),
-                ),
-                Expanded(child: Divider(color: t.line)),
-              ],
+            child: Center(
+              child: SectionLabel(
+                _pasteKey ? 'Or paste a key' : 'Or sign in',
+                header: false,
+              ),
             ),
           ),
         ],
         NamedControl(
           'Server address',
-          size: 14,
+          quiet: true,
           labelled: true,
           AppField(
             controller: _url,
@@ -545,7 +549,7 @@ class _KeyCardState extends State<_KeyCard> {
         if (_pasteKey)
           NamedControl(
             'Developer API key',
-            size: 14,
+            quiet: true,
             labelled: true,
             AppField(
               controller: _key,
@@ -558,7 +562,7 @@ class _KeyCardState extends State<_KeyCard> {
         else ...[
           NamedControl(
             'Password',
-            size: 14,
+            quiet: true,
             labelled: true,
             AppField(
               controller: _password,
@@ -576,28 +580,35 @@ class _KeyCardState extends State<_KeyCard> {
           ),
         ],
         const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: AppButton(
-                saving
-                    ? 'Checking…'
-                    : _pasteKey
-                    ? 'Save key'
-                    : 'Sign in',
-                primary: scanner == null,
-                onPressed: saving
-                    ? null
-                    : _pasteKey
-                    ? _save
-                    : _signIn,
-              ),
+        ActionRow(even: true, [
+          AppButton(
+            saving
+                ? 'Checking…'
+                : _pasteKey
+                ? 'Save key'
+                : 'Sign in',
+            primary: scanner == null,
+            onPressed: saving
+                ? null
+                : _pasteKey
+                ? _save
+                : _signIn,
+          ),
+        ]),
+        Tappable(
+          label: _pasteKey ? 'Use password' : 'Paste a key',
+          onTap: () {
+            if (!saving) setState(() => _pasteKey = !_pasteKey);
+          },
+          radius: BorderRadius.circular(Sizes.phoneControl),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 52),
+            alignment: Alignment.center,
+            child: Text(
+              _pasteKey ? 'Use password' : 'Paste a key',
+              style: Type.sans(16, weight: FontWeight.w500, color: t.accent),
             ),
-            const SizedBox(width: 8),
-            TextAction.plain(_pasteKey ? 'Use password' : 'Paste a key', () {
-              if (!saving) setState(() => _pasteKey = !_pasteKey);
-            }),
-          ],
+          ),
         ),
         for (final note in [?_scanProblem, ?_settings.message]) ...[
           const SizedBox(height: 14),

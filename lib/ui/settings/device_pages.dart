@@ -41,13 +41,12 @@ class AppearancePage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           spacing: phone ? 20 : 12,
           children: [
-            // A phone puts each name over its choices, with no card, as the design canvas
-            // draws it, and says what the text size does once, under both.
+            // A phone puts each name over its choices in a card of its own, as the design
+            // canvas draws it.
             if (phone) ...[
-              NamedControl('Theme', theme),
-              NamedControl('Chat text size', size),
-              const HelpText(
-                'Text size scales the chat\'s turns, not the controls around them.',
+              PanelCard(children: [NamedControl('Theme', theme, size: 17)]),
+              PanelCard(
+                children: [NamedControl('Chat text size', size, size: 17)],
               ),
             ] else
               FieldCard([
@@ -66,18 +65,6 @@ class AppearancePage extends StatelessWidget {
       },
     );
   }
-}
-
-/// What the Chat page holds, as a phone's Settings list says it: the switches this device has.
-String chatSummary(AppScope scope) {
-  final parts = [
-    if (scope.dictation != null) 'dictation',
-    if (scope.readAloud != null) 'reading aloud',
-    if (scope.canSpellcheck) 'spellcheck',
-    'answer details',
-  ];
-  final line = parts.join(', ');
-  return line[0].toUpperCase() + line.substring(1);
 }
 
 /// How the chat behaves on this device: each [ChatSwitch] the device can use.
@@ -121,10 +108,11 @@ class ChatPage extends StatelessWidget {
         spacing: 12,
         children: [
           FieldCard([
+            // A phone names each switch alone, as the design canvas draws them.
             for (final (which, label, help) in rows)
               FieldRow(
                 label: label,
-                help: help,
+                help: ScreenClass.ofContext(context).isPhone ? '' : help,
                 small: true,
                 control: AppSwitch(
                   value: prefs.prefs.isOn(which),

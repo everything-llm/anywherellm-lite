@@ -1,7 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
-import '../../core/prefs.dart';
 import '../app_scope.dart';
+import '../state/settings_controller.dart';
 import '../icons.dart';
 import '../layout.dart';
 import '../links.dart';
@@ -154,8 +156,8 @@ class _PhoneFrame extends StatelessWidget {
   }
 }
 
-/// A phone's list of Settings: This app's pages, each with what it is set to, and once a server
-/// is saved, AnythingLLM's Server row.
+/// A phone's list of Settings: once a server is saved, a card with it, whether it answers and
+/// Test connection; This app's pages; then AnythingLLM's Server row.
 class _PhoneNav extends StatelessWidget {
   const _PhoneNav();
 
@@ -163,45 +165,50 @@ class _PhoneNav extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final shell = scope.shell;
-    final connection = scope.settings.connection;
+    final settings = scope.settings;
     return ListenableBuilder(
-      listenable: Listenable.merge([scope.prefs, scope.system]),
+      listenable: Listenable.merge([
+        scope.prefs,
+        scope.system,
+        settings,
+        scope.chat.unreachable,
+      ]),
       builder: (context, _) {
-        final prefs = scope.prefs.prefs;
+        final connection = settings.connection;
         return ListView(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
-            const SectionLabel('This app'),
-            const SizedBox(height: 6),
+            if (connection != null) ...[
+              const _ServerCard(),
+              const SizedBox(height: 20),
+            ],
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: FieldCard.inset),
+              child: SectionLabel('This app'),
+            ),
+            const SizedBox(height: 8),
             FieldCard([
-              NavRow(
-                title: SettingsPage.connection.label,
-                about: connection == null
-                    ? 'Not connected'
-                    : 'Connected to ${connection.uri.host}',
-                onTap: () => shell.showSettingsPage(SettingsPage.connection),
-              ),
-              NavRow(
-                title: SettingsPage.appearance.label,
-                about: switch (prefs.theme) {
-                  ThemePref.system => 'System theme',
-                  ThemePref.light => 'Light theme',
-                  ThemePref.dark => 'Dark theme',
-                },
-                onTap: () => shell.showSettingsPage(SettingsPage.appearance),
-              ),
-              NavRow(
-                title: SettingsPage.chat.label,
-                about: chatSummary(scope),
-                onTap: () => shell.showSettingsPage(SettingsPage.chat),
-              ),
+              for (final (page, icon) in const [
+                (SettingsPage.connection, 'link'),
+                (SettingsPage.appearance, 'settings'),
+                (SettingsPage.chat, 'chat'),
+              ])
+                NavRow(
+                  icon: icon,
+                  title: page.label,
+                  onTap: () => shell.showSettingsPage(page),
+                ),
             ]),
             if (connection != null) ...[
-              const SizedBox(height: 18),
-              const SectionLabel('AnythingLLM'),
-              const SizedBox(height: 6),
+              const SizedBox(height: 20),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: FieldCard.inset),
+                child: SectionLabel('AnythingLLM'),
+              ),
+              const SizedBox(height: 8),
               FieldCard([
                 NavRow(
+                  icon: 'activity',
                   title: SettingsPage.server.label,
                   about: serverSummary(scope.system),
                   onTap: () => shell.showSettingsPage(SettingsPage.server),
@@ -212,6 +219,85 @@ class _PhoneNav extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+/// The server saved, on a phone's list of Settings: whether it answers, its host, and Test
+/// connection.
+class _ServerCard extends StatelessWidget {
+  const _ServerCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final settings = scope.settings;
+    final t = Tokens.of(context);
+    final connection = settings.connection!;
+    final (state, color) = switch (settings.check) {
+      ConnectionCheck.testing => ('Testing…', t.muted),
+      ConnectionCheck.failed => ('Not answering', t.badfg),
+      _ when scope.chat.unreachable.value => ('Connection problem', t.badfg),
+      _ => ('Connected', t.okfg),
+    };
+    return FieldCard([
+      Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: FieldCard.inset,
+          vertical: 16,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 2,
+          children: [
+            Row(
+              spacing: 12,
+              children: [
+                Expanded(
+                  child: Text(
+                    'AnythingLLM',
+                    style: Type.sans(19, weight: FontWeight.w500, color: t.ink),
+                  ),
+                ),
+                Semantics(
+                  liveRegion: true,
+                  child: Text(state, style: Type.sans(13, color: color)),
+                ),
+              ],
+            ),
+            Text(
+              connection.host,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Type.mono(13, color: t.muted),
+            ),
+            if (settings.check == ConnectionCheck.failed)
+              if (settings.message case final message?)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    message,
+                    style: Type.sans(13, color: t.badfg, height: 1.4),
+                  ),
+                ),
+          ],
+        ),
+      ),
+      Tappable(
+        label: 'Test connection',
+        onTap: settings.check == ConnectionCheck.testing
+            ? null
+            : () => unawaited(settings.testSaved()),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 56),
+          padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Test connection',
+            style: Type.sans(17, weight: FontWeight.w500, color: t.accent),
+          ),
+        ),
+      ),
+    ]);
   }
 }
 

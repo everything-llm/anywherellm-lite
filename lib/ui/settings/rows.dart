@@ -179,12 +179,16 @@ class NamedControl extends StatelessWidget {
     super.key,
     this.size = 15,
     this.labelled = false,
+    this.quiet = false,
   });
 
   final String name;
   final Widget control;
   final double size;
   final bool labelled;
+
+  /// The name small and muted over its field, as a phone's sign-in form sets it.
+  final bool quiet;
 
   @override
   Widget build(BuildContext context) {
@@ -193,12 +197,17 @@ class NamedControl extends StatelessWidget {
       spacing: 6,
       children: [
         ExcludeSemantics(
-          child: Text(
-            name,
-            style: Type.sans(
-              size,
-              weight: FontWeight.w500,
-              color: Tokens.of(context).ink,
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: quiet ? 8 : 0),
+            child: Text(
+              name,
+              style: quiet
+                  ? Type.sans(13, color: Tokens.of(context).muted)
+                  : Type.sans(
+                      size,
+                      weight: FontWeight.w500,
+                      color: Tokens.of(context).ink,
+                    ),
             ),
           ),
         ),

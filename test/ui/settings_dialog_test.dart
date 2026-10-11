@@ -201,9 +201,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Connect to your'), findsOneWidget);
     final scan = tester.getTopLeft(control('Scan QR code'));
-    expect(scan.dy, lessThan(tester.getTopLeft(find.text('or sign in')).dy));
+    expect(scan.dy, lessThan(tester.getTopLeft(find.text('OR SIGN IN')).dy));
     expect(
-      tester.getTopLeft(find.text('or sign in')).dy,
+      tester.getTopLeft(find.text('OR SIGN IN')).dy,
       lessThan(tester.getTopLeft(control('Sign in')).dy),
     );
     expect(control('Paste a key'), findsOneWidget);
@@ -384,5 +384,20 @@ void main() {
     h.shell.openSettings(SettingsPage.server);
     await tester.pumpAndSettle();
     expect(find.text('1 widget, on Q3 planning'), findsOneWidget);
+  });
+
+  testWidgets("a phone's Settings opens on the server, which it can test", (
+    tester,
+  ) async {
+    final llm = planningServer();
+    final h = await pumpApp(tester, llm: llm, size: const Size(390, 844));
+    h.shell.openSettings();
+    await tester.pumpAndSettle();
+    expect(find.text('AnythingLLM'), findsWidgets);
+    expect(find.text('Connected'), findsOneWidget);
+    await tester.tap(control('Test connection'));
+    await tester.pumpAndSettle();
+    expect(llm.verified, hasLength(1));
+    expect(find.text('Connected'), findsOneWidget);
   });
 }
