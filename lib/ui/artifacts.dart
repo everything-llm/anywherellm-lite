@@ -66,13 +66,14 @@ class _ArtifactsRowState extends State<ArtifactsRow> {
       builder: (context, _) {
         final created = scope.created;
         if (created.unavailable) return const SizedBox.shrink();
-        final count = created.list?.files.length;
+        final list = created.list;
+        final count = list == null
+            ? null
+            : list.files.length + (list.apps?.length ?? 0);
         return DrawerRow(
           icon: 'grid',
           title: 'Artifacts',
-          heard: count == null
-              ? 'Artifacts'
-              : 'Artifacts, ${plural(count, 'file', 'files')}',
+          heard: list == null ? 'Artifacts' : 'Artifacts, ${_counts(list)}',
           iconSize: IconSize.small,
           trailing: count == null ? null : DrawerCount('$count'),
           onTap: () {
@@ -86,9 +87,17 @@ class _ArtifactsRowState extends State<ArtifactsRow> {
   }
 }
 
-/// A phone's Artifacts: the files the agent's code left in the open workspace, newest first,
-/// under how much of the workspace's room is used. A row opens its [CreatedSheet]. It shows the
-/// read the drawer made as it opened, or makes one, and reads again on its refresh button.
+/// How many apps and files [list] has: `2 apps · 4 files`, or the files alone from a host that
+/// does not list apps.
+String _counts(CreatedList list) => [
+  if (list.apps case final apps?) plural(apps.length, 'app', 'apps'),
+  plural(list.files.length, 'file', 'files'),
+].join(' · ');
+
+/// A phone's Artifacts: the open workspace's apps, then the files the agent's code left in it,
+/// newest first, under how much of the workspace's room is used. An app's row opens the app and
+/// a file's row its [CreatedSheet]. It shows the read the drawer made as it opened, or makes
+/// one, and reads again on its refresh button.
 class ArtifactsPage extends StatelessWidget {
   const ArtifactsPage({super.key});
 
@@ -157,14 +166,35 @@ class ArtifactsPage extends StatelessWidget {
                   ),
                 ),
               ),
-              if (list != null)
-                Text(plural(list.files.length, 'file', 'files'), style: small),
+              if (list != null) Text(_counts(list), style: small),
             ],
           ),
         ),
         if (created.problem case final problem?) ...[
           const SizedBox(height: 16),
           AlertBox(AlertKind.bad, problem.title, text: problem.text),
+        ],
+        if (list?.apps case final apps?) ...[
+          const Padding(
+            padding: EdgeInsets.only(top: 20, bottom: 8),
+            child: CardHeading('Apps'),
+          ),
+          FieldCard([
+            if (apps.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: FieldCard.inset,
+                  vertical: 20,
+                ),
+                child: Text('No apps in this workspace yet.', style: muted),
+              ),
+            for (final app in apps)
+              _AppRow(
+                app,
+                key: ValueKey(app.id),
+                working: created.working.contains(app.id),
+              ),
+          ]),
         ],
         const Padding(
           padding: EdgeInsets.only(top: 20, bottom: 8),
@@ -219,6 +249,92 @@ class ArtifactsPage extends StatelessWidget {
       ],
     );
   }
+}
+
+/// One app: its title over its kind and how it stands, which opens it, and a More button that
+/// opens its [CreatedSheet].
+class _AppRow extends StatelessWidget {
+  const _AppRow(this.app, {super.key, required this.working});
+
+  final CreatedApp app;
+
+  /// Whether the app is being deleted.
+  final bool working;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final t = Tokens.of(context);
+    final about = working ? 'Working…' : app.about;
+    return Padding(
+      padding: const EdgeInsets.only(left: FieldCard.inset, right: 8),
+      child: Row(
+        spacing: 4,
+        children: [
+          Expanded(
+            child: Tappable(
+              label: [app.title, if (about.isNotEmpty) about].join(', '),
+              onTap: working || !_canOpen(app) ? null : () => _open(scope, app),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 64),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    spacing: 2,
+                    children: [
+                      Text(
+                        app.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Type.sans(16, weight: FontWeight.w500),
+                      ),
+                      if (about.isNotEmpty)
+                        Text(
+                          about,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Type.sans(
+                            13,
+                            color: app.error == null ? t.muted : t.badfg,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          IconBtn(
+            'more',
+            tooltip: 'Open in the browser or delete ${app.title}',
+            box: 44,
+            size: IconSize.small,
+            onPressed: working ? null : () => scope.shell.openCreatedSheet(app),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Whether [app] can open in the app's own sheet: it needs its live card and the card's link.
+bool _canOpen(CreatedApp app) => app.card != null && app.link != null;
+
+/// Opens [app] as its card in a chat does, in place of the Artifacts page.
+void _open(AppScope scope, CreatedApp app) {
+  final slug = scope.chat.activeSlug;
+  if (slug == null) return;
+  scope.shell
+    ..closePopup()
+    ..closePhonePage()
+    ..showApp((
+      card: app.card!,
+      page: app.link!,
+      name: app.title,
+      workspace: slug,
+    ));
 }
 
 /// One file: its name over [createdMeta] and its mark, when it has one, and a More icon. The
@@ -315,8 +431,9 @@ class _FileRow extends StatelessWidget {
   }
 }
 
-/// A phone's sheet for one created file, over the window: Download, Open page for a page on the
-/// web, Keep for a working file, and Delete file, which asks first.
+/// A phone's sheet for one created file or app, over the window. A file's: Download, Open page
+/// for a page on the web, Keep for a working file, and Delete file. An app's: Open, Open in the
+/// browser and Delete app. Either delete asks first.
 class CreatedSheet extends StatelessWidget {
   const CreatedSheet(this.of, {super.key});
 
@@ -325,53 +442,36 @@ class CreatedSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
-    final file = of.file;
-    final created = scope.created;
+    final item = of.item;
     final shell = scope.shell;
+    final (actions, delete) = switch (item) {
+      CreatedFile() => (_fileActions(context, item), 'Delete file'),
+      CreatedApp() => (_appActions(context, item), 'Delete app'),
+    };
     return ModalSheet(
-      title: of.deleting ? 'Delete file' : file.name,
+      title: of.deleting ? delete : item.label,
       onClose: shell.closePopup,
       child: of.deleting
-          ? _Delete(file)
+          ? SheetQuestion(
+              deleteCreatedQuestion(item),
+              onKeep: shell.closePopup,
+              onDelete: () {
+                shell.closePopup();
+                unawaited(scope.created.remove(item));
+              },
+            )
           : SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 spacing: 16,
                 children: [
+                  if (actions.isNotEmpty) FieldCard(inSheet: true, actions),
                   FieldCard(inSheet: true, [
                     CardRow(
-                      'Download',
-                      icon: 'download',
-                      onTap: () {
-                        shell.closePopup();
-                        unawaited(saveCreated(context, file));
-                      },
-                    ),
-                    if (file.isPage)
-                      CardRow(
-                        'Open page',
-                        icon: 'external',
-                        onTap: () {
-                          shell.closePopup();
-                          unawaited(openLink(context, file.url!));
-                        },
-                      ),
-                    if (file.area == CreatedArea.work)
-                      CardRow(
-                        'Keep',
-                        icon: 'check',
-                        onTap: () {
-                          shell.closePopup();
-                          unawaited(created.keep(file));
-                        },
-                      ),
-                  ]),
-                  FieldCard(inSheet: true, [
-                    CardRow(
-                      'Delete file',
+                      delete,
                       icon: 'trash',
                       tone: RowTone.danger,
-                      onTap: () => shell.openCreatedSheet(file, deleting: true),
+                      onTap: () => shell.openCreatedSheet(item, deleting: true),
                     ),
                   ]),
                 ],
@@ -379,24 +479,55 @@ class CreatedSheet extends StatelessWidget {
             ),
     );
   }
-}
 
-/// The question before a created file is deleted.
-class _Delete extends StatelessWidget {
-  const _Delete(this.file);
-
-  final CreatedFile file;
-
-  @override
-  Widget build(BuildContext context) {
+  List<Widget> _fileActions(BuildContext context, CreatedFile file) {
     final scope = AppScope.of(context);
-    return SheetQuestion(
-      deleteCreatedQuestion(file),
-      onKeep: scope.shell.closePopup,
-      onDelete: () {
-        scope.shell.closePopup();
-        unawaited(scope.created.remove(file));
-      },
-    );
+    final shell = scope.shell;
+    return [
+      CardRow(
+        'Download',
+        icon: 'download',
+        onTap: () {
+          shell.closePopup();
+          unawaited(saveCreated(context, file));
+        },
+      ),
+      if (file.isPage)
+        CardRow(
+          'Open page',
+          icon: 'external',
+          onTap: () {
+            shell.closePopup();
+            unawaited(openLink(context, file.url!));
+          },
+        ),
+      if (file.area == CreatedArea.work)
+        CardRow(
+          'Keep',
+          icon: 'check',
+          onTap: () {
+            shell.closePopup();
+            unawaited(scope.created.keep(file));
+          },
+        ),
+    ];
+  }
+
+  List<Widget> _appActions(BuildContext context, CreatedApp app) {
+    final scope = AppScope.of(context);
+    final page = app.page;
+    return [
+      if (_canOpen(app))
+        CardRow('Open', icon: 'grid', onTap: () => _open(scope, app)),
+      if (page != null)
+        CardRow(
+          'Open in the browser',
+          icon: 'external',
+          onTap: () {
+            scope.shell.closePopup();
+            unawaited(openLink(context, page.toString()));
+          },
+        ),
+    ];
   }
 }

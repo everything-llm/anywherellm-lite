@@ -322,7 +322,7 @@ class AppShell extends StatelessWidget {
                                         child: CreatedSheet(
                                           of,
                                           key: ValueKey((
-                                            of.file.id,
+                                            of.item.id,
                                             of.deleting,
                                           )),
                                         ),

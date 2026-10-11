@@ -19,9 +19,19 @@ enum CreatedArea {
   static CreatedArea? named(Object? name) => values.asNameMap()[name];
 }
 
+/// Something the agent left in a workspace's sandbox that the host lists and deletes: a
+/// [CreatedFile] or a [CreatedApp]. Its [id] is the one thing the host's other calls take.
+sealed class Created {
+  const Created();
+
+  String get id;
+
+  /// What the person calls it: a file's name, an app's title.
+  String get label;
+}
+
 /// One file the agent's code left in a workspace's sandbox, as the everythingllm host lists it.
-/// Its [id] is the one thing the host's other calls take.
-class CreatedFile {
+class CreatedFile extends Created {
   const CreatedFile({
     required this.id,
     required this.name,
@@ -33,8 +43,12 @@ class CreatedFile {
     this.url,
   });
 
+  @override
   final String id;
   final String name;
+
+  @override
+  String get label => name;
 
   /// The folder the file is in, inside its area, or empty.
   final String dir;
@@ -92,11 +106,94 @@ class CreatedFile {
       DateTime.fromMillisecondsSinceEpoch(seconds.toInt() * 1000);
 }
 
+/// One of a workspace's apps, as the everythingllm host lists it beside the created files: an
+/// app's page and the data it keeps, which the agent makes with its app skill. Its [id] is
+/// `apps/<name>`.
+class CreatedApp extends Created {
+  const CreatedApp({
+    required this.id,
+    required this.name,
+    required this.title,
+    required this.modified,
+    this.kind,
+    this.summary = '',
+    this.page,
+    this.card,
+    this.link,
+    this.error,
+  });
+
+  @override
+  final String id;
+
+  /// Its name in the workspace, as its card's address has it.
+  final String name;
+  final String title;
+
+  /// When its data last changed.
+  final DateTime modified;
+
+  /// The starter it was made from, such as `list`; null for an app the agent wrote whole, or
+  /// one made before the host kept it.
+  final String? kind;
+
+  /// A line about it now, such as `4 of 6 left`.
+  final String summary;
+
+  /// Its page on the web, its live card, and where the card leads, which opens the page.
+  final Uri? page;
+  final Uri? card;
+  final Uri? link;
+
+  /// Why its data could not be read; such an app can still be deleted.
+  final String? error;
+
+  @override
+  String get label => title;
+
+  static const _kinds = {
+    'list': 'List',
+    'tracker': 'Tracker',
+    'pomodoro': 'Timer',
+    'flashcards': 'Deck',
+    'calendar': 'Calendar',
+  };
+
+  /// The line under its title: its kind in words and how it stands, or why it cannot be read.
+  String get about =>
+      error ?? [?_kinds[kind], if (summary.isNotEmpty) summary].join(' · ');
+
+  /// The app as the host lists it, or null for something that is not one.
+  static CreatedApp? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final id = json['id'];
+    final name = json['name'];
+    final title = json['title'];
+    final modified = json['modified'];
+    if (id is! String || name is! String || title is! String) return null;
+    Uri? uri(String key) =>
+        json[key] is String ? Uri.tryParse(json[key] as String) : null;
+    return CreatedApp(
+      id: id,
+      name: name,
+      title: title,
+      modified: CreatedFile._seconds(modified is num ? modified : 0),
+      kind: json['kind'] is String ? json['kind'] as String : null,
+      summary: json['summary'] is String ? json['summary'] as String : '',
+      page: uri('page'),
+      card: uri('card'),
+      link: uri('link'),
+      error: json['error'] is String ? json['error'] as String : null,
+    );
+  }
+}
+
 /// A workspace's created files, newest first, with how much of the workspace's room they and
 /// the rest of its sandbox use.
 class CreatedList {
   const CreatedList({
     this.files = const [],
+    this.apps,
     this.used = 0,
     this.warn = 0,
     this.limit = 0,
@@ -104,6 +201,9 @@ class CreatedList {
   });
 
   final List<CreatedFile> files;
+
+  /// The workspace's apps, last changed first, or null from a host that does not list them.
+  final List<CreatedApp>? apps;
 
   /// Bytes the whole workspace uses: its files, its packages and the like.
   final int used;
@@ -123,6 +223,12 @@ class CreatedList {
       files: [
         for (final entry in json['files'] as List) ?CreatedFile.fromJson(entry),
       ],
+      apps: json['apps'] is List
+          ? [
+              for (final entry in json['apps'] as List)
+                ?CreatedApp.fromJson(entry),
+            ]
+          : null,
       used: number('used'),
       warn: number('warn'),
       limit: number('limit'),
@@ -172,9 +278,13 @@ String createdMeta(CreatedFile file, DateTime now, {bool address = true}) => [
 
 final _scheme = RegExp(r'^https?://');
 
-/// What is asked before [file] is deleted.
-String deleteCreatedQuestion(CreatedFile file) =>
-    'Delete ${file.name} from the workspace? It cannot be got back.';
+/// What is asked before [item] is deleted.
+String deleteCreatedQuestion(Created item) => switch (item) {
+  CreatedFile(:final name) =>
+    'Delete $name from the workspace? It cannot be got back.',
+  CreatedApp(:final title) =>
+    'Delete $title? Its data goes with it, and its card in a chat says it was deleted.',
+};
 
 String _goes(Duration left) {
   if (left <= Duration.zero) return 'Goes soon';

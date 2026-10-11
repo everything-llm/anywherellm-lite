@@ -38,12 +38,32 @@ final _kept = CreatedFile(
   area: CreatedArea.project,
 );
 
-/// A phone over a server whose open workspace holds [files].
-Future<Harness> _phone(WidgetTester tester, List<CreatedFile> files) async {
+final _groceries = CreatedApp(
+  id: 'apps/groceries',
+  name: 'groceries',
+  title: 'Groceries',
+  kind: 'list',
+  summary: '4 of 6 left',
+  modified: DateTime.now(),
+  page: Uri.parse('https://host.example.ts.net:8447/q3/apps/groceries/'),
+  card: Uri.parse(
+    'https://host.example.ts.net:8445/_live/apps/q3/groceries.png',
+  ),
+  link: Uri.parse('https://host.example.ts.net:8445/_live/apps/q3/groceries'),
+);
+
+/// A phone over a server whose open workspace holds [files], and [apps] when its host lists
+/// them.
+Future<Harness> _phone(
+  WidgetTester tester,
+  List<CreatedFile> files, {
+  List<CreatedApp>? apps,
+}) async {
   final llm = planningServer();
   final h = await pumpApp(tester, llm: llm, size: phone);
   llm.created[h.chat.activeSlug!] = CreatedList(
     files: files,
+    apps: apps,
     used: 1200 * 1024 * 1024,
     warn: 4 * 1024 * 1024 * 1024,
     limit: 5 * 1024 * 1024 * 1024,
@@ -159,5 +179,56 @@ void main() {
     await tester.pumpAndSettle();
     expect(control('Artifacts'), findsNothing);
     expect(find.text('Artifacts'), findsNothing);
+  });
+
+  testWidgets(
+    'apps come first, counted with the files, and open as in a chat',
+    (tester) async {
+      final h = await _phone(tester, [_kept], apps: [_groceries]);
+      h.shell.toggleSide();
+      await tester.pumpAndSettle();
+      expect(control('Artifacts, 1 app · 1 file'), findsOneWidget);
+      await tester.tap(control('Artifacts, 1 app · 1 file'));
+      await tester.pumpAndSettle();
+      expect(inPage(find.text('1 app · 1 file')), findsOneWidget);
+      expect(inPage(find.text('List · 4 of 6 left')), findsOneWidget);
+      await tester.tap(inPage(find.text('Groceries')));
+      await tester.pumpAndSettle();
+      expect(h.shell.phonePage, isNull);
+      expect(h.shell.app?.name, 'Groceries');
+      expect(h.shell.app?.page, _groceries.link);
+    },
+  );
+
+  testWidgets('an app\'s sheet opens it in the browser or deletes it', (
+    tester,
+  ) async {
+    final h = await _phone(tester, const [], apps: [_groceries]);
+    h.shell.openPhonePage(PhonePage.artifacts);
+    await tester.pumpAndSettle();
+    await tester.tap(control('Open in the browser or delete Groceries'));
+    await tester.pumpAndSettle();
+    expect(control('Open'), findsOneWidget);
+    await tester.tap(control('Open in the browser'));
+    await tester.pumpAndSettle();
+    expect(h.opened.single, _groceries.page);
+
+    await tester.tap(control('Open in the browser or delete Groceries'));
+    await tester.pumpAndSettle();
+    await tester.tap(control('Delete app'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Its data goes with it'), findsOneWidget);
+    await tester.tap(control('Delete'));
+    await tester.pumpAndSettle();
+    expect(h.llm.calls, contains('deleteCreated:apps/groceries'));
+    expect(inPage(find.text('No apps in this workspace yet.')), findsOneWidget);
+  });
+
+  testWidgets('a host that does not list apps shows no Apps', (tester) async {
+    final h = await _phone(tester, [_kept]);
+    h.shell.openPhonePage(PhonePage.artifacts);
+    await tester.pumpAndSettle();
+    expect(inPage(find.text('APPS')), findsNothing);
+    expect(inPage(find.text('1 file')), findsOneWidget);
   });
 }

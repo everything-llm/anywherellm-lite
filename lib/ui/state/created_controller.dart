@@ -10,8 +10,9 @@ import 'chat_controller.dart';
 import 'notice.dart';
 import 'settings_controller.dart';
 
-/// The files the agent's code left in the open workspace's sandbox, as the everythingllm host
-/// lists them, and what the person does with each: Download, Keep and Delete. A workspace or a
+/// The files the agent's code left in the open workspace's sandbox and its apps, as the
+/// everythingllm host lists them, and what the person does with each: Download, Keep and
+/// Delete. A workspace or a
 /// server that shows afresh starts it afresh. A server without the host's route leaves
 /// [unavailable] set, and is not asked again until another server shows.
 class CreatedController extends ChangeNotifier {
@@ -40,7 +41,7 @@ class CreatedController extends ChangeNotifier {
   /// Why the last read or change failed.
   Notice? problem;
 
-  /// The ids of the files being kept or deleted.
+  /// The ids of the files and apps being kept or deleted.
   final Set<String> working = {};
 
   int _reads = 0;
@@ -122,28 +123,28 @@ class CreatedController extends ChangeNotifier {
   Future<void> keep(CreatedFile file) =>
       _change(file, 'keep', (slug) => _api.keepCreated(slug, file.id));
 
-  /// Deletes [file] from the workspace.
-  Future<void> remove(CreatedFile file) =>
-      _change(file, 'delete', (slug) => _api.deleteCreated(slug, file.id));
+  /// Deletes [item], a file or an app, from the workspace.
+  Future<void> remove(Created item) =>
+      _change(item, 'delete', (slug) => _api.deleteCreated(slug, item.id));
 
   Future<void> _change(
-    CreatedFile file,
+    Created item,
     String verb,
     Future<void> Function(String slug) call,
   ) async {
     final here = _of;
     final slug = here?.slug;
-    if (slug == null || !working.add(file.id)) return;
+    if (slug == null || !working.add(item.id)) return;
     problem = null;
     notifyListeners();
     Notice? failed;
     try {
       await call(slug);
     } on ApiException catch (error) {
-      failed = Notice('Could not $verb ${file.name}', error.message);
+      failed = Notice('Could not $verb ${item.label}', error.message);
     }
     if (_of != here) return;
-    working.remove(file.id);
+    working.remove(item.id);
     notifyListeners();
     // What the host has now, whether the change went or not.
     await read();

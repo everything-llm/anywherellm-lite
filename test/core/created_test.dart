@@ -91,6 +91,55 @@ void main() {
     );
   });
 
+  group('an app', () {
+    Map<String, Object?> app([Map<String, Object?> more = const {}]) => {
+      'id': 'apps/groceries',
+      'name': 'groceries',
+      'title': 'Groceries',
+      'kind': 'list',
+      'summary': '4 of 6 left',
+      'modified': 1760000000,
+      'page': 'https://host.example.ts.net:8447/q3/apps/groceries/',
+      'card': 'https://host.example.ts.net:8445/_live/apps/q3/groceries.png',
+      'link': 'https://host.example.ts.net:8445/_live/apps/q3/groceries',
+      ...more,
+    };
+
+    test('reads its kind in words, how it stands and where it is', () {
+      final read = CreatedApp.fromJson(app())!;
+      expect(read.id, 'apps/groceries');
+      expect(read.label, 'Groceries');
+      expect(read.about, 'List · 4 of 6 left');
+      expect(read.link.toString(), endsWith('/_live/apps/q3/groceries'));
+      expect(
+        CreatedApp.fromJson(app({'kind': 'pomodoro'}))!.about,
+        startsWith('Timer'),
+      );
+      expect(CreatedApp.fromJson(app({'kind': 'blank'}))!.about, '4 of 6 left');
+      expect(
+        CreatedApp.fromJson(app({'error': 'bad data'}))!.about,
+        'bad data',
+      );
+      expect(CreatedApp.fromJson({'id': 'apps/x'}), isNull);
+    });
+
+    test('is listed only by a host that lists apps', () {
+      final withApps = CreatedList.fromJson({
+        'files': [],
+        'apps': [app(), 'junk'],
+      })!;
+      expect(withApps.apps, hasLength(1));
+      expect(CreatedList.fromJson({'files': []})!.apps, isNull);
+    });
+
+    test('asks a question of its own before it is deleted', () {
+      expect(
+        deleteCreatedQuestion(CreatedApp.fromJson(app())!),
+        startsWith('Delete Groceries? Its data goes with it'),
+      );
+    });
+  });
+
   group('a mark', () {
     final now = DateTime(2026, 10, 9, 12);
     CreatedFile file(String area, {DateTime? expires}) => CreatedFile(

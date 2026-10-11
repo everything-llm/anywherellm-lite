@@ -407,9 +407,21 @@ class FakeAnythingLlm implements AnythingLlmApi {
     return kept;
   }, id);
 
+  /// Deletes a file, or an app by its `apps/<name>` id, as the server does.
   @override
   Future<void> deleteCreated(String slug, String id) =>
       _run('deleteCreated', () {
+        final apps = created[slug]?.apps;
+        if (id.startsWith('apps/')) {
+          if (apps == null || !apps.any((a) => a.id == id)) {
+            throw ApiException("there's no app '$id'", status: 404);
+          }
+          _createdSet(slug, created[slug]!.files, [
+            for (final a in apps)
+              if (a.id != id) a,
+          ]);
+          return;
+        }
         _need(slug, id);
         _createdSet(slug, [
           for (final f in created[slug]!.files)
@@ -425,10 +437,15 @@ class FakeAnythingLlm implements AnythingLlmApi {
       _createdFile(slug, id) ??
       (throw ApiException("There's no '$id'", status: 404));
 
-  void _createdSet(String slug, List<CreatedFile> files) {
+  void _createdSet(
+    String slug,
+    List<CreatedFile> files, [
+    List<CreatedApp>? apps,
+  ]) {
     final was = created[slug]!;
     created[slug] = CreatedList(
       files: files,
+      apps: apps ?? was.apps,
       used: was.used,
       warn: was.warn,
       limit: was.limit,

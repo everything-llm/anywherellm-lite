@@ -39,12 +39,12 @@ class ChatSheetFor {
   final bool deleting;
 }
 
-/// A phone's sheet for one created file of the open workspace: Download, Open page, Keep and
-/// Delete file, or with [deleting] the question whether to delete it.
+/// A phone's sheet for one created file or app of the open workspace: what can be done with
+/// it, or with [deleting] the question whether to delete it.
 class CreatedSheetFor {
-  const CreatedSheetFor(this.file, {this.deleting = false});
+  const CreatedSheetFor(this.item, {this.deleting = false});
 
-  final CreatedFile file;
+  final Created item;
   final bool deleting;
 }
 
@@ -116,9 +116,9 @@ class ShellController extends ChangeNotifier {
   void openGallery(List<Picture> pictures, int index, {required String chat}) =>
       _popup.value = GalleryOpen(pictures, index, chat: chat);
 
-  /// Opens [file]'s sheet, closing any other popup.
-  void openCreatedSheet(CreatedFile file, {bool deleting = false}) =>
-      _popup.value = CreatedSheetFor(file, deleting: deleting);
+  /// Opens [item]'s sheet, closing any other popup.
+  void openCreatedSheet(Created item, {bool deleting = false}) =>
+      _popup.value = CreatedSheetFor(item, deleting: deleting);
 
   /// Opens [thread]'s sheet, closing any other popup and the drawer.
   void openChatSheet(Thread thread, {bool deleting = false}) {

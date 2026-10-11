@@ -129,7 +129,7 @@ abstract interface class AnythingLlmApi {
   /// or the project folder has a file of that name.
   Future<String> keepCreated(String slug, String id);
 
-  /// Deletes the created file [id]. Fails with [ApiException].
+  /// Deletes the created file or app [id]. Fails with [ApiException].
   Future<void> deleteCreated(String slug, String id);
 
   /// The jobs AnythingLLM runs on a schedule. It takes the server's web login, as the presets
