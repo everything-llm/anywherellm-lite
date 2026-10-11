@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 
 import '../../core/copy.dart';
@@ -200,10 +198,7 @@ class DocBodyView extends StatelessWidget {
             ),
           ),
         ] else
-          Text(
-            'The server did not send this document\'s text.',
-            style: Type.sans(13.5, color: t.muted),
-          ),
+          Text(noDocText, style: Type.sans(13.5, color: t.muted)),
         const SizedBox(height: 8),
         Text(
           'The server keeps only the text it read, never the uploaded file.',
@@ -228,11 +223,10 @@ class _DownloadTextState extends State<_DownloadText> {
   String? _saved;
 
   Future<void> _download() async {
-    final path = await saveFile(
+    final path = await saveText(
       context,
-      textFileName(widget.doc.title),
-      () async => utf8.encode(widget.doc.text!),
-      failTitle: 'Could not save ${widget.doc.title}',
+      widget.doc.title,
+      () async => widget.doc.text!,
     );
     if (path != null && mounted) setState(() => _saved = path);
   }

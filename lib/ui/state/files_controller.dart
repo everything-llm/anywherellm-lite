@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../core/connection.dart';
+import '../../core/copy.dart';
 import '../../core/files.dart';
 import '../../core/ports.dart';
 import '../../core/server_models.dart';
@@ -323,6 +324,11 @@ class FilesController extends ChangeNotifier {
     contentLoading = false;
     notifyListeners();
   }
+
+  /// The text the server keeps of the document at [path], or an [ApiException] when it cannot
+  /// be read or the server left it out.
+  Future<String> textOf(String path) async =>
+      (await _api.document(path)).text ?? (throw const ApiException(noDocText));
 
   /// Puts the extracted text away, back to the documents.
   void closeText() {

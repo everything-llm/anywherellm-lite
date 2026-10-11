@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/sources.dart';
 import '../app_scope.dart';
+import '../files/save_file.dart';
 import '../icons.dart';
 import '../layout.dart';
 import '../tokens.dart';
@@ -192,7 +193,7 @@ Widget _fileSliver(
   );
 }
 
-/// A file in the panel: on a phone 56 px tall, with a larger title, switch and trash.
+/// A file in the panel: on a phone 56 px tall, with a larger title, switch, download and trash.
 class _FileRow extends StatelessWidget {
   const _FileRow(this.file, {required this.flashed});
 
@@ -215,6 +216,7 @@ class _FileRow extends StatelessWidget {
           tooltip: 'Use in answers',
           onChanged: (_) => scope.sources.toggle(file),
         ),
+        DownloadTextButton(file),
         IconBtn(
           'trash',
           tooltip: 'Remove ${file.title}',
@@ -321,6 +323,32 @@ class SourceRow extends StatelessWidget {
         ),
         for (final widget in trailing) ...[SizedBox(width: gap), widget],
       ],
+    );
+  }
+}
+
+/// Saves the text the server read from [file], which is all it keeps of it, through [saveText].
+/// A failure shows in [SourcesController.problems].
+class DownloadTextButton extends StatelessWidget {
+  const DownloadTextButton(this.file, {super.key});
+
+  final SourceFile file;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final phone = ScreenClass.ofContext(context).isPhone;
+    return IconBtn(
+      'download',
+      tooltip: 'Download text of ${file.title}',
+      box: phone ? 44 : 32,
+      size: phone ? IconSize.small : IconSize.xs,
+      onPressed: () => saveText(
+        context,
+        file.title,
+        () => scope.files.textOf(file.path),
+        report: scope.sources.report,
+      ),
     );
   }
 }

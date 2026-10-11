@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/widgets.dart';
 
+import '../../core/files.dart';
 import '../app_scope.dart';
 
 /// The [FileSaver] the app uses on Linux: the system's save dialog, then a write to the place
@@ -51,6 +53,21 @@ Future<String?> saveFile(
     return null;
   }
 }
+
+/// Saves what [text] gives, the text the server read from the document called [title], under
+/// [textFileName], as [saveFile] does.
+Future<String?> saveText(
+  BuildContext context,
+  String title,
+  Future<String> Function() text, {
+  void Function(String title, String text)? report,
+}) => saveFile(
+  context,
+  textFileName(title),
+  () async => utf8.encode(await text()),
+  failTitle: 'Could not save $title',
+  report: report,
+);
 
 /// [error]'s message without Dart's `Exception: ` prefix.
 String _plain(Exception error) =>

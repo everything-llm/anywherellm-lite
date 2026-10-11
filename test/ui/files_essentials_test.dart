@@ -129,6 +129,33 @@ void main() {
     expect(inPane(control('Download text')), findsNothing);
   });
 
+  testWidgets('a document\'s row saves its text', (tester) async {
+    final h = await openFiles(tester);
+    await tester.tap(inPane(control('Download text of Q3 roadmap.pdf')));
+    await tester.pumpAndSettle();
+    expect(
+      utf8.decode(h.saved['Q3 roadmap.pdf.txt']!),
+      'The text of Q3 roadmap.pdf.',
+    );
+    expect(h.files.reading, isNull);
+  });
+
+  testWidgets('a row\'s download of a document without text says why', (
+    tester,
+  ) async {
+    final llm = planningServer()
+      ..textless.add('custom-documents/Q3 roadmap.pdf.json');
+    final h = await openFiles(tester, llm: llm);
+    await tester.tap(inPane(control('Download text of Q3 roadmap.pdf')));
+    await tester.pumpAndSettle();
+    expect(h.saved, isEmpty);
+    expect(inPane(find.text('Could not save Q3 roadmap.pdf')), findsOneWidget);
+    expect(
+      inPane(find.text('The server did not send this document\'s text.')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('a text that cannot be read says why', (tester) async {
     final llm = planningServer()
       ..errors['document'] = const ApiException('The server is down.');

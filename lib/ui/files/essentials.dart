@@ -197,8 +197,8 @@ class EssentialDocs extends StatelessWidget {
   }
 }
 
-/// One document: its type, name and size, whether it is pinned, its switch, and View extracted
-/// text, which moves under the name when the row is narrow.
+/// One document: its type, name and size, whether it is pinned, its switch, View extracted
+/// text, which moves under the name when the row is narrow, and Download text.
 class _DocRow extends StatelessWidget {
   const _DocRow(this.doc, {super.key});
 
@@ -238,6 +238,7 @@ class _DocRow extends StatelessWidget {
                 onChanged: (_) => scope.sources.toggle(doc),
               ),
               if (wide) view,
+              DownloadTextButton(doc),
             ],
           );
         },

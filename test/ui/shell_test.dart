@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/connection.dart';
@@ -586,6 +587,32 @@ void main() {
       await tester.pumpAndSettle();
       expect(h.sources.files, hasLength(2));
       expect(find.text('Removed Q3 roadmap.pdf'), findsNothing);
+    });
+
+    testWidgets('a file\'s download saves the text the server read', (
+      tester,
+    ) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      await tester.tap(control('Download text of Q3 roadmap.pdf'));
+      await tester.pumpAndSettle();
+      expect(
+        utf8.decode(h.saved['Q3 roadmap.pdf.txt']!),
+        'The text of Q3 roadmap.pdf.',
+      );
+    });
+
+    testWidgets('a file whose text cannot be read says why', (tester) async {
+      final llm = planningServer()
+        ..errors['document'] = const ApiException('The server is down.');
+      final h = await pumpApp(tester, llm: llm);
+      await tester.tap(control('Download text of Q3 roadmap.pdf'));
+      await tester.pumpAndSettle();
+      expect(h.saved, isEmpty);
+      expect(
+        inSources(find.text('Could not save Q3 roadmap.pdf')),
+        findsOneWidget,
+      );
+      expect(inSources(find.text('The server is down.')), findsOneWidget);
     });
 
     testWidgets('Sources closes and opens from the header', (tester) async {
