@@ -12,9 +12,9 @@ import 'chat_controller.dart';
 /// What the main pane shows: the chat, or the server's data as files.
 enum Pane { chats, files }
 
-/// What the panel to the right of the chat shows: Sources, the chat's browser, an app, or the
-/// passages an answer read from one file.
-enum Beside { sources, browser, app, passages }
+/// What the panel to the right of the chat shows: Sources, the chat's browser, an app, the
+/// passages an answer read from one file, or all of an answer's sources ([cited]).
+enum Beside { sources, browser, app, passages, cited }
 
 /// A citation whose passages the panel to the right shows, with its [number] in its answer.
 typedef CitedPassages = ({int number, Citation citation});
@@ -241,6 +241,7 @@ class ShellController extends ChangeNotifier {
   bool get browserOpen => rightOpen && _beside == Beside.browser;
   bool get appOpen => rightOpen && _beside == Beside.app;
   bool get passagesOpen => rightOpen && _beside == Beside.passages;
+  bool get citedOpen => rightOpen && _beside == Beside.cited;
   bool get settingsOpen => _settingsOpen;
 
   /// The page Settings shows, or null for its list where the list and a page do not fit side by
@@ -294,6 +295,25 @@ class ShellController extends ChangeNotifier {
 
   /// Takes the passages out of the panel and puts back what was there, open or closed.
   void closePassages() => _giveBack(Beside.passages);
+
+  List<Citation>? _cited;
+
+  /// The sources of the answer the panel to the right lists, or listed last.
+  List<Citation>? get cited => _cited;
+
+  /// Lists all of an answer's [citations] in the panel to the right, opening it, or closes it
+  /// when it already lists them.
+  void toggleCited(List<Citation> citations) {
+    if (citedOpen && identical(_cited, citations)) return closeCited();
+    if (!identical(citations, _cited)) {
+      _cited = citations;
+      notifyListeners();
+    }
+    _take(Beside.cited);
+  }
+
+  /// Takes an answer's sources out of the panel and puts back what was there, open or closed.
+  void closeCited() => _giveBack(Beside.cited);
 
   /// Opens the panel on [next], remembering what it showed.
   void _take(Beside next) {

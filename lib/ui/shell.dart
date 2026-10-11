@@ -9,6 +9,7 @@ import 'app_scope.dart';
 import 'chat/app_panel.dart';
 import 'chat/browser_panel.dart';
 import 'chat/chat_view.dart';
+import 'chat/cited_sources.dart';
 import 'chat/gallery.dart';
 import 'chat_sheet.dart';
 import 'chat/passages_sheet.dart';
@@ -99,6 +100,7 @@ class AppShell extends StatelessWidget {
       if (sidebarDrawer && shell.sideOpen) return shell.closeSide;
       if (shell.appOpen) return shell.closeApp;
       if (shell.passagesOpen) return shell.closePassages;
+      if (shell.citedOpen) return shell.closeCited;
       if (shell.browserOpen) return shell.closeBrowser;
       if (rightClosable && shell.rightOpen) return shell.closeSources;
       // A phone's workspace pages step back: a document's text, a page, then the chat.
@@ -134,7 +136,9 @@ class AppShell extends StatelessWidget {
             // The panel to the right: Sources, or the chat's browser or an app, wider and never
             // wider than the screen.
             final rightWidth = switch (shell.beside) {
-              Beside.sources || Beside.passages => Sizes.sources,
+              Beside.sources ||
+              Beside.passages ||
+              Beside.cited => Sizes.sources,
               _ => min(Sizes.browser, box.maxWidth),
             };
             // Closed, the panel stays built for its closing animation; TickerMode, inside that
@@ -146,6 +150,7 @@ class AppShell extends StatelessWidget {
                 Beside.browser => BrowserPanel(width: rightWidth),
                 Beside.app => AppPanel(app: shell.app!, width: rightWidth),
                 Beside.passages => const PassagesPanel(),
+                Beside.cited => const CitedPanel(),
               },
             );
             VoidCallback? close() => topClose(

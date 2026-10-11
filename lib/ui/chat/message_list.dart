@@ -876,48 +876,87 @@ class _Status extends StatelessWidget {
   }
 }
 
-/// The sources an answer drew on. An agent's can be dozens of web pages, so past the first few
-/// they fold behind a count.
-class _Citations extends StatefulWidget {
+/// The sources an answer drew on, in one line that never wraps, so the answer keeps its height:
+/// the first three by name, then the rest folded into one "+N" chip that lists them all in the
+/// panel to the right, or on a phone in a sheet. A web page is named by its site.
+class _Citations extends StatelessWidget {
   const _Citations(this.citations);
 
   final List<Citation> citations;
 
-  static const shown = 5;
+  /// How many are named before the rest fold.
+  static const shown = 3;
 
   @override
-  State<_Citations> createState() => _CitationsState();
+  Widget build(BuildContext context) {
+    final shell = AppScope.of(context).shell;
+    final folded = citations.length > shown + 1;
+    final named = folded ? citations.take(shown) : citations;
+    return ListenableBuilder(
+      listenable: shell,
+      builder: (context, _) {
+        final open = shell.citedOpen && identical(shell.cited, citations);
+        return ClipRect(
+          child: Row(
+            spacing: 6,
+            children: [
+              for (final (i, citation) in named.indexed)
+                Flexible(
+                  child: _Citation(number: i + 1, citation: citation),
+                ),
+              if (folded)
+                _MoreSources(
+                  citations.length - shown,
+                  open: open,
+                  onTap: () => shell.toggleCited(citations),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
-class _CitationsState extends State<_Citations> {
-  bool _all = false;
+/// How many more sources an answer has, which lists them all; lit while they show.
+class _MoreSources extends StatelessWidget {
+  const _MoreSources(this.count, {required this.open, required this.onTap});
+
+  final int count;
+  final bool open;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final citations = widget.citations;
-    final folded = !_all && citations.length > _Citations.shown + 1;
-    final count = folded ? _Citations.shown : citations.length;
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: [
-        for (final (i, citation) in citations.take(count).indexed)
-          _Citation(number: i + 1, citation: citation),
-        if (folded)
-          Tappable(
-            label: '${citations.length - count} more sources',
-            onTap: () => setState(() => _all = true),
-            radius: BorderRadius.circular(99),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              child: Text(
-                '${citations.length - count} more',
-                style: Type.sans(12.5, color: t.muted),
+    final phone = ScreenClass.ofContext(context).isPhone;
+    return Tappable(
+      touchTarget: true,
+      label: '$count more sources',
+      toggled: open,
+      onTap: onTap,
+      radius: BorderRadius.circular(99),
+      color: open ? t.sel : (phone ? t.panel : t.hover),
+      side: phone ? BorderSide(color: t.line) : null,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: phone ? 36 : 0),
+        child: Padding(
+          padding: phone
+              ? const EdgeInsets.symmetric(horizontal: 12)
+              : const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          child: Center(
+            widthFactor: 1,
+            heightFactor: 1,
+            child: Text(
+              '+$count',
+              style: Type.sans(
+                phone ? 13.5 : 12.5,
+                color: open ? t.accent : (phone ? t.ink2 : t.muted),
               ),
             ),
           ),
-      ],
+        ),
+      ),
     );
   }
 }
@@ -1003,25 +1042,28 @@ class _CitationState extends State<_Citation> {
       color: phone ? t.panel : (live ? t.accentbg : t.hover),
       side: phone ? BorderSide(color: t.line) : null,
       child: ConstrainedBox(
-        constraints: BoxConstraints(minHeight: phone ? 32 : 0),
+        constraints: BoxConstraints(minHeight: phone ? 36 : 0),
         child: Padding(
           padding: phone
-              ? const EdgeInsets.fromLTRB(6, 0, 10, 0)
+              ? const EdgeInsets.fromLTRB(8, 0, 12, 0)
               : const EdgeInsets.fromLTRB(6, 4, 10, 4),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               CitationNumber(number, live: live),
               const SizedBox(width: 6),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 240),
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: phone
-                      ? Type.sans(13, color: t.ink2)
-                      : Type.sans(12.5, color: live ? t.accent : t.ink2),
+              Flexible(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 240),
+                  child: Text(
+                    // A web page goes by its site, as a row of them reads best.
+                    url?.host ?? title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: phone
+                        ? Type.sans(13.5, color: t.ink2)
+                        : Type.sans(12.5, color: live ? t.accent : t.ink2),
+                  ),
                 ),
               ),
             ],

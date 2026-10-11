@@ -529,11 +529,18 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Running web-browsing'), findsNothing);
         expect(h.chat.turns.last.text, 'Headline');
-        expect(control('Source 5: Story 5'), findsOneWidget);
-        expect(control('Source 6: Story 6'), findsNothing);
-        await tester.tap(control('4 more sources'));
+        // Three by name in one line, the rest behind +6, which lists them all beside the chat.
+        expect(control('Source 3: Story 3'), findsOneWidget);
+        expect(control('Source 4: Story 4'), findsNothing);
+        await tester.tap(control('6 more sources'));
         await tester.pumpAndSettle();
-        expect(control('Source 9: Story 9'), findsOneWidget);
+        expect(h.shell.citedOpen, isTrue);
+        expect(find.text('Sources for this answer'), findsOneWidget);
+        expect(find.text('9 sources'), findsOneWidget);
+        expect(control('Story 9'), findsOneWidget);
+        await tester.tap(control('6 more sources'));
+        await tester.pumpAndSettle();
+        expect(h.shell.citedOpen, isFalse);
       },
     );
 
