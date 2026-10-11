@@ -11,10 +11,12 @@ import '../tokens.dart';
 import '../type.dart';
 import '../icons.dart';
 import '../widgets/basics.dart';
+import '../widgets/buttons.dart';
 import '../widgets/tappable.dart';
 import '../widgets/min_height.dart';
 import '../widgets/phone_page.dart';
 import 'files_view.dart';
+import 'save_file.dart';
 import '../settings/rows.dart';
 import '../widgets/fields.dart';
 
@@ -94,7 +96,27 @@ class _WorkspacePagesState extends State<WorkspacePages> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              PhonePageHeader(title: title, back: back, onBack: onBack),
+              PhonePageHeader(
+                title: title,
+                back: back,
+                onBack: onBack,
+                // A document's text saves from the bar over it.
+                action: reading == null
+                    ? null
+                    : IconBtn(
+                        'download',
+                        tooltip: 'Download the extracted text',
+                        box: 48,
+                        filled: true,
+                        size: IconSize.small,
+                        onPressed: () => saveText(
+                          context,
+                          reading.title,
+                          () => _files.textOf(reading.path),
+                          report: scope.sources.report,
+                        ),
+                      ),
+              ),
               for (final problem in _files.problems)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),

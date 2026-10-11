@@ -50,13 +50,12 @@ void main() {
       shares,
       SharedLink(Uri.parse('https://example.test/prices'), title: 'Prices'),
     );
-    expect(inSheet(find.text('Send to AnywhereLLM')), findsOneWidget);
+    expect(inSheet(find.text('Share to AnywhereLLM')), findsOneWidget);
     expect(inSheet(find.text('Prices')), findsOneWidget);
-    expect(inSheet(find.text('Used last')), findsOneWidget);
     expect(tester.takeException(), isNull);
-    await tester.tap(inSheet(find.text('Household')));
+    await tester.tap(inSheet(control('Household')));
     await tester.pumpAndSettle();
-    await tester.tap(inSheet(control('Add to Documents')));
+    await tester.tap(inSheet(control('Add to documents')));
     await tester.pumpAndSettle();
     expect(h.chat.activeSlug, 'household');
     expect(llm.calls, contains('uploadLink:https://example.test/prices'));
@@ -65,36 +64,27 @@ void main() {
     await shares.close();
   });
 
-  testWidgets('asking about shared text starts a new chat with it quoted', (
+  testWidgets('asking about shared text puts it, quoted, in a new chat', (
     tester,
   ) async {
     final shares = StreamController<SharedItem>();
     final llm = planningServer();
     final h = await pumpApp(tester, llm: llm, size: phone, shares: shares);
     await share(tester, shares, const SharedText('Service due in May.'));
-    await tester.tap(inSheet(find.text('Ask about it')));
-    await tester.pumpAndSettle();
-    // A question is needed.
-    await tester.tap(inSheet(control('Ask')));
-    await tester.pumpAndSettle();
-    expect(inSheet(find.text('Write a question about it.')), findsOneWidget);
-    await tester.enterText(
-      inSheet(find.byType(EditableText)),
-      'When is it due?',
-    );
-    await tester.pump();
-    await tester.tap(inSheet(control('Ask')));
+    await tester.tap(inSheet(control('Ask about it')));
     await tester.pumpAndSettle();
     expect(find.byType(ShareSheet), findsNothing);
+    // Nothing goes until the person asks.
+    expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
+    expect(h.chat.activeThread, isNull);
     expect(
-      llm.calls.where((c) => c.startsWith('streamChat')).last,
-      endsWith('When is it due?\n\n> Service due in May.'),
+      tester.widget<EditableText>(composerField).controller.text,
+      '> Service due in May.\n\n',
     );
-    expect(h.chat.activeThread, isNot('budget'));
     await shares.close();
   });
 
-  testWidgets('a shared file goes with the question, but not past 20 MB', (
+  testWidgets('a shared file goes with the message, but not past 20 MB', (
     tester,
   ) async {
     final shares = StreamController<SharedItem>();
@@ -105,14 +95,9 @@ void main() {
       shares,
       SharedFile('huge.pdf', 21 * 1024 * 1024, () async => [1]),
     );
-    await tester.tap(inSheet(find.text('Ask about it')));
-    await tester.pumpAndSettle();
-    await tester.enterText(inSheet(find.byType(EditableText)), 'Cheaper?');
-    await tester.pump();
-    await tester.tap(inSheet(control('Ask')));
+    await tester.tap(inSheet(control('Ask about it')));
     await tester.pumpAndSettle();
     expect(inSheet(find.textContaining('20 MB at most')), findsOneWidget);
-    expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
     await tester.tap(inSheet(control('Close')));
     await tester.pumpAndSettle();
     await share(
@@ -121,9 +106,17 @@ void main() {
       SharedFile('quote.pdf', 4, () async => [1, 2, 3, 4]),
     );
     expect(inSheet(find.text('PDF')), findsOneWidget);
-    await tester.tap(inSheet(control('Add to Documents')));
+    await tester.tap(inSheet(control('Ask about it')));
     await tester.pumpAndSettle();
-    expect(llm.calls, contains('upload:quote.pdf'));
+    expect(control('1 file attached. Review'), findsOneWidget);
+    await share(
+      tester,
+      shares,
+      SharedFile('notes.pdf', 4, () async => [1, 2, 3, 4]),
+    );
+    await tester.tap(inSheet(control('Add to documents')));
+    await tester.pumpAndSettle();
+    expect(llm.calls, contains('upload:notes.pdf'));
     await shares.close();
   });
 
@@ -142,48 +135,16 @@ void main() {
           () async => throw const FileSystemException(),
         ),
       );
-      await tester.tap(inSheet(find.text('Ask about it')));
-      await tester.pumpAndSettle();
-      await tester.enterText(inSheet(find.byType(EditableText)), 'Cheaper?');
-      await tester.pump();
-      await tester.tap(inSheet(control('Ask')));
+      await tester.tap(inSheet(control('Ask about it')));
       await tester.pumpAndSettle();
       expect(
         inSheet(find.text('The shared file could not be read.')),
         findsOne,
       );
-      expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
       expect(find.byType(ShareSheet), findsOneWidget);
       await shares.close();
     },
   );
-
-  testWidgets('asking where an answer is running says so and keeps the item', (
-    tester,
-  ) async {
-    final shares = StreamController<SharedItem>();
-    final llm = planningServer()..hold = true;
-    final h = await pumpApp(tester, llm: llm, size: phone, shares: shares);
-    await h.chat.send('And next quarter?');
-    await tester.pump();
-    shares.add(const SharedText('Service due in May.'));
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.tap(inSheet(find.text('Ask about it')));
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.enterText(inSheet(find.byType(EditableText)), 'When?');
-    await tester.pump();
-    await tester.tap(inSheet(control('Ask')));
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(
-      inSheet(
-        find.text('This workspace is still answering. Ask when it ends.'),
-      ),
-      findsOneWidget,
-    );
-    expect(llm.calls.where((c) => c.startsWith('streamChat')), hasLength(1));
-    await llm.chat!.close();
-    await shares.close();
-  });
 
   testWidgets('with no server the sheet says to connect first', (tester) async {
     final shares = StreamController<SharedItem>();

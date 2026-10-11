@@ -324,6 +324,25 @@ class ChatController extends ChangeNotifier {
   ({String text, List<Attachment> attachments})? takeRefused() =>
       _refused.remove(activeThread);
 
+  /// What another app shared, for the composer of the chat it was put in.
+  ({String? thread, String text, List<Attachment> attachments})? _shared;
+
+  /// Puts [text] and [attachments] in the composer of the chat on screen, for the person to
+  /// ask about them.
+  void putInComposer(String text, List<Attachment> attachments) {
+    _shared = (thread: activeThread, text: text, attachments: attachments);
+    notifyListeners();
+  }
+
+  /// What [putInComposer] put in the chat on screen, for the composer to take; null once
+  /// taken, or when it was put in another chat.
+  ({String text, List<Attachment> attachments})? takeShared() {
+    final shared = _shared;
+    if (shared == null || shared.thread != activeThread) return null;
+    _shared = null;
+    return (text: shared.text, attachments: shared.attachments);
+  }
+
   /// How many messages have been sent, so the chat can bring each new one into view.
   int get sends => _sends;
   int _sends = 0;
@@ -771,8 +790,9 @@ class ChatController extends ChangeNotifier {
     activeThread = threadSlug;
     if (threadSlug != null) _ready.remove(threadSlug);
     _watchLost(fresh: true);
-    // A refused message goes back to the composer only in its own chat.
+    // A refused or shared message goes back to the composer only in its own chat.
     _refused.removeWhere((thread, _) => thread != threadSlug);
+    if (_shared?.thread != threadSlug) _shared = null;
     editing = null;
     _clearLinkNotice();
     _rememberChat();

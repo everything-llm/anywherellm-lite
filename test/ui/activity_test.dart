@@ -85,8 +85,10 @@ void main() {
     expect(find.text('Draft an agenda for the kickoff.'), findsOneWidget);
     expect(find.textContaining('Answering'), findsOneWidget);
     expect(find.textContaining('Done · 12 min ago'), findsOneWidget);
-    expect(find.textContaining('Failed · yesterday'), findsOneWidget);
-    expect(find.text('The relay restarted during the answer.'), findsOneWidget);
+    expect(
+      find.text('Failed · yesterday · The relay restarted during the answer.'),
+      findsOneWidget,
+    );
     expect(find.textContaining('Stopped · 2 days ago'), findsOneWidget);
     expect(find.text('Q3 planning · A chat that is gone'), findsOneWidget);
     expect(tester.takeException(), isNull);

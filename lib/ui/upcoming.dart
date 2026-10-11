@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../core/copy.dart';
 import '../core/schedule.dart';
 import 'app_scope.dart';
-import 'icons.dart';
 import 'links.dart';
 import 'settings/rows.dart';
 import 'settings/settings_pages.dart';
@@ -110,13 +109,8 @@ class _UpcomingPageState extends State<UpcomingPage> {
                 final jobs = system.jobs;
                 final now = DateTime.now();
                 return ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   children: [
-                    Text(
-                      'Jobs the server runs on a schedule.',
-                      style: Type.sans(14.5, color: t.ink2, height: 1.5),
-                    ),
-                    const SizedBox(height: 14),
                     if (system.jobsProblem case final problem?) ...[
                       AlertBox(
                         AlertKind.warn,
@@ -147,17 +141,20 @@ class _UpcomingPageState extends State<UpcomingPage> {
                       FieldCard([
                         for (final job in jobs) _JobRow(job, now: now),
                       ]),
+                    const SizedBox(height: 12),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: HelpText('Read only here.'),
+                    ),
                     const SizedBox(height: 16),
                     if (scope.settings.configured)
-                      AppButton(
-                        'Edit in AnythingLLM\'s web page',
-                        icon: 'external',
-                        onPressed: () => openServerPage(context),
-                      ),
-                    const SizedBox(height: 10),
-                    const HelpText(
-                      'Read only here. A job\'s result goes to its workspace.',
-                    ),
+                      ActionRow(even: true, [
+                        AppButton(
+                          'Edit in AnythingLLM\'s web page',
+                          icon: 'external',
+                          onPressed: () => openServerPage(context),
+                        ),
+                      ]),
                   ],
                 );
               },
@@ -169,8 +166,8 @@ class _UpcomingPageState extends State<UpcomingPage> {
   }
 }
 
-/// One job: its workspace and schedule over its name, then when it runs next, by a clock, and
-/// how it last ran, in green when it went well and red when it failed.
+/// One job: its name, then one line of its workspace, its schedule and when it runs next, or
+/// when its last run failed, in red.
 class _JobRow extends StatelessWidget {
   const _JobRow(this.job, {required this.now});
 
@@ -182,61 +179,43 @@ class _JobRow extends StatelessWidget {
     final t = Tokens.of(context);
     final next = job.nextRun;
     final last = job.lastRun;
-    final status = job.lastStatusText;
-    final when = !job.enabled
+    final failed = job.lastWentWell == false;
+    final when = failed
+        ? ['Last run failed', if (last != null) whenText(last, now)].join(' ')
+        : !job.enabled
         ? 'Off'
         : next != null
         ? 'Next: ${whenText(next, now)}'
         : null;
-    final lastText = [?status, if (last != null) whenText(last, now)].join(' ');
-    final lastColor = switch (job.lastWentWell) {
-      true => t.okfg,
-      false => t.badfg,
-      null => null,
-    };
+    final about = [?job.workspace, describeSchedule(job.cron, now)].join(' · ');
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: FieldCard.inset,
+        vertical: 12,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        spacing: 3,
+        spacing: 2,
         children: [
           Text(
-            [?job.workspace, describeSchedule(job.cron, now)].join(' · '),
-            style: Type.sans(12.5, color: t.muted),
-          ),
-          Text(
             job.name,
-            style: Type.sans(15.5, weight: FontWeight.w500, color: t.ink),
+            style: Type.sans(17, weight: FontWeight.w500, color: t.ink),
           ),
-          if (when != null)
-            Row(
+          Text.rich(
+            TextSpan(
+              text: about,
               children: [
-                AppIcon('clock', size: IconSize.xs, color: t.muted),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(when, style: Type.sans(13.5, color: t.ink2)),
-                ),
-              ],
-            ),
-          if (lastText.isNotEmpty)
-            Text.rich(
-              TextSpan(
-                text: 'Last run: ',
-                children: [
+                if (when != null) ...[
+                  const TextSpan(text: ' · '),
                   TextSpan(
-                    text: lastText,
-                    style: lastColor == null
-                        ? null
-                        : Type.sans(
-                            12.5,
-                            weight: FontWeight.w600,
-                            color: lastColor,
-                          ),
+                    text: when,
+                    style: failed ? Type.sans(13, color: t.badfg) : null,
                   ),
                 ],
-              ),
-              style: Type.sans(12.5, color: t.muted),
+              ],
             ),
+            style: Type.sans(13, color: t.muted, height: 1.4),
+          ),
         ],
       ),
     );

@@ -211,6 +211,32 @@ class _DocRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
+    // A phone's row is the document's name, its size and its switch; tapped, it opens the text.
+    if (ScreenClass.ofContext(context).isPhone) {
+      return Tappable(
+        label: 'View extracted text of ${doc.title}',
+        onTap: () => scope.files.viewText(doc.path, doc.title),
+        excludeSemantics: false,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 64),
+          padding: const EdgeInsets.only(left: FieldCard.inset, right: 8),
+          child: SourceRow(
+            doc,
+            meta: doc.filesMeta,
+            roomy: true,
+            large: true,
+            trailing: [
+              AppSwitch(
+                value: doc.on,
+                label: 'Use ${doc.title} in answers',
+                large: true,
+                onChanged: (_) => scope.sources.toggle(doc),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     final view = TextAction.plain(
       'View extracted text',
       () => scope.files.viewText(doc.path, doc.title),
@@ -256,6 +282,7 @@ class TextViewer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final files = AppScope.of(context).files;
+    if (ScreenClass.ofContext(context).isPhone) return const _PhoneText();
     return EssentialsPage([
       Align(
         alignment: Alignment.centerLeft,
@@ -270,5 +297,90 @@ class TextViewer extends StatelessWidget {
       else if (files.doc case final doc?)
         DocBodyView(doc),
     ]);
+  }
+}
+
+/// A phone's page of a document's text, under the header that names it and offers Download: its
+/// kind and size, whether answers use it, the text in a card, and Remove from workspace.
+class _PhoneText extends StatelessWidget {
+  const _PhoneText();
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final files = scope.files;
+    final t = Tokens.of(context);
+    final path = files.reading?.path;
+    final file = scope.sources.files.where((f) => f.path == path).firstOrNull;
+    final text = files.doc?.text;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      children: [
+        if (file != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              FieldCard.inset,
+              0,
+              FieldCard.inset,
+              16,
+            ),
+            child: Row(
+              spacing: 12,
+              children: [
+                Expanded(
+                  child: Text(
+                    '${file.tile} · ${file.size}',
+                    style: Type.sans(13, color: t.muted),
+                  ),
+                ),
+                Text(
+                  file.on ? 'Used in answers' : 'Not used',
+                  style: Type.sans(13, color: t.muted),
+                ),
+              ],
+            ),
+          ),
+        if (files.contentLoading)
+          Text('Loading…', style: Type.sans(14, color: t.muted))
+        else
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+            decoration: BoxDecoration(
+              color: t.panel,
+              border: Border.all(color: t.line2),
+              borderRadius: BorderRadius.circular(Sizes.phoneCard),
+            ),
+            child: SelectableText(
+              text ?? 'The server sent no text for this document.',
+              style: Type.sans(
+                15.5,
+                color: text == null ? t.muted : t.ink2,
+                height: 1.65,
+              ),
+            ),
+          ),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Text(
+            'The text the server read from this document.',
+            style: Type.sans(13, color: t.muted, height: 1.45),
+          ),
+        ),
+        if (file != null) ...[
+          const SizedBox(height: 20),
+          ActionRow(even: true, [
+            AppButton(
+              'Remove from workspace',
+              danger: true,
+              onPressed: () {
+                files.closeText();
+                scope.sources.remove(file);
+              },
+            ),
+          ]),
+        ],
+      ],
+    );
   }
 }

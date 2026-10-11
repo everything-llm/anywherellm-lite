@@ -7,6 +7,8 @@ import '../../core/outputs.dart';
 import '../../core/upload.dart';
 import '../sources/sources_panel.dart';
 import '../app_scope.dart';
+import '../icons.dart';
+import '../settings/rows.dart';
 import '../settings/settings_pages.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';
@@ -15,8 +17,8 @@ import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/fields.dart';
 import '../widgets/sheet.dart';
+import '../widgets/tappable.dart';
 import 'shared_item.dart';
-import '../widgets/radio_card.dart';
 
 /// [bytes] as they are when they are already a [Uint8List], copied otherwise.
 Uint8List _bytesOf(List<int> bytes) =>
@@ -35,10 +37,10 @@ Future<List<int>> _readShared(Future<List<int>> Function() read) async {
 /// What to do with a shared item.
 enum _Use { add, ask }
 
-/// Send to AnywhereLLM: what another app shared, the workspace to take it (the open one first,
-/// and chosen), and whether to add it to that workspace's documents or ask about it in a new
-/// chat there, with a question. An answer asked about runs on the server, so the sheet closes
-/// at once. With no server saved it says to connect first.
+/// Share to AnywhereLLM: what another app shared, the workspace to take it (the open one first,
+/// and chosen), then Add to documents, which adds it to that workspace's documents, or Ask about
+/// it, which opens a new chat there with it in the message, a file attached, for the person to
+/// ask. With no server saved it says to connect first.
 class ShareSheet extends StatefulWidget {
   const ShareSheet(this.item, {super.key});
 
@@ -50,16 +52,8 @@ class ShareSheet extends StatefulWidget {
 
 class _ShareSheetState extends State<ShareSheet> {
   late String? _slug = AppScope.of(context).chat.activeSlug;
-  _Use _use = _Use.add;
-  final _question = TextEditingController();
   bool _working = false;
   String? _problem;
-
-  @override
-  void dispose() {
-    _question.dispose();
-    super.dispose();
-  }
 
   /// The item's tile, name and the line under it.
   (String, String, String) get _shown => switch (widget.item) {
@@ -72,32 +66,17 @@ class _ShareSheetState extends State<ShareSheet> {
     SharedFile(:final name, :final size) => (
       sourceExt(name),
       name,
-      sizeText(size),
+      '${sourceExt(name)} · ${sizeText(size)}',
     ),
   };
 
-  /// What happens to the item, under the button.
-  String get _foot => switch ((_use, widget.item)) {
-    (_Use.ask, SharedFile()) => 'A file goes with the message, up to 20 MB. The answer keeps running if you leave.',
-    (_Use.ask, _) =>
-      'It goes in the message. The answer keeps running if you leave.',
-    (_Use.add, SharedLink()) => 'The server reads the page and keeps its text.',
-    (_Use.add, SharedFile()) =>
-      'The server keeps the text it reads from the file, not the file.',
-    (_Use.add, SharedText()) => 'Saved as a document of its own.',
-  };
-
-  Future<void> _go() async {
+  Future<void> _go(_Use use) async {
     final scope = AppScope.of(context);
     final slug = _slug;
     if (slug == null) return;
     final item = widget.item;
-    if (_use == _Use.ask && _question.text.trim().isEmpty) {
-      setState(() => _problem = 'Write a question about it.');
-      return;
-    }
     if (item case SharedFile(:final name, :final size)
-        when _use == _Use.ask && size > maxAttachmentBytes) {
+        when use == _Use.ask && size > maxAttachmentBytes) {
       setState(() => _problem = attachmentProblem(name, size));
       return;
     }
@@ -109,19 +88,11 @@ class _ShareSheetState extends State<ShareSheet> {
     final shell = scope.shell;
     if (chat.activeSlug != slug) await chat.select(slug);
     if (!mounted) return;
-    // A workspace answers one chat at a time, so a question could not be sent.
-    if (_use == _Use.ask && (chat.workspaceAnswering || chat.atLimit)) {
-      setState(() {
-        _working = false;
-        _problem = 'This workspace is still answering. Ask when it ends.';
-      });
-      return;
-    }
     shell
       ..closeSettings()
       ..showPane(Pane.chats);
     try {
-      switch (_use) {
+      switch (use) {
         case _Use.add:
           final sources = scope.sources;
           switch (item) {
@@ -142,29 +113,20 @@ class _ShareSheetState extends State<ShareSheet> {
             ..closeShared()
             ..openSources();
         case _Use.ask:
-          final question = _question.text.trim();
           final (message, attachments) = switch (item) {
-            SharedLink(:final url) => (
-              '$question\n\n$url',
-              const <Attachment>[],
-            ),
+            SharedLink(:final url) => ('$url\n\n', const <Attachment>[]),
             SharedText(:final text) => (
-              '$question\n\n> ${text.trim().replaceAll('\n', '\n> ')}',
+              '> ${text.trim().replaceAll('\n', '\n> ')}\n\n',
               const <Attachment>[],
             ),
             SharedFile(:final name, :final read) => (
-              question,
+              '',
               [Attachment.of(name, _bytesOf(await _readShared(read)))],
             ),
           };
           chat.newChat();
           shell.closeShared();
-          if (!await chat.send(message, attachments: attachments)) {
-            chat.report(
-              'Could not send the question',
-              'The chat could not take it just now. Ask again.',
-            );
-          }
+          chat.putInComposer(message, attachments);
       }
     } on UnreadableFile catch (error) {
       if (mounted) {
@@ -183,9 +145,8 @@ class _ShareSheetState extends State<ShareSheet> {
     final shell = scope.shell;
     final (tile, name, about) = _shown;
     return SheetFrame(
-      title: 'Send to AnywhereLLM',
+      title: 'Share to AnywhereLLM',
       onClose: shell.closeShared,
-      maxFraction: 0.92,
       child: SingleChildScrollView(
         child: ListenableBuilder(
           listenable: Listenable.merge([scope.chat, scope.settings]),
@@ -205,125 +166,144 @@ class _ShareSheetState extends State<ShareSheet> {
                 workspaces.firstOrNull;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
+              spacing: 16,
               children: [
-                Container(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                  decoration: BoxDecoration(
-                    color: t.panel2,
-                    border: Border.all(color: t.line),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      TypeTile.label(tile),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Type.sans(
-                                14.5,
-                                weight: FontWeight.w500,
-                                color: t.ink,
+                FieldCard(inSheet: true, [
+                  Container(
+                    constraints: const BoxConstraints(minHeight: 64),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: FieldCard.inset,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      spacing: 14,
+                      children: [
+                        TypeTile.label(tile),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Type.sans(17, color: t.ink),
                               ),
-                            ),
-                            Text(
-                              about,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Type.sans(12.5, color: t.muted),
-                            ),
-                          ],
+                              Text(
+                                about,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Type.sans(13, color: t.muted),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
+                ]),
                 if (!scope.settings.configured) ...[
-                  const SizedBox(height: 16),
                   const HelpText(
                     'Connect to your AnythingLLM server first, then share it again.',
                   ),
-                  const SizedBox(height: 12),
-                  AppButton(
-                    'Open Settings',
-                    primary: true,
-                    onPressed: () {
-                      shell.closeShared();
-                      shell.openSettings(SettingsPage.connection);
-                    },
-                  ),
+                  ActionRow(even: true, [
+                    AppButton(
+                      'Open Settings',
+                      primary: true,
+                      onPressed: () {
+                        shell.closeShared();
+                        shell.openSettings(SettingsPage.connection);
+                      },
+                    ),
+                  ]),
                 ] else ...[
-                  const SizedBox(height: 16),
-                  const SectionLabel('Workspace'),
-                  const SizedBox(height: 4),
-                  for (final w in workspaces)
-                    RadioCard(
-                      title: w.name,
-                      hint: w.slug == active ? 'Used last' : null,
-                      card: false,
-                      selected: w == chosen,
-                      onTap: () => setState(() => _slug = w.slug),
-                    ),
-                  const SizedBox(height: 12),
-                  const SectionLabel('What to do with it'),
-                  const SizedBox(height: 6),
-                  for (final (use, title, detail) in [
-                    (
-                      _Use.add,
-                      'Add to Documents',
-                      'Answers in ${chosen?.name ?? 'the workspace'} can draw on it from now on.',
-                    ),
-                    (
-                      _Use.ask,
-                      'Ask about it',
-                      'Starts a new chat with it attached. It is not kept as a document.',
-                    ),
-                  ])
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: RadioCard(
-                        title: title,
-                        about: detail,
-                        selected: _use == use,
-                        onTap: () => setState(() {
-                          _use = use;
-                          _problem = null;
-                        }),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    spacing: 8,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: FieldCard.inset,
+                        ),
+                        child: SectionLabel('Workspace'),
                       ),
-                    ),
-                  if (_use == _Use.ask) ...[
-                    const SizedBox(height: 4),
-                    AppField(
-                      controller: _question,
-                      label: 'Your question',
-                      hint: 'What do you want to know?',
-                    ),
-                  ],
-                  if (_problem case final problem?) ...[
-                    const SizedBox(height: 8),
-                    HelpText(problem, status: true),
-                  ],
-                  const SizedBox(height: 14),
-                  AppButton(
-                    _working
-                        ? 'Sending…'
-                        : _use == _Use.add
-                        ? 'Add to Documents'
-                        : 'Ask',
-                    primary: true,
-                    onPressed: _working || chosen == null ? null : _go,
+                      FieldCard(inSheet: true, [
+                        for (final w in workspaces)
+                          _WorkspaceRow(
+                            w.name,
+                            chosen: w == chosen,
+                            onTap: () => setState(() => _slug = w.slug),
+                          ),
+                      ]),
+                    ],
                   ),
-                  const SizedBox(height: 10),
-                  HelpText(_foot),
+                  if (_problem case final problem?)
+                    HelpText(problem, status: true),
+                  ActionRow(even: true, [
+                    AppButton(
+                      'Add to documents',
+                      onPressed: _working || chosen == null
+                          ? null
+                          : () => _go(_Use.add),
+                    ),
+                    AppButton(
+                      'Ask about it',
+                      primary: true,
+                      onPressed: _working || chosen == null
+                          ? null
+                          : () => _go(_Use.ask),
+                    ),
+                  ]),
                 ],
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+/// A workspace that can take the item, checked while [chosen].
+class _WorkspaceRow extends StatelessWidget {
+  const _WorkspaceRow(this.name, {required this.chosen, required this.onTap});
+
+  final String name;
+  final bool chosen;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Semantics(
+      inMutuallyExclusiveGroup: true,
+      checked: chosen,
+      child: Tappable(
+        label: name,
+        selected: chosen,
+        onTap: onTap,
+        excludeSemantics: false,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 64),
+          padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
+          child: Row(
+            spacing: 14,
+            children: [
+              Expanded(
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Type.sans(
+                    17,
+                    weight: chosen ? FontWeight.w600 : FontWeight.w400,
+                    color: t.ink,
+                  ),
+                ),
+              ),
+              if (chosen) AppIcon('check', color: t.ink),
+            ],
+          ),
         ),
       ),
     );

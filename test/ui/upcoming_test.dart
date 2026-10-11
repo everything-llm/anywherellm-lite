@@ -37,8 +37,11 @@ void main() {
     final page = find.byType(UpcomingPage);
     expect(page, findsOneWidget);
     expect(find.text('Morning brief'), findsOneWidget);
-    expect(find.text('Household · Every 30 minutes'), findsOneWidget);
-    expect(find.text('Off'), findsOneWidget);
+    expect(
+      find.textContaining('Household · Every 30 minutes · Next: '),
+      findsOneWidget,
+    );
+    expect(find.textContaining(' · Off'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();

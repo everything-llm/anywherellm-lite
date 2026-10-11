@@ -357,4 +357,34 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets("a phone's document opens its text, with Download and Remove", (
+    tester,
+  ) async {
+    final h = await pumpApp(
+      tester,
+      llm: planningServer(),
+      size: const Size(390, 844),
+    );
+    h.shell.showPane(Pane.files);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Documents'));
+    await tester.pumpAndSettle();
+    await tester.tap(control('View extracted text of Q3 roadmap.pdf'));
+    await tester.pumpAndSettle();
+    expect(control('Download the extracted text'), findsOneWidget);
+    expect(find.text('Used in answers'), findsOneWidget);
+    await tester.tap(control('Download the extracted text'));
+    await tester.pumpAndSettle();
+    expect(h.saved.keys, contains('Q3 roadmap.pdf.txt'));
+    await tapVisible(tester, control('Remove from workspace'));
+    await tester.pumpAndSettle();
+    expect(h.files.reading, isNull);
+    expect(
+      h.sources.files.where((f) => f.on).map((f) => f.title),
+      isNot(contains('Q3 roadmap.pdf')),
+    );
+    // The undo for the removal lets go.
+    await tester.pump(const Duration(seconds: 7));
+  });
 }

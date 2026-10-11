@@ -6,6 +6,7 @@ import '../core/activity.dart';
 import '../core/server_models.dart';
 import 'app_scope.dart';
 import 'icons.dart';
+import 'settings/rows.dart';
 import 'state/shell_controller.dart';
 import 'tokens.dart';
 import 'type.dart';
@@ -152,11 +153,10 @@ class _ActivityPageState extends State<ActivityPage> {
       for (final w in chat.workspaces)
         for (final c in chat.threadsOf(w.slug)) (w.slug, c.slug): c.name,
     };
-    Widget row(RelayRun run, int i) {
+    Widget row(RelayRun run) {
       final thread = threads[(run.workspace, run.thread)];
       return _RunRow(
         run,
-        first: i == 0,
         now: now,
         where: [
           ?workspaces[run.workspace],
@@ -170,7 +170,7 @@ class _ActivityPageState extends State<ActivityPage> {
     return CustomScrollView(
       slivers: [
         SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           sliver: SliverList.list(
             children: [
               if (system.activityProblem case final problem?) ...[
@@ -189,11 +189,11 @@ class _ActivityPageState extends State<ActivityPage> {
               if (groups != null) ...[
                 if (groups.running.isNotEmpty) ...[
                   const _Heading('Running now'),
-                  for (final (i, run) in groups.running.indexed) row(run, i),
+                  FieldCard([for (final run in groups.running) row(run)]),
                 ],
                 if (groups.ended.isNotEmpty) ...[
                   const _Heading('Finished, last 7 days'),
-                  for (final (i, run) in groups.ended.indexed) row(run, i),
+                  FieldCard([for (final run in groups.ended) row(run)]),
                 ],
               ],
             ],
@@ -223,7 +223,7 @@ class _Heading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 18, bottom: 2),
+    padding: const EdgeInsets.fromLTRB(FieldCard.inset, 20, FieldCard.inset, 8),
     child: SectionLabel(text),
   );
 }
@@ -233,7 +233,6 @@ class _Heading extends StatelessWidget {
 class _RunRow extends StatelessWidget {
   const _RunRow(
     this.run, {
-    required this.first,
     required this.now,
     required this.where,
     required this.canOpen,
@@ -241,7 +240,6 @@ class _RunRow extends StatelessWidget {
   });
 
   final RelayRun run;
-  final bool first;
   final DateTime now;
   final String where;
   final bool canOpen;
@@ -254,7 +252,7 @@ class _RunRow extends StatelessWidget {
     final question = run.question ?? 'A question the relay did not keep';
     final (label, color) = switch (run) {
       RelayRun(running: true) => ('Answering', t.accent),
-      RelayRun(done: true) => ('Done', t.okfg),
+      RelayRun(done: true) => ('Done', t.ink),
       RelayRun(failed: true) => ('Failed', t.badfg),
       _ => (run.status == 'cancelled' ? 'Stopped' : run.status, t.muted),
     };
@@ -263,10 +261,9 @@ class _RunRow extends StatelessWidget {
     final tail = run.running
         ? (started == null ? null : elapsedText(now.difference(started)))
         : (ended == null ? null : agoText(ended, now));
-    return Container(
-      decoration: BoxDecoration(
-        border: first ? null : Border(top: BorderSide(color: t.line2)),
-      ),
+    final why = run.failed ? run.error : null;
+    return Padding(
+      padding: const EdgeInsets.only(left: FieldCard.inset, right: 8),
       child: Row(
         spacing: 4,
         children: [
@@ -283,7 +280,7 @@ class _RunRow extends StatelessWidget {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minHeight: 64),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     spacing: 2,
@@ -304,9 +301,7 @@ class _RunRow extends StatelessWidget {
                       ),
                       Text(
                         question,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Type.sans(15, color: t.ink, height: 1.4),
+                        style: Type.sans(15.5, color: t.ink, height: 1.4),
                       ),
                       Text.rich(
                         TextSpan(
@@ -314,21 +309,17 @@ class _RunRow extends StatelessWidget {
                             TextSpan(
                               text: label,
                               style: Type.sans(
-                                12.5,
-                                weight: FontWeight.w600,
+                                13,
+                                weight: FontWeight.w700,
                                 color: color,
                               ),
                             ),
                             if (tail != null) TextSpan(text: ' · $tail'),
+                            if (why != null) TextSpan(text: ' · $why'),
                           ],
                         ),
-                        style: Type.sans(12.5, color: t.muted),
+                        style: Type.sans(13, color: t.muted, height: 1.4),
                       ),
-                      if (run.failed && run.error != null)
-                        Text(
-                          run.error!,
-                          style: Type.sans(12.5, color: t.badfg, height: 1.4),
-                        ),
                     ],
                   ),
                 ),
@@ -364,17 +355,14 @@ class _StopButton extends StatelessWidget {
     return Tappable(
       label: 'Stop this answer',
       onTap: onTap,
-      radius: BorderRadius.circular(9),
+      shape: const CircleBorder(),
       child: SizedBox.square(
         dimension: 44,
         child: Center(
           child: Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: t.ink,
-              borderRadius: BorderRadius.circular(9),
-            ),
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(color: t.ink, shape: BoxShape.circle),
             alignment: Alignment.center,
             child: Container(
               width: 9,
