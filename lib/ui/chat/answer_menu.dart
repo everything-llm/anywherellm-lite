@@ -12,15 +12,16 @@ import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
+import '../settings/rows.dart';
 import '../widgets/menu.dart';
 import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
 
-/// The square an answer's action button takes and its icon's size: 44 on a phone, where the
+/// The circle an answer's action button takes and its icon's size: 44 on a phone, where the
 /// design canvas sets the buttons side by side, and 30 elsewhere.
 ({double box, IconSize icon}) answerAction(BuildContext context) =>
     ScreenClass.ofContext(context).isPhone
-    ? (box: 44, icon: IconSize.small)
+    ? (box: 44, icon: IconSize.xs)
     : (box: 30, icon: IconSize.xs);
 
 /// More, under a finished answer the server measured or that can be rated:
@@ -92,7 +93,11 @@ class _AnswerMoreState extends State<AnswerMore> {
           child: SizedBox.square(
             dimension: answerAction(context).box,
             child: Center(
-              child: AppIcon('more', size: IconSize.small, color: t.ink2),
+              child: AppIcon(
+                'more',
+                size: answerAction(context).icon,
+                color: t.ink2,
+              ),
             ),
           ),
         );
@@ -150,27 +155,118 @@ class _AnswerMenu extends StatelessWidget {
   /// Drawn in a sheet, at a phone's sizes, rather than as a menu.
   final bool sheet;
 
+  /// A phone's sheet: the figures in one card, Rate this answer in another, and the switch in
+  /// a third.
+  Widget _cards(BuildContext context) {
+    final t = Tokens.of(context);
+    final prefs = AppScope.of(context).prefs;
+    final metrics = this.metrics;
+    final rate = this.rate;
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 16,
+        children: [
+          if (metrics != null && metrics.named.isNotEmpty)
+            FieldCard(inSheet: true, [
+              for (final (name, value) in metrics.named)
+                Container(
+                  constraints: const BoxConstraints(minHeight: 52),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: FieldCard.inset,
+                    vertical: 8,
+                  ),
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    children: [
+                      Text(name, style: Type.sans(15, color: t.muted)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          value,
+                          textAlign: TextAlign.end,
+                          style: Type.sans(15, color: t.ink),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ]),
+          if (rate != null)
+            FieldCard(inSheet: true, [
+              ListenableBuilder(
+                listenable: turn,
+                builder: (context, _) => Container(
+                  constraints: const BoxConstraints(minHeight: 64),
+                  padding: const EdgeInsets.only(
+                    left: FieldCard.inset,
+                    right: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Rate this answer',
+                          style: Type.sans(17, color: t.ink),
+                        ),
+                      ),
+                      for (final good in const [true, false])
+                        IconBtn(
+                          good ? 'thumb-up' : 'thumb-down',
+                          tooltip: good ? 'Good answer' : 'Bad answer',
+                          active: turn.feedback == good,
+                          onPressed: () => rate.mark(turn, good),
+                          box: 44,
+                          size: IconSize.small,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ]),
+          if (metrics != null)
+            FieldCard(inSheet: true, [
+              ListenableBuilder(
+                listenable: prefs,
+                builder: (context, _) {
+                  final on = prefs.prefs.isOn(ChatSwitch.answerDetails);
+                  return FieldRow(
+                    label: 'Show details under every answer',
+                    small: true,
+                    control: AppSwitch(
+                      value: on,
+                      label: 'Show details under every answer',
+                      large: true,
+                      onChanged: (on) =>
+                          prefs.setSwitch(ChatSwitch.answerDetails, on),
+                    ),
+                  );
+                },
+              ),
+            ]),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final prefs = AppScope.of(context).prefs;
     final metrics = this.metrics;
     final rate = this.rate;
-    final text = sheet ? 14.5 : 13.0;
-    final row = sheet ? 44.0 : 40.0;
-    final pad = sheet ? 4.0 : 10.0;
+    if (sheet) return _cards(context);
+    const text = 13.0;
+    const row = 40.0;
+    const pad = 10.0;
     final rows = <Widget>[
-      if (!sheet)
-        const Padding(
-          padding: EdgeInsets.fromLTRB(10, 6, 10, 4),
-          child: SectionLabel('This answer'),
-        ),
+      const Padding(
+        padding: EdgeInsets.fromLTRB(10, 6, 10, 4),
+        child: SectionLabel('This answer'),
+      ),
       for (final (name, value) in metrics?.named ?? const <(String, String)>[])
         Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: pad,
-            vertical: sheet ? 8 : 5,
-          ),
+          padding: EdgeInsets.symmetric(horizontal: pad, vertical: 5),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -199,7 +295,7 @@ class _AnswerMenu extends StatelessWidget {
                   Expanded(
                     child: Text(
                       'Rate this answer',
-                      style: Type.sans(sheet ? 14.5 : 13.5, color: t.ink),
+                      style: Type.sans(13.5, color: t.ink),
                     ),
                   ),
                   for (final good in const [true, false])
@@ -208,8 +304,8 @@ class _AnswerMenu extends StatelessWidget {
                       tooltip: good ? 'Good answer' : 'Bad answer',
                       active: turn.feedback == good,
                       onPressed: () => rate.mark(turn, good),
-                      box: sheet ? 44 : 30,
-                      size: sheet ? IconSize.small : IconSize.xs,
+                      box: 30,
+                      size: IconSize.xs,
                     ),
                 ],
               ),
@@ -236,7 +332,7 @@ class _AnswerMenu extends StatelessWidget {
                       Expanded(
                         child: Text(
                           label,
-                          style: Type.sans(sheet ? 14.5 : 13.5, color: t.ink),
+                          style: Type.sans(13.5, color: t.ink),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -249,14 +345,6 @@ class _AnswerMenu extends StatelessWidget {
           },
         ),
     ];
-    if (sheet) {
-      return SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: rows,
-        ),
-      );
-    }
     return SizedBox(
       width: 248,
       child: AppMenu(label: 'This answer', children: rows),

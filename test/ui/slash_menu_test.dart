@@ -86,20 +86,27 @@ void main() {
     },
   );
 
-  testWidgets("a phone's slash button starts a command in an empty message", (
-    tester,
-  ) async {
-    await pumpApp(
-      tester,
-      llm: planningServer(),
-      size: const Size(390, 844),
-      sourcesOpen: false,
-    );
-    await tester.tap(
-      find.byWidgetPredicate((w) => w is Tappable && w.label == 'Commands'),
-    );
-    await tester.pump();
-    expect(_draft(tester), '/');
-    expect(find.byType(SlashMenu), findsOneWidget);
-  });
+  testWidgets(
+    'a phone has no Commands button; typing / opens them over the composer',
+    (tester) async {
+      await pumpApp(
+        tester,
+        llm: planningServer(),
+        size: const Size(390, 844),
+        sourcesOpen: false,
+      );
+      expect(
+        find.byWidgetPredicate((w) => w is Tappable && w.label == 'Commands'),
+        findsNothing,
+      );
+      await tester.enterText(composerField, '/');
+      await tester.pump();
+      expect(find.byType(SlashMenu), findsOneWidget);
+      // The commands are a card of their own, above the composer's card.
+      expect(
+        tester.getRect(find.byType(SlashMenu)).bottom,
+        lessThan(tester.getRect(composerField).top),
+      );
+    },
+  );
 }

@@ -165,7 +165,7 @@ class _MessageListState extends State<MessageList> {
       slivers: [
         SliverPadding(
           padding: phone
-              ? const EdgeInsets.fromLTRB(20, 20, 20, 8)
+              ? const EdgeInsets.fromLTRB(16, 16, 16, 12)
               : const EdgeInsets.fromLTRB(20, 12, 20, 28),
           sliver: _HoldPlace(
             newest: _newest,
@@ -369,9 +369,13 @@ class _Empty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sources = AppScope.of(context).sources;
+    // A phone stacks the suggestions under the headline, as the design canvas draws them.
+    final phone = ScreenClass.ofContext(context).isPhone;
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: phone
+            ? const EdgeInsets.fromLTRB(16, 12, 16, 16)
+            : const EdgeInsets.all(20),
         child: Rise(
           duration: const Duration(milliseconds: 400),
           child: Column(
@@ -386,14 +390,11 @@ class _Empty extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
               ),
-              const SizedBox(height: 22),
+              SizedBox(height: phone ? 14 : 22),
               ListenableBuilder(
                 listenable: sources,
-                builder: (context, _) => Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
+                builder: (context, _) {
+                  final suggestions = [
                     // Only the first two switched-on files are named.
                     for (final s in suggestionsFor([
                       ...sources.files
@@ -402,8 +403,16 @@ class _Empty extends StatelessWidget {
                           .take(2),
                     ]))
                       _Suggestion(s.label, onTap: () => onSuggest(s.prompt)),
-                  ],
-                ),
+                  ];
+                  return phone
+                      ? Column(spacing: 14, children: suggestions)
+                      : Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: suggestions,
+                        );
+                },
               ),
             ],
           ),
@@ -430,6 +439,7 @@ class _SuggestionState extends State<_Suggestion> {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final lit = _hover ? t.accent : null;
+    final phone = ScreenClass.ofContext(context).isPhone;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -437,17 +447,25 @@ class _SuggestionState extends State<_Suggestion> {
         label: widget.text,
         onTap: widget.onTap,
         // A pill on one line; a label that wraps keeps its corners rather than bulging.
-        radius: BorderRadius.circular(19),
+        radius: BorderRadius.circular(phone ? 24 : 19),
         color: t.panel,
-        side: BorderSide(color: lit ?? t.line),
+        side: BorderSide(color: lit ?? (phone ? t.line2 : t.line)),
         hoverColor: Colors.transparent,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        child: Container(
+          constraints: BoxConstraints(
+            minHeight: phone ? 44 : 0,
+            // A phone's column of suggestions keeps to the screen's width.
+            maxWidth: phone ? MediaQuery.sizeOf(context).width - 32 : 520,
+          ),
+          padding: phone
+              ? const EdgeInsets.symmetric(horizontal: 18, vertical: 10)
+              : const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
           child: Text(
             widget.text,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: Type.sans(14, color: lit ?? t.ink),
+            textAlign: TextAlign.center,
+            style: Type.sans(phone ? 15 : 14, color: lit ?? t.ink),
           ),
         ),
       ),

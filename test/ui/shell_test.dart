@@ -13,7 +13,6 @@ import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/confirm_box.dart';
 import 'package:anywherellm/ui/widgets/controls.dart';
 import 'package:anywherellm/ui/widgets/fields.dart';
-import 'package:anywherellm/ui/widgets/pane_header.dart';
 import 'package:anywherellm/ui/widgets/qr_mark.dart';
 import 'package:anywherellm/ui/widgets/sheet.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
@@ -1045,40 +1044,23 @@ void main() {
 
   group('a narrow window', () {
     testWidgets(
-      'a phone\'s chat header keeps 4 px at its left and 6 at its right',
+      'a phone\'s chat header names the workspace and its documents over the chat',
       (tester) async {
-        await pumpApp(
+        final h = await pumpApp(
           tester,
           llm: planningServer(),
           size: const Size(390, 844),
         );
-        final bar = tester.widget<Container>(
-          find
-              .descendant(
-                of: find.byType(PaneHeader),
-                matching: find.byType(Container),
-              )
-              .first,
-        );
-        expect(bar.padding, const EdgeInsets.only(left: 4, right: 6));
-        // The workspace sits over the chat's name, and a pull down refreshes in place of a
-        // button.
-        expect(
-          find.descendant(
-            of: find.byType(PaneHeader),
-            matching: find.text('Q3 planning'),
-          ),
-          findsOneWidget,
-        );
+        expect(find.text('Q3 planning · 2 docs in use'), findsOneWidget);
+        // A pull down refreshes, and Documents is under the workspace's settings.
         expect(find.byTooltip('Refresh'), findsNothing);
-        // Documents shows its count alone where the header is narrow.
-        expect(
-          find.descendant(
-            of: control('Documents, 2 on'),
-            matching: find.text('2'),
-          ),
-          findsOneWidget,
-        );
+        expect(control('Documents, 2 on'), findsNothing);
+        expect(find.byTooltip('New chat'), findsOneWidget);
+        // On a saved chat the title opens the chat's sheet.
+        await tester.tap(find.text('Q3 planning · 2 docs in use'));
+        await tester.pumpAndSettle();
+        expect(h.shell.chatSheet, isNotNull);
+        expect(tester.takeException(), isNull);
       },
     );
 
@@ -1130,7 +1112,7 @@ void main() {
         sourcesOpen: false,
       );
       expect(find.byType(SourcesPanel), findsNothing);
-      await tester.tap(control('Documents, 2 on'));
+      h.shell.openSources();
       await tester.pumpAndSettle();
       final sheet = find.byType(SheetFrame);
       expect(
@@ -1147,12 +1129,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(h.shell.sourcesOpen, isFalse);
       expect(find.byType(SheetFrame), findsNothing);
-      await tester.tap(control('Documents, 2 on'));
+      h.shell.openSources();
       await tester.pumpAndSettle();
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(h.shell.sourcesOpen, isFalse);
-      await tester.tap(control('Documents, 2 on'));
+      h.shell.openSources();
       await tester.pumpAndSettle();
       await tester.drag(
         find.descendant(of: sheet, matching: find.text('Documents')),

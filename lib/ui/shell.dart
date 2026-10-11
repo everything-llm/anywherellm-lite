@@ -9,6 +9,7 @@ import 'app_scope.dart';
 import 'chat/app_panel.dart';
 import 'chat/browser_panel.dart';
 import 'chat/chat_view.dart';
+import 'chat_sheet.dart';
 import 'chat/passages_sheet.dart';
 import 'files/files_view.dart';
 import 'files/workspace_pages.dart';
@@ -281,6 +282,16 @@ class AppShell extends StatelessWidget {
                                 valueListenable: shell.popup,
                                 builder: (context, popup, _) => Stack(
                                   children: [
+                                    if (popup case final ChatSheetFor of)
+                                      Positioned.fill(
+                                        child: ChatSheet(
+                                          of,
+                                          key: ValueKey((
+                                            of.thread.slug,
+                                            of.deleting,
+                                          )),
+                                        ),
+                                      ),
                                     if (popup == Popup.switcher) ...[
                                       _Scrim(
                                         onTap: () =>

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 
 import 'chat/dictation.dart';
+import 'chat/photo_picker.dart';
 import 'chat/speaker.dart';
 import 'share/shared_item.dart';
 import 'state/browser_controller.dart';
@@ -73,6 +74,7 @@ class AppScope extends InheritedWidget {
     this.shares,
     this.appView,
     this.dictation,
+    this.photos,
     this.pasteImage,
     this.readAloud,
     this.labelAnswers = false,
@@ -109,6 +111,10 @@ class AppScope extends InheritedWidget {
 
   /// Writes what the person says in the composer, or null where the device cannot listen.
   final Dictation? dictation;
+
+  /// Pictures from the device's photos and camera for the composer's Attach sheet, or null
+  /// where the device has neither, and Attach opens the file picker.
+  final PhotoPicker? photos;
 
   /// Reads a copied picture for the composer's paste, or null where the platform's own paste
   /// brings pictures, through the keyboard on Android, or none, in a browser.

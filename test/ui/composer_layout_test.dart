@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/tokens.dart';
 
 import '../support/fake_api.dart';
@@ -24,11 +25,13 @@ void main() {
       size: const Size(390, 844),
       sourcesOpen: false,
     );
-    // Documents is drawn 36 px tall; its target is 44.
-    final documents = tester.getCenter(find.byTooltip('Documents'));
-    await tester.tapAt(documents + const Offset(0, 20));
+    // Attach is drawn 30 px across; its target is 44.
+    final attach = tester.getCenter(
+      find.byTooltip('Attach files to this message'),
+    );
+    await tester.tapAt(attach + const Offset(0, 20));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(h.shell.sourcesOpen, isTrue);
+    expect(h.shell.popup.value, Popup.attach);
   });
 
   /// The composer's card: the box with a shadow around the message field.

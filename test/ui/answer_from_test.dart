@@ -1,6 +1,7 @@
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/ui/chat/composer.dart';
 import 'package:anywherellm/ui/chat/model_picker.dart';
+import 'package:anywherellm/ui/widgets/sheet.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -145,7 +146,7 @@ void main() {
     expect(h.shell.answerFromOpen, isFalse);
   });
 
-  testWidgets('on a phone the menu holds the model, which opens the picker', (
+  testWidgets('on a phone the sheet holds the model, which opens the picker', (
     tester,
   ) async {
     await pumpApp(tester, llm: onChat(), size: phone);
@@ -154,14 +155,17 @@ void main() {
     await tester.tap(chip);
     await tester.pumpAndSettle();
     expect(
-      find.text('Both apply to every chat in Q3 planning.'),
+      find.descendant(
+        of: find.byType(SheetFrame),
+        matching: find.text('Answer from'),
+      ),
       findsOneWidget,
     );
-    expect(menuNote, findsNothing);
+    expect(menuNote, findsOneWidget);
     await tester.tap(control('Chat model, qwen3:8b'));
     await tester.pumpAndSettle();
     expect(find.byType(ModelPicker), findsOneWidget);
-    expect(find.text('Both apply to every chat in Q3 planning.'), findsNothing);
+    expect(menuNote, findsNothing);
   });
 
   for (final size in const [Size(360, 480), Size(780, 700), Size(1400, 900)]) {
@@ -171,12 +175,22 @@ void main() {
         await pumpApp(tester, llm: onChat(), size: size);
         await tester.tap(chip);
         await tester.pumpAndSettle();
-        final menu = tester.getRect(control('Files only'));
+        final choice = find.byWidgetPredicate(
+          (w) => w is Tappable && w.label.startsWith('Files only'),
+        );
+        await tester.ensureVisible(choice);
+        await tester.pumpAndSettle();
+        final menu = tester.getRect(choice);
         expect(menu.top, greaterThanOrEqualTo(0));
         expect(menu.right, lessThanOrEqualTo(size.width));
+        // A phone's sheet covers the composer; a menu sits above it.
         expect(
           menu.bottom,
-          lessThanOrEqualTo(tester.getRect(find.byType(Composer)).top),
+          lessThanOrEqualTo(
+            size.width < 720
+                ? size.height
+                : tester.getRect(find.byType(Composer)).top,
+          ),
         );
       },
     );

@@ -18,10 +18,19 @@ enum Beside { sources, browser, app, passages }
 /// A citation whose passages the panel to the right shows, with its [number] in its answer.
 typedef CitedPassages = ({int number, Citation citation});
 
+/// A phone's sheet for one chat of the workspace on screen: its name, its pin and Delete, or
+/// with [deleting] the question whether to delete it.
+class ChatSheetFor {
+  const ChatSheetFor(this.thread, {this.deleting = false});
+
+  final Thread thread;
+  final bool deleting;
+}
+
 /// A popup over the window or a part of it, at most one open at a time: the sidebar's workspace
-/// menu, the Ctrl+K switcher, or the composer's Answer from menu. An answer's More menu is
-/// keyed by its [Turn] instead.
-enum Popup { workspaces, switcher, answerFrom }
+/// menu, the Ctrl+K switcher, the composer's Answer from menu, or a phone's Attach sheet. An
+/// answer's More menu is keyed by its [Turn] instead.
+enum Popup { workspaces, switcher, answerFrom, attach }
 
 /// What is open around the chat: the sidebar drawer, the Documents panel (Sources in the code),
 /// the Settings dialog, the [popup] open, and which [Pane] is on screen. The sidebar is a drawer
@@ -67,6 +76,18 @@ class ShellController extends ChangeNotifier {
     final Turn turn => turn,
     _ => null,
   };
+
+  /// The chat whose sheet is open on a phone, or null.
+  ChatSheetFor? get chatSheet => switch (_popup.value) {
+    final ChatSheetFor sheet => sheet,
+    _ => null,
+  };
+
+  /// Opens [thread]'s sheet, closing any other popup and the drawer.
+  void openChatSheet(Thread thread, {bool deleting = false}) {
+    _popup.value = ChatSheetFor(thread, deleting: deleting);
+    closeSide();
+  }
 
   /// Opens the popup [key], closing any other, or closes it when it is open.
   void togglePopup(Object key) =>

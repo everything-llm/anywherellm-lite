@@ -286,9 +286,7 @@ void main() {
     );
   });
 
-  testWidgets('titles are semibold, larger than section heads', (
-    tester,
-  ) async {
+  testWidgets('titles are semibold, larger than section heads', (tester) async {
     final h = await pumpApp(tester, llm: planningServer());
     h.shell.openSettings(SettingsPage.chats);
     await tester.pumpAndSettle();

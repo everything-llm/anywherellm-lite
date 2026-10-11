@@ -17,12 +17,16 @@ class AppButton extends StatelessWidget {
     super.key,
     required this.onPressed,
     this.primary = false,
+    this.danger = false,
     this.icon,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final bool primary;
+
+  /// A destructive action that is not the primary one: its label in [Tokens.badfg].
+  final bool danger;
 
   /// An icon after the label, such as `external` for a button that leaves the app.
   final String? icon;
@@ -32,7 +36,11 @@ class AppButton extends StatelessWidget {
     final t = Tokens.of(context);
     final phone = ScreenClass.ofContext(context).isPhone;
     final height = phone ? 52.0 : 40.0;
-    final fg = primary ? t.onaccent : t.ink;
+    final fg = primary
+        ? t.onaccent
+        : danger
+        ? t.badfg
+        : t.ink;
     return Tappable(
       label: label,
       onTap: onPressed,

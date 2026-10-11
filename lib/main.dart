@@ -20,7 +20,9 @@ import 'ui/app_scope.dart';
 import 'ui/boot_screen.dart';
 import 'ui/chat/app_web_view.dart';
 import 'ui/chat/device_speaker.dart';
+import 'ui/chat/device_photos.dart';
 import 'ui/chat/dictation.dart';
+import 'ui/chat/photo_picker.dart';
 import 'ui/chat/speaker.dart';
 import 'ui/chat/speech_dictation.dart';
 import 'ui/files/save_android.dart';
@@ -144,6 +146,9 @@ class _SessionHostState extends State<SessionHost> {
   /// Listens for speech on Android, and is null where the device has no such service to use.
   final Dictation? _dictation = _android ? SpeechDictation() : null;
 
+  /// The device's photos and camera on Android, for the composer's Attach sheet.
+  final PhotoPicker? _photos = _android ? DevicePhotos() : null;
+
   /// Apps' pages in web views on Android, kept for the app's life so a page stays loaded.
   final AppView? _appView = _android ? AppWebViews() : null;
 
@@ -256,6 +261,7 @@ class _SessionHostState extends State<SessionHost> {
         shares: _shares,
         appView: _appView,
         dictation: _dictation,
+        photos: _photos,
         pasteImage: _linux ? () => Pasteboard.image : null,
         readAloud: _readAloud,
         labelAnswers: kIsWeb,

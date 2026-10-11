@@ -9,10 +9,12 @@ import '../tokens.dart';
 import '../type.dart';
 import '../widgets/headline.dart';
 import '../widgets/basics.dart';
+import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
 import '../widgets/pane_header.dart';
 import '../widgets/tappable.dart';
 import '../state/chat_controller.dart';
+import '../state/shell_controller.dart';
 import 'browser_chip.dart';
 import 'composer.dart';
 import 'message_list.dart';
@@ -181,6 +183,7 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
+    if (ScreenClass.ofContext(context).isPhone) return const _PhoneHeader();
     return ListenableBuilder(
       listenable: Listenable.merge([scope.chat, scope.sources, scope.shell]),
       builder: (context, _) {
@@ -290,6 +293,120 @@ class _Header extends StatelessWidget {
   }
 }
 
+/// A phone's header: the menu, the workspace and its documents over the chat's name, which
+/// opens the chat's sheet, or on a new chat the workspace's settings, then the browser while the
+/// chat has one and New chat.
+class _PhoneHeader extends StatelessWidget {
+  const _PhoneHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final t = Tokens.of(context);
+    return ListenableBuilder(
+      listenable: Listenable.merge([scope.chat, scope.sources]),
+      builder: (context, _) {
+        final chat = scope.chat;
+        final workspace = chat.active;
+        final thread = chat.activeThread == null
+            ? null
+            : chat
+                  .threadsOf(workspace?.slug ?? '')
+                  .where((c) => c.slug == chat.activeThread)
+                  .firstOrNull;
+        final docs = scope.sources.onCount;
+        final title = Text(
+          workspace == null ? 'AnywhereLLM' : chat.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Type.sans(18, weight: FontWeight.w600, color: t.ink),
+        );
+        return SizedBox(
+          height: 72,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              spacing: 4,
+              children: [
+                IconBtn(
+                  'hamburger',
+                  tooltip: 'Workspaces',
+                  box: 48,
+                  filled: true,
+                  size: IconSize.small,
+                  onPressed: scope.shell.toggleSide,
+                ),
+                Expanded(
+                  child: workspace == null
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Semantics(header: true, child: title),
+                        )
+                      : Tappable(
+                          label: thread != null
+                              ? '${chat.title}. Rename, pin or delete this chat'
+                              : '${workspace.name}. Open workspace settings',
+                          onTap: () => thread != null
+                              ? scope.shell.openChatSheet(thread)
+                              : scope.shell.showPane(Pane.files),
+                          radius: BorderRadius.circular(12),
+                          child: Container(
+                            constraints: const BoxConstraints(minHeight: 48),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Row(
+                                  spacing: 4,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        '${workspace.name} · '
+                                        '${docs == 1 ? '1 doc' : '$docs docs'} in use',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Type.sans(
+                                          12.5,
+                                          color: t.muted,
+                                          height: 1.3,
+                                        ),
+                                      ),
+                                    ),
+                                    AppIcon(
+                                      'down',
+                                      size: IconSize.tiny,
+                                      color: t.muted,
+                                    ),
+                                  ],
+                                ),
+                                title,
+                              ],
+                            ),
+                          ),
+                        ),
+                ),
+                if (workspace != null) ...[
+                  const _BrowserButton(compact: true),
+                  IconBtn(
+                    'plus',
+                    tooltip: 'New chat',
+                    box: 48,
+                    filled: true,
+                    size: IconSize.small,
+                    onPressed: chat.newChat,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _HeaderButton extends StatelessWidget {
   const _HeaderButton({
     required this.label,
@@ -374,6 +491,25 @@ class _BrowserButton extends StatelessWidget {
     }
     final browsing =
         (running?.browsing ?? false) || (scope.browser.tab?.working ?? false);
+    // A phone's header buttons are round, with the dot at the button's corner.
+    if (ScreenClass.ofContext(context).isPhone) {
+      return Stack(
+        children: [
+          IconBtn(
+            'globe',
+            tooltip: browsing ? 'Browser, in use now' : 'Browser',
+            box: 48,
+            filled: true,
+            active: shell.browserOpen,
+            size: IconSize.small,
+            onPressed: shell.browserOpen
+                ? shell.closeBrowser
+                : shell.showBrowser,
+          ),
+          if (browsing) const Positioned(top: 8, right: 8, child: _Pulse()),
+        ],
+      );
+    }
     return Padding(
       padding: const EdgeInsets.only(left: 8),
       child: _HeaderButton(

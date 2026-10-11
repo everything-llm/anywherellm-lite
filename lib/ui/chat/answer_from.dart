@@ -5,13 +5,16 @@ import 'package:flutter/material.dart';
 
 import '../../core/chat.dart';
 import '../app_scope.dart';
-import '../icons.dart';
 import '../layout.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
+import '../settings/rows.dart';
 import '../widgets/basics.dart';
 import '../widgets/menu.dart';
+import '../widgets/phone_page.dart';
+import '../widgets/radio_card.dart';
+import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
 import 'composer_chip.dart';
 import 'model_picker.dart';
@@ -159,6 +162,36 @@ class _AnswerFromAnchorState extends State<AnswerFromAnchor> {
         final card = box.maxWidth;
         final width = phone ? card : math.min(348.0, card);
         final left = phone ? 0.0 : math.min(76.0, card - width);
+        final listened = Listenable.merge([
+          scope.chat,
+          scope.sources,
+          scope.sources.chatMode,
+          scope.system,
+        ]);
+        // A phone's choice is a sheet over the window, its modes as cards.
+        if (phone) {
+          return ValueListenableBuilder(
+            valueListenable: scope.shell.popup,
+            builder: (context, popup, child) => PopupSheet(
+              open: popup == Popup.answerFrom,
+              onClose: _close,
+              title: 'Answer from',
+              sheet: (context) => ListenableBuilder(
+                listenable: listened,
+                builder: (context, _) {
+                  if (!_canChoose(scope)) return const SizedBox.shrink();
+                  scope.system.wantSettingsOnce();
+                  return _Sheet(
+                    onPickModel: widget.onPickModel,
+                    onClose: _close,
+                  );
+                },
+              ),
+              child: child!,
+            ),
+            child: widget.child,
+          );
+        }
         return ValueListenableBuilder(
           valueListenable: scope.shell.popup,
           builder: (context, popup, child) => PopupAnchor(
@@ -169,20 +202,11 @@ class _AnswerFromAnchorState extends State<AnswerFromAnchor> {
             width: width,
             offset: Offset(left, -8),
             menu: (context) => ListenableBuilder(
-              listenable: Listenable.merge([
-                scope.chat,
-                scope.sources,
-                scope.sources.chatMode,
-                scope.system,
-              ]),
+              listenable: listened,
               builder: (context, _) {
                 if (!_canChoose(scope)) return const SizedBox.shrink();
                 if (phone) scope.system.wantSettingsOnce();
-                return _Menu(
-                  phone: phone,
-                  onPickModel: widget.onPickModel,
-                  onClose: _close,
-                );
+                return _Menu(onClose: _close);
               },
             ),
             child: child!,
@@ -194,16 +218,11 @@ class _AnswerFromAnchorState extends State<AnswerFromAnchor> {
   }
 }
 
-/// The Answer from menu: the three modes, and a note that the choice is the workspace's. On a
-/// phone the Model row comes before the note, since the composer has room for one chip.
-class _Menu extends StatelessWidget {
-  const _Menu({
-    required this.phone,
-    required this.onPickModel,
-    required this.onClose,
-  });
+/// A phone's Answer from sheet: the three modes as cards, a note that the choice is the
+/// workspace's, and the Model row, since the composer has room for one chip.
+class _Sheet extends StatelessWidget {
+  const _Sheet({required this.onPickModel, required this.onClose});
 
-  final bool phone;
   final VoidCallback onPickModel;
   final VoidCallback onClose;
 
@@ -213,10 +232,64 @@ class _Menu extends StatelessWidget {
     final t = Tokens.of(context);
     final mode = scope.sources.chatMode.value;
     final workspace = scope.chat.active?.name ?? 'this workspace';
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 8,
+        children: [
+          for (final m in ChatMode.values)
+            Semantics(
+              inMutuallyExclusiveGroup: true,
+              checked: m == mode,
+              child: RadioCard(
+                title: m.title,
+                about: m.detail,
+                selected: m == mode,
+                onTap: () {
+                  onClose();
+                  unawaited(scope.sources.setChatMode(m));
+                },
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            child: Text(
+              'Applies to every chat in $workspace.',
+              style: Type.sans(13, color: t.muted, height: 1.4),
+            ),
+          ),
+          FieldCard(inSheet: true, [
+            NavRow(
+              title: 'Chat model',
+              about: workspaceModel(scope),
+              onTap: () {
+                onClose();
+                onPickModel();
+              },
+            ),
+          ]),
+        ],
+      ),
+    );
+  }
+}
+
+/// The Answer from menu: the three modes, and a note that the choice is the workspace's.
+class _Menu extends StatelessWidget {
+  const _Menu({required this.onClose});
+
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final t = Tokens.of(context);
+    final mode = scope.sources.chatMode.value;
+    final workspace = scope.chat.active?.name ?? 'this workspace';
     final note = Padding(
-      padding: EdgeInsets.fromLTRB(10, phone ? 6 : 2, 10, phone ? 6 : 4),
+      padding: const EdgeInsets.fromLTRB(10, 2, 10, 4),
       child: Text(
-        '${phone ? 'Both apply' : 'Applies'} to every chat in $workspace.',
+        'Applies to every chat in $workspace.',
         style: Type.sans(12, color: t.muted, height: 1.4),
       ),
     );
@@ -224,27 +297,19 @@ class _Menu extends StatelessWidget {
       label: 'Answer from',
       children: [
         Padding(
-          padding: EdgeInsets.fromLTRB(10, phone ? 8 : 6, 10, 4),
+          padding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
           child: const SectionLabel('Answer from'),
         ),
         for (final m in ChatMode.values)
           _Choice(
             m,
             chosen: m == mode,
-            phone: phone,
             onTap: () {
               onClose();
               unawaited(scope.sources.setChatMode(m));
             },
           ),
         const MenuDivider(),
-        if (phone)
-          _ModelRow(
-            onTap: () {
-              onClose();
-              onPickModel();
-            },
-          ),
         note,
       ],
     );
@@ -253,16 +318,10 @@ class _Menu extends StatelessWidget {
 
 /// One mode: a radio, what it answers from and the line under that.
 class _Choice extends StatelessWidget {
-  const _Choice(
-    this.mode, {
-    required this.chosen,
-    required this.phone,
-    required this.onTap,
-  });
+  const _Choice(this.mode, {required this.chosen, required this.onTap});
 
   final ChatMode mode;
   final bool chosen;
-  final bool phone;
   final VoidCallback onTap;
 
   @override
@@ -271,7 +330,7 @@ class _Choice extends StatelessWidget {
     final radio = Container(
       width: 16,
       height: 16,
-      margin: EdgeInsets.only(top: phone ? 0 : 2),
+      margin: const EdgeInsets.only(top: 2),
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
@@ -298,85 +357,33 @@ class _Choice extends StatelessWidget {
         radius: BorderRadius.circular(10),
         color: chosen ? t.sel : null,
         excludeSemantics: false,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: phone ? 52 : 0),
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: 10,
-              vertical: phone ? 6 : 8,
-            ),
-            child: Row(
-              crossAxisAlignment: phone
-                  ? CrossAxisAlignment.center
-                  : CrossAxisAlignment.start,
-              spacing: phone ? 12 : 10,
-              children: [
-                radio,
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    spacing: 1,
-                    children: [
-                      Text(
-                        mode.title,
-                        style: Type.sans(
-                          phone ? 14.5 : 13.5,
-                          weight: chosen ? FontWeight.w600 : FontWeight.w500,
-                          color: t.ink,
-                        ),
-                      ),
-                      Text(
-                        mode.detail,
-                        style: Type.sans(12.5, color: t.muted, height: 1.4),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The phone's Model row: the model the workspace answers with, which opens the model picker.
-class _ModelRow extends StatelessWidget {
-  const _ModelRow({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    final t = Tokens.of(context);
-    final model = workspaceModel(scope);
-    return Tappable(
-      label: 'Chat model, $model',
-      onTap: onTap,
-      radius: BorderRadius.circular(10),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 48),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             spacing: 10,
             children: [
-              Text(
-                'Model',
-                style: Type.sans(14.5, weight: FontWeight.w500, color: t.ink),
-              ),
+              radio,
               Expanded(
-                child: Text(
-                  model,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.end,
-                  style: Type.sans(13.5, color: t.muted),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: 1,
+                  children: [
+                    Text(
+                      mode.title,
+                      style: Type.sans(
+                        13.5,
+                        weight: chosen ? FontWeight.w600 : FontWeight.w500,
+                        color: t.ink,
+                      ),
+                    ),
+                    Text(
+                      mode.detail,
+                      style: Type.sans(12.5, color: t.muted, height: 1.4),
+                    ),
+                  ],
                 ),
               ),
-              AppIcon('chevron', size: IconSize.xs, color: t.muted),
             ],
           ),
         ),

@@ -13,12 +13,15 @@ import '../icons.dart';
 import '../layout.dart';
 import '../settings/settings_pages.dart';
 import '../state/chat_controller.dart';
+import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
+import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
 import 'answer_from.dart';
+import 'attach_sheet.dart';
 import 'dictation.dart';
 import 'model_picker.dart';
 import 'slash_menu.dart';
@@ -245,29 +248,57 @@ class _ComposerState extends State<Composer> {
     widget.focus.requestFocus();
   }
 
-  /// Starts a command in an empty message, which opens the menu.
-  void _slash() {
-    if (widget.draft.text.isEmpty) {
-      widget.draft.value = const TextEditingValue(
-        text: '/',
-        selection: TextSelection.collapsed(offset: 1),
-      );
-    }
-    setState(() => _menuClosed = false);
-    widget.focus.requestFocus();
-  }
-
   /// Attaches the files picked, unless another chat was shown while the picker was open.
-  Future<void> _attach() async {
+  Future<void> _attach() =>
+      _pickWith(openFiles, 'The file picker did not open');
+
+  /// Attaches what [pick] gives, unless another chat was shown meanwhile. A failure is put in
+  /// [_problem] after [failed].
+  Future<void> _pickWith(
+    Future<List<XFile>> Function() pick,
+    String failed,
+  ) async {
     final shown = _chatShown;
     final List<XFile> picked;
     try {
-      picked = await openFiles();
+      picked = await pick();
     } catch (error) {
-      setState(() => _problem = 'The file picker did not open: $error');
+      if (mounted) setState(() => _problem = '$failed: $error');
       return;
     }
     await _addFiles(picked, shown);
+  }
+
+  /// A phone's Attach sheet, over the composer while [Popup.attach] is open.
+  Widget _attachSheet(Widget child) {
+    final shell = _scope.shell;
+    final photos = _scope.photos;
+    void close() => shell.closePopup(Popup.attach);
+    return ValueListenableBuilder(
+      valueListenable: shell.popup,
+      builder: (context, popup, child) => PopupSheet(
+        open: popup == Popup.attach,
+        onClose: close,
+        title: 'Attach',
+        sheet: (context) => AttachSheet(
+          attached: _attached,
+          onRemove: _remove,
+          onPhotos: photos == null
+              ? null
+              : () => _pickWith(photos.choose, 'The photos did not open'),
+          onCamera: photos == null
+              ? null
+              : () => _pickWith(
+                  () async => [?await photos.take()],
+                  'The camera did not open',
+                ),
+          onFiles: _attach,
+          onDone: close,
+        ),
+        child: child!,
+      ),
+      child: child,
+    );
   }
 
   /// Attaches the files dropped on the composer. Nothing is taken while a chat answers, as the
@@ -371,7 +402,9 @@ class _ComposerState extends State<Composer> {
     final scope = AppScope.of(context);
     final draft = widget.draft;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+      padding: ScreenClass.ofContext(context).isPhone
+          ? const EdgeInsets.fromLTRB(16, 8, 16, 16)
+          : const EdgeInsets.fromLTRB(20, 8, 20, 20),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: Sizes.column),
@@ -400,8 +433,9 @@ class _ComposerState extends State<Composer> {
                   onHighlight: (i) => setState(() => _highlight = i),
                   onPick: _pick,
                   onDismiss: () => setState(() => _menuClosed = true),
-                  onSlash: _slash,
-                  onAttach: _attach,
+                  onAttach: ScreenClass.ofContext(context).isPhone
+                      ? () => scope.shell.togglePopup(Popup.attach)
+                      : _attach,
                   onRemove: _remove,
                   onSend: _send,
                   held: _held != null,
@@ -426,8 +460,11 @@ class _ComposerState extends State<Composer> {
                   },
                 ),
               );
-              if (!scope.chat.alreadyAnswering) return form;
-              return Column(
+              final phone = ScreenClass.ofContext(context).isPhone;
+              if (!scope.chat.alreadyAnswering) {
+                return phone ? _attachSheet(form) : form;
+              }
+              final column = Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const _AlreadyAnswering(),
@@ -435,6 +472,7 @@ class _ComposerState extends State<Composer> {
                   form,
                 ],
               );
+              return phone ? _attachSheet(column) : column;
             },
           ),
         ),
@@ -454,7 +492,6 @@ class _Form extends StatelessWidget {
     required this.onHighlight,
     required this.onPick,
     required this.onDismiss,
-    required this.onSlash,
     required this.onAttach,
     required this.onRemove,
     required this.onSend,
@@ -482,7 +519,8 @@ class _Form extends StatelessWidget {
   final ValueChanged<int> onHighlight;
   final ValueChanged<SlashCommand> onPick;
   final VoidCallback onDismiss;
-  final VoidCallback onSlash;
+
+  /// Attaches files: the file picker, or on a phone the Attach sheet.
   final VoidCallback onAttach;
   final ValueChanged<Attachment> onRemove;
   final ValueChanged<String> onSend;
@@ -582,7 +620,7 @@ class _Form extends StatelessWidget {
       },
     };
 
-    return AnswerFromAnchor(
+    final card = AnswerFromAnchor(
       onPickModel: () {
         if (!picking) onPickModel();
       },
@@ -590,7 +628,7 @@ class _Form extends StatelessWidget {
         // A phone's buttons run nearer the card's edges than its text, as the design canvas
         // draws them; what sits over them is indented to the text's edge.
         padding: phone
-            ? const EdgeInsets.fromLTRB(4, 12, 6, 4)
+            ? const EdgeInsets.fromLTRB(8, 14, 8, 6)
             : const EdgeInsets.fromLTRB(16, 12, 12, 10),
         decoration: BoxDecoration(
           color: t.panel,
@@ -646,7 +684,7 @@ class _Form extends StatelessWidget {
                     ModelPicker(onClose: onPickModel),
                     Divider(height: 21, thickness: 1, color: t.line),
                   ],
-                  if (menu) ...[
+                  if (menu && !phone) ...[
                     SlashMenu(
                       commands: matches,
                       highlight: highlight,
@@ -655,7 +693,9 @@ class _Form extends StatelessWidget {
                     ),
                     Divider(height: 13, thickness: 1, color: t.line),
                   ],
-                  if (attached.isNotEmpty) ...[
+                  // A phone names how many files go along beside Attach, and lists them in its
+                  // Attach sheet, so the composer keeps its height.
+                  if (attached.isNotEmpty && !phone) ...[
                     Wrap(
                       spacing: 6,
                       runSpacing: 6,
@@ -667,8 +707,8 @@ class _Form extends StatelessWidget {
                     const SizedBox(height: 8),
                   ],
                   ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      minHeight: 26,
+                    constraints: BoxConstraints(
+                      minHeight: phone ? 30 : 26,
                       maxHeight: 140,
                     ),
                     child: CallbackShortcuts(
@@ -725,7 +765,7 @@ class _Form extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: phone ? 4 : 8),
             Row(
               children: [
                 IconBtn(
@@ -735,16 +775,11 @@ class _Form extends StatelessWidget {
                   box: 30,
                   size: IconSize.small,
                 ),
-                // Typing / opens the commands, so a desktop has no button for them; a phone
-                // keeps it, as the design canvas draws.
-                if (phone)
-                  IconBtn(
-                    'slash',
-                    tooltip: 'Commands',
-                    onPressed: chat.busy ? null : onSlash,
-                    box: 30,
-                    size: IconSize.small,
-                  ),
+                // Typing / opens the commands, so there is no button for them.
+                if (phone && attached.isNotEmpty) ...[
+                  const SizedBox(width: 4),
+                  _FilesPill(attached.length, onTap: onAttach),
+                ],
                 SizedBox(width: phone ? 2 : 4),
                 // Takes all the room left, so Send sits at the right edge. On a phone the model is
                 // a row in the Answer from menu, since the row has room for one chip.
@@ -799,7 +834,8 @@ class _Form extends StatelessWidget {
                 else
                   _RoundButton(
                     label: 'Send',
-                    color: sendable ? t.accent : t.off,
+                    // A phone's Send keeps the accent, as the design canvas draws it.
+                    color: sendable || phone ? t.accent : t.off,
                     onTap: sendable ? send : null,
                     child: AppIcon(
                       'send',
@@ -812,6 +848,20 @@ class _Form extends StatelessWidget {
           ],
         ),
       ),
+    );
+    if (!phone || !menu) return card;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SlashMenu(
+          commands: matches,
+          highlight: highlight,
+          onPick: onPick,
+          note: chat.commandsNote,
+        ),
+        const SizedBox(height: 8),
+        card,
+      ],
     );
   }
 }
@@ -833,6 +883,34 @@ class _PasteImage extends ContextAction<PasteTextIntent> {
     final own = callingAction;
     onPaste(() => own?.invoke(intent));
     return null;
+  }
+}
+
+/// How many files go with the next message, on a phone, which opens the Attach sheet.
+class _FilesPill extends StatelessWidget {
+  const _FilesPill(this.count, {required this.onTap});
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final words = count == 1 ? '1 file' : '$count files';
+    return Tappable(
+      touchTarget: true,
+      label: '$words attached. Review',
+      onTap: onTap,
+      radius: BorderRadius.circular(99),
+      color: t.accentbg,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        child: Text(
+          words,
+          style: Type.sans(13, weight: FontWeight.w600, color: t.accent),
+        ),
+      ),
+    );
   }
 }
 

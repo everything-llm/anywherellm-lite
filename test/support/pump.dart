@@ -2,7 +2,9 @@ import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/ui/app.dart';
 import 'package:anywherellm/ui/app_scope.dart';
 import 'package:anywherellm/ui/chat/composer.dart';
+import 'package:file_selector/file_selector.dart' show XFile;
 import 'package:anywherellm/ui/chat/dictation.dart';
+import 'package:anywherellm/ui/chat/photo_picker.dart';
 import 'package:anywherellm/ui/chat/speaker.dart';
 import 'package:anywherellm/ui/share/shared_item.dart';
 import 'package:anywherellm/ui/shell.dart';
@@ -20,6 +22,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'fake_api.dart';
 import 'fake_settings.dart';
 import 'rig.dart';
+
+/// A [PhotoPicker] that gives [chosen] from the library and [taken] from the camera, or with
+/// [cameraFails] a camera that cannot be used.
+class FakePhotos implements PhotoPicker {
+  List<XFile> chosen = [];
+  XFile? taken;
+  bool cameraFails = false;
+
+  @override
+  Future<List<XFile>> choose() async => chosen;
+
+  @override
+  Future<XFile?> take() async {
+    if (cameraFails) throw StateError('camera_access_denied');
+    return taken;
+  }
+}
 
 /// A [Dictation] a test drives: [say] is what the microphone hears, and [finish] is the
 /// recogniser ending the go, by a pause unless told otherwise. With [available] false it cannot listen.
@@ -102,6 +121,7 @@ class Harness extends Rig {
     bool sourcesOpen = true,
     this.canScan = false,
     bool canDictate = false,
+    bool canPickPhotos = false,
     bool canSpeak = false,
     this.labelAnswers = false,
     this.canSpellcheck = false,
@@ -111,6 +131,7 @@ class Harness extends Rig {
     this.canViewApps = false,
     this.browserEvery,
   }) : dictation = canDictate ? FakeDictation() : null,
+       photos = canPickPhotos ? FakePhotos() : null,
        speaker = canSpeak ? FakeSpeaker() : null,
        shell = ShellController(sourcesPinned: sourcesOpen);
 
@@ -127,6 +148,9 @@ class Harness extends Rig {
 
   /// The picture on the fake clipboard, or null when it holds none.
   Uint8List? clipboardImage;
+
+  /// The device's photos and camera, or null where there are none.
+  final FakePhotos? photos;
 
   /// What the microphone does, or null when the device cannot listen.
   final FakeDictation? dictation;
@@ -231,6 +255,7 @@ class Harness extends Rig {
       shares: shares?.stream,
       appView: canViewApps ? appPages : null,
       dictation: dictation,
+      photos: photos,
       pasteImage: canPasteImages ? () async => clipboardImage : null,
       readAloud: readAloud,
       labelAnswers: labelAnswers,
@@ -248,7 +273,8 @@ class Harness extends Rig {
 
 /// Sizes the test window, builds the app on [llm] and lets the first loads finish. With no
 /// [connection], no server is set up. With [canScan], Settings offers a fake QR scanner, with
-/// [canDictate] the composer a microphone, with [canSpeak] each answer Read aloud, and with
+/// [canDictate] the composer a microphone, with [canPickPhotos] the Attach sheet the device's
+/// photos and camera, with [canSpeak] each answer Read aloud, and with
 /// [labelAnswers] each finished answer a semantics label, as in a browser. With
 /// [canPasteImages], Ctrl+V in the composer reads [Harness.clipboardImage].
 Future<Harness> pumpApp(
@@ -260,6 +286,7 @@ Future<Harness> pumpApp(
   bool sourcesOpen = true,
   bool canScan = false,
   bool canDictate = false,
+  bool canPickPhotos = false,
   bool canSpeak = false,
   bool labelAnswers = false,
   bool canSpellcheck = false,
@@ -282,6 +309,7 @@ Future<Harness> pumpApp(
     shares: shares,
     canViewApps: canViewApps,
     canDictate: canDictate,
+    canPickPhotos: canPickPhotos,
     canSpeak: canSpeak,
     labelAnswers: labelAnswers,
     canSpellcheck: canSpellcheck,

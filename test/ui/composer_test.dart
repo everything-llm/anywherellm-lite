@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:anywherellm/ui/chat/composer.dart';
+import 'package:anywherellm/ui/widgets/sheet.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
 import 'package:flutter/services.dart';
@@ -342,5 +343,67 @@ void main() {
       expect(sent(llm, 'Second'), 1);
       expect(h.chat.answeringIn('q3'), isTrue);
     });
+  });
+
+  group('on a phone', () {
+    const phone = Size(390, 844);
+    Finder inSheet(Finder f) =>
+        find.descendant(of: find.byType(SheetFrame), matching: f);
+
+    testWidgets(
+      'Attach opens a sheet that lists the files and takes them off',
+      (tester) async {
+        FileSelectorPlatform.instance = _Picker([contract()]);
+        await pumpApp(tester, llm: planningServer(), size: phone);
+        await tester.tap(find.byTooltip('Attach files to this message'));
+        await tester.pumpAndSettle();
+        // No photos on this device: Files alone.
+        expect(inSheet(find.text('Photo library')), findsNothing);
+        await tester.tap(control('Files'));
+        await tester.pumpAndSettle();
+        expect(inSheet(find.text('contract.pdf')), findsOneWidget);
+        await tester.tap(control('Done'));
+        await tester.pumpAndSettle();
+        expect(find.byType(SheetFrame), findsNothing);
+        // The composer keeps its height: one pill says how many go along.
+        expect(find.text('contract.pdf'), findsNothing);
+        expect(control('1 file attached. Review'), findsOneWidget);
+        await tester.tap(control('1 file attached. Review'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Remove contract.pdf'));
+        await tester.pumpAndSettle();
+        expect(inSheet(find.text('contract.pdf')), findsNothing);
+        await tester.tap(control('Done'));
+        await tester.pumpAndSettle();
+        expect(control('1 file attached. Review'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'the sheet adds from the photos and says when the camera fails',
+      (tester) async {
+        final h = await pumpApp(
+          tester,
+          llm: planningServer(),
+          size: phone,
+          canPickPhotos: true,
+        );
+        h.photos!
+          ..chosen = [photo()]
+          ..cameraFails = true;
+        await tester.tap(find.byTooltip('Attach files to this message'));
+        await tester.pumpAndSettle();
+        await tester.tap(control('Photo library'));
+        await tester.pumpAndSettle();
+        expect(inSheet(find.text('photo.png')), findsOneWidget);
+        await tester.tap(control('Take a photo'));
+        await tester.pumpAndSettle();
+        await tester.tap(control('Done'));
+        await tester.pumpAndSettle();
+        expect(find.text('Could not attach'), findsOneWidget);
+        expect(find.textContaining('The camera did not open'), findsOneWidget);
+        expect(control('1 file attached. Review'), findsOneWidget);
+      },
+    );
   });
 }
