@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../icons.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/fields.dart';
@@ -19,7 +20,7 @@ class PanelCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: t.panel,
-        borderRadius: BorderRadius.circular(11),
+        borderRadius: BorderRadius.circular(_cardRadius(context)),
         border: Border.all(color: t.line),
       ),
       child: Column(
@@ -30,6 +31,10 @@ class PanelCard extends StatelessWidget {
     );
   }
 }
+
+/// A settings card's corners: 12 on a phone, 11 elsewhere, as the design canvas draws them.
+double _cardRadius(BuildContext context) =>
+    ScreenClass.ofContext(context).isPhone ? 12 : 11;
 
 /// A rounded panel of [rows], a hairline between each.
 class FieldCard extends StatelessWidget {
@@ -44,7 +49,7 @@ class FieldCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: t.panel,
-        borderRadius: BorderRadius.circular(11),
+        borderRadius: BorderRadius.circular(_cardRadius(context)),
         border: Border.all(color: t.line),
       ),
       child: Column(
@@ -62,7 +67,8 @@ class FieldCard extends StatelessWidget {
 
 /// A setting in a [FieldCard]: its [label] and [help] on the left and its [control] on the
 /// right, or the control under them where the row is narrow. A [small] control, such as a
-/// switch, stays on the right however narrow.
+/// switch, stays on the right however narrow; on a phone it sits in a 52 px column near the
+/// card's edge, as the design canvas draws it.
 class FieldRow extends StatelessWidget {
   const FieldRow({
     super.key,
@@ -87,9 +93,10 @@ class FieldRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    final phone = ScreenClass.ofContext(context).isPhone;
     final about = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: 2,
+      spacing: phone ? 0 : 2,
       children: [
         Wrap(
           spacing: 8,
@@ -98,7 +105,11 @@ class FieldRow extends StatelessWidget {
           children: [
             Text(
               label,
-              style: Type.sans(14.5, weight: FontWeight.w500, color: t.ink),
+              style: Type.sans(
+                phone ? 15 : 14.5,
+                weight: FontWeight.w500,
+                color: t.ink,
+              ),
             ),
             ?tag,
           ],
@@ -106,17 +117,22 @@ class FieldRow extends StatelessWidget {
         if (help.isNotEmpty) HelpText(help),
       ],
     );
+    final edge = phone && small;
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 56),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: edge
+            ? const EdgeInsets.fromLTRB(16, 6, 4, 6)
+            : const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: LayoutBuilder(
           builder: (context, box) => small || box.maxWidth >= sideBySide
               ? Row(
-                  spacing: small ? 12 : 16,
+                  spacing: edge ? 8 : (small ? 12 : 16),
                   children: [
                     Expanded(child: about),
-                    if (small)
+                    if (edge)
+                      SizedBox(width: 52, child: Center(child: control))
+                    else if (small)
                       control
                     else
                       SizedBox(width: 280, child: control),
@@ -210,7 +226,7 @@ class PageWarning extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: t.warnbg,
-        borderRadius: BorderRadius.circular(11),
+        borderRadius: BorderRadius.circular(_cardRadius(context)),
       ),
       child: Text(text, style: Type.sans(14, color: t.warnfg, height: 1.5)),
     );

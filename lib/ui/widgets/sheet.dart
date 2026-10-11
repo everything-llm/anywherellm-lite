@@ -149,14 +149,14 @@ class _SheetFrameState extends State<SheetFrame>
             constraints: BoxConstraints(maxHeight: most),
             height: tall ? most : null,
             decoration: BoxDecoration(
-              color: t.panel,
+              color: t.panel2,
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(20),
               ),
               boxShadow: [
                 BoxShadow(
                   color: t.shadow,
-                  blurRadius: 32,
+                  blurRadius: 40,
                   spreadRadius: -12,
                   offset: const Offset(0, -12),
                 ),
@@ -226,7 +226,7 @@ class SheetHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return Container(
-      padding: EdgeInsets.fromLTRB(20, 4, 8, divided ? 10 : 2),
+      padding: EdgeInsets.fromLTRB(16, 6, 16, divided ? 10 : 2),
       decoration: divided
           ? BoxDecoration(
               border: Border(bottom: BorderSide(color: t.line2)),
@@ -259,7 +259,7 @@ class SheetHeader extends StatelessWidget {
                       about,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: Type.sans(12.5, color: t.muted),
+                      style: Type.sans(13.5, color: t.muted, height: 1.45),
                     ),
                   ),
               ],

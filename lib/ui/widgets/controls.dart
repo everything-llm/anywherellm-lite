@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import 'tappable.dart';
@@ -93,7 +94,12 @@ class SwitchTrack extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final (width, height, knob) = large
+    // A phone draws every switch at the larger size, as the design canvas does.
+    final (
+      width,
+      height,
+      knob,
+    ) = large || ScreenClass.ofContext(context).isPhone
         ? (38.0, 22.0, 18.0)
         : (34.0, 20.0, 16.0);
     return AnimatedContainer(

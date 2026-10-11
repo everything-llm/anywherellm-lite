@@ -10,23 +10,35 @@ Color fieldEdge(BuildContext context) => ScreenClass.ofContext(context).isPhone
     ? Tokens.of(context).line2
     : Tokens.of(context).line;
 
+/// A text field's fill: on a phone [Tokens.panel], as the design canvas draws it, else
+/// [Tokens.bg].
+Color fieldFill(BuildContext context) => ScreenClass.ofContext(context).isPhone
+    ? Tokens.of(context).panel
+    : Tokens.of(context).bg;
+
 /// The look of a text area that fills its space, such as the prompt editor: [fill] behind it,
-/// [fieldEdge] round it, and the accent, 2 px, while it has the focus.
-InputDecoration editorDecoration(BuildContext context, Color fill) {
+/// [fieldEdge] round it, and the accent, 2 px, while it has the focus. [padding] is round the
+/// text, 14 on every side unless given.
+InputDecoration editorDecoration(
+  BuildContext context,
+  Color fill, {
+  EdgeInsets? padding,
+}) {
   OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
-    borderRadius: BorderRadius.circular(Sizes.control),
+    borderRadius: BorderRadius.circular(Sizes.controlOf(context)),
     borderSide: BorderSide(color: color, width: width),
   );
   return InputDecoration(
     filled: true,
     fillColor: fill,
-    contentPadding: const EdgeInsets.all(14),
+    contentPadding: padding ?? const EdgeInsets.all(14),
     enabledBorder: border(fieldEdge(context), 1),
     focusedBorder: border(Tokens.of(context).accent, 2),
   );
 }
 
-/// The input: one line 44px tall, or [maxLines] lines, rounded, a ring in the accent on focus.
+/// The input: one line 44px tall, 48 on a phone, or [maxLines] lines, rounded, a ring in the
+/// accent on focus.
 class AppField extends StatelessWidget {
   const AppField({
     super.key,
@@ -80,9 +92,11 @@ class AppField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    final height = Sizes.fieldOf(context);
+    final size = ScreenClass.ofContext(context).isPhone ? 15.5 : 15.0;
     OutlineInputBorder border(Color color, [double width = 1]) =>
         OutlineInputBorder(
-          borderRadius: BorderRadius.circular(Sizes.control),
+          borderRadius: BorderRadius.circular(Sizes.controlOf(context)),
           borderSide: BorderSide(color: color, width: width),
           gapPadding: 0,
         );
@@ -106,14 +120,14 @@ class AppField extends StatelessWidget {
         enableIMEPersonalizedLearning: !obscure,
         onChanged: onChanged,
         onSubmitted: onSubmitted,
-        style: Type.sans(15).copyWith(color: t.ink),
+        style: Type.sans(size).copyWith(color: t.ink),
         cursorColor: t.accent,
         decoration: InputDecoration(
           isDense: true,
           filled: true,
-          fillColor: t.bg,
+          fillColor: fieldFill(context),
           hintText: hint,
-          hintStyle: Type.sans(15, color: t.fade),
+          hintStyle: Type.sans(size, color: t.fade),
           prefixIcon: icon == null
               ? null
               : Center(
@@ -130,12 +144,12 @@ class AppField extends StatelessWidget {
                   padding: const EdgeInsets.only(right: 4),
                   child: suffix,
                 ),
-          prefixIconConstraints: const BoxConstraints(minHeight: 44),
-          contentPadding: const EdgeInsets.symmetric(
+          prefixIconConstraints: BoxConstraints(minHeight: height),
+          contentPadding: EdgeInsets.symmetric(
             horizontal: 13,
-            vertical: 13,
+            vertical: (height - 18) / 2,
           ),
-          constraints: const BoxConstraints(minHeight: 44),
+          constraints: BoxConstraints(minHeight: height),
           enabledBorder: border(fieldEdge(context)),
           focusedBorder: border(t.accent, 2),
         ),
@@ -144,8 +158,8 @@ class AppField extends StatelessWidget {
   }
 }
 
-/// A choice among [choices], drawn as a field: 44px tall and rounded, with [hint] while
-/// [value] is none of them. A null [onChanged] turns it off.
+/// A choice among [choices], drawn as a field: as tall as an [AppField] and rounded, with
+/// [hint] while [value] is none of them. A null [onChanged] turns it off.
 class AppSelect extends StatelessWidget {
   const AppSelect({
     super.key,
@@ -167,13 +181,14 @@ class AppSelect extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    final radius = BorderRadius.circular(Sizes.controlOf(context));
     return Container(
-      height: 44,
+      height: Sizes.fieldOf(context),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: t.bg,
-        border: Border.all(color: t.line),
-        borderRadius: BorderRadius.circular(Sizes.control),
+        color: fieldFill(context),
+        border: Border.all(color: fieldEdge(context)),
+        borderRadius: radius,
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -182,7 +197,7 @@ class AppSelect extends StatelessWidget {
           hint: Text(hint, style: Type.sans(15, color: t.fade)),
           style: Type.sans(15, color: t.ink),
           dropdownColor: t.panel,
-          borderRadius: BorderRadius.circular(Sizes.control),
+          borderRadius: radius,
           icon: RotatedBox(
             quarterTurns: 1,
             child: AppIcon('chevron', size: IconSize.xs, color: t.muted),

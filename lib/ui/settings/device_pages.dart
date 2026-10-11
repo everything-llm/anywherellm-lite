@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/prefs.dart';
 import '../app_scope.dart';
 import '../layout.dart';
+import '../tokens.dart';
+import '../type.dart';
 import '../widgets/controls.dart';
 import '../widgets/fields.dart';
 import '../widgets/segmented.dart';
@@ -15,48 +17,88 @@ class AppearancePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final prefs = AppScope.of(context).prefs;
+    final phone = ScreenClass.ofContext(context).isPhone;
     return ListenableBuilder(
       listenable: prefs,
-      builder: (context, _) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: 12,
-        children: [
-          FieldCard([
-            FieldRow(
-              label: 'Theme',
-              control: Segmented<ThemePref>(
-                options: const [
-                  (ThemePref.system, 'System'),
-                  (ThemePref.light, 'Light'),
-                  (ThemePref.dark, 'Dark'),
-                ],
-                value: prefs.prefs.theme,
-                onChanged: prefs.setTheme,
+      builder: (context, _) {
+        final theme = Segmented<ThemePref>(
+          options: const [
+            (ThemePref.system, 'System'),
+            (ThemePref.light, 'Light'),
+            (ThemePref.dark, 'Dark'),
+          ],
+          value: prefs.prefs.theme,
+          onChanged: prefs.setTheme,
+        );
+        final size = Segmented<TextSize>(
+          options: const [
+            (TextSize.small, 'Small'),
+            (TextSize.normal, 'Normal'),
+            (TextSize.large, 'Large'),
+          ],
+          value: prefs.prefs.textSize,
+          onChanged: prefs.setTextSize,
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: phone ? 20 : 12,
+          children: [
+            // A phone puts each name over its choices, with no card, as the design canvas
+            // draws it, and says what the text size does once, under both.
+            if (phone) ...[
+              _Named('Theme', theme),
+              _Named('Chat text size', size),
+              const HelpText(
+                'Text size scales the chat\'s turns, not the controls around them.',
               ),
-            ),
-            FieldRow(
-              label: 'Chat text size',
-              // As the design canvas words it on each.
-              help: ScreenClass.ofContext(context).isPhone
-                  ? 'Text size scales the chat\'s turns, not the controls around them.'
-                  : 'Scales the chat\'s turns, not the controls around them.',
-              control: Segmented<TextSize>(
-                options: const [
-                  (TextSize.small, 'Small'),
-                  (TextSize.normal, 'Normal'),
-                  (TextSize.large, 'Large'),
-                ],
-                value: prefs.prefs.textSize,
-                onChanged: prefs.setTextSize,
-              ),
-            ),
-          ]),
-          if (prefs.problem case final problem?)
-            HelpText('${problem.title}. ${problem.text}', status: true),
-        ],
-      ),
+            ] else
+              FieldCard([
+                FieldRow(label: 'Theme', control: theme),
+                FieldRow(
+                  label: 'Chat text size',
+                  help:
+                      'Scales the chat\'s turns, not the controls around them.',
+                  control: size,
+                ),
+              ]),
+            if (prefs.problem case final problem?)
+              HelpText('${problem.title}. ${problem.text}', status: true),
+          ],
+        );
+      },
     );
   }
+}
+
+/// [control] under its [name], which a screen reader hears as the group's.
+class _Named extends StatelessWidget {
+  const _Named(this.name, this.control);
+
+  final String name;
+  final Widget control;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    label: name,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 6,
+      children: [
+        ExcludeSemantics(
+          child: Text(
+            name,
+            style: Type.sans(
+              15,
+              weight: FontWeight.w500,
+              color: Tokens.of(context).ink,
+            ),
+          ),
+        ),
+        control,
+      ],
+    ),
+  );
 }
 
 /// What the Chat page holds, as a phone's Settings list says it: the switches this device has.

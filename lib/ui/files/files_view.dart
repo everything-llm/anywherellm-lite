@@ -247,6 +247,9 @@ class _EditorState extends State<_Editor> {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final prompt = widget.node.kind == NodeKind.prompt;
+    // A phone's Instructions are prose, set as the design canvas sets them, with its two
+    // buttons sharing the line.
+    final prose = widget.phone && prompt;
     final block = _everythingllmBlock.hasMatch(_saved);
     final List<String> notes;
     if (!prompt) {
@@ -273,7 +276,9 @@ class _EditorState extends State<_Editor> {
         const SingleActivator(LogicalKeyboardKey.keyS, control: true): _save,
       },
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: prose
+            ? const EdgeInsets.fromLTRB(20, 14, 20, 20)
+            : const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -285,9 +290,12 @@ class _EditorState extends State<_Editor> {
             for (final note in notes)
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
-                child: Text(note, style: Type.sans(13, color: t.muted)),
+                child: Text(
+                  note,
+                  style: Type.sans(13, color: t.muted, height: 1.45),
+                ),
               ),
-            const SizedBox(height: 6),
+            SizedBox(height: prose ? 4 : 6),
             Expanded(
               child: Semantics(
                 label: widget.node.name,
@@ -299,9 +307,20 @@ class _EditorState extends State<_Editor> {
                   textAlignVertical: TextAlignVertical.top,
                   autocorrect: false,
                   enableSuggestions: false,
-                  style: Type.mono(13, color: t.ink, height: 1.5),
+                  style: prose
+                      ? Type.sans(15, color: t.ink, height: 1.55)
+                      : Type.mono(13, color: t.ink, height: 1.5),
                   cursorColor: t.accent,
-                  decoration: editorDecoration(context, t.panel),
+                  decoration: editorDecoration(
+                    context,
+                    t.panel,
+                    padding: prose
+                        ? const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          )
+                        : null,
+                  ),
                 ),
               ),
             ),
@@ -309,19 +328,29 @@ class _EditorState extends State<_Editor> {
             // Only the buttons follow the draft, so typing rebuilds nothing else.
             ListenableBuilder(
               listenable: _draft,
-              builder: (context, _) => ActionRow([
-                AppButton(
-                  'Revert',
-                  onPressed: _dirty && !_saving
-                      ? () => _draft.text = _saved
-                      : null,
-                ),
-                AppButton(
-                  _saving ? 'Saving…' : 'Save',
-                  primary: true,
-                  onPressed: _dirty && !_saving ? _save : null,
-                ),
-              ]),
+              builder: (context, _) {
+                final buttons = [
+                  AppButton(
+                    'Revert',
+                    onPressed: _dirty && !_saving
+                        ? () => _draft.text = _saved
+                        : null,
+                  ),
+                  AppButton(
+                    _saving ? 'Saving…' : 'Save',
+                    primary: true,
+                    onPressed: _dirty && !_saving ? _save : null,
+                  ),
+                ];
+                if (!prose) return ActionRow(buttons);
+                return Row(
+                  children: [
+                    Expanded(child: buttons[0]),
+                    const SizedBox(width: 8),
+                    Expanded(child: buttons[1]),
+                  ],
+                );
+              },
             ),
           ],
         ),

@@ -49,6 +49,17 @@ abstract final class Sizes {
   static const phoneComposer = 20.0;
   static const control = 10.0;
 
+  /// A button's or a field's corners on a phone, rounder than [control].
+  static const phoneControl = 12.0;
+
+  /// A button's or a field's corners in the window [context] is in.
+  static double controlOf(BuildContext context) =>
+      ScreenClass.ofContext(context).isPhone ? phoneControl : control;
+
+  /// A one-line field's height in the window [context] is in: taller on a phone.
+  static double fieldOf(BuildContext context) =>
+      ScreenClass.ofContext(context).isPhone ? 48 : 44;
+
   /// The least width at which Settings shows its list and a page side by side.
   static const settingsSideBySide = 820.0;
 

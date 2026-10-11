@@ -588,7 +588,11 @@ class _Form extends StatelessWidget {
         if (!picking) onPickModel();
       },
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 12, 10),
+        // A phone's buttons run nearer the card's edges than its text, as the design canvas
+        // draws them; what sits over them is indented to the text's edge.
+        padding: phone
+            ? const EdgeInsets.fromLTRB(4, 12, 6, 4)
+            : const EdgeInsets.fromLTRB(16, 12, 12, 10),
         decoration: BoxDecoration(
           color: t.panel,
           borderRadius: BorderRadius.circular(
@@ -608,99 +612,112 @@ class _Form extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (problem case final problem?) ...[
-              AlertBox(AlertKind.bad, 'Could not attach', text: problem),
-              const SizedBox(height: 8),
-            ],
-            if (micProblem case final problem?) ...[
-              AlertBox(AlertKind.bad, 'Could not listen', text: problem),
-              const SizedBox(height: 8),
-            ],
-            if (chat.editing != null)
-              _FormNote(
-                'Editing a sent message: sending replaces it and everything after it.',
-                action: 'Send as new',
-                onAction: chat.cancelEdit,
-              ),
-            if (held)
-              _FormNote(
-                'Sends when this answer ends.',
-                action: "Don't send",
-                onAction: onRelease,
-              ),
-            if (picking) ...[
-              ModelPicker(onClose: onPickModel),
-              Divider(height: 21, thickness: 1, color: t.line),
-            ],
-            if (menu) ...[
-              SlashMenu(
-                commands: matches,
-                highlight: highlight,
-                onPick: onPick,
-                note: chat.commandsNote,
-              ),
-              Divider(height: 13, thickness: 1, color: t.line),
-            ],
-            if (attached.isNotEmpty) ...[
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
+            Padding(
+              padding: EdgeInsets.only(left: phone ? 12 : 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final a in attached)
-                    _AttachedChip(a, onRemove: () => onRemove(a)),
-                ],
-              ),
-              const SizedBox(height: 8),
-            ],
-            ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 26, maxHeight: 140),
-              child: CallbackShortcuts(
-                bindings: bindings,
-                child: Semantics(
-                  label: 'Message',
-                  textField: true,
-                  // Only the field follows the prefs, for its spellcheck.
-                  child: ListenableBuilder(
-                    listenable: scope.prefs,
-                    builder: (context, _) => _pasting(
-                      TextField(
-                        controller: draft,
-                        focusNode: focus,
-                        // Open while this chat answers, for the next message.
-                        enabled: !chat.busy || here,
-                        spellCheckConfiguration:
-                            scope.canSpellcheck &&
-                                scope.prefs.prefs.isOn(ChatSwitch.spellcheck)
-                            ? const SpellCheckConfiguration()
-                            : const SpellCheckConfiguration.disabled(),
-                        minLines: 1,
-                        maxLines: null,
-                        keyboardType: TextInputType.multiline,
-                        textInputAction: TextInputAction.newline,
-                        // A phone's keyboard starts each sentence with a capital.
-                        textCapitalization: TextCapitalization.sentences,
-                        style: Type.sans(15.5, color: t.ink, height: 1.5),
-                        cursorColor: t.accent,
-                        // A picture from a phone keyboard's clipboard; the rest goes in as text.
-                        contentInsertionConfiguration:
-                            ContentInsertionConfiguration(
-                              allowedMimeTypes: imageMimes.toList(),
-                              onContentInserted: onInserted,
+                  if (problem case final problem?) ...[
+                    AlertBox(AlertKind.bad, 'Could not attach', text: problem),
+                    const SizedBox(height: 8),
+                  ],
+                  if (micProblem case final problem?) ...[
+                    AlertBox(AlertKind.bad, 'Could not listen', text: problem),
+                    const SizedBox(height: 8),
+                  ],
+                  if (chat.editing != null)
+                    _FormNote(
+                      'Editing a sent message: sending replaces it and everything after it.',
+                      action: 'Send as new',
+                      onAction: chat.cancelEdit,
+                    ),
+                  if (held)
+                    _FormNote(
+                      'Sends when this answer ends.',
+                      action: "Don't send",
+                      onAction: onRelease,
+                    ),
+                  if (picking) ...[
+                    ModelPicker(onClose: onPickModel),
+                    Divider(height: 21, thickness: 1, color: t.line),
+                  ],
+                  if (menu) ...[
+                    SlashMenu(
+                      commands: matches,
+                      highlight: highlight,
+                      onPick: onPick,
+                      note: chat.commandsNote,
+                    ),
+                    Divider(height: 13, thickness: 1, color: t.line),
+                  ],
+                  if (attached.isNotEmpty) ...[
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final a in attached)
+                          _AttachedChip(a, onRemove: () => onRemove(a)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minHeight: 26,
+                      maxHeight: 140,
+                    ),
+                    child: CallbackShortcuts(
+                      bindings: bindings,
+                      child: Semantics(
+                        label: 'Message',
+                        textField: true,
+                        // Only the field follows the prefs, for its spellcheck.
+                        child: ListenableBuilder(
+                          listenable: scope.prefs,
+                          builder: (context, _) => _pasting(
+                            TextField(
+                              controller: draft,
+                              focusNode: focus,
+                              // Open while this chat answers, for the next message.
+                              enabled: !chat.busy || here,
+                              spellCheckConfiguration:
+                                  scope.canSpellcheck &&
+                                      scope.prefs.prefs.isOn(
+                                        ChatSwitch.spellcheck,
+                                      )
+                                  ? const SpellCheckConfiguration()
+                                  : const SpellCheckConfiguration.disabled(),
+                              minLines: 1,
+                              maxLines: null,
+                              keyboardType: TextInputType.multiline,
+                              textInputAction: TextInputAction.newline,
+                              // A phone's keyboard starts each sentence with a capital.
+                              textCapitalization: TextCapitalization.sentences,
+                              style: Type.sans(15.5, color: t.ink, height: 1.5),
+                              cursorColor: t.accent,
+                              // A picture from a phone keyboard's clipboard; the rest goes in as text.
+                              contentInsertionConfiguration:
+                                  ContentInsertionConfiguration(
+                                    allowedMimeTypes: imageMimes.toList(),
+                                    onContentInserted: onInserted,
+                                  ),
+                              decoration: InputDecoration(
+                                isCollapsed: true,
+                                border: InputBorder.none,
+                                hintText: hint,
+                                hintStyle: Type.sans(
+                                  15.5,
+                                  color: t.fade,
+                                  height: 1.5,
+                                ),
+                              ),
                             ),
-                        decoration: InputDecoration(
-                          isCollapsed: true,
-                          border: InputBorder.none,
-                          hintText: hint,
-                          hintStyle: Type.sans(
-                            15.5,
-                            color: t.fade,
-                            height: 1.5,
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
             const SizedBox(height: 8),
@@ -723,7 +740,7 @@ class _Form extends StatelessWidget {
                     box: 30,
                     size: IconSize.small,
                   ),
-                const SizedBox(width: 4),
+                SizedBox(width: phone ? 2 : 4),
                 // Takes all the room left, so Send sits at the right edge. On a phone the model is
                 // a row in the Answer from menu, since the row has room for one chip.
                 Expanded(
@@ -749,7 +766,7 @@ class _Form extends StatelessWidget {
                 ),
                 if (onDictate != null)
                   Padding(
-                    padding: const EdgeInsets.only(right: 4),
+                    padding: EdgeInsets.only(right: phone ? 0 : 4),
                     child: IconBtn(
                       'mic',
                       tooltip: listening ? 'Stop dictating' : 'Dictate',

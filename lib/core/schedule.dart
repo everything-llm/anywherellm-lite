@@ -52,6 +52,25 @@ class ScheduledJob {
 
   /// How the latest run ended, in the server's word, such as `completed` or `failed`.
   final String? lastStatus;
+
+  /// Whether the latest run went well: true for one the server calls completed, false for one
+  /// it calls failed, and null for any other word, such as one still running, or none.
+  bool? get lastWentWell => switch (lastStatus?.toLowerCase()) {
+    'completed' || 'complete' || 'done' || 'success' || 'succeeded' => true,
+    'failed' || 'failure' || 'error' || 'errored' => false,
+    _ => null,
+  };
+
+  /// [lastStatus] as a word to show: Done, Failed, or the server's own word with a capital.
+  String? get lastStatusText => switch (lastWentWell) {
+    true => 'Done',
+    false => 'Failed',
+    null => switch (lastStatus) {
+      final word? when word.isNotEmpty =>
+        word[0].toUpperCase() + word.substring(1),
+      _ => null,
+    },
+  };
 }
 
 DateTime? _time(Object? value) =>

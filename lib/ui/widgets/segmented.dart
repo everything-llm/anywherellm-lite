@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import 'tappable.dart';
 
-/// A row of equal segments, one of them chosen. [onChanged] null shows it disabled.
+/// A row of equal segments, one of them chosen. [onChanged] null shows it disabled. On a phone
+/// each segment is at least 40 tall, its label at 14.5, as the design canvas draws it.
 class Segmented<T> extends StatelessWidget {
   const Segmented({
     super.key,
@@ -41,13 +43,14 @@ class Segmented<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final onChanged = this.onChanged;
+    final phone = ScreenClass.ofContext(context).isPhone;
     return Opacity(
       opacity: onChanged == null ? 0.55 : 1,
       child: Container(
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
           color: t.hover,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(phone ? 12 : 10),
         ),
         child: _rows([
           for (final (option, label) in options)
@@ -55,10 +58,12 @@ class Segmented<T> extends StatelessWidget {
               label: label,
               selected: value == option,
               onTap: onChanged == null ? null : () => onChanged(option),
-              radius: BorderRadius.circular(8),
+              radius: BorderRadius.circular(phone ? 9 : 8),
               color: value == option ? t.panel : null,
               child: _centred(
-                Padding(
+                Container(
+                  constraints: BoxConstraints(minHeight: phone ? 40 : 0),
+                  alignment: phone ? Alignment.center : null,
                   padding: EdgeInsets.symmetric(
                     vertical: 6,
                     horizontal: maxLines > 1 ? 4 : 0,
@@ -69,7 +74,7 @@ class Segmented<T> extends StatelessWidget {
                     maxLines: maxLines,
                     overflow: TextOverflow.ellipsis,
                     style: Type.sans(
-                      13.5,
+                      phone ? 14.5 : 13.5,
                       weight: value == option
                           ? FontWeight.w600
                           : FontWeight.w400,

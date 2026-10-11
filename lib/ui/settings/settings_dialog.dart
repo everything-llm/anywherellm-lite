@@ -132,6 +132,10 @@ class _PhoneFrame extends StatelessWidget {
       null => 'Back to the chat',
       final page => 'Back to ${page.parent?.label ?? 'Settings'}',
     };
+    // A first run opens on its welcome alone, with no bar over it; Back still closes it.
+    if (page == SettingsPage.connection && !configured) {
+      return const _PageView(SettingsPage.connection, wide: false, phone: true);
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -541,8 +545,10 @@ class _PageView extends StatelessWidget {
       key: ValueKey(page),
       padding: wide
           ? const EdgeInsets.fromLTRB(32, 24, 32, 40)
+          : phone && firstRun
+          ? const EdgeInsets.fromLTRB(24, 72, 24, 24)
           : phone
-          ? const EdgeInsets.fromLTRB(20, 12, 20, 32)
+          ? const EdgeInsets.fromLTRB(20, 14, 20, 32)
           : const EdgeInsets.fromLTRB(16, 16, 16, 32),
       child: Align(
         alignment: Alignment.topLeft,
@@ -566,15 +572,26 @@ class _PageView extends StatelessWidget {
                     ),
                   ),
                 ),
-              // A phone's first run says what to do in its own words.
-              if (!(phone && firstRun)) ...[
+              // A phone's first run says what to do in its own words, and a phone's
+              // Appearance and Chat need no line, as the design canvas draws them.
+              if (phone && firstRun)
+                const SizedBox.shrink()
+              else if (phone && page == SettingsPage.appearance)
+                const SizedBox(height: 2)
+              else if (phone && page == SettingsPage.chat)
+                const SizedBox.shrink()
+              else if (phone) ...[
+                Text(switch (page) {
+                  SettingsPage.connection =>
+                    'How this phone reaches AnythingLLM.',
+                  SettingsPage.server => 'What AnythingLLM runs with. Each row opens the page that changes it.',
+                  _ => page.about,
+                }, style: Type.sans(14.5, color: t.ink2, height: 1.5)),
+                const SizedBox(height: 14),
+              ] else ...[
                 const SizedBox(height: 6),
                 Text(
-                  phone && page == SettingsPage.connection
-                      ? 'How this phone reaches AnythingLLM.'
-                      : phone && page == SettingsPage.server
-                      ? 'What AnythingLLM runs with. Each row opens the page that changes it.'
-                      : page.about,
+                  page.about,
                   style: Type.sans(15, color: t.ink2, height: 1.5),
                 ),
                 const SizedBox(height: 20),

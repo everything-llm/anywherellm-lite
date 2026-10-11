@@ -254,7 +254,8 @@ class _Header extends StatelessWidget {
           actions: workspace == null
               ? null
               : (compact) => [
-                  const SizedBox(width: 12),
+                  // A phone's buttons sit side by side, as the design canvas draws them.
+                  SizedBox(width: phone ? 4 : 12),
                   if (!phone)
                     _HeaderButton(
                       label: 'Refresh',
@@ -265,7 +266,7 @@ class _Header extends StatelessWidget {
                     ),
                   // New chat sits at the top of the sidebar while it is in the layout.
                   if (showMenu) ...[
-                    const SizedBox(width: 8),
+                    if (!phone) const SizedBox(width: 8),
                     _HeaderButton(
                       label: 'New chat',
                       icon: 'plus',
@@ -274,7 +275,7 @@ class _Header extends StatelessWidget {
                     ),
                   ],
                   _BrowserButton(compact: compact),
-                  const SizedBox(width: 8),
+                  SizedBox(width: phone ? 2 : 8),
                   _HeaderButton(
                     label: 'Documents',
                     heard: 'Documents, ${scope.sources.onCount} on',
@@ -325,6 +326,10 @@ class _HeaderButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    // On a phone an icon alone sits in a 36 px square, and one with a count is padded 6, as
+    // the design canvas draws them.
+    final tight = compact && ScreenClass.ofContext(context).isPhone;
+    final gap = tight ? 6.0 : 7.0;
     return Tappable(
       touchTarget: true,
       label: heard ?? label,
@@ -333,24 +338,24 @@ class _HeaderButton extends StatelessWidget {
       onTap: onTap,
       radius: BorderRadius.circular(9),
       color: pressed == true ? t.hover : null,
-      child: SizedBox(
+      child: Container(
         height: 36,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppIcon(icon, size: IconSize.xs, color: compact ? t.ink2 : t.ink),
-              if (!compact) ...[
-                const SizedBox(width: 7),
-                Text(
-                  label,
-                  style: Type.sans(14, weight: FontWeight.w500, color: t.ink),
-                ),
-              ],
-              if (trailing != null) ...[const SizedBox(width: 7), trailing!],
+        constraints: BoxConstraints(minWidth: tight ? 36 : 0),
+        alignment: Alignment.center,
+        padding: EdgeInsets.symmetric(horizontal: tight ? 6 : 12),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppIcon(icon, size: IconSize.xs, color: compact ? t.ink2 : t.ink),
+            if (!compact) ...[
+              SizedBox(width: gap),
+              Text(
+                label,
+                style: Type.sans(14, weight: FontWeight.w500, color: t.ink),
+              ),
             ],
-          ),
+            if (trailing != null) ...[SizedBox(width: gap), trailing!],
+          ],
         ),
       ),
     );

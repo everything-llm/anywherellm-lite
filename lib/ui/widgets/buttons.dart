@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../icons.dart';
@@ -6,29 +8,39 @@ import '../tokens.dart';
 import '../type.dart';
 import 'tappable.dart';
 
-/// The button: bordered, with a filled `primary` form.
+/// The button: bordered, with a filled `primary` form. On a phone it is 44 tall with its label
+/// at 14.5, and a primary one 48 with its label at 15.5, as the design canvas draws them.
 class AppButton extends StatelessWidget {
   const AppButton(
     this.label, {
     super.key,
     required this.onPressed,
     this.primary = false,
+    this.icon,
+    this.narrow = false,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final bool primary;
 
+  /// An icon after the label, such as `external` for a button that leaves the app.
+  final String? icon;
+
+  /// 8 px either side of the label rather than 16, for buttons that share a line in equal
+  /// widths ([ActionRow.even]).
+  final bool narrow;
+
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final phone = ScreenClass.ofContext(context).isPhone;
-    final height = phone ? 44.0 : 40.0;
+    final height = phone ? (primary ? 48.0 : 44.0) : 40.0;
     final fg = primary ? t.onaccent : t.ink;
     return Tappable(
       label: label,
       onTap: onPressed,
-      radius: BorderRadius.circular(Sizes.control),
+      radius: BorderRadius.circular(Sizes.controlOf(context)),
       color: primary ? t.accent : t.panel,
       side: BorderSide(color: primary ? t.accent : t.line),
       hoverColor: primary ? t.onaccent.withValues(alpha: 0.1) : null,
@@ -36,7 +48,7 @@ class AppButton extends StatelessWidget {
       child: ConstrainedBox(
         constraints: BoxConstraints(minHeight: height),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: narrow ? 8 : 16),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
@@ -46,9 +58,19 @@ class AppButton extends StatelessWidget {
                 child: Text(
                   label,
                   textAlign: TextAlign.center,
-                  style: Type.sans(14, weight: FontWeight.w500, color: fg),
+                  style: phone
+                      ? Type.sans(
+                          primary ? 15.5 : 14.5,
+                          weight: primary ? FontWeight.w600 : FontWeight.w500,
+                          color: fg,
+                        )
+                      : Type.sans(14, weight: FontWeight.w500, color: fg),
                 ),
               ),
+              if (icon case final icon?) ...[
+                const SizedBox(width: 8),
+                AppIcon(icon, size: IconSize.xs, color: fg),
+              ],
             ],
           ),
         ),
@@ -113,19 +135,35 @@ class IconBtn extends StatelessWidget {
 
 /// A form's buttons, such as Cancel and Add, in a row at its end that wraps when narrow. A
 /// page's own buttons under its cards sit from the start of the line ([WrapAlignment.start]).
+/// [even] shares the line between them in equal widths, as a phone's card does.
 class ActionRow extends StatelessWidget {
   const ActionRow(
     this.children, {
     super.key,
     this.alignment = WrapAlignment.end,
+    this.even = false,
   });
 
   final List<Widget> children;
   final WrapAlignment alignment;
+  final bool even;
 
   @override
-  Widget build(BuildContext context) =>
-      Wrap(alignment: alignment, spacing: 8, runSpacing: 8, children: children);
+  Widget build(BuildContext context) {
+    if (!even) {
+      return Wrap(
+        alignment: alignment,
+        spacing: 8,
+        runSpacing: 8,
+        children: children,
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: 8,
+      children: [for (final child in children) Expanded(child: child)],
+    );
+  }
 }
 
 /// A small text button in the accent, with an icon before it, or only its words
@@ -156,21 +194,31 @@ class TextAction extends StatelessWidget {
   final String? semanticLabel;
 
   /// The least height, with the words in its middle, as beside buttons whose row it shares.
+  /// On a phone it is at least 44.
   final double? height;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    final phone = ScreenClass.ofContext(context).isPhone;
+    final height = phone ? math.max(44.0, this.height ?? 0) : this.height;
     final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (icon case final icon?) ...[
-          AppIcon(icon, size: IconSize.xs, color: t.accent),
+          AppIcon(
+            icon,
+            size: phone ? IconSize.small : IconSize.xs,
+            color: t.accent,
+          ),
           const SizedBox(width: 6),
         ],
         // Wraps where the line is too narrow for it.
         Flexible(
-          child: Text(label, style: Type.sans(13, color: t.accent)),
+          child: Text(
+            label,
+            style: Type.sans(phone ? 14 : 13, color: t.accent),
+          ),
         ),
       ],
     );

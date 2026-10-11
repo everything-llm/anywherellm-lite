@@ -1,6 +1,7 @@
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/chat/answer_body.dart';
+import 'package:anywherellm/ui/chat/markdown_lists.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:anywherellm/ui/widgets/controls.dart';
@@ -61,7 +62,24 @@ List<String> _clipboard(WidgetTester tester) {
   return copied;
 }
 
+/// The gap between the foot of the [first] line's text and the top of the [second]'s.
+double _gap(WidgetTester tester, String first, String second) =>
+    tester.getTopLeft(find.textContaining(second)).dy -
+    tester.getBottomLeft(find.textContaining(first)).dy;
+
 void main() {
+  testWidgets('a tight list sets its items line to line, a loose one apart', (
+    tester,
+  ) async {
+    await _show(
+      tester,
+      'Plan:\n\n- Alpha\n- Beta\n\nThen:\n\n- Gamma\n\n- Delta',
+    );
+    expect(_gap(tester, 'Alpha', 'Beta'), 0);
+    expect(_gap(tester, 'Gamma', 'Delta'), 12);
+    expect(_gap(tester, 'Plan:', 'Alpha'), 12);
+  });
+
   testWidgets('a table wider than the chat shows its scrollbar', (
     tester,
   ) async {
@@ -262,6 +280,28 @@ $$\frac{a}{b}$$
     await llm.chat!.close();
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.bySemanticsLabel('Copy answer'), findsOneWidget);
+  });
+
+  testWidgets('the caret ends the text being written, but not inside code', (
+    tester,
+  ) async {
+    final llm = _server()..hold = true;
+    final h = await pumpApp(tester, llm: llm);
+    h.chat.newChat();
+    await tester.pumpAndSettle();
+    await h.chat.send('More?');
+    llm.chat!.add(const TextChunk('The plan is'));
+    await tester.pump(const Duration(milliseconds: 100));
+    final line = find.textContaining('The plan is', findRichText: true);
+    expect(find.descendant(of: line, matching: find.byType(Caret)), findsOne);
+    expect(find.byType(Caret), findsOne);
+    llm.chat!.add(const TextChunk('\n\n```\nprint(1'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.textContaining(caretMark, findRichText: true), findsNothing);
+    expect(find.byType(Caret), findsOne);
+    await llm.chat!.close();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.byType(Caret), findsNothing);
   });
 
   testWidgets('reasoning never shows, and is left out of Copy', (tester) async {

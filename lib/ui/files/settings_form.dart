@@ -208,7 +208,7 @@ class _SettingsFormState extends State<SettingsForm> {
         .where((p) => similarity is num && p.$1 == similarity)
         .firstOrNull;
     final dirty = _dirty;
-    final buttons = ActionRow([
+    final buttons = ActionRow(even: widget.phone, [
       AppButton('Revert', onPressed: dirty && !_saving ? _revert : null),
       AppButton(
         _saving ? 'Saving…' : 'Save',
@@ -216,7 +216,9 @@ class _SettingsFormState extends State<SettingsForm> {
         onPressed: dirty && !_saving ? _save : null,
       ),
     ]);
-    if (widget.phone) return _phone(context, buttons);
+    // A phone shows its buttons only once something has changed, as the design canvas draws
+    // the page at rest.
+    if (widget.phone) return _phone(context, dirty || _saving ? buttons : null);
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
@@ -365,14 +367,14 @@ class _SettingsFormState extends State<SettingsForm> {
     );
   }
 
-  /// The phone's three settings, under their buttons' row.
-  Widget _phone(BuildContext context, Widget buttons) {
+  /// The phone's three settings, then [buttons], when there are any.
+  Widget _phone(BuildContext context, Widget? buttons) {
     final scope = AppScope.of(context);
     final workspace = scope.chat.active?.name ?? 'this workspace';
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
       children: [
-        const SizedBox(height: 14),
+        const SizedBox(height: 18),
         const SectionLabel('Answer from'),
         const SizedBox(height: 6),
         Semantics(
@@ -387,6 +389,7 @@ class _SettingsFormState extends State<SettingsForm> {
                   child: RadioCard(
                     title: mode.title,
                     about: mode.detail,
+                    restWeight: FontWeight.w500,
                     selected: _mode == mode.name,
                     onTap: () => setState(() => _mode = mode.name),
                   ),
@@ -432,8 +435,7 @@ class _SettingsFormState extends State<SettingsForm> {
           'What Files only says when no document matches. These apply to every chat in '
           '$workspace. Chat history, temperature and document search are in the desktop app.',
         ),
-        const SizedBox(height: 16),
-        buttons,
+        if (buttons != null) ...[const SizedBox(height: 16), buttons],
       ],
     );
   }

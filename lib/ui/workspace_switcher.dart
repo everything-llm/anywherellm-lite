@@ -226,16 +226,19 @@ class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
       (w) => w.slug != active?.slug && _chat.readyIn(w.slug),
     );
     final name = active == null ? 'Workspaces' : 'Workspaces: ${active.name}';
+    // A phone's is 48 tall, its name at 15 over a sheet that rises below, as the design canvas
+    // draws it.
+    final phone = ScreenClass.ofContext(context).isPhone;
     return Tappable(
       label: elsewhere ? '$name, an answer is ready in another' : name,
       tooltip: 'Switch workspace',
       expanded: open,
       onTap: () => _shell.togglePopup(Popup.workspaces),
-      radius: BorderRadius.circular(Sizes.control),
+      radius: BorderRadius.circular(Sizes.controlOf(context)),
       color: open ? t.hover : t.panel,
       side: BorderSide(color: t.line),
       child: SizedBox(
-        height: 44,
+        height: phone ? 48 : 44,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 0, 10, 0),
           child: Row(
@@ -246,7 +249,7 @@ class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Type.sans(
-                    14.5,
+                    phone ? 15 : 14.5,
                     weight: FontWeight.w600,
                     color: active == null ? t.muted : t.ink,
                   ),
@@ -261,7 +264,11 @@ class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
               ],
               if (elsewhere) const ReadyDot(),
               const SizedBox(width: 8),
-              AppIcon('unfold', size: IconSize.xs, color: t.muted),
+              AppIcon(
+                phone ? 'down' : 'unfold',
+                size: IconSize.xs,
+                color: t.muted,
+              ),
             ],
           ),
         ),
@@ -294,12 +301,15 @@ class _WorkspaceMenu extends StatelessWidget {
     final ordered = scope.prefs.prefs.inOrder(chat.workspaces, (w) => w.slug);
     final active = chat.active;
     final keys = showsWorkspaceKeys(context);
-    final create = AppMenuItem(
-      'New workspace',
-      icon: 'plus',
-      accent: true,
-      onTap: onCreate,
-    );
+    // A phone's sheet draws it plain, as its other rows are, as the design canvas does.
+    final create = sheet
+        ? AppMenuItem('New workspace', onTap: onCreate)
+        : AppMenuItem(
+            'New workspace',
+            icon: 'plus',
+            accent: true,
+            onTap: onCreate,
+          );
     final rename = active == null
         ? null
         : AppMenuItem('Rename workspace', onTap: onRename);

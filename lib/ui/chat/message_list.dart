@@ -25,6 +25,7 @@ import '../widgets/rise.dart';
 import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
 import 'answer_body.dart';
+import 'markdown_lists.dart';
 import 'answer_menu.dart';
 import 'approval_card.dart';
 import 'browser_chip.dart';
@@ -137,15 +138,21 @@ class _MessageListState extends State<MessageList> {
     // On a phone a pull down past the oldest turn reads the chat again, in place of the
     // header's Refresh.
     final phone = ScreenClass.ofContext(context).isPhone;
+    // The list is reversed, so a long chat opens at its newest turn; it is as tall as its turns
+    // and sits at the top, so a short chat starts under the header, as the design canvas
+    // draws it.
     final list = CustomScrollView(
       // Another chat gets a list of its own, which starts at its newest turn.
       key: ValueKey((chat.activeSlug, chat.activeThread)),
       controller: _scroll,
       reverse: true,
+      shrinkWrap: true,
       physics: phone ? const AlwaysScrollableScrollPhysics() : null,
       slivers: [
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+          padding: phone
+              ? const EdgeInsets.fromLTRB(20, 20, 20, 8)
+              : const EdgeInsets.fromLTRB(20, 12, 20, 28),
           sliver: _HoldPlace(
             newest: _newest,
             holds: () => _holds(turns.lastOrNull, scope.prefs),
@@ -164,12 +171,13 @@ class _MessageListState extends State<MessageList> {
         ),
       ],
     );
-    if (!phone) return list;
+    final top = Align(alignment: Alignment.topCenter, child: list);
+    if (!phone) return top;
     // MessageList is built afresh as the chat changes, so this follows refreshing.
     return PullRefresh(
       refreshing: chat.refreshing,
       onRefresh: chat.refresh,
-      child: list,
+      child: top,
     );
   }
 
@@ -177,11 +185,13 @@ class _MessageListState extends State<MessageList> {
   Widget _turn(ChatController chat, List<Turn> turns, int i) {
     final turn = turns[turns.length - 1 - i];
     final first = i == turns.length - 1;
-    // An answer sits closer to its own question than a question to the answer before it.
+    // An answer sits closer to its own question than a question to the answer before it. On a
+    // phone every turn is 14 from the one before.
     final answering =
         !first &&
         turn.role != Role.user &&
         turns[turns.length - 2 - i].role == Role.user;
+    final phone = ScreenClass.ofContext(context).isPhone;
     return _Measured(
       key: _keyOf(turn),
       into: i == 0 ? _newest : null,
@@ -195,6 +205,8 @@ class _MessageListState extends State<MessageList> {
             padding: EdgeInsets.only(
               top: first
                   ? 0
+                  : phone
+                  ? 14
                   : answering
                   ? 16
                   : 26,
@@ -475,9 +487,30 @@ class _UserBubble extends StatelessWidget {
   /// Puts [text] back in the composer, to replace the question when the app is signed in.
   final VoidCallback onEdit;
 
-  /// Edit sits beside the bubble, at its foot, so nothing stands between it and the answer.
+  /// Edit sits beside the bubble, at its foot, so nothing stands between it and the answer. On
+  /// a phone the bubble stands alone, at most 300 wide, as the design canvas draws it, and a
+  /// long press on it is Edit.
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
+  Widget build(BuildContext context) {
+    if (!ScreenClass.ofContext(context).isPhone) return _beside(context);
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Semantics(
+        customSemanticsActions: {
+          const CustomSemanticsAction(label: 'Edit'): onEdit,
+        },
+        child: GestureDetector(
+          onLongPress: onEdit,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 300),
+            child: _bubble(context),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _beside(BuildContext context) => LayoutBuilder(
     builder: (context, box) => Row(
       mainAxisAlignment: MainAxisAlignment.end,
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -502,8 +535,11 @@ class _UserBubble extends StatelessWidget {
 
   Widget _bubble(BuildContext context) {
     final t = Tokens.of(context);
+    final phone = ScreenClass.ofContext(context).isPhone;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+      padding: phone
+          ? const EdgeInsets.symmetric(horizontal: 14, vertical: 10)
+          : const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
       decoration: BoxDecoration(
         color: t.bubble,
         borderRadius: const BorderRadius.only(
@@ -628,9 +664,12 @@ class _AnswerState extends State<_Answer> {
     final split = splitReasoning(turn.text, streaming: turn.streaming);
     final failure = turn.streaming ? null : modelFailure(split.answer);
     final answered = split.answer.isNotEmpty && failure == null;
+    // The caret ends the text being written where it can, and stands alone where it cannot.
+    final inline = turn.streaming && answered && takesCaret(split.answer);
     final rate = answered ? _feedbackOf(context, turn) : null;
     // An answer cut short shows what came in the second ink, under why it stopped.
     final cut = !turn.streaming && (turn.stopped || turn.error != null);
+    final phone = ScreenClass.ofContext(context).isPhone;
     // The red box asks again itself, so Retry does not show twice.
     final askAgain =
         turn.error != null && !turn.stillRunning && retry?.onPressed != null;
@@ -659,6 +698,7 @@ class _AnswerState extends State<_Answer> {
             split.answer,
             label: AppScope.of(context).labelAnswers && !turn.streaming,
             muted: cut,
+            caret: inline,
           ),
         if (turn.browsing)
           Padding(
@@ -673,7 +713,7 @@ class _AnswerState extends State<_Answer> {
               padding: const EdgeInsets.only(top: 10),
               child: ApprovalCard(turn, request),
             ),
-        if (turn.streaming)
+        if (turn.streaming && !inline)
           // The caret alone, as the design canvas draws it, from the send on, while a
           // model's reasoning is hidden too.
           const Padding(padding: EdgeInsets.only(top: 6), child: Caret()),
@@ -705,7 +745,7 @@ class _AnswerState extends State<_Answer> {
           BrowserChip(turn),
         ],
         if (!turn.streaming && turn.citations.isNotEmpty) ...[
-          const SizedBox(height: 12),
+          SizedBox(height: phone ? 10 : 12),
           _Citations(turn.citations),
         ],
         if (!turn.streaming && turn.files.isNotEmpty) ...[
@@ -713,33 +753,44 @@ class _AnswerState extends State<_Answer> {
           GeneratedFiles(turn.files),
         ],
         if (!turn.streaming && (answered || (retry != null && !askAgain))) ...[
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              if (answered) CopyButton(split.answer, tooltip: 'Copy answer'),
-              if (AppScope.of(context).readAloud case final aloud?
-                  when answered)
-                _ReadAloudButton(aloud, turn),
-              if (retry case final retry? when !askAgain)
-                IconBtn(
-                  'refresh',
-                  tooltip: retry.tooltip,
-                  onPressed: retry.onPressed,
-                  box: 30,
-                  size: IconSize.xs,
-                ),
-              if (turn.metrics != null || rate != null)
-                AnswerMore(turn, turn.metrics, rate: rate),
-              // In Agent mode the server may go on to finish the answer and save it, which
-              // shows when the chat is read again.
-              if (turn.stopped)
-                Text(
-                  'Stopped · the server may still save it',
-                  style: Type.sans(12, color: Tokens.of(context).muted),
-                ),
-            ],
+          SizedBox(height: phone ? 10 : 6),
+          // On a phone the buttons are 44 wide, side by side, and the row starts 12 to the
+          // left, so the first icon lines up with the text.
+          Transform.translate(
+            offset: Offset(phone ? -12 : 0, 0),
+            child: Wrap(
+              spacing: phone ? 0 : 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                if (answered)
+                  CopyButton(
+                    split.answer,
+                    tooltip: 'Copy answer',
+                    box: phone ? 44 : 30,
+                    size: phone ? IconSize.small : IconSize.xs,
+                  ),
+                if (AppScope.of(context).readAloud case final aloud?
+                    when answered)
+                  _ReadAloudButton(aloud, turn),
+                if (retry case final retry? when !askAgain)
+                  IconBtn(
+                    'refresh',
+                    tooltip: retry.tooltip,
+                    onPressed: retry.onPressed,
+                    box: phone ? 44 : 30,
+                    size: phone ? IconSize.small : IconSize.xs,
+                  ),
+                if (turn.metrics != null || rate != null)
+                  AnswerMore(turn, turn.metrics, rate: rate),
+                // In Agent mode the server may go on to finish the answer and save it, which
+                // shows when the chat is read again.
+                if (turn.stopped)
+                  Text(
+                    'Stopped · the server may still save it',
+                    style: Type.sans(12, color: Tokens.of(context).muted),
+                  ),
+              ],
+            ),
           ),
         ],
       ],
@@ -766,12 +817,13 @@ class _ReadAloudButton extends StatelessWidget {
     listenable: aloud,
     builder: (context, _) {
       final reading = identical(aloud.reading, turn);
+      final phone = ScreenClass.ofContext(context).isPhone;
       return IconBtn(
         reading ? 'stop' : 'speaker',
         tooltip: reading ? 'Stop reading' : 'Read aloud',
         onPressed: () => aloud.toggle(turn),
-        box: 30,
-        size: IconSize.xs,
+        box: phone ? 44 : 30,
+        size: phone ? IconSize.small : IconSize.xs,
       );
     },
   );
@@ -903,6 +955,7 @@ class _CitationState extends State<_Citation> {
     final present = scope.sources.byTitle(title) != null;
     final live = present || url != null;
     final passages = present && citation.passages.isNotEmpty;
+    final phone = ScreenClass.ofContext(context).isPhone;
     void close() => scope.shell.closePopup(citation);
     final chip = Tappable(
       label: present || url == null
@@ -927,24 +980,34 @@ class _CitationState extends State<_Citation> {
           ? null
           : () => openLink(context, url.toString()),
       radius: BorderRadius.circular(99),
-      color: live ? t.accentbg : t.hover,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(6, 4, 10, 4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CitationNumber(number, live: live),
-            const SizedBox(width: 6),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 240),
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Type.sans(12.5, color: live ? t.accent : t.ink2),
+      // On a phone a chip is the panel's colour, outlined, 32 tall, as the design canvas
+      // draws it.
+      color: phone ? t.panel : (live ? t.accentbg : t.hover),
+      side: phone ? BorderSide(color: t.line) : null,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: phone ? 32 : 0),
+        child: Padding(
+          padding: phone
+              ? const EdgeInsets.fromLTRB(6, 0, 10, 0)
+              : const EdgeInsets.fromLTRB(6, 4, 10, 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CitationNumber(number, live: live),
+              const SizedBox(width: 6),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 240),
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: phone
+                      ? Type.sans(13, color: t.ink2)
+                      : Type.sans(12.5, color: live ? t.accent : t.ink2),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/files.dart';
 import '../../core/server_models.dart';
 import '../app_scope.dart';
+import '../layout.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
@@ -33,9 +34,10 @@ class PassagesPanel extends StatelessWidget {
 }
 
 /// What an answer read from one file, in the sheet a citation opens on a phone or the panel
-/// beside the chat on a desktop: the citation's [number] and the file, how many passages, then each passage, closest first, with how close
-/// it was to the question when the server said, and View extracted text, which shows the
-/// file's whole text in the workspace's pages.
+/// beside the chat on a desktop: the citation's [number] and the file with how many passages,
+/// at the line's end on a phone, then each passage, closest first, with how close it was to the question
+/// at its top right when the server said, and View extracted text, which shows the file's
+/// whole text in the workspace's pages.
 class PassagesView extends StatelessWidget {
   const PassagesView({
     super.key,
@@ -56,40 +58,41 @@ class PassagesView extends StatelessWidget {
     final t = Tokens.of(context);
     final passages = citation.passages;
     final file = scope.sources.byTitle(citation.title);
+    final phone = ScreenClass.ofContext(context).isPhone;
+    final name = Text(
+      citation.title,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: Type.sans(14, weight: FontWeight.w500, color: t.ink),
+    );
+    final count = Text(
+      passages.length == 1
+          ? '1 passage'
+          : '${passages.length} passages, closest first',
+      style: Type.sans(12, color: t.muted),
+    );
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // A phone's sheet has the room to put the count at the line's end; the panel beside
+          // a desktop's chat puts it under the name.
           Row(
             children: [
               CitationNumber(number),
               const SizedBox(width: 8),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      citation.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Type.sans(
-                        14,
-                        weight: FontWeight.w500,
-                        color: t.ink,
+                child: phone
+                    ? name
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [name, count],
                       ),
-                    ),
-                    Text(
-                      passages.length == 1
-                          ? '1 passage'
-                          : '${passages.length} passages, closest first',
-                      style: Type.sans(12, color: t.muted),
-                    ),
-                  ],
-                ),
               ),
+              if (phone) ...[const SizedBox(width: 8), count],
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           for (final passage in passages) ...[
             Container(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -99,12 +102,13 @@ class PassagesView extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (passage.score case final score?) ...[
                     Text(
                       '${(score * 100).round()}% match',
-                      style: Type.sans(12.5, color: t.muted),
+                      textAlign: TextAlign.end,
+                      style: Type.sans(12.5, color: t.muted, height: 1.4),
                     ),
                     const SizedBox(height: 4),
                   ],
@@ -153,9 +157,11 @@ class CitationNumber extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    // A little larger on a phone, as the design canvas draws it.
+    final phone = ScreenClass.ofContext(context).isPhone;
     return Container(
-      width: 16,
-      height: 16,
+      width: phone ? 17 : 16,
+      height: phone ? 17 : 16,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: live ? t.accent : t.muted,
@@ -164,7 +170,7 @@ class CitationNumber extends StatelessWidget {
       child: Text(
         '$number',
         style: Type.sans(
-          10,
+          phone ? 10.5 : 10,
           weight: FontWeight.w600,
           color: t.onaccent,
           height: 1,

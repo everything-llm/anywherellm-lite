@@ -70,7 +70,7 @@ class _Welcome extends StatelessWidget {
     final scan = AppScope.of(context).scanner != null;
     final big = Type.serif(40, color: t.ink, height: 1.1, letterSpacing: -0.6);
     return Padding(
-      padding: const EdgeInsets.only(top: 12, bottom: 18),
+      padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -130,6 +130,60 @@ class _ServerStatusState extends State<_ServerStatus> {
     builder: (context, _) {
       if (_settings.connection == null) return const SizedBox.shrink();
       final testing = _settings.check == ConnectionCheck.testing;
+      final test = ActionRow(alignment: WrapAlignment.start, [
+        AppButton(
+          testing ? 'Testing…' : 'Test connection',
+          onPressed: testing ? null : widget.onTest,
+        ),
+      ]);
+      // A phone says only whether answers keep running, the word under its name, as the
+      // design canvas draws it.
+      if (ScreenClass.ofContext(context).isPhone) {
+        final t = Tokens.of(context);
+        return Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: 14,
+            children: [
+              FieldCard([
+                Container(
+                  constraints: const BoxConstraints(minHeight: 52),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
+                  alignment: Alignment.centerLeft,
+                  child: Semantics(
+                    container: true,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Background answers',
+                          style: Type.sans(12.5, color: t.muted),
+                        ),
+                        Text(
+                          switch (_settings.relay) {
+                            RelayState.found => 'Available',
+                            RelayState.absent => 'Not available',
+                            RelayState.unreachable => 'Could not check',
+                            RelayState.unknown => 'Checking…',
+                          },
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Type.sans(15, color: t.ink),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ]),
+              test,
+            ],
+          ),
+        );
+      }
       return Padding(
         padding: const EdgeInsets.only(top: 10),
         child: Column(
@@ -159,12 +213,7 @@ class _ServerStatusState extends State<_ServerStatus> {
                 },
               ),
             ]),
-            ActionRow(alignment: WrapAlignment.start, [
-              AppButton(
-                testing ? 'Testing…' : 'Test connection',
-                onPressed: testing ? null : widget.onTest,
-              ),
-            ]),
+            test,
           ],
         ),
       );
@@ -315,19 +364,21 @@ class _KeyCardState extends State<_KeyCard> {
                       Text(
                         'AnythingLLM server',
                         style: Type.sans(
-                          14.5,
+                          phone ? 15 : 14.5,
                           weight: FontWeight.w500,
                           color: t.ink,
                         ),
                       ),
-                      Text(
-                        set
-                            ? 'The address is shown below. The key is stored in this device\'s keyring and never shown.'
-                            : _pasteKey
-                            ? 'Create a key in AnythingLLM under Settings → Developer API, then paste it here.'
-                            : 'Sign in with the password AnythingLLM\'s web page asks for. The app makes its own developer key.',
-                        style: Type.sans(12.5, color: t.muted, height: 1.45),
-                      ),
+                      // A phone puts the address first and says where the key is under it.
+                      if (!(phone && set))
+                        Text(
+                          set
+                              ? 'The address is shown below. The key is stored in this device\'s keyring and never shown.'
+                              : _pasteKey
+                              ? 'Create a key in AnythingLLM under Settings → Developer API, then paste it here.'
+                              : 'Sign in with the password AnythingLLM\'s web page asks for. The app makes its own developer key.',
+                          style: Type.sans(12.5, color: t.muted, height: 1.45),
+                        ),
                     ],
                   ),
                 ),
@@ -343,11 +394,22 @@ class _KeyCardState extends State<_KeyCard> {
               ],
             ),
             if (set && !_replacing)
-              Text(connection.baseUrl, style: Type.mono(12.5, color: t.muted)),
+              Text(
+                connection.baseUrl,
+                maxLines: phone ? 1 : null,
+                overflow: phone ? TextOverflow.ellipsis : null,
+                style: Type.mono(12.5, color: t.muted),
+              ),
+            if (phone && set)
+              Text(
+                'The key is stored in this phone\'s keyring and never shown.',
+                style: Type.sans(12.5, color: t.muted, height: 1.45),
+              ),
             if (set)
-              ActionRow([
+              ActionRow(even: phone, [
                 AppButton(
                   _replacing ? 'Cancel' : 'Edit connection',
+                  narrow: phone,
                   onPressed: () => setState(() {
                     _replacing = !_replacing;
                     _shell.setScanning(false);
@@ -361,6 +423,7 @@ class _KeyCardState extends State<_KeyCard> {
                   ),
                 AppButton(
                   _confirmForget ? 'Really forget it?' : 'Forget this server',
+                  narrow: phone,
                   onPressed: _forget,
                 ),
               ]),
@@ -454,13 +517,13 @@ class _KeyCardState extends State<_KeyCard> {
   );
 
   /// A phone's first run: Scan QR code first where there is a camera, then the address and
-  /// the password, Sign in and Paste a key, or the key in the password's place.
+  /// the password, each under its name, Sign in and Paste a key, or the key in the password's
+  /// place.
   Widget _firstRun(BuildContext context, bool saving, VoidCallback startScan) {
     final t = Tokens.of(context);
     final scanner = _scanner;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 14,
       children: [
         if (scanner != null) ...[
           _phoneScan(scanner),
@@ -469,73 +532,124 @@ class _KeyCardState extends State<_KeyCard> {
             primary: true,
             onPressed: saving ? null : startScan,
           ),
-          Row(
-            children: [
-              Expanded(child: Divider(color: t.line)),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  _pasteKey ? 'or paste a key' : 'or sign in',
-                  style: Type.sans(12.5, color: t.muted),
+          Padding(
+            padding: const EdgeInsets.only(top: 24, bottom: 16),
+            child: Row(
+              children: [
+                Expanded(child: Divider(color: t.line)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    _pasteKey ? 'or paste a key' : 'or sign in',
+                    style: Type.sans(12.5, color: t.muted),
+                  ),
                 ),
-              ),
-              Expanded(child: Divider(color: t.line)),
-            ],
+                Expanded(child: Divider(color: t.line)),
+              ],
+            ),
           ),
         ],
-        AppField(
-          controller: _url,
-          label: 'Server address',
-          hint: _example,
-          keyboardType: TextInputType.url,
-          autofillHints: const [AutofillHints.url],
-        ),
-        if (_pasteKey)
+        _Named(
+          'Server address',
           AppField(
-            controller: _key,
-            label: 'AnythingLLM developer API key',
-            hint: 'Paste the AnythingLLM API key',
-            obscure: true,
-            keyboardType: TextInputType.visiblePassword,
+            controller: _url,
+            label: 'Server address',
+            hint: _example,
+            keyboardType: TextInputType.url,
+            autofillHints: const [AutofillHints.url],
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (_pasteKey)
+          _Named(
+            'Developer API key',
+            AppField(
+              controller: _key,
+              label: 'AnythingLLM developer API key',
+              hint: 'Paste the AnythingLLM API key',
+              obscure: true,
+              keyboardType: TextInputType.visiblePassword,
+            ),
           )
         else ...[
-          AppField(
-            controller: _password,
-            label: 'Password',
-            hint: 'Leave it empty if the server has none',
-            obscure: true,
-            keyboardType: TextInputType.visiblePassword,
-            onSubmitted: (_) => saving ? null : _signIn(),
+          _Named(
+            'Password',
+            AppField(
+              controller: _password,
+              label: 'Password',
+              hint: 'Leave it empty if the server has none',
+              obscure: true,
+              keyboardType: TextInputType.visiblePassword,
+              onSubmitted: (_) => saving ? null : _signIn(),
+            ),
           ),
+          const SizedBox(height: 8),
           Text(
             'The password AnythingLLM\'s web page asks for. The app makes its own developer key.',
             style: Type.sans(12.5, color: t.muted, height: 1.45),
           ),
         ],
-        ActionRow(alignment: WrapAlignment.start, [
-          AppButton(
-            saving
-                ? 'Checking…'
-                : _pasteKey
-                ? 'Save key'
-                : 'Sign in',
-            primary: scanner == null,
-            onPressed: saving
-                ? null
-                : _pasteKey
-                ? _save
-                : _signIn,
-          ),
-          TextAction.plain(_pasteKey ? 'Use password' : 'Paste a key', () {
-            if (!saving) setState(() => _pasteKey = !_pasteKey);
-          }, height: 44),
-        ]),
-        if (_scanProblem case final problem?) HelpText(problem, status: true),
-        if (_settings.message case final message?)
-          HelpText(message, status: true),
-        if (_settings.keyringProblem case final problem?)
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: AppButton(
+                saving
+                    ? 'Checking…'
+                    : _pasteKey
+                    ? 'Save key'
+                    : 'Sign in',
+                primary: scanner == null,
+                onPressed: saving
+                    ? null
+                    : _pasteKey
+                    ? _save
+                    : _signIn,
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextAction.plain(_pasteKey ? 'Use password' : 'Paste a key', () {
+              if (!saving) setState(() => _pasteKey = !_pasteKey);
+            }),
+          ],
+        ),
+        for (final note in [?_scanProblem, ?_settings.message]) ...[
+          const SizedBox(height: 14),
+          HelpText(note, status: true),
+        ],
+        if (_settings.keyringProblem case final problem?) ...[
+          const SizedBox(height: 14),
           AlertBox(AlertKind.warn, problem.title, text: problem.text),
+        ],
       ],
     );
   }
+}
+
+/// A field under its [name], as a phone's first run shows them. A screen reader hears the
+/// field's own label.
+class _Named extends StatelessWidget {
+  const _Named(this.name, this.field);
+
+  final String name;
+  final Widget field;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    spacing: 6,
+    children: [
+      ExcludeSemantics(
+        child: Text(
+          name,
+          style: Type.sans(
+            14,
+            weight: FontWeight.w500,
+            color: Tokens.of(context).ink,
+          ),
+        ),
+      ),
+      field,
+    ],
+  );
 }

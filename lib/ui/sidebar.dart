@@ -54,12 +54,13 @@ class _SidebarState extends State<Sidebar> {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    final phone = ScreenClass.ofContext(context).isPhone;
     return Semantics(
       container: true,
       label: 'Workspaces',
       child: MinHeight(
         // A phone's drawer has Activity and Upcoming too, a row of 44 px each.
-        min: Sizes.panelMin + (ScreenClass.ofContext(context).isPhone ? 44 : 0),
+        min: Sizes.panelMin + (phone ? 44 : 0),
         child: Container(
           width: widget.width,
           padding: const EdgeInsets.fromLTRB(12, 18, 12, 12),
@@ -70,12 +71,15 @@ class _SidebarState extends State<Sidebar> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(8, 2, 8, 16),
-                child: Align(alignment: Alignment.centerLeft, child: Brand()),
+              Padding(
+                padding: EdgeInsets.fromLTRB(8, 2, 8, phone ? 14 : 16),
+                child: const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Brand(),
+                ),
               ),
               WorkspaceSwitcher(_ask),
-              const SizedBox(height: 12),
+              SizedBox(height: phone ? 10 : 12),
               Expanded(
                 child: ListenableBuilder(
                   listenable: Listenable.merge([
@@ -152,6 +156,8 @@ class _ChatsState extends State<_Chats> {
     final scope = AppScope.of(context);
     final chat = scope.chat;
     final t = Tokens.of(context);
+    // A phone's rows are 44 tall, their words at 15, as the design canvas draws them.
+    final phone = ScreenClass.ofContext(context).isPhone;
     return ListenableBuilder(
       listenable: Listenable.merge([chat, scope.prefs, _search]),
       builder: (context, _) {
@@ -167,19 +173,23 @@ class _ChatsState extends State<_Chats> {
                   chat.newChat();
                   scope.shell.closeSide();
                 },
-                radius: BorderRadius.circular(8),
+                radius: BorderRadius.circular(phone ? 10 : 8),
                 child: SizedBox(
-                  height: 40,
+                  height: phone ? 44 : 40,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    padding: EdgeInsets.symmetric(horizontal: phone ? 12 : 10),
                     child: Row(
                       children: [
-                        AppIcon('plus', size: IconSize.xs, color: t.ink2),
+                        AppIcon(
+                          'plus',
+                          size: phone ? IconSize.small : IconSize.xs,
+                          color: t.ink2,
+                        ),
                         const SizedBox(width: 10),
                         Text(
                           'New chat',
                           style: Type.sans(
-                            14,
+                            phone ? 15 : 14,
                             weight: FontWeight.w500,
                             color: t.ink,
                           ),
@@ -190,7 +200,7 @@ class _ChatsState extends State<_Chats> {
                 ),
               ),
             Padding(
-              padding: const EdgeInsets.only(top: 4, bottom: 4),
+              padding: EdgeInsets.symmetric(vertical: phone ? 0 : 4),
               child: _SearchRow(
                 controller: _search,
                 focus: scope.shell.searchFocus,
@@ -260,7 +270,9 @@ class _ChatsState extends State<_Chats> {
           Semantics(
             header: true,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 14, 10, 4),
+              padding: ScreenClass.ofContext(context).isPhone
+                  ? const EdgeInsets.fromLTRB(12, 12, 12, 4)
+                  : const EdgeInsets.fromLTRB(10, 14, 10, 4),
               child: Text(
                 'Chats',
                 style: Type.sans(
@@ -317,8 +329,9 @@ class _ChatsState extends State<_Chats> {
   }
 }
 
-/// The search, drawn as one of the sidebar's rows: no border, 40 px tall, the search icon before
-/// the text and [suffix] after it. It fills while it has the focus.
+/// The search, drawn as one of the sidebar's rows: no border, 40 px tall, 44 with its words at
+/// 15 on a phone, the search icon before the text and [suffix] after it. It fills while it has
+/// the focus.
 class _SearchRow extends StatelessWidget {
   const _SearchRow({
     required this.controller,
@@ -333,22 +346,27 @@ class _SearchRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    final phone = ScreenClass.ofContext(context).isPhone;
+    final size = phone ? 15.0 : 14.0;
     return ListenableBuilder(
       listenable: focus,
       builder: (context, child) => AnimatedContainer(
         duration: motion(context, const Duration(milliseconds: 150)),
-        height: 40,
-        padding: EdgeInsets.only(left: 10, right: suffix == null ? 8 : 0),
+        height: phone ? 44 : 40,
+        padding: EdgeInsets.only(
+          left: phone ? 12 : 10,
+          right: suffix == null ? 8 : 0,
+        ),
         decoration: BoxDecoration(
           color: focus.hasFocus ? t.hover : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(phone ? 10 : 8),
         ),
         child: child,
       ),
       child: Row(
         children: [
           AppIcon('search', size: IconSize.small, color: t.muted),
-          const SizedBox(width: 8),
+          SizedBox(width: phone ? 10 : 8),
           Expanded(
             child: Semantics(
               label: 'Search workspaces and chats',
@@ -357,13 +375,13 @@ class _SearchRow extends StatelessWidget {
                 controller: controller,
                 focusNode: focus,
                 autocorrect: false,
-                style: Type.sans(14, color: t.ink),
+                style: Type.sans(size, color: t.ink),
                 cursorColor: t.accent,
                 decoration: InputDecoration(
                   isCollapsed: true,
                   border: InputBorder.none,
                   hintText: 'Search chats',
-                  hintStyle: Type.sans(14, color: t.fade),
+                  hintStyle: Type.sans(size, color: t.fade),
                 ),
               ),
             ),
@@ -516,7 +534,9 @@ class _ChatRowState extends State<_ChatRow> {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
     final rename = _rename;
-    final left = widget.indent ? 36.0 : 10.0;
+    // A phone's row is 44 tall, its name at 15, as the design canvas draws it.
+    final phone = ScreenClass.ofContext(context).isPhone;
+    final left = widget.indent ? 36.0 : (phone ? 12.0 : 10.0);
     final ready = scope.chat.isReady(widget.thread.slug);
     if (rename != null) {
       return Padding(
@@ -535,7 +555,7 @@ class _ChatRowState extends State<_ChatRow> {
     return Container(
       decoration: BoxDecoration(
         color: widget.current ? t.sel : null,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(phone ? 10 : 8),
       ),
       child: Row(
         children: [
@@ -561,8 +581,9 @@ class _ChatRowState extends State<_ChatRow> {
                 }
               },
               onDoubleTap: widget.current ? _startRename : null,
-              radius: BorderRadius.circular(8),
-              child: Padding(
+              radius: BorderRadius.circular(phone ? 10 : 8),
+              child: Container(
+                constraints: BoxConstraints(minHeight: phone ? 44 : 0),
                 padding: EdgeInsets.fromLTRB(left, 8, 4, 8),
                 child: Row(
                   children: [
@@ -576,7 +597,7 @@ class _ChatRowState extends State<_ChatRow> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Type.sans(
-                          14,
+                          phone ? 15 : 14,
                           weight: widget.current
                               ? FontWeight.w600
                               : FontWeight.w400,

@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'dart:ui' show Size;
+import 'dart:typed_data';
+import 'dart:ui' show Offset, Size;
 
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/chat_log.dart';
@@ -12,6 +13,7 @@ import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/upload.dart';
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/quick_switcher.dart';
 import 'package:anywherellm/ui/sidebar.dart';
@@ -275,11 +277,37 @@ void main() {
       final h = await pumpApp(tester, llm: awkward(), size: size);
       h.shell.openSources();
       await tester.pumpAndSettle();
-      final zone = tester.widget<DropZone>(find.byType(DropZone).last);
-      await zone.onFiles([
-        for (final name in ['a-$longWord.pdf', 'b-$longWord.md'])
-          UploadFile(name: name, read: () async => [1]),
-      ]);
+      final names = ['a-$longWord.pdf', 'b-$longWord.md'];
+      final zones = find.byType(DropZone);
+      if (zones.evaluate().isNotEmpty) {
+        await tester.widget<DropZone>(zones.last).onFiles([
+          for (final name in names)
+            UploadFile(name: name, read: () async => [1]),
+        ]);
+      } else {
+        // A phone's sheet has buttons rather than a drop zone; a drop on them still waits.
+        tester
+            .widget<DropTarget>(
+              find.descendant(
+                of: find.byType(SourcesPanel),
+                matching: find.byType(DropTarget),
+              ),
+            )
+            .onDragDone!(
+          DropDoneDetails(
+            files: [
+              for (final name in names)
+                DropItemFile.fromData(
+                  Uint8List.fromList([1]),
+                  path: name,
+                  length: 1,
+                ),
+            ],
+            localPosition: Offset.zero,
+            globalPosition: Offset.zero,
+          ),
+        );
+      }
       await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsLabel('Details of a-$longWord.pdf'));
       await tester.pumpAndSettle();

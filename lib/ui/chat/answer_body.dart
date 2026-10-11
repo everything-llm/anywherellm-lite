@@ -18,6 +18,7 @@ import '../widgets/buttons.dart';
 import '../widgets/side_scroll.dart';
 import 'card_image.dart';
 import 'highlight.dart';
+import 'markdown_lists.dart';
 import 'math.dart';
 import '../icons.dart';
 
@@ -36,9 +37,14 @@ class AnswerBody extends StatelessWidget {
     super.key,
     this.label = false,
     this.muted = false,
+    this.caret = false,
   });
 
   final String text;
+
+  /// Ends the text with the [Caret], for an answer still being written that [takesCaret]. The
+  /// text is not selectable meanwhile, since a selectable text holds no widget.
+  final bool caret;
 
   /// Draws the words in the second ink, for an answer that stopped before its end.
   final bool muted;
@@ -51,7 +57,10 @@ class AnswerBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final ink = muted ? t.ink2 : t.ink;
-    final body = Type.sans(15.5, color: ink, height: 1.65);
+    // A phone sets its text a little tighter, as the design canvas draws it.
+    final phone = ScreenClass.ofContext(context).isPhone;
+    final lineHeight = phone ? 1.6 : 1.65;
+    final body = Type.sans(15.5, color: ink, height: lineHeight);
     final code = Type.mono(13.5, color: ink, height: 1.5);
     TextStyle heading(double size) =>
         Type.sans(size, weight: FontWeight.w600, color: ink, height: 1.35);
@@ -66,10 +75,10 @@ class AnswerBody extends StatelessWidget {
       for (final l in linkedIn)
         l.link: ?appCardOf(l.image, l.link, l.alt, server),
     };
-    final markdown = MarkdownBody(
-      data: text,
-      selectable: true,
-      extensionSet: answerMarkdown,
+    final markdown = TightListMarkdown(
+      data: caret ? '$text$caretMark' : text,
+      selectable: !caret,
+      extensionSet: caret ? _withCaret : answerMarkdown,
       onTapLink: (_, href, _) {
         if (href == null) return;
         final shell = AppScope.of(context).shell;
@@ -95,9 +104,11 @@ class AnswerBody extends StatelessWidget {
         if (!linked.contains(uri)) return card;
         return _AppCardShown(uri, card: card);
       },
+      bulletBuilder: (bullet) => listBullet(bullet, body),
       builders: {
         'pre': _CodeBlockBuilder(),
         'math': MathBuilder(style: body, fallback: code),
+        'caret': CaretBuilder(),
       },
       styleSheet: MarkdownStyleSheet(
         p: body,
@@ -121,7 +132,7 @@ class AnswerBody extends StatelessWidget {
           15.5,
           weight: FontWeight.w600,
           color: ink,
-          height: 1.65,
+          height: lineHeight,
         ),
         del: body.copyWith(decoration: TextDecoration.lineThrough),
         blockquote: body.copyWith(color: t.ink2),
@@ -129,8 +140,8 @@ class AnswerBody extends StatelessWidget {
         blockquoteDecoration: BoxDecoration(
           border: Border(left: BorderSide(color: t.line, width: 3)),
         ),
-        blockSpacing: 12,
-        listIndent: 22,
+        blockSpacing: phone ? 8 : 12,
+        listIndent: phone ? 20 : 22,
         listBullet: body,
         tableHead: Type.sans(
           14,
@@ -163,6 +174,12 @@ class AnswerBody extends StatelessWidget {
     );
   }
 }
+
+/// [answerMarkdown] that also reads the [caretMark].
+final _withCaret = md.ExtensionSet(answerMarkdown.blockSyntaxes, [
+  ...answerMarkdown.inlineSyntaxes,
+  CaretSyntax(),
+]);
 
 /// The addresses of the images in the Markdown [text] that sit inside a link.
 Set<Uri> linkedImages(String text) => {
@@ -246,11 +263,13 @@ class CopyButton extends StatefulWidget {
     super.key,
     this.tooltip = 'Copy',
     this.box = 30,
+    this.size = IconSize.xs,
   });
 
   final String text;
   final String tooltip;
   final double box;
+  final IconSize size;
 
   @override
   State<CopyButton> createState() => _CopyButtonState();
@@ -292,7 +311,7 @@ class _CopyButtonState extends State<CopyButton> {
           tooltip: widget.tooltip,
           onPressed: _copy,
           box: widget.box,
-          size: IconSize.xs,
+          size: widget.size,
         ),
       ],
     );

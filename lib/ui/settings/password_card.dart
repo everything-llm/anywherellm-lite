@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/ports.dart';
 import '../app_scope.dart';
+import '../layout.dart';
 import '../state/settings_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
@@ -54,6 +55,7 @@ class _PasswordCardState extends State<PasswordCard> {
         return const SizedBox.shrink();
       }
       final t = Tokens.of(context);
+      final phone = ScreenClass.ofContext(context).isPhone;
       final checking = _settings.checkingPassword;
       final editing = !set || _replacing;
       return Padding(
@@ -70,19 +72,21 @@ class _PasswordCardState extends State<PasswordCard> {
                       Text(
                         'Server password',
                         style: Type.sans(
-                          14.5,
+                          phone ? 15 : 14.5,
                           weight: FontWeight.w500,
                           color: t.ink,
                         ),
                       ),
-                      Text(
-                        auth == ServerAuth.multiUser && !set
-                            ? 'This server has several users. Signing in with a user name is not supported, so its own commands, feedback, and Retry and Edit that replace the old exchange stay off.'
-                            : set
-                            ? 'Stored in this device\'s keyring and never shown.'
-                            : 'Optional. This server has a password. With it, the app lists the server\'s own commands, marks answers good or bad, and Retry and Edit replace the old exchange.',
-                        style: Type.sans(12.5, color: t.muted, height: 1.45),
-                      ),
+                      // A phone says nothing more of a saved one, as the design canvas draws it.
+                      if (!(phone && set))
+                        Text(
+                          auth == ServerAuth.multiUser && !set
+                              ? 'This server has several users. Signing in with a user name is not supported, so its own commands, feedback, and Retry and Edit that replace the old exchange stay off.'
+                              : set
+                              ? 'Stored in this device\'s keyring and never shown.'
+                              : 'Optional. This server has a password. With it, the app lists the server\'s own commands, marks answers good or bad, and Retry and Edit replace the old exchange.',
+                          style: Type.sans(12.5, color: t.muted, height: 1.45),
+                        ),
                     ],
                   ),
                 ),
@@ -96,13 +100,15 @@ class _PasswordCardState extends State<PasswordCard> {
               ],
             ),
             if (set)
-              ActionRow([
+              ActionRow(even: phone, [
                 AppButton(
                   _replacing ? 'Cancel' : 'Change password',
+                  narrow: phone,
                   onPressed: () => setState(() => _replacing = !_replacing),
                 ),
                 AppButton(
                   'Forget password',
+                  narrow: phone,
                   onPressed: _settings.forgetPassword,
                 ),
               ]),

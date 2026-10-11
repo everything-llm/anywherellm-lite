@@ -36,7 +36,7 @@ class DrawerRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
             children: [
-              AppIcon(icon, size: IconSize.xs, color: t.ink2),
+              AppIcon(icon, size: IconSize.small, color: t.ink2),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../core/copy.dart';
 import '../core/schedule.dart';
 import 'app_scope.dart';
+import 'icons.dart';
 import 'links.dart';
 import 'settings/settings_pages.dart';
 import 'tokens.dart';
@@ -112,7 +113,7 @@ class _UpcomingPageState extends State<UpcomingPage> {
                   children: [
                     Text(
                       'Jobs the server runs on a schedule.',
-                      style: Type.sans(14.5, color: t.ink2),
+                      style: Type.sans(14.5, color: t.ink2, height: 1.5),
                     ),
                     const SizedBox(height: 14),
                     if (system.jobsProblem case final problem?) ...[
@@ -141,18 +142,28 @@ class _UpcomingPageState extends State<UpcomingPage> {
                         style: Type.sans(14, color: t.muted),
                       )
                     else
-                      for (final job in jobs) ...[
-                        _JobCard(job, now: now),
-                        const SizedBox(height: 8),
-                      ],
-                    const SizedBox(height: 12),
-                    if (scope.settings.configured)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: AppButton(
-                          'Edit in AnythingLLM\'s web page',
-                          onPressed: () => openServerPage(context),
+                      // One card, a rule between its jobs, as the design canvas draws it.
+                      Container(
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          color: t.panel,
+                          border: Border.all(color: t.line),
+                          borderRadius: BorderRadius.circular(12),
                         ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (final (i, job) in jobs.indexed)
+                              _JobRow(job, now: now, ruled: i > 0),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                    if (scope.settings.configured)
+                      AppButton(
+                        'Edit in AnythingLLM\'s web page',
+                        icon: 'external',
+                        onPressed: () => openServerPage(context),
                       ),
                     const SizedBox(height: 10),
                     const HelpText(
@@ -169,47 +180,80 @@ class _UpcomingPageState extends State<UpcomingPage> {
   }
 }
 
-/// One job: its name, its workspace and schedule, then when it runs next and how it last ran.
-class _JobCard extends StatelessWidget {
-  const _JobCard(this.job, {required this.now});
+/// One job: its workspace and schedule over its name, then when it runs next, by a clock, and
+/// how it last ran, in green when it went well and red when it failed. [ruled] draws a rule
+/// over it.
+class _JobRow extends StatelessWidget {
+  const _JobRow(this.job, {required this.now, this.ruled = false});
 
   final ScheduledJob job;
   final DateTime now;
+  final bool ruled;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final next = job.nextRun;
     final last = job.lastRun;
-    final lines = [
-      if (!job.enabled)
-        'Off'
-      else if (next != null)
-        'Next: ${whenText(next, now)}',
-      if (last != null)
-        'Last run: ${[?job.lastStatus, whenText(last, now)].join(', ')}',
-    ];
+    final status = job.lastStatusText;
+    final when = !job.enabled
+        ? 'Off'
+        : next != null
+        ? 'Next: ${whenText(next, now)}'
+        : null;
+    final lastText = [?status, if (last != null) whenText(last, now)].join(' ');
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: t.panel,
-        border: Border.all(color: t.line),
-        borderRadius: BorderRadius.circular(12),
+        border: ruled ? Border(top: BorderSide(color: t.line2)) : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        spacing: 2,
+        spacing: 3,
         children: [
-          Text(
-            job.name,
-            style: Type.sans(15.5, weight: FontWeight.w500, color: t.ink),
-          ),
           Text(
             [?job.workspace, describeSchedule(job.cron, now)].join(' · '),
             style: Type.sans(12.5, color: t.muted),
           ),
-          for (final line in lines)
-            Text(line, style: Type.sans(13, color: t.ink2)),
+          Text(
+            job.name,
+            style: Type.sans(15.5, weight: FontWeight.w500, color: t.ink),
+          ),
+          if (when != null)
+            Row(
+              children: [
+                AppIcon('clock', size: IconSize.xs, color: t.muted),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(when, style: Type.sans(13.5, color: t.ink2)),
+                ),
+              ],
+            ),
+          if (lastText.isNotEmpty)
+            Text.rich(
+              TextSpan(
+                text: 'Last run: ',
+                children: [
+                  TextSpan(
+                    text: lastText,
+                    style: switch (job.lastWentWell) {
+                      true => Type.sans(
+                        12.5,
+                        weight: FontWeight.w600,
+                        color: t.okfg,
+                      ),
+                      false => Type.sans(
+                        12.5,
+                        weight: FontWeight.w600,
+                        color: t.badfg,
+                      ),
+                      null => null,
+                    },
+                  ),
+                ],
+              ),
+              style: Type.sans(12.5, color: t.muted),
+            ),
         ],
       ),
     );

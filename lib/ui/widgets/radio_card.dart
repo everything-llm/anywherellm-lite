@@ -5,7 +5,8 @@ import '../type.dart';
 import 'tappable.dart';
 
 /// One choice of several: a radio ring, [title], the line [about] under it and [hint] after
-/// it. As a [card], it sits in a box filled while chosen; otherwise it is a plain row.
+/// it. As a [card], it sits in a box filled while chosen; otherwise it is a plain row. A title
+/// not chosen is at [restWeight], and a chosen one semibold.
 class RadioCard extends StatelessWidget {
   const RadioCard({
     super.key,
@@ -15,6 +16,7 @@ class RadioCard extends StatelessWidget {
     this.about,
     this.hint,
     this.card = true,
+    this.restWeight = FontWeight.w400,
   });
 
   final String title;
@@ -22,6 +24,7 @@ class RadioCard extends StatelessWidget {
   final String? hint;
   final bool selected;
   final bool card;
+  final FontWeight restWeight;
   final VoidCallback onTap;
 
   @override
@@ -38,7 +41,10 @@ class RadioCard extends StatelessWidget {
           : null,
       child: Container(
         constraints: BoxConstraints(minHeight: card ? 56 : 48),
-        padding: EdgeInsets.symmetric(horizontal: card ? 12 : 0, vertical: 6),
+        padding: EdgeInsets.symmetric(
+          horizontal: card ? 12 : 0,
+          vertical: card ? 8 : 6,
+        ),
         child: Row(
           children: [
             Container(
@@ -67,12 +73,13 @@ class RadioCard extends StatelessWidget {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: 1,
                 children: [
                   Text(
                     title,
                     style: Type.sans(
                       15,
-                      weight: selected ? FontWeight.w600 : FontWeight.w400,
+                      weight: selected ? FontWeight.w600 : restWeight,
                       color: t.ink,
                     ),
                   ),
