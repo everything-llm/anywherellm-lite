@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../core/chat.dart';
 import '../../core/files.dart';
+import '../../core/gallery.dart';
 import '../../core/server_models.dart';
 import '../settings/settings_pages.dart';
 import '../share/shared_item.dart';
@@ -17,6 +18,16 @@ enum Beside { sources, browser, app, passages }
 
 /// A citation whose passages the panel to the right shows, with its [number] in its answer.
 typedef CitedPassages = ({int number, Citation citation});
+
+/// The page over the window that shows an answer's [pictures] one at a time, from [index], in
+/// the chat named [chat].
+class GalleryOpen {
+  const GalleryOpen(this.pictures, this.index, {required this.chat});
+
+  final List<Picture> pictures;
+  final int index;
+  final String chat;
+}
 
 /// A phone's sheet for one chat of the workspace on screen: its name, its pin and Delete, or
 /// with [deleting] the question whether to delete it.
@@ -82,6 +93,10 @@ class ShellController extends ChangeNotifier {
     final ChatSheetFor sheet => sheet,
     _ => null,
   };
+
+  /// Opens the page of [pictures] at [index], over the window.
+  void openGallery(List<Picture> pictures, int index, {required String chat}) =>
+      _popup.value = GalleryOpen(pictures, index, chat: chat);
 
   /// Opens [thread]'s sheet, closing any other popup and the drawer.
   void openChatSheet(Thread thread, {bool deleting = false}) {

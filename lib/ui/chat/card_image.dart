@@ -30,6 +30,8 @@ class CardImage extends StatefulWidget {
     required this.allowHttp,
     required this.linked,
     this.maxHeight = 360,
+    this.fit = BoxFit.contain,
+    this.unloaded,
   });
 
   final Uri uri;
@@ -42,6 +44,14 @@ class CardImage extends StatefulWidget {
 
   /// The tallest it is drawn.
   final double maxHeight;
+
+  /// How the image fills its box: whole ([BoxFit.contain]) and rounded, or with
+  /// [BoxFit.cover] filling it to its edges, as a gallery's tile does, which rounds it itself.
+  final BoxFit fit;
+
+  /// What shows in the image's place when it is not loaded or did not load, in place of its
+  /// description.
+  final WidgetBuilder? unloaded;
 
   bool get loadable => loadableImage(uri, server, allowHttp: allowHttp);
 
@@ -209,9 +219,18 @@ class _CardImageState extends State<CardImage> {
   @override
   Widget build(BuildContext context) {
     final frame = _frame;
-    final described = _described(context);
+    final described = widget.unloaded?.call(context) ?? _described(context);
     if (!widget.loadable || (frame == null && _ended)) return described;
     if (frame == null) return const SizedBox.shrink();
+    if (widget.fit != BoxFit.contain) {
+      return Image.memory(
+        frame,
+        fit: widget.fit,
+        gaplessPlayback: true,
+        semanticLabel: widget.alt,
+        errorBuilder: (_, _, _) => described,
+      );
+    }
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: widget.maxHeight),
       child: ClipRRect(

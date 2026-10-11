@@ -9,6 +9,7 @@ import 'app_scope.dart';
 import 'chat/app_panel.dart';
 import 'chat/browser_panel.dart';
 import 'chat/chat_view.dart';
+import 'chat/gallery.dart';
 import 'chat_sheet.dart';
 import 'chat/passages_sheet.dart';
 import 'files/files_view.dart';
@@ -282,6 +283,13 @@ class AppShell extends StatelessWidget {
                                 valueListenable: shell.popup,
                                 builder: (context, popup, _) => Stack(
                                   children: [
+                                    if (popup case final GalleryOpen open)
+                                      Positioned.fill(
+                                        child: GalleryPage(
+                                          open,
+                                          key: ObjectKey(open),
+                                        ),
+                                      ),
                                     if (popup case final ChatSheetFor of)
                                       Positioned.fill(
                                         child: ChatSheet(

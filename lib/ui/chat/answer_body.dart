@@ -7,6 +7,7 @@ import 'package:markdown/markdown.dart' as md;
 
 import '../../core/browser.dart';
 import '../../core/chat.dart';
+import '../../core/gallery.dart';
 import '../../core/markdown.dart';
 import '../app_scope.dart';
 import '../layout.dart';
@@ -17,6 +18,7 @@ import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/side_scroll.dart';
 import 'card_image.dart';
+import 'gallery.dart';
 import 'highlight.dart';
 import 'markdown_lists.dart';
 import 'math.dart';
@@ -30,7 +32,8 @@ import '../icons.dart';
 /// address, which a model could have filled with what it read, to that site. Any other image
 /// shows as its description, which reads as a link: a tap opens the link around the image, or
 /// else the image's own address. A linked app card opens its app beside the chat, or in a sheet
-/// on a phone, rather than its page.
+/// on a phone, rather than its page. Two or more pictures in a row, as an image search gives
+/// them, are a [Gallery] ([answerParts]).
 class AnswerBody extends StatelessWidget {
   const AnswerBody(
     this.text, {
@@ -55,6 +58,40 @@ class AnswerBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final parts = answerParts(text);
+    final Widget body;
+    if (parts case [TextPart(:final markdown)]) {
+      body = _markdown(context, markdown, caret: caret);
+    } else {
+      final phone = ScreenClass.ofContext(context).isPhone;
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: phone ? 8 : 12,
+        children: [
+          for (final (i, part) in parts.indexed)
+            switch (part) {
+              TextPart(:final markdown) => _markdown(
+                context,
+                markdown,
+                caret: caret && i == parts.length - 1,
+              ),
+              GalleryPart(:final pictures) => Gallery(pictures),
+            },
+        ],
+      );
+    }
+    if (!label) return body;
+    // Explicit child nodes keep a link or a Copy code button from merging into the label.
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: plainText(text),
+      child: body,
+    );
+  }
+
+  /// [text] drawn as Markdown, ending in the caret when [caret].
+  Widget _markdown(BuildContext context, String text, {required bool caret}) {
     final t = Tokens.of(context);
     final ink = muted ? t.ink2 : t.ink;
     // A phone sets its text a little tighter, as the design canvas draws it.
@@ -75,7 +112,7 @@ class AnswerBody extends StatelessWidget {
       for (final l in linkedIn)
         l.link: ?appCardOf(l.image, l.link, l.alt, server),
     };
-    final markdown = TightListMarkdown(
+    return TightListMarkdown(
       data: caret ? '$text$caretMark' : text,
       selectable: !caret,
       extensionSet: caret ? _withCaret : answerMarkdown,
@@ -163,14 +200,6 @@ class AnswerBody extends StatelessWidget {
         tablePadding: const EdgeInsets.only(bottom: 10),
         horizontalRuleDecoration: BoxDecoration(border: Border(top: border)),
       ),
-    );
-    if (!label) return markdown;
-    // Explicit child nodes keep a link or a Copy code button from merging into the label.
-    return Semantics(
-      container: true,
-      explicitChildNodes: true,
-      label: plainText(text),
-      child: markdown,
     );
   }
 }
