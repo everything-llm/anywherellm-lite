@@ -9,7 +9,8 @@ import '../type.dart';
 import 'tappable.dart';
 
 /// The button: bordered, with a filled `primary` form. On a phone it is 44 tall with its label
-/// at 14.5, and a primary one 48 with its label at 15.5, as the design canvas draws them.
+/// at 14.5, and a primary one 48 with its label at 15.5, as the design canvas draws them. In an
+/// [ActionRow.even] it keeps 8 px either side of its label rather than 16.
 class AppButton extends StatelessWidget {
   const AppButton(
     this.label, {
@@ -17,7 +18,6 @@ class AppButton extends StatelessWidget {
     required this.onPressed,
     this.primary = false,
     this.icon,
-    this.narrow = false,
   });
 
   final String label;
@@ -26,10 +26,6 @@ class AppButton extends StatelessWidget {
 
   /// An icon after the label, such as `external` for a button that leaves the app.
   final String? icon;
-
-  /// 8 px either side of the label rather than 16, for buttons that share a line in equal
-  /// widths ([ActionRow.even]).
-  final bool narrow;
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +44,9 @@ class AppButton extends StatelessWidget {
       child: ConstrainedBox(
         constraints: BoxConstraints(minHeight: height),
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: narrow ? 8 : 16),
+          padding: EdgeInsets.symmetric(
+            horizontal: _EvenRow.holds(context) ? 8 : 16,
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
@@ -158,12 +156,25 @@ class ActionRow extends StatelessWidget {
         children: children,
       );
     }
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: 8,
-      children: [for (final child in children) Expanded(child: child)],
+    return _EvenRow(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: 8,
+        children: [for (final child in children) Expanded(child: child)],
+      ),
     );
   }
+}
+
+/// Marks the buttons of an [ActionRow.even], which share the line in equal widths.
+class _EvenRow extends InheritedWidget {
+  const _EvenRow({required super.child});
+
+  static bool holds(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<_EvenRow>() != null;
+
+  @override
+  bool updateShouldNotify(_EvenRow old) => false;
 }
 
 /// A small text button in the accent, with an icon before it, or only its words

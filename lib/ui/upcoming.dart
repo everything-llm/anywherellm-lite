@@ -7,6 +7,7 @@ import '../core/schedule.dart';
 import 'app_scope.dart';
 import 'icons.dart';
 import 'links.dart';
+import 'settings/rows.dart';
 import 'settings/settings_pages.dart';
 import 'tokens.dart';
 import 'type.dart';
@@ -143,21 +144,9 @@ class _UpcomingPageState extends State<UpcomingPage> {
                       )
                     else
                       // One card, a rule between its jobs, as the design canvas draws it.
-                      Container(
-                        clipBehavior: Clip.antiAlias,
-                        decoration: BoxDecoration(
-                          color: t.panel,
-                          border: Border.all(color: t.line),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            for (final (i, job) in jobs.indexed)
-                              _JobRow(job, now: now, ruled: i > 0),
-                          ],
-                        ),
-                      ),
+                      FieldCard([
+                        for (final job in jobs) _JobRow(job, now: now),
+                      ]),
                     const SizedBox(height: 16),
                     if (scope.settings.configured)
                       AppButton(
@@ -181,14 +170,12 @@ class _UpcomingPageState extends State<UpcomingPage> {
 }
 
 /// One job: its workspace and schedule over its name, then when it runs next, by a clock, and
-/// how it last ran, in green when it went well and red when it failed. [ruled] draws a rule
-/// over it.
+/// how it last ran, in green when it went well and red when it failed.
 class _JobRow extends StatelessWidget {
-  const _JobRow(this.job, {required this.now, this.ruled = false});
+  const _JobRow(this.job, {required this.now});
 
   final ScheduledJob job;
   final DateTime now;
-  final bool ruled;
 
   @override
   Widget build(BuildContext context) {
@@ -202,11 +189,13 @@ class _JobRow extends StatelessWidget {
         ? 'Next: ${whenText(next, now)}'
         : null;
     final lastText = [?status, if (last != null) whenText(last, now)].join(' ');
-    return Container(
+    final lastColor = switch (job.lastWentWell) {
+      true => t.okfg,
+      false => t.badfg,
+      null => null,
+    };
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        border: ruled ? Border(top: BorderSide(color: t.line2)) : null,
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         spacing: 3,
@@ -236,19 +225,13 @@ class _JobRow extends StatelessWidget {
                 children: [
                   TextSpan(
                     text: lastText,
-                    style: switch (job.lastWentWell) {
-                      true => Type.sans(
-                        12.5,
-                        weight: FontWeight.w600,
-                        color: t.okfg,
-                      ),
-                      false => Type.sans(
-                        12.5,
-                        weight: FontWeight.w600,
-                        color: t.badfg,
-                      ),
-                      null => null,
-                    },
+                    style: lastColor == null
+                        ? null
+                        : Type.sans(
+                            12.5,
+                            weight: FontWeight.w600,
+                            color: lastColor,
+                          ),
                   ),
                 ],
               ),

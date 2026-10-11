@@ -21,19 +21,27 @@ class TightListMarkdown extends MarkdownBody {
     super.bulletBuilder,
   });
 
+  /// The children as tightened, by the list `flutter_markdown_plus` built, which it hands to
+  /// every build until it parses the text again.
+  static final _tightened = Expando<List<Widget>>();
+
   @override
-  Widget build(BuildContext context, List<Widget>? children) =>
-      super.build(context, [
-        for (final child in children!)
-          tightenLists(child, styleSheet?.blockSpacing),
-      ]);
+  Widget build(BuildContext context, List<Widget>? children) {
+    final spacing = styleSheet?.blockSpacing;
+    if (children == null || spacing == null) {
+      return super.build(context, children);
+    }
+    final tight = _tightened[children] ??= [
+      for (final child in children) tightenLists(child, spacing),
+    ];
+    return super.build(context, tight);
+  }
 }
 
 /// [widget] as `flutter_markdown_plus` built it, with the [spacing] taken out from between the
 /// items of each tight list in it and from inside each tight item, which holds a nested list
 /// under its text.
-Widget tightenLists(Widget widget, double? spacing) {
-  if (spacing == null) return widget;
+Widget tightenLists(Widget widget, double spacing) {
   bool spacer(Widget w) =>
       w is SizedBox &&
       w.width == null &&
@@ -123,13 +131,12 @@ const caretMark = '\uE000';
 
 /// Whether [text], still being written, can take the caret at its end: not while it ends inside
 /// a code block or display math, where the mark would show as itself.
-bool takesCaret(String text) {
-  final fences = RegExp(
-    r'^\s*(```|~~~)',
-    multiLine: true,
-  ).allMatches(text).length;
-  return fences.isEven && r'$$'.allMatches(text).length.isEven;
-}
+bool takesCaret(String text) =>
+    _fence.allMatches(text).length.isEven &&
+    r'$$'.allMatches(text).length.isEven;
+
+/// A line that opens or closes a code block.
+final _fence = RegExp(r'^\s*(```|~~~)', multiLine: true);
 
 /// [caretMark], read as a `caret` element.
 class CaretSyntax extends md.InlineSyntax {

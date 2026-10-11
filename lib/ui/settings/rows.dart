@@ -149,6 +149,47 @@ class FieldRow extends StatelessWidget {
   }
 }
 
+/// [control] under its [name] in the sans at [size], as a phone's settings set a field or a
+/// choice. The name is heard once: as the control's own label when it has one ([labelled]),
+/// else as this group's.
+class NamedControl extends StatelessWidget {
+  const NamedControl(
+    this.name,
+    this.control, {
+    super.key,
+    this.size = 15,
+    this.labelled = false,
+  });
+
+  final String name;
+  final Widget control;
+  final double size;
+  final bool labelled;
+
+  @override
+  Widget build(BuildContext context) {
+    final named = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 6,
+      children: [
+        ExcludeSemantics(
+          child: Text(
+            name,
+            style: Type.sans(
+              size,
+              weight: FontWeight.w500,
+              color: Tokens.of(context).ink,
+            ),
+          ),
+        ),
+        control,
+      ],
+    );
+    if (labelled) return named;
+    return Semantics(container: true, label: name, child: named);
+  }
+}
+
 /// A row that only shows a [value], right-aligned, beside its [label].
 class ReadOnlyRow extends StatelessWidget {
   const ReadOnlyRow({

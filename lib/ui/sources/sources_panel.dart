@@ -72,7 +72,6 @@ class _Body extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final sources = scope.sources;
-    final t = Tokens.of(context);
     // Everything below the heading scrolls together, so an open form or a long list of
     // files waiting to be added never pushes past the panel.
     return CustomScrollView(
@@ -96,29 +95,7 @@ class _Body extends StatelessWidget {
             ],
           ),
         ),
-        if (files.isEmpty)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Text(
-                sources.loading ? 'Loading…' : 'No files yet.',
-                textAlign: TextAlign.center,
-                style: Type.sans(13.5, color: t.muted),
-              ),
-            ),
-          )
-        else
-          SliverList.separated(
-            itemCount: files.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 6),
-            itemBuilder: (context, i) => Rise(
-              key: ValueKey(files[i].path),
-              child: _FileRow(
-                files[i],
-                flashed: sources.flashed == files[i].path,
-              ),
-            ),
-          ),
+        _fileSliver(context, files, phone: false),
       ],
     );
   }
@@ -136,7 +113,6 @@ class _PhoneBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final sources = scope.sources;
-    final t = Tokens.of(context);
     final slug = scope.chat.activeSlug;
     return CustomScrollView(
       shrinkWrap: true,
@@ -161,29 +137,7 @@ class _PhoneBody extends StatelessWidget {
             ],
           ),
         ),
-        if (files.isEmpty)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text(
-                sources.loading ? 'Loading…' : 'No files yet.',
-                textAlign: TextAlign.center,
-                style: Type.sans(14, color: t.muted),
-              ),
-            ),
-          )
-        else
-          SliverList.builder(
-            itemCount: files.length,
-            itemBuilder: (context, i) => Rise(
-              key: ValueKey(files[i].path),
-              child: _FileRow(
-                files[i],
-                flashed: sources.flashed == files[i].path,
-                ruled: i > 0,
-              ),
-            ),
-          ),
+        _fileSliver(context, files, phone: true),
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.only(top: 4),
@@ -203,14 +157,47 @@ class _PhoneBody extends StatelessWidget {
   }
 }
 
-/// A file in the panel: on a phone 56 px tall, with a rule over it when [ruled], a larger
-/// title, switch and trash.
+/// The [files], or a line saying there are none yet: on a [phone] with a rule between them,
+/// as the design canvas draws the sheet.
+Widget _fileSliver(
+  BuildContext context,
+  List<SourceFile> files, {
+  required bool phone,
+}) {
+  final sources = AppScope.of(context).sources;
+  final t = Tokens.of(context);
+  if (files.isEmpty) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: phone
+            ? const EdgeInsets.symmetric(vertical: 12)
+            : const EdgeInsets.only(top: 16),
+        child: Text(
+          sources.loading ? 'Loading…' : 'No files yet.',
+          textAlign: TextAlign.center,
+          style: Type.sans(phone ? 14 : 13.5, color: t.muted),
+        ),
+      ),
+    );
+  }
+  return SliverList.separated(
+    itemCount: files.length,
+    separatorBuilder: (_, _) => phone
+        ? Divider(height: 1, thickness: 1, color: t.line2)
+        : const SizedBox(height: 6),
+    itemBuilder: (context, i) => Rise(
+      key: ValueKey(files[i].path),
+      child: _FileRow(files[i], flashed: sources.flashed == files[i].path),
+    ),
+  );
+}
+
+/// A file in the panel: on a phone 56 px tall, with a larger title, switch and trash.
 class _FileRow extends StatelessWidget {
-  const _FileRow(this.file, {required this.flashed, this.ruled = false});
+  const _FileRow(this.file, {required this.flashed});
 
   final SourceFile file;
   final bool flashed;
-  final bool ruled;
 
   @override
   Widget build(BuildContext context) {
@@ -246,12 +233,7 @@ class _FileRow extends StatelessWidget {
         duration: motion(context, const Duration(milliseconds: 300)),
         constraints: const BoxConstraints(minHeight: 56),
         alignment: Alignment.centerLeft,
-        decoration: BoxDecoration(
-          color: flashed ? t.accentbg : Colors.transparent,
-          border: Border(
-            top: BorderSide(color: ruled ? t.line2 : Colors.transparent),
-          ),
-        ),
+        color: flashed ? t.accentbg : Colors.transparent,
         child: row,
       );
     }

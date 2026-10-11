@@ -16,6 +16,13 @@ import '../widgets/menu.dart';
 import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
 
+/// The square an answer's action button takes and its icon's size: 44 on a phone, where the
+/// design canvas sets the buttons side by side, and 30 elsewhere.
+({double box, IconSize icon}) answerAction(BuildContext context) =>
+    ScreenClass.ofContext(context).isPhone
+    ? (box: 44, icon: IconSize.small)
+    : (box: 30, icon: IconSize.xs);
+
 /// More, under a finished answer the server measured or that can be rated:
 /// its menu, This answer, names the answer's model, time, tokens, speed and cost, as far as
 /// [metrics] has them, then Rate this answer when [rate] can, then Show details under every answer, [ChatSwitch.answerDetails], when there
@@ -83,7 +90,7 @@ class _AnswerMoreState extends State<AnswerMore> {
           radius: BorderRadius.circular(6),
           color: open ? t.hover : null,
           child: SizedBox.square(
-            dimension: 30,
+            dimension: answerAction(context).box,
             child: Center(
               child: AppIcon('more', size: IconSize.small, color: t.ink2),
             ),

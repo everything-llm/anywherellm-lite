@@ -136,82 +136,41 @@ class _ServerStatusState extends State<_ServerStatus> {
           onPressed: testing ? null : widget.onTest,
         ),
       ]);
-      // A phone says only whether answers keep running, the word under its name, as the
-      // design canvas draws it.
-      if (ScreenClass.ofContext(context).isPhone) {
-        final t = Tokens.of(context);
-        return Padding(
-          padding: const EdgeInsets.only(top: 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            spacing: 14,
-            children: [
-              FieldCard([
-                Container(
-                  constraints: const BoxConstraints(minHeight: 52),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 6,
-                  ),
-                  alignment: Alignment.centerLeft,
-                  child: Semantics(
-                    container: true,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Background answers',
-                          style: Type.sans(12.5, color: t.muted),
-                        ),
-                        Text(
-                          switch (_settings.relay) {
-                            RelayState.found => 'Available',
-                            RelayState.absent => 'Not available',
-                            RelayState.unreachable => 'Could not check',
-                            RelayState.unknown => 'Checking…',
-                          },
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Type.sans(15, color: t.ink),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ]),
-              test,
-            ],
-          ),
-        );
-      }
+      final phone = ScreenClass.ofContext(context).isPhone;
       return Padding(
         padding: const EdgeInsets.only(top: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 20,
+          spacing: phone ? 14 : 20,
           children: [
             FieldCard([
-              ReadOnlyRow(
-                label: 'Background answers',
-                help: 'Provided by the everythingllm relay on the server.',
-                value: switch (_settings.relay) {
-                  RelayState.found => 'Available. Answers keep running after the app lets go of them.',
-                  RelayState.absent =>
-                    'Not available. Answers come straight from AnythingLLM.',
-                  RelayState.unreachable => 'Could not check.',
-                  RelayState.unknown => 'Checking…',
-                },
-              ),
-              ReadOnlyRow(
-                label: 'Server',
-                value: switch (_settings.auth) {
-                  ServerAuth.none => 'AnythingLLM, single user, no password',
-                  ServerAuth.password =>
-                    'AnythingLLM, single user, password on',
-                  ServerAuth.multiUser => 'AnythingLLM, several users',
-                  null => 'Not known yet',
-                },
-              ),
+              // A phone says only whether answers keep running, the word under its name, as
+              // the design canvas draws it.
+              if (phone)
+                _PhoneRelayRow(_settings.relay)
+              else ...[
+                ReadOnlyRow(
+                  label: 'Background answers',
+                  help: 'Provided by the everythingllm relay on the server.',
+                  value: switch (_settings.relay) {
+                    RelayState.found => 'Available. Answers keep running after the app lets go of them.',
+                    RelayState.absent =>
+                      'Not available. Answers come straight from AnythingLLM.',
+                    RelayState.unreachable => 'Could not check.',
+                    RelayState.unknown => 'Checking…',
+                  },
+                ),
+                ReadOnlyRow(
+                  label: 'Server',
+                  value: switch (_settings.auth) {
+                    ServerAuth.none => 'AnythingLLM, single user, no password',
+                    ServerAuth.password =>
+                      'AnythingLLM, single user, password on',
+                    ServerAuth.multiUser => 'AnythingLLM, several users',
+                    null => 'Not known yet',
+                  },
+                ),
+              ],
             ]),
             test,
           ],
@@ -219,6 +178,43 @@ class _ServerStatusState extends State<_ServerStatus> {
       );
     },
   );
+}
+
+/// Background answers on a phone: the word for whether answers keep running, under its name.
+class _PhoneRelayRow extends StatelessWidget {
+  const _PhoneRelayRow(this.relay);
+
+  final RelayState relay;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Container(
+      constraints: const BoxConstraints(minHeight: 52),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      alignment: Alignment.centerLeft,
+      child: Semantics(
+        container: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Background answers', style: Type.sans(12.5, color: t.muted)),
+            Text(
+              switch (relay) {
+                RelayState.found => 'Available',
+                RelayState.absent => 'Not available',
+                RelayState.unreachable => 'Could not check',
+                RelayState.unknown => 'Checking…',
+              },
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Type.sans(15, color: t.ink),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// The address and key: saved, replaced or forgotten, shown as a QR code for a phone, or read
@@ -369,8 +365,9 @@ class _KeyCardState extends State<_KeyCard> {
                           color: t.ink,
                         ),
                       ),
-                      // A phone puts the address first and says where the key is under it.
-                      if (!(phone && set))
+                      // A phone, signed in by now, puts the address first and says where
+                      // the key is under it.
+                      if (!phone)
                         Text(
                           set
                               ? 'The address is shown below. The key is stored in this device\'s keyring and never shown.'
@@ -400,7 +397,7 @@ class _KeyCardState extends State<_KeyCard> {
                 overflow: phone ? TextOverflow.ellipsis : null,
                 style: Type.mono(12.5, color: t.muted),
               ),
-            if (phone && set)
+            if (phone)
               Text(
                 'The key is stored in this phone\'s keyring and never shown.',
                 style: Type.sans(12.5, color: t.muted, height: 1.45),
@@ -409,7 +406,6 @@ class _KeyCardState extends State<_KeyCard> {
               ActionRow(even: phone, [
                 AppButton(
                   _replacing ? 'Cancel' : 'Edit connection',
-                  narrow: phone,
                   onPressed: () => setState(() {
                     _replacing = !_replacing;
                     _shell.setScanning(false);
@@ -423,7 +419,6 @@ class _KeyCardState extends State<_KeyCard> {
                   ),
                 AppButton(
                   _confirmForget ? 'Really forget it?' : 'Forget this server',
-                  narrow: phone,
                   onPressed: _forget,
                 ),
               ]),
@@ -549,8 +544,10 @@ class _KeyCardState extends State<_KeyCard> {
             ),
           ),
         ],
-        _Named(
+        NamedControl(
           'Server address',
+          size: 14,
+          labelled: true,
           AppField(
             controller: _url,
             label: 'Server address',
@@ -561,8 +558,10 @@ class _KeyCardState extends State<_KeyCard> {
         ),
         const SizedBox(height: 12),
         if (_pasteKey)
-          _Named(
+          NamedControl(
             'Developer API key',
+            size: 14,
+            labelled: true,
             AppField(
               controller: _key,
               label: 'AnythingLLM developer API key',
@@ -572,8 +571,10 @@ class _KeyCardState extends State<_KeyCard> {
             ),
           )
         else ...[
-          _Named(
+          NamedControl(
             'Password',
+            size: 14,
+            labelled: true,
             AppField(
               controller: _password,
               label: 'Password',
@@ -624,32 +625,4 @@ class _KeyCardState extends State<_KeyCard> {
       ],
     );
   }
-}
-
-/// A field under its [name], as a phone's first run shows them. A screen reader hears the
-/// field's own label.
-class _Named extends StatelessWidget {
-  const _Named(this.name, this.field);
-
-  final String name;
-  final Widget field;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    spacing: 6,
-    children: [
-      ExcludeSemantics(
-        child: Text(
-          name,
-          style: Type.sans(
-            14,
-            weight: FontWeight.w500,
-            color: Tokens.of(context).ink,
-          ),
-        ),
-      ),
-      field,
-    ],
-  );
 }

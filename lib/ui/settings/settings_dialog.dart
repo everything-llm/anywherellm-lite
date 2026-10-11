@@ -574,12 +574,10 @@ class _PageView extends StatelessWidget {
                 ),
               // A phone's first run says what to do in its own words, and a phone's
               // Appearance and Chat need no line, as the design canvas draws them.
-              if (phone && firstRun)
+              if (phone && (firstRun || page == SettingsPage.chat))
                 const SizedBox.shrink()
               else if (phone && page == SettingsPage.appearance)
                 const SizedBox(height: 2)
-              else if (phone && page == SettingsPage.chat)
-                const SizedBox.shrink()
               else if (phone) ...[
                 Text(switch (page) {
                   SettingsPage.connection =>

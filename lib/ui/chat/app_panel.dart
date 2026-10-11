@@ -18,6 +18,13 @@ String _kindOf(BuildContext context, AppCard app) {
   return 'App · ${workspace?.name ?? app.workspace}';
 }
 
+/// Where [app]'s page opens in the app: in the app's theme, so the page matches it whatever the
+/// device's. The sheet shows it and the chat fetches it ahead at this one address.
+Uri appPageOf(BuildContext context, AppCard app) => themedPage(
+  app.page,
+  light: Theme.of(context).brightness == Brightness.light,
+);
+
 /// The app's live card, drawn large. It is followed only while it can be seen, as every card
 /// is.
 Widget _card(BuildContext context, AppCard app) {
@@ -69,10 +76,7 @@ class AppPanel extends StatelessWidget {
       child: switch (AppScope.of(context).appView) {
         // On a phone with a web view, the app's own page, which can change it.
         final view? when sheet => view.show(
-          themedPage(
-            app.page,
-            light: Theme.of(context).brightness == Brightness.light,
-          ),
+          appPageOf(context, app),
           placeholder: _card(context, app),
           onLeave: (url) => openLink(context, url.toString()),
         ),

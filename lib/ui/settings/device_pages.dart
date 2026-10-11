@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import '../../core/prefs.dart';
 import '../app_scope.dart';
 import '../layout.dart';
-import '../tokens.dart';
-import '../type.dart';
 import '../widgets/controls.dart';
 import '../widgets/fields.dart';
 import '../widgets/segmented.dart';
@@ -46,8 +44,8 @@ class AppearancePage extends StatelessWidget {
             // A phone puts each name over its choices, with no card, as the design canvas
             // draws it, and says what the text size does once, under both.
             if (phone) ...[
-              _Named('Theme', theme),
-              _Named('Chat text size', size),
+              NamedControl('Theme', theme),
+              NamedControl('Chat text size', size),
               const HelpText(
                 'Text size scales the chat\'s turns, not the controls around them.',
               ),
@@ -68,37 +66,6 @@ class AppearancePage extends StatelessWidget {
       },
     );
   }
-}
-
-/// [control] under its [name], which a screen reader hears as the group's.
-class _Named extends StatelessWidget {
-  const _Named(this.name, this.control);
-
-  final String name;
-  final Widget control;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    container: true,
-    label: name,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 6,
-      children: [
-        ExcludeSemantics(
-          child: Text(
-            name,
-            style: Type.sans(
-              15,
-              weight: FontWeight.w500,
-              color: Tokens.of(context).ink,
-            ),
-          ),
-        ),
-        control,
-      ],
-    ),
-  );
 }
 
 /// What the Chat page holds, as a phone's Settings list says it: the switches this device has.

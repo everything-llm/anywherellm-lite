@@ -12,29 +12,38 @@ import '../app_scope.dart';
 class AppWebViews implements AppView {
   _AppPage? _kept;
 
-  /// The page kept for [page], made afresh unless the one kept is [page] and has not failed.
-  /// A kept page on screen is never replaced by a [prefetch].
-  _AppPage? _keep(Uri page, {required bool showing}) {
-    final kept = _kept;
-    if (kept != null && kept.page == page && !kept.failed) return kept;
-    if (kept != null && kept.shown > 0 && !showing) return null;
-    kept?.drop();
+  _AppPage _replace(Uri page) {
+    _kept?.drop();
     return _kept = _AppPage(page);
   }
 
+  /// A page on screen stays, and one whose load failed is fetched again only when it shows.
   @override
-  void prefetch(Uri page) => _keep(page, showing: false);
+  void prefetch(Uri page) {
+    if (_kept case final kept? when kept.page == page || kept.shown > 0) return;
+    _replace(page);
+  }
 
   @override
   Widget show(
     Uri page, {
     required Widget placeholder,
     required void Function(Uri url) onLeave,
-  }) => _AppWebView(
-    page: _keep(page, showing: true)!,
-    placeholder: placeholder,
-    onLeave: onLeave,
-  );
+  }) {
+    // A failed page is fetched again when it next opens, not while it shows.
+    final kept = switch (_kept) {
+      final kept? when kept.page == page && (!kept.failed || kept.shown > 0) =>
+        kept,
+      _ => _replace(page),
+    };
+    // Another page gets a state of its own, which counts it shown.
+    return _AppWebView(
+      key: ObjectKey(kept),
+      page: kept,
+      placeholder: placeholder,
+      onLeave: onLeave,
+    );
+  }
 }
 
 /// [page] in a web view of its own, loading from the moment it is made.
@@ -86,6 +95,7 @@ class _AppPage extends ChangeNotifier {
 
 class _AppWebView extends StatefulWidget {
   const _AppWebView({
+    super.key,
     required this.page,
     required this.placeholder,
     required this.onLeave,
@@ -111,25 +121,14 @@ class _AppWebViewState extends State<_AppWebView> {
   @override
   void didUpdateWidget(_AppWebView old) {
     super.didUpdateWidget(old);
-    if (identical(old.page, widget.page)) {
-      widget.page.onLeave = widget.onLeave;
-      return;
-    }
-    _leave(old.page);
-    widget.page
-      ..shown += 1
-      ..onLeave = widget.onLeave;
+    widget.page.onLeave = widget.onLeave;
   }
 
   @override
   void dispose() {
-    _leave(widget.page);
-    super.dispose();
-  }
-
-  static void _leave(_AppPage page) {
-    page.shown -= 1;
+    final page = widget.page..shown -= 1;
     if (page.shown == 0) page.onLeave = null;
+    super.dispose();
   }
 
   @override

@@ -103,12 +103,10 @@ class _PasswordCardState extends State<PasswordCard> {
               ActionRow(even: phone, [
                 AppButton(
                   _replacing ? 'Cancel' : 'Change password',
-                  narrow: phone,
                   onPressed: () => setState(() => _replacing = !_replacing),
                 ),
                 AppButton(
                   'Forget password',
-                  narrow: phone,
                   onPressed: _settings.forgetPassword,
                 ),
               ]),

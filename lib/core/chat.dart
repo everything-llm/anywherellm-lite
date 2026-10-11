@@ -239,9 +239,13 @@ AppCard? appCardOf(Uri image, Uri page, String alt, Uri? server) {
 }
 
 /// The apps' cards in the answer [text], in order, each a linked image [appCardOf] takes.
-List<AppCard> appCardsIn(String text, Uri? server) => [
-  for (final l in linkedImagesIn(text)) ?appCardOf(l.image, l.link, l.alt, server),
-];
+List<AppCard> appCardsIn(String text, Uri? server) {
+  if (server == null || !text.contains('/_live/apps/')) return const [];
+  return [
+    for (final l in linkedImagesIn(text))
+      ?appCardOf(l.image, l.link, l.alt, server),
+  ];
+}
 
 /// What the description [alt] calls an app, or else its card's [file] name in words.
 String _appName(String alt, String file) {

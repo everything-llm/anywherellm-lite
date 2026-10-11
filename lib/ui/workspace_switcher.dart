@@ -238,7 +238,7 @@ class _WorkspaceSwitcherState extends State<WorkspaceSwitcher> {
       color: open ? t.hover : t.panel,
       side: BorderSide(color: t.line),
       child: SizedBox(
-        height: phone ? 48 : 44,
+        height: Sizes.fieldOf(context),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 0, 10, 0),
           child: Row(
@@ -302,14 +302,12 @@ class _WorkspaceMenu extends StatelessWidget {
     final active = chat.active;
     final keys = showsWorkspaceKeys(context);
     // A phone's sheet draws it plain, as its other rows are, as the design canvas does.
-    final create = sheet
-        ? AppMenuItem('New workspace', onTap: onCreate)
-        : AppMenuItem(
-            'New workspace',
-            icon: 'plus',
-            accent: true,
-            onTap: onCreate,
-          );
+    final create = AppMenuItem(
+      'New workspace',
+      icon: sheet ? null : 'plus',
+      accent: !sheet,
+      onTap: onCreate,
+    );
     final rename = active == null
         ? null
         : AppMenuItem('Rename workspace', onTap: onRename);

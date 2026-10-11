@@ -4,7 +4,6 @@ import '../../core/copy.dart';
 import '../../core/files.dart';
 import '../../core/sources.dart';
 import '../app_scope.dart';
-import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
@@ -156,10 +155,9 @@ class EssentialDocs extends StatelessWidget {
                     : TextAction.plain(
                         'Test a question',
                         test,
-                        // As tall as the buttons, so it sits level with their first row.
-                        height: ScreenClass.ofContext(context).isPhone
-                            ? 44
-                            : 40,
+                        // As tall as the buttons, so it sits level with their first row; a
+                        // phone's are 44, which a TextAction is there at least.
+                        height: 40,
                       ),
               ),
             ),

@@ -27,6 +27,7 @@ import '../widgets/tappable.dart';
 import 'answer_body.dart';
 import 'markdown_lists.dart';
 import 'answer_menu.dart';
+import 'app_panel.dart';
 import 'approval_card.dart';
 import 'browser_chip.dart';
 import 'generated_files.dart';
@@ -103,11 +104,7 @@ class _MessageListState extends State<MessageList> {
     if (view == null || !ScreenClass.ofContext(context).isPhone) return;
     final app = scope.chat.appCard;
     if (app == null) return;
-    // In the theme its sheet will show it in.
-    final page = themedPage(
-      app.page,
-      light: Theme.of(context).brightness == Brightness.light,
-    );
+    final page = appPageOf(context, app);
     WidgetsBinding.instance.addPostFrameCallback((_) => view.prefetch(page));
   }
 
@@ -686,6 +683,7 @@ class _AnswerState extends State<_Answer> {
     // An answer cut short shows what came in the second ink, under why it stopped.
     final cut = !turn.streaming && (turn.stopped || turn.error != null);
     final phone = ScreenClass.ofContext(context).isPhone;
+    final action = answerAction(context);
     // The red box asks again itself, so Retry does not show twice.
     final askAgain =
         turn.error != null && !turn.stillRunning && retry?.onPressed != null;
@@ -782,8 +780,8 @@ class _AnswerState extends State<_Answer> {
                   CopyButton(
                     split.answer,
                     tooltip: 'Copy answer',
-                    box: phone ? 44 : 30,
-                    size: phone ? IconSize.small : IconSize.xs,
+                    box: action.box,
+                    size: action.icon,
                   ),
                 if (AppScope.of(context).readAloud case final aloud?
                     when answered)
@@ -793,8 +791,8 @@ class _AnswerState extends State<_Answer> {
                     'refresh',
                     tooltip: retry.tooltip,
                     onPressed: retry.onPressed,
-                    box: phone ? 44 : 30,
-                    size: phone ? IconSize.small : IconSize.xs,
+                    box: action.box,
+                    size: action.icon,
                   ),
                 if (turn.metrics != null || rate != null)
                   AnswerMore(turn, turn.metrics, rate: rate),
@@ -833,13 +831,13 @@ class _ReadAloudButton extends StatelessWidget {
     listenable: aloud,
     builder: (context, _) {
       final reading = identical(aloud.reading, turn);
-      final phone = ScreenClass.ofContext(context).isPhone;
+      final action = answerAction(context);
       return IconBtn(
         reading ? 'stop' : 'speaker',
         tooltip: reading ? 'Stop reading' : 'Read aloud',
         onPressed: () => aloud.toggle(turn),
-        box: phone ? 44 : 30,
-        size: phone ? IconSize.small : IconSize.xs,
+        box: action.box,
+        size: action.icon,
       );
     },
   );
