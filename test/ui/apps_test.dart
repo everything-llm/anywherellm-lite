@@ -115,7 +115,7 @@ void main() {
       expect(find.text('Quarter priorities'), findsOneWidget);
     });
 
-    testWidgets('an app opens full screen at the app\'s theme, and Back '
+    testWidgets('an app opens in a sheet at the app\'s theme, and Close '
         'closes it', (tester) async {
       final h = await _withApps(tester);
       await _appsTab(tester);
@@ -124,7 +124,7 @@ void main() {
       expect(find.byType(AppScreen), findsOneWidget);
       expect(find.text('Web view of $_page?theme=light'), findsOneWidget);
       expect(find.text('List · Q3 planning'), findsOneWidget);
-      await tester.tap(find.byTooltip('Back'));
+      await tester.tap(find.byTooltip('Close'));
       await tester.pumpAndSettle();
       expect(find.byType(AppScreen), findsNothing);
       expect(find.byType(AppsTab), findsOneWidget);

@@ -10,9 +10,8 @@ import '../layout.dart';
 import '../links.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';
-import '../type.dart';
 import '../widgets/buttons.dart';
-import '../widgets/phone_page.dart';
+import '../widgets/sheet.dart';
 import 'app_data.dart';
 
 /// Shows an app's working page in the device's web view.
@@ -22,10 +21,11 @@ abstract interface class AppView {
   Widget show(Uri page, {required void Function(Uri url) onLeave});
 }
 
-/// An app full screen, over the home and the chat: Back, its title over its kind and
-/// workspace, and More, which opens its data; under them its working page, in the app's own
-/// theme, or where the device has no web view its card with a way to the page in the browser.
-/// A page of its data shows over it, and Back steps back through them.
+/// An app in a tall sheet over the home or the chat: its title over its kind and workspace, More,
+/// which opens its data, and Close; under them its working page, in the app's own theme, or
+/// where the device has no web view its card with a way to the page in the browser. Dragging the
+/// sheet down or tapping the scrim closes it. A page of its data shows full screen over it, and
+/// Back steps back through them.
 class AppScreen extends StatefulWidget {
   const AppScreen(this.app, {super.key});
 
@@ -36,14 +36,25 @@ class AppScreen extends StatefulWidget {
 }
 
 class _AppScreenState extends State<AppScreen> {
+  late final _apps = AppScope.of(context).apps;
+
   @override
   void initState() {
     super.initState();
-    final apps = AppScope.of(context).apps;
     // A read tells the controller's listeners at once, so it waits for the frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(apps.check(widget.app));
+      if (mounted) unawaited(_apps.check(widget.app));
     });
+  }
+
+  @override
+  void dispose() {
+    // The chat stayed on screen under the sheet, so its card of this app is read again only
+    // when the app changed meanwhile, as through its page.
+    final apps = _apps;
+    final app = widget.app;
+    scheduleMicrotask(() => unawaited(apps.check(app)));
+    super.dispose();
   }
 
   @override
@@ -55,87 +66,56 @@ class _AppScreenState extends State<AppScreen> {
       builder: (context, _) {
         final app = scope.apps.appOf(widget.app);
         final pages = scope.shell.appPages;
-        return ColoredBox(
-          color: t.bg,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Offstage(
-                offstage: pages.isNotEmpty,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _Header(app),
-                    Expanded(child: _Page(app)),
-                  ],
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Offstage(
+              offstage: pages.isNotEmpty,
+              child: SheetFrame(
+                title: app.title,
+                about: _about(context, app),
+                height: SheetHeight.tall,
+                padding: EdgeInsets.zero,
+                onClose: scope.shell.closeApp,
+                actions: [
+                  IconBtn(
+                    'more',
+                    tooltip: 'Data and history for ${app.title}',
+                    box: 44,
+                    filled: true,
+                    size: IconSize.small,
+                    onPressed: () => scope.shell.showAppPage(const AppFolder()),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                child: _Page(app),
+              ),
+            ),
+            if (pages.isNotEmpty)
+              ColoredBox(
+                color: t.bg,
+                child: AppDataPage(
+                  pages.last,
+                  app: app,
+                  key: ValueKey((pages.length, pages.last)),
                 ),
               ),
-              if (pages.isNotEmpty)
-                ColoredBox(
-                  color: t.bg,
-                  child: AppDataPage(
-                    pages.last,
-                    app: app,
-                    key: ValueKey((pages.length, pages.last)),
-                  ),
-                ),
-            ],
-          ),
+          ],
         );
       },
     );
   }
 }
 
-/// The bar over an app: Back, its title over its kind and workspace, and More.
-class _Header extends StatelessWidget {
-  const _Header(this.app);
-
-  final ServerApp app;
-
-  @override
-  Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    final t = Tokens.of(context);
-    final workspace =
-        scope.chat.workspaces
-            .where((w) => w.slug == app.ref.workspace)
-            .firstOrNull
-            ?.name ??
-        app.ref.workspace;
-    return PhonePageHeader(
-      back: 'Back',
-      onBack: scope.shell.closeApp,
-      heading: Semantics(
-        header: true,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              app.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Type.sans(17, weight: FontWeight.w600, color: t.ink),
-            ),
-            Text(
-              '${kindLabel(app.kind)} · $workspace',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Type.sans(12.5, color: t.muted),
-            ),
-          ],
-        ),
-      ),
-      action: IconBtn(
-        'more',
-        tooltip: 'Data and history for ${app.title}',
-        box: 48,
-        filled: true,
-        size: IconSize.small,
-        onPressed: () => scope.shell.showAppPage(const AppFolder()),
-      ),
-    );
-  }
+/// The line under an app's title: its kind and its workspace, by name where the server has it.
+String _about(BuildContext context, ServerApp app) {
+  final workspace =
+      AppScope.of(context).chat.workspaces
+          .where((w) => w.slug == app.ref.workspace)
+          .firstOrNull
+          ?.name ??
+      app.ref.workspace;
+  return '${kindLabel(app.kind)} · $workspace';
 }
 
 /// The app's working page in the web view, at the app's own theme, or its card where the

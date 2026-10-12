@@ -77,13 +77,9 @@ class AppShell extends StatelessWidget {
       builder: (context, _) {
         final files = shell.pane == Pane.files;
         final app = shell.app;
-        final chatShown = shell.chatOpen && !files && app == null;
+        final chatShown = shell.chatOpen && !files;
         final homeCovered =
-            shell.chatOpen ||
-            files ||
-            shell.upcomingOpen ||
-            shell.settingsOpen ||
-            app != null;
+            shell.chatOpen || files || shell.upcomingOpen || shell.settingsOpen;
         // The Apps tab shows only while the apps server is there.
         final appsTab =
             shell.tab == HomeTab.apps && scope.apps.available == true;
@@ -167,7 +163,7 @@ class AppShell extends StatelessWidget {
                           const Positioned.fill(child: UpcomingPage()),
                         // The sheet's own scrim closes it.
                         if (shell.rightOpen) Positioned.fill(child: right),
-                        // An app full screen, over the chat it was opened from.
+                        // An app in a sheet, over the chat or the tab it was opened from.
                         if (app != null)
                           Positioned.fill(
                             child: AppScreen(app, key: ValueKey(app)),

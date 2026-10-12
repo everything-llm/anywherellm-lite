@@ -78,11 +78,14 @@ void main() {
       expect(find.text('Web view of $_page?theme=light'), findsOneWidget);
       expect(h.opened, isEmpty);
 
-      // Back shows the chat again, and its card as the app is now.
+      // Back closes the sheet over the chat, and the app is checked again: its card is read
+      // again only when the app changed.
+      h.appsServer.calls.clear();
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(h.shell.app, isNull);
-      expect(h.appsServer.cardAsks, hasLength(2));
+      expect(h.appsServer.calls, contains('app:groceries'));
+      expect(h.appsServer.cardAsks, hasLength(1));
     });
 
     testWidgets('a card is read again when its chat opens again, and when its '
