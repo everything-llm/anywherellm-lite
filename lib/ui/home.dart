@@ -19,17 +19,18 @@ import 'widgets/phone_page.dart';
 import 'widgets/tappable.dart';
 import 'workspace_switcher.dart';
 
-/// The bar at the foot of the home: Chats and Settings, the tab shown on a pill of
-/// [Tokens.sel] with its icon in the accent.
+/// The bar at the foot of the home: Chats, Apps while the apps server is there, and Settings,
+/// the tab shown on a pill of [Tokens.sel] with its icon in the accent.
 class HomeTabBar extends StatelessWidget {
   const HomeTabBar({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final shell = AppScope.of(context).shell;
+    final scope = AppScope.of(context);
+    final shell = scope.shell;
     final t = Tokens.of(context);
     return ListenableBuilder(
-      listenable: shell,
+      listenable: Listenable.merge([shell, scope.apps]),
       builder: (context, _) => Semantics(
         container: true,
         label: 'Sections',
@@ -42,15 +43,21 @@ class HomeTabBar extends StatelessWidget {
           ),
           child: Row(
             children: [
-              for (final (tab, label, icon) in const [
+              for (final (tab, label, icon) in [
                 (HomeTab.chats, 'Chats', 'chat'),
+                if (scope.apps.available == true)
+                  (HomeTab.apps, 'Apps', 'grid'),
                 (HomeTab.settings, 'Settings', 'settings'),
               ])
                 Expanded(
                   child: _Tab(
                     label: label,
                     icon: icon,
-                    on: shell.tab == tab,
+                    on:
+                        shell.tab == tab ||
+                        (tab == HomeTab.chats &&
+                            shell.tab == HomeTab.apps &&
+                            scope.apps.available != true),
                     onTap: () => shell.showTab(tab),
                   ),
                 ),

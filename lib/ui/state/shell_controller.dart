@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../core/apps.dart';
 import '../../core/files.dart';
 import '../../core/gallery.dart';
 import '../../core/server_models.dart';
@@ -10,8 +11,37 @@ import 'chat_controller.dart';
 /// What the main pane shows: the chat, or the open workspace's pages.
 enum Pane { chats, files }
 
-/// A tab of the bar at the foot of the home: the open workspace's chats, or Settings' list.
-enum HomeTab { chats, settings }
+/// A tab of the bar at the foot of the home: the open workspace's chats, its apps where the
+/// apps server is there, or Settings' list.
+enum HomeTab { chats, apps, settings }
+
+/// A page of an app's data, over the app shown full screen: its folder, one of its files,
+/// its log, or its git history.
+sealed class AppPage {
+  const AppPage();
+}
+
+/// The app's folder: its files and its git history.
+class AppFolder extends AppPage {
+  const AppFolder();
+}
+
+/// One file of the app's folder, at [path], such as `app.json`.
+class AppFileOf extends AppPage {
+  const AppFileOf(this.path);
+
+  final String path;
+}
+
+/// The app's `log.jsonl`, read as its history.
+class AppLog extends AppPage {
+  const AppLog();
+}
+
+/// The commits of the app's folder.
+class AppGit extends AppPage {
+  const AppGit();
+}
 
 /// What the sheet over the chat shows: Sources, the passages an answer read from one
 /// file, or all of an answer's sources ([cited]).
@@ -100,6 +130,51 @@ class ShellController extends ChangeNotifier {
     if (key == null || identical(_popup.value, key)) _popup.value = null;
   }
 
+  HomeTab _homeTab = HomeTab.chats;
+  AppRef? _app;
+  final List<AppPage> _appPages = [];
+
+  /// The app shown full screen, over the home and the chat, or null.
+  AppRef? get app => _app;
+
+  /// The pages of the app's data open over it, the top one last.
+  List<AppPage> get appPages => List.unmodifiable(_appPages);
+
+  /// Shows [ref]'s working page full screen, or with [data] its folder over it.
+  void openApp(AppRef ref, {bool data = false}) {
+    _app = ref;
+    _appPages
+      ..clear()
+      ..addAll([if (data) const AppFolder()]);
+    _settingsOpen = false;
+    _rightOpen = false;
+    _popup.value = null;
+    notifyListeners();
+  }
+
+  /// Opens [page] of the shown app's data over what shows.
+  void showAppPage(AppPage page) {
+    if (_app == null) return;
+    _appPages.add(page);
+    _popup.value = null;
+    notifyListeners();
+  }
+
+  /// Steps back from the top page of the app's data, or closes the app when none is open.
+  void appBack() {
+    if (_appPages.isEmpty) return closeApp();
+    _appPages.removeLast();
+    notifyListeners();
+  }
+
+  void closeApp() {
+    if (_app == null) return;
+    _app = null;
+    _appPages.clear();
+    _popup.value = null;
+    notifyListeners();
+  }
+
   bool _rightOpen = false;
   FilesSection? _workspacePage;
   bool _scanning = false;
@@ -184,14 +259,14 @@ class ShellController extends ChangeNotifier {
   /// Whether the chat shows, full screen over the home.
   bool get chatOpen => _chatOpen;
 
-  /// The tab the home shows: Settings while Settings is open, else Chats.
-  HomeTab get tab => _settingsOpen ? HomeTab.settings : HomeTab.chats;
+  /// The tab the home shows: Settings while Settings is open, else Chats or Apps.
+  HomeTab get tab => _settingsOpen ? HomeTab.settings : _homeTab;
 
   /// Whether the home shows, with the bar of its tabs: the Chats tab with nothing over it, or
   /// Settings' list.
   bool get atHome => _settingsOpen
       ? _settingsPage == null
-      : !_chatOpen && _pane == Pane.chats && !_upcomingOpen;
+      : !_chatOpen && _pane == Pane.chats && !_upcomingOpen && _app == null;
 
   /// Whether the sheet over the chat, or over the workspace's pages, is open.
   bool get rightOpen => _rightOpen;
@@ -212,12 +287,18 @@ class ShellController extends ChangeNotifier {
   /// Shows the chat full screen over the home, closing Settings, the workspace's pages and a
   /// page over the Chats tab.
   void openChat() {
-    if (_chatOpen && !_settingsOpen && _pane == Pane.chats && !_upcomingOpen) {
+    if (_chatOpen &&
+        !_settingsOpen &&
+        _pane == Pane.chats &&
+        !_upcomingOpen &&
+        _app == null) {
       return;
     }
     _chatOpen = true;
     _settingsOpen = false;
     _scanning = false;
+    _app = null;
+    _appPages.clear();
     _sourcesUnder = null;
     _pane = Pane.chats;
     _workspacePage = null;
@@ -245,6 +326,9 @@ class ShellController extends ChangeNotifier {
     _upcomingOpen = false;
     _scanning = false;
     _settingsOpen = tab == HomeTab.settings;
+    if (tab != HomeTab.settings) _homeTab = tab;
+    _app = null;
+    _appPages.clear();
     _settingsPage = null;
     _settingsDirect = false;
     _popup.value = null;

@@ -1,9 +1,11 @@
 import 'package:flutter/widgets.dart';
 
+import 'apps/app_screen.dart';
 import 'chat/dictation.dart';
 import 'chat/photo_picker.dart';
 import 'chat/speaker.dart';
 import 'share/shared_item.dart';
+import 'state/apps_controller.dart';
 import 'state/chat_controller.dart';
 import 'state/files_controller.dart';
 import 'state/memory_controller.dart';
@@ -44,6 +46,7 @@ class AppScope extends InheritedWidget {
     required this.files,
     required this.system,
     required this.memory,
+    required this.apps,
     required this.launch,
     required this.save,
     this.scanner,
@@ -52,6 +55,7 @@ class AppScope extends InheritedWidget {
     this.dictation,
     this.photos,
     this.readAloud,
+    this.appView,
     this.canSpellcheck = false,
     required super.child,
   });
@@ -66,6 +70,9 @@ class AppScope extends InheritedWidget {
 
   /// The Memory page's saved memories.
   final MemoryController memory;
+
+  /// The apps server beside the server in use, when it is there, and its apps.
+  final AppsController apps;
   final LinkOpener launch;
   final FileSaver save;
 
@@ -89,6 +96,10 @@ class AppScope extends InheritedWidget {
 
   /// Reads an answer aloud, or null where the device has no speech to read with.
   final ReadAloud? readAloud;
+
+  /// Shows an app's working page in a web view, or null where the device has none, and an app
+  /// shows its card with a way to its page in the browser.
+  final AppView? appView;
 
   /// Whether the platform has a spell checker the message box can use.
   final bool canSpellcheck;

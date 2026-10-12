@@ -6,12 +6,14 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'adapters/anythingllm_client.dart';
+import 'adapters/apps_client.dart';
 import 'adapters/json_prefs_store.dart';
 import 'adapters/keyring_settings_store.dart';
 import 'core/connection.dart';
 import 'core/ports.dart';
 import 'ui/app.dart';
 import 'ui/app_scope.dart';
+import 'ui/apps/app_web_view.dart';
 import 'ui/boot_screen.dart';
 import 'ui/chat/device_speaker.dart';
 import 'ui/chat/device_photos.dart';
@@ -26,6 +28,7 @@ import 'ui/share/android_shares.dart';
 import 'ui/share/shared_item.dart';
 import 'ui/settings/settings_pages.dart';
 import 'ui/shell.dart';
+import 'ui/state/apps_controller.dart';
 import 'ui/state/memory_controller.dart';
 import 'ui/state/chat_controller.dart';
 import 'ui/state/files_controller.dart';
@@ -47,12 +50,14 @@ Future<void> main() async {
   );
   final holder = ConnectionHolder();
   final llm = HttpAnythingLlmApi(holder: holder);
+  final apps = HttpAppsApi(holder: holder);
   final prefs = PrefsController(JsonPrefsStore(prefsFile));
   runApp(
     AnywhereLlmApp(
       prefs: prefs,
       home: SessionHost(
         llm: llm,
+        apps: apps,
         settings: SettingsController(llm, KeyringSettingsStore(), holder),
         prefs: prefs,
         shell: ShellController(),
@@ -74,6 +79,7 @@ class SessionHost extends StatefulWidget {
   const SessionHost({
     super.key,
     required this.llm,
+    required this.apps,
     required this.settings,
     required this.prefs,
     required this.shell,
@@ -81,6 +87,9 @@ class SessionHost extends StatefulWidget {
   });
 
   final AnythingLlmApi llm;
+
+  /// The apps server beside AnythingLLM, which may not be there.
+  final AppsApi apps;
   final SettingsController settings;
   final PrefsController prefs;
   final ShellController shell;
@@ -97,6 +106,7 @@ class _SessionHostState extends State<SessionHost> {
   late final FilesController _files;
   late final SystemController _system;
   late final MemoryController _memory;
+  late final AppsController _apps;
 
   /// Reads answers aloud with the device's engine.
   late final ReadAloud _readAloud;
@@ -120,6 +130,7 @@ class _SessionHostState extends State<SessionHost> {
     _files = FilesController(widget.llm, widget.settings, _chat, _sources);
     _system = SystemController(widget.llm, widget.settings);
     _memory = MemoryController(widget.llm, widget.settings, _chat);
+    _apps = AppsController(widget.apps, widget.settings, _chat);
     _readAloud = ReadAloud(DeviceSpeaker(), _chat, widget.prefs);
     // A deleted chat waiting to be undone is deleted as the app hides: Android can end a hidden
     // app without a word.
@@ -135,6 +146,7 @@ class _SessionHostState extends State<SessionHost> {
   void dispose() {
     _lifecycle.dispose();
     _readAloud.dispose();
+    _apps.dispose();
     _memory.dispose();
     _system.dispose();
     _files.dispose();
@@ -175,6 +187,7 @@ class _SessionHostState extends State<SessionHost> {
         files: _files,
         system: _system,
         memory: _memory,
+        apps: _apps,
         launch: widget.launch,
         save: saveWithPicker,
         scanner: cameraScanner,
@@ -183,6 +196,7 @@ class _SessionHostState extends State<SessionHost> {
         dictation: _dictation,
         photos: _photos,
         readAloud: _readAloud,
+        appView: const AppWebViews(),
         canSpellcheck: WidgetsBinding
             .instance
             .platformDispatcher

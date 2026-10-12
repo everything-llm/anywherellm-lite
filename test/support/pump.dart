@@ -1,6 +1,7 @@
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/ui/app.dart';
 import 'package:anywherellm/ui/app_scope.dart';
+import 'package:anywherellm/ui/apps/app_screen.dart';
 import 'package:anywherellm/ui/chat/composer.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:anywherellm/ui/chat/dictation.dart';
@@ -19,6 +20,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_api.dart';
+import 'fake_apps.dart';
 import 'fake_settings.dart';
 import 'rig.dart';
 
@@ -108,13 +110,26 @@ class FakeSpeaker implements Speaker {
   }
 }
 
+/// An [AppView] that draws an app's page as the text `Web view of <page>`.
+class FakeAppView implements AppView {
+  final List<Uri> shown = [];
+
+  @override
+  Widget show(Uri page, {required void Function(Uri url) onLeave}) {
+    shown.add(page);
+    return Center(child: Text('Web view of $page'));
+  }
+}
+
 /// The controllers a test can read and drive, and the app built on them.
 class Harness extends Rig {
   Harness({
     super.llm,
     super.store,
     super.prefsStore,
+    super.appsServer,
     super.connection,
+    bool canViewApps = false,
     this.canScan = false,
     bool canDictate = false,
     bool canPickPhotos = false,
@@ -125,9 +140,13 @@ class Harness extends Rig {
   }) : dictation = canDictate ? FakeDictation() : null,
        photos = canPickPhotos ? FakePhotos() : null,
        speaker = canSpeak ? FakeSpeaker() : null,
+       appView = canViewApps ? FakeAppView() : null,
        shell = ShellController();
 
   final ShellController shell;
+
+  /// The device's web view for an app's page, or null where there is none.
+  final FakeAppView? appView;
 
   /// Whether the message box may spellcheck, as on Android.
   final bool canSpellcheck;
@@ -201,6 +220,8 @@ class Harness extends Rig {
       files: files,
       system: system,
       memory: memory,
+      apps: apps,
+      appView: appView,
       launch: (url) async {
         opened.add(url);
         if (openThrows case final error?) throw error;
@@ -237,13 +258,17 @@ const phoneSize = Size(390, 844);
 /// Sizes the test window, builds the app on [llm] and lets the first loads finish. With no
 /// [connection], no server is set up. With [canScan], Settings offers a fake QR scanner, with
 /// [canDictate] the composer a microphone, with [canPickPhotos] the Attach sheet the device's
-/// photos and camera, and with [canSpeak] each answer Read aloud. The window is a phone's,
+/// photos and camera, and with [canSpeak] each answer Read aloud. [appsServer] is the apps
+/// server beside it, absent unless given present, and [canViewApps] draws an app's page with a
+/// [FakeAppView]. The window is a phone's,
 /// [phoneSize], unless [size] says otherwise. The chat shows full screen, as after a chat is
 /// tapped on the Chats tab, unless [onChat] is false, which leaves the home showing.
 Future<Harness> pumpApp(
   WidgetTester tester, {
   FakeAnythingLlm? llm,
   FakePrefsStore? prefsStore,
+  FakeApps? appsServer,
+  bool canViewApps = false,
   Connection? connection = sampleConnection,
   Size size = phoneSize,
   bool canScan = false,
@@ -261,6 +286,8 @@ Future<Harness> pumpApp(
   final harness = Harness(
     llm: llm,
     prefsStore: prefsStore,
+    appsServer: appsServer,
+    canViewApps: canViewApps,
     connection: connection,
     canScan: canScan,
     canShare: canShare,

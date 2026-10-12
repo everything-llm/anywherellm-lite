@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../../core/apps.dart';
 import '../../core/chat.dart';
 import '../../core/ports.dart';
 import '../app_scope.dart';
@@ -16,6 +17,10 @@ import '../widgets/tappable.dart';
 /// description says whether the image was not loaded or failed to load, and why it failed. It
 /// opens the image's address when tapped, unless the image is [linked], where the link around
 /// it takes the tap.
+///
+/// An app's card from the apps server ([appCardRef]) is read as one picture, in the app's
+/// theme, afresh each time its chat shows again and when the app changes; tapped, it opens the
+/// app where the apps server is there.
 class AnswerImage extends StatefulWidget {
   const AnswerImage(
     this.uri, {
@@ -53,6 +58,9 @@ class AnswerImage extends StatefulWidget {
 
   bool get loadable => loadableImage(uri, server);
 
+  /// The app whose card this is, or null.
+  AppRef? get app => appCardRef(uri, server);
+
   @override
   State<AnswerImage> createState() => _AnswerImageState();
 }
@@ -63,6 +71,28 @@ class _AnswerImageState extends State<AnswerImage> {
 
   /// The image's bytes when they were already read as it was built.
   Uint8List? _now;
+
+  /// An app card's last picture, kept while it is read again.
+  Uint8List? _card;
+
+  /// Whether the card's chat showed when the card was last built, so it is read afresh when
+  /// the chat shows again.
+  bool _shown = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final shown = TickerMode.valuesOf(context).enabled;
+    if (shown && !_shown && widget.app != null) {
+      // The chat shows again, so the card shows the app as it is now.
+      AppScope.of(context).apps.card(
+        widget.uri,
+        light: Theme.of(context).brightness == Brightness.light,
+        fresh: true,
+      );
+    }
+    _shown = shown;
+  }
 
   @override
   void initState() {
@@ -79,10 +109,10 @@ class _AnswerImageState extends State<AnswerImage> {
 
   void _read() {
     final chat = AppScope.of(context).chat;
-    _now = widget.loadable ? chat.imageNow(widget.uri) : null;
-    _bytes = widget.loadable && _now == null
-        ? chat.imageBytes(widget.uri)
-        : null;
+    // An app's card is read through the apps server, in build.
+    final plain = widget.loadable && widget.app == null;
+    _now = plain ? chat.imageNow(widget.uri) : null;
+    _bytes = plain && _now == null ? chat.imageBytes(widget.uri) : null;
   }
 
   /// The image's description, drawn as a link: the host it is not loaded from, or that it did
@@ -155,8 +185,44 @@ class _AnswerImageState extends State<AnswerImage> {
     );
   }
 
+  /// An app's card: its picture read once, kept while it is read again, and tapped, its app.
+  Widget _appCard(BuildContext context, AppRef app) {
+    final scope = AppScope.of(context);
+    final light = Theme.of(context).brightness == Brightness.light;
+    return ListenableBuilder(
+      listenable: scope.apps,
+      builder: (context, _) => FutureBuilder<Uint8List>(
+        future: scope.apps.card(widget.uri, light: light),
+        builder: (context, snapshot) {
+          if (snapshot.data case final frame?) _card = frame;
+          final frame = _card;
+          if (frame == null) {
+            if (snapshot.hasError) {
+              final error = snapshot.error;
+              return _unloaded(
+                context,
+                failure: error is ApiException ? error.message : '$error',
+              );
+            }
+            return SizedBox(height: widget.fit == BoxFit.contain ? 120 : null);
+          }
+          final picture = _image(context, frame);
+          if (widget.linked || scope.apps.available != true) return picture;
+          return Tappable(
+            label: 'Open ${widget.alt ?? app.name}',
+            onTap: () => scope.shell.openApp(app),
+            child: picture,
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.app case final app? when widget.loadable) {
+      return _appCard(context, app);
+    }
     final now = _now;
     if (now != null) return _image(context, now);
     final bytes = _bytes;

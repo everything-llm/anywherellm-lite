@@ -44,7 +44,7 @@ class WorkspaceSwitcher extends StatelessWidget {
           onClose: () => shell.closePopup(Popup.workspaces),
           title: 'Workspaces',
           sheet: (context) => SingleChildScrollView(
-            child: _WorkspaceMenu(
+            child: WorkspaceMenu(
               onCreate: () => shell.togglePopup(WorkspaceSheet.create),
             ),
           ),
@@ -84,8 +84,8 @@ class WorkspaceSwitcher extends StatelessWidget {
 /// The Workspaces sheet: the workspaces in one card, each with how many documents it has, to
 /// open one or press and hold to drag it to another place, and New workspace in another. The
 /// rest is in the workspace's settings.
-class _WorkspaceMenu extends StatelessWidget {
-  const _WorkspaceMenu({required this.onCreate});
+class WorkspaceMenu extends StatelessWidget {
+  const WorkspaceMenu({super.key, required this.onCreate});
 
   final VoidCallback onCreate;
 

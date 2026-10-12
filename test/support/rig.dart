@@ -1,4 +1,5 @@
 import 'package:anywherellm/core/connection.dart';
+import 'package:anywherellm/ui/state/apps_controller.dart';
 import 'package:anywherellm/ui/state/chat_controller.dart';
 import 'package:anywherellm/ui/state/files_controller.dart';
 import 'package:anywherellm/ui/state/prefs_controller.dart';
@@ -7,6 +8,7 @@ import 'package:anywherellm/ui/state/sources_controller.dart';
 import 'package:anywherellm/ui/state/system_controller.dart';
 
 import 'fake_api.dart';
+import 'fake_apps.dart';
 import 'fake_settings.dart';
 
 /// A [FakeAnythingLlm] with the app's controllers over it. [connection] is in use from the
@@ -16,8 +18,10 @@ class Rig {
     FakeAnythingLlm? llm,
     FakeSettingsStore? store,
     FakePrefsStore? prefsStore,
+    FakeApps? appsServer,
     Connection? connection,
   }) : llm = llm ?? FakeAnythingLlm(),
+       appsServer = appsServer ?? FakeApps(),
        store = store ?? FakeSettingsStore(),
        prefsStore = prefsStore ?? FakePrefsStore() {
     settings = SettingsController(
@@ -30,9 +34,13 @@ class Rig {
     sources = SourcesController(this.llm, chat, prefs);
     files = FilesController(this.llm, settings, chat, sources);
     system = SystemController(this.llm, settings);
+    apps = AppsController(this.appsServer, settings, chat);
   }
 
   final FakeAnythingLlm llm;
+
+  /// The apps server beside the fake AnythingLLM, absent unless a test makes it present.
+  final FakeApps appsServer;
   final FakeSettingsStore store;
   final FakePrefsStore prefsStore;
   late final SettingsController settings;
@@ -41,6 +49,7 @@ class Rig {
   late final SourcesController sources;
   late final FilesController files;
   late final SystemController system;
+  late final AppsController apps;
 
   /// Reads the prefs and the workspaces, as the app does at start.
   Future<void> start() async {
@@ -50,6 +59,7 @@ class Rig {
   }
 
   void dispose() {
+    apps.dispose();
     system.dispose();
     files.dispose();
     sources.dispose();
