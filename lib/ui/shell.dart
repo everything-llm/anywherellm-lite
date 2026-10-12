@@ -13,6 +13,7 @@ import 'chat/chat_view.dart';
 import 'chat/cited_sources.dart';
 import 'chat/gallery.dart';
 import 'chat_sheet.dart';
+import 'created_text.dart';
 import 'chat/passages_sheet.dart';
 import 'files/files_view.dart';
 import 'files/workspace_pages.dart';
@@ -91,6 +92,13 @@ class AppShell extends StatelessWidget {
       if (shell.shared != null) return shell.closeShared;
       if (shell.popup.value != null) return shell.closePopup;
       if (shell.scanning) return () => shell.setScanning(false);
+      // An app opened from a phone page sits over it and closes first.
+      if (phone && shell.appOpen && shell.phonePage != null) {
+        return shell.closeApp;
+      }
+      if (shell.createdText != null && shell.phonePage != null) {
+        return shell.closeCreatedText;
+      }
       if (shell.phonePage != null && !shell.settingsOpen) {
         return shell.closePhonePage;
       }
@@ -263,8 +271,10 @@ class AppShell extends StatelessWidget {
                                 duration: duration,
                                 child: right,
                               ),
-                            // The sheet's own scrim closes it.
-                            if (sheetOpen) Positioned.fill(child: right),
+                            // The sheet's own scrim closes it. Opened from a phone page, it
+                            // sits over that page.
+                            if (sheetOpen && shell.phonePage == null)
+                              Positioned.fill(child: right),
                             // A phone puts back a deleted chat from over the chat, as its
                             // drawer has closed.
                             if (screen.isPhone && !shell.settingsOpen)
@@ -277,6 +287,13 @@ class AppShell extends StatelessWidget {
                                   PhonePage.activity => const ActivityPage(),
                                 },
                               ),
+                            if (shell.createdText case final file?
+                                when shell.phonePage != null)
+                              Positioned.fill(
+                                child: CreatedText(file, key: ObjectKey(file)),
+                              ),
+                            if (sheetOpen && shell.phonePage != null)
+                              Positioned.fill(child: right),
                             // A phone's Settings is a page over the window.
                             if (shell.settingsOpen && screen.isPhone)
                               const Positioned.fill(

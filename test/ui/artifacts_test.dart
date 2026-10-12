@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:anywherellm/core/created.dart';
 import 'package:anywherellm/ui/artifacts.dart';
+import 'package:anywherellm/ui/created_text.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,6 +30,15 @@ final _page = CreatedFile(
   modified: DateTime.now().subtract(const Duration(days: 1)),
   area: CreatedArea.public,
   url: 'https://host.example.ts.net:8447/q3/costs/index.html',
+);
+
+final _notes = CreatedFile(
+  id: 'project/notes.md',
+  name: 'notes.md',
+  dir: '',
+  size: 40,
+  modified: DateTime.now().subtract(const Duration(minutes: 2)),
+  area: CreatedArea.project,
 );
 
 final _kept = CreatedFile(
@@ -101,6 +113,41 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(h.shell.phonePage, isNull);
+  });
+
+  testWidgets('a Markdown file opens its text, and Back gives the list back', (
+    tester,
+  ) async {
+    final h = await _phone(tester, [_notes, _kept]);
+    h.llm.createdBytes[_notes.id] = utf8.encode('# Plan\n\n- **one** step');
+    h.shell.openPhonePage(PhonePage.artifacts);
+    await tester.pumpAndSettle();
+    await tester.tap(inPage(find.text('notes.md')));
+    await tester.pumpAndSettle();
+    expect(h.shell.popup.value, isNull);
+    expect(find.byType(CreatedText), findsOneWidget);
+    expect(find.text('Plan'), findsOneWidget);
+    expect(find.textContaining('one'), findsWidgets);
+    expect(find.textContaining('#'), findsNothing);
+    await tester.tap(find.byTooltip('Download notes.md'));
+    await tester.pumpAndSettle();
+    expect(h.saved.keys, contains('notes.md'));
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(CreatedText), findsNothing);
+    expect(h.shell.phonePage, PhonePage.artifacts);
+    // Its More still opens the sheet, which has Read.
+    await tester.tap(find.byTooltip('Download, keep or delete notes.md'));
+    await tester.pumpAndSettle();
+    await tester.tap(control('Read'));
+    await tester.pumpAndSettle();
+    expect(find.byType(CreatedText), findsOneWidget);
+    // Any other file still opens its sheet.
+    await tester.tap(find.byTooltip('Back to Artifacts'));
+    await tester.pumpAndSettle();
+    await _openSheet(tester, 'report.pdf');
+    expect(control('Read'), findsNothing);
+    expect(control('Download'), findsOneWidget);
   });
 
   testWidgets('a file\'s sheet offers only what fits it', (tester) async {
@@ -182,7 +229,7 @@ void main() {
   });
 
   testWidgets(
-    'apps come first, counted with the files, and open as in a chat',
+    'apps come first, counted with the files, and open over the page',
     (tester) async {
       final h = await _phone(tester, [_kept], apps: [_groceries]);
       h.shell.toggleSide();
@@ -194,9 +241,21 @@ void main() {
       expect(inPage(find.text('List · 4 of 6 left')), findsOneWidget);
       await tester.tap(inPage(find.text('Groceries')));
       await tester.pumpAndSettle();
-      expect(h.shell.phonePage, isNull);
+      expect(h.shell.phonePage, PhonePage.artifacts);
+      expect(h.shell.appOpen, isTrue);
       expect(h.shell.app?.name, 'Groceries');
       expect(h.shell.app?.page, _groceries.link);
+      // Close, and then Back, give back the page rather than the chat.
+      await tester.tap(find.byTooltip('Close').last);
+      await tester.pumpAndSettle();
+      expect(h.shell.appOpen, isFalse);
+      expect(h.shell.phonePage, PhonePage.artifacts);
+      await tester.tap(inPage(find.text('Groceries')));
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(h.shell.appOpen, isFalse);
+      expect(h.shell.phonePage, PhonePage.artifacts);
     },
   );
 

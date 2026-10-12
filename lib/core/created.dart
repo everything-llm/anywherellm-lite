@@ -68,6 +68,11 @@ class CreatedFile extends Created {
 
   static final _page = RegExp(r'\.html?$', caseSensitive: false);
 
+  /// Whether the file is Markdown, which a phone's Artifacts shows as text.
+  bool get isMarkdown => _markdown.hasMatch(name);
+
+  static final _markdown = RegExp(r'\.(md|markdown)$', caseSensitive: false);
+
   /// Whether the browser downloaded the file: the host keeps its downloads in `project/downloads`.
   bool get fromBrowser =>
       area == CreatedArea.project &&

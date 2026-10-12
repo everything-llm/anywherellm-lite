@@ -322,13 +322,13 @@ class _AppRow extends StatelessWidget {
 /// Whether [app] can open in the app's own sheet: it needs its live card and the card's link.
 bool _canOpen(CreatedApp app) => app.card != null && app.link != null;
 
-/// Opens [app] as its card in a chat does, in place of the Artifacts page.
+/// Opens [app] as its card in a chat does, over the Artifacts page, which its Close gives
+/// back.
 void _open(AppScope scope, CreatedApp app) {
   final slug = scope.chat.activeSlug;
   if (slug == null) return;
   scope.shell
     ..closePopup()
-    ..closePhonePage()
     ..showApp((
       card: app.card!,
       page: app.link!,
@@ -338,7 +338,8 @@ void _open(AppScope scope, CreatedApp app) {
 }
 
 /// One file: its name over [createdMeta] and its mark, when it has one, and a More icon. The
-/// whole row opens its [CreatedSheet].
+/// whole row opens its [CreatedSheet], or a Markdown file's text, when More is a button that
+/// opens the sheet.
 class _FileRow extends StatelessWidget {
   const _FileRow(
     this.file, {
@@ -359,18 +360,25 @@ class _FileRow extends StatelessWidget {
     final t = Tokens.of(context);
     final mark = createdMark(file, now);
     final meta = createdMeta(file, now, address: false);
+    final reads = file.isMarkdown;
     return Tappable(
       label: [
         file.name,
         meta,
         ?mark,
         if (working) 'working',
-        'Download',
-        if (file.isPage) 'open page',
-        if (file.area == CreatedArea.work) 'keep',
-        'or delete',
+        if (reads) 'opens its text' else 'Download',
+        if (!reads) ...[
+          if (file.isPage) 'open page',
+          if (file.area == CreatedArea.work) 'keep',
+          'or delete',
+        ],
       ].join(', '),
-      onTap: working ? null : () => shell.openCreatedSheet(file),
+      onTap: working
+          ? null
+          : reads
+          ? () => shell.showCreatedText(file)
+          : () => shell.openCreatedSheet(file),
       child: Container(
         constraints: const BoxConstraints(minHeight: 64),
         padding: const EdgeInsets.only(left: FieldCard.inset, right: 8),
@@ -418,12 +426,21 @@ class _FileRow extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox.square(
-              dimension: 44,
-              child: Center(
-                child: AppIcon('more', size: IconSize.small, color: t.muted),
+            if (reads)
+              IconBtn(
+                'more',
+                tooltip: 'Download, keep or delete ${file.name}',
+                box: 44,
+                size: IconSize.small,
+                onPressed: working ? null : () => shell.openCreatedSheet(file),
+              )
+            else
+              SizedBox.square(
+                dimension: 44,
+                child: Center(
+                  child: AppIcon('more', size: IconSize.small, color: t.muted),
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -431,9 +448,9 @@ class _FileRow extends StatelessWidget {
   }
 }
 
-/// A phone's sheet for one created file or app, over the window. A file's: Download, Open page
-/// for a page on the web, Keep for a working file, and Delete file. An app's: Open, Open in the
-/// browser and Delete app. Either delete asks first.
+/// A phone's sheet for one created file or app, over the window. A file's: Read for a Markdown
+/// file, Download, Open page for a page on the web, Keep for a working file, and Delete file. An
+/// app's: Open, Open in the browser and Delete app. Either delete asks first.
 class CreatedSheet extends StatelessWidget {
   const CreatedSheet(this.of, {super.key});
 
@@ -484,6 +501,12 @@ class CreatedSheet extends StatelessWidget {
     final scope = AppScope.of(context);
     final shell = scope.shell;
     return [
+      if (file.isMarkdown)
+        CardRow(
+          'Read',
+          icon: 'doc',
+          onTap: () => shell.showCreatedText(file),
+        ),
       CardRow(
         'Download',
         icon: 'download',
