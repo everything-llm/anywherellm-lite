@@ -9,7 +9,6 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 | Users and invites | `/v1/admin/*`. They matter only in multi-user mode. |
 | Generate or edit an image | `POST /v1/openai/images/generations`, multipart with `prompt`, optional `size` and optional `image_references` to edit. It answers a base64 PNG, and only when the server has an image provider set up. |
 | Chats that are in no chat thread | `GET /v1/workspace/{slug}/chats` answers `history`: the chats sent outside any thread, such as the web UI's default workspace chat. Every workspace on the server checked on 2026-10-06 answered an empty list, so this waits until someone uses the default chat. |
-| Large libraries a page at a time | `GET /v1/documents/folder/{name}` with `offset` and `limit`. The library is read in one call today. |
 | Settings when a workspace is made | `POST /v1/workspace/new` takes `similarityThreshold`, `openAiTemp`, `openAiHistory`, `openAiPrompt`, `queryRefusalResponse` and `topN`. Today they are set afterwards in `settings.json`. |
 
 ## Needs a check against a live server
@@ -22,7 +21,6 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 | Signing in makes one key | Built against AnythingLLM v1.16.2's source and tested with fakes only. Sign in with the address and password on the home server, then check that the web UI's Developer API page lists one key named `AnywhereLLM` and that the workspaces load. It writes one key to the server. |
 | Signing in again reuses the key | Forget the connection and sign in again, and sign in on a second device: the Developer API page must still list one `AnywhereLLM` key. Then delete it there and check that every device fails with the key refused and signs in again with a new one. |
 | A server with no password | Signing in with the address alone needs a server without a password; none has been tried. |
-| Closing the window during a chat's undo | Delete a chat and close the Linux window within 6 s: the chat must be gone from the server. It relies on Flutter handing the window's close to `AppLifecycleListener.onExitRequested`, which tests cannot show. |
 
 ## Local, no server needed
 
@@ -31,14 +29,6 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 | Send a dictated message on its own | The web UI's auto-submit speech. Dictation fills the message and waits for Send. |
 | Read every answer aloud as it arrives | The web UI's auto-speak. Read aloud is a button on each answer, on Android only. |
 | Spellcheck, auto-scroll and HTML in answers | The web UI's Customization > Chat preferences. Each is a local setting. |
-
-## Needs a new dependency
-
-| Gap | What it needs |
-| --- | --- |
-| A microphone on Linux | `speech_to_text` has no Linux implementation, so only Android has one. Linux needs another recogniser. |
-| Read aloud on Linux | `flutter_tts` has no Linux implementation. Linux needs another speech engine, such as speech-dispatcher. |
-| Dropping files onto the chat to attach them | `desktop_drop` is already in use for Sources. Decide whether a drop on the chat attaches or adds a source. |
 
 ## Needs the private session API
 
