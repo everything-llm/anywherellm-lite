@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -60,7 +62,13 @@ class _AppWebViewState extends State<_AppWebView> {
   Widget build(BuildContext context) => Stack(
     fit: StackFit.expand,
     children: [
-      WebViewWidget(controller: _web),
+      // The page takes every touch on it at once. Without this the app's SelectionArea joins
+      // each gesture's arena: the page then gets a scroll only after the selection's drag gives
+      // up, a sideways drag or a hold never, and nothing while the arena is undecided.
+      WebViewWidget(
+        controller: _web,
+        gestureRecognizers: {Factory(EagerGestureRecognizer.new)},
+      ),
       if (!_loaded)
         ColoredBox(
           color: Theme.of(context).canvasColor,
