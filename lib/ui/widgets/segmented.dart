@@ -49,7 +49,7 @@ class Segmented<T> extends StatelessWidget {
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
           color: t.hover,
-          borderRadius: BorderRadius.circular(Sizes.phoneControl),
+          borderRadius: BorderRadius.circular(Sizes.control),
         ),
         child: _rows([
           for (final (option, label) in options)

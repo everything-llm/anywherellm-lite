@@ -44,7 +44,7 @@ class SlashMenu extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: t.panel,
-          borderRadius: BorderRadius.circular(Sizes.phoneCard),
+          borderRadius: BorderRadius.circular(Sizes.card),
           border: Border.all(color: t.line2),
           boxShadow: [
             BoxShadow(

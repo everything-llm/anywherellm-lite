@@ -144,12 +144,12 @@ class _HitState extends State<_Hit> {
         setState(() => _whole = !_whole);
         AppScope.of(context).sources.flash(hit.title);
       },
-      radius: BorderRadius.circular(Sizes.control),
+      radius: BorderRadius.circular(Sizes.small),
       child: Container(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         decoration: BoxDecoration(
           color: t.panel,
-          borderRadius: BorderRadius.circular(Sizes.control),
+          borderRadius: BorderRadius.circular(Sizes.small),
           border: Border.all(color: t.line2),
         ),
         child: Column(

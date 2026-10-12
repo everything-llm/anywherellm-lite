@@ -53,7 +53,7 @@ class AlertBox extends StatelessWidget {
         decoration: BoxDecoration(
           color: fill,
           border: border,
-          borderRadius: BorderRadius.circular(Sizes.card),
+          borderRadius: BorderRadius.circular(Sizes.notice),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -132,7 +132,9 @@ class UndoBar extends StatelessWidget {
             : const EdgeInsets.fromLTRB(12, 4, 4, 4),
         decoration: BoxDecoration(
           color: t.ink,
-          borderRadius: BorderRadius.circular(floating ? 16 : Sizes.control),
+          borderRadius: BorderRadius.circular(
+            floating ? Sizes.control : Sizes.small,
+          ),
           boxShadow: floating
               ? [
                   BoxShadow(

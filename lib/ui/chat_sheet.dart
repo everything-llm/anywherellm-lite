@@ -97,11 +97,10 @@ class _ChatSheetState extends State<ChatSheet> {
                   onSubmitted: (_) => _save(),
                 ),
               ),
-              FieldCard(inSheet: true, [
+              FieldCard([
                 FieldRow(
                   label: 'Pin to the top',
                   small: true,
-                  inSheet: true,
                   control: AppSwitch(
                     value: pinned,
                     label: 'Pin to the top',
@@ -111,7 +110,7 @@ class _ChatSheetState extends State<ChatSheet> {
                   ),
                 ),
               ]),
-              FieldCard(inSheet: true, [
+              FieldCard([
                 CardRow(
                   'Delete chat',
                   icon: 'trash',

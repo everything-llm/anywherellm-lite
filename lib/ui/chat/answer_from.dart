@@ -212,7 +212,7 @@ class _Sheet extends StatelessWidget {
               style: Type.sans(13, color: t.muted, height: 1.4),
             ),
           ),
-          FieldCard(inSheet: true, [
+          FieldCard([
             NavRow(
               title: 'Chat model',
               about: workspaceModel(scope),

@@ -6,13 +6,14 @@ import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/fields.dart';
+import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
 
 /// A card's ground: [Tokens.panel], or [Tokens.bg] for a card in a sheet ([inSheet]), with
 /// the rounded [Tokens.line2] edge every card has.
 BoxDecoration cardDecoration(Tokens t, {bool inSheet = false}) => BoxDecoration(
   color: inSheet ? t.bg : t.panel,
-  borderRadius: BorderRadius.circular(Sizes.phoneCard),
+  borderRadius: BorderRadius.circular(Sizes.card),
   border: Border.all(color: t.line2),
 );
 
@@ -39,12 +40,11 @@ class PanelCard extends StatelessWidget {
 
 /// A rounded panel of [rows], a hairline between each, as a grouped card: its edge is
 /// [Tokens.line2] and its hairlines stop [inset] short of its sides, where its rows keep their
-/// text. [inSheet] fills it with [Tokens.bg], as a card in a sheet is.
+/// text. In a [SheetFrame] it is filled with [Tokens.bg], as a card in a sheet is.
 class FieldCard extends StatelessWidget {
-  const FieldCard(this.rows, {super.key, this.inSheet = false});
+  const FieldCard(this.rows, {super.key});
 
   final List<Widget> rows;
-  final bool inSheet;
 
   /// How far the rows keep their text from the card's sides.
   static const inset = 20.0;
@@ -54,7 +54,7 @@ class FieldCard extends StatelessWidget {
     final t = Tokens.of(context);
     return Container(
       clipBehavior: Clip.antiAlias,
-      decoration: cardDecoration(t, inSheet: inSheet),
+      decoration: cardDecoration(t, inSheet: SheetFrame.holds(context)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -91,20 +91,21 @@ class SliverFieldCard extends StatelessWidget {
     required this.count,
     required this.row,
     this.keyOf,
-    this.inSheet = false,
   });
 
   final int count;
   final IndexedWidgetBuilder row;
   final Key Function(int i)? keyOf;
-  final bool inSheet;
 
   @override
   Widget build(BuildContext context) {
-    const corner = Radius.circular(Sizes.phoneCard - 1);
+    const corner = Radius.circular(Sizes.card - 1);
     final keyOf = this.keyOf;
     return DecoratedSliver(
-      decoration: cardDecoration(Tokens.of(context), inSheet: inSheet),
+      decoration: cardDecoration(
+        Tokens.of(context),
+        inSheet: SheetFrame.holds(context),
+      ),
       sliver: SliverPadding(
         // Inside the edge, as a [FieldCard]'s rows are.
         padding: const EdgeInsets.all(1),
@@ -163,16 +164,12 @@ class FieldRow extends StatelessWidget {
     this.help = '',
     this.small = false,
     this.tag,
-    this.inSheet = false,
   });
 
   final String label;
   final String help;
   final Widget control;
   final bool small;
-
-  /// Whether it is a row of a sheet's card, 64 tall rather than a page's.
-  final bool inSheet;
 
   /// A badge beside the label, such as Recommended.
   final Widget? tag;
@@ -183,6 +180,8 @@ class FieldRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    // A row of a sheet's card is 64 tall rather than a page's.
+    final inSheet = SheetFrame.holds(context);
     final about = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -208,10 +207,10 @@ class FieldRow extends StatelessWidget {
     return ConstrainedBox(
       constraints: BoxConstraints(
         minHeight: inSheet
-            ? 64
+            ? Sizes.cardRow
             : small
-            ? 88
-            : 68,
+            ? Sizes.infoRow
+            : Sizes.navRow,
       ),
       child: Padding(
         padding: EdgeInsets.symmetric(
@@ -319,7 +318,7 @@ class InfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return Container(
-      constraints: const BoxConstraints(minHeight: 88),
+      constraints: const BoxConstraints(minHeight: Sizes.infoRow),
       padding: const EdgeInsets.symmetric(
         horizontal: FieldCard.inset,
         vertical: 10,
@@ -444,7 +443,7 @@ class PageWarning extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: t.warnbg,
-        borderRadius: BorderRadius.circular(Sizes.phoneCard),
+        borderRadius: BorderRadius.circular(Sizes.card),
       ),
       child: Text(text, style: Type.sans(14, color: t.warnfg, height: 1.5)),
     );
@@ -513,7 +512,7 @@ class CardRow extends StatelessWidget {
     this.trailing,
     this.tone = RowTone.plain,
     this.strong = false,
-    this.height = 64,
+    this.height = Sizes.cardRow,
     this.large = false,
     this.checked,
     this.heard,
@@ -553,7 +552,7 @@ class CardRow extends StatelessWidget {
       onTap: onTap,
       dimWhenDisabled: 0.5,
       child: Container(
-        constraints: BoxConstraints(minHeight: large ? 68 : height),
+        constraints: BoxConstraints(minHeight: large ? Sizes.navRow : height),
         padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
         child: Row(
           spacing: large ? 16 : 14,
@@ -695,7 +694,7 @@ class CardNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    constraints: const BoxConstraints(minHeight: 64),
+    constraints: const BoxConstraints(minHeight: Sizes.cardRow),
     padding: const EdgeInsets.symmetric(
       horizontal: FieldCard.inset,
       vertical: 12,

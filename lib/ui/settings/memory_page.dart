@@ -4,6 +4,7 @@ import '../../core/memory.dart';
 import '../app_scope.dart';
 import '../icons.dart';
 import '../state/memory_controller.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
@@ -221,7 +222,7 @@ class _WorkspaceChoice extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       spacing: 16,
       children: [
-        FieldCard(inSheet: true, [
+        FieldCard([
           for (final MapEntry(key: each, value: name) in names.entries)
             CardRow(
               name,
@@ -267,7 +268,7 @@ class _Item extends StatelessWidget {
       label: heard ?? text,
       onTap: onTap,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 64),
+        constraints: const BoxConstraints(minHeight: Sizes.cardRow),
         padding: const EdgeInsets.symmetric(
           horizontal: FieldCard.inset,
           vertical: 12,

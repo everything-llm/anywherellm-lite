@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/chat.dart';
 import '../icons.dart';
 import '../settings/rows.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';
@@ -38,10 +39,10 @@ class AttachSheet extends StatelessWidget {
         spacing: 16,
         children: [
           if (attached.isNotEmpty)
-            FieldCard(inSheet: true, [
+            FieldCard([
               for (final a in attached)
                 Container(
-                  constraints: const BoxConstraints(minHeight: 64),
+                  constraints: const BoxConstraints(minHeight: Sizes.cardRow),
                   padding: const EdgeInsets.only(
                     left: FieldCard.inset,
                     right: 8,
@@ -67,7 +68,7 @@ class AttachSheet extends StatelessWidget {
                   ),
                 ),
             ]),
-          FieldCard(inSheet: true, [
+          FieldCard([
             if (onPhotos case final onPhotos?)
               CardRow('Photo library', onTap: onPhotos, trailing: plus),
             if (onCamera case final onCamera?)

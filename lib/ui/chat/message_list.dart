@@ -605,17 +605,9 @@ class _AnswerState extends State<_Answer> {
                 : null,
           ),
         ],
-        // The citations' line is 44 tall around its chips, as the design canvas draws it.
         if (!turn.streaming && turn.citations.isNotEmpty) ...[
           const SizedBox(height: 8),
-          ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 44),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              heightFactor: 1,
-              child: _Citations(turn.citations),
-            ),
-          ),
+          _Citations(turn.citations),
         ],
         if (!turn.streaming && turn.files.isNotEmpty) ...[
           const SizedBox(height: 12),
@@ -745,21 +737,29 @@ class _Citations extends StatelessWidget {
       listenable: shell,
       builder: (context, _) {
         final open = shell.citedOpen && identical(shell.cited, citations);
-        return ClipRect(
-          child: Row(
-            spacing: 6,
-            children: [
-              for (final (i, citation) in named.indexed)
-                Flexible(
-                  child: _Citation(number: i + 1, citation: citation),
-                ),
-              if (folded)
-                _MoreSources(
-                  citations.length - shown,
-                  open: open,
-                  onTap: () => shell.toggleCited(citations),
-                ),
-            ],
+        // The line is 44 tall around its chips, as the design canvas draws it.
+        return ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            heightFactor: 1,
+            child: ClipRect(
+              child: Row(
+                spacing: 6,
+                children: [
+                  for (final (i, citation) in named.indexed)
+                    Flexible(
+                      child: _Citation(number: i + 1, citation: citation),
+                    ),
+                  if (folded)
+                    _MoreSources(
+                      citations.length - shown,
+                      open: open,
+                      onTap: () => shell.toggleCited(citations),
+                    ),
+                ],
+              ),
+            ),
           ),
         );
       },

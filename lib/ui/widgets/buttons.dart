@@ -43,7 +43,7 @@ class AppButton extends StatelessWidget {
     return Tappable(
       label: label,
       onTap: onPressed,
-      radius: BorderRadius.circular(Sizes.phoneControl),
+      radius: BorderRadius.circular(Sizes.control),
       color: primary ? t.accent : t.panel,
       side: BorderSide(color: primary ? t.accent : t.line),
       hoverColor: primary ? t.onaccent.withValues(alpha: 0.1) : null,

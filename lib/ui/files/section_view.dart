@@ -87,13 +87,13 @@ class _EditorState extends State<_Editor> {
                 textAlignVertical: TextAlignVertical.top,
                 autocorrect: false,
                 enableSuggestions: false,
-                style: Type.sans(15.5, color: t.ink, height: 1.5),
+                style: Type.textArea(15.5, t.ink),
                 cursorColor: t.accent,
                 decoration: editorDecoration(context, t.panel).copyWith(
                   // An empty prompt says what applies instead.
                   hintText:
                       'Empty: the server\'s default system prompt applies.',
-                  hintStyle: Type.sans(15.5, color: t.muted, height: 1.5),
+                  hintStyle: Type.textArea(15.5, t.muted),
                 ),
               ),
             ),

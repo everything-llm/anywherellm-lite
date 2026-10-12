@@ -5,6 +5,7 @@ import '../../core/server_models.dart';
 import '../app_scope.dart';
 import '../links.dart';
 import '../settings/rows.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/sheet.dart';
@@ -53,7 +54,7 @@ class CitedSources extends StatelessWidget {
             style: Type.note(t.muted),
           ),
         ),
-        FieldCard(inSheet: true, [
+        FieldCard([
           for (final (i, c) in citations.indexed) _CitedRow(c, number: i + 1),
         ]),
       ],
@@ -95,7 +96,7 @@ class _CitedRow extends StatelessWidget {
       label: [citation.title, ?about].join(', '),
       onTap: open,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 80),
+        constraints: const BoxConstraints(minHeight: Sizes.citedRow),
         padding: const EdgeInsets.symmetric(
           horizontal: FieldCard.inset,
           vertical: 8,

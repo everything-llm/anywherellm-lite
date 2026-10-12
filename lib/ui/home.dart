@@ -81,7 +81,7 @@ class _Tab extends StatelessWidget {
     return Tappable(
       label: label,
       selected: on,
-      radius: BorderRadius.circular(Sizes.control),
+      radius: BorderRadius.circular(Sizes.small),
       onTap: onTap,
       child: SizedBox(
         height: 56,
@@ -338,7 +338,7 @@ class _Search extends StatelessWidget {
         padding: EdgeInsets.only(left: 16, right: searching ? 4 : 16),
         decoration: BoxDecoration(
           color: t.panel,
-          borderRadius: BorderRadius.circular(Sizes.phoneControl),
+          borderRadius: BorderRadius.circular(Sizes.control),
           border: Border.all(color: focus.hasFocus ? t.ink : t.line),
         ),
         child: child,
@@ -440,7 +440,7 @@ class _ChatRow extends StatelessWidget {
                 }
               },
               child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 64),
+                constraints: const BoxConstraints(minHeight: Sizes.cardRow),
                 child: Row(
                   spacing: 8,
                   children: [

@@ -22,7 +22,7 @@ InputDecoration editorDecoration(
   EdgeInsets? padding,
 }) {
   OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
-    borderRadius: BorderRadius.circular(Sizes.phoneControl),
+    borderRadius: BorderRadius.circular(Sizes.control),
     borderSide: BorderSide(color: color, width: width),
   );
   return InputDecoration(
@@ -97,10 +97,15 @@ class AppField extends StatelessWidget {
     const size = 16.0;
     OutlineInputBorder border(Color color, [double width = 1]) =>
         OutlineInputBorder(
-          borderRadius: BorderRadius.circular(Sizes.phoneControl),
+          borderRadius: BorderRadius.circular(Sizes.control),
           borderSide: BorderSide(color: color, width: width),
           gapPadding: 0,
         );
+    // Several lines are set apart, as the design canvas sets a text area.
+    final text = Type.sans(
+      size,
+      height: maxLines > 1 ? Type.textAreaLine : null,
+    );
     return Semantics(
       label: label,
       textField: true,
@@ -122,22 +127,14 @@ class AppField extends StatelessWidget {
         enableIMEPersonalizedLearning: !obscure,
         onChanged: onChanged,
         onSubmitted: onSubmitted,
-        // Several lines are set apart, as the design canvas sets a text area.
-        style: Type.sans(
-          size,
-          height: maxLines > 1 ? 1.5 : null,
-        ).copyWith(color: t.ink),
+        style: text.copyWith(color: t.ink),
         cursorColor: t.accent,
         decoration: InputDecoration(
           isDense: true,
           filled: true,
           fillColor: fieldFill(context),
           hintText: hint,
-          hintStyle: Type.sans(
-            size,
-            color: t.muted,
-            height: maxLines > 1 ? 1.5 : null,
-          ),
+          hintStyle: text.copyWith(color: t.muted),
           prefixIcon: icon == null
               ? null
               : Center(
@@ -191,7 +188,7 @@ class AppSelect extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final radius = BorderRadius.circular(Sizes.phoneControl);
+    final radius = BorderRadius.circular(Sizes.control);
     return Container(
       height: Sizes.field,
       padding: const EdgeInsets.symmetric(horizontal: 12),

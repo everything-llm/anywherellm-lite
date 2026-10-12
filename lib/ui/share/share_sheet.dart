@@ -11,6 +11,7 @@ import '../icons.dart';
 import '../settings/rows.dart';
 import '../settings/settings_pages.dart';
 import '../state/shell_controller.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
@@ -170,9 +171,9 @@ class _ShareSheetState extends State<ShareSheet> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               spacing: 16,
               children: [
-                FieldCard(inSheet: true, [
+                FieldCard([
                   Container(
-                    constraints: const BoxConstraints(minHeight: 64),
+                    constraints: const BoxConstraints(minHeight: Sizes.cardRow),
                     padding: const EdgeInsets.symmetric(
                       horizontal: FieldCard.inset,
                       vertical: 10,
@@ -227,7 +228,7 @@ class _ShareSheetState extends State<ShareSheet> {
                         padding: EdgeInsets.symmetric(horizontal: 8),
                         child: SectionLabel('Workspace'),
                       ),
-                      FieldCard(inSheet: true, [
+                      FieldCard([
                         for (final w in workspaces)
                           _WorkspaceRow(
                             w.name,
@@ -284,7 +285,7 @@ class _WorkspaceRow extends StatelessWidget {
         onTap: onTap,
         excludeSemantics: false,
         child: Container(
-          constraints: const BoxConstraints(minHeight: 64),
+          constraints: const BoxConstraints(minHeight: Sizes.cardRow),
           padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
           child: Row(
             spacing: 14,

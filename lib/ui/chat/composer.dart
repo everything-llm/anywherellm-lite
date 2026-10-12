@@ -520,7 +520,7 @@ class _Form extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(8, 14, 8, 6),
         decoration: BoxDecoration(
           color: t.panel,
-          borderRadius: BorderRadius.circular(Sizes.phoneComposer),
+          borderRadius: BorderRadius.circular(Sizes.composer),
           border: Border.all(color: t.line2),
           boxShadow: [
             BoxShadow(
@@ -595,7 +595,7 @@ class _Form extends StatelessWidget {
                             textInputAction: TextInputAction.newline,
                             // The keyboard starts each sentence with a capital.
                             textCapitalization: TextCapitalization.sentences,
-                            style: Type.sans(15.5, color: t.ink, height: 1.5),
+                            style: Type.textArea(15.5, t.ink),
                             cursorColor: t.accent,
                             // A picture from the keyboard's clipboard; the rest goes in as text.
                             contentInsertionConfiguration:
@@ -611,11 +611,7 @@ class _Form extends StatelessWidget {
                               ),
                               border: InputBorder.none,
                               hintText: hint,
-                              hintStyle: Type.sans(
-                                15.5,
-                                color: t.muted,
-                                height: 1.5,
-                              ),
+                              hintStyle: Type.textArea(15.5, t.muted),
                             ),
                           ),
                         ),
@@ -805,7 +801,7 @@ class _SendWhenDone extends StatelessWidget {
       label: 'Send when done',
       tooltip: 'Send when done',
       onTap: onTap,
-      radius: BorderRadius.circular(Sizes.control),
+      radius: BorderRadius.circular(Sizes.small),
       color: t.accentbg,
       child: SizedBox(
         height: 34,
@@ -839,7 +835,7 @@ class _NoKey extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       decoration: BoxDecoration(
         color: t.warnbg,
-        borderRadius: BorderRadius.circular(Sizes.card),
+        borderRadius: BorderRadius.circular(Sizes.notice),
       ),
       child: Wrap(
         crossAxisAlignment: WrapCrossAlignment.center,

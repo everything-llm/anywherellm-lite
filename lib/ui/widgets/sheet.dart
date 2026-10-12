@@ -55,6 +55,10 @@ class SheetFrame extends StatefulWidget {
   /// The room left above a [SheetHeight.tall] sheet, where the chat shows through the scrim.
   static const gap = 72.0;
 
+  /// Whether [context] is inside a sheet, whose cards are filled with [Tokens.bg].
+  static bool holds(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_InSheet>() != null;
+
   @override
   State<SheetFrame> createState() => _SheetFrameState();
 }
@@ -169,7 +173,12 @@ class _SheetFrameState extends State<SheetFrame>
                 header,
                 Flexible(
                   fit: tall ? FlexFit.tight : FlexFit.loose,
-                  child: Padding(padding: widget.padding, child: widget.child),
+                  child: _InSheet(
+                    child: Padding(
+                      padding: widget.padding,
+                      child: widget.child,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -200,6 +209,14 @@ class _SheetFrameState extends State<SheetFrame>
       },
     );
   }
+}
+
+/// Marks what a [SheetFrame] holds, for [SheetFrame.holds].
+class _InSheet extends InheritedWidget {
+  const _InSheet({required super.child});
+
+  @override
+  bool updateShouldNotify(_InSheet old) => false;
 }
 
 /// A sheet's header: [title] at 19, the line [about] under it, [actions] and a 44 px Close, with

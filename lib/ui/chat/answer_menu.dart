@@ -6,6 +6,7 @@ import '../app_scope.dart';
 import '../icons.dart';
 import '../state/chat_controller.dart';
 import '../state/shell_controller.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';
@@ -130,7 +131,7 @@ class _AnswerMenu extends StatelessWidget {
         spacing: 16,
         children: [
           if (metrics != null && metrics.named.isNotEmpty)
-            FieldCard(inSheet: true, [
+            FieldCard([
               for (final (name, value) in metrics.named)
                 Container(
                   constraints: const BoxConstraints(minHeight: 52),
@@ -155,11 +156,11 @@ class _AnswerMenu extends StatelessWidget {
                 ),
             ]),
           if (rate != null)
-            FieldCard(inSheet: true, [
+            FieldCard([
               ListenableBuilder(
                 listenable: turn,
                 builder: (context, _) => Container(
-                  constraints: const BoxConstraints(minHeight: 64),
+                  constraints: const BoxConstraints(minHeight: Sizes.cardRow),
                   padding: const EdgeInsets.only(
                     left: FieldCard.inset,
                     right: 8,
@@ -187,7 +188,7 @@ class _AnswerMenu extends StatelessWidget {
               ),
             ]),
           if (metrics != null)
-            FieldCard(inSheet: true, [
+            FieldCard([
               ListenableBuilder(
                 listenable: prefs,
                 builder: (context, _) {
@@ -195,7 +196,6 @@ class _AnswerMenu extends StatelessWidget {
                   return FieldRow(
                     label: 'Show details under every answer',
                     small: true,
-                    inSheet: true,
                     control: AppSwitch(
                       value: on,
                       label: 'Show details under every answer',

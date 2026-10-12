@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../icons.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import 'buttons.dart';
@@ -144,7 +145,7 @@ class NavRow extends StatelessWidget {
       selected: selected,
       onTap: onTap,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 68),
+        constraints: const BoxConstraints(minHeight: Sizes.navRow),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         child: Row(
           children: [

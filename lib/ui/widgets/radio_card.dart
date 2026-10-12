@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import 'tappable.dart';
@@ -38,7 +39,7 @@ class RadioCard extends StatelessWidget {
       color: card ? (selected ? t.sel : t.panel) : null,
       side: card ? BorderSide(color: selected ? t.sel : t.line) : null,
       child: Container(
-        constraints: BoxConstraints(minHeight: card ? 64 : 48),
+        constraints: BoxConstraints(minHeight: card ? Sizes.cardRow : 48),
         padding: EdgeInsets.symmetric(
           horizontal: card ? 18 : 0,
           vertical: card ? 8 : 6,

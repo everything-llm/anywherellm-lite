@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/sources.dart';
 import '../app_scope.dart';
 import '../settings/rows.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
@@ -97,12 +98,9 @@ class _Body extends StatelessWidget {
         ),
         if (card) ...[
           if (files.isEmpty)
-            SliverToBoxAdapter(
-              child: FieldCard(inSheet: true, const [CardNote('Loading…')]),
-            )
+            SliverToBoxAdapter(child: FieldCard(const [CardNote('Loading…')]))
           else
             SliverFieldCard(
-              inSheet: true,
               count: files.length,
               keyOf: (i) => ValueKey(files[i].path),
               row: (context, i) => Rise(
@@ -173,7 +171,7 @@ class _FileRow extends StatelessWidget {
                 unawaited(scope.files.viewText(file.path, file.title));
               },
               child: Container(
-                constraints: const BoxConstraints(minHeight: 64),
+                constraints: const BoxConstraints(minHeight: Sizes.cardRow),
                 padding: const EdgeInsets.only(left: FieldCard.inset),
                 child: SourceRow(file, meta: file.meta),
               ),

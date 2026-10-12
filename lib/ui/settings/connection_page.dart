@@ -461,7 +461,7 @@ class _KeyCardState extends State<_KeyCard> {
           onTap: () {
             if (!saving) setState(() => _pasteKey = !_pasteKey);
           },
-          radius: BorderRadius.circular(Sizes.phoneControl),
+          radius: BorderRadius.circular(Sizes.control),
           child: Container(
             constraints: const BoxConstraints(minHeight: 52),
             alignment: Alignment.center,

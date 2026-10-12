@@ -51,7 +51,7 @@ class WorkspaceSwitcher extends StatelessWidget {
           child: Tappable(
             label: elsewhere ? '$name, an answer is ready in another' : name,
             expanded: shell.menuOpen,
-            radius: BorderRadius.circular(Sizes.control),
+            radius: BorderRadius.circular(Sizes.small),
             onTap: () => shell.togglePopup(Popup.workspaces),
             child: ConstrainedBox(
               constraints: const BoxConstraints(minHeight: 48),
@@ -125,8 +125,8 @@ class _WorkspaceMenu extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         spacing: 16,
         children: [
-          if (ordered.isNotEmpty) FieldCard(inSheet: true, [list]),
-          FieldCard(inSheet: true, [
+          if (ordered.isNotEmpty) FieldCard([list]),
+          FieldCard([
             CardRow(
               'New workspace',
               icon: 'plus',
