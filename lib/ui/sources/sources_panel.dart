@@ -87,7 +87,7 @@ class _Body extends StatelessWidget {
                   files.isEmpty && !sources.loading
                       ? 'No documents in this workspace yet.'
                       : 'Answers draw on the ones switched on.',
-                  style: Type.sans(13, color: t.muted, height: 1.45),
+                  style: Type.note(t.muted),
                 ),
               ),
               ..._notices(context),
@@ -98,13 +98,7 @@ class _Body extends StatelessWidget {
         if (card) ...[
           if (files.isEmpty)
             SliverToBoxAdapter(
-              child: FieldCard(inSheet: true, [
-                Container(
-                  constraints: const BoxConstraints(minHeight: 64),
-                  alignment: Alignment.center,
-                  child: Text('Loading…', style: Type.sans(14, color: t.muted)),
-                ),
-              ]),
+              child: FieldCard(inSheet: true, const [CardNote('Loading…')]),
             )
           else
             SliverFieldCard(
@@ -232,7 +226,7 @@ class SourceRow extends StatelessWidget {
                   meta,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Type.sans(13, color: t.muted, height: 1.45),
+                  style: Type.note(t.muted),
                 ),
             ],
           ),

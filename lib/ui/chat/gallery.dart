@@ -9,6 +9,7 @@ import '../app_scope.dart';
 import '../files/save_file.dart';
 import '../icons.dart';
 import '../layout.dart';
+import '../settings/rows.dart';
 import '../links.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';
@@ -243,7 +244,7 @@ class _GalleryPageState extends State<GalleryPage> {
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 560),
                     child: ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                      padding: Sizes.pagePadding,
                       children: [
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -392,11 +393,7 @@ class _GalleryPageState extends State<GalleryPage> {
     return Container(
       height: 390,
       clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: t.panel,
-        border: Border.all(color: t.line2),
-        borderRadius: BorderRadius.circular(Sizes.phoneCard),
-      ),
+      decoration: cardDecoration(t),
       child: Stack(
         children: [
           PageView.builder(

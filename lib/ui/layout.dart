@@ -1,3 +1,5 @@
+import 'package:flutter/painting.dart';
+
 abstract final class Sizes {
   /// The widest the chat's turns and composer are laid out.
   static const column = 720.0;
@@ -20,6 +22,9 @@ abstract final class Sizes {
 
   /// A button's or a field's corners, rounder than [control].
   static const phoneControl = 16.0;
+
+  /// Around a phone page's cards, under its header.
+  static const pagePadding = EdgeInsets.fromLTRB(16, 8, 16, 24);
 
   /// A one-line field's height.
   static const field = 52.0;

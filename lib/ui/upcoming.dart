@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../core/copy.dart';
 import '../core/schedule.dart';
 import 'app_scope.dart';
+import 'layout.dart';
 import 'links.dart';
 import 'settings/rows.dart';
 import 'settings/settings_pages.dart';
@@ -113,7 +114,7 @@ class _UpcomingPageState extends State<UpcomingPage> {
                 final jobs = system.jobs;
                 final now = DateTime.now();
                 return ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  padding: Sizes.pagePadding,
                   children: [
                     if (system.jobsProblem case final problem?) ...[
                       AlertBox(
@@ -189,38 +190,18 @@ class _JobRow extends StatelessWidget {
         ? 'Next: ${whenText(next, now)}'
         : null;
     final about = [?job.workspace, describeSchedule(job.cron, now)].join(' · ');
-    return Container(
-      constraints: const BoxConstraints(minHeight: 88),
-      padding: const EdgeInsets.symmetric(
-        horizontal: FieldCard.inset,
-        vertical: 10,
-      ),
-      alignment: Alignment.centerLeft,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+    return InfoRow(
+      job.name,
+      aboutSpan: TextSpan(
+        text: about,
         children: [
-          Text(
-            job.name,
-            style: Type.sans(17, weight: FontWeight.w500, color: t.ink),
-          ),
-          Text.rich(
+          if (when != null) ...[
+            const TextSpan(text: ' · '),
             TextSpan(
-              text: about,
-              children: [
-                if (when != null) ...[
-                  const TextSpan(text: ' · '),
-                  TextSpan(
-                    text: when,
-                    style: failed ? Type.sans(13, color: t.badfg) : null,
-                  ),
-                ],
-              ],
+              text: when,
+              style: failed ? Type.sans(13, color: t.badfg) : null,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Type.sans(13, color: t.muted),
-          ),
+          ],
         ],
       ),
     );

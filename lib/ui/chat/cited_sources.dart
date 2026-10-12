@@ -50,7 +50,7 @@ class CitedSources extends StatelessWidget {
             web
                 ? '${plural(citations.length, 'web page', 'web pages')} the agent read.'
                 : plural(citations.length, 'source', 'sources'),
-            style: Type.sans(13, color: t.muted, height: 1.45),
+            style: Type.note(t.muted),
           ),
         ),
         FieldCard(inSheet: true, [
@@ -114,11 +114,7 @@ class _CitedRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: Type.sans(15, color: t.ink),
                   ),
-                  if (about != null)
-                    Text(
-                      about,
-                      style: Type.sans(13, color: t.muted, height: 1.45),
-                    ),
+                  if (about != null) Text(about, style: Type.note(t.muted)),
                 ],
               ),
             ),

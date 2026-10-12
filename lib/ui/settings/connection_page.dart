@@ -83,7 +83,7 @@ class _Welcome extends StatelessWidget {
               scan
                   ? 'Already set up on your computer? Scan its code and this phone is connected.'
                   : 'Sign in with the address and password of your AnythingLLM server.',
-              style: Type.sans(13, color: t.muted, height: 1.45),
+              style: Type.note(t.muted),
             ),
           ),
         ],
@@ -425,7 +425,7 @@ class _KeyCardState extends State<_KeyCard> {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Text(
               'The password AnythingLLM\'s web page asks for. The app makes its own developer key.',
-              style: Type.sans(13, color: t.muted, height: 1.45),
+              style: Type.note(t.muted),
             ),
           ),
         ],

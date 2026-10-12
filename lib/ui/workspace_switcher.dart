@@ -10,6 +10,7 @@ import 'tokens.dart';
 import 'type.dart';
 import 'settings/rows.dart';
 import 'widgets/basics.dart';
+import 'widgets/phone_page.dart';
 import 'widgets/sheet.dart';
 import 'widgets/tappable.dart';
 
@@ -64,12 +65,7 @@ class WorkspaceSwitcher extends StatelessWidget {
                         active?.name ?? 'No workspace yet',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Type.sans(
-                          26,
-                          weight: FontWeight.w600,
-                          letterSpacing: -0.3,
-                          color: active == null ? t.muted : t.ink,
-                        ),
+                        style: TabTitle.style(active == null ? t.muted : t.ink),
                       ),
                     ),
                   ),
@@ -168,49 +164,25 @@ class _WorkspaceItem extends StatelessWidget {
       index: index,
       child: Ruled(
         ruled: index > 0,
-        child: Tappable(
-          label: ready ? '${workspace.name}, answer ready' : workspace.name,
-          selected: active,
+        child: CardRow(
+          workspace.name,
+          heard: ready ? '${workspace.name}, answer ready' : null,
+          checked: active,
           onTap: () {
             scope.shell.closePopup(Popup.workspaces);
             if (!active) chat.select(workspace.slug);
           },
-          child: SizedBox(
-            height: 64,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 22,
-                    child: active
-                        ? AppIcon('check', size: IconSize.normal, color: t.ink)
-                        : null,
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
-                      workspace.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Type.sans(
-                        17,
-                        weight: active ? FontWeight.w600 : FontWeight.w400,
-                        color: t.ink,
-                      ),
-                    ),
-                  ),
-                  if (ready) const ReadyDot(),
-                  if (count != null) ...[
-                    const SizedBox(width: 8),
-                    Text(
-                      plural(count, 'doc', 'docs'),
-                      style: Type.sans(13, color: t.muted),
-                    ),
-                  ],
-                ],
-              ),
-            ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            spacing: 8,
+            children: [
+              if (ready) const ReadyDot(),
+              if (count != null)
+                Text(
+                  plural(count, 'doc', 'docs'),
+                  style: Type.sans(13, color: t.muted),
+                ),
+            ],
           ),
         ),
       ),

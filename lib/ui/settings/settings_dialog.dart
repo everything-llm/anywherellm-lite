@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
+import '../layout.dart';
 import '../state/settings_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
@@ -123,14 +124,10 @@ class _Nav extends StatelessWidget {
       builder: (context, _) {
         final connection = settings.connection;
         return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          padding: Sizes.pagePadding,
           children: [
-            if (connection != null) ...[
-              const _ServerCard(),
-              const SizedBox(height: 20),
-            ],
-            const CardHeading('This app'),
-            const SizedBox(height: 10),
+            if (connection != null) const _ServerCard(),
+            CardHeading('This app', top: connection != null ? 20 : 0),
             FieldCard([
               for (final (page, icon) in const [
                 (SettingsPage.connection, 'link'),
@@ -144,9 +141,7 @@ class _Nav extends StatelessWidget {
                 ),
             ]),
             if (connection != null) ...[
-              const SizedBox(height: 20),
               const CardHeading('AnythingLLM'),
-              const SizedBox(height: 10),
               FieldCard([
                 NavRow(
                   icon: 'server',
@@ -235,7 +230,7 @@ class _PageView extends StatelessWidget {
       key: ValueKey(page),
       padding: firstRun
           ? const EdgeInsets.fromLTRB(16, 56, 16, 16)
-          : const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          : Sizes.pagePadding,
       child: Align(
         alignment: Alignment.topLeft,
         child: ConstrainedBox(
@@ -244,10 +239,7 @@ class _PageView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (page.about case final about?) ...[
-                Text(
-                  about,
-                  style: Type.sans(14.5, color: t.ink2, height: 1.5),
-                ),
+                Text(about, style: Type.sans(14.5, color: t.ink2, height: 1.5)),
                 const SizedBox(height: 14),
               ],
               KeyedSubtree(key: ValueKey((page, server)), child: _body(page)),

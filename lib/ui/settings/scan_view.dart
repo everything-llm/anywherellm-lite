@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/phone_page.dart';
@@ -17,7 +18,7 @@ class ScanView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final note = Type.sans(13, color: t.muted, height: 1.45);
+    final note = Type.note(t.muted);
     return ColoredBox(
       color: t.bg,
       child: SafeArea(
@@ -31,7 +32,7 @@ class ScanView extends StatelessWidget {
             ),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                padding: Sizes.pagePadding,
                 children: [
                   AspectRatio(
                     aspectRatio: 1,

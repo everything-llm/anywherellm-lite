@@ -23,7 +23,7 @@ class TextViewer extends StatelessWidget {
     final file = scope.sources.files.where((f) => f.path == path).firstOrNull;
     final text = files.text;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: Sizes.pagePadding,
       children: [
         if (file != null)
           Padding(
@@ -54,11 +54,7 @@ class TextViewer extends StatelessWidget {
         else
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
-            decoration: BoxDecoration(
-              color: t.panel,
-              border: Border.all(color: t.line2),
-              borderRadius: BorderRadius.circular(Sizes.phoneCard),
-            ),
+            decoration: cardDecoration(t),
             child: SelectableText(
               text ?? 'The server sent no text for this document.',
               style: Type.sans(
@@ -73,7 +69,7 @@ class TextViewer extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Text(
             'The text the server read from this document.',
-            style: Type.sans(13, color: t.muted, height: 1.45),
+            style: Type.note(t.muted),
           ),
         ),
         if (file != null) ...[

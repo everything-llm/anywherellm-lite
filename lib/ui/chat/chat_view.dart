@@ -9,6 +9,7 @@ import '../type.dart';
 import '../widgets/headline.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
+import '../widgets/phone_page.dart';
 import '../widgets/tappable.dart';
 import '../state/shell_controller.dart';
 import 'composer.dart';
@@ -193,86 +194,69 @@ class _Header extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: Type.sans(18, weight: FontWeight.w600, color: t.ink),
         );
-        return SizedBox(
-          height: 72,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              spacing: 4,
-              children: [
-                IconBtn(
-                  'back',
-                  tooltip: 'Back to the chats',
+        return PhonePageHeader(
+          back: 'Back to the chats',
+          onBack: scope.shell.closeChat,
+          heading: workspace == null
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Semantics(header: true, child: title),
+                )
+              : Tappable(
+                  label: thread != null
+                      ? '${chat.title}. Rename, pin or delete this chat'
+                      : '${workspace.name}. Open workspace settings',
+                  onTap: () => thread != null
+                      ? scope.shell.openChatSheet(thread)
+                      : scope.shell.showPane(Pane.files),
+                  radius: BorderRadius.circular(12),
+                  child: Container(
+                    constraints: const BoxConstraints(minHeight: 48),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Row(
+                          spacing: 4,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                '${workspace.name} · '
+                                '${docs == 1 ? '1 doc' : '$docs docs'} in use',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Type.sans(
+                                  12.5,
+                                  weight: FontWeight.w700,
+                                  color: t.muted,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ),
+                            AppIcon(
+                              'chevron',
+                              size: IconSize.tiny,
+                              color: t.muted,
+                            ),
+                          ],
+                        ),
+                        title,
+                      ],
+                    ),
+                  ),
+                ),
+          action: workspace == null
+              ? null
+              : IconBtn(
+                  'plus',
+                  tooltip: 'New chat',
                   box: 48,
                   filled: true,
                   size: IconSize.small,
-                  onPressed: scope.shell.closeChat,
+                  onPressed: chat.newChat,
                 ),
-                Expanded(
-                  child: workspace == null
-                      ? Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Semantics(header: true, child: title),
-                        )
-                      : Tappable(
-                          label: thread != null
-                              ? '${chat.title}. Rename, pin or delete this chat'
-                              : '${workspace.name}. Open workspace settings',
-                          onTap: () => thread != null
-                              ? scope.shell.openChatSheet(thread)
-                              : scope.shell.showPane(Pane.files),
-                          radius: BorderRadius.circular(12),
-                          child: Container(
-                            constraints: const BoxConstraints(minHeight: 48),
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Row(
-                                  spacing: 4,
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        '${workspace.name} · '
-                                        '${docs == 1 ? '1 doc' : '$docs docs'} in use',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: Type.sans(
-                                          12.5,
-                                          weight: FontWeight.w700,
-                                          color: t.muted,
-                                          height: 1.3,
-                                        ),
-                                      ),
-                                    ),
-                                    AppIcon(
-                                      'chevron',
-                                      size: IconSize.tiny,
-                                      color: t.muted,
-                                    ),
-                                  ],
-                                ),
-                                title,
-                              ],
-                            ),
-                          ),
-                        ),
-                ),
-                if (workspace != null) ...[
-                  IconBtn(
-                    'plus',
-                    tooltip: 'New chat',
-                    box: 48,
-                    filled: true,
-                    size: IconSize.small,
-                    onPressed: chat.newChat,
-                  ),
-                ],
-              ],
-            ),
-          ),
         );
       },
     );

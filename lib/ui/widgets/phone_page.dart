@@ -7,17 +7,21 @@ import 'buttons.dart';
 import 'tappable.dart';
 
 /// The bar over a phone's full page: a round back button, heard as [back], [title] centred at
-/// 19, and at most one round [action] at its end.
+/// 19, or [heading] in its place, and at most one round [action] at its end.
 class PhonePageHeader extends StatelessWidget {
   const PhonePageHeader({
     super.key,
-    required this.title,
+    this.title = '',
+    this.heading,
     required this.back,
     required this.onBack,
     this.action,
   });
 
   final String title;
+
+  /// What the bar shows between its buttons in place of [title], such as the chat's name.
+  final Widget? heading;
 
   /// What the back button is heard as, such as Back to the chat.
   final String back;
@@ -45,16 +49,22 @@ class PhonePageHeader extends StatelessWidget {
             ),
             const SizedBox(width: 4),
             Expanded(
-              child: Semantics(
-                header: true,
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: Type.sans(19, weight: FontWeight.w600, color: t.ink),
-                ),
-              ),
+              child:
+                  heading ??
+                  Semantics(
+                    header: true,
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: Type.sans(
+                        19,
+                        weight: FontWeight.w600,
+                        color: t.ink,
+                      ),
+                    ),
+                  ),
             ),
             const SizedBox(width: 4),
             action ?? const SizedBox(width: 48),
@@ -71,6 +81,10 @@ class TabTitle extends StatelessWidget {
 
   final String title;
 
+  /// A tab's title in [color]: semibold at 26.
+  static TextStyle style(Color color) =>
+      Type.sans(26, weight: FontWeight.w600, letterSpacing: -0.3, color: color);
+
   @override
   Widget build(BuildContext context) => SizedBox(
     height: 72,
@@ -84,12 +98,7 @@ class TabTitle extends StatelessWidget {
             title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Type.sans(
-              26,
-              weight: FontWeight.w600,
-              letterSpacing: -0.3,
-              color: Tokens.of(context).ink,
-            ),
+            style: style(Tokens.of(context).ink),
           ),
         ),
       ),

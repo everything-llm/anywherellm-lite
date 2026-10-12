@@ -33,6 +33,9 @@ abstract final class Type {
     letterSpacing: letterSpacing,
   );
 
+  /// A muted note at 13, as under a card or a sheet's title, in [color].
+  static TextStyle note(Color color) => sans(13, color: color, height: 1.45);
+
   static TextStyle mono(
     double size, {
     FontWeight weight = FontWeight.w400,

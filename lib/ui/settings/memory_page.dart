@@ -126,7 +126,7 @@ class MemoryPage extends StatelessWidget {
         ] else
           ...[]
       else ...[
-        ..._heading('Saved memories'),
+        CardHeading('Saved memories'),
         FieldCard([
           FieldRow(
             label: 'Saved memories',
@@ -163,11 +163,11 @@ class MemoryPage extends StatelessWidget {
             ),
           ),
         ] else if (saved != null) ...[
-          ..._heading(
+          CardHeading(
             'Every workspace · ${saved.global.length} of $globalMemoryLimit',
           ),
           _savedList(context, saved.global, global: true),
-          ..._heading(
+          CardHeading(
             'Only $name · ${saved.workspace.length} of $workspaceMemoryLimit',
           ),
           _savedList(context, saved.workspace, global: false),
@@ -175,13 +175,6 @@ class MemoryPage extends StatelessWidget {
       ],
     ];
   }
-
-  /// A heading over a card, with the page's space above it.
-  static List<Widget> _heading(String text) => [
-    const SizedBox(height: 20),
-    CardHeading(text),
-    const SizedBox(height: 10),
-  ];
 
   Widget _savedList(
     BuildContext context,
@@ -200,7 +193,7 @@ class MemoryPage extends StatelessWidget {
           onTap: () => shell.togglePopup(MemorySheet('$scope:${m.id}')),
         ),
       if (list.length >= limit)
-        _Line('All $limit in use. Delete one to add another.')
+        CardNote('All $limit in use. Delete one to add another.')
       else
         _Item(
           key: ValueKey('$scope:new'),
@@ -243,7 +236,7 @@ class _WorkspaceChoice extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Text(
             'Memories for every workspace show whichever you pick.',
-            style: Type.sans(13, color: t.muted, height: 1.45),
+            style: Type.note(t.muted),
           ),
         ),
       ],
@@ -296,29 +289,6 @@ class _Item extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// A line of muted text in a card, where its rows would be.
-class _Line extends StatelessWidget {
-  const _Line(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 64),
-      padding: const EdgeInsets.symmetric(
-        horizontal: FieldCard.inset,
-        vertical: 12,
-      ),
-      alignment: Alignment.centerLeft,
-      child: Text(
-        text,
-        style: Type.sans(15.5, color: Tokens.of(context).muted),
       ),
     );
   }
@@ -439,7 +409,7 @@ class _SavedEditorState extends State<_SavedEditor> {
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Text(
             'Every chat there is shown it, word for word.',
-            style: Type.sans(13, color: t.muted, height: 1.45),
+            style: Type.note(t.muted),
           ),
         ),
         if (_problem case final problem?)

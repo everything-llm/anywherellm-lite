@@ -217,7 +217,7 @@ class _ChatsTabState extends State<ChatsTab> {
                   return CustomScrollView(
                     slivers: [
                       SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                        padding: Sizes.pagePadding,
                         sliver: SliverMainAxisGroup(
                           slivers: [
                             SliverToBoxAdapter(
@@ -241,13 +241,7 @@ class _ChatsTabState extends State<ChatsTab> {
                                 ),
                               if (chat.activeSlug case final slug?) ...[
                                 const SliverToBoxAdapter(
-                                  child: Padding(
-                                    padding: EdgeInsets.only(
-                                      top: 20,
-                                      bottom: 10,
-                                    ),
-                                    child: CardHeading('Chats'),
-                                  ),
+                                  child: CardHeading('Chats'),
                                 ),
                                 _chats(context, slug),
                               ],
@@ -281,7 +275,7 @@ class _ChatsTabState extends State<ChatsTab> {
     ];
     if (rows.isEmpty) {
       return const SliverToBoxAdapter(
-        child: FieldCard([_None('No chats yet.')]),
+        child: FieldCard([CardNote('No chats yet.')]),
       );
     }
     return SliverFieldCard(
@@ -302,7 +296,7 @@ class _ChatsTabState extends State<ChatsTab> {
     if (found.isEmpty) {
       return [
         const SizedBox(height: 20),
-        FieldCard([_None('Nothing matches "$query".')]),
+        FieldCard([CardNote('Nothing matches "$query".')]),
       ];
     }
     return [
@@ -322,21 +316,6 @@ class _ChatsTabState extends State<ChatsTab> {
       ],
     ];
   }
-}
-
-/// A line in the card of chats when there are none to list.
-class _None extends StatelessWidget {
-  const _None(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    constraints: const BoxConstraints(minHeight: 64),
-    padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
-    alignment: Alignment.centerLeft,
-    child: Text(text, style: Type.sans(15.5, color: Tokens.of(context).muted)),
-  );
 }
 
 /// The search: a field on the panel inside a [Tokens.line] edge, which turns [Tokens.ink]

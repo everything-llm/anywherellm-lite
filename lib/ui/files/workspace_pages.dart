@@ -161,7 +161,7 @@ class _WorkspacePagesState extends State<WorkspacePages> {
         final prompt = _files.detail(slug)?.prompt?.trim().split('\n').first;
         final mode = scope.sources.chatMode.value;
         return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          padding: Sizes.pagePadding,
           children: [
             SummaryCard(
               title: name,
@@ -175,15 +175,13 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                       ? 'No documents yet'
                       : '${plural(docs.length, 'document', 'documents')}, '
                             '$on used in answers',
-                  style: Type.sans(13, color: t.muted, height: 1.45),
+                  style: Type.note(t.muted),
                 ),
               ],
               link: 'Rename',
               onLink: () => shell.togglePopup(WorkspaceSheet.rename),
             ),
-            const SizedBox(height: 20),
             const CardHeading('How it answers'),
-            const SizedBox(height: 10),
             FieldCard([
               NavRow(
                 icon: 'doc',

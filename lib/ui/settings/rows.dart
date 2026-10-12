@@ -292,13 +292,15 @@ class NamedControl extends StatelessWidget {
 }
 
 /// A row of a [FieldCard] that only says something: [title] at 17, with [tag] beside it, over
-/// the line [about], in the mono face when [mono], and [trailing] at its end. It is taller
+/// the line [about], in the mono face when [mono], or the line [aboutSpan] drawn as it says, and
+/// [trailing] at its end. It is taller
 /// than a row that opens something, as the design canvas draws it.
 class InfoRow extends StatelessWidget {
   const InfoRow(
     this.title, {
     super.key,
     this.about,
+    this.aboutSpan,
     this.mono = false,
     this.tag,
     this.trailing,
@@ -306,6 +308,7 @@ class InfoRow extends StatelessWidget {
 
   final String title;
   final String? about;
+  final InlineSpan? aboutSpan;
   final bool mono;
 
   /// A badge beside [title], such as Saved.
@@ -345,9 +348,9 @@ class InfoRow extends StatelessWidget {
                     ?tag,
                   ],
                 ),
-                if (about case final about?)
-                  Text(
-                    about,
+                if (about != null || aboutSpan != null)
+                  Text.rich(
+                    aboutSpan ?? TextSpan(text: about),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: mono
@@ -513,9 +516,13 @@ class CardRow extends StatelessWidget {
     this.height = 64,
     this.large = false,
     this.checked,
+    this.heard,
   });
 
   final String label;
+
+  /// What a screen reader hears in place of [label], when it says more.
+  final String? heard;
 
   /// Null while the row can do nothing, which fades it.
   final VoidCallback? onTap;
@@ -541,7 +548,7 @@ class CardRow extends StatelessWidget {
       RowTone.danger => t.badfg,
     };
     return Tappable(
-      label: label,
+      label: heard ?? label,
       selected: checked,
       onTap: onTap,
       dimWhenDisabled: 0.5,
@@ -665,15 +672,35 @@ class SummaryCard extends StatelessWidget {
   }
 }
 
-/// A heading over a phone's [FieldCard], its words in line with the card's rows.
+/// A heading over a phone's [FieldCard], its words in line with the card's rows, [top] under
+/// what is above it and 10 over the card.
 class CardHeading extends StatelessWidget {
-  const CardHeading(this.text, {super.key});
+  const CardHeading(this.text, {super.key, this.top = 20});
+
+  final String text;
+  final double top;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.fromLTRB(FieldCard.inset, top, FieldCard.inset, 10),
+    child: SectionLabel(text),
+  );
+}
+
+/// A muted line in a [FieldCard], where its rows would be, as when there are none.
+class CardNote extends StatelessWidget {
+  const CardNote(this.text, {super.key});
 
   final String text;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
-    child: SectionLabel(text),
+  Widget build(BuildContext context) => Container(
+    constraints: const BoxConstraints(minHeight: 64),
+    padding: const EdgeInsets.symmetric(
+      horizontal: FieldCard.inset,
+      vertical: 12,
+    ),
+    alignment: Alignment.centerLeft,
+    child: Text(text, style: Type.sans(15.5, color: Tokens.of(context).muted)),
   );
 }

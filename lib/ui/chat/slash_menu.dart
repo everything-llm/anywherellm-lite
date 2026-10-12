@@ -102,10 +102,7 @@ class SlashMenu extends StatelessWidget {
                   decoration: BoxDecoration(
                     border: Border(top: BorderSide(color: t.line2)),
                   ),
-                  child: Text(
-                    note,
-                    style: Type.sans(13, color: t.muted, height: 1.45),
-                  ),
+                  child: Text(note, style: Type.note(t.muted)),
                 ),
             ],
           ),

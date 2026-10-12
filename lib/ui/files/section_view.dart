@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/files.dart';
 import '../app_scope.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';
@@ -71,7 +72,7 @@ class _EditorState extends State<_Editor> {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: Sizes.pagePadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

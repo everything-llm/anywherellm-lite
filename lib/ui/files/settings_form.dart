@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/chat.dart';
 import '../../core/server_models.dart';
 import '../app_scope.dart';
+import '../layout.dart';
 import '../widgets/buttons.dart';
 import '../chat/model_picker.dart';
 import '../widgets/fields.dart';
@@ -159,10 +160,9 @@ class _SettingsFormState extends State<SettingsForm> {
     final scope = AppScope.of(context);
     final workspace = scope.chat.active?.name ?? 'this workspace';
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: Sizes.pagePadding,
       children: [
-        const CardHeading('Answer from'),
-        const SizedBox(height: 10),
+        const CardHeading('Answer from', top: 0),
         Semantics(
           container: true,
           label: 'Answer from',
@@ -180,9 +180,7 @@ class _SettingsFormState extends State<SettingsForm> {
             ],
           ),
         ),
-        const SizedBox(height: 20),
         const CardHeading('Model'),
-        const SizedBox(height: 10),
         ListenableBuilder(
           listenable: Listenable.merge([scope.sources, scope.system]),
           builder: (context, _) {
@@ -205,9 +203,7 @@ class _SettingsFormState extends State<SettingsForm> {
           const SizedBox(height: 8),
           ModelPicker(onClose: () => setState(() => _picking = false)),
         ],
-        const SizedBox(height: 20),
         const CardHeading('When the files do not cover it'),
-        const SizedBox(height: 10),
         AppField(
           controller: _text['queryRefusalResponse']!,
           label: 'When the files do not cover it',
