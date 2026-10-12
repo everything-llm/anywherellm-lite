@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'app_scope.dart';
 import 'home.dart';
+import 'layout.dart';
 import 'tokens.dart';
 import 'widgets/rise.dart';
 
@@ -25,21 +26,21 @@ class _ChatsShelfState extends State<ChatsShelf>
     with SingleTickerProviderStateMixin {
   /// How far the shelf is out, from 0 (hidden at the left) to 1.
   late final _out = AnimationController(vsync: this);
-
-  /// Whether the first slide in has been started.
-  bool _slid = false;
+  late final _slide = Tween(
+    begin: const Offset(-1, 0),
+    end: Offset.zero,
+  ).animate(CurvedAnimation(parent: _out, curve: Curves.easeOut));
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_slid) return;
-    _slid = true;
-    final slide = motion(context, const Duration(milliseconds: 220));
-    if (slide == Duration.zero) {
-      _out.value = 1;
-    } else {
-      _out.animateTo(1, duration: slide, curve: Curves.easeOut);
-    }
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final slide = motion(context, const Duration(milliseconds: 220));
+      slide == Duration.zero
+          ? _out.value = 1
+          : _out.animateTo(1, duration: slide);
+    });
   }
 
   @override
@@ -52,68 +53,55 @@ class _ChatsShelfState extends State<ChatsShelf>
   Widget build(BuildContext context) {
     final shell = AppScope.of(context).shell;
     final t = Tokens.of(context);
+    const corner = BorderRadius.horizontal(
+      right: Radius.circular(Sizes.composer),
+    );
     return LayoutBuilder(
-      builder: (context, box) {
-        final width = math.min(
-          box.maxWidth * ChatsShelf.fraction,
-          ChatsShelf.maxWidth,
-        );
-        return AnimatedBuilder(
-          animation: _out,
-          builder: (context, child) => Stack(
-            children: [
-              Positioned.fill(
-                child: Semantics(
-                  label: 'Close the chats',
-                  button: true,
-                  child: GestureDetector(
-                    onTap: shell.closeShelf,
-                    child: ColoredBox(
-                      color: t.scrim.withValues(alpha: t.scrim.a * _out.value),
-                    ),
-                  ),
+      builder: (context, box) => Stack(
+        children: [
+          Positioned.fill(
+            child: FadeTransition(
+              opacity: _out,
+              child: Semantics(
+                label: 'Close the chats',
+                button: true,
+                child: GestureDetector(
+                  onTap: shell.closeShelf,
+                  child: ColoredBox(color: t.scrim),
                 ),
-              ),
-              Positioned(
-                left: -width * (1 - _out.value),
-                top: 0,
-                bottom: 0,
-                width: width,
-                child: child!,
-              ),
-            ],
-          ),
-          child: GestureDetector(
-            onHorizontalDragEnd: (details) {
-              if (details.velocity.pixelsPerSecond.dx < -300) {
-                shell.closeShelf();
-              }
-            },
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: t.bg,
-                borderRadius: const BorderRadius.horizontal(
-                  right: Radius.circular(28),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: t.shadow,
-                    blurRadius: 40,
-                    spreadRadius: -12,
-                    offset: const Offset(12, 0),
-                  ),
-                ],
-              ),
-              child: const ClipRRect(
-                borderRadius: BorderRadius.horizontal(
-                  right: Radius.circular(28),
-                ),
-                child: ChatsTab(),
               ),
             ),
           ),
-        );
-      },
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: math.min(
+              box.maxWidth * ChatsShelf.fraction,
+              ChatsShelf.maxWidth,
+            ),
+            child: SlideTransition(
+              position: _slide,
+              child: RepaintBoundary(
+                child: GestureDetector(
+                  onHorizontalDragEnd: (details) {
+                    if (details.velocity.pixelsPerSecond.dx < -300) {
+                      shell.closeShelf();
+                    }
+                  },
+                  child: Material(
+                    color: t.bg,
+                    borderRadius: corner,
+                    clipBehavior: Clip.antiAlias,
+                    elevation: 0,
+                    child: const ChatsTab(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
