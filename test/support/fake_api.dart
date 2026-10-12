@@ -8,6 +8,7 @@ import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/created.dart';
 import 'package:anywherellm/core/embeds.dart';
+import 'package:anywherellm/core/memory.dart';
 import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/schedule.dart';
@@ -343,6 +344,226 @@ class FakeAnythingLlm implements AnythingLlmApi {
         if (found == null) return null;
         return (question: found.question, events: found.events.stream);
       }, thread);
+
+  /// What [memorySwitches] answers, and [setMemorySwitches] changes.
+  MemorySwitches switches = const MemorySwitches(enabled: true, learn: true);
+
+  /// The saved memories for every workspace.
+  final List<SavedMemory> globalMemories = [];
+
+  /// Each workspace's own saved memories, by slug.
+  final Map<String, List<SavedMemory>> workspaceMemories = {};
+
+  /// An id no saved memory has, as the server numbers them.
+  int get _nextMemory =>
+      [
+        0,
+        for (final list in [globalMemories, ...workspaceMemories.values])
+          for (final m in list) m.id,
+      ].reduce((a, b) => a > b ? a : b) +
+      1;
+
+  @override
+  Future<MemorySwitches> memorySwitches() =>
+      _run('memorySwitches', () => switches);
+
+  @override
+  Future<void> setMemorySwitches({bool? enabled, bool? learn}) => _run(
+    'setMemorySwitches',
+    () => switches = MemorySwitches(
+      enabled: enabled ?? switches.enabled,
+      learn: learn ?? switches.learn,
+    ),
+    [
+      ?enabled == null ? null : 'enabled=$enabled',
+      ?learn == null ? null : 'learn=$learn',
+    ].join(','),
+  );
+
+  /// Refuses a saved-memory call while they are off, as the server does.
+  void _memoriesOn() {
+    if (!switches.enabled) {
+      throw const ApiException('Personalization is disabled.', status: 403);
+    }
+  }
+
+  /// The list a saved memory for every workspace, or for [slug], goes in.
+  List<SavedMemory> _memories(String? slug) => slug == null
+      ? globalMemories
+      : workspaceMemories.putIfAbsent(slug, () => []);
+
+  /// Adds [memory] to the list for every workspace, or for [slug], unless it is full, as the
+  /// server refuses it.
+  SavedMemory _keepMemory(SavedMemory memory, String? slug) {
+    final list = _memories(slug);
+    final limit = slug == null ? globalMemoryLimit : workspaceMemoryLimit;
+    if (list.length >= limit) {
+      throw ApiException(
+        'Maximum ${slug == null ? 'global' : 'workspace'} memory limit ($limit) reached.',
+        status: 400,
+      );
+    }
+    list.add(memory);
+    return memory;
+  }
+
+  /// The list that holds saved memory [id], or a 404.
+  List<SavedMemory> _holding(int id) =>
+      [
+        globalMemories,
+        ...workspaceMemories.values,
+      ].where((list) => list.any((m) => m.id == id)).firstOrNull ??
+      (throw const ApiException('Memory not found.', status: 404));
+
+  @override
+  Future<SavedMemories> savedMemories(String slug) => _run('savedMemories', () {
+    _memoriesOn();
+    return SavedMemories(
+      global: [...globalMemories],
+      workspace: [...?workspaceMemories[slug]],
+    );
+  }, slug);
+
+  @override
+  Future<SavedMemory> addMemory(
+    String slug,
+    String text, {
+    required bool global,
+  }) => _run('addMemory', () {
+    _memoriesOn();
+    return _keepMemory(
+      SavedMemory(id: _nextMemory, text: text, global: global),
+      global ? null : slug,
+    );
+  }, text);
+
+  @override
+  Future<SavedMemory> editMemory(int id, String text) => _run('editMemory', () {
+    _memoriesOn();
+    final list = _holding(id);
+    final at = list.indexWhere((m) => m.id == id);
+    return list[at] = SavedMemory(id: id, text: text, global: list[at].global);
+  }, '$id');
+
+  @override
+  Future<void> deleteMemory(int id) => _run('deleteMemory', () {
+    _memoriesOn();
+    _holding(id).removeWhere((m) => m.id == id);
+  }, '$id');
+
+  @override
+  Future<SavedMemory> moveMemory(int id, {String? toWorkspace}) =>
+      _run('moveMemory', () {
+        _memoriesOn();
+        final list = _holding(id);
+        final memory = list.firstWhere((m) => m.id == id);
+        final moved = _keepMemory(
+          SavedMemory(id: id, text: memory.text, global: toWorkspace == null),
+          toWorkspace,
+        );
+        list.remove(memory);
+        return moved;
+      }, '$id:${toWorkspace ?? 'global'}');
+
+  /// Whether the server has no long-term memory route, as one without the everythingllm host.
+  bool noMemoryRoute = false;
+
+  /// The long-term facts, newest first, each with its workspace, or null for every workspace.
+  final List<({LongFact fact, String? workspace})> longFacts = [];
+
+  /// The files whose text the long-term memory keeps, by workspace slug.
+  final Map<String, List<LongFile>> longFiles = {};
+
+  int _nextFact = 1;
+
+  /// Keeps [text] as a long-term fact of [workspace], or of every workspace when it is null.
+  LongFact addFact(String text, {String? workspace, DateTime? created}) {
+    final fact = LongFact(
+      id: 'm${_nextFact++}',
+      text: text,
+      global: workspace == null,
+      created: created ?? DateTime.now(),
+    );
+    longFacts.insert(0, (fact: fact, workspace: workspace));
+    return fact;
+  }
+
+  /// The long-term facts workspace [slug]'s agent recalls: every workspace's and its own.
+  List<LongFact> _factsOf(String slug) => [
+    for (final f in longFacts)
+      if (f.workspace == null || f.workspace == slug) f.fact,
+  ];
+
+  @override
+  Future<LongMemory?> longMemory(String slug) => _run(
+    'longMemory',
+    () => noMemoryRoute
+        ? null
+        : LongMemory(
+            count: _factsOf(slug).length,
+            facts: _factsOf(slug),
+            files: [...?longFiles[slug]],
+          ),
+    slug,
+  );
+
+  /// Finds each fact that shares a word's first five letters with [query], more shared words
+  /// closer, as a model would find it by meaning.
+  @override
+  Future<List<RecallHit>> recallMemory(
+    String slug,
+    String query,
+  ) => _run('recallMemory', () {
+    Set<String> words(String text) => {
+      for (final w in RegExp(r'[a-z0-9]{3,}').allMatches(text.toLowerCase()))
+        w[0]!.substring(0, w[0]!.length < 5 ? w[0]!.length : 5),
+    };
+    final asked = words(query);
+    final found = [
+      for (final fact in _factsOf(slug))
+        if (words(fact.text).intersection(asked).length case final n when n > 0)
+          RecallHit(score: 0.55 + 0.1 * n, text: fact.text, fact: fact),
+    ]..sort((a, b) => b.score.compareTo(a.score));
+    return found;
+  }, query);
+
+  @override
+  Future<({LongFact fact, bool isNew})> rememberLong(
+    String slug,
+    String text, {
+    required bool global,
+  }) => _run('rememberLong', () {
+    final same = _factsOf(slug)
+        .where((f) => f.text.toLowerCase() == text.toLowerCase())
+        .firstOrNull;
+    if (same != null) return (fact: same, isNew: false);
+    return (fact: addFact(text, workspace: global ? null : slug), isNew: true);
+  }, text);
+
+  @override
+  Future<void> forgetLong(String slug, {String? fact, String? path}) => _run(
+    'forgetLong',
+    () {
+      if (path != null) {
+        final files = longFiles[slug] ?? [];
+        final before = files.length;
+        files.removeWhere((f) => f.path == path || f.path.startsWith('$path/'));
+        if (files.length == before) {
+          throw ApiException("nothing ingested from '$path'", status: 404);
+        }
+        return;
+      }
+      final before = longFacts.length;
+      longFacts.removeWhere(
+        (f) =>
+            f.fact.id == fact && (f.workspace == null || f.workspace == slug),
+      );
+      if (longFacts.length == before) {
+        throw ApiException('no fact $fact here', status: 404);
+      }
+    },
+    fact ?? path,
+  );
 
   /// What [scheduledJobs] answers.
   List<ScheduledJob> jobs = const [];

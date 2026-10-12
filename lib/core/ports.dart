@@ -7,6 +7,7 @@ import 'commands.dart';
 import 'connection.dart';
 import 'created.dart';
 import 'embeds.dart';
+import 'memory.dart';
 import 'prefs.dart';
 import 'schedule.dart';
 import 'server_models.dart';
@@ -135,6 +136,55 @@ abstract interface class AnythingLlmApi {
   /// The jobs AnythingLLM runs on a schedule. It takes the server's web login, as the presets
   /// do: on a server with a password it needs one saved.
   Future<List<ScheduledJob>> scheduledJobs();
+
+  /// Whether the server keeps saved memories, and saves them from chats itself. This and the
+  /// other saved-memory calls take the server's web login, as the presets do.
+  Future<MemorySwitches> memorySwitches();
+
+  /// Turns saved memories, or the server saving them from chats, on or off; null leaves one as
+  /// it is.
+  Future<void> setMemorySwitches({bool? enabled, bool? learn});
+
+  /// The saved memories workspace [slug]'s chats are shown. Fails with status 403 while the
+  /// server keeps none.
+  Future<SavedMemories> savedMemories(String slug);
+
+  /// Saves [text] for every workspace when [global], else for workspace [slug]. A full list is
+  /// an [ApiException] in the server's words.
+  Future<SavedMemory> addMemory(
+    String slug,
+    String text, {
+    required bool global,
+  });
+
+  Future<SavedMemory> editMemory(int id, String text);
+
+  Future<void> deleteMemory(int id);
+
+  /// Shows memory [id] in every workspace's chats, or, given [toWorkspace], in that workspace's
+  /// only.
+  Future<SavedMemory> moveMemory(int id, {String? toWorkspace});
+
+  /// What workspace [slug]'s agent can recall from the everythingllm host's long-term memory.
+  /// Null when the server does not say, as one without the host's route. Fails with
+  /// [ApiException].
+  Future<LongMemory?> longMemory(String slug);
+
+  /// The facts and parts of files closest in meaning to [query], closest first. Fails with
+  /// [ApiException], as while the host's model loads.
+  Future<List<RecallHit>> recallMemory(String slug, String query);
+
+  /// Keeps [text] in the long-term memory, for every workspace when [global], and answers the
+  /// fact with whether it is new rather than one that already says it.
+  Future<({LongFact fact, bool isNew})> rememberLong(
+    String slug,
+    String text, {
+    required bool global,
+  });
+
+  /// Forgets the long-term [fact], by its id, or the text read in from [path], a file or
+  /// folder; the files themselves stay.
+  Future<void> forgetLong(String slug, {String? fact, String? path});
 
   /// Tells the server whether the tool [request] asks about may run. Fails with [ApiException]
   /// when it was answered already, or the server stopped waiting.

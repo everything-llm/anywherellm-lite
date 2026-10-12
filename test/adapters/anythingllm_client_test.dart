@@ -1328,6 +1328,122 @@ void main() {
     });
   });
 
+  group('saved memories', () {
+    test(
+      'the switches are read and written as the server\'s preferences',
+      () async {
+        final server = _SignInServer()
+          ..routes['/api/admin/system-preferences-for'] = {
+            'settings': {
+              'memory_enabled': 'true',
+              'memory_auto_extraction': 'false',
+            },
+          }
+          ..routes['/api/admin/system-preferences'] = {
+            'success': true,
+            'error': null,
+          };
+        final api = server.api();
+        final switches = await api.memorySwitches();
+        expect((switches.enabled, switches.learn), (true, false));
+        expect(
+          server.seen.last.url.queryParameters['labels'],
+          'memory_enabled,memory_auto_extraction',
+        );
+        await api.setMemorySwitches(learn: true);
+        expect(server.seen.last.method, 'POST');
+        expect(jsonDecode(server.seen.last.body), {
+          'memory_auto_extraction': 'true',
+        });
+      },
+    );
+
+    test('a server that never set them keeps none and learns', () async {
+      final server = _SignInServer()
+        ..routes['/api/admin/system-preferences-for'] = {
+          'settings': {'memory_enabled': 'false'},
+        };
+      final switches = await server.api().memorySwitches();
+      expect((switches.enabled, switches.learn), (false, true));
+    });
+
+    test(
+      'a workspace\'s memories are listed, added, edited and moved',
+      () async {
+        final memory = {
+          'id': 7,
+          'content': 'Prefers metric units.',
+          'scope': 'global',
+          'workspaceId': null,
+        };
+        final server = _SignInServer()
+          ..routes['/api/workspaces/q3/memories'] = {
+            'memories': {
+              'global': [memory],
+              'workspace': [
+                {
+                  'id': 8,
+                  'content': 'Reports go to Maja.',
+                  'scope': 'workspace',
+                },
+                {'id': 'bad'},
+              ],
+            },
+            'memory': memory,
+          }
+          ..routes['/api/memories/7'] = {'memory': memory}
+          ..routes['/api/memories/7/demote/q3'] = {
+            'memory': {...memory, 'scope': 'workspace'},
+          };
+        final api = server.api();
+        final listed = await api.savedMemories('q3');
+        expect(
+          [for (final m in listed.global) m.text],
+          ['Prefers metric units.'],
+        );
+        expect(listed.global.single.global, isTrue);
+        expect([for (final m in listed.workspace) m.id], [8]);
+
+        final added = await api.addMemory(
+          'q3',
+          'Prefers metric units.',
+          global: true,
+        );
+        expect(added.id, 7);
+        expect(server.seen.last.method, 'POST');
+        expect(jsonDecode(server.seen.last.body), {
+          'content': 'Prefers metric units.',
+          'scope': 'global',
+        });
+
+        await api.editMemory(7, 'Prefers metric.');
+        expect(server.seen.last.method, 'PUT');
+        expect(jsonDecode(server.seen.last.body), {
+          'content': 'Prefers metric.',
+        });
+
+        final moved = await api.moveMemory(7, toWorkspace: 'q3');
+        expect(moved.global, isFalse);
+        expect(server.seen.last.url.path, '/api/memories/7/demote/q3');
+        expect(server.seen.last.headers['Authorization'], 'Bearer TOKEN-1');
+      },
+    );
+
+    test('a full list fails in the server\'s words', () async {
+      final api = _api(
+        (_) async => http.Response(
+          jsonEncode({'error': 'Maximum global memory limit (5) reached.'}),
+          400,
+        ),
+        current: _connection.withPassword(null),
+      );
+      final error = await _failure(
+        api.addMemory('q3', 'One more.', global: true),
+      );
+      expect(error.message, 'Maximum global memory limit (5) reached.');
+    });
+  });
+
   group('slash commands', () {
     test('reads the presets from the system route, signed in', () async {
       final server = _SignInServer()

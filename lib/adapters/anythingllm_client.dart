@@ -13,6 +13,7 @@ import '../core/commands.dart';
 import '../core/connection.dart';
 import '../core/created.dart';
 import '../core/embeds.dart';
+import '../core/memory.dart';
 import '../core/ports.dart';
 import '../core/schedule.dart';
 import '../core/server_models.dart';
@@ -391,25 +392,28 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   }
 
   /// The response to [method] on a route of the everythingllm host on the connection in use,
-  /// which [route] makes from the server's address, with [headers] beside the key's, within
-  /// [limit].
+  /// which [route] makes from the server's address, with [headers] beside the key's and [body]
+  /// as JSON, within [limit].
   Future<http.Response> _host(
     String method,
     Uri Function(Uri server) route, {
     Map<String, String> headers = const {},
+    Map<String, Object?>? body,
     Duration? limit,
   }) async {
     final connection = _current;
     final url = route(connection.uri);
+    final request = http.Request(method, url)
+      ..headers.addAll({..._headers(connection), ...headers});
+    if (body != null) {
+      request
+        ..headers['Content-Type'] = 'application/json'
+        ..body = jsonEncode(body);
+    }
     return _fetch(
       connection,
       limit ?? timeout,
-      () async => http.Response.fromStream(
-        await _client.send(
-          http.Request(method, url)
-            ..headers.addAll({..._headers(connection), ...headers}),
-        ),
-      ),
+      () async => http.Response.fromStream(await _client.send(request)),
     );
   }
 
@@ -817,6 +821,134 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   @override
   Future<List<ScheduledJob>> scheduledJobs() async =>
       scheduledJobsOf(await _session('GET', '/api/scheduled-jobs'));
+
+  /// The switches are the server's preferences `memory_enabled` and `memory_auto_extraction`,
+  /// read and written as text through its admin routes, which a single-user server answers.
+  @override
+  Future<MemorySwitches> memorySwitches() async => MemorySwitches.fromJson(
+    await _session(
+      'GET',
+      '/api/admin/system-preferences-for'
+          '?labels=memory_enabled,memory_auto_extraction',
+    ),
+  );
+
+  @override
+  Future<void> setMemorySwitches({bool? enabled, bool? learn}) => _session(
+    'POST',
+    '/api/admin/system-preferences',
+    body: {
+      'memory_enabled': ?enabled?.toString(),
+      'memory_auto_extraction': ?learn?.toString(),
+    },
+  );
+
+  @override
+  Future<SavedMemories> savedMemories(String slug) async =>
+      SavedMemories.fromJson(
+        await _session(
+          'GET',
+          '/api/workspaces/${Uri.encodeComponent(slug)}/memories',
+        ),
+      );
+
+  @override
+  Future<SavedMemory> addMemory(
+    String slug,
+    String text, {
+    required bool global,
+  }) async => _memory(
+    await _session(
+      'POST',
+      '/api/workspaces/${Uri.encodeComponent(slug)}/memories',
+      body: {'content': text, 'scope': global ? 'global' : 'workspace'},
+    ),
+  );
+
+  @override
+  Future<SavedMemory> editMemory(int id, String text) async => _memory(
+    await _session('PUT', '/api/memories/$id', body: {'content': text}),
+  );
+
+  @override
+  Future<void> deleteMemory(int id) => _session('DELETE', '/api/memories/$id');
+
+  @override
+  Future<SavedMemory> moveMemory(int id, {String? toWorkspace}) async =>
+      _memory(
+        await _session(
+          'POST',
+          toWorkspace == null
+              ? '/api/memories/$id/promote'
+              : '/api/memories/$id/demote/${Uri.encodeComponent(toWorkspace)}',
+        ),
+      );
+
+  /// The memory an answer holds under `memory`.
+  SavedMemory _memory(Object? body) =>
+      SavedMemory.fromJson(_field(body, 'memory')) ??
+      (throw const ApiException('The server did not say what it saved.'));
+
+  @override
+  Future<LongMemory?> longMemory(String slug) async {
+    final connection = _current.withPassword(null);
+    if (_noRoute.contains((connection, 'memory'))) return null;
+    final response = await _host('GET', (server) => memoryRoute(server, slug));
+    final body = _json(response);
+    if (_routeMissing(connection, 'memory', response, body)) return null;
+    return LongMemory.fromJson(_decode(response)) ??
+        (throw const ApiException(
+          'The server did not answer like the long-term memory.',
+        ));
+  }
+
+  @override
+  Future<List<RecallHit>> recallMemory(String slug, String query) async {
+    final hits = _field(
+      _decode(
+        await _host(
+          'GET',
+          (server) => memoryRoute(server, slug, '/recall', {'q': query}),
+        ),
+      ),
+      'hits',
+    );
+    return [
+      if (hits is List)
+        for (final hit in hits) ?RecallHit.fromJson(hit),
+    ];
+  }
+
+  @override
+  Future<({LongFact fact, bool isNew})> rememberLong(
+    String slug,
+    String text, {
+    required bool global,
+  }) async {
+    final body = _decode(
+      await _host(
+        'POST',
+        (server) => memoryRoute(server, slug, '/remember'),
+        body: {'text': text, 'scope': global ? 'global' : 'workspace'},
+      ),
+    );
+    final fact =
+        LongFact.fromJson(_field(body, 'fact')) ??
+        (throw const ApiException('The server did not say what it kept.'));
+    return (fact: fact, isNew: _field(body, 'new') != false);
+  }
+
+  @override
+  Future<void> forgetLong(String slug, {String? fact, String? path}) async =>
+      _decode(
+        await _host(
+          'POST',
+          (server) => memoryRoute(server, slug, '/forget', {
+            'id': ?fact,
+            'path': ?path,
+          }),
+        ),
+      );
 
   /// The server answers a bare `OK`.
   @override
