@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'apps.dart';
 import 'chat.dart';
 import 'chat_log.dart';
 import 'commands.dart';
@@ -204,6 +205,49 @@ abstract interface class AnythingLlmApi {
 
   /// The chats embed [uuid] has held, in the server's order.
   Future<List<EmbedChat>> embedChats(String uuid);
+}
+
+/// The apps server, anythingllm-apps-v2, which may run beside AnythingLLM on its host and
+/// takes the same developer key. Every method but [available] and [card] uses the connection
+/// in use and throws [ApiException] on failure, [NotConfigured] when there is none.
+abstract interface class AppsApi {
+  /// Whether the apps server answers beside the server in use: its `/health`, asked without
+  /// the key, names [appsService]. The answer is remembered for the connection; [again] asks
+  /// afresh. Never throws: anything else is false.
+  Future<bool> available({bool again = false});
+
+  /// Workspace [workspace]'s apps, newest change first.
+  Future<List<ServerApp>> apps(String workspace);
+
+  /// The files of [app]'s folder, less its caches and git.
+  Future<List<AppFile>> files(AppRef app);
+
+  /// The text of [app]'s file at [path], as stored.
+  Future<String> file(AppRef app, String path);
+
+  /// [app]'s data after log line [line], or now when [line] is null.
+  Future<AppState> state(AppRef app, {int? line});
+
+  /// The commits of [app]'s folder, newest first.
+  Future<List<AppCommit>> history(AppRef app);
+
+  /// `git show` of [app]'s commit [commit].
+  Future<String> diff(AppRef app, String commit);
+
+  /// Puts [app]'s data back as it was after line [line], as a new line, and returns its number.
+  Future<int> restore(AppRef app, int line);
+
+  /// Reverts [app]'s commit [commit] as a new commit, and returns its hash.
+  Future<String> revert(AppRef app, String commit);
+
+  /// Gives [app] the title [title]. Its folder keeps its name.
+  Future<void> rename(AppRef app, String title);
+
+  /// Deletes [app] with its data.
+  Future<void> delete(AppRef app);
+
+  /// The picture at [url], an app's card read once. Sent without the key.
+  Future<Uint8List> card(Uri url);
 }
 
 /// Where the connection is kept between runs.
