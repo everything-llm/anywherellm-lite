@@ -140,7 +140,7 @@ class _Body extends StatelessWidget {
             ? ('Loading…', '')
             : (
                 'No workspaces yet',
-                'Make one with New workspace, in the workspace menu at the top of the drawer.',
+                'Make one with New workspace, under the workspace\'s name at the top of the Chats tab.',
               );
         return Center(
           child: SingleChildScrollView(
@@ -166,8 +166,8 @@ class _Body extends StatelessWidget {
   }
 }
 
-/// The chat's header: the menu, the workspace and its documents over the chat's name, which
-/// opens the chat's sheet, or on a new chat the workspace's settings, then New chat.
+/// The chat's header: Back to the chats, the workspace and its documents over the chat's
+/// name, which opens the chat's sheet, or on a new chat the workspace's settings, then New chat.
 class _Header extends StatelessWidget {
   const _Header();
 
@@ -201,12 +201,12 @@ class _Header extends StatelessWidget {
               spacing: 4,
               children: [
                 IconBtn(
-                  'hamburger',
-                  tooltip: 'Workspaces',
+                  'back',
+                  tooltip: 'Back to the chats',
                   box: 48,
                   filled: true,
                   size: IconSize.small,
-                  onPressed: scope.shell.toggleSide,
+                  onPressed: scope.shell.closeChat,
                 ),
                 Expanded(
                   child: workspace == null
@@ -241,13 +241,14 @@ class _Header extends StatelessWidget {
                                         overflow: TextOverflow.ellipsis,
                                         style: Type.sans(
                                           12.5,
+                                          weight: FontWeight.w700,
                                           color: t.muted,
                                           height: 1.3,
                                         ),
                                       ),
                                     ),
                                     AppIcon(
-                                      'down',
+                                      'chevron',
                                       size: IconSize.tiny,
                                       color: t.muted,
                                     ),

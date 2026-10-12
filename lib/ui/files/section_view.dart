@@ -69,23 +69,11 @@ class _EditorState extends State<_Editor> {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final name = AppScope.of(context).chat.active?.name ?? 'this workspace';
-    final note = _saved.trim().isEmpty
-        ? 'Empty: the server\'s default system prompt applies.'
-        : 'What every answer in $name is told first.';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Text(
-              note,
-              style: Type.sans(13, color: t.muted, height: 1.45),
-            ),
-          ),
-          const SizedBox(height: 4),
           Expanded(
             child: Semantics(
               label: widget.node.name,
@@ -97,36 +85,40 @@ class _EditorState extends State<_Editor> {
                 textAlignVertical: TextAlignVertical.top,
                 autocorrect: false,
                 enableSuggestions: false,
-                style: Type.sans(15, color: t.ink, height: 1.55),
+                style: Type.sans(15.5, color: t.ink, height: 1.5),
                 cursorColor: t.accent,
-                decoration: editorDecoration(
-                  context,
-                  t.panel,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
-                  ),
+                decoration: editorDecoration(context, t.panel).copyWith(
+                  // An empty prompt says what applies instead.
+                  hintText:
+                      'Empty: the server\'s default system prompt applies.',
+                  hintStyle: Type.sans(15.5, color: t.muted, height: 1.5),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          // Only the buttons follow the draft, so typing rebuilds nothing else.
+          const SizedBox(height: 20),
+          // Only the buttons follow the draft, so typing rebuilds nothing else. They show once
+          // the text has changed, in a line kept for them, as the design canvas draws it.
           ListenableBuilder(
             listenable: _draft,
-            builder: (context, _) => ActionRow(even: true, [
-              AppButton(
-                'Revert',
-                onPressed: _dirty && !_saving
-                    ? () => _draft.text = _saved
-                    : null,
-              ),
-              AppButton(
-                _saving ? 'Saving…' : 'Save',
-                primary: true,
-                onPressed: _dirty && !_saving ? _save : null,
-              ),
-            ]),
+            builder: (context, _) => ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 52),
+              child: !_dirty && !_saving
+                  ? null
+                  : ActionRow(even: true, [
+                      AppButton(
+                        'Revert',
+                        onPressed: _dirty && !_saving
+                            ? () => _draft.text = _saved
+                            : null,
+                      ),
+                      AppButton(
+                        _saving ? 'Saving…' : 'Save',
+                        primary: true,
+                        onPressed: _dirty && !_saving ? _save : null,
+                      ),
+                    ]),
+            ),
           ),
         ],
       ),
@@ -134,8 +126,8 @@ class _EditorState extends State<_Editor> {
   }
 }
 
-/// A page of the open workspace: its documents, its instructions or its answer settings, the
-/// node [FilesController.section] picks, or the text of one of its documents.
+/// A page of the open workspace: its instructions or its answer settings, the node
+/// [FilesController.section] picks, or the text of one of its documents.
 Widget essentialSection(BuildContext context, FileNode? node) {
   final scope = AppScope.of(context);
   final files = scope.files;
@@ -145,8 +137,8 @@ Widget essentialSection(BuildContext context, FileNode? node) {
   final section = files.section;
   final key = ValueKey('${node?.path}#${files.revision}');
   return switch (section) {
-    // Keyed by workspace, so what waits to be added stays with it.
-    FilesSection.documents => EssentialDocs(key: ValueKey(workspace.slug)),
+    // The documents are a sheet over the pages; this shows only until the text picked reads.
+    FilesSection.documents => const Blank('Loading…'),
     _ when files.contentLoading || (node == null && files.loading) =>
       const Blank('Loading…'),
     _ when node == null => Blank(

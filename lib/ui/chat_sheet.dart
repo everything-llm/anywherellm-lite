@@ -101,6 +101,7 @@ class _ChatSheetState extends State<ChatSheet> {
                 FieldRow(
                   label: 'Pin to the top',
                   small: true,
+                  inSheet: true,
                   control: AppSwitch(
                     value: pinned,
                     label: 'Pin to the top',
@@ -143,6 +144,8 @@ class _Delete extends StatelessWidget {
       onKeep: scope.shell.closePopup,
       onDelete: () {
         scope.shell.closePopup();
+        // The chat on screen goes with it, back to the Chats tab.
+        if (scope.chat.activeThread == of.thread.slug) scope.shell.closeChat();
         unawaited(scope.chat.delete(of.thread.slug));
       },
     );

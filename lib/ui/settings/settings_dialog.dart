@@ -6,6 +6,7 @@ import '../app_scope.dart';
 import '../state/settings_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
+import '../home.dart';
 import '../widgets/phone_page.dart';
 import 'chats_page.dart';
 import 'connection_page.dart';
@@ -19,9 +20,9 @@ import 'rows.dart';
 import 'server_page.dart';
 import 'settings_pages.dart';
 
-/// Settings, a page over the window: a back arrow and the title, then the list in two groups,
-/// This app and AnythingLLM, whose Server row opens the Server page, which lists the server's
-/// pages.
+/// Settings: its list as the Settings tab, under its title and over the bar of tabs, in two
+/// groups, This app and AnythingLLM, whose Server row opens the Server page, which lists the
+/// server's pages; a page shows over the window under a back arrow and its name.
 class SettingsDialog extends StatefulWidget {
   const SettingsDialog({super.key});
 
@@ -64,7 +65,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
   }
 }
 
-/// The list, or a page, under a back arrow and the title.
+/// The list as a tab, or a page under a back arrow and its name.
 class _Frame extends StatelessWidget {
   const _Frame({required this.page, required this.configured});
 
@@ -79,23 +80,29 @@ class _Frame extends StatelessWidget {
     if (page != null && page.needsServer && !configured) {
       page = SettingsPage.connection;
     }
-    final back = switch (page) {
-      null => 'Back to the chat',
-      final page => 'Back to ${page.parent?.label ?? 'Settings'}',
-    };
     // A first run opens on its welcome alone, with no bar over it; Back still closes it.
     if (page == SettingsPage.connection && !configured) {
       return const _PageView(SettingsPage.connection);
+    }
+    if (page == null) {
+      return const Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TabTitle('Settings'),
+          Expanded(child: _Nav()),
+          HomeTabBar(),
+        ],
+      );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         PhonePageHeader(
-          title: page?.label ?? 'Settings',
-          back: back,
+          title: page.label,
+          back: 'Back to ${page.parent?.label ?? 'Settings'}',
           onBack: shell.settingsBack,
         ),
-        Expanded(child: page == null ? const _Nav() : _PageView(page)),
+        Expanded(child: _PageView(page)),
       ],
     );
   }
@@ -123,11 +130,11 @@ class _Nav extends StatelessWidget {
               const SizedBox(height: 20),
             ],
             const CardHeading('This app'),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             FieldCard([
               for (final (page, icon) in const [
                 (SettingsPage.connection, 'link'),
-                (SettingsPage.appearance, 'settings'),
+                (SettingsPage.appearance, 'brush'),
                 (SettingsPage.chat, 'chat'),
               ])
                 NavRow(
@@ -139,10 +146,10 @@ class _Nav extends StatelessWidget {
             if (connection != null) ...[
               const SizedBox(height: 20),
               const CardHeading('AnythingLLM'),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               FieldCard([
                 NavRow(
-                  icon: 'activity',
+                  icon: 'server',
                   title: SettingsPage.server.label,
                   about: serverSummary(scope.system),
                   onTap: () => shell.showSettingsPage(SettingsPage.server),
@@ -186,58 +193,28 @@ class _ServerCard extends StatelessWidget {
       _ when scope.chat.unreachable.value => ('Connection problem', t.badfg),
       _ => ('Connected', t.okfg),
     };
-    return FieldCard([
-      Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: FieldCard.inset,
-          vertical: 16,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          spacing: 2,
-          children: [
-            Row(
-              spacing: 12,
-              children: [
-                Expanded(
-                  child: Text(
-                    'AnythingLLM',
-                    style: Type.sans(19, weight: FontWeight.w500, color: t.ink),
-                  ),
-                ),
-                Semantics(
-                  liveRegion: true,
-                  child: Text(state, style: Type.sans(13, color: color)),
-                ),
-              ],
-            ),
-            Text(
-              connection.host,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Type.mono(13, color: t.muted),
-            ),
-            if (settings.check == ConnectionCheck.failed)
-              if (settings.message case final message?)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    message,
-                    style: Type.sans(13, color: t.badfg, height: 1.4),
-                  ),
-                ),
-          ],
-        ),
+    return SummaryCard(
+      title: 'AnythingLLM',
+      trailing: Semantics(
+        liveRegion: true,
+        child: Text(state, style: Type.sans(15, color: color)),
       ),
-      CardRow(
-        'Test connection',
-        tone: RowTone.accent,
-        height: 56,
-        onTap: settings.check == ConnectionCheck.testing
-            ? null
-            : () => unawaited(settings.testSaved()),
-      ),
-    ]);
+      lines: [
+        Text(
+          connection.host,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Type.mono(13, color: t.muted, height: 1.45),
+        ),
+        if (settings.check == ConnectionCheck.failed)
+          if (settings.message case final message?)
+            Text(message, style: Type.sans(13, color: t.badfg, height: 1.4)),
+      ],
+      link: 'Test connection',
+      onLink: settings.check == ConnectionCheck.testing
+          ? null
+          : () => unawaited(settings.testSaved()),
+    );
   }
 }
 
@@ -257,8 +234,8 @@ class _PageView extends StatelessWidget {
     return SingleChildScrollView(
       key: ValueKey(page),
       padding: firstRun
-          ? const EdgeInsets.fromLTRB(24, 72, 24, 24)
-          : const EdgeInsets.fromLTRB(20, 14, 20, 32),
+          ? const EdgeInsets.fromLTRB(16, 56, 16, 16)
+          : const EdgeInsets.fromLTRB(16, 8, 16, 24),
       child: Align(
         alignment: Alignment.topLeft,
         child: ConstrainedBox(
@@ -266,19 +243,13 @@ class _PageView extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // The first run says what to do in its own words, and Appearance and Chat need no
-              // line, as the design canvas draws them.
-              if (firstRun || page == SettingsPage.chat)
-                const SizedBox.shrink()
-              else if (page == SettingsPage.appearance)
-                const SizedBox(height: 2)
-              else ...[
-                Text(switch (page) {
-                  SettingsPage.connection =>
-                    'How this phone reaches AnythingLLM.',
-                  SettingsPage.server => 'What AnythingLLM runs with. Each row opens the page that changes it.',
-                  _ => page.about,
-                }, style: Type.sans(14.5, color: t.ink2, height: 1.5)),
+              // The pages the design canvas draws need no line about them; the server's
+              // other pages say what they are for.
+              if (!_bare.contains(page)) ...[
+                Text(
+                  page.about,
+                  style: Type.sans(14.5, color: t.ink2, height: 1.5),
+                ),
                 const SizedBox(height: 14),
               ],
               KeyedSubtree(key: ValueKey((page, server)), child: _body(page)),
@@ -288,6 +259,15 @@ class _PageView extends StatelessWidget {
       ),
     );
   }
+
+  /// The pages shown with no line about them, as the design canvas draws them.
+  static const _bare = {
+    SettingsPage.connection,
+    SettingsPage.appearance,
+    SettingsPage.chat,
+    SettingsPage.server,
+    SettingsPage.memory,
+  };
 
   static Widget _body(SettingsPage page) => switch (page) {
     SettingsPage.connection => const ConnectionPage(),

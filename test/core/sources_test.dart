@@ -32,17 +32,14 @@ void main() {
     );
     expect(file.tile, 'MD');
     expect(file.meta, '1,204 words');
-    expect(file.filesMeta, '1,204 words');
     expect(const SourceFile(path: 'p', title: 'README', on: true).meta, '');
   });
 
   test('a switched-off file says it is not used', () {
     const off = SourceFile(path: 'p', title: 'Pricing', on: false, words: 1040);
     expect(off.meta, 'Not used · 1,040 words');
-    expect(off.filesMeta, '1,040 words · Not used in answers');
     const uncounted = SourceFile(path: 'p', title: 'Pricing', on: false);
     expect(uncounted.meta, 'Not used');
-    expect(uncounted.filesMeta, 'Not used in answers');
   });
 
   test('a title loses the extension of the file it came from', () {

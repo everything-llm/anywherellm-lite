@@ -1,0 +1,462 @@
+import 'package:flutter/material.dart';
+
+import '../core/chat_groups.dart';
+import '../core/copy.dart';
+import '../core/find.dart';
+import '../core/server_models.dart';
+import 'app_scope.dart';
+import 'icons.dart';
+import 'layout.dart';
+import 'settings/rows.dart';
+import 'state/shell_controller.dart';
+import 'tokens.dart';
+import 'type.dart';
+import 'upcoming.dart';
+import 'widgets/basics.dart';
+import 'widgets/buttons.dart';
+import 'widgets/min_height.dart';
+import 'widgets/phone_page.dart';
+import 'widgets/tappable.dart';
+import 'workspace_switcher.dart';
+
+/// The bar at the foot of the home: Chats and Settings, the tab shown on a pill of
+/// [Tokens.sel] with its icon in the accent.
+class HomeTabBar extends StatelessWidget {
+  const HomeTabBar({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final shell = AppScope.of(context).shell;
+    final t = Tokens.of(context);
+    return ListenableBuilder(
+      listenable: shell,
+      builder: (context, _) => Semantics(
+        container: true,
+        label: 'Sections',
+        explicitChildNodes: true,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
+          decoration: BoxDecoration(
+            color: t.side,
+            border: Border(top: BorderSide(color: t.line2)),
+          ),
+          child: Row(
+            children: [
+              for (final (tab, label, icon) in const [
+                (HomeTab.chats, 'Chats', 'chat'),
+                (HomeTab.settings, 'Settings', 'settings'),
+              ])
+                Expanded(
+                  child: _Tab(
+                    label: label,
+                    icon: icon,
+                    on: shell.tab == tab,
+                    onTap: () => shell.showTab(tab),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Tab extends StatelessWidget {
+  const _Tab({
+    required this.label,
+    required this.icon,
+    required this.on,
+    required this.onTap,
+  });
+
+  final String label;
+  final String icon;
+  final bool on;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Tappable(
+      label: label,
+      selected: on,
+      radius: BorderRadius.circular(Sizes.control),
+      onTap: onTap,
+      child: SizedBox(
+        height: 56,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          spacing: 4,
+          children: [
+            Container(
+              width: 60,
+              height: 32,
+              decoration: BoxDecoration(
+                color: on ? t.sel : null,
+                borderRadius: BorderRadius.circular(99),
+              ),
+              child: Center(
+                child: AppIcon(
+                  icon,
+                  size: IconSize.medium,
+                  color: on ? t.accent : t.ink2,
+                ),
+              ),
+            ),
+            Text(
+              label,
+              style: Type.sans(
+                12.5,
+                weight: on ? FontWeight.w600 : FontWeight.w500,
+                color: on ? t.ink : t.muted,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The Chats tab: the open workspace's name as its title, which opens the Workspaces sheet,
+/// with Workspace settings and New chat beside it; the search; the Upcoming card; then the
+/// workspace's chats under Chats, each with a More button that opens its sheet. A chat opens
+/// full screen over the home.
+class ChatsTab extends StatefulWidget {
+  const ChatsTab({super.key});
+
+  @override
+  State<ChatsTab> createState() => _ChatsTabState();
+}
+
+class _ChatsTabState extends State<ChatsTab> {
+  final _search = TextEditingController();
+
+  /// What the search holds, trimmed: it changes only with the words, not with the cursor.
+  final _query = ValueNotifier('');
+
+  @override
+  void initState() {
+    super.initState();
+    _search.addListener(() => _query.value = _search.text.trim());
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    _query.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final chat = scope.chat;
+    final shell = scope.shell;
+    return Semantics(
+      container: true,
+      label: 'Chats',
+      child: MinHeight(
+        min: Sizes.panelMin,
+        child: ListenableBuilder(
+          listenable: Listenable.merge([
+            chat,
+            scope.prefs,
+            scope.settings,
+            _query,
+          ]),
+          builder: (context, _) {
+            final query = _query.value;
+            final searching = query.isNotEmpty;
+            final active = chat.active;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: 72,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 16, 0),
+                    child: Row(
+                      spacing: 8,
+                      children: [
+                        const Expanded(child: WorkspaceSwitcher()),
+                        if (active != null) ...[
+                          IconBtn(
+                            'settings',
+                            tooltip: 'Workspace settings',
+                            box: 48,
+                            filled: true,
+                            onPressed: () => shell.showPane(Pane.files),
+                          ),
+                          IconBtn(
+                            'plus',
+                            tooltip: 'New chat',
+                            box: 48,
+                            filled: true,
+                            onPressed: () {
+                              chat.newChat();
+                              shell.openChat();
+                            },
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    children: [
+                      _Search(_search, focus: shell.searchFocus),
+                      if (searching)
+                        ..._found(context, query)
+                      else ...[
+                        if (scope.settings.configured) ...[
+                          const SizedBox(height: 20),
+                          const UpcomingCard(),
+                        ],
+                        if (active != null) ...[
+                          const SizedBox(height: 20),
+                          const CardHeading('Chats'),
+                          const SizedBox(height: 10),
+                          FieldCard(_chats(context)),
+                        ],
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  /// The open workspace's chats: the pinned ones, then the ones this device used last, then
+  /// the rest.
+  List<Widget> _chats(BuildContext context) {
+    final scope = AppScope.of(context);
+    final chat = scope.chat;
+    final slug = chat.activeSlug!;
+    final groups = groupChats(
+      chat.threadsOf(slug),
+      scope.prefs.pinnedIn(slug),
+      scope.prefs.recentIn(slug),
+    );
+    final rows = [
+      for (final thread in groups.pinned)
+        _ChatRow(thread, workspace: slug, pinned: true),
+      for (final thread in [...groups.recent, ...groups.rest])
+        _ChatRow(thread, workspace: slug, pinned: false),
+    ];
+    return rows.isEmpty ? [const _None('No chats yet.')] : rows;
+  }
+
+  /// What [query] finds: each workspace whose name or a chat of which matches, in a card with
+  /// its matching chats under it.
+  List<Widget> _found(BuildContext context, String query) {
+    final scope = AppScope.of(context);
+    final chat = scope.chat;
+    final ordered = scope.prefs.prefs.inOrder(chat.workspaces, (w) => w.slug);
+    final found = findChats(query, ordered, chat.threadsOf);
+    if (found.isEmpty) {
+      return [
+        const SizedBox(height: 20),
+        FieldCard([_None('Nothing matches "$query".')]),
+      ];
+    }
+    return [
+      for (final (workspace, threads) in found) ...[
+        const SizedBox(height: 20),
+        FieldCard([
+          _FoundWorkspace(workspace),
+          for (final thread in threads)
+            _ChatRow(
+              thread,
+              workspace: workspace.slug,
+              pinned: scope.prefs
+                  .pinnedIn(workspace.slug)
+                  .contains(thread.slug),
+            ),
+        ]),
+      ],
+    ];
+  }
+}
+
+/// A line in the card of chats when there are none to list.
+class _None extends StatelessWidget {
+  const _None(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    constraints: const BoxConstraints(minHeight: 64),
+    padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
+    alignment: Alignment.centerLeft,
+    child: Text(text, style: Type.sans(15.5, color: Tokens.of(context).muted)),
+  );
+}
+
+/// The search: a field on the panel inside a [Tokens.line] edge, which turns [Tokens.ink]
+/// while it has the focus.
+class _Search extends StatelessWidget {
+  const _Search(this.controller, {required this.focus});
+
+  final TextEditingController controller;
+  final FocusNode focus;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final searching = controller.text.isNotEmpty;
+    return ListenableBuilder(
+      listenable: focus,
+      builder: (context, child) => Container(
+        constraints: const BoxConstraints(minHeight: Sizes.field),
+        padding: EdgeInsets.only(left: 16, right: searching ? 4 : 16),
+        decoration: BoxDecoration(
+          color: t.panel,
+          borderRadius: BorderRadius.circular(Sizes.phoneControl),
+          border: Border.all(color: focus.hasFocus ? t.ink : t.line),
+        ),
+        child: child,
+      ),
+      child: Row(
+        spacing: 10,
+        children: [
+          AppIcon('search', size: IconSize.small, color: t.muted),
+          Expanded(
+            child: Semantics(
+              label: 'Search workspaces and chats',
+              textField: true,
+              child: TextField(
+                controller: controller,
+                focusNode: focus,
+                autocorrect: false,
+                style: Type.sans(16, color: t.ink),
+                cursorColor: t.accent,
+                decoration: InputDecoration(
+                  isCollapsed: true,
+                  border: InputBorder.none,
+                  hintText: 'Search chats',
+                  hintStyle: Type.sans(16, color: t.muted),
+                ),
+              ),
+            ),
+          ),
+          if (searching)
+            IconBtn(
+              'close',
+              tooltip: 'Clear search',
+              box: 44,
+              size: IconSize.xs,
+              onPressed: controller.clear,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A workspace the search found: tapped, it opens.
+class _FoundWorkspace extends StatelessWidget {
+  const _FoundWorkspace(this.workspace);
+
+  final Workspace workspace;
+
+  @override
+  Widget build(BuildContext context) {
+    final chat = AppScope.of(context).chat;
+    final active = chat.activeSlug == workspace.slug;
+    final count = chat.docCounts[workspace.slug];
+    return NavRow(
+      icon: 'grid',
+      title: workspace.name,
+      about: count != null && count > 0 ? plural(count, 'doc', 'docs') : null,
+      heard: workspace.name,
+      selected: active,
+      chevron: false,
+      onTap: () {
+        if (!active) chat.select(workspace.slug);
+      },
+    );
+  }
+}
+
+/// A chat in the Chats tab: its name, after it its pin and whether its answer is ready, and a
+/// More button that opens its sheet. Tapped, it opens full screen.
+class _ChatRow extends StatelessWidget {
+  const _ChatRow(this.thread, {required this.workspace, required this.pinned});
+
+  final Thread thread;
+  final String workspace;
+  final bool pinned;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final chat = scope.chat;
+    final t = Tokens.of(context);
+    final ready = chat.isReady(thread.slug);
+    return Padding(
+      padding: const EdgeInsets.only(left: FieldCard.inset, right: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Tappable(
+              label: [
+                thread.name,
+                if (pinned) 'pinned',
+                if (ready) 'answer ready',
+              ].join(', '),
+              onTap: () async {
+                scope.shell.openChat();
+                if (chat.activeSlug != workspace) {
+                  await chat.select(workspace, thread: thread.slug);
+                } else {
+                  await chat.open(thread.slug);
+                }
+              },
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 64),
+                child: Row(
+                  spacing: 8,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        thread.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Type.sans(
+                          16,
+                          weight: FontWeight.w500,
+                          color: t.ink,
+                        ),
+                      ),
+                    ),
+                    if (pinned)
+                      AppIcon('pin', size: IconSize.xs, color: t.muted),
+                    if (ready) const ReadyDot(gap: false),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // A chat's sheet acts on the workspace on screen.
+          if (workspace == chat.activeSlug)
+            IconBtn(
+              'more',
+              tooltip: 'Rename, pin or delete ${thread.name}',
+              box: 44,
+              size: IconSize.small,
+              onPressed: () => scope.shell.openChatSheet(thread),
+            ),
+        ],
+      ),
+    );
+  }
+}

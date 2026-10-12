@@ -13,6 +13,7 @@ import '../settings/settings_pages.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
+import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/fields.dart';
 import '../widgets/sheet.dart';
@@ -36,7 +37,7 @@ Future<List<int>> _readShared(Future<List<int>> Function() read) async {
 /// What to do with a shared item.
 enum _Use { add, ask }
 
-/// Share to AnywhereLLM: what another app shared, the workspace to take it (the open one first,
+/// Share to AnywhereLLM Lite: what another app shared, the workspace to take it (the open one first,
 /// and chosen), then Add to documents, which adds it to that workspace's documents, or Ask about
 /// it, which opens a new chat there with it in the message, a file attached, for the person to
 /// ask. With no server saved it says to connect first.
@@ -124,7 +125,9 @@ class _ShareSheetState extends State<ShareSheet> {
             ),
           };
           chat.newChat();
-          shell.closeShared();
+          shell
+            ..closeShared()
+            ..openChat();
           chat.putInComposer(message, attachments);
       }
     } on UnreadableFile catch (error) {
@@ -144,7 +147,7 @@ class _ShareSheetState extends State<ShareSheet> {
     final shell = scope.shell;
     final (tile, name, about) = _shown;
     return SheetFrame(
-      title: 'Share to AnywhereLLM',
+      title: 'Share to AnywhereLLM Lite',
       onClose: shell.closeShared,
       child: SingleChildScrollView(
         child: ListenableBuilder(
@@ -218,9 +221,12 @@ class _ShareSheetState extends State<ShareSheet> {
                 ] else ...[
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
-                    spacing: 8,
+                    spacing: 12,
                     children: [
-                      const CardHeading('Workspace'),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: SectionLabel('Workspace'),
+                      ),
                       FieldCard(inSheet: true, [
                         for (final w in workspaces)
                           _WorkspaceRow(
@@ -283,6 +289,12 @@ class _WorkspaceRow extends StatelessWidget {
           child: Row(
             spacing: 14,
             children: [
+              SizedBox.square(
+                dimension: IconSize.row.px,
+                child: chosen
+                    ? AppIcon('check', size: IconSize.row, color: t.ink)
+                    : null,
+              ),
               Expanded(
                 child: Text(
                   name,
@@ -295,7 +307,6 @@ class _WorkspaceRow extends StatelessWidget {
                   ),
                 ),
               ),
-              if (chosen) AppIcon('check', color: t.ink),
             ],
           ),
         ),

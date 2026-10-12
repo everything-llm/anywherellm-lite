@@ -61,7 +61,7 @@ void main() {
     await tester.pumpAndSettle();
     // Two groups and no switch: this app's pages, then the server's one row.
     expect(find.text('Theme'), findsNothing);
-    expect(find.text('Server'), findsOneWidget);
+    expect(find.text('Server', skipOffstage: false), findsOneWidget);
     expect(find.text('Chat model'), findsNothing);
     expect(control('All settings'), findsNothing);
     await tester.tap(find.text('Appearance'));
@@ -72,14 +72,9 @@ void main() {
     expect(h.shell.settingsOpen, isTrue);
     expect(h.shell.settingsPage, isNull);
     // Server lists the server's pages, and each goes back to it.
-    await tester.tap(find.text('Server'));
+    await tapVisible(tester, find.text('Server', skipOffstage: false));
     await tester.pumpAndSettle();
-    expect(
-      find.text(
-        'What AnythingLLM runs with. Each row opens the page that changes it.',
-      ),
-      findsOneWidget,
-    );
+    expect(h.shell.settingsPage, SettingsPage.server);
     await tester.tap(find.text('Chat model'));
     await tester.pumpAndSettle();
     expect(h.shell.settingsPage, SettingsPage.chatModel);
@@ -90,7 +85,8 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(h.shell.settingsPage, isNull);
-    await tester.tap(find.byTooltip('Back to the chat'));
+    // The list is a tab: Back gives the Chats tab back.
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(h.shell.settingsOpen, isFalse);
   });

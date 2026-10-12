@@ -11,6 +11,9 @@ import 'chat_controller.dart';
 /// What the main pane shows: the chat, or the open workspace's pages.
 enum Pane { chats, files }
 
+/// A tab of the bar at the foot of the home: the open workspace's chats, or Settings' list.
+enum HomeTab { chats, settings }
+
 /// What the sheet over the chat shows: Sources, the passages an answer read from one
 /// file, or all of an answer's sources ([cited]).
 enum Beside { sources, passages, cited }
@@ -34,7 +37,7 @@ class ChatSheetFor {
   final bool deleting;
 }
 
-/// A page a phone shows over the chat, from its drawer: the server's scheduled jobs.
+/// A page shown over the Chats tab, from its Upcoming card: the server's scheduled jobs.
 enum PhonePage { upcoming }
 
 /// A phone's sheet about the open workspace: a new workspace's name, the open one's new name,
@@ -42,18 +45,19 @@ enum PhonePage { upcoming }
 enum WorkspaceSheet { create, rename, delete }
 
 /// A popup over the window, at most one open at a time: the workspace menu, the composer's Answer
-/// from sheet, or the Attach sheet. An answer's More sheet is keyed by its [Turn] instead.
-enum Popup { workspaces, answerFrom, attach }
+/// from sheet, the Attach sheet, or the Memory page's choice of workspace. An answer's More sheet
+/// is keyed by its [Turn] instead.
+enum Popup { workspaces, answerFrom, attach, memoryWorkspace }
 
-/// What is open around the chat: the drawer, the sheet over the chat ([Beside]: the Documents
-/// panel, Sources in the code, or an answer's passages or sources), Settings, the [popup] open,
-/// and which [Pane] is on screen.
+/// What is open over the home and its two tabs: the chat, full screen over them, the sheet over
+/// the chat ([Beside]: the Documents panel, Sources in the code, or an answer's passages or
+/// sources), Settings and the page of it shown, the [popup] open, and which [Pane] is on screen.
 class ShellController extends ChangeNotifier {
   ShellController();
 
-  bool _sideOpen = false;
+  bool _chatOpen = false;
 
-  /// The drawer's search field.
+  /// The Chats tab's search field.
   final searchFocus = FocusNode(debugLabel: 'Search chats');
 
   final _popup = ValueNotifier<Object?>(null);
@@ -91,11 +95,9 @@ class ShellController extends ChangeNotifier {
   void openGallery(List<Picture> pictures, int index, {required String chat}) =>
       _popup.value = GalleryOpen(pictures, index, chat: chat);
 
-  /// Opens [thread]'s sheet, closing any other popup and the drawer.
-  void openChatSheet(Thread thread, {bool deleting = false}) {
-    _popup.value = ChatSheetFor(thread, deleting: deleting);
-    closeSide();
-  }
+  /// Opens [thread]'s sheet, closing any other popup.
+  void openChatSheet(Thread thread, {bool deleting = false}) =>
+      _popup.value = ChatSheetFor(thread, deleting: deleting);
 
   /// Opens the popup [key], closing any other, or closes it when it is open.
   void togglePopup(Object key) =>
@@ -170,6 +172,10 @@ class ShellController extends ChangeNotifier {
   Pane _pane = Pane.chats;
   SettingsPage? _settingsPage;
 
+  /// Whether Settings was opened on its page from elsewhere, not from its list, so that Back
+  /// from a page with no parent gives back what was under it rather than the list.
+  bool _settingsDirect = false;
+
   /// What the sheet over the chat shows.
   Beside _beside = Beside.sources;
 
@@ -182,10 +188,20 @@ class ShellController extends ChangeNotifier {
   /// The citation whose passages the sheet over the chat shows, or showed last.
   Citation? get passages => _passages;
 
-  bool get sideOpen => _sideOpen;
+  /// Whether the chat shows, full screen over the home.
+  bool get chatOpen => _chatOpen;
 
-  /// Whether the sheet over the chat is open. It is never open while Files is on screen.
-  bool get rightOpen => _pane == Pane.chats && _rightOpen;
+  /// The tab the home shows: Settings while Settings is open, else Chats.
+  HomeTab get tab => _settingsOpen ? HomeTab.settings : HomeTab.chats;
+
+  /// Whether the home shows, with the bar of its tabs: the Chats tab with nothing over it, or
+  /// Settings' list.
+  bool get atHome => _settingsOpen
+      ? _settingsPage == null
+      : !_chatOpen && _pane == Pane.chats && _phonePage == null;
+
+  /// Whether the sheet over the chat, or over the workspace's pages, is open.
+  bool get rightOpen => _rightOpen;
 
   /// What the sheet over the chat shows, open or not.
   Beside get beside => _beside;
@@ -200,8 +216,50 @@ class ShellController extends ChangeNotifier {
 
   Pane get pane => _pane;
 
-  void toggleSide() => _set(side: !_sideOpen);
-  void closeSide() => _set(side: false);
+  /// Shows the chat full screen over the home, closing Settings, the workspace's pages and a
+  /// page over the Chats tab.
+  void openChat() {
+    if (_chatOpen &&
+        !_settingsOpen &&
+        _pane == Pane.chats &&
+        _phonePage == null) {
+      return;
+    }
+    _chatOpen = true;
+    _settingsOpen = false;
+    _scanning = false;
+    _sourcesUnder = null;
+    _pane = Pane.chats;
+    _workspacePage = null;
+    _phonePage = null;
+    notifyListeners();
+  }
+
+  /// Takes the chat off the screen, back to the Chats tab. It stays built, so a draft and a
+  /// running answer survive.
+  void closeChat() {
+    if (!_chatOpen) return;
+    _chatOpen = false;
+    _rightOpen = false;
+    closePopup();
+    notifyListeners();
+  }
+
+  /// Shows [tab] with nothing over it.
+  void showTab(HomeTab tab) {
+    _chatOpen = false;
+    _rightOpen = false;
+    _sourcesUnder = null;
+    _pane = Pane.chats;
+    _workspacePage = null;
+    _phonePage = null;
+    _scanning = false;
+    _settingsOpen = tab == HomeTab.settings;
+    _settingsPage = null;
+    _settingsDirect = false;
+    _popup.value = null;
+    notifyListeners();
+  }
 
   void openSources() => _setRight(open: true, beside: Beside.sources);
 
@@ -262,31 +320,41 @@ class ShellController extends ChangeNotifier {
         : _setRight(open: true, beside: under);
   }
 
-  /// Opens Settings on [page], or on its list.
+  /// Opens Settings on [page], over what shows, so that Back from it gives that back; or on its
+  /// list, the Settings tab, in place of whatever showed.
   void openSettings([SettingsPage? page]) {
+    if (page == null) return showTab(HomeTab.settings);
+    _settingsDirect = !_settingsOpen || _settingsDirect;
     _settingsPage = page;
     _settingsOpen = true;
-    _sideOpen = false;
     _popup.value = null;
     notifyListeners();
   }
 
   void closeSettings() {
     _scanning = false;
-    _set(settings: false);
+    if (!_settingsOpen) return;
+    _settingsOpen = false;
+    _settingsDirect = false;
+    notifyListeners();
   }
 
+  /// Shows Settings' [page], or its list. A page opened from the list goes back to it.
   void showSettingsPage(SettingsPage? page) {
     if (page == _settingsPage) return;
+    if (_settingsPage == null) _settingsDirect = false;
     _settingsPage = page;
     notifyListeners();
   }
 
-  /// Goes back from the Settings page shown to the page it is reached from, the Server page or
-  /// the list. From the list, Settings closes.
+  /// Goes back from the Settings page shown to the page it is reached from: the Server page,
+  /// the list, or what showed under Settings when it opened on the page. From the list,
+  /// Settings closes, back to the Chats tab.
   void settingsBack() {
     final page = _settingsPage;
     if (page == null) {
+      closeSettings();
+    } else if (page.parent == null && _settingsDirect) {
       closeSettings();
     } else {
       showSettingsPage(page.parent);
@@ -297,7 +365,37 @@ class ShellController extends ChangeNotifier {
     if (pane == _pane) return;
     _pane = pane;
     _workspacePage = null;
+    _rightOpen = false;
+    _sourcesUnder = null;
     closePopup();
+    notifyListeners();
+  }
+
+  /// What showed under the Documents sheet when a document's text was opened from it, or null
+  /// when the text was opened otherwise.
+  Pane? _sourcesUnder;
+
+  /// Shows a document's text, picked in the Documents sheet, in the workspace's pages in place
+  /// of the sheet, which [textClosed] gives back.
+  void showDocText() {
+    _sourcesUnder = _pane;
+    _rightOpen = false;
+    _beside = Beside.sources;
+    _pane = Pane.files;
+    _workspacePage = null;
+    closePopup();
+    notifyListeners();
+  }
+
+  /// After a document's text closes: when it was opened from the Documents sheet, the sheet
+  /// over what showed under it.
+  void textClosed() {
+    final under = _sourcesUnder;
+    if (under == null) return;
+    _sourcesUnder = null;
+    _pane = under;
+    _beside = Beside.sources;
+    _rightOpen = true;
     notifyListeners();
   }
 
@@ -309,18 +407,10 @@ class ShellController extends ChangeNotifier {
     _set(right: open);
   }
 
-  void _set({bool? side, bool? right, bool? settings}) {
-    final next = (
-      side ?? _sideOpen,
-      right ?? _rightOpen,
-      settings ?? _settingsOpen,
-    );
-    if (next == (_sideOpen, _rightOpen, _settingsOpen)) return;
-    _sideOpen = next.$1;
-    // The menu is the drawer's: it goes with the drawer.
-    if (!_sideOpen) closePopup(Popup.workspaces);
-    _rightOpen = next.$2;
-    _settingsOpen = next.$3;
+  void _set({bool? right}) {
+    final next = right ?? _rightOpen;
+    if (next == _rightOpen) return;
+    _rightOpen = next;
     notifyListeners();
   }
 }

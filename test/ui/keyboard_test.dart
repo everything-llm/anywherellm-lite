@@ -119,15 +119,15 @@ void main() {
     },
   );
 
-  testWidgets('the sidebar on a phone on its side scrolls above the keyboard', (
-    tester,
-  ) async {
-    final h = await pumpApp(tester, llm: planningServer(), size: side);
-    h.shell.toggleSide();
-    raiseKeyboard(tester, sideKeyboard);
-    await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull);
-  });
+  testWidgets(
+    'the Chats tab on a phone on its side scrolls above the keyboard',
+    (tester) async {
+      await pumpApp(tester, llm: planningServer(), size: side, onChat: false);
+      raiseKeyboard(tester, sideKeyboard);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'a workspace prompt being edited on a phone on its side is above the keyboard',

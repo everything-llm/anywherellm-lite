@@ -29,11 +29,9 @@ void main() {
           enabled: false,
         ),
       ];
-    final h = await pumpApp(tester, llm: llm, size: phone);
-    h.shell.toggleSide();
-    await tester.pumpAndSettle();
-    expect(control('Upcoming, 2 jobs'), findsOneWidget);
-    await tester.tap(control('Upcoming, 2 jobs'));
+    final h = await pumpApp(tester, llm: llm, size: phone, onChat: false);
+    expect(find.textContaining('2 jobs · next today'), findsOneWidget);
+    await tester.tap(find.text('Upcoming'));
     await tester.pumpAndSettle();
     final page = find.byType(UpcomingPage);
     expect(page, findsOneWidget);

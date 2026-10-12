@@ -13,20 +13,20 @@ import 'tokens.dart';
 import 'type.dart';
 import 'widgets/basics.dart';
 import 'widgets/buttons.dart';
-import 'widgets/drawer_row.dart';
 import 'widgets/phone_page.dart';
 import 'widgets/fields.dart';
 
-/// Upcoming in a phone's drawer: the jobs the server runs on a schedule, with how many once
-/// read. It reads them the first time it shows on a server. Tapped, it opens [UpcomingPage].
-class UpcomingRow extends StatefulWidget {
-  const UpcomingRow({super.key});
+/// Upcoming on the Chats tab, a card of one row: the jobs the server runs on a schedule, with
+/// how many and when the next runs once read. It reads them the first time it shows on a
+/// server. Tapped, it opens [UpcomingPage].
+class UpcomingCard extends StatefulWidget {
+  const UpcomingCard({super.key});
 
   @override
-  State<UpcomingRow> createState() => _UpcomingRowState();
+  State<UpcomingCard> createState() => _UpcomingCardState();
 }
 
-class _UpcomingRowState extends State<UpcomingRow> {
+class _UpcomingCardState extends State<UpcomingCard> {
   @override
   void initState() {
     super.initState();
@@ -46,18 +46,25 @@ class _UpcomingRowState extends State<UpcomingRow> {
       listenable: scope.system,
       builder: (context, _) {
         final jobs = scope.system.jobs;
-        final count = jobs == null ? null : plural(jobs.length, 'job', 'jobs');
-        return DrawerRow(
-          icon: 'clock',
-          title: 'Upcoming',
-          heard: count == null ? 'Upcoming' : 'Upcoming, $count',
-          trailing: count == null ? null : DrawerCount(count),
-          onTap: () {
-            scope.shell
-              ..closeSide()
-              ..openPhonePage(PhonePage.upcoming);
-          },
-        );
+        final now = DateTime.now();
+        final next = [
+          for (final job in jobs ?? const <ScheduledJob>[])
+            if (job.enabled) ?job.nextRun,
+        ]..sort();
+        final about = jobs == null
+            ? null
+            : [
+                plural(jobs.length, 'job', 'jobs'),
+                if (next.isNotEmpty) 'next ${whenText(next.first, now)}',
+              ].join(' · ');
+        return FieldCard([
+          NavRow(
+            icon: 'clock',
+            title: 'Upcoming',
+            about: about,
+            onTap: () => scope.shell.openPhonePage(PhonePage.upcoming),
+          ),
+        ]);
       },
     );
   }
@@ -96,7 +103,7 @@ class _UpcomingPageState extends State<UpcomingPage> {
         children: [
           PhonePageHeader(
             title: 'Upcoming',
-            back: 'Back to the chat',
+            back: 'Back to the chats',
             onBack: shell.closePhonePage,
           ),
           Expanded(
@@ -139,12 +146,9 @@ class _UpcomingPageState extends State<UpcomingPage> {
                       FieldCard([
                         for (final job in jobs) _JobRow(job, now: now),
                       ]),
-                    const SizedBox(height: 12),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: HelpText('Read only here.'),
-                    ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
+                    const HelpText('Read only here.'),
+                    const SizedBox(height: 20),
                     if (scope.settings.configured)
                       ActionRow(even: true, [
                         AppButton(
@@ -165,7 +169,7 @@ class _UpcomingPageState extends State<UpcomingPage> {
 }
 
 /// One job: its name, then one line of its workspace, its schedule and when it runs next, or
-/// when its last run failed, in red.
+/// when its last run failed, in red, cut short where it is too long.
 class _JobRow extends StatelessWidget {
   const _JobRow(this.job, {required this.now});
 
@@ -186,14 +190,16 @@ class _JobRow extends StatelessWidget {
         ? 'Next: ${whenText(next, now)}'
         : null;
     final about = [?job.workspace, describeSchedule(job.cron, now)].join(' · ');
-    return Padding(
+    return Container(
+      constraints: const BoxConstraints(minHeight: 88),
       padding: const EdgeInsets.symmetric(
         horizontal: FieldCard.inset,
-        vertical: 12,
+        vertical: 10,
       ),
+      alignment: Alignment.centerLeft,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        spacing: 2,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             job.name,
@@ -212,7 +218,9 @@ class _JobRow extends StatelessWidget {
                 ],
               ],
             ),
-            style: Type.sans(13, color: t.muted, height: 1.4),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Type.sans(13, color: t.muted),
           ),
         ],
       ),

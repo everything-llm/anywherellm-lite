@@ -6,7 +6,7 @@ import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/ui/chat/chat_view.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
-import 'package:anywherellm/ui/phone_drawer.dart';
+import 'package:anywherellm/ui/home.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/controls.dart';
@@ -19,8 +19,9 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/fake_api.dart';
 import '../support/pump.dart';
 
-Finder inSidebar(String text) =>
-    find.descendant(of: find.byType(PhoneDrawer), matching: find.text(text));
+/// [text] in the Chats tab, drawn while Settings is closed.
+Finder inHome(String text) =>
+    find.descendant(of: find.byType(ChatsTab), matching: find.text(text));
 
 Finder inSources(Finder finder) =>
     find.descendant(of: find.byType(SourcesPanel), matching: finder);
@@ -375,23 +376,35 @@ void main() {
       expect(opacityOf(inSources(find.text('PDF'))), 0.5);
     });
 
-    testWidgets('removing a file can be undone from the toast', (tester) async {
-      final llm = planningServer();
-      final h = await withDocuments(tester, llm);
-      await tester.tap(control('Remove Q3 roadmap.pdf'));
-      await tester.pumpAndSettle();
-      expect(find.text('Removed Q3 roadmap.pdf'), findsOneWidget);
-      await tester.tap(control('Undo'));
-      await tester.pumpAndSettle();
-      expect(h.sources.files, hasLength(2));
-      expect(find.text('Removed Q3 roadmap.pdf'), findsNothing);
-    });
+    testWidgets(
+      'a file opens its text, which removes it, and the sheet comes back',
+      (tester) async {
+        final llm = planningServer();
+        final h = await withDocuments(tester, llm);
+        await tester.tap(control('View extracted text of Q3 roadmap.pdf'));
+        await tester.pumpAndSettle();
+        expect(h.shell.sourcesOpen, isFalse);
+        expect(h.files.reading?.title, 'Q3 roadmap.pdf');
+        await tapVisible(tester, control('Remove from workspace'));
+        await tester.pumpAndSettle();
+        // Its undo is in the sheet, which comes back over what showed under it.
+        expect(h.shell.sourcesOpen, isTrue);
+        expect(h.shell.pane, Pane.chats);
+        expect(find.text('Removed Q3 roadmap.pdf'), findsOneWidget);
+        await tester.tap(control('Undo'));
+        await tester.pumpAndSettle();
+        expect(h.sources.files, hasLength(2));
+        expect(find.text('Removed Q3 roadmap.pdf'), findsNothing);
+      },
+    );
 
     testWidgets('a file\'s download saves the text the server read', (
       tester,
     ) async {
       final h = await withDocuments(tester, planningServer());
-      await tester.tap(control('Download text of Q3 roadmap.pdf'));
+      await tester.tap(control('View extracted text of Q3 roadmap.pdf'));
+      await tester.pumpAndSettle();
+      await tester.tap(control('Download the extracted text'));
       await tester.pumpAndSettle();
       expect(
         utf8.decode(h.saved['Q3 roadmap.pdf.txt']!),
@@ -403,9 +416,14 @@ void main() {
       final llm = planningServer()
         ..errors['document'] = const ApiException('The server is down.');
       final h = await withDocuments(tester, llm);
-      await tester.tap(control('Download text of Q3 roadmap.pdf'));
+      await tester.tap(control('View extracted text of Q3 roadmap.pdf'));
+      await tester.pumpAndSettle();
+      await tester.tap(control('Download the extracted text'));
       await tester.pumpAndSettle();
       expect(h.saved, isEmpty);
+      // Back gives the sheet back, which says why.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
       expect(
         inSources(find.text('Could not save Q3 roadmap.pdf')),
         findsOneWidget,
@@ -446,7 +464,9 @@ void main() {
       expect(h.store.saved?.apiKey, 'K9');
       expect(find.text('The key was saved.'), findsOneWidget);
       expect(find.text('Saved'), findsOneWidget);
-      expect(inSidebar('Q3 planning'), findsOneWidget);
+      h.shell.showTab(HomeTab.chats);
+      await tester.pumpAndSettle();
+      expect(inHome('Q3 planning'), findsOneWidget);
     });
 
     Future<Harness> signedIn(
@@ -474,7 +494,9 @@ void main() {
       expect(h.store.saved?.password, 'PASS-WORD');
       expect(find.text('Signed in to owen.example.ts.net.'), findsOneWidget);
       expect(control('Sign in'), findsNothing);
-      expect(inSidebar('Q3 planning'), findsOneWidget);
+      h.shell.showTab(HomeTab.chats);
+      await tester.pumpAndSettle();
+      expect(inHome('Q3 planning'), findsOneWidget);
     });
 
     testWidgets('a wrong password says so and saves nothing', (tester) async {
@@ -665,13 +687,11 @@ void main() {
       );
       tester.view.resetViewInsets();
       await tester.pumpAndSettle();
-      // Back goes from the page to the list, then closes Settings.
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(h.shell.settingsPage, isNull);
+      // Back from a page opened over the chat gives the chat back.
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(h.shell.settingsOpen, isFalse);
+      expect(h.shell.chatOpen, isTrue);
     });
 
     testWidgets('a scanned code connects as a typed key does', (tester) async {
@@ -690,7 +710,9 @@ void main() {
       expect(h.store.saved?.baseUrl, 'https://owen.example.ts.net');
       expect(h.store.saved?.apiKey, 'K9');
       expect(find.text('The key was saved.'), findsOneWidget);
-      expect(inSidebar('Q3 planning'), findsOneWidget);
+      h.shell.showTab(HomeTab.chats);
+      await tester.pumpAndSettle();
+      expect(inHome('Q3 planning'), findsOneWidget);
     });
 
     testWidgets('a scanned key the server refuses shows in the key field', (
@@ -767,19 +789,26 @@ void main() {
 
     testWidgets('Esc and the back arrow step out of it', (tester) async {
       final h = await pumpApp(tester, llm: planningServer());
-      h.shell.openSettings(SettingsPage.connection);
+      h.shell.openSettings();
       await tester.pumpAndSettle();
+      await tester.tap(control('Connection'));
+      await tester.pumpAndSettle();
+      expect(h.shell.settingsPage, SettingsPage.connection);
+      // A page opened from the list steps back to it, and the list back to the Chats tab.
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
       expect(h.shell.settingsPage, isNull);
+      expect(h.shell.settingsOpen, isTrue);
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
       expect(find.byType(SettingsDialog), findsNothing);
-      h.shell.openSettings();
+      h.shell
+        ..openSettings()
+        ..showSettingsPage(SettingsPage.chat);
       await tester.pumpAndSettle();
-      await tapVisible(tester, control('Back to the chat'));
+      await tester.tap(control('Back to Settings'));
       await tester.pumpAndSettle();
-      expect(h.shell.settingsOpen, isFalse);
+      expect(h.shell.settingsPage, isNull);
     });
   });
 

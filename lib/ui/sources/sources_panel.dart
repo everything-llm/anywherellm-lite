@@ -1,9 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../core/files.dart';
 import '../../core/sources.dart';
 import '../app_scope.dart';
-import '../files/save_file.dart';
-import '../icons.dart';
+import '../settings/rows.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
@@ -12,12 +14,13 @@ import '../widgets/controls.dart';
 import '../widgets/upload_queue.dart';
 import '../widgets/rise.dart';
 import '../widgets/sheet.dart';
+import '../widgets/tappable.dart';
 import '../widgets/side_panel.dart';
 import 'add_source.dart';
 import 'test_question.dart';
 
-/// The active workspace's files, which people see as Documents: add them, switch them on and
-/// off, remove them, and test what a question finds in them.
+/// The active workspace's files, which people see as Documents: switch them on and off, open
+/// the text the server read from each, add them, and test what a question finds in them.
 class SourcesPanel extends StatelessWidget {
   const SourcesPanel({super.key});
 
@@ -26,7 +29,6 @@ class SourcesPanel extends StatelessWidget {
     final scope = AppScope.of(context);
     return SidePanel(
       title: 'Documents',
-      about: 'Answers draw on the ones switched on.',
       onClose: scope.shell.closeSources,
       sheetHeight: SheetHeight.fit,
       child: ListenableBuilder(
@@ -58,8 +60,9 @@ List<Widget> _notices(BuildContext context) {
   ];
 }
 
-/// The sheet: Add a file, Add a link and Paste text as buttons, the files with a rule between
-/// them, then Test a question. It is as tall as what it holds.
+/// The sheet: what the switches mean, the files in a card, each with its switch, then Add a
+/// file, Add a link and Paste text as buttons, and Test a question. It is as tall as what it
+/// holds.
 class _Body extends StatelessWidget {
   const _Body(this.files);
 
@@ -71,6 +74,7 @@ class _Body extends StatelessWidget {
     final scope = AppScope.of(context);
     final sources = scope.sources;
     final slug = scope.chat.activeSlug;
+    final t = Tokens.of(context);
     return CustomScrollView(
       shrinkWrap: true,
       slivers: [
@@ -78,7 +82,39 @@ class _Body extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  files.isEmpty && !sources.loading
+                      ? 'No documents in this workspace yet.'
+                      : 'Answers draw on the ones switched on.',
+                  style: Type.sans(13, color: t.muted, height: 1.45),
+                ),
+              ),
+              ..._notices(context),
+              const SizedBox(height: 16),
+              if (files.isNotEmpty || sources.loading) ...[
+                FieldCard(inSheet: true, [
+                  if (files.isEmpty)
+                    Container(
+                      constraints: const BoxConstraints(minHeight: 64),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Loading…',
+                        style: Type.sans(14, color: t.muted),
+                      ),
+                    ),
+                  for (final file in files)
+                    Rise(
+                      key: ValueKey(file.path),
+                      child: _FileRow(
+                        file,
+                        flashed: sources.flashed == file.path,
+                      ),
+                    ),
+                ]),
+                const SizedBox(height: 16),
+              ],
               UploadQueue(
                 key: ValueKey(('queue', slug)),
                 onSend: sources.upload,
@@ -89,24 +125,17 @@ class _Body extends StatelessWidget {
                   leading: AppButton('Add a file', onPressed: browse),
                 ),
               ),
-              ..._notices(context),
-              const SizedBox(height: 12),
-            ],
-          ),
-        ),
-        _fileSliver(context, files),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: TestQuestion(
-              key: ValueKey(('test', slug)),
-              trigger: (open) => Align(
-                alignment: Alignment.centerLeft,
-                child: open == null
-                    ? const SizedBox.shrink()
-                    : TextAction('search', 'Test a question', open),
+              const SizedBox(height: 4),
+              TestQuestion(
+                key: ValueKey(('test', slug)),
+                trigger: (open) => Align(
+                  alignment: Alignment.centerLeft,
+                  child: open == null
+                      ? const SizedBox.shrink()
+                      : TextAction('search', 'Test a question', open),
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ],
@@ -114,35 +143,8 @@ class _Body extends StatelessWidget {
   }
 }
 
-/// The [files], or a line saying there are none yet, with a rule between them, as the design
-/// canvas draws the sheet.
-Widget _fileSliver(BuildContext context, List<SourceFile> files) {
-  final sources = AppScope.of(context).sources;
-  final t = Tokens.of(context);
-  if (files.isEmpty) {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Text(
-          sources.loading ? 'Loading…' : 'No files yet.',
-          textAlign: TextAlign.center,
-          style: Type.sans(14, color: t.muted),
-        ),
-      ),
-    );
-  }
-  return SliverList.separated(
-    itemCount: files.length,
-    separatorBuilder: (_, _) =>
-        Divider(height: 1, thickness: 1, color: t.line2),
-    itemBuilder: (context, i) => Rise(
-      key: ValueKey(files[i].path),
-      child: _FileRow(files[i], flashed: sources.flashed == files[i].path),
-    ),
-  );
-}
-
-/// A file in the sheet: 56 px tall, with its switch, download and trash.
+/// A file in the sheet's card: its type, name and size, and its switch. Tapped, it shows the
+/// text the server read from it in the workspace's pages, where it is downloaded or removed.
 class _FileRow extends StatelessWidget {
   const _FileRow(this.file, {required this.flashed});
 
@@ -153,65 +155,63 @@ class _FileRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
-    final row = SourceRow(
-      file,
-      meta: file.meta,
-      trailing: [
-        AppSwitch(
-          value: file.on,
-          label: 'Use ${file.title} in answers',
-          tooltip: 'Use in answers',
-          onChanged: (_) => scope.sources.toggle(file),
-        ),
-        DownloadTextButton(file),
-        IconBtn(
-          'trash',
-          tooltip: 'Remove ${file.title}',
-          box: 44,
-          size: IconSize.small,
-          dangerHover: true,
-          onPressed: () => scope.sources.remove(file),
-        ),
-      ],
-    );
-    // A citation's flash fills the row, between its rules.
+    // A citation's flash fills the row.
     return AnimatedContainer(
       duration: motion(context, const Duration(milliseconds: 300)),
-      constraints: const BoxConstraints(minHeight: 56),
-      alignment: Alignment.centerLeft,
       color: flashed ? t.accentbg : Colors.transparent,
-      child: row,
+      child: Row(
+        children: [
+          Expanded(
+            child: Tappable(
+              label: 'View extracted text of ${file.title}',
+              excludeSemantics: false,
+              onTap: () {
+                scope.shell.showDocText();
+                unawaited(
+                  scope.files
+                      .openSection(FilesSection.documents)
+                      .then((_) => scope.files.viewText(file.path, file.title)),
+                );
+              },
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 64),
+                padding: const EdgeInsets.only(left: FieldCard.inset),
+                child: SourceRow(file, meta: file.meta),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 8, right: FieldCard.inset),
+            child: AppSwitch(
+              value: file.on,
+              label: 'Use ${file.title} in answers',
+              tooltip: 'Use in answers',
+              onChanged: (_) => scope.sources.toggle(file),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-/// A document's row: its [TypeTile], its title with [meta] under it, then each of [trailing],
-/// such as its switch. [roomy] is how the workspace's Documents page draws it: wider gaps, and
-/// [meta] on up to two lines.
+/// A document's row: its [TypeTile], then its title with [meta] under it.
 class SourceRow extends StatelessWidget {
-  SourceRow(
-    SourceFile file, {
-    super.key,
-    required this.meta,
-    required this.trailing,
-    this.roomy = false,
-  }) : tile = TypeTile(file),
-       title = file.title;
+  SourceRow(SourceFile file, {super.key, required this.meta})
+    : tile = TypeTile(file),
+      title = file.title;
 
   final Widget tile;
   final String title;
   final String meta;
-  final List<Widget> trailing;
-  final bool roomy;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final gap = roomy ? 12.0 : 10.0;
     return Row(
+      spacing: 14,
       children: [
         tile,
-        SizedBox(width: gap),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -220,45 +220,19 @@ class SourceRow extends StatelessWidget {
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Type.sans(14.5, weight: FontWeight.w500, color: t.ink),
+                style: Type.sans(15, color: t.ink),
               ),
               if (meta.isNotEmpty)
                 Text(
                   meta,
-                  maxLines: roomy ? 2 : 1,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Type.sans(12, color: t.muted),
+                  style: Type.sans(13, color: t.muted, height: 1.45),
                 ),
             ],
           ),
         ),
-        for (final widget in trailing) ...[SizedBox(width: gap), widget],
       ],
-    );
-  }
-}
-
-/// Saves the text the server read from [file], which is all it keeps of it, through [saveText].
-/// A failure shows in [SourcesController.problems].
-class DownloadTextButton extends StatelessWidget {
-  const DownloadTextButton(this.file, {super.key});
-
-  final SourceFile file;
-
-  @override
-  Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    return IconBtn(
-      'download',
-      tooltip: 'Download text of ${file.title}',
-      box: 44,
-      size: IconSize.small,
-      onPressed: () => saveText(
-        context,
-        file.title,
-        () => scope.files.textOf(file.path),
-        report: scope.sources.report,
-      ),
     );
   }
 }
@@ -286,16 +260,11 @@ class TypeTile extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: t.accentbg,
-          borderRadius: BorderRadius.circular(5),
+          borderRadius: BorderRadius.circular(6),
         ),
         child: Text(
           label,
-          style: Type.sans(
-            9.5,
-            weight: FontWeight.w600,
-            color: t.accent,
-            letterSpacing: 9.5 * 0.03,
-          ),
+          style: Type.sans(9.5, weight: FontWeight.w700, color: t.accent),
         ),
       ),
     );

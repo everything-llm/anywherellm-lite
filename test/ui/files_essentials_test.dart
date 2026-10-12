@@ -2,6 +2,7 @@ import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/core/upload.dart';
 import 'package:anywherellm/ui/files/workspace_pages.dart';
+import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/upload_queue.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +13,10 @@ import '../support/pump.dart';
 
 Finder inPages(Finder finder) =>
     find.descendant(of: find.byType(WorkspacePages), matching: finder);
+
+/// [finder] in the Documents sheet.
+Finder inSheet(Finder finder) =>
+    find.descendant(of: find.byType(SourcesPanel), matching: finder);
 
 /// Opens the open workspace's pages, the window tall enough to show each whole.
 Future<Harness> openPages(WidgetTester tester, {FakeAnythingLlm? llm}) async {
@@ -60,31 +65,25 @@ void main() {
     expect(h.shell.pane, Pane.chats);
   });
 
-  testWidgets('Documents lists them, and one switched off is off in answers', (
-    tester,
-  ) async {
-    final h = await openPages(tester);
-    await openPage(tester, 'Documents');
-    expect(
-      inPages(find.text('2 documents, 2 used in answers')),
-      findsOneWidget,
-    );
-    expect(inPages(find.text('120 words')), findsNWidgets(2));
-    for (final label in ['Add a file', 'Add a link', 'Paste text']) {
-      expect(inPages(control(label)), findsOneWidget, reason: label);
-    }
-    await tester.tap(inPages(control('Use Q3 roadmap.pdf in answers')));
-    await tester.pumpAndSettle();
-    expect(h.sources.onCount, 1);
-    expect(
-      inPages(find.text('120 words · Not used in answers')),
-      findsOneWidget,
-    );
-    expect(
-      inPages(find.text('2 documents, 1 used in answers')),
-      findsOneWidget,
-    );
-  });
+  testWidgets(
+    'Documents opens the sheet, and one switched off is off in answers',
+    (tester) async {
+      final h = await openPages(tester);
+      await openPage(tester, 'Documents');
+      expect(h.shell.sourcesOpen, isTrue);
+      expect(inSheet(find.text('120 words')), findsNWidgets(2));
+      for (final label in ['Add a file', 'Add a link', 'Paste text']) {
+        expect(inSheet(control(label)), findsOneWidget, reason: label);
+      }
+      await tester.tap(inSheet(control('Use Q3 roadmap.pdf in answers')));
+      await tester.pumpAndSettle();
+      expect(h.sources.onCount, 1);
+      expect(inSheet(find.text('Not used · 120 words')), findsOneWidget);
+      h.shell.closeSources();
+      await tester.pumpAndSettle();
+      expect(inPages(find.text('1 of 2 used in answers')), findsOneWidget);
+    },
+  );
 
   testWidgets('a document opens its text, with Download and Remove', (
     tester,
@@ -101,6 +100,9 @@ void main() {
     await tapVisible(tester, control('Remove from workspace'));
     await tester.pumpAndSettle();
     expect(h.files.reading, isNull);
+    // The sheet the text was opened from comes back, with the undo.
+    expect(h.shell.sourcesOpen, isTrue);
+    expect(inSheet(find.text('Removed Q3 roadmap.pdf')), findsOneWidget);
     expect(
       h.sources.files.where((f) => f.on).map((f) => f.title),
       isNot(contains('Q3 roadmap.pdf')),
@@ -143,7 +145,7 @@ void main() {
     final llm = planningServer();
     await openPages(tester, llm: llm);
     await openPage(tester, 'Documents');
-    final queue = tester.widget<UploadQueue>(inPages(find.byType(UploadQueue)));
+    final queue = tester.widget<UploadQueue>(inSheet(find.byType(UploadQueue)));
     await queue.onSend([
       UploadFile(name: 'a.md', read: () async => [1]),
     ]);
@@ -157,13 +159,13 @@ void main() {
   ) async {
     await openPages(tester);
     await openPage(tester, 'Documents');
-    await tester.tap(inPages(control('Test a question')));
+    await tapVisible(tester, inSheet(control('Test a question')));
     await tester.pumpAndSettle();
-    expect(inPages(control('Test a question')), findsNothing);
-    expect(inPages(control('Done')), findsOneWidget);
-    await tester.tap(inPages(control('Done')));
+    expect(inSheet(control('Test a question')), findsNothing);
+    expect(inSheet(control('Done')), findsOneWidget);
+    await tapVisible(tester, inSheet(control('Done')));
     await tester.pumpAndSettle();
-    expect(inPages(control('Test a question')), findsOneWidget);
+    expect(inSheet(control('Test a question')), findsOneWidget);
   });
 
   testWidgets('Instructions is the workspace\'s PROMPT.md', (tester) async {
@@ -172,10 +174,8 @@ void main() {
     final h = await openPages(tester, llm: llm);
     await openPage(tester, 'Instructions');
     expect(h.files.selected, promptPath('q3'));
-    expect(
-      find.text('What every answer in Q3 planning is told first.'),
-      findsOneWidget,
-    );
+    // Save shows once the text has changed.
+    expect(inPages(control('Save')), findsNothing);
     await tester.enterText(
       inPages(find.byType(TextField)),
       'Answer in French.',

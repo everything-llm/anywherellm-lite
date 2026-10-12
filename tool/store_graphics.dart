@@ -234,7 +234,7 @@ void main() {
         baseUrl: 'https://anythingllm.example.ts.net',
         apiKey: 'K1',
       ),
-      // A pinned chat, so the sidebar shows its groups: Pinned, Recent and All chats.
+      // A pinned chat, so the Chats tab shows it first.
       prefsStore: FakePrefsStore(
         Prefs(
           theme: ThemePref.dark,
@@ -254,16 +254,18 @@ void main() {
     );
     await _capture(tester, 'phoneScreenshots/1_chat.png');
 
-    // The sidebar with the workspace's chats, then its workspace menu open over them.
-    h.shell.toggleSide();
+    // The Chats tab with the workspace's chats, then the Workspaces sheet open over it.
+    h.shell.closeChat();
     await tester.pumpAndSettle();
     await _capture(tester, 'phoneScreenshots/2_chats.png');
     h.shell.togglePopup(Popup.workspaces);
     await tester.pumpAndSettle();
     await _capture(tester, 'phoneScreenshots/3_workspaces.png');
 
-    h.shell.closeSide();
-    h.shell.openSources();
+    h.shell
+      ..closePopup()
+      ..openChat()
+      ..openSources();
     await tester.pumpAndSettle();
     await _capture(tester, 'phoneScreenshots/4_sources.png');
 

@@ -19,6 +19,13 @@ import 'save_file.dart';
 import '../settings/rows.dart';
 import '../settings/settings_pages.dart';
 
+/// Closes the document's text shown, giving back the Documents sheet when the text was opened
+/// from it.
+void closeDocText(AppScope scope) {
+  scope.files.closeText();
+  scope.shell.textClosed();
+}
+
 /// What the page of [section] is called: Answer settings is Answer from.
 String _titleOf(FilesSection section) =>
     section == FilesSection.answers ? 'Answer from' : section.title;
@@ -74,7 +81,7 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                 page == null
                     ? 'Back to the workspace'
                     : 'Back to ${_titleOf(page)}',
-                _files.closeText,
+                () => closeDocText(scope),
               )
             : page != null
             ? (
@@ -157,55 +164,27 @@ class _WorkspacePagesState extends State<WorkspacePages> {
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
-            FieldCard([
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: FieldCard.inset,
-                  vertical: 16,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  spacing: 2,
-                  children: [
-                    Row(
-                      spacing: 12,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Type.sans(
-                              19,
-                              weight: FontWeight.w500,
-                              color: t.ink,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          plural(chats, 'chat', 'chats'),
-                          style: Type.sans(13, color: t.muted),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      '${plural(docs.length, 'document', 'documents')}, '
-                      '$on used in answers',
-                      style: Type.sans(13, color: t.muted),
-                    ),
-                  ],
-                ),
+            SummaryCard(
+              title: name,
+              trailing: Text(
+                plural(chats, 'chat', 'chats'),
+                style: Type.sans(13, color: t.muted),
               ),
-              CardRow(
-                'Rename',
-                tone: RowTone.accent,
-                height: 56,
-                onTap: () => shell.togglePopup(WorkspaceSheet.rename),
-              ),
-            ]),
+              lines: [
+                Text(
+                  docs.isEmpty
+                      ? 'No documents yet'
+                      : '${plural(docs.length, 'document', 'documents')}, '
+                            '$on used in answers',
+                  style: Type.sans(13, color: t.muted, height: 1.45),
+                ),
+              ],
+              link: 'Rename',
+              onLink: () => shell.togglePopup(WorkspaceSheet.rename),
+            ),
             const SizedBox(height: 20),
             const CardHeading('How it answers'),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             FieldCard([
               NavRow(
                 icon: 'doc',
@@ -213,7 +192,7 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                 about: docs.isEmpty
                     ? 'None yet'
                     : '$on of ${docs.length} used in answers',
-                onTap: () => _open(shell, FilesSection.documents),
+                onTap: shell.openSources,
               ),
               NavRow(
                 icon: 'pencil',
@@ -224,7 +203,7 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                 onTap: () => _open(shell, FilesSection.instructions),
               ),
               NavRow(
-                icon: 'chat',
+                icon: 'settings',
                 title: 'Answer from',
                 about: (mode ?? ChatMode.automatic).title,
                 onTap: () => _open(shell, FilesSection.answers),
@@ -245,6 +224,7 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                 'Delete workspace',
                 icon: 'trash',
                 tone: RowTone.danger,
+                large: true,
                 onTap: chat.answeringIn(slug)
                     ? null
                     : () => shell.togglePopup(WorkspaceSheet.delete),

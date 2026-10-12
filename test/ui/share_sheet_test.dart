@@ -50,7 +50,7 @@ void main() {
       shares,
       SharedLink(Uri.parse('https://example.test/prices'), title: 'Prices'),
     );
-    expect(inSheet(find.text('Share to AnywhereLLM')), findsOneWidget);
+    expect(inSheet(find.text('Share to AnywhereLLM Lite')), findsOneWidget);
     expect(inSheet(find.text('Prices')), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.tap(inSheet(control('Household')));

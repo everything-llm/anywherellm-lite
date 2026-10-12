@@ -77,8 +77,8 @@ class FieldCard extends StatelessWidget {
 
 /// A setting in a [FieldCard]: its [label] and [help] on the left and its [control] on the
 /// right, or the control under them where the row is narrow. A [small] control, such as a
-/// switch, stays on the right however narrow, in a 52 px column near the card's edge, as the
-/// design canvas draws it.
+/// switch, stays on the right however narrow, in a 52 px column at the card's inset, in a row
+/// as tall as an [InfoRow], as the design canvas draws it.
 class FieldRow extends StatelessWidget {
   const FieldRow({
     super.key,
@@ -87,12 +87,16 @@ class FieldRow extends StatelessWidget {
     this.help = '',
     this.small = false,
     this.tag,
+    this.inSheet = false,
   });
 
   final String label;
   final String help;
   final Widget control;
   final bool small;
+
+  /// Whether it is a row of a sheet's card, 64 tall rather than a page's.
+  final bool inSheet;
 
   /// A badge beside the label, such as Recommended.
   final Widget? tag;
@@ -113,7 +117,11 @@ class FieldRow extends StatelessWidget {
           children: [
             Text(
               label,
-              style: Type.sans(17, weight: FontWeight.w500, color: t.ink),
+              style: Type.sans(
+                17,
+                weight: inSheet ? FontWeight.w400 : FontWeight.w500,
+                color: t.ink,
+              ),
             ),
             ?tag,
           ],
@@ -122,18 +130,22 @@ class FieldRow extends StatelessWidget {
       ],
     );
     return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 68),
+      constraints: BoxConstraints(
+        minHeight: inSheet
+            ? 64
+            : small
+            ? 88
+            : 68,
+      ),
       child: Padding(
-        padding: small
-            ? const EdgeInsets.fromLTRB(FieldCard.inset, 6, 4, 6)
-            : const EdgeInsets.symmetric(
-                horizontal: FieldCard.inset,
-                vertical: 10,
-              ),
+        padding: EdgeInsets.symmetric(
+          horizontal: FieldCard.inset,
+          vertical: inSheet ? 6 : 10,
+        ),
         child: LayoutBuilder(
           builder: (context, box) => small || box.maxWidth >= sideBySide
               ? Row(
-                  spacing: small ? 8 : 16,
+                  spacing: 16,
                   children: [
                     Expanded(child: about),
                     if (small)
@@ -200,6 +212,79 @@ class NamedControl extends StatelessWidget {
     );
     if (labelled) return named;
     return Semantics(container: true, label: name, child: named);
+  }
+}
+
+/// A row of a [FieldCard] that only says something: [title] at 17, with [tag] beside it, over
+/// the line [about], in the mono face when [mono], and [trailing] at its end. It is taller
+/// than a row that opens something, as the design canvas draws it.
+class InfoRow extends StatelessWidget {
+  const InfoRow(
+    this.title, {
+    super.key,
+    this.about,
+    this.mono = false,
+    this.tag,
+    this.trailing,
+  });
+
+  final String title;
+  final String? about;
+  final bool mono;
+
+  /// A badge beside [title], such as Saved.
+  final Widget? tag;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Container(
+      constraints: const BoxConstraints(minHeight: 88),
+      padding: const EdgeInsets.symmetric(
+        horizontal: FieldCard.inset,
+        vertical: 10,
+      ),
+      child: Row(
+        spacing: 12,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  spacing: 10,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        title,
+                        style: Type.sans(
+                          17,
+                          weight: FontWeight.w500,
+                          color: t.ink,
+                        ),
+                      ),
+                    ),
+                    ?tag,
+                  ],
+                ),
+                if (about case final about?)
+                  Text(
+                    about,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: mono
+                        ? Type.mono(13, color: t.muted)
+                        : Type.sans(13, color: t.muted),
+                  ),
+              ],
+            ),
+          ),
+          ?trailing,
+        ],
+      ),
+    );
   }
 }
 
@@ -337,8 +422,9 @@ class Fold extends StatelessWidget {
 /// action in [Tokens.badfg].
 enum RowTone { plain, accent, danger }
 
-/// A row of a phone's [FieldCard] that does one thing when tapped: [icon], then [label] at 17
-/// in its [tone], then [trailing], kept [FieldCard.inset] from the card's sides.
+/// A row of a phone's [FieldCard] that does one thing when tapped: [icon] at 22, then [label]
+/// at 17 in its [tone], then [trailing], kept [FieldCard.inset] from the card's sides. A
+/// [large] row is a page's, as tall as a [NavRow] with its icon at 24.
 class CardRow extends StatelessWidget {
   const CardRow(
     this.label, {
@@ -349,6 +435,8 @@ class CardRow extends StatelessWidget {
     this.tone = RowTone.plain,
     this.strong = false,
     this.height = 64,
+    this.large = false,
+    this.checked,
   });
 
   final String label;
@@ -362,6 +450,11 @@ class CardRow extends StatelessWidget {
   /// Semibold words, as New workspace is.
   final bool strong;
   final double height;
+  final bool large;
+
+  /// For a row that is one of a choice: whether it is the one chosen, which a check before it
+  /// marks and its words in semibold, and a screen reader hears.
+  final bool? checked;
 
   @override
   Widget build(BuildContext context) {
@@ -373,24 +466,36 @@ class CardRow extends StatelessWidget {
     };
     return Tappable(
       label: label,
+      selected: checked,
       onTap: onTap,
       dimWhenDisabled: 0.5,
       child: Container(
-        constraints: BoxConstraints(minHeight: height),
+        constraints: BoxConstraints(minHeight: large ? 68 : height),
         padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
         child: Row(
-          spacing: 16,
+          spacing: large ? 16 : 14,
           children: [
-            if (icon case final icon?)
-              AppIcon(icon, color: tone == RowTone.plain ? t.ink2 : color),
+            if (checked case final checked?)
+              SizedBox.square(
+                dimension: IconSize.row.px,
+                child: checked
+                    ? AppIcon('check', size: IconSize.row, color: color)
+                    : null,
+              )
+            else if (icon case final icon?)
+              AppIcon(
+                icon,
+                size: large ? IconSize.large : IconSize.row,
+                color: color,
+              ),
             Expanded(
               child: Text(
                 label,
                 style: Type.sans(
                   17,
-                  weight: strong
+                  weight: strong || checked == true
                       ? FontWeight.w600
-                      : tone == RowTone.accent
+                      : tone == RowTone.accent || large
                       ? FontWeight.w500
                       : FontWeight.w400,
                   color: color,
@@ -400,6 +505,89 @@ class CardRow extends StatelessWidget {
             ?trailing,
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A card that sums one thing up, as Settings' server and the workspace are: [title] at 19,
+/// with [trailing] at its end, the [lines] under it, then [link], a row in the accent over a
+/// hairline, which does [onLink].
+class SummaryCard extends StatelessWidget {
+  const SummaryCard({
+    super.key,
+    required this.title,
+    this.trailing,
+    this.lines = const [],
+    this.link,
+    this.onLink,
+  });
+
+  final String title;
+  final Widget? trailing;
+  final List<Widget> lines;
+  final String? link;
+
+  /// Null while the link can do nothing, which fades it.
+  final VoidCallback? onLink;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Container(
+      padding: const EdgeInsets.all(FieldCard.inset),
+      decoration: BoxDecoration(
+        color: t.panel,
+        borderRadius: BorderRadius.circular(Sizes.phoneCard),
+        border: Border.all(color: t.line2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 8,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            spacing: 12,
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Type.sans(19, weight: FontWeight.w500, color: t.ink),
+                ),
+              ),
+              ?trailing,
+            ],
+          ),
+          ...lines,
+          if (link case final link?)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Tappable(
+                label: link,
+                onTap: onLink,
+                dimWhenDisabled: 0.5,
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 44),
+                  padding: const EdgeInsets.only(top: 6),
+                  alignment: Alignment.centerLeft,
+                  decoration: BoxDecoration(
+                    border: Border(top: BorderSide(color: t.line2)),
+                  ),
+                  child: Text(
+                    link,
+                    style: Type.sans(
+                      17,
+                      weight: FontWeight.w500,
+                      color: t.accent,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

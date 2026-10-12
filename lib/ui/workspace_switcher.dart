@@ -13,8 +13,8 @@ import 'widgets/basics.dart';
 import 'widgets/sheet.dart';
 import 'widgets/tappable.dart';
 
-/// The switcher at the top of the drawer: the open workspace's name and a chevron, which open
-/// the Workspaces sheet. Its documents are heard, not shown.
+/// The Chats tab's title: the open workspace's name at 26 and a chevron, which open the
+/// Workspaces sheet. Its documents are heard, not shown.
 class WorkspaceSwitcher extends StatelessWidget {
   const WorkspaceSwitcher({super.key});
 
@@ -53,28 +53,29 @@ class WorkspaceSwitcher extends StatelessWidget {
             radius: BorderRadius.circular(Sizes.control),
             onTap: () => shell.togglePopup(Popup.workspaces),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 44),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  spacing: 6,
-                  children: [
-                    Flexible(
+              constraints: const BoxConstraints(minHeight: 48),
+              child: Row(
+                spacing: 6,
+                children: [
+                  Flexible(
+                    child: Semantics(
+                      header: true,
                       child: Text(
                         active?.name ?? 'No workspace yet',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Type.sans(
-                          17,
+                          26,
                           weight: FontWeight.w600,
+                          letterSpacing: -0.3,
                           color: active == null ? t.muted : t.ink,
                         ),
                       ),
                     ),
-                    AppIcon('down', size: IconSize.small, color: t.muted),
-                    if (elsewhere) const ReadyDot(),
-                  ],
-                ),
+                  ),
+                  AppIcon('down', color: t.muted),
+                  if (elsewhere) const ReadyDot(gap: false),
+                ],
               ),
             ),
           ),
@@ -165,53 +166,83 @@ class _WorkspaceItem extends StatelessWidget {
     // A press and hold starts the drag, since a touch would otherwise scroll.
     return ReorderableDelayedDragStartListener(
       index: index,
-      child: Tappable(
-        label: ready ? '${workspace.name}, answer ready' : workspace.name,
-        selected: active,
-        onTap: () {
-          scope.shell.closePopup(Popup.workspaces);
-          if (!active) chat.select(workspace.slug);
-        },
-        child: SizedBox(
-          height: 64,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 22,
-                  child: active
-                      ? AppIcon('check', size: IconSize.normal, color: t.ink)
-                      : null,
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    workspace.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Type.sans(
-                      17,
-                      weight: active ? FontWeight.w600 : FontWeight.w400,
-                      color: t.ink,
+      child: _Ruled(
+        ruled: index > 0,
+        child: Tappable(
+          label: ready ? '${workspace.name}, answer ready' : workspace.name,
+          selected: active,
+          onTap: () {
+            scope.shell.closePopup(Popup.workspaces);
+            if (!active) chat.select(workspace.slug);
+          },
+          child: SizedBox(
+            height: 64,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 22,
+                    child: active
+                        ? AppIcon('check', size: IconSize.normal, color: t.ink)
+                        : null,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      workspace.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Type.sans(
+                        17,
+                        weight: active ? FontWeight.w600 : FontWeight.w400,
+                        color: t.ink,
+                      ),
                     ),
                   ),
-                ),
-                if (ready) const ReadyDot(),
-                if (count != null) ...[
-                  const SizedBox(width: 8),
-                  Text(
-                    plural(count, 'doc', 'docs'),
-                    style: Type.sans(13, color: t.muted),
-                  ),
+                  if (ready) const ReadyDot(),
+                  if (count != null) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      plural(count, 'doc', 'docs'),
+                      style: Type.sans(13, color: t.muted),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+/// [child] under a hairline [FieldCard.inset] short of its sides when [ruled], as a row of a
+/// grouped card under another is.
+class _Ruled extends StatelessWidget {
+  const _Ruled({required this.ruled, required this.child});
+
+  final bool ruled;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => !ruled
+      ? child
+      : Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Divider(
+              height: 1,
+              thickness: 1,
+              indent: FieldCard.inset,
+              endIndent: FieldCard.inset,
+              color: Tokens.of(context).line2,
+            ),
+            child,
+          ],
+        );
 }
 
 /// A workspace as it looks while it is dragged.

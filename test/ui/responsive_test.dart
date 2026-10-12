@@ -12,7 +12,7 @@ import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/files/workspace_pages.dart';
-import 'package:anywherellm/ui/phone_drawer.dart';
+import 'package:anywherellm/ui/home.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:file_picker_platform_interface/file_picker_platform_interface.dart';
@@ -84,11 +84,14 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('the open drawers and Settings fit at $at', (tester) async {
+    testWidgets('the Chats tab, the sheet and Settings fit at $at', (
+      tester,
+    ) async {
       final h = await pumpApp(tester, llm: awkward(), size: size);
-      h.shell
-        ..toggleSide()
-        ..openSources();
+      h.shell.closeChat();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      h.shell.openSources();
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       h.shell.openSettings();
@@ -197,9 +200,7 @@ void main() {
     });
 
     testWidgets('a search with long names fits at $at', (tester) async {
-      final h = await pumpApp(tester, llm: awkward(), size: size);
-      h.shell.toggleSide();
-      await tester.pumpAndSettle();
+      await pumpApp(tester, llm: awkward(), size: size, onChat: false);
       await tester.enterText(
         find.bySemanticsLabel('Search workspaces and chats').last,
         longWord.substring(0, 5),
@@ -382,11 +383,11 @@ void main() {
       h.shell.showPane(Pane.files);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      for (final page in [
-        FilesSection.documents,
-        FilesSection.instructions,
-        FilesSection.answers,
-      ]) {
+      h.shell.openSources();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      h.shell.closeSources();
+      for (final page in [FilesSection.instructions, FilesSection.answers]) {
         h.shell.showWorkspacePage(page);
         await h.files.openSection(page);
         await tester.pumpAndSettle();
@@ -411,10 +412,9 @@ void main() {
       final llm = awkward();
       final path = 'custom-documents/file-$longWord.pdf.json';
       final h = await pumpApp(tester, llm: llm, size: size);
-      h.shell.showPane(Pane.files);
-      await tester.pumpAndSettle();
-      h.shell.showWorkspacePage(FilesSection.documents);
-      await h.files.openSection(FilesSection.documents);
+      h.shell
+        ..showPane(Pane.files)
+        ..openSources();
       await tester.pumpAndSettle();
       await h.sources.toggle(h.sources.files.first);
       await tester.pumpAndSettle();
@@ -428,14 +428,23 @@ void main() {
   testWidgets('clear of the phone\'s bars', (tester) async {
     tester.view.padding = const FakeViewPadding(top: 24, bottom: 24);
     addTearDown(tester.view.resetPadding);
-    final h = await pumpApp(tester, llm: awkward(), size: const Size(360, 640));
-    h.shell
-      ..toggleSide()
-      ..openSources();
+    final h = await pumpApp(
+      tester,
+      llm: awkward(),
+      size: const Size(360, 640),
+      onChat: false,
+    );
+    h.shell.openSources();
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    final top = tester.getTopLeft(find.byType(PhoneDrawer)).dy;
-    expect(top, greaterThanOrEqualTo(24));
+    expect(
+      tester.getTopLeft(find.byType(ChatsTab)).dy,
+      greaterThanOrEqualTo(24),
+    );
+    expect(
+      tester.getBottomLeft(find.byType(HomeTabBar)).dy,
+      lessThanOrEqualTo(640 - 24),
+    );
   });
 
   testWidgets('turning and resizing the window keeps working', (tester) async {

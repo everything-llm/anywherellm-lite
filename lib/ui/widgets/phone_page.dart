@@ -65,7 +65,40 @@ class PhonePageHeader extends StatelessWidget {
   }
 }
 
-/// A row that opens another page: [title], the line [about] under it, and a chevron.
+/// The title over a tab of the home, such as Settings: at 26, from the start of the line.
+class TabTitle extends StatelessWidget {
+  const TabTitle(this.title, {super.key});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 72,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Semantics(
+          header: true,
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Type.sans(
+              26,
+              weight: FontWeight.w600,
+              letterSpacing: -0.3,
+              color: Tokens.of(context).ink,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// A row that opens another page: an [icon] at 24, [title], the line [about] under it, and a
+/// chevron.
 class NavRow extends StatelessWidget {
   const NavRow({
     super.key,
@@ -75,6 +108,7 @@ class NavRow extends StatelessWidget {
     this.heard,
     this.icon,
     this.chevron = true,
+    this.selected,
   });
 
   final String title;
@@ -90,11 +124,15 @@ class NavRow extends StatelessWidget {
   /// What a screen reader hears, when it says more than [title] and [about].
   final String? heard;
 
+  /// Whether a screen reader hears the row as the one chosen, when it is one of a choice.
+  final bool? selected;
+
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return Tappable(
       label: heard ?? [title, ?about].join(', '),
+      selected: selected,
       onTap: onTap,
       child: Container(
         constraints: const BoxConstraints(minHeight: 68),
@@ -102,7 +140,7 @@ class NavRow extends StatelessWidget {
         child: Row(
           children: [
             if (icon case final icon?) ...[
-              AppIcon(icon, color: t.ink2),
+              AppIcon(icon, size: IconSize.large, color: t.ink),
               const SizedBox(width: 16),
             ],
             Expanded(

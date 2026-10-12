@@ -81,33 +81,45 @@ void main() {
     expect(h.shell.pane.name, 'files');
   });
 
-  testWidgets(
-    "the drawer's rows lead to the workspace, the chats and the app",
-    (tester) async {
-      final h = await pumpApp(tester, llm: planningServer(), size: _phone);
-      h.shell.toggleSide();
-      await tester.pumpAndSettle();
-      expect(find.text('Chats'), findsOneWidget);
-      expect(find.text('Upcoming'), findsOneWidget);
-      // A chat's More opens its sheet, and closes the drawer.
-      await tester.tap(control('Rename, pin or delete Budget questions'));
-      await tester.pumpAndSettle();
-      expect(h.shell.chatSheet?.thread.slug, 'budget');
-      expect(h.shell.sideOpen, isFalse);
-      h.shell
-        ..closePopup()
-        ..toggleSide();
-      await tester.pumpAndSettle();
-      await tester.tap(control('Workspace settings'));
-      await tester.pumpAndSettle();
-      expect(h.shell.pane.name, 'files');
-      h.shell.toggleSide();
-      await tester.pumpAndSettle();
-      await tester.tap(control('Settings'));
-      await tester.pumpAndSettle();
-      expect(h.shell.settingsOpen, isTrue);
-    },
-  );
+  testWidgets('the Chats tab leads to the workspace, the chats and Settings', (
+    tester,
+  ) async {
+    final h = await pumpApp(
+      tester,
+      llm: planningServer(),
+      size: _phone,
+      onChat: false,
+    );
+    expect(find.text('Chats'), findsOneWidget);
+    expect(find.text('Upcoming'), findsOneWidget);
+    // A chat's More opens its sheet over the tab.
+    await tester.tap(control('Rename, pin or delete Budget questions'));
+    await tester.pumpAndSettle();
+    expect(h.shell.chatSheet?.thread.slug, 'budget');
+    expect(h.shell.chatOpen, isFalse);
+    h.shell.closePopup();
+    await tester.pumpAndSettle();
+    // A chat opens full screen, and Back gives the tab back.
+    await tester.tap(control('Quarter priorities'));
+    await tester.pumpAndSettle();
+    expect(h.shell.chatOpen, isTrue);
+    expect(h.chat.activeThread, 'priorities');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(h.shell.chatOpen, isFalse);
+    await tester.tap(control('Workspace settings'));
+    await tester.pumpAndSettle();
+    expect(h.shell.pane.name, 'files');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tap(control('Settings'));
+    await tester.pumpAndSettle();
+    expect(h.shell.settingsOpen, isTrue);
+    expect(h.shell.settingsPage, isNull);
+    await tester.tap(control('Chats'));
+    await tester.pumpAndSettle();
+    expect(h.shell.settingsOpen, isFalse);
+  });
 
   testWidgets('a chat deleted from its sheet can be put back over the chat', (
     tester,

@@ -238,7 +238,8 @@ const phoneSize = Size(390, 844);
 /// [connection], no server is set up. With [canScan], Settings offers a fake QR scanner, with
 /// [canDictate] the composer a microphone, with [canPickPhotos] the Attach sheet the device's
 /// photos and camera, and with [canSpeak] each answer Read aloud. The window is a phone's,
-/// [phoneSize], unless [size] says otherwise.
+/// [phoneSize], unless [size] says otherwise. The chat shows full screen, as after a chat is
+/// tapped on the Chats tab, unless [onChat] is false, which leaves the home showing.
 Future<Harness> pumpApp(
   WidgetTester tester, {
   FakeAnythingLlm? llm,
@@ -252,6 +253,7 @@ Future<Harness> pumpApp(
   bool canSpellcheck = false,
   bool canShare = false,
   StreamController<SharedItem>? shares,
+  bool onChat = true,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -270,6 +272,7 @@ Future<Harness> pumpApp(
   );
   addTearDown(harness.dispose);
   await harness.prefs.load();
+  if (onChat) harness.shell.openChat();
   await tester.pumpWidget(harness.app);
   await harness.chat.load();
   // As the app's start does, once the connection is read.

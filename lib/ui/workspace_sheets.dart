@@ -45,7 +45,7 @@ class _WorkspaceSheetViewState extends State<WorkspaceSheetView> {
     if (typed.isEmpty) return;
     if (widget.kind == WorkspaceSheet.create) {
       unawaited(chat.createWorkspace(typed));
-      _scope.shell.closeSide();
+      _scope.shell.openChat();
     } else if (active != null && typed != active.name) {
       unawaited(chat.renameWorkspace(active.slug, typed));
     }
