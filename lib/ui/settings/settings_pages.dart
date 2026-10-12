@@ -1,7 +1,7 @@
 import '../../core/providers.dart';
 
 /// The pages of Settings. Connection, Appearance and Chat are about this device; Server lists
-/// the pages about AnythingLLM, which open from it.
+/// the pages about AnythingLLM, which open from it, and Memory sits beside it.
 enum SettingsPage {
   connection(
     'Connection',
@@ -15,6 +15,11 @@ enum SettingsPage {
     needsServer: false,
   ),
   chat('Chat', 'How the chat behaves on this device.', needsServer: false),
+  memory(
+    'Memory',
+    'What chats are shown about you, and what the agent can look up when a question needs '
+        'it. AnythingLLM calls the first saved memories.',
+  ),
   server(
     'Server',
     'What AnythingLLM runs with. A change here changes the server for every device and '
@@ -69,8 +74,9 @@ enum SettingsPage {
   final bool needsServer;
 
   /// The page this one is reached from and goes back to: [server] for a page about the server
-  /// other than [server] itself, or null, the list, for the others.
-  SettingsPage? get parent => needsServer && this != server ? server : null;
+  /// other than [server] itself and [memory], or null, the list, for the others.
+  SettingsPage? get parent =>
+      needsServer && this != server && this != memory ? server : null;
 }
 
 /// A page of AnythingLLM's own web page that the app does not have, which Settings links to.

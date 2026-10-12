@@ -17,6 +17,7 @@ import '../widgets/phone_page.dart';
 import 'files_view.dart';
 import 'save_file.dart';
 import '../settings/rows.dart';
+import '../settings/settings_pages.dart';
 import '../widgets/fields.dart';
 
 /// What a phone calls the page of [section]: Answer settings is Answer from.
@@ -140,8 +141,8 @@ class _WorkspacePagesState extends State<WorkspacePages> {
   }
 
   /// The workspace's settings: its name with its chats and documents, and Rename; then How it
-  /// answers, its Documents, Instructions and Answer from, each with what it holds; then
-  /// Delete workspace.
+  /// answers, its Documents, Instructions and Answer from, each with what it holds, and Memory,
+  /// which opens Settings' Memory page on this workspace; then Delete workspace.
   Widget _overview(BuildContext context, String name) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
@@ -230,6 +231,15 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                 title: 'Answer from',
                 about: (mode ?? ChatMode.automatic).title,
                 onTap: () => _open(shell, FilesSection.answers),
+              ),
+              NavRow(
+                icon: 'memory',
+                title: 'Memory',
+                about: 'What chats are shown, and the agent can recall',
+                onTap: () {
+                  scope.memory.show(slug);
+                  shell.openSettings(SettingsPage.memory);
+                },
               ),
             ]),
             const SizedBox(height: 20),

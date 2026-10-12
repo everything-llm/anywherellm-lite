@@ -19,6 +19,7 @@ import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/shell.dart';
 import 'package:anywherellm/ui/state/browser_controller.dart';
 import 'package:anywherellm/ui/state/created_controller.dart';
+import 'package:anywherellm/ui/state/memory_controller.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter/widgets.dart';
 
@@ -213,6 +214,7 @@ Future<void> main() async {
   final shell = ShellController(sourcesPinned: false);
   final browser = BrowserController(llm, rig.chat, shell);
   final created = CreatedController(llm, rig.settings, rig.chat);
+  final memory = MemoryController(llm, rig.settings, rig.chat);
   await rig.prefs.load();
   runApp(
     AnywhereLlmApp(
@@ -227,6 +229,7 @@ Future<void> main() async {
         system: rig.system,
         browser: browser,
         created: created,
+        memory: memory,
         launch: (url) async => true,
         save: (name, bytes) async => null,
         dictation: _NoDictation(),

@@ -10,6 +10,7 @@ import 'package:anywherellm/ui/share/shared_item.dart';
 import 'package:anywherellm/ui/shell.dart';
 import 'package:anywherellm/ui/state/browser_controller.dart';
 import 'package:anywherellm/ui/state/created_controller.dart';
+import 'package:anywherellm/ui/state/memory_controller.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 
@@ -174,6 +175,9 @@ class Harness extends Rig {
   /// The open workspace's created files as the fake server lists them.
   late final CreatedController created = CreatedController(llm, settings, chat);
 
+  /// The Memory page's memories as the fake server keeps them.
+  late final MemoryController memory = MemoryController(llm, settings, chat);
+
   late final ReadAloud? readAloud = switch (speaker) {
     final speaker? => ReadAloud(speaker, chat, prefs),
     null => null,
@@ -181,6 +185,7 @@ class Harness extends Rig {
 
   @override
   void dispose() {
+    memory.dispose();
     created.dispose();
     browser.dispose();
     readAloud?.dispose();
@@ -245,6 +250,7 @@ class Harness extends Rig {
       system: system,
       browser: browser,
       created: created,
+      memory: memory,
       launch: (url) async {
         opened.add(url);
         if (openThrows case final error?) throw error;

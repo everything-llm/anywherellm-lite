@@ -18,6 +18,7 @@ import 'connection_page.dart';
 import 'device_pages.dart';
 import 'embeds_page.dart';
 import 'json_page.dart';
+import 'memory_page.dart';
 import 'privacy_page.dart';
 import 'provider_page.dart';
 import 'rows.dart';
@@ -157,7 +158,7 @@ class _PhoneFrame extends StatelessWidget {
 }
 
 /// A phone's list of Settings: once a server is saved, a card with it, whether it answers and
-/// Test connection; This app's pages; then AnythingLLM's Server row.
+/// Test connection; This app's pages; then AnythingLLM's Server and Memory rows.
 class _PhoneNav extends StatelessWidget {
   const _PhoneNav();
 
@@ -201,6 +202,12 @@ class _PhoneNav extends StatelessWidget {
                   title: SettingsPage.server.label,
                   about: serverSummary(scope.system),
                   onTap: () => shell.showSettingsPage(SettingsPage.server),
+                ),
+                NavRow(
+                  icon: 'memory',
+                  title: SettingsPage.memory.label,
+                  about: 'Saved and long-term',
+                  onTap: () => shell.showSettingsPage(SettingsPage.memory),
                 ),
               ]),
             ],
@@ -481,6 +488,7 @@ class _NavState extends State<_Nav> {
                   item(SettingsPage.server.label, page: SettingsPage.server),
                   if (current != null && current.parent != null)
                     item(current.label, page: current, indent: 22),
+                  item(SettingsPage.memory.label, page: SettingsPage.memory),
                 ],
               ],
             ],
@@ -691,6 +699,7 @@ class _PageView extends StatelessWidget {
       switch (page) {
         SettingsPage.connection => const ConnectionPage(),
         SettingsPage.server => ServerPage(phone: phone),
+        SettingsPage.memory => const MemoryPage(),
         SettingsPage.appearance => const AppearancePage(),
         SettingsPage.chat => const ChatPage(),
         SettingsPage.chatModel => ProviderPage(

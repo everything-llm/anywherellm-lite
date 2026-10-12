@@ -10,6 +10,7 @@ import 'state/browser_controller.dart';
 import 'state/created_controller.dart';
 import 'state/chat_controller.dart';
 import 'state/files_controller.dart';
+import 'state/memory_controller.dart';
 import 'state/prefs_controller.dart';
 import 'state/settings_controller.dart';
 import 'state/shell_controller.dart';
@@ -82,6 +83,7 @@ class AppScope extends InheritedWidget {
     required this.system,
     required this.browser,
     required this.created,
+    required this.memory,
     required this.launch,
     required this.save,
     this.scanner,
@@ -107,6 +109,9 @@ class AppScope extends InheritedWidget {
   final SystemController system;
   final BrowserController browser;
   final CreatedController created;
+
+  /// The Memory page's saved and long-term memories.
+  final MemoryController memory;
   final LinkOpener launch;
   final FileSaver save;
 

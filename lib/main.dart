@@ -36,6 +36,7 @@ import 'ui/settings/settings_pages.dart';
 import 'ui/shell.dart';
 import 'ui/state/browser_controller.dart';
 import 'ui/state/created_controller.dart';
+import 'ui/state/memory_controller.dart';
 import 'ui/state/chat_controller.dart';
 import 'ui/state/files_controller.dart';
 import 'ui/state/prefs_controller.dart';
@@ -140,6 +141,7 @@ class _SessionHostState extends State<SessionHost> {
   late final SystemController _system;
   late final BrowserController _browser;
   late final CreatedController _created;
+  late final MemoryController _memory;
 
   /// Reads answers aloud on Android, and is null where the device has no such engine to use.
   ReadAloud? _readAloud;
@@ -183,6 +185,7 @@ class _SessionHostState extends State<SessionHost> {
     _system = SystemController(widget.llm, widget.settings);
     _browser = BrowserController(widget.llm, _chat, widget.shell);
     _created = CreatedController(widget.llm, widget.settings, _chat);
+    _memory = MemoryController(widget.llm, widget.settings, _chat);
     if (_android) {
       _readAloud = ReadAloud(DeviceSpeaker(), _chat, widget.prefs);
     }
@@ -214,6 +217,7 @@ class _SessionHostState extends State<SessionHost> {
   void dispose() {
     _lifecycle.dispose();
     _readAloud?.dispose();
+    _memory.dispose();
     _created.dispose();
     _browser.dispose();
     _system.dispose();
@@ -256,6 +260,7 @@ class _SessionHostState extends State<SessionHost> {
         system: _system,
         browser: _browser,
         created: _created,
+        memory: _memory,
         launch: widget.launch,
         save: _save,
         scanner: _android ? cameraScanner : null,
