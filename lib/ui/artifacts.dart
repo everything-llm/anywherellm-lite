@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../core/copy.dart';
 import '../core/created.dart';
 import 'app_scope.dart';
+import 'created_text.dart';
 import 'files/created_files.dart';
 import 'icons.dart';
 import 'links.dart';
@@ -77,6 +78,7 @@ class _ArtifactsRowState extends State<ArtifactsRow> {
           iconSize: IconSize.small,
           trailing: count == null ? null : DrawerCount('$count'),
           onTap: () {
+            scope.created.closeText();
             scope.shell
               ..closeSide()
               ..openPhonePage(PhonePage.artifacts);
@@ -108,31 +110,43 @@ class ArtifactsPage extends StatelessWidget {
     final created = scope.created..want();
     return ColoredBox(
       color: t.bg,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          PhonePageHeader(
-            title: 'Artifacts',
-            back: 'Back to the chat',
-            onBack: scope.shell.closePhonePage,
-            action: IconBtn(
-              'refresh',
-              tooltip: 'Read the list again',
-              box: 48,
-              filled: true,
-              size: IconSize.small,
-              onPressed: () {
-                if (!created.loading) unawaited(created.read());
-              },
-            ),
-          ),
-          Expanded(
-            child: ListenableBuilder(
-              listenable: created,
-              builder: (context, _) => _body(scope, t),
-            ),
-          ),
-        ],
+      child: ListenableBuilder(
+        listenable: created,
+        builder: (context, _) {
+          final file = created.reading;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (file == null)
+                PhonePageHeader(
+                  title: 'Artifacts',
+                  back: 'Back to the chat',
+                  onBack: scope.shell.closePhonePage,
+                  action: _HeaderButton(
+                    'refresh',
+                    tooltip: 'Read the list again',
+                    onPressed: () {
+                      if (!created.loading) unawaited(created.read());
+                    },
+                  ),
+                )
+              else
+                PhonePageHeader(
+                  title: file.name,
+                  back: 'Back to Artifacts',
+                  onBack: created.closeText,
+                  action: _HeaderButton(
+                    'download',
+                    tooltip: 'Download ${file.name}',
+                    onPressed: () => unawaited(saveCreated(context, file)),
+                  ),
+                ),
+              Expanded(
+                child: file == null ? _body(scope, t) : const CreatedText(),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -251,6 +265,29 @@ class ArtifactsPage extends StatelessWidget {
   }
 }
 
+/// A round button at the end of [ArtifactsPage]'s header.
+class _HeaderButton extends StatelessWidget {
+  const _HeaderButton(
+    this.icon, {
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final String icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => IconBtn(
+    icon,
+    tooltip: tooltip,
+    box: 48,
+    filled: true,
+    size: IconSize.small,
+    onPressed: onPressed,
+  );
+}
+
 /// One app: its title over its kind and how it stands, which opens it, and a More button that
 /// opens its [CreatedSheet].
 class _AppRow extends StatelessWidget {
@@ -356,7 +393,8 @@ class _FileRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shell = AppScope.of(context).shell;
+    final scope = AppScope.of(context);
+    final shell = scope.shell;
     final t = Tokens.of(context);
     final mark = createdMark(file, now);
     final meta = createdMeta(file, now, address: false);
@@ -367,8 +405,10 @@ class _FileRow extends StatelessWidget {
         meta,
         ?mark,
         if (working) 'working',
-        if (reads) 'opens its text' else 'Download',
-        if (!reads) ...[
+        if (reads)
+          'opens its text'
+        else ...[
+          'Download',
           if (file.isPage) 'open page',
           if (file.area == CreatedArea.work) 'keep',
           'or delete',
@@ -376,9 +416,9 @@ class _FileRow extends StatelessWidget {
       ].join(', '),
       onTap: working
           ? null
-          : reads
-          ? () => shell.showCreatedText(file)
-          : () => shell.openCreatedSheet(file),
+          : () => reads
+                ? unawaited(scope.created.openText(file))
+                : shell.openCreatedSheet(file),
       child: Container(
         constraints: const BoxConstraints(minHeight: 64),
         padding: const EdgeInsets.only(left: FieldCard.inset, right: 8),
@@ -505,7 +545,10 @@ class CreatedSheet extends StatelessWidget {
         CardRow(
           'Read',
           icon: 'doc',
-          onTap: () => shell.showCreatedText(file),
+          onTap: () {
+            shell.closePopup();
+            unawaited(scope.created.openText(file));
+          },
         ),
       CardRow(
         'Download',

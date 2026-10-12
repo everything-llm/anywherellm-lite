@@ -162,25 +162,6 @@ class ShellController extends ChangeNotifier {
   void closePhonePage() {
     if (_phonePage == null) return;
     _phonePage = null;
-    _createdText = null;
-    notifyListeners();
-  }
-
-  CreatedFile? _createdText;
-
-  /// The Markdown file whose text a phone's Artifacts shows over its list, or null.
-  CreatedFile? get createdText => _createdText;
-
-  /// Shows [file]'s text over a phone's Artifacts, closing the popup open.
-  void showCreatedText(CreatedFile file) {
-    _createdText = file;
-    _popup.value = null;
-    notifyListeners();
-  }
-
-  void closeCreatedText() {
-    if (_createdText == null) return;
-    _createdText = null;
     notifyListeners();
   }
 

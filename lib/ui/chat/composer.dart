@@ -855,17 +855,20 @@ class _Form extends StatelessWidget {
         ),
       ),
     );
-    if (!phone || !menu) return card;
+    if (!phone) return card;
+    // The card keeps its place whether the commands show, so the field, and the keyboard with
+    // it, is never built afresh as a slash is typed.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SlashMenu(
-          commands: matches,
-          highlight: highlight,
-          onPick: onPick,
-          note: chat.commandsNote,
-        ),
-        const SizedBox(height: 8),
+        if (menu) ...[
+          SlashStrip(
+            commands: matches,
+            onPick: onPick,
+            note: chat.commandsNote,
+          ),
+          const SizedBox(height: 8),
+        ],
         card,
       ],
     );

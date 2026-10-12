@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
@@ -11,10 +12,10 @@ import 'notice.dart';
 import 'settings_controller.dart';
 
 /// The files the agent's code left in the open workspace's sandbox and its apps, as the
-/// everythingllm host lists them, and what the person does with each: Download, Keep and
-/// Delete. A workspace or a
-/// server that shows afresh starts it afresh. A server without the host's route leaves
-/// [unavailable] set, and is not asked again until another server shows.
+/// everythingllm host lists them, and what the person does with each: Download, Keep, Delete
+/// and, for a Markdown file, reading its text. A workspace or a server that shows afresh starts
+/// it afresh. A server without the host's route leaves [unavailable] set, and is not asked again
+/// until another server shows.
 class CreatedController extends ChangeNotifier {
   CreatedController(this._api, this._settings, this._chat) {
     _settings.addListener(_changed);
@@ -46,6 +47,20 @@ class CreatedController extends ChangeNotifier {
 
   int _reads = 0;
 
+  /// The Markdown file whose text a phone's Artifacts shows in place of its list, or null.
+  CreatedFile? reading;
+
+  /// [reading]'s bytes and its text, once read; null while they are read, when the file is over
+  /// [readMax], or when the read failed, which [problem] says.
+  List<int>? readBytes;
+  String? readText;
+
+  /// Whether [reading]'s bytes are being read.
+  bool readLoading = false;
+
+  /// The most a file may hold to be read and shown as text: 2 MB.
+  static const readMax = 2 * 1024 * 1024;
+
   ({Connection? server, String? slug}) get _here => (
     server: _settings.connection?.withPassword(null),
     slug: _chat.activeSlug,
@@ -61,7 +76,37 @@ class CreatedController extends ChangeNotifier {
     loading = false;
     problem = null;
     working.clear();
+    _forgetReading();
     notifyListeners();
+  }
+
+  /// Shows [file]'s text in place of the list, reading it unless it is over [readMax].
+  Future<void> openText(CreatedFile file) async {
+    _forgetReading();
+    reading = file;
+    readLoading = file.size <= readMax;
+    notifyListeners();
+    if (!readLoading) return;
+    final read = await bytes(file);
+    if (!identical(reading, file)) return;
+    readLoading = false;
+    readBytes = read;
+    readText = read == null ? null : utf8.decode(read, allowMalformed: true);
+    notifyListeners();
+  }
+
+  /// Gives the list back in place of a file's text.
+  void closeText() {
+    if (reading == null) return;
+    _forgetReading();
+    notifyListeners();
+  }
+
+  void _forgetReading() {
+    reading = null;
+    readBytes = null;
+    readText = null;
+    readLoading = false;
   }
 
   /// Reads the files unless they are read already, or the server cannot say, or the last read
@@ -105,6 +150,7 @@ class CreatedController extends ChangeNotifier {
 
   /// The bytes of [file], or null when they could not be read, and why shows as [problem].
   Future<List<int>?> bytes(CreatedFile file) async {
+    if (identical(file, reading) && readBytes != null) return readBytes;
     final here = _of;
     final slug = here?.slug;
     if (slug == null) return null;

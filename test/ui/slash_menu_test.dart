@@ -101,11 +101,44 @@ void main() {
       );
       await tester.enterText(composerField, '/');
       await tester.pump();
-      expect(find.byType(SlashMenu), findsOneWidget);
+      expect(find.byType(SlashStrip), findsOneWidget);
       // The commands are a card of their own, above the composer's card.
       expect(
-        tester.getRect(find.byType(SlashMenu)).bottom,
+        tester.getRect(find.byType(SlashStrip)).bottom,
         lessThan(tester.getRect(composerField).top),
+      );
+    },
+  );
+
+  testWidgets(
+    'on a phone the commands are suggestions that leave the field and its focus alone',
+    (tester) async {
+      await pumpApp(
+        tester,
+        llm: planningServer()..presets = const [_research],
+        size: const Size(390, 844),
+        sourcesOpen: false,
+      );
+      await tester.showKeyboard(composerField);
+      final field = tester.state(composerField);
+      await _type(tester, '/');
+      expect(find.byType(SlashStrip), findsOneWidget);
+      // The field is the same one, so the keyboard stays as it was.
+      expect(identical(tester.state(composerField), field), isTrue);
+      expect(
+        tester.widget<EditableText>(composerField).focusNode.hasFocus,
+        isTrue,
+      );
+      // One line of suggestions, not a card of them.
+      expect(tester.getSize(find.byType(SlashStrip)).height, lessThan(80));
+      await tester.tap(control('/deep-research: Research a question in depth'));
+      await tester.pump();
+      expect(_draft(tester), '/deep-research ');
+      expect(find.byType(SlashStrip), findsNothing);
+      expect(identical(tester.state(composerField), field), isTrue);
+      expect(
+        tester.widget<EditableText>(composerField).focusNode.hasFocus,
+        isTrue,
       );
     },
   );
