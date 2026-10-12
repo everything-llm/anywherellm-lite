@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/errors.dart';
 import '../../core/gallery.dart';
 import '../app_scope.dart';
 import '../files/save_file.dart';
@@ -16,7 +17,7 @@ import '../widgets/buttons.dart';
 import '../widgets/phone_page.dart';
 import '../widgets/rise.dart';
 import '../widgets/tappable.dart';
-import 'card_image.dart';
+import 'answer_image.dart';
 
 /// An answer's pictures in one row of four square tiles, so the row keeps its height whatever
 /// the answer holds: past four, the fourth says how many more there are. A tile opens the
@@ -99,7 +100,7 @@ class _Tile extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             ColoredBox(color: t.hover),
-            CardImage(
+            AnswerImage(
               picture.image,
               alt: picture.caption,
               server: scope.settings.connection?.uri,
@@ -201,9 +202,14 @@ class _GalleryPageState extends State<GalleryPage> {
 
   void _close() => AppScope.of(context).shell.closePopup();
 
-  /// The picture's bytes as last read, or null when it has not loaded.
-  List<int>? _bytes(Picture picture) =>
-      AppScope.of(context).chat.lastFrame(picture.image);
+  /// The picture's bytes, or null when they cannot be read.
+  Future<List<int>?> _bytes(Picture picture) async {
+    try {
+      return await AppScope.of(context).chat.imageBytes(picture.image);
+    } on ApiException {
+      return null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -246,9 +252,7 @@ class _GalleryPageState extends State<GalleryPage> {
                             spacing: 12,
                             children: [
                               Text(
-                                picture.fromWebSearch
-                                    ? 'From a web search'
-                                    : 'From this answer',
+                                'From this answer',
                                 style: Type.sans(13, color: t.muted),
                               ),
                               Expanded(
@@ -310,7 +314,7 @@ class _GalleryPageState extends State<GalleryPage> {
                               saveFile(
                                 context,
                                 picture.fileName,
-                                () async => _bytes(picture),
+                                () => _bytes(picture),
                                 failTitle: 'Could not save ${picture.fileName}',
                                 report: scope.chat.report,
                               ),
@@ -321,11 +325,11 @@ class _GalleryPageState extends State<GalleryPage> {
                               'Share',
                               onPressed: () => unawaited(
                                 shareFile(context, picture.fileName, () async {
-                                  final bytes = _bytes(picture);
+                                  final bytes = await _bytes(picture);
                                   if (bytes == null) {
                                     scope.chat.report(
                                       'Could not share ${picture.fileName}',
-                                      'The picture has not loaded.',
+                                      'The picture could not be read.',
                                     );
                                   }
                                   return bytes;
@@ -401,7 +405,7 @@ class _GalleryPageState extends State<GalleryPage> {
             itemCount: count,
             onPageChanged: (i) => setState(() => _at = i),
             itemBuilder: (context, i) => SizedBox.expand(
-              child: CardImage(
+              child: AnswerImage(
                 _pictures[i].image,
                 alt: _pictures[i].caption,
                 server: scope.settings.connection?.uri,

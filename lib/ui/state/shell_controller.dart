@@ -1,8 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
-import '../../core/chat.dart';
-import '../../core/created.dart';
 import '../../core/files.dart';
 import '../../core/gallery.dart';
 import '../../core/server_models.dart';
@@ -13,9 +11,9 @@ import 'chat_controller.dart';
 /// What the main pane shows: the chat, or the server's data as files.
 enum Pane { chats, files }
 
-/// What the panel to the right of the chat shows: Sources, the chat's browser, an app, the
-/// passages an answer read from one file, or all of an answer's sources ([cited]).
-enum Beside { sources, browser, app, passages, cited }
+/// What the panel to the right of the chat shows: Sources, the passages an answer read from one
+/// file, or all of an answer's sources ([cited]).
+enum Beside { sources, passages, cited }
 
 /// A citation whose passages the panel to the right shows, with its [number] in its answer.
 typedef CitedPassages = ({int number, Citation citation});
@@ -39,18 +37,9 @@ class ChatSheetFor {
   final bool deleting;
 }
 
-/// A phone's sheet for one created file or app of the open workspace: what can be done with
-/// it, or with [deleting] the question whether to delete it.
-class CreatedSheetFor {
-  const CreatedSheetFor(this.item, {this.deleting = false});
-
-  final Created item;
-  final bool deleting;
-}
-
-/// A page a phone shows over the chat, from its drawer: the workspace's created files, the
-/// server's scheduled jobs, or the answers the relay ran.
-enum PhonePage { artifacts, upcoming, activity }
+/// A page a phone shows over the chat, from its drawer: the server's scheduled jobs, or the
+/// answers the relay ran.
+enum PhonePage { upcoming, activity }
 
 /// A phone's sheet about the open workspace: a new workspace's name, the open one's new name,
 /// or whether to delete it.
@@ -66,10 +55,9 @@ enum Popup { workspaces, switcher, answerFrom, attach }
 /// only below desktop width; Sources sits in the layout at wide widths and is a drawer below
 /// that.
 ///
-/// The panel to the right of the chat shows Sources, the chat's browser, an app or an answer's
-/// passages ([Beside]). It
-/// keeps one open flag per layout: the panel in the layout starts open ([sourcesPinned]), the
-/// drawer starts closed. [rightOpen] is the flag of the layout in use.
+/// The panel to the right of the chat shows Sources or an answer's passages ([Beside]). It keeps
+/// one open flag per layout: the panel in the layout starts open ([sourcesPinned]), the drawer
+/// starts closed. [rightOpen] is the flag of the layout in use.
 class ShellController extends ChangeNotifier {
   ShellController({this._sourcesPinned = true});
 
@@ -115,10 +103,6 @@ class ShellController extends ChangeNotifier {
   /// Opens the page of [pictures] at [index], over the window.
   void openGallery(List<Picture> pictures, int index, {required String chat}) =>
       _popup.value = GalleryOpen(pictures, index, chat: chat);
-
-  /// Opens [item]'s sheet, closing any other popup.
-  void openCreatedSheet(Created item, {bool deleting = false}) =>
-      _popup.value = CreatedSheetFor(item, deleting: deleting);
 
   /// Opens [thread]'s sheet, closing any other popup and the drawer.
   void openChatSheet(Thread thread, {bool deleting = false}) {
@@ -214,15 +198,9 @@ class ShellController extends ChangeNotifier {
   /// What the panel to the right shows.
   Beside _beside = Beside.sources;
 
-  /// What the panel showed before the browser or an app took it, to be put back when that
-  /// closes: the browser or app it took over from, if one showed, and whether Sources was open
-  /// before either did.
+  /// What the panel showed before passages or sources took it, to be put back when that closes:
+  /// what it took over from, if not Sources, and whether Sources was open before either did.
   ({Beside? under, bool sources}) _before = (under: null, sources: false);
-
-  AppCard? _app;
-
-  /// The app the panel to the right shows, or showed last.
-  AppCard? get app => _app;
 
   CitedPassages? _passages;
 
@@ -239,8 +217,6 @@ class ShellController extends ChangeNotifier {
   Beside get beside => _beside;
 
   bool get sourcesOpen => rightOpen && _beside == Beside.sources;
-  bool get browserOpen => rightOpen && _beside == Beside.browser;
-  bool get appOpen => rightOpen && _beside == Beside.app;
   bool get passagesOpen => rightOpen && _beside == Beside.passages;
   bool get citedOpen => rightOpen && _beside == Beside.cited;
   bool get settingsOpen => _settingsOpen;
@@ -263,25 +239,6 @@ class ShellController extends ChangeNotifier {
 
   /// Closes the panel to the right, whatever it shows.
   void closeSources() => _setRight(open: false, beside: Beside.sources);
-
-  /// Shows the chat's browser in the panel to the right, opening it.
-  void showBrowser() => _take(Beside.browser);
-
-  /// Takes the browser out of the panel and puts back what was there, open or closed.
-  void closeBrowser() => _giveBack(Beside.browser);
-
-  /// Shows [app] in the panel to the right, opening it; on a phone the shell draws it as a sheet
-  /// over the chat instead.
-  void showApp(AppCard app) {
-    if (app != _app) {
-      _app = app;
-      notifyListeners();
-    }
-    _take(Beside.app);
-  }
-
-  /// Takes the app out of the panel and puts back what was there, open or closed.
-  void closeApp() => _giveBack(Beside.app);
 
   /// Shows the passages an answer read from [citation]'s file in the panel to the right,
   /// opening it, or closes it when it already shows them.

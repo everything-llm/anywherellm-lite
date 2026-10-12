@@ -6,14 +6,14 @@ import '../support/fake_api.dart';
 import '../support/pixels.dart';
 import '../support/pump.dart';
 
-/// An answer of [count] pictures from an image search, each on a line of its own.
+/// An answer of [count] pictures, each on a line of its own.
 FakeAnythingLlm _searched(int count) {
   final llm = answering(
     'These are from the pages I read.\n\n'
-    '${[for (var i = 1; i <= count; i++) '[![Unit $i](https://h:8445/_webimages/$i.jpg)](https://site$i.example/p)'].join('\n\n')}',
+    '${[for (var i = 1; i <= count; i++) '[![Unit $i](https://h:3001/p/$i.jpg)](https://site$i.example/p)'].join('\n\n')}',
   );
   for (var i = 1; i <= count; i++) {
-    llm.images[Uri.parse('https://h:8445/_webimages/$i.jpg')] = [pixel];
+    llm.images[Uri.parse('https://h:3001/p/$i.jpg')] = pixel;
   }
   return llm;
 }
@@ -49,7 +49,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(GalleryPage), findsOneWidget);
       expect(find.text('2 of 3'), findsOneWidget);
-      expect(find.text('From a web search'), findsOneWidget);
+      expect(find.text('From this answer'), findsOneWidget);
       expect(find.text('Unit 2'), findsOneWidget);
       expect(find.text('site2.example'), findsOneWidget);
       await tester.tap(control('Next picture'));
@@ -71,7 +71,7 @@ void main() {
     tester,
   ) async {
     final llm = _searched(2)
-      ..images.remove(Uri.parse('https://h:8445/_webimages/2.jpg'));
+      ..images.remove(Uri.parse('https://h:3001/p/2.jpg'));
     await pumpApp(tester, llm: llm, size: const Size(390, 844));
     expect(
       find.descendant(

@@ -353,11 +353,10 @@ void main() {
     expect(textFileName('  '), 'document.txt');
   });
 
-  test('each Essentials section but Created files is a node of the tree', () {
+  test('each Essentials section is a node of the tree', () {
     expect(FilesSection.documents.pathIn('q3'), docsPath('q3'));
     expect(FilesSection.instructions.pathIn('q3'), '/workspaces/q3/PROMPT.md');
     expect(FilesSection.answers.pathIn('q3'), '/workspaces/q3/settings.json');
-    expect(FilesSection.created.pathIn('q3'), isNull);
     expect(FilesSection.answers.title, 'Answer settings');
   });
 }

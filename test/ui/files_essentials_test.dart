@@ -51,7 +51,6 @@ void main() {
       'Documents, 2 on',
       'Instructions',
       'Answer settings',
-      'Created files',
     ]) {
       expect(inSidebar(control(label)), findsOneWidget, reason: label);
     }
@@ -245,23 +244,6 @@ void main() {
     expect(inSidebar(control('settings.json')), findsOneWidget);
   });
 
-  testWidgets(
-    'Created files says where an answer\'s files are on a server that does not list them',
-    (tester) async {
-      final h = await openFiles(
-        tester,
-        llm: planningServer()..noCreatedRoute = true,
-      );
-      await tapSection(tester, 'Created files');
-      expect(paneTitle(tester), 'Created files');
-      expect(h.files.selected, isNull);
-      expect(
-        inPane(find.textContaining('appear under the answer that made them')),
-        findsOneWidget,
-      );
-    },
-  );
-
   testWidgets('Essentials follows another workspace opened meanwhile', (
     tester,
   ) async {
@@ -297,12 +279,6 @@ void main() {
         findsOneWidget,
       );
       expect(inPages(find.text('2 of 2 used in answers')), findsOneWidget);
-      expect(
-        inPages(
-          find.text('Created files and the file tree are in the desktop app.'),
-        ),
-        findsOneWidget,
-      );
       await tester.tap(inPages(find.text('Answer from')));
       await tester.pumpAndSettle();
       expect(h.shell.workspacePage, FilesSection.answers);
@@ -337,8 +313,7 @@ void main() {
     tester,
   ) async {
     final llm = planningServer()
-      ..spaces[0].prompt =
-          'Answer from the documents.\n<everythingllm>skills</everythingllm>';
+      ..spaces[0].prompt = 'Answer from the documents.';
     final h = await pumpApp(tester, llm: llm, size: const Size(390, 844));
     h.shell.showPane(Pane.files);
     await tester.pumpAndSettle();
@@ -350,10 +325,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(
-      find.text(
-        'What every answer in Q3 planning is told first. Write outside the '
-        '<everythingllm> block; the server keeps that part.',
-      ),
+      find.text('What every answer in Q3 planning is told first.'),
       findsOneWidget,
     );
   });

@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import '../core/browser.dart';
 import '../core/chat.dart';
 import '../core/outputs.dart';
 import '../core/ports.dart';
@@ -53,11 +52,7 @@ Stream<ChatEvent> chatEventsOf(Stream<Map<String, dynamic>> chunks) async* {
         if (chunk['thought'] case final String thought
             when thought.trim().isNotEmpty) {
           afterStatus = true;
-          final call = toolCall(thought);
-          yield StatusChunk(
-            (call == null ? null : browserStep(call)) ?? agentStatus(thought),
-            tool: call?.name,
-          );
+          yield StatusChunk(agentStatus(thought));
         }
       case 'textResponse':
         if (text is String && text.isNotEmpty) {

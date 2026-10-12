@@ -365,8 +365,6 @@ void main() {
       await rig.chat.select('household');
       await pumpEventQueue();
       expect(rig.files.selected, settingsPath('household'));
-      await rig.files.openSection(FilesSection.created);
-      expect(rig.files.selected, isNull);
     });
 
     test(

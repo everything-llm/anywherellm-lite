@@ -6,9 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app_scope.dart';
-import 'artifacts.dart';
-import 'chat/app_panel.dart';
-import 'chat/browser_panel.dart';
 import 'chat/chat_view.dart';
 import 'chat/cited_sources.dart';
 import 'chat/gallery.dart';
@@ -61,10 +58,8 @@ void _openWorkspace(AppScope scope, int index) {
 /// them when it is open.
 ///
 /// Below 820 the sidebar is a drawer from the left; below 1120 Sources is a drawer from the
-/// right. On a phone the panel to the right, Sources, the browser or an app, is a sheet over
-/// the chat instead. Esc and
-/// Back close the topmost thing open: the popup, Settings, then a drawer, the app or the
-/// browser.
+/// right. On a phone the panel to the right is a sheet over the chat instead. Esc and Back close
+/// the topmost thing open: the popup, Settings, then a drawer.
 class AppShell extends StatelessWidget {
   const AppShell({super.key});
 
@@ -93,20 +88,15 @@ class AppShell extends StatelessWidget {
       if (shell.scanning) return () => shell.setScanning(false);
       // What the panel to the right shows, which a phone draws as a sheet over its pages.
       VoidCallback? side() {
-        if (shell.appOpen) return shell.closeApp;
         if (shell.passagesOpen) return shell.closePassages;
         if (shell.citedOpen) return shell.closeCited;
-        if (shell.browserOpen) return shell.closeBrowser;
         if (rightClosable && shell.rightOpen) return shell.closeSources;
         return null;
       }
 
-      if (shell.phonePage case final page? when !shell.settingsOpen) {
+      if (shell.phonePage != null && !shell.settingsOpen) {
         if (phone) {
           if (side() case final close?) return close;
-        }
-        if (page == PhonePage.artifacts && scope.created.reading != null) {
-          return scope.created.closeText;
         }
         return shell.closePhonePage;
       }
@@ -147,26 +137,12 @@ class AppShell extends StatelessWidget {
             final drawerWidth = screen.isPhone
                 ? max(Sizes.sidebar, min(360.0, box.maxWidth * 0.82))
                 : Sizes.sidebar;
-            // The panel to the right: Sources, or the chat's browser or an app, wider and never
-            // wider than the screen.
-            final rightWidth = switch (shell.beside) {
-              Beside.sources ||
-              Beside.passages ||
-              Beside.cited => Sizes.sources,
-              _ => min(Sizes.browser, box.maxWidth),
+            const rightWidth = Sizes.sources;
+            final right = switch (shell.beside) {
+              Beside.sources => const SourcesPanel(),
+              Beside.passages => const PassagesPanel(),
+              Beside.cited => const CitedPanel(),
             };
-            // Closed, the panel stays built for its closing animation; TickerMode, inside that
-            // animation, tells a live card in it to let go.
-            final right = TickerMode(
-              enabled: shell.rightOpen,
-              child: switch (shell.beside) {
-                Beside.sources => const SourcesPanel(),
-                Beside.browser => BrowserPanel(width: rightWidth),
-                Beside.app => AppPanel(app: shell.app!, width: rightWidth),
-                Beside.passages => const PassagesPanel(),
-                Beside.cited => const CitedPanel(),
-              },
-            );
             VoidCallback? close() => topClose(
               settingsSideBySide: settingsSideBySide,
               sidebarDrawer: screen.sidebarDrawer,
@@ -278,7 +254,6 @@ class AppShell extends StatelessWidget {
                             if (shell.phonePage case final page?)
                               Positioned.fill(
                                 child: switch (page) {
-                                  PhonePage.artifacts => const ArtifactsPage(),
                                   PhonePage.upcoming => const UpcomingPage(),
                                   PhonePage.activity => const ActivityPage(),
                                 },
@@ -328,16 +303,6 @@ class AppShell extends StatelessWidget {
                                         child: WorkspaceSheetView(
                                           kind,
                                           key: ValueKey(kind),
-                                        ),
-                                      ),
-                                    if (popup case final CreatedSheetFor of)
-                                      Positioned.fill(
-                                        child: CreatedSheet(
-                                          of,
-                                          key: ValueKey((
-                                            of.item.id,
-                                            of.deleting,
-                                          )),
                                         ),
                                       ),
                                     if (popup case final ChatSheetFor of)

@@ -13,8 +13,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
-import '../support/multipart.dart';
-
 const _connection = Connection(
   baseUrl: 'https://host.example.ts.net:3001',
   apiKey: 'SECRET-KEY',
@@ -64,147 +62,6 @@ Future<ApiException> _failure(Future<void> call) async {
 }
 
 void main() {
-  group('a chat\'s browser', () {
-    const reply = {
-      'tab': {
-        'card': 'https://host.example.ts.net:8445/_live/browser/bw-1.jpg',
-        'page': 'https://host.example.ts.net:8445/_live/browser/bw-1',
-        'state': 'working',
-        'title': 'Hacker News',
-      },
-      'logins': [],
-    };
-
-    test('is asked of the host\'s cards port with the developer key', () async {
-      final seen = <http.Request>[];
-      final browser = await _answering(
-        reply,
-        seen: seen,
-      ).chatBrowser('q3', 'budget');
-      expect(browser!.tab!.title, 'Hacker News');
-      expect(
-        seen.single.url.toString(),
-        'https://host.example.ts.net:8445/_live/browser/chat/q3/budget',
-      );
-      expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
-    });
-
-    test('is nothing when the server has no such route or chat', () async {
-      for (final status in [404, 403, 502]) {
-        final api = _api((_) async => http.Response('No such chat.', status));
-        expect(
-          await api.chatBrowser('q3', 'budget'),
-          isNull,
-          reason: '$status',
-        );
-      }
-      final api = _api((_) async => http.Response('<html></html>', 200));
-      expect(await api.chatBrowser('q3', 'budget'), isNull);
-      final unreachable = _api((_) async => throw http.ClientException('no'));
-      expect(await unreachable.chatBrowser('q3', 'budget'), isNull);
-    });
-
-    test(
-      'is nothing with no server, or over http where it is not allowed',
-      () async {
-        final none = _api((_) async => http.Response('{}', 200), current: null);
-        expect(await none.chatBrowser('q3', 'budget'), isNull);
-        final http1 = HttpAnythingLlmApi(
-          holder: ConnectionHolder(
-            const Connection(
-              baseUrl: 'http://host.example.ts.net:3001',
-              apiKey: 'K',
-            ),
-          ),
-          allowHttp: false,
-          client: MockClient((_) async => throw StateError('must not ask')),
-        );
-        expect(await http1.chatBrowser('q3', 'budget'), isNull);
-      },
-    );
-
-    test(
-      'a host with no route at all is not asked again until the relay is',
-      () async {
-        final seen = <http.Request>[];
-        final api = _api((request) async {
-          seen.add(request);
-          return http.Response('<html>Not found</html>', 404);
-        });
-        expect(await api.chatBrowser('q3', 'budget'), isNull);
-        expect(await api.chatBrowser('q3', 'other'), isNull);
-        expect(seen, hasLength(1));
-        // A JSON error is the route itself saying there is no such chat, so it is asked again.
-        final route = _api((request) async {
-          seen.add(request);
-          return http.Response('{"error":"No such chat."}', 404);
-        });
-        await route.chatBrowser('q3', 'a');
-        await route.chatBrowser('q3', 'b');
-        expect(seen, hasLength(3));
-      },
-    );
-
-    test(
-      'its picture is asked again with the last etag, and says when unchanged',
-      () async {
-        final seen = <http.Request>[];
-        final api = _api((request) async {
-          seen.add(request);
-          if (request.headers['If-None-Match'] == '"a"') {
-            return http.Response('', 304);
-          }
-          return http.Response.bytes([1, 2, 3], 200, headers: {'etag': '"a"'});
-        });
-        final first = await api.browserFrame('q3', 'budget');
-        expect(first!.bytes, [1, 2, 3]);
-        expect(first.etag, '"a"');
-        expect(
-          seen.last.url.toString(),
-          'https://host.example.ts.net:8445/_live/browser/chat/q3/budget/card.jpg',
-        );
-        expect(seen.last.headers['Accept'], 'image/jpeg');
-        expect(seen.last.headers['Authorization'], 'Bearer SECRET-KEY');
-        final again = await api.browserFrame('q3', 'budget', etag: first.etag);
-        expect(again!.bytes, isNull);
-        expect(again.etag, '"a"');
-      },
-    );
-
-    test('a chat with no tab has no picture', () async {
-      final api = _api((_) async => http.Response('{"error":"No tab."}', 404));
-      expect(await api.browserFrame('q3', 'budget'), isNull);
-    });
-
-    test(
-      'is handed back by a POST, and answers as the chat\'s browser does',
-      () async {
-        final seen = <http.Request>[];
-        final browser = await _answering(
-          reply,
-          seen: seen,
-        ).handBackBrowser('q3', 'budget');
-        expect(browser.tab!.state, 'working');
-        expect(seen.single.method, 'POST');
-        expect(seen.single.url.path, '/_live/browser/chat/q3/budget/give');
-      },
-    );
-
-    test('a hand back the server refuses says why', () async {
-      final error = await _failure(
-        _api(
-          (_) async =>
-              http.Response('{"error":"This chat has no browser tab."}', 404),
-        ).handBackBrowser('q3', 'budget'),
-      );
-      expect(error.message, 'This chat has no browser tab.');
-      final odd = await _failure(
-        _answering({'unrelated': true}).handBackBrowser('q3', 'budget'),
-      );
-      expect(odd.message, contains('did not answer like the browser'));
-    });
-  });
-
   group('verify', () {
     test('asks /api/v1/auth with the bearer key', () async {
       late http.Request seen;
@@ -1089,17 +946,8 @@ void main() {
       );
     });
 
-    test('a browser skill call is a browser step in words', () async {
+    test('a tool call is named in words', () async {
       final events = await streaming([
-        data({
-          'id': 'a',
-          'type': 'agentThought',
-          'thought':
-              '@agent is executing `browser-act` tool {\n  "action": "fill",\n'
-              '  "ref": "e1",\n  "text": "Scratch Test"\n}',
-          'close': false,
-          'error': null,
-        }),
         data({
           'id': 'a',
           'type': 'agentThought',
@@ -1116,14 +964,10 @@ void main() {
           'close': true,
           'error': false,
         }),
-      ]).streamChat('w', 't', 'Fill it').toList();
-      final statuses = events.whereType<StatusChunk>().toList();
+      ]).streamChat('w', 't', 'Search').toList();
       expect(
-        [for (final s in statuses) (s.text, s.tool)],
-        [
-          ('Typing into a field', 'browser-act'),
-          ('Running web-browsing', 'web-browsing'),
-        ],
+        [for (final s in events.whereType<StatusChunk>()) s.text],
+        ['Running web-browsing'],
       );
     });
 
@@ -3282,17 +3126,14 @@ void main() {
   });
 
   group('answerImage', () {
-    final card = Uri.parse(
-      'https://host.example.ts.net:8445/_live/run/r-1.png',
+    final picture = Uri.parse(
+      'https://host.example.ts.net:8080/pictures/a.png',
     );
 
-    /// A client that answers [body] as [type] once [headers] completes, recording each
-    /// request in [seen].
+    /// A client that answers [body] with [status], recording each request in [seen].
     HttpAnythingLlmApi images(
       Stream<List<int>> body, {
-      String type = multipartType,
       int status = 200,
-      Future<void>? headers,
       List<http.BaseRequest>? seen,
       bool allowHttp = true,
     }) => HttpAnythingLlmApi(
@@ -3300,21 +3141,22 @@ void main() {
       allowHttp: allowHttp,
       client: MockClient.streaming((request, _) async {
         seen?.add(request);
-        await headers;
         return http.StreamedResponse(
           body,
           status,
-          headers: {'content-type': type},
+          headers: {'content-type': 'image/png'},
         );
       }),
     );
 
-    test('reads each frame, with no key, password or token', () async {
+    test('reads the image whole, with no key, password or token', () async {
       final seen = <http.BaseRequest>[];
-      final api = images(Stream.value(multipart(['one', 'two'])), seen: seen);
-      final frames = await api.answerImage(card).toList();
-      expect(frames.map(ascii.decode), ['one', 'two']);
-      expect(seen.single.url, card);
+      final api = images(
+        Stream.fromIterable([ascii.encode('o'), ascii.encode('ne')]),
+        seen: seen,
+      );
+      expect(ascii.decode(await api.answerImage(picture)), 'one');
+      expect(seen.single.url, picture);
       expect(seen.single.method, 'GET');
       expect(
         seen.single.headers.keys.map((k) => k.toLowerCase()),
@@ -3327,9 +3169,7 @@ void main() {
       final seen = <http.BaseRequest>[];
       final api = images(const Stream.empty(), seen: seen, allowHttp: false);
       final error = await _failure(
-        api
-            .answerImage(Uri.parse('http://host.example.ts.net:8445/a.png'))
-            .drain<void>(),
+        api.answerImage(Uri.parse('http://host.example.ts.net:8080/a.png')),
       );
       expect(error.message, contains('plain http'));
       expect(seen, isEmpty);
@@ -3337,50 +3177,21 @@ void main() {
 
     test('a missing image fails in plain words', () async {
       final api = images(
-        Stream.value(ascii.encode('No such run.')),
+        Stream.value(ascii.encode('No such picture.')),
         status: 404,
       );
-      final error = await _failure(api.answerImage(card).drain<void>());
+      final error = await _failure(api.answerImage(picture));
       expect(
         error.message,
         'The image could not be read: the server answered 404.',
       );
     });
 
-    test('cancelling lets go of the response', () async {
-      var cancelled = false;
-      final body = StreamController<List<int>>(
-        onCancel: () => cancelled = true,
-      );
-      final first = Completer<void>();
-      final reading = images(body.stream)
-          .answerImage(card)
-          .listen((_) => first.complete());
-      body.add(multipart(['one'], closed: false));
-      await first.future;
-      await reading.cancel();
-      expect(cancelled, isTrue);
+    test('an image past the limit is refused', () async {
+      final api = images(Stream.value(Uint8List(maxImageBytes + 1)));
+      final error = await _failure(api.answerImage(picture));
+      expect(error.message, 'The image is too large to show.');
     });
-
-    test(
-      'cancelling before the headers come lets go of them when they do',
-      () async {
-        var cancelled = false;
-        final body = StreamController<List<int>>(
-          onCancel: () => cancelled = true,
-        );
-        final headers = Completer<void>();
-        final reading = images(
-          body.stream,
-          headers: headers.future,
-        ).answerImage(card).listen((_) => fail('no frame expected'));
-        await pumpEventQueue();
-        await reading.cancel();
-        headers.complete();
-        await pumpEventQueue();
-        expect(cancelled, isTrue);
-      },
-    );
   });
 }
 

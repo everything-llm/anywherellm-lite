@@ -16,9 +16,6 @@ class Picture {
     return last ?? 'picture.jpg';
   }
 
-  /// Whether the picture is a copy the server's image search made of one on the web.
-  bool get fromWebSearch => image.path.startsWith('/_webimages/');
-
   @override
   bool operator ==(Object other) =>
       other is Picture &&
@@ -57,20 +54,14 @@ final _picture = RegExp(
 /// A line holding only images, with nothing but spaces between them.
 final _pictureLine = RegExp('^\\s*(?:${_picture.pattern}\\s*)+\$');
 
-/// Whether [image] is one of the everythingllm host's cards, a page's or a live one, which an
-/// answer draws large and alone, never in a gallery.
-bool isCardImage(Uri image) =>
-    image.path.startsWith('/_cards/') || image.path.startsWith('/_live/');
-
-/// The pictures on a line that holds only images, or null when it holds anything else or a
-/// card.
+/// The pictures on a line that holds only images, or null when it holds anything else.
 List<Picture>? _picturesOn(String line) {
   if (!_pictureLine.hasMatch(line)) return null;
   final found = <Picture>[];
   for (final m in _picture.allMatches(line)) {
     final linked = m[2] != null;
     final image = Uri.tryParse(linked ? m[2]! : m[5]!);
-    if (image == null || isCardImage(image)) return null;
+    if (image == null) return null;
     found.add(
       Picture(
         image,

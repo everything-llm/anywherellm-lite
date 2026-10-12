@@ -1,8 +1,5 @@
-import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:anywherellm/core/errors.dart';
-import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -10,36 +7,22 @@ import '../support/fake_api.dart';
 import '../support/pixels.dart';
 import '../support/pump.dart';
 
-final _card = Uri.parse('https://h:8445/_live/run/r-1.png');
-final _page = Uri.parse('https://h:8445/_live/run/r-1');
+final _chart = Uri.parse('https://h:3001/pictures/chart.png');
+final _page = Uri.parse('https://h:3001/reports/q3');
 
-FakeAnythingLlm _withCard() => answering('Here:\n\n[![Run]($_card)]($_page)');
+FakeAnythingLlm _withChart() =>
+    answering('Here:\n\n[![Chart]($_chart)]($_page)');
 
 /// The bytes of the answer image on screen.
 Uint8List _shown(WidgetTester tester) =>
     (tester.widget<Image>(find.byType(Image)).image as MemoryImage).bytes;
 
-/// Gives [frame] to [live] and pumps until it is on screen.
-Future<void> _arrives(
-  WidgetTester tester,
-  StreamController<Uint8List> live,
-  Uint8List frame,
-) async {
-  live.add(frame);
-  for (var i = 0; i < 5; i++) {
-    await tester.pump();
-    final images = find.byType(Image).evaluate();
-    if (images.isNotEmpty && identical(_shown(tester), frame)) return;
-  }
-  fail('the frame did not show');
-}
-
 int _reads(FakeAnythingLlm llm) =>
-    llm.calls.where((c) => c == 'answerImage:$_card').length;
+    llm.calls.where((c) => c == 'answerImage:$_chart').length;
 
-/// Taps the card shown. The test's image never decodes, so it has no size to tap: this calls
+/// Taps the image shown. The test's image never decodes, so it has no size to tap: this calls
 /// the link around it.
-Future<void> _tapCard(WidgetTester tester) async {
+Future<void> _tapImage(WidgetTester tester) async {
   tester
       .widget<GestureDetector>(
         find
@@ -54,81 +37,68 @@ Future<void> _tapCard(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('a live card shows each new frame and opens its page', (
+  testWidgets('a linked image from the server shows and opens its link', (
     tester,
   ) async {
-    final live = StreamController<Uint8List>.broadcast();
-    addTearDown(live.close);
-    final llm = _withCard()..liveImages[_card] = live;
+    final source = Uri.parse('https://zoo.example/red-panda');
+    final llm = answering('Red pandas:\n\n[![Red panda]($_chart)]($source)')
+      ..images[_chart] = pixel;
     final h = await pumpApp(tester, llm: llm);
-    await tester.pump();
-    expect(live.hasListener, isTrue);
-    expect(find.byType(Image), findsNothing);
-
-    await _arrives(tester, live, pixel);
+    await tester.pumpAndSettle();
     expect(_shown(tester), pixel);
+    expect(llm.calls, contains('answerImage:$_chart'));
+    expect(llm.calls.where((c) => c.contains('zoo.example')), isEmpty);
 
-    await _arrives(tester, live, redPixel);
-    expect(_shown(tester), redPixel);
-
-    await _tapCard(tester);
-    expect(h.opened, [_page]);
+    await _tapImage(tester);
+    expect(h.opened, [source]);
   });
 
-  testWidgets('a card whose description holds an address is still a card', (
+  testWidgets('an image whose description holds an address is still one', (
     tester,
   ) async {
-    final card = Uri.parse(
-      'https://h:8445/_live/browser/bw-3aeecef2b460eeb7.jpg',
-    );
-    final page = Uri.parse('https://h:8445/_live/browser/bw-3aeecef2b460eeb7');
     final llm = answering(
-      'Card: [![Browser: https://mail.example/un/v2/sh/WCPx]($card)]($page)',
-    )..images[card] = [pixel];
+      'Card: [![Page: https://mail.example/un/v2/sh/WCPx]($_chart)]($_page)',
+    )..images[_chart] = pixel;
     final h = await pumpApp(tester, llm: llm);
     await tester.pumpAndSettle();
     expect(_shown(tester), pixel);
     expect(find.textContaining('mail.example'), findsNothing);
-
-    // A browser card opens the chat's browser beside it, not the take-over view.
-    await _tapCard(tester);
-    expect(h.shell.browserOpen, isTrue);
-    expect(h.opened, isEmpty);
+    await _tapImage(tester);
+    expect(h.opened, [_page]);
   });
 
-  testWidgets('a card that cannot be read shows its description', (
+  testWidgets('an image that cannot be read shows its description', (
     tester,
   ) async {
-    await pumpApp(tester, llm: _withCard());
+    await pumpApp(tester, llm: _withChart());
     await tester.pumpAndSettle();
     expect(find.byType(Image), findsNothing);
-    expect(find.text('[Run: did not load]'), findsOneWidget);
+    expect(find.text('[Chart: did not load]'), findsOneWidget);
     expect(
       find.byTooltip('The image could not be read: the server answered 404.'),
       findsOneWidget,
     );
   });
 
-  testWidgets('a card that did not load opens the link around it', (
+  testWidgets('an image that did not load opens the link around it', (
     tester,
   ) async {
-    final h = await pumpApp(tester, llm: _withCard());
+    final h = await pumpApp(tester, llm: _withChart());
     await tester.pumpAndSettle();
-    await tester.tap(find.text('[Run: did not load]'));
+    await tester.tap(find.text('[Chart: did not load]'));
     await tester.pump(const Duration(milliseconds: 500));
     expect(h.opened, [_page]);
   });
 
   testWidgets('an image outside a link opens its own address', (tester) async {
-    final chart = Uri.parse('https://h:8445/_cards/chart.png');
     final h = await pumpApp(
       tester,
-      llm: answering('Here:\n\n![Chart]($chart)'),
+      llm: answering('Here:\n\n![Chart]($_chart)'),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('[Chart: did not load]'));
     await tester.pump(const Duration(milliseconds: 500));
-    expect(h.opened, [chart]);
+    expect(h.opened, [_chart]);
   });
 
   testWidgets('an image off the server is not read and says where it is', (
@@ -150,28 +120,10 @@ void main() {
     expect(h.opened, [elsewhere]);
   });
 
-  testWidgets('a web picture the server copied shows and opens its source', (
+  testWidgets('an image is read once, and shown again without asking', (
     tester,
   ) async {
-    // image-search saves the picture on the pages site and links it to the page it is on.
-    final copy = Uri.parse('https://h:8445/_webimages/0a1b2c3d4e5f.jpg');
-    final source = Uri.parse('https://zoo.example/red-panda');
-    final llm = answering('Red pandas:\n\n[![Red panda]($copy)]($source)')
-      ..images[copy] = [pixel];
-    final h = await pumpApp(tester, llm: llm);
-    await tester.pumpAndSettle();
-    expect(_shown(tester), pixel);
-    expect(llm.calls, contains('answerImage:$copy'));
-    expect(llm.calls.where((c) => c.contains('zoo.example')), isEmpty);
-
-    await _tapCard(tester);
-    expect(h.opened, [source]);
-  });
-
-  testWidgets('a plain card is read once, and shown again without asking', (
-    tester,
-  ) async {
-    final llm = _withCard()..images[_card] = [pixel];
+    final llm = _withChart()..images[_chart] = pixel;
     final h = await pumpApp(tester, llm: llm);
     await tester.pumpAndSettle();
     expect(_shown(tester), pixel);
@@ -183,70 +135,5 @@ void main() {
     await tester.pumpAndSettle();
     expect(_shown(tester), pixel);
     expect(_reads(llm), 1);
-  });
-
-  testWidgets(
-    'a live card is let go of while Files shows, and read again after',
-    (tester) async {
-      final live = StreamController<Uint8List>.broadcast();
-      addTearDown(live.close);
-      final llm = _withCard()..liveImages[_card] = live;
-      final h = await pumpApp(tester, llm: llm);
-      await tester.pump();
-      live.add(pixel);
-      await tester.pump();
-      expect(live.hasListener, isTrue);
-
-      h.shell.showPane(Pane.files);
-      await tester.pump();
-      expect(live.hasListener, isFalse);
-
-      h.shell.showPane(Pane.chats);
-      await tester.pump();
-      expect(live.hasListener, isTrue);
-      expect(_shown(tester), pixel);
-      expect(_reads(llm), 2);
-    },
-  );
-
-  testWidgets('a live card whose connection dropped is read again after', (
-    tester,
-  ) async {
-    final live = StreamController<Uint8List>.broadcast();
-    addTearDown(live.close);
-    final llm = _withCard()..liveImages[_card] = live;
-    final h = await pumpApp(tester, llm: llm);
-    await tester.pump();
-    await _arrives(tester, live, pixel);
-    live.addError(const ApiException('The connection dropped.'));
-    await tester.pump();
-    expect(live.hasListener, isFalse);
-    expect(_shown(tester), pixel);
-
-    h.shell.showPane(Pane.files);
-    await tester.pump();
-    h.shell.showPane(Pane.chats);
-    await tester.pump();
-    expect(live.hasListener, isTrue);
-  });
-
-  testWidgets('a live card is let go of while the app is hidden', (
-    tester,
-  ) async {
-    final live = StreamController<Uint8List>.broadcast();
-    addTearDown(live.close);
-    await pumpApp(tester, llm: _withCard()..liveImages[_card] = live);
-    await tester.pump();
-    expect(live.hasListener, isTrue);
-
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-    await tester.pump();
-    expect(live.hasListener, isFalse);
-
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pump();
-    expect(live.hasListener, isTrue);
   });
 }

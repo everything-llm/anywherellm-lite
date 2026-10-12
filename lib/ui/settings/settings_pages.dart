@@ -17,8 +17,7 @@ enum SettingsPage {
   chat('Chat', 'How the chat behaves on this device.', needsServer: false),
   memory(
     'Memory',
-    'What chats are shown about you, and what the agent can look up when a question needs '
-        'it. AnythingLLM calls the first saved memories.',
+    'What chats are shown about you, which AnythingLLM calls saved memories.',
   ),
   server(
     'Server',

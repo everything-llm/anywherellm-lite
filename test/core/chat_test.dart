@@ -231,49 +231,6 @@ void main() {
     );
   });
 
-  group('themedCard', () {
-    final server = Uri.parse('https://h:3001');
-    String themed(String card, {bool light = true}) =>
-        themedCard(Uri.parse(card), server, light: light).toString();
-
-    test('asks the server\'s cards for light in the light theme', () {
-      expect(
-        themed('https://h:8445/_cards/q3.png?v=abc'),
-        'https://h:8445/_cards/q3.png?v=abc&theme=light',
-      );
-      expect(
-        themed('https://h:8445/_live/apps/q3/list.png'),
-        'https://h:8445/_live/apps/q3/list.png?theme=light',
-      );
-    });
-
-    test('leaves the dark theme, other paths and other hosts alone', () {
-      for (final (card, light) in [
-        ('https://h:8445/_cards/q3.png', false),
-        ('https://h:8445/pictures/cat.png', true),
-        ('https://elsewhere:8445/_cards/q3.png', true),
-        ('https://h:8445/_cards/q3.png?theme=dark', true),
-      ]) {
-        expect(themed(card, light: light), card);
-      }
-    });
-  });
-
-  test('themedPage asks an app\'s page for the app\'s theme', () {
-    final page = Uri.parse('https://h:8445/_live/apps/q3/list');
-    expect(
-      themedPage(page, light: true).toString(),
-      'https://h:8445/_live/apps/q3/list?theme=light',
-    );
-    expect(
-      themedPage(
-        Uri.parse('https://h:8447/q3/apps/list/?theme=light&x=1'),
-        light: false,
-      ).toString(),
-      'https://h:8447/q3/apps/list/?theme=dark&x=1',
-    );
-  });
-
   group('loadableImage', () {
     final server = Uri.parse('https://owen.example.ts.net:3001');
     bool loads(String image, {Uri? from, bool allowHttp = true}) =>
@@ -285,14 +242,7 @@ void main() {
         isTrue,
       );
       expect(
-        loads('https://owen.example.ts.net:8445/card.png', from: server),
-        isTrue,
-      );
-      expect(
-        loads(
-          'https://owen.example.ts.net:8445/_webimages/a1b2.jpg',
-          from: server,
-        ),
+        loads('https://owen.example.ts.net:8080/card.png', from: server),
         isTrue,
       );
     });
@@ -305,64 +255,11 @@ void main() {
     test('http only from an http server where http is allowed', () {
       final plain = Uri.parse('http://box.local:3001');
       expect(loads('http://owen.example.ts.net/a.png', from: server), isFalse);
-      expect(loads('http://box.local:8445/a.png', from: plain), isTrue);
+      expect(loads('http://box.local:8080/a.png', from: plain), isTrue);
       expect(
-        loads('http://box.local:8445/a.png', from: plain, allowHttp: false),
+        loads('http://box.local:8080/a.png', from: plain, allowHttp: false),
         isFalse,
       );
-    });
-  });
-
-  group('isAppCard', () {
-    final server = Uri.parse('https://owen.example.ts.net:3001');
-    bool card(String image, {Uri? from}) => isAppCard(Uri.parse(image), from);
-
-    test('a live app card on the server\'s host, on any port', () {
-      expect(
-        card(
-          'https://owen.example.ts.net:8455/_live/apps/home/groceries.png',
-          from: server,
-        ),
-        isTrue,
-      );
-    });
-
-    test('nothing else', () {
-      const other = 'https://owen.example.ts.net:8455';
-      expect(card('$other/_live/apps/home/groceries.png'), isFalse);
-      expect(
-        card('https://evil.test/_live/apps/home/groceries.png', from: server),
-        isFalse,
-      );
-      expect(card('$other/_live/apps/home.png', from: server), isFalse);
-      expect(card('$other/_live/apps/a/b/c.png', from: server), isFalse);
-      expect(card('$other/_live/browser/bw-1.jpg', from: server), isFalse);
-      expect(card('$other/_cards/groceries.png', from: server), isFalse);
-    });
-
-    test('names the app by its description, or else by its address', () {
-      final page = Uri.parse('https://owen.example.ts.net:8447/home/apps/a/');
-      AppCard? of(String image, String alt) =>
-          appCardOf(Uri.parse(image), page, alt, server);
-      const host = 'https://owen.example.ts.net:8455/_live/apps';
-      final named = of('$host/home/groceries.png', ' Groceries ')!;
-      expect(named.name, 'Groceries');
-      expect(named.workspace, 'home');
-      expect(named.page, page);
-      expect(named.card.path, '/_live/apps/home/groceries.png');
-      expect(of('$host/home/weekend_to-do.png', '')!.name, 'Weekend to do');
-      expect(of('$host/q3%20plan/list.png', '')!.workspace, 'q3 plan');
-      expect(of('https://evil.test/_live/apps/home/a.png', 'A'), isNull);
-    });
-
-    test('only when its page is a web page on the server\'s host', () {
-      const image = 'https://owen.example.ts.net:8455/_live/apps/home/a.png';
-      AppCard? of(String page) =>
-          appCardOf(Uri.parse(image), Uri.parse(page), 'A', server);
-      expect(of('https://owen.example.ts.net:8447/home/apps/a/'), isNotNull);
-      expect(of('https://evil.example/login'), isNull);
-      expect(of('javascript:alert(1)'), isNull);
-      expect(of('file:///etc/passwd'), isNull);
     });
   });
 }

@@ -18,8 +18,6 @@ import 'core/ports.dart';
 import 'ui/app.dart';
 import 'ui/app_scope.dart';
 import 'ui/boot_screen.dart';
-import 'ui/chat/app_web_view.dart';
-import 'ui/chat/takeover_web_view.dart';
 import 'ui/chat/device_speaker.dart';
 import 'ui/chat/device_photos.dart';
 import 'ui/chat/dictation.dart';
@@ -34,8 +32,6 @@ import 'ui/share/android_shares.dart';
 import 'ui/share/shared_item.dart';
 import 'ui/settings/settings_pages.dart';
 import 'ui/shell.dart';
-import 'ui/state/browser_controller.dart';
-import 'ui/state/created_controller.dart';
 import 'ui/state/memory_controller.dart';
 import 'ui/state/chat_controller.dart';
 import 'ui/state/files_controller.dart';
@@ -139,8 +135,6 @@ class _SessionHostState extends State<SessionHost> {
   late final SourcesController _sources;
   late final FilesController _files;
   late final SystemController _system;
-  late final BrowserController _browser;
-  late final CreatedController _created;
   late final MemoryController _memory;
 
   /// Reads answers aloud on Android, and is null where the device has no such engine to use.
@@ -151,10 +145,6 @@ class _SessionHostState extends State<SessionHost> {
 
   /// The device's photos and camera on Android, for the composer's Attach sheet.
   final PhotoPicker? _photos = _android ? DevicePhotos() : null;
-
-  /// Apps' pages in web views on Android, kept for the app's life so a page stays loaded.
-  final AppView? _appView = _android ? AppWebViews() : null;
-  final TakeoverView? _takeover = _android ? const TakeoverWebView() : null;
 
   /// What other apps share with AnywhereLLM on Android, read once for the app's life.
   final Stream<SharedItem>? _shares = _android
@@ -183,8 +173,6 @@ class _SessionHostState extends State<SessionHost> {
       _sources,
     );
     _system = SystemController(widget.llm, widget.settings);
-    _browser = BrowserController(widget.llm, _chat, widget.shell);
-    _created = CreatedController(widget.llm, widget.settings, _chat);
     _memory = MemoryController(widget.llm, widget.settings, _chat);
     if (_android) {
       _readAloud = ReadAloud(DeviceSpeaker(), _chat, widget.prefs);
@@ -218,8 +206,6 @@ class _SessionHostState extends State<SessionHost> {
     _lifecycle.dispose();
     _readAloud?.dispose();
     _memory.dispose();
-    _created.dispose();
-    _browser.dispose();
     _system.dispose();
     _files.dispose();
     _sources.dispose();
@@ -258,16 +244,12 @@ class _SessionHostState extends State<SessionHost> {
         sources: _sources,
         files: _files,
         system: _system,
-        browser: _browser,
-        created: _created,
         memory: _memory,
         launch: widget.launch,
         save: _save,
         scanner: _android ? cameraScanner : null,
         share: _android ? shareBytes : null,
         shares: _shares,
-        appView: _appView,
-        takeover: _takeover,
         dictation: _dictation,
         photos: _photos,
         pasteImage: _linux ? () => Pasteboard.image : null,

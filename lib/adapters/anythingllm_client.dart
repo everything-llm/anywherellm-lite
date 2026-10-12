@@ -6,12 +6,10 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
-import '../core/browser.dart';
 import '../core/chat.dart';
 import '../core/chat_log.dart';
 import '../core/commands.dart';
 import '../core/connection.dart';
-import '../core/created.dart';
 import '../core/embeds.dart';
 import '../core/memory.dart';
 import '../core/ports.dart';
@@ -19,7 +17,6 @@ import '../core/schedule.dart';
 import '../core/server_models.dart';
 import '../core/upload.dart';
 import 'anythingllm_stream.dart';
-import 'image_frames.dart';
 
 /// [AnythingLlmApi] over the server's HTTP API, with the bearer key on every request.
 ///
@@ -371,165 +368,6 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       ),
     ),
   );
-
-  /// The routes, by connection and kind (`browser` or `created`), whose host answered as no route
-  /// at all, as a server without it does, so they are not asked again until Test connection asks
-  /// about the relay again.
-  final _noRoute = <(Connection, String)>{};
-
-  /// Whether [response], to a [kind] route of [connection]'s host, shows the host has no such
-  /// route, which is remembered: a 404 that is not JSON. JSON, even an error, is the route itself
-  /// answering, as when it knows no such chat.
-  bool _routeMissing(
-    Connection connection,
-    String kind,
-    http.Response response,
-    Object? body,
-  ) {
-    final missing = response.statusCode == 404 && body == null;
-    if (missing) _noRoute.add((connection, kind));
-    return missing;
-  }
-
-  /// The response to [method] on a route of the everythingllm host on the connection in use,
-  /// which [route] makes from the server's address, with [headers] beside the key's and [body]
-  /// as JSON, within [limit].
-  Future<http.Response> _host(
-    String method,
-    Uri Function(Uri server) route, {
-    Map<String, String> headers = const {},
-    Map<String, Object?>? body,
-    Duration? limit,
-  }) async {
-    final connection = _current;
-    final url = route(connection.uri);
-    final request = http.Request(method, url)
-      ..headers.addAll({..._headers(connection), ...headers});
-    if (body != null) {
-      request
-        ..headers['Content-Type'] = 'application/json'
-        ..body = jsonEncode(body);
-    }
-    return _fetch(
-      connection,
-      limit ?? timeout,
-      () async => http.Response.fromStream(await _client.send(request)),
-    );
-  }
-
-  @override
-  Future<ChatBrowser?> chatBrowser(String slug, String thread) async {
-    try {
-      final connection = _current.withPassword(null);
-      if (_noRoute.contains((connection, 'browser'))) return null;
-      final response = await _host(
-        'GET',
-        (server) => browserRoute(server, slug, thread),
-      );
-      final body = _json(response);
-      if (_routeMissing(connection, 'browser', response, body)) return null;
-      return response.statusCode == 200 ? ChatBrowser.fromJson(body) : null;
-    } on ApiException {
-      return null;
-    }
-  }
-
-  @override
-  Future<({Uint8List? bytes, String? etag})?> browserFrame(
-    String slug,
-    String thread, {
-    String? etag,
-    bool light = false,
-  }) async {
-    final response = await _host(
-      'GET',
-      (server) => browserRoute(
-        server,
-        slug,
-        thread,
-        '/card.jpg',
-        light ? {'theme': 'light'} : null,
-      ),
-      headers: {'Accept': 'image/jpeg', 'If-None-Match': ?etag},
-    );
-    return switch (response.statusCode) {
-      200 => (bytes: response.bodyBytes, etag: response.headers['etag']),
-      304 => (bytes: null, etag: etag),
-      _ => null,
-    };
-  }
-
-  @override
-  Future<ChatBrowser> handBackBrowser(String slug, String thread) async {
-    final response = await _host(
-      'POST',
-      (server) => browserRoute(server, slug, thread, '/give'),
-    );
-    return ChatBrowser.fromJson(_decode(response)) ??
-        (throw const ApiException(
-          'The server did not answer like the browser.',
-        ));
-  }
-
-  /// The response to [method] on the created files' route for [slug], with [tail] and the created
-  /// file [path] as [createdRoute] takes them.
-  Future<http.Response> _created(
-    String method,
-    String slug, {
-    String tail = '',
-    String? path,
-    Duration? limit,
-  }) => _host(
-    method,
-    (server) => createdRoute(server, slug, tail, path),
-    limit: limit,
-  );
-
-  @override
-  Future<CreatedList?> createdFiles(String slug) async {
-    final connection = _current.withPassword(null);
-    if (_noRoute.contains((connection, 'created'))) return null;
-    final response = await _created('GET', slug);
-    final body = _json(response);
-    if (_routeMissing(connection, 'created', response, body)) return null;
-    // JSON that says no, as the route does for a workspace with no sandbox yet, is an empty list.
-    if (response.statusCode == 404) return const CreatedList();
-    return CreatedList.fromJson(_decode(response)) ??
-        (throw const ApiException(
-          'The server did not answer like the sandbox.',
-        ));
-  }
-
-  @override
-  Future<List<int>> downloadCreated(String slug, String id) async {
-    final response = await _created(
-      'GET',
-      slug,
-      tail: '/download',
-      path: id,
-      limit: uploadTimeout,
-    );
-    if (response.statusCode != 200) {
-      _decode(response);
-      throw const ApiException(_refused);
-    }
-    return response.bodyBytes;
-  }
-
-  @override
-  Future<String> keepCreated(String slug, String id) async {
-    final response = await _created('POST', slug, tail: '/keep', path: id);
-    final kept = _field(_decode(response), 'id');
-    return kept is String
-        ? kept
-        : throw const ApiException('The server did not say where it kept it.');
-  }
-
-  @override
-  Future<void> deleteCreated(String slug, String id) async {
-    final response = await _created('POST', slug, tail: '/delete', path: id);
-    _decode(response);
-  }
 
   /// The relay's runs of [status], or every kept run when it is null, read as JSON holding runs
   /// or an object with them under `runs`, less those that clear a chat.
@@ -889,67 +727,6 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       SavedMemory.fromJson(_field(body, 'memory')) ??
       (throw const ApiException('The server did not say what it saved.'));
 
-  @override
-  Future<LongMemory?> longMemory(String slug) async {
-    final connection = _current.withPassword(null);
-    if (_noRoute.contains((connection, 'memory'))) return null;
-    final response = await _host('GET', (server) => memoryRoute(server, slug));
-    final body = _json(response);
-    if (_routeMissing(connection, 'memory', response, body)) return null;
-    return LongMemory.fromJson(_decode(response)) ??
-        (throw const ApiException(
-          'The server did not answer like the long-term memory.',
-        ));
-  }
-
-  @override
-  Future<List<RecallHit>> recallMemory(String slug, String query) async {
-    final hits = _field(
-      _decode(
-        await _host(
-          'GET',
-          (server) => memoryRoute(server, slug, '/recall', {'q': query}),
-        ),
-      ),
-      'hits',
-    );
-    return [
-      if (hits is List)
-        for (final hit in hits) ?RecallHit.fromJson(hit),
-    ];
-  }
-
-  @override
-  Future<({LongFact fact, bool isNew})> rememberLong(
-    String slug,
-    String text, {
-    required bool global,
-  }) async {
-    final body = _decode(
-      await _host(
-        'POST',
-        (server) => memoryRoute(server, slug, '/remember'),
-        body: {'text': text, 'scope': global ? 'global' : 'workspace'},
-      ),
-    );
-    final fact =
-        LongFact.fromJson(_field(body, 'fact')) ??
-        (throw const ApiException('The server did not say what it kept.'));
-    return (fact: fact, isNew: _field(body, 'new') != false);
-  }
-
-  @override
-  Future<void> forgetLong(String slug, {String? fact, String? path}) async =>
-      _decode(
-        await _host(
-          'POST',
-          (server) => memoryRoute(server, slug, '/forget', {
-            'id': ?fact,
-            'path': ?path,
-          }),
-        ),
-      );
-
   /// The server answers a bare `OK`.
   @override
   Future<void> dropFrom(String slug, String thread, int chatId) => _session(
@@ -1095,61 +872,38 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   );
 
   /// A bare `GET` of [url], on any port of the server's host as [loadableImage] allows, read
-  /// by [imageFrames]. The response is let go of at once when the subscription was cancelled
-  /// while it waited for the headers, as an `async*` body would only notice at its next `yield`.
+  /// whole, at most [maxImageBytes].
   @override
-  Stream<Uint8List> answerImage(Uri url) {
-    late final StreamController<Uint8List> out;
-    StreamSubscription<Uint8List>? reading;
-    var cancelled = false;
-    Future<void> start() async {
-      try {
-        final connection = _current;
-        if (!allowHttp && url.scheme == 'http') {
-          throw const ApiException(
-            'This device does not load images over plain http.',
-          );
-        }
-        final response = await _fetch(
-          connection,
-          timeout,
-          () => _client.send(http.Request('GET', url)),
-        );
-        final ok = response.statusCode >= 200 && response.statusCode < 300;
-        if (cancelled || !ok) {
-          unawaited(response.stream.listen(null).cancel());
-        }
-        if (cancelled) return;
-        if (!ok) {
-          throw ApiException(
-            'The image could not be read: the server answered ${response.statusCode}.',
-          );
-        }
-        reading = imageFrames(response.stream, response.headers['content-type'])
-            .listen(
-              out.add,
-              onError: (Object error) => out.addError(
-                error is http.ClientException
-                    ? ApiException('The image was cut off: ${error.message}')
-                    : error,
-              ),
-              onDone: out.close,
-            );
-      } on ApiException catch (error) {
-        if (cancelled) return;
-        out.addError(error);
-        await out.close();
-      }
+  Future<Uint8List> answerImage(Uri url) async {
+    final connection = _current;
+    if (!allowHttp && url.scheme == 'http') {
+      throw const ApiException(
+        'This device does not load images over plain http.',
+      );
     }
-
-    out = StreamController(
-      onListen: () => unawaited(start()),
-      onCancel: () {
-        cancelled = true;
-        return reading?.cancel();
-      },
+    final response = await _fetch(
+      connection,
+      timeout,
+      () => _client.send(http.Request('GET', url)),
     );
-    return out.stream;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      unawaited(response.stream.listen(null).cancel());
+      throw ApiException(
+        'The image could not be read: the server answered ${response.statusCode}.',
+      );
+    }
+    final bytes = BytesBuilder(copy: false);
+    try {
+      await for (final chunk in response.stream) {
+        bytes.add(chunk);
+        if (bytes.length > maxImageBytes) {
+          throw const ApiException('The image is too large to show.');
+        }
+      }
+    } on http.ClientException catch (error) {
+      throw ApiException('The image was cut off: ${error.message}');
+    }
+    return bytes.takeBytes();
   }
 
   /// The bytes of the file the server answers [path] with, which is not always JSON; a failure
@@ -1338,7 +1092,6 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   Future<bool> relayFound({bool again = false}) {
     if (again) {
       _relays.remove(_current.withPassword(null));
-      _noRoute.clear();
     }
     return _isRelay(_current);
   }
@@ -1713,6 +1466,9 @@ Map<String, String> attachmentJson(Attachment attachment) {
     'contentString': 'data:$type;base64,${base64Encode(attachment.bytes)}',
   };
 }
+
+/// The most bytes one image in an answer may take.
+const maxImageBytes = 16 * 1024 * 1024;
 
 const _documentTypes = {
   '.pdf': 'application/pdf',

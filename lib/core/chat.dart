@@ -4,7 +4,6 @@ import 'dart:typed_data';
 
 import 'package:characters/characters.dart';
 
-import 'markdown.dart';
 import 'outputs.dart';
 import 'server_models.dart';
 import 'upload.dart';
@@ -51,12 +50,10 @@ class TextChunk extends ChatEvent {
   final String text;
 }
 
-/// What the agent is doing now, such as running a tool. It is not part of the answer. [tool]
-/// names the tool it calls, when the status is a [toolCall].
+/// What the agent is doing now, such as running a tool. It is not part of the answer.
 class StatusChunk extends ChatEvent {
-  const StatusChunk(this.text, {this.tool});
+  const StatusChunk(this.text);
   final String text;
-  final String? tool;
 }
 
 /// The whole answer, which takes the place of the text streamed so far. An agent streams what it
@@ -134,7 +131,7 @@ String agentStatus(String thought) {
 }
 
 /// A tool call an agent's status [thought] reports, as AnythingLLM words it when its provider
-/// is verbose: ``@agent is executing `browser-act` tool {...}``, the tool's [name] and its
+/// is verbose: ``@agent is executing `web-browsing` tool {...}``, the tool's [name] and its
 /// arguments, JSON as sent, in [args]; or null for any other thought.
 ({String name, String args})? toolCall(String thought) {
   final call = _toolCall.firstMatch(thought.trim());
@@ -183,81 +180,6 @@ bool loadableImage(Uri uri, Uri? server, {required bool allowHttp}) =>
     uri.host == server.host &&
     (uri.scheme == 'https' ||
         (uri.scheme == 'http' && server.scheme == 'http' && allowHttp));
-
-/// The address the app reads the image at [uri] from: with `theme=light` added when [light],
-/// for one of everythingllm's cards on the [server]'s host (a `/_cards/` or `/_live/` path),
-/// which it draws dark unless asked for light; anything else as it is.
-Uri themedCard(Uri uri, Uri? server, {required bool light}) {
-  if (!light || server == null || uri.host != server.host) return uri;
-  if (!uri.path.startsWith('/_cards/') && !uri.path.startsWith('/_live/')) {
-    return uri;
-  }
-  if (uri.queryParameters.containsKey('theme')) return uri;
-  return uri.replace(
-    queryParameters: {...uri.queryParameters, 'theme': 'light'},
-  );
-}
-
-/// The address an app's [page] opens at in the app: with `theme` set to light when [light] and
-/// to dark otherwise, which everythingllm's card link passes on to the page, so the page keeps
-/// to the app's theme whatever the device's.
-Uri themedPage(Uri page, {required bool light}) => page.replace(
-  queryParameters: {...page.queryParameters, 'theme': light ? 'light' : 'dark'},
-);
-
-/// Whether [uri] is a live app card on the [server]'s host: everythingllm's sandbox draws an
-/// app's current state at `/_live/apps/<workspace>/<name>.png`. It is an ordinary live card; its
-/// page, which the link around it names, opens through the app's link opener.
-bool isAppCard(Uri uri, Uri? server) =>
-    server != null && uri.host == server.host && _appCard.hasMatch(uri.path);
-
-final _appCard = RegExp(r'^/_live/apps/[^/]+/[^/]+\.png$');
-
-/// An app's live card in an answer and the page its link opens: [name] is what the card's
-/// description calls the app, and [workspace] the slug of the workspace its data is in.
-typedef AppCard = ({Uri card, Uri page, String name, String workspace});
-
-/// [image], described as [alt] and linked to [page], as an app's card, or null when it is not
-/// one ([isAppCard]) or its [page] is not a web page on the [server]'s host, since an answer
-/// could otherwise open any address in the app's web view. An empty description names the app
-/// after its address: `groceries.png` is Groceries.
-AppCard? appCardOf(Uri image, Uri page, String alt, Uri? server) {
-  if (!isAppCard(image, server)) return null;
-  if (page.host != server!.host ||
-      !(page.scheme == 'https' || page.scheme == 'http')) {
-    return null;
-  }
-  if (image.pathSegments case [_, _, final workspace, final file]) {
-    return (
-      card: image,
-      page: page,
-      name: _appName(alt, file),
-      workspace: workspace,
-    );
-  }
-  return null;
-}
-
-/// The apps' cards in the answer [text], in order, each a linked image [appCardOf] takes.
-List<AppCard> appCardsIn(String text, Uri? server) {
-  if (server == null || !text.contains('/_live/apps/')) return const [];
-  return [
-    for (final l in linkedImagesIn(text))
-      ?appCardOf(l.image, l.link, l.alt, server),
-  ];
-}
-
-/// What the description [alt] calls an app, or else its card's [file] name in words.
-String _appName(String alt, String file) {
-  final named = alt.trim();
-  final words = file
-      .substring(0, file.length - '.png'.length)
-      .replaceAll(RegExp('[-_]+'), ' ')
-      .trim();
-  if (named.isNotEmpty) return named;
-  if (words.isEmpty) return 'App';
-  return '${words[0].toUpperCase()}${words.substring(1)}';
-}
 
 /// The failure an agent's [answer] reports in place of an answer, or null when it is an answer.
 /// AnythingLLM's agent sends a model's failure as the answer's text, starting with

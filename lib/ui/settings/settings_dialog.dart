@@ -206,7 +206,7 @@ class _PhoneNav extends StatelessWidget {
                 NavRow(
                   icon: 'memory',
                   title: SettingsPage.memory.label,
-                  about: 'Saved and long-term',
+                  about: 'Saved memories',
                   onTap: () => shell.showSettingsPage(SettingsPage.memory),
                 ),
               ]),

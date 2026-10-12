@@ -82,21 +82,6 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(inPane(find.text(_blockNote)), findsNothing);
-  });
-
-  testWidgets('a prompt with an everythingllm block says to write outside it', (
-    tester,
-  ) async {
-    final llm = planningServer();
-    llm.spaces.first.prompt =
-        '<everythingllm version="a3f9c2e1">\nBe brief.\n</everythingllm>';
-    final h = await pumpApp(tester, llm: llm);
-    h.shell.showPane(Pane.files);
-    await tester.pumpAndSettle();
-    await tapTree(tester, 'Q3 planning');
-    await tapTree(tester, 'PROMPT.md');
-    expect(inPane(find.text(_blockNote)), findsOneWidget);
   });
 
   testWidgets('bad settings show why and keep the draft', (tester) async {
@@ -439,6 +424,3 @@ void main() {
     expect(h.files.selected, '/library/custom-documents/Q3 roadmap.pdf.json');
   });
 }
-
-const _blockNote =
-    'Write your own instructions outside the <everythingllm> block; the server\'s update-prompt skill replaces that block.';

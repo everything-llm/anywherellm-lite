@@ -18,7 +18,6 @@ import 'files_view.dart';
 import 'save_file.dart';
 import '../settings/rows.dart';
 import '../settings/settings_pages.dart';
-import '../widgets/fields.dart';
 
 /// What a phone calls the page of [section]: Answer settings is Answer from.
 String _titleOf(FilesSection section) =>
@@ -27,7 +26,7 @@ String _titleOf(FilesSection section) =>
 /// Files on a phone: the open workspace's settings rather than the server's tree. It opens on
 /// the workspace, with Rename and Delete workspace, and its Documents, Instructions and Answer
 /// from, each with a line of what it holds; a page opens under a back arrow, and the text of a
-/// document over that. Created files and the tree stay on the desktop.
+/// document over that.
 class WorkspacePages extends StatefulWidget {
   const WorkspacePages({super.key});
 
@@ -235,7 +234,7 @@ class _WorkspacePagesState extends State<WorkspacePages> {
               NavRow(
                 icon: 'memory',
                 title: 'Memory',
-                about: 'What chats are shown, and the agent can recall',
+                about: 'What chats are shown',
                 onTap: () {
                   scope.memory.show(slug);
                   shell.openSettings(SettingsPage.memory);
@@ -253,13 +252,6 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                     : () => shell.togglePopup(WorkspaceSheet.delete),
               ),
             ]),
-            const SizedBox(height: 12),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8),
-              child: HelpText(
-                'Created files and the file tree are in the desktop app.',
-              ),
-            ),
           ],
         );
       },

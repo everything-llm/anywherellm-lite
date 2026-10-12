@@ -13,9 +13,7 @@ import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
 import '../widgets/pane_header.dart';
 import '../widgets/tappable.dart';
-import '../state/chat_controller.dart';
 import '../state/shell_controller.dart';
-import 'browser_chip.dart';
 import 'composer.dart';
 import 'message_list.dart';
 
@@ -269,7 +267,6 @@ class _Header extends StatelessWidget {
                       onTap: chat.newChat,
                     ),
                   ],
-                  _BrowserButton(compact: compact),
                   SizedBox(width: phone ? 2 : 8),
                   _HeaderButton(
                     label: 'Documents',
@@ -294,8 +291,7 @@ class _Header extends StatelessWidget {
 }
 
 /// A phone's header: the menu, the workspace and its documents over the chat's name, which
-/// opens the chat's sheet, or on a new chat the workspace's settings, then the browser while the
-/// chat has one and New chat.
+/// opens the chat's sheet, or on a new chat the workspace's settings, then New chat.
 class _PhoneHeader extends StatelessWidget {
   const _PhoneHeader();
 
@@ -388,7 +384,6 @@ class _PhoneHeader extends StatelessWidget {
                         ),
                 ),
                 if (workspace != null) ...[
-                  const _BrowserButton(compact: true),
                   IconBtn(
                     'plus',
                     tooltip: 'New chat',
@@ -469,103 +464,4 @@ class _HeaderButton extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Browser in the header, while the chat on screen has used the everythingllm browser
-/// ([ChatController.usedBrowser]): it shows and hides the browser beside the chat, and pulses
-/// while the agent is using it. It reads the running answer itself, which notifies on each
-/// chunk where the controller does not.
-class _BrowserButton extends StatelessWidget {
-  const _BrowserButton({required this.compact});
-
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) => BrowserStateBuilder(builder: _build);
-
-  Widget _build(BuildContext context, Turn? running) {
-    final scope = AppScope.of(context);
-    final shell = scope.shell;
-    if (!scope.chat.usedBrowser && scope.browser.tab == null) {
-      return const SizedBox.shrink();
-    }
-    final browsing =
-        (running?.browsing ?? false) || (scope.browser.tab?.working ?? false);
-    // A phone's header buttons are round, with the dot at the button's corner.
-    if (ScreenClass.ofContext(context).isPhone) {
-      return Stack(
-        children: [
-          IconBtn(
-            'globe',
-            tooltip: browsing ? 'Browser, in use now' : 'Browser',
-            box: 48,
-            filled: true,
-            active: shell.browserOpen,
-            size: IconSize.small,
-            onPressed: shell.browserOpen
-                ? shell.closeBrowser
-                : shell.showBrowser,
-          ),
-          if (browsing) const Positioned(top: 8, right: 8, child: _Pulse()),
-        ],
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.only(left: 8),
-      child: _HeaderButton(
-        label: 'Browser',
-        heard: browsing ? 'Browser, in use now' : 'Browser',
-        icon: 'globe',
-        compact: compact,
-        pressed: shell.browserOpen,
-        onTap: shell.browserOpen ? shell.closeBrowser : shell.showBrowser,
-        trailing: browsing ? const _Pulse() : null,
-      ),
-    );
-  }
-}
-
-/// A dot that pulses, or holds still where the system asks for reduced motion.
-class _Pulse extends StatefulWidget {
-  const _Pulse();
-
-  @override
-  State<_Pulse> createState() => _PulseState();
-}
-
-class _PulseState extends State<_Pulse> with SingleTickerProviderStateMixin {
-  late final _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-    lowerBound: 0.35,
-  );
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _controller.value = 1;
-    } else if (!_controller.isAnimating) {
-      _controller.repeat(reverse: true);
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => FadeTransition(
-    opacity: _controller,
-    child: Container(
-      width: 8,
-      height: 8,
-      decoration: BoxDecoration(
-        color: Tokens.of(context).accent,
-        shape: BoxShape.circle,
-      ),
-    ),
-  );
 }

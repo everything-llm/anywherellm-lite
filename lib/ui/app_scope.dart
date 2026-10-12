@@ -6,8 +6,6 @@ import 'chat/dictation.dart';
 import 'chat/photo_picker.dart';
 import 'chat/speaker.dart';
 import 'share/shared_item.dart';
-import 'state/browser_controller.dart';
-import 'state/created_controller.dart';
 import 'state/chat_controller.dart';
 import 'state/files_controller.dart';
 import 'state/memory_controller.dart';
@@ -32,37 +30,6 @@ typedef FileSaver = Future<String?> Function(
 /// Hands the file [name], holding [bytes], to the system's share sheet.
 typedef FileSharer = Future<void> Function(String name, List<int> bytes);
 
-/// Apps' own pages in a web view. It keeps one page loaded out of sight, the newest it was
-/// asked to fetch or show, so showing that page again is at once.
-abstract interface class AppView {
-  /// Starts loading [page] out of sight, in place of the page kept, unless that one is on
-  /// screen.
-  void prefetch(Uri page);
-
-  /// [page] in a web view, the one kept when it is [page], with [placeholder] over it until it
-  /// loads, and a link off its host handed to [onLeave].
-  Widget show(
-    Uri page, {
-    required Widget placeholder,
-    required void Function(Uri url) onLeave,
-  });
-}
-
-/// The everythingllm browser's take-over view in a web view, as the chat's browser screen. The
-/// page, finding the app's channel, draws Back and a message bar: Back comes to `onBack`, and
-/// what the bar sends to `onSay`, whose answer, a line saying how the message went, the page
-/// shows over the bar. A link off the view goes to `onLeave`.
-abstract interface class TakeoverView {
-  /// [page] in a web view, with [placeholder] over it until it loads.
-  Widget show(
-    Uri page, {
-    required Widget placeholder,
-    required VoidCallback onBack,
-    required Future<String> Function(String text) onSay,
-    required void Function(Uri url) onLeave,
-  });
-}
-
 /// A camera view that reads QR codes and calls [onCode] with the first one's text.
 typedef CodeScanner = Widget Function(void Function(String code) onCode);
 
@@ -81,16 +48,12 @@ class AppScope extends InheritedWidget {
     required this.sources,
     required this.files,
     required this.system,
-    required this.browser,
-    required this.created,
     required this.memory,
     required this.launch,
     required this.save,
     this.scanner,
     this.share,
     this.shares,
-    this.appView,
-    this.takeover,
     this.dictation,
     this.photos,
     this.pasteImage,
@@ -107,10 +70,8 @@ class AppScope extends InheritedWidget {
   final SourcesController sources;
   final FilesController files;
   final SystemController system;
-  final BrowserController browser;
-  final CreatedController created;
 
-  /// The Memory page's saved and long-term memories.
+  /// The Memory page's saved memories.
   final MemoryController memory;
   final LinkOpener launch;
   final FileSaver save;
@@ -125,14 +86,6 @@ class AppScope extends InheritedWidget {
   /// What other apps share with AnywhereLLM, or null where the device has no share sheet to
   /// receive from.
   final Stream<SharedItem>? shares;
-
-  /// Shows an app's page in its sheet, or null where the device has no web view, and the sheet
-  /// shows the app's card.
-  final AppView? appView;
-
-  /// Shows the chat's browser as the take-over view, full screen on a phone, or null where the
-  /// device has no web view, and the browser shows as its picture in a sheet.
-  final TakeoverView? takeover;
 
   /// Writes what the person says in the composer, or null where the device cannot listen.
   final Dictation? dictation;

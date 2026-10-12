@@ -5,8 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
-import '../../core/browser.dart';
-import '../../core/chat.dart';
 import '../../core/gallery.dart';
 import '../../core/markdown.dart';
 import '../app_scope.dart';
@@ -14,11 +12,9 @@ import '../layout.dart';
 import '../links.dart';
 import '../tokens.dart';
 import '../type.dart';
-import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/side_scroll.dart';
-import 'browser_item.dart';
-import 'card_image.dart';
+import 'answer_image.dart';
 import 'gallery.dart';
 import 'highlight.dart';
 import 'markdown_lists.dart';
@@ -28,13 +24,11 @@ import '../icons.dart';
 /// An answer's text, drawn as Markdown and selectable. A code block, a table and display math
 /// scroll sideways rather than widen the chat, showing a scrollbar while they do, and a code
 /// block has its own Copy button. A link opens outside the app. An image loads only from the
-/// AnythingLLM server's own host, on any port, as a tool's card does, and only over https or
-/// the server's own scheme where plain http is allowed: loading any other would send its
-/// address, which a model could have filled with what it read, to that site. Any other image
-/// shows as its description, which reads as a link: a tap opens the link around the image, or
-/// else the image's own address. A linked app card opens its app beside the chat, or in a sheet
-/// on a phone, rather than its page. Two or more pictures in a row, as an image search gives
-/// them, are a [Gallery] ([answerParts]).
+/// AnythingLLM server's own host, on any port, and only over https or the server's own scheme
+/// where plain http is allowed: loading any other would send its address, which a model could
+/// have filled with what it read, to that site. Any other image shows as its description, which
+/// reads as a link: a tap opens the link around the image, or else the image's own address. Two
+/// or more pictures in a row are a [Gallery] ([answerParts]).
 class AnswerBody extends StatelessWidget {
   const AnswerBody(
     this.text, {
@@ -106,50 +100,21 @@ class AnswerBody extends StatelessWidget {
     final settings = AppScope.of(context).settings;
     final server = settings.connection?.uri;
     final allowHttp = settings.allowHttp;
-    final linkedIn = linkedImagesIn(text);
-    // A phone draws a browser tab's card as the app's item.
-    final browserItems = phone
-        ? {
-            for (final card in browserCards(text, server: server))
-              if (!card.login) card.image: card,
-          }
-        : const <Uri, BrowserCard>{};
-    final linked = {for (final l in linkedIn) l.image};
-    // The apps whose cards the answer links, by the link a tap on the card follows.
-    final apps = {
-      for (final l in linkedIn)
-        l.link: ?appCardOf(l.image, l.link, l.alt, server),
-    };
+    final linked = linkedImages(text);
     return TightListMarkdown(
       data: caret ? '$text$caretMark' : text,
       selectable: !caret,
       extensionSet: caret ? _withCaret : answerMarkdown,
       onTapLink: (_, href, _) {
-        if (href == null) return;
-        final shell = AppScope.of(context).shell;
-        // A browser card opens the chat's browser beside it, where Take over leaves the app,
-        // and an app's card its app.
-        if (isBrowserPage(href, server)) {
-          shell.showBrowser();
-        } else if (apps[Uri.tryParse(href)] case final app?) {
-          shell.showApp(app);
-        } else {
-          openLink(context, href);
-        }
+        if (href != null) openLink(context, href);
       },
-      imageBuilder: (uri, _, alt) {
-        if (browserItems[uri] case final item?) return BrowserItem(item);
-        final card = CardImage(
-          uri,
-          alt: alt,
-          server: server,
-          allowHttp: allowHttp,
-          linked: linked.contains(uri),
-        );
-        if (!isAppCard(uri, server)) return card;
-        if (!linked.contains(uri)) return card;
-        return _AppCardShown(uri, card: card);
-      },
+      imageBuilder: (uri, _, alt) => AnswerImage(
+        uri,
+        alt: alt,
+        server: server,
+        allowHttp: allowHttp,
+        linked: linked.contains(uri),
+      ),
       bulletBuilder: (bullet) => listBullet(bullet, body),
       builders: {
         'pre': _CodeBlockBuilder(),
@@ -352,64 +317,6 @@ class _CopyButtonState extends State<CopyButton> {
           size: widget.size,
         ),
       ],
-    );
-  }
-}
-
-/// A linked app card, ringed in the accent while its app shows beside the chat, over a caption
-/// that says the card is live and what a tap does: on a phone it opens a sheet, elsewhere the
-/// panel beside the chat.
-class _AppCardShown extends StatelessWidget {
-  const _AppCardShown(this.uri, {required this.card});
-
-  final Uri uri;
-  final Widget card;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    final shell = AppScope.of(context).shell;
-    final phone = ScreenClass.ofContext(context).isPhone;
-    return ListenableBuilder(
-      listenable: shell,
-      child: card,
-      builder: (context, card) {
-        final beside = !phone && shell.appOpen && shell.app?.card == uri;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  if (beside) BoxShadow(color: t.accent, spreadRadius: 2),
-                ],
-              ),
-              child: card,
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ReadyDot(gap: false, color: t.okdot),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      phone
-                          ? 'Live · tap to open'
-                          : beside
-                          ? 'Live · open beside the chat'
-                          : 'Live · click to open beside the chat',
-                      style: Type.sans(12.5, color: t.muted),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
     );
   }
 }

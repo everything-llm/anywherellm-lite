@@ -31,12 +31,7 @@ const _fields = {
   SettingsPage.chats: ['Export'],
   SettingsPage.embeds: ['Allowed sites', 'Chats per day', 'Chats per visit'],
   SettingsPage.privacy: ['Anonymous telemetry'],
-  SettingsPage.memory: [
-    'Saved memories',
-    'Learn from chats',
-    'Long-term memory',
-    'Remember something',
-  ],
+  SettingsPage.memory: ['Saved memories', 'Learn from chats'],
 };
 
 /// The names of [page]'s fields: its choosers, and what each provider it offers reads.

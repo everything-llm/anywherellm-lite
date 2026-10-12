@@ -8,8 +8,6 @@ import 'package:anywherellm/ui/chat/photo_picker.dart';
 import 'package:anywherellm/ui/chat/speaker.dart';
 import 'package:anywherellm/ui/share/shared_item.dart';
 import 'package:anywherellm/ui/shell.dart';
-import 'package:anywherellm/ui/state/browser_controller.dart';
-import 'package:anywherellm/ui/state/created_controller.dart';
 import 'package:anywherellm/ui/state/memory_controller.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
@@ -129,9 +127,6 @@ class Harness extends Rig {
     this.canPasteImages = false,
     this.canShare = false,
     this.shares,
-    this.canViewApps = false,
-    this.canTakeOver = false,
-    this.browserEvery,
   }) : dictation = canDictate ? FakeDictation() : null,
        photos = canPickPhotos ? FakePhotos() : null,
        speaker = canSpeak ? FakeSpeaker() : null,
@@ -160,21 +155,6 @@ class Harness extends Rig {
   /// What reads answers aloud, or null when the device cannot speak.
   final FakeSpeaker? speaker;
 
-  /// The chat on screen's browser as the fake server says it. It reads at the pace of
-  /// [browserEvery], or never on a timer, which a test that opens the panel need not wait out.
-  late final BrowserController browser = BrowserController(
-    llm,
-    chat,
-    shell,
-    every: browserEvery,
-  );
-
-  /// How often the open panel reads the browser, or null for never.
-  final Duration? browserEvery;
-
-  /// The open workspace's created files as the fake server lists them.
-  late final CreatedController created = CreatedController(llm, settings, chat);
-
   /// The Memory page's memories as the fake server keeps them.
   late final MemoryController memory = MemoryController(llm, settings, chat);
 
@@ -186,8 +166,6 @@ class Harness extends Rig {
   @override
   void dispose() {
     memory.dispose();
-    created.dispose();
-    browser.dispose();
     readAloud?.dispose();
     super.dispose();
   }
@@ -214,18 +192,6 @@ class Harness extends Rig {
   /// What other apps share with the app, as a test adds it, or null where it receives none.
   final StreamController<SharedItem>? shares;
 
-  /// Whether an app's sheet shows its page, as on Android. The page is a line of text naming it.
-  final bool canViewApps;
-
-  /// The web view an app's page shows in, with [canViewApps].
-  final appPages = FakeAppView();
-
-  /// Whether the chat's browser shows as the take-over view, as on Android.
-  final bool canTakeOver;
-
-  /// The web view the take-over view shows in, with [canTakeOver].
-  final takeover = FakeTakeover();
-
   /// Every file the app shared, by name, with its bytes.
   final Map<String, List<int>> shared = {};
 
@@ -248,8 +214,6 @@ class Harness extends Rig {
       sources: sources,
       files: files,
       system: system,
-      browser: browser,
-      created: created,
       memory: memory,
       launch: (url) async {
         opened.add(url);
@@ -266,8 +230,6 @@ class Harness extends Rig {
       },
       share: canShare ? (name, bytes) async => shared[name] = bytes : null,
       shares: shares?.stream,
-      appView: canViewApps ? appPages : null,
-      takeover: canTakeOver ? takeover : null,
       dictation: dictation,
       photos: photos,
       pasteImage: canPasteImages ? () async => clipboardImage : null,
@@ -307,9 +269,6 @@ Future<Harness> pumpApp(
   bool canPasteImages = false,
   bool canShare = false,
   StreamController<SharedItem>? shares,
-  bool canViewApps = false,
-  bool canTakeOver = false,
-  Duration? browserEvery,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -322,15 +281,12 @@ Future<Harness> pumpApp(
     canScan: canScan,
     canShare: canShare,
     shares: shares,
-    canViewApps: canViewApps,
-    canTakeOver: canTakeOver,
     canDictate: canDictate,
     canPickPhotos: canPickPhotos,
     canSpeak: canSpeak,
     labelAnswers: labelAnswers,
     canSpellcheck: canSpellcheck,
     canPasteImages: canPasteImages,
-    browserEvery: browserEvery,
   );
   addTearDown(harness.dispose);
   await harness.prefs.load();
@@ -414,49 +370,4 @@ Future<void> chatAction(WidgetTester tester, String item) async {
   await tester.pumpAndSettle();
   await tester.tap(control(item).last);
   await tester.pumpAndSettle();
-}
-
-/// A web view that draws an app's page as the text `Web view of <page>` and records each page
-/// prefetched, in order, without one asked again in a row.
-class FakeAppView implements AppView {
-  final prefetched = <Uri>[];
-
-  @override
-  void prefetch(Uri page) {
-    if (prefetched.lastOrNull != page) prefetched.add(page);
-  }
-
-  @override
-  Widget show(
-    Uri page, {
-    required Widget placeholder,
-    required void Function(Uri url) onLeave,
-  }) => Text('Web view of $page');
-}
-
-/// A web view that draws the take-over view as the text `Take-over view of <page>`, with the
-/// page's Back as a button heard as Page back. [say] sends a message as the page's message bar
-/// does.
-class FakeTakeover implements TakeoverView {
-  Future<String> Function(String text)? _say;
-
-  /// Sends [text] as the page's message bar does, and answers the line the app gives back.
-  Future<String> say(String text) => _say!(text);
-
-  @override
-  Widget show(
-    Uri page, {
-    required Widget placeholder,
-    required VoidCallback onBack,
-    required Future<String> Function(String text) onSay,
-    required void Function(Uri url) onLeave,
-  }) {
-    _say = onSay;
-    return Column(
-      children: [
-        Text('Take-over view of $page'),
-        Tappable(label: 'Page back', onTap: onBack, child: const Text('Back')),
-      ],
-    );
-  }
 }

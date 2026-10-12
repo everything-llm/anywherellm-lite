@@ -3,9 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   const a =
-      '[![Unit by a wall](https://h:8445/_webimages/a.jpg)](https://one.example/a)';
-  const b =
-      '[![On a bracket](https://h:8445/_webimages/b.jpg)](https://two.example/b)';
+      '[![Unit by a wall](https://h:3001/p/a.jpg)](https://one.example/a)';
+  const b = '[![On a bracket](https://h:3001/p/b.jpg)](https://two.example/b)';
 
   test('two pictures on lines of their own are a gallery between the text', () {
     final parts = answerParts(
@@ -20,7 +19,6 @@ void main() {
     expect(pictures.map((p) => p.caption), ['Unit by a wall', 'On a bracket']);
     expect(pictures.first.site, 'one.example');
     expect(pictures.first.page, Uri.parse('https://one.example/a'));
-    expect(pictures.first.fromWebSearch, isTrue);
     expect(pictures.first.fileName, 'a.jpg');
     expect((parts[2] as TextPart).markdown, '\nThat is all.');
   });
@@ -35,17 +33,9 @@ void main() {
     ]);
   });
 
-  test(
-    'one picture, a card, a picture in a sentence or in code stays text',
-    () {
-      for (final text in [
-        a,
-        '$a\n\n[![Report](https://h:8445/_cards/r.png)](https://h:8445/r)',
-        'See $a and $b',
-        '```\n$a\n$b\n```',
-      ]) {
-        expect(answerParts(text), [isA<TextPart>()], reason: text);
-      }
-    },
-  );
+  test('one picture, a picture in a sentence or in code stays text', () {
+    for (final text in [a, 'See $a and $b', '```\n$a\n$b\n```']) {
+      expect(answerParts(text), [isA<TextPart>()], reason: text);
+    }
+  });
 }

@@ -1,11 +1,9 @@
 import 'dart:typed_data';
 
-import 'browser.dart';
 import 'chat.dart';
 import 'chat_log.dart';
 import 'commands.dart';
 import 'connection.dart';
-import 'created.dart';
 import 'embeds.dart';
 import 'memory.dart';
 import 'prefs.dart';
@@ -95,44 +93,6 @@ abstract interface class AnythingLlmApi {
   /// ended.
   Future<void> cancelRun(String id);
 
-  /// What the server says of the chat's everythingllm browser: its tab, with who has it and
-  /// what was done last, and its requests for logins. Null when the server does not say, as one
-  /// without the browser's route, or a chat it knows no tab of and no request for: the chat
-  /// never fails for this.
-  Future<ChatBrowser?> chatBrowser(String slug, String thread);
-
-  /// The chat's browser tab as one picture now, a JPEG, read again to follow it. [etag] is the
-  /// one the last picture came with: an unchanged picture answers with null [bytes]. Null when
-  /// the chat has no tab.
-  Future<({Uint8List? bytes, String? etag})?> browserFrame(
-    String slug,
-    String thread, {
-    String? etag,
-    bool light = false,
-  });
-
-  /// Gives the chat's browser back to the agent, when the person has it, and answers as
-  /// [chatBrowser] does. Fails with [ApiException].
-  Future<ChatBrowser> handBackBrowser(String slug, String thread);
-
-  /// The files the agent's code left in the workspace's sandbox, newest first, with how much
-  /// room the workspace uses. An empty list for a workspace that has no sandbox yet; null when
-  /// the server does not say, as one without the everythingllm host's route. Fails with
-  /// [ApiException].
-  Future<CreatedList?> createdFiles(String slug);
-
-  /// The bytes of the created file [id] (as [CreatedFile.id] has it). Fails with
-  /// [ApiException].
-  Future<List<int>> downloadCreated(String slug, String id);
-
-  /// Moves the working file [id] into the workspace's project folder, where it stays, and
-  /// answers the file's id there. Fails with [ApiException], as when a run holds the workspace
-  /// or the project folder has a file of that name.
-  Future<String> keepCreated(String slug, String id);
-
-  /// Deletes the created file or app [id]. Fails with [ApiException].
-  Future<void> deleteCreated(String slug, String id);
-
   /// The jobs AnythingLLM runs on a schedule. It takes the server's web login, as the presets
   /// do: on a server with a password it needs one saved.
   Future<List<ScheduledJob>> scheduledJobs();
@@ -164,27 +124,6 @@ abstract interface class AnythingLlmApi {
   /// Shows memory [id] in every workspace's chats, or, given [toWorkspace], in that workspace's
   /// only.
   Future<SavedMemory> moveMemory(int id, {String? toWorkspace});
-
-  /// What workspace [slug]'s agent can recall from the everythingllm host's long-term memory.
-  /// Null when the server does not say, as one without the host's route. Fails with
-  /// [ApiException].
-  Future<LongMemory?> longMemory(String slug);
-
-  /// The facts and parts of files closest in meaning to [query], closest first. Fails with
-  /// [ApiException], as while the host's model loads.
-  Future<List<RecallHit>> recallMemory(String slug, String query);
-
-  /// Keeps [text] in the long-term memory, for every workspace when [global], and answers the
-  /// fact with whether it is new rather than one that already says it.
-  Future<({LongFact fact, bool isNew})> rememberLong(
-    String slug,
-    String text, {
-    required bool global,
-  });
-
-  /// Forgets the long-term [fact], by its id, or the text read in from [path], a file or
-  /// folder; the files themselves stay.
-  Future<void> forgetLong(String slug, {String? fact, String? path});
 
   /// Tells the server whether the tool [request] asks about may run. Fails with [ApiException]
   /// when it was answered already, or the server stopped waiting.
@@ -290,10 +229,9 @@ abstract interface class AnythingLlmApi {
   /// The bytes of a file or image an agent made, by the [storageName] the server gave it.
   Future<List<int>> generatedFile(String storageName);
 
-  /// The image at [url], from an answer, as it is drawn: one frame for a plain image, and each
-  /// new frame of a live one, which the server keeps pushing until it ends the response. Sent
-  /// without the key, the password or a login token. Cancelling closes the connection.
-  Stream<Uint8List> answerImage(Uri url);
+  /// The bytes of the image at [url], from an answer. Sent without the key, the password or a
+  /// login token.
+  Future<Uint8List> answerImage(Uri url);
 
   /// The server's settings, with every secret replaced by whether it is set.
   Future<Map<String, Object?>> systemSettings();

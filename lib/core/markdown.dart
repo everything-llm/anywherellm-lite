@@ -2,8 +2,8 @@ import 'package:markdown/markdown.dart' as md;
 
 /// GitHub-flavoured Markdown as an answer is read, TeX included ([mathSyntaxes]). A bare
 /// address stops at a `]` it did not open, as on GitHub, which links bare addresses only after
-/// links and images are read: so a card whose description holds an address,
-/// `[![Browser: https://...](card.jpg)](page)`, stays an image inside a link, and
+/// links and images are read: so an image whose description holds an address,
+/// `[![See https://...](picture.jpg)](page)`, stays an image inside a link, and
 /// `https://x.example/?ids[]=1` stays one address.
 final answerMarkdown = md.ExtensionSet(
   md.ExtensionSet.gitHubFlavored.blockSyntaxes,

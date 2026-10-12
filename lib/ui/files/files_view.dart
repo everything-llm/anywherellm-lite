@@ -13,7 +13,6 @@ import '../widgets/fields.dart';
 import '../widgets/min_height.dart';
 import '../widgets/pane_header.dart';
 import 'doc_views.dart';
-import 'created_files.dart';
 import 'essentials.dart';
 import 'file_tree.dart';
 import 'folder_view.dart';
@@ -213,9 +212,6 @@ class _Editor extends StatefulWidget {
   State<_Editor> createState() => _EditorState();
 }
 
-/// The opening tag of the server's EverythingLLM block, with or without attributes.
-final _everythingllmBlock = RegExp(r'<everythingllm[\s>]');
-
 class _EditorState extends State<_Editor> {
   late final TextEditingController _draft;
   late final String _saved;
@@ -250,7 +246,6 @@ class _EditorState extends State<_Editor> {
     // A phone's Instructions are prose, set as the design canvas sets them, with its two
     // buttons sharing the line.
     final prose = widget.phone && prompt;
-    final block = _everythingllmBlock.hasMatch(_saved);
     final List<String> notes;
     if (!prompt) {
       notes = [
@@ -261,14 +256,10 @@ class _EditorState extends State<_Editor> {
     } else if (widget.phone) {
       // A phone says it in one line, as the design canvas does.
       final name = AppScope.of(context).chat.active?.name ?? 'this workspace';
-      notes = [
-        'What every answer in $name is told first.'
-            '${block ? ' Write outside the <everythingllm> block; the server keeps that part.' : ''}',
-      ];
+      notes = ['What every answer in $name is told first.'];
     } else {
       notes = [
         'This prompt replaces the default system prompt in this workspace.',
-        if (block) 'Write your own instructions outside the <everythingllm> block; the server\'s update-prompt skill replaces that block.',
       ];
     }
     return CallbackShortcuts(
@@ -349,8 +340,7 @@ class _EditorState extends State<_Editor> {
   }
 }
 
-/// The Essentials view's section of the open workspace, each but Created files the same node as
-/// in the tree, or the text of one of its documents. On a [phone] its answer settings are the
+/// The Essentials view's section of the open workspace, the same node as in the tree, or the text of one of its documents. On a [phone] its answer settings are the
 /// few a phone shows.
 Widget essentialSection(
   BuildContext context,
@@ -367,8 +357,6 @@ Widget essentialSection(
   return switch (section) {
     // Keyed by workspace, so what waits to be added stays with it.
     FilesSection.documents => EssentialDocs(key: ValueKey(workspace.slug)),
-    // Keyed by workspace, so another one's files are read afresh.
-    FilesSection.created => CreatedFiles(key: ValueKey(workspace.slug)),
     _ when files.contentLoading || (node == null && files.loading) =>
       const Blank('Loading…'),
     _ when node == null => Blank(

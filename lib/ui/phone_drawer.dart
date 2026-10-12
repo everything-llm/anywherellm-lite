@@ -5,7 +5,6 @@ import '../core/copy.dart';
 import '../core/find.dart';
 import '../core/server_models.dart';
 import 'activity.dart';
-import 'artifacts.dart';
 import 'app_scope.dart';
 import 'icons.dart';
 import 'layout.dart';
@@ -21,8 +20,8 @@ import 'widgets/tappable.dart';
 import 'workspace_switcher.dart';
 
 /// A phone's drawer, in flat rows on its ground as the design canvas draws it: the workspace
-/// switcher beside Workspace settings; the search, New chat, Artifacts and the open workspace's
-/// chats under Chats, each with a More button that opens its sheet; then, under a hairline, Activity,
+/// switcher beside Workspace settings; the search, New chat and the open workspace's chats under
+/// Chats, each with a More button that opens its sheet; then, under a hairline, Activity,
 /// Upcoming and Settings. Only the chats scroll, unless the drawer is shorter than
 /// [minHeight].
 class PhoneDrawer extends StatefulWidget {
@@ -122,7 +121,6 @@ class _PhoneDrawerState extends State<PhoneDrawer> {
                           shell.closeSide();
                         },
                       ),
-                      if (scope.settings.configured) const ArtifactsRow(),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(12, 14, 12, 4),
                         child: Semantics(

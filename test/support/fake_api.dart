@@ -1,12 +1,10 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:anywherellm/core/browser.dart';
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/chat_log.dart';
 import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/connection.dart';
-import 'package:anywherellm/core/created.dart';
 import 'package:anywherellm/core/embeds.dart';
 import 'package:anywherellm/core/memory.dart';
 import 'package:anywherellm/core/outputs.dart';
@@ -118,15 +116,9 @@ class FakeAnythingLlm implements AnythingLlmApi {
   /// What [generatedFile] answers, by storage name. Any other name is not found.
   final Map<String, List<int>> generated = {};
 
-  /// What [answerImage] answers for a plain image, by address: its frames, then done.
-  final Map<Uri, List<List<int>>> images = {};
+  /// What [answerImage] answers, by address. Any other address is not found.
+  final Map<Uri, List<int>> images = {};
 
-  /// What [answerImage] answers for a live image, by address: a broadcast stream the test adds
-  /// frames to, whose `hasListener` says whether the app is following it.
-  final Map<Uri, StreamController<Uint8List>> liveImages = {};
-
-  /// Every address [answerImage] was asked for, as the app asked it.
-  final List<Uri> imageAsks = [];
   bool hold = false;
   StreamController<ChatEvent>? chat;
 
@@ -154,23 +146,13 @@ class FakeAnythingLlm implements AnythingLlmApi {
   final Map<String, Completer<void>> gates = {};
   var _made = 0;
 
-  Future<T> _run<T>(
-    String name,
-    T Function() value, [
-    String? arg,
-    List<String>? log,
-  ]) async {
-    (log ?? calls).add(arg == null ? name : '$name:$arg');
+  Future<T> _run<T>(String name, T Function() value, [String? arg]) async {
+    calls.add(arg == null ? name : '$name:$arg');
     await gates[name]?.future;
     final error = errors[name];
     if (error != null) throw error;
     return value();
   }
-
-  /// Each read of a chat's browser or its picture, as `chatBrowser:<thread>` or
-  /// `browserFrame:<thread>`. They are kept apart from [calls]: the app reads them on its own
-  /// as an answer ends, which no test of what a chat asked the server wants between its calls.
-  final List<String> browserReads = [];
 
   FakeWorkspace _space(String slug) => spaces.firstWhere(
     (w) => w.slug == slug,
@@ -465,264 +447,12 @@ class FakeAnythingLlm implements AnythingLlmApi {
         return moved;
       }, '$id:${toWorkspace ?? 'global'}');
 
-  /// Whether the server has no long-term memory route, as one without the everythingllm host.
-  bool noMemoryRoute = false;
-
-  /// The long-term facts, newest first, each with its workspace, or null for every workspace.
-  final List<({LongFact fact, String? workspace})> longFacts = [];
-
-  /// The files whose text the long-term memory keeps, by workspace slug.
-  final Map<String, List<LongFile>> longFiles = {};
-
-  int _nextFact = 1;
-
-  /// Keeps [text] as a long-term fact of [workspace], or of every workspace when it is null.
-  LongFact addFact(String text, {String? workspace, DateTime? created}) {
-    final fact = LongFact(
-      id: 'm${_nextFact++}',
-      text: text,
-      global: workspace == null,
-      created: created ?? DateTime.now(),
-    );
-    longFacts.insert(0, (fact: fact, workspace: workspace));
-    return fact;
-  }
-
-  /// The long-term facts workspace [slug]'s agent recalls: every workspace's and its own.
-  List<LongFact> _factsOf(String slug) => [
-    for (final f in longFacts)
-      if (f.workspace == null || f.workspace == slug) f.fact,
-  ];
-
-  @override
-  Future<LongMemory?> longMemory(String slug) => _run(
-    'longMemory',
-    () => noMemoryRoute
-        ? null
-        : LongMemory(
-            count: _factsOf(slug).length,
-            facts: _factsOf(slug),
-            files: [...?longFiles[slug]],
-          ),
-    slug,
-  );
-
-  /// Finds each fact that shares a word's first five letters with [query], more shared words
-  /// closer, as a model would find it by meaning.
-  @override
-  Future<List<RecallHit>> recallMemory(
-    String slug,
-    String query,
-  ) => _run('recallMemory', () {
-    Set<String> words(String text) => {
-      for (final w in RegExp(r'[a-z0-9]{3,}').allMatches(text.toLowerCase()))
-        w[0]!.substring(0, w[0]!.length < 5 ? w[0]!.length : 5),
-    };
-    final asked = words(query);
-    final found = [
-      for (final fact in _factsOf(slug))
-        if (words(fact.text).intersection(asked).length case final n when n > 0)
-          RecallHit(score: 0.55 + 0.1 * n, text: fact.text, fact: fact),
-    ]..sort((a, b) => b.score.compareTo(a.score));
-    return found;
-  }, query);
-
-  @override
-  Future<({LongFact fact, bool isNew})> rememberLong(
-    String slug,
-    String text, {
-    required bool global,
-  }) => _run('rememberLong', () {
-    final same = _factsOf(slug)
-        .where((f) => f.text.toLowerCase() == text.toLowerCase())
-        .firstOrNull;
-    if (same != null) return (fact: same, isNew: false);
-    return (fact: addFact(text, workspace: global ? null : slug), isNew: true);
-  }, text);
-
-  @override
-  Future<void> forgetLong(String slug, {String? fact, String? path}) => _run(
-    'forgetLong',
-    () {
-      if (path != null) {
-        final files = longFiles[slug] ?? [];
-        final before = files.length;
-        files.removeWhere((f) => f.path == path || f.path.startsWith('$path/'));
-        if (files.length == before) {
-          throw ApiException("nothing ingested from '$path'", status: 404);
-        }
-        return;
-      }
-      final before = longFacts.length;
-      longFacts.removeWhere(
-        (f) =>
-            f.fact.id == fact && (f.workspace == null || f.workspace == slug),
-      );
-      if (longFacts.length == before) {
-        throw ApiException('no fact $fact here', status: 404);
-      }
-    },
-    fact ?? path,
-  );
-
   /// What [scheduledJobs] answers.
   List<ScheduledJob> jobs = const [];
 
   @override
   Future<List<ScheduledJob>> scheduledJobs() =>
       _run('scheduledJobs', () => jobs);
-
-  /// What [createdFiles] answers, by workspace slug: an empty list for one not here.
-  final Map<String, CreatedList> created = {};
-
-  /// Whether the server has no route for created files, as one without the everythingllm host.
-  bool noCreatedRoute = false;
-
-  /// The bytes [downloadCreated] answers, by file id; a file without any is empty.
-  final Map<String, List<int>> createdBytes = {};
-
-  @override
-  Future<CreatedList?> createdFiles(String slug) => _run(
-    'createdFiles',
-    () => noCreatedRoute ? null : created[slug] ?? const CreatedList(),
-    slug,
-  );
-
-  @override
-  Future<List<int>> downloadCreated(String slug, String id) =>
-      _run('downloadCreated', () {
-        _need(slug, id);
-        return createdBytes[id] ?? const [];
-      }, id);
-
-  /// Moves a working file to the same path in the project, as the server does, and refuses a
-  /// file that is not a working file or a path the project has.
-  @override
-  Future<String> keepCreated(String slug, String id) => _run('keepCreated', () {
-    final file = _need(slug, id);
-    if (file.area != CreatedArea.work) {
-      throw const ApiException(
-        'only a working file needs keeping',
-        status: 409,
-      );
-    }
-    final kept = 'project/${id.split('/').skip(2).join('/')}';
-    if (_createdFile(slug, kept) != null) {
-      throw ApiException("/project already has '$kept'", status: 409);
-    }
-    _createdSet(slug, [
-      for (final f in created[slug]!.files)
-        if (f.id == id)
-          CreatedFile(
-            id: kept,
-            name: f.name,
-            dir: f.dir,
-            size: f.size,
-            modified: f.modified,
-            area: CreatedArea.project,
-          )
-        else
-          f,
-    ]);
-    createdBytes[kept] = createdBytes.remove(id) ?? const [];
-    return kept;
-  }, id);
-
-  /// Deletes a file, or an app by its `apps/<name>` id, as the server does.
-  @override
-  Future<void> deleteCreated(String slug, String id) =>
-      _run('deleteCreated', () {
-        final apps = created[slug]?.apps;
-        if (id.startsWith('apps/')) {
-          if (apps == null || !apps.any((a) => a.id == id)) {
-            throw ApiException("there's no app '$id'", status: 404);
-          }
-          _createdSet(slug, created[slug]!.files, [
-            for (final a in apps)
-              if (a.id != id) a,
-          ]);
-          return;
-        }
-        _need(slug, id);
-        _createdSet(slug, [
-          for (final f in created[slug]!.files)
-            if (f.id != id) f,
-        ]);
-        createdBytes.remove(id);
-      }, id);
-
-  CreatedFile? _createdFile(String slug, String id) =>
-      created[slug]?.files.where((f) => f.id == id).firstOrNull;
-
-  CreatedFile _need(String slug, String id) =>
-      _createdFile(slug, id) ??
-      (throw ApiException("There's no '$id'", status: 404));
-
-  void _createdSet(
-    String slug,
-    List<CreatedFile> files, [
-    List<CreatedApp>? apps,
-  ]) {
-    final was = created[slug]!;
-    created[slug] = CreatedList(
-      files: files,
-      apps: apps ?? was.apps,
-      used: was.used,
-      warn: was.warn,
-      limit: was.limit,
-      truncated: was.truncated,
-    );
-  }
-
-  /// What [chatBrowser] answers, by thread: none for a chat with no browser.
-  final Map<String, ChatBrowser> browsers = {};
-
-  @override
-  Future<ChatBrowser?> chatBrowser(String slug, String thread) =>
-      _run('chatBrowser', () => browsers[thread], thread, browserReads);
-
-  /// The picture [browserFrame] answers, by thread. Its etag is its length.
-  final Map<String, Uint8List> frames = {};
-
-  @override
-  Future<({Uint8List? bytes, String? etag})?> browserFrame(
-    String slug,
-    String thread, {
-    String? etag,
-    bool light = false,
-  }) => _run(
-    'browserFrame',
-    () {
-      final frame = frames[thread];
-      if (frame == null) return null;
-      final tag = '"${frame.length}"';
-      return etag == tag
-          ? (bytes: null, etag: etag)
-          : (bytes: frame, etag: tag);
-    },
-    thread,
-    browserReads,
-  );
-
-  @override
-  Future<ChatBrowser> handBackBrowser(String slug, String thread) =>
-      _run('handBackBrowser', () {
-        final now = browsers[thread] ?? const ChatBrowser();
-        final tab = now.tab;
-        if (tab != null && tab.yours) {
-          browsers[thread] = ChatBrowser(
-            tab: BrowserTab(
-              page: tab.page,
-              state: 'idle',
-              title: tab.title,
-              site: tab.site,
-              last: tab.last,
-            ),
-            logins: now.logins,
-          );
-        }
-        return browsers[thread] ?? now;
-      }, thread);
 
   /// What [relayRuns] answers.
   List<RelayRun> allRuns = const [];
@@ -1070,30 +800,15 @@ class FakeAnythingLlm implements AnythingLlmApi {
   Future<int> vectorCount() => _run('vectorCount', () => vectors);
 
   @override
-  Stream<Uint8List> answerImage(Uri asked) {
-    imageAsks.add(asked);
-    // The test's images are kept by their address as the answer gives it, whatever theme the
-    // app asks for.
-    final rest = {...asked.queryParameters}..remove('theme');
-    final bare = !asked.queryParameters.containsKey('theme')
-        ? asked
-        : rest.isEmpty
-        ? Uri.parse(asked.toString().split('?').first)
-        : asked.replace(queryParameters: rest);
-    calls.add('answerImage:$bare');
-    if (errors['answerImage'] case final Object error) {
-      return Stream.error(error);
-    }
-    if (liveImages[bare] case final live?) return live.stream;
-    if (images[bare] case final frames?) {
-      return Stream.fromIterable(frames.map(Uint8List.fromList));
-    }
-    return Stream.error(
-      const ApiException(
+  Future<Uint8List> answerImage(Uri url) => _run('answerImage', () {
+    final bytes = images[url];
+    if (bytes == null) {
+      throw const ApiException(
         'The image could not be read: the server answered 404.',
-      ),
-    );
-  }
+      );
+    }
+    return Uint8List.fromList(bytes);
+  }, url.toString());
 
   @override
   Future<List<int>> generatedFile(String storageName) =>

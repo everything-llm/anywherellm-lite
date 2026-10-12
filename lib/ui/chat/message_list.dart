@@ -28,9 +28,7 @@ import '../widgets/tappable.dart';
 import 'answer_body.dart';
 import 'markdown_lists.dart';
 import 'answer_menu.dart';
-import 'app_panel.dart';
 import 'approval_card.dart';
-import 'browser_chip.dart';
 import 'generated_files.dart';
 import 'passages_sheet.dart';
 import 'speaker.dart';
@@ -98,17 +96,6 @@ class _MessageListState extends State<MessageList> {
     });
   }
 
-  /// On a phone with a web view, starts loading the page of the chat's newest app card after
-  /// this frame, so the card's sheet opens on the page at once.
-  void _prefetchApp(BuildContext context, AppScope scope) {
-    final view = scope.appView;
-    if (view == null || !ScreenClass.ofContext(context).isPhone) return;
-    final app = scope.chat.appCard;
-    if (app == null) return;
-    final page = appPageOf(context, app);
-    WidgetsBinding.instance.addPostFrameCallback((_) => view.prefetch(page));
-  }
-
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
@@ -117,7 +104,6 @@ class _MessageListState extends State<MessageList> {
     final turns = chat.turns;
     if (workspace == null) return const SizedBox.shrink();
     _follow(chat);
-    _prefetchApp(context, scope);
     if (turns.isEmpty) {
       return _Empty(workspace: workspace.name, onSuggest: widget.onSuggest);
     }
@@ -718,13 +704,7 @@ class _AnswerState extends State<_Answer> {
             muted: cut,
             caret: inline,
           ),
-        if (turn.browsing)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: BrowserChip(turn),
-          )
-        else if (turn.streaming && turn.status != null)
-          _Status(turn.status!),
+        if (turn.streaming && turn.status != null) _Status(turn.status!),
         if (turn.streaming)
           for (final request in turn.approvals)
             Padding(
@@ -755,12 +735,6 @@ class _AnswerState extends State<_Answer> {
                   ? AppButton('Ask again', onPressed: retry!.onPressed)
                   : null,
             ),
-        ],
-        if (!turn.streaming &&
-            turn.browserSteps.isNotEmpty &&
-            AppScope.of(context).chat.cardsOf(turn).isEmpty) ...[
-          const SizedBox(height: 10),
-          BrowserChip(turn),
         ],
         if (!turn.streaming && turn.citations.isNotEmpty) ...[
           SizedBox(height: phone ? 10 : 12),

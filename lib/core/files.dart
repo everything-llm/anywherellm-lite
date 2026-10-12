@@ -71,24 +71,22 @@ String promptPath(String slug) => '/workspaces/$slug/PROMPT.md';
 /// The tree path of workspace [slug]'s answer settings.
 String settingsPath(String slug) => '/workspaces/$slug/settings.json';
 
-/// What the Files pane's Essentials view lists for the open workspace. Each but [created] shows
-/// a node of the tree under a plain name.
+/// What the Files pane's Essentials view lists for the open workspace. Each shows a node of the
+/// tree under a plain name.
 enum FilesSection {
   documents('Documents'),
   instructions('Instructions'),
-  answers('Answer settings'),
-  created('Created files');
+  answers('Answer settings');
 
   const FilesSection(this.title);
 
   final String title;
 
-  /// The tree path of what the section shows in workspace [slug], or null when it shows no node.
-  String? pathIn(String slug) => switch (this) {
+  /// The tree path of what the section shows in workspace [slug].
+  String pathIn(String slug) => switch (this) {
     documents => docsPath(slug),
     instructions => promptPath(slug),
     answers => settingsPath(slug),
-    created => null,
   };
 }
 

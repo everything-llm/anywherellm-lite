@@ -9,8 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/fake_api.dart';
 import '../support/pump.dart';
 
-/// The planning server with saved memories for every workspace and Q3 planning's own, and
-/// long-term facts and a file read in.
+/// The planning server with saved memories for every workspace and Q3 planning's own.
 FakeAnythingLlm _remembering() {
   final llm = planningServer();
   llm.globalMemories.addAll(const [
@@ -26,12 +25,6 @@ FakeAnythingLlm _remembering() {
   ];
   llm.workspaceMemories['household'] = [
     const SavedMemory(id: 4, text: 'The boiler is from 2019.', global: false),
-  ];
-  llm.addFact('Prefers morning appointments.');
-  llm.addFact('The Q3 budget for research is about 40k.', workspace: 'q3');
-  llm.addFact('Takes coffee black.');
-  llm.longFiles['q3'] = [
-    const LongFile(path: '/project/interview-notes.md', parts: 12),
   ];
   return llm;
 }
@@ -60,7 +53,7 @@ Finder _field(String hint) => _inPage(
 const _memoryHint = 'One short fact, such as: Prefers metric units.';
 
 void main() {
-  testWidgets('the page lists both memories of the open workspace', (
+  testWidgets('the page lists the saved memories of the open workspace', (
     tester,
   ) async {
     await _openMemory(tester, _remembering());
@@ -68,9 +61,6 @@ void main() {
       'Name is Anna.',
       'Lives in Uppsala.',
       'Reports go to Maja on Fridays.',
-      'Takes coffee black.',
-      'The Q3 budget for research is about 40k.',
-      '/project/interview-notes.md',
     ]) {
       expect(_inPage(find.text(text)), findsOneWidget, reason: text);
     }
@@ -115,7 +105,7 @@ void main() {
       control('Reports go to Maja on Fridays. Change or delete'),
     );
     await tester.pumpAndSettle();
-    await tester.tap(_inPage(find.text('Every workspace')));
+    await tapVisible(tester, _inPage(find.text('Every workspace')));
     await tester.pumpAndSettle();
     await tapVisible(tester, control('Save'));
     await tester.pumpAndSettle();
@@ -134,7 +124,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.enterText(_field(_memoryHint), 'Reports go to Maja.');
-    await tester.tap(_inPage(find.text('Every workspace')));
+    await tapVisible(tester, _inPage(find.text('Every workspace')));
     await tester.pumpAndSettle();
     await tapVisible(tester, control('Save'));
     await tester.pumpAndSettle();
@@ -168,72 +158,6 @@ void main() {
     );
     expect(find.text('Name is Anna.'), findsNothing);
     expect(control('Learn from chats'), findsNothing);
-    // The long-term memory is a thing apart.
-    expect(_inPage(find.text('Takes coffee black.')), findsOneWidget);
-  });
-
-  testWidgets('a search finds long-term facts closest first, and one is '
-      'forgotten after asking', (tester) async {
-    final llm = _remembering();
-    await _openMemory(tester, llm);
-    await tester.enterText(_field('Find by meaning'), 'coffee');
-    await tester.pump(const Duration(milliseconds: 450));
-    await tester.pumpAndSettle();
-    expect(llm.calls, contains('recallMemory:coffee'));
-    expect(find.text('CLOSEST FIRST'), findsOneWidget);
-    expect(find.textContaining('65% match'), findsOneWidget);
-    expect(_inPage(find.text('Prefers morning appointments.')), findsNothing);
-
-    await tapVisible(tester, control('Takes coffee black. Forget it'));
-    await tester.pumpAndSettle();
-    await tapVisible(tester, control('Forget'));
-    await tester.pumpAndSettle();
-    expect(llm.calls.where((c) => c.startsWith('forgetLong:m')), hasLength(1));
-    expect(_inPage(find.text('Takes coffee black.')), findsNothing);
-    expect(find.text('Nothing kept is close to that.'), findsOneWidget);
-  });
-
-  testWidgets('something remembered is kept for the workspace, and a fact '
-      'already kept says so', (tester) async {
-    final llm = _remembering();
-    await _openMemory(tester, llm);
-    await tapVisible(tester, control('Remember something'));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      _field('One short fact, such as: Takes coffee black.'),
-      'Maja prefers slides to documents.',
-    );
-    await tapVisible(tester, control('Remember'));
-    await tester.pumpAndSettle();
-    expect(llm.longFacts.first.workspace, 'q3');
-    expect(
-      _inPage(find.text('Maja prefers slides to documents.')),
-      findsOneWidget,
-    );
-
-    await tapVisible(tester, control('Remember something'));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      _field('One short fact, such as: Takes coffee black.'),
-      'takes coffee black.',
-    );
-    await tapVisible(tester, control('Remember'));
-    await tester.pumpAndSettle();
-    expect(find.text('Already kept: Takes coffee black.'), findsOneWidget);
-  });
-
-  testWidgets('a file\'s text is forgotten after asking', (tester) async {
-    final llm = _remembering();
-    await _openMemory(tester, llm);
-    await tapVisible(
-      tester,
-      control('/project/interview-notes.md. Forget its text'),
-    );
-    await tester.pumpAndSettle();
-    await tapVisible(tester, control('Forget'));
-    await tester.pumpAndSettle();
-    expect(llm.calls, contains('forgetLong:/project/interview-notes.md'));
-    expect(llm.longFiles['q3'], isEmpty);
   });
 
   testWidgets('another workspace shows its own memories', (tester) async {
@@ -247,23 +171,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(_inPage(find.text('The boiler is from 2019.')), findsOneWidget);
     expect(find.text('Reports go to Maja on Fridays.'), findsNothing);
-    expect(
-      _inPage(find.text('The Q3 budget for research is about 40k.')),
-      findsNothing,
-    );
-  });
-
-  testWidgets('a server without the host says it has no long-term memory', (
-    tester,
-  ) async {
-    final llm = _remembering()..noMemoryRoute = true;
-    await _openMemory(tester, llm);
-    expect(
-      find.textContaining('This server has no long-term memory'),
-      findsOneWidget,
-    );
-    expect(_field('Find by meaning'), findsNothing);
-    expect(_inPage(find.text('Name is Anna.')), findsOneWidget);
   });
 
   testWidgets('a failed read says why', (tester) async {
@@ -287,7 +194,7 @@ void main() {
     );
     h.shell.openSettings();
     await tester.pumpAndSettle();
-    await tapVisible(tester, control('Memory, Saved and long-term'));
+    await tapVisible(tester, control('Memory, Saved memories'));
     await tester.pumpAndSettle();
     expect(find.byType(MemoryPage), findsOneWidget);
     expect(_inPage(find.text('Name is Anna.')), findsOneWidget);
@@ -297,10 +204,7 @@ void main() {
     await h.chat.select('household');
     h.shell.showPane(Pane.files);
     await tester.pumpAndSettle();
-    await tapVisible(
-      tester,
-      control('Memory, What chats are shown, and the agent can recall'),
-    );
+    await tapVisible(tester, control('Memory, What chats are shown'));
     await tester.pumpAndSettle();
     expect(_inPage(find.text('The boiler is from 2019.')), findsOneWidget);
   });

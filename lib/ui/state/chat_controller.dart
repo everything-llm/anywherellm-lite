@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../../core/browser.dart';
 import '../../core/chat.dart';
 import '../../core/commands.dart';
 import '../../core/connection.dart';
@@ -95,68 +94,14 @@ class Turn extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// The everythingllm browser's steps in this answer, in order, as the stream told them. A
-  /// saved answer has none: its history keeps no status lines.
-  List<String> browserSteps = const [];
-
-  /// Whether the latest [status] is one of [browserSteps].
-  bool get browsing => streaming && _browserStatus;
-  bool _browserStatus = false;
-
-  /// Notifies when [status] changes, which the text does far more often; a view of the
-  /// browser listens here rather than to every chunk.
-  Listenable get statusChanges => _statusChanges;
-  final _statusChanges = ChangeNotifier();
-
-  /// The browser cards in [text] on the [server] given, read again only when either changes.
-  List<BrowserCard> _cardsOf(Uri? server) {
-    if (_cards case (final read, final on, final cards)
-        when identical(read, text) && on == server) {
-      return cards;
-    }
-    final cards = browserCards(text, server: server);
-    _cards = (text, server, cards);
-    return cards;
-  }
-
-  (String, Uri?, List<BrowserCard>)? _cards;
-
-  /// The apps' cards in [text] on the [server] given, read again only when either changes.
-  List<AppCard> _appsOf(Uri? server) {
-    if (_apps case (final read, final on, final apps)
-        when identical(read, text) && on == server) {
-      return apps;
-    }
-    final apps = appCardsIn(text, server);
-    _apps = (text, server, apps);
-    return apps;
-  }
-
-  (String, Uri?, List<AppCard>)? _apps;
-
   void _grow(String more) {
     text += more;
     notifyListeners();
   }
 
-  /// Whether the status line that comes next is a browser skill's own words for the step its
-  /// call began: everythingllm's skills say it right after AnythingLLM reports the call.
-  bool _ownWords = false;
-
-  void _setStatus(String line, {String? tool}) {
+  void _setStatus(String line) {
     status = line;
-    if (tool != null) {
-      _browserStatus = _ownWords = isBrowserTool(tool);
-      if (_browserStatus) browserSteps = [...browserSteps, line];
-    } else if (_ownWords) {
-      // The skill's words name the element, so they take the place of the call's.
-      _ownWords = false;
-      browserSteps = [...browserSteps.take(browserSteps.length - 1), line];
-    } else {
-      _browserStatus = false;
-    }
     notifyListeners();
-    _statusChanges.notifyListeners();
   }
 
   void _replace(String whole) {
@@ -368,9 +313,8 @@ class ChatController extends ChangeNotifier {
   /// The bytes of each file an agent made, by storage name, read once per server.
   final Map<String, Future<List<int>?>> _madeFiles = {};
 
-  /// The last frame of each image in an answer, by address, and whether that read gave one
-  /// frame and ended, so the image will not change.
-  final Map<Uri, ({Uint8List frame, bool whole})> _images = {};
+  /// The bytes of each image in an answer, by address, read once per server.
+  final Map<Uri, Future<Uint8List>> _images = {};
 
   static const linkNoticeFor = Duration(seconds: 6);
 
@@ -437,43 +381,6 @@ class ChatController extends ChangeNotifier {
   /// The answer running in the chat on screen, or null. It notifies on each chunk, which this
   /// controller does not.
   Turn? get runningHere => _here?.answer;
-
-  /// The browser's cards in the chat on screen's finished answers, newest first. A running
-  /// answer's cards count once it ends, so the text streaming in is never parsed for one.
-  Iterable<BrowserCard> get _cardsHere sync* {
-    final server = _server?.uri;
-    for (final turn in turns.reversed) {
-      if (turn.role != Role.assistant || turn.streaming) continue;
-      yield* turn._cardsOf(server).reversed;
-    }
-  }
-
-  /// The newest app's card in the chat on screen's finished answers, or null. A running
-  /// answer's count once it ends, as the browser's do.
-  AppCard? get appCard {
-    final server = _server?.uri;
-    for (final turn in turns.reversed) {
-      if (turn.role != Role.assistant || turn.streaming) continue;
-      if (turn._appsOf(server).lastOrNull case final app?) return app;
-    }
-    return null;
-  }
-
-  /// The newest tab's card in the chat on screen, or null.
-  BrowserCard? get browserCard => _cardsHere.where((c) => !c.login).firstOrNull;
-
-  /// The newest login request's card in the chat on screen, when no tab's card came after it.
-  BrowserCard? get loginCard =>
-      _cardsHere.takeWhile((c) => c.login).firstOrNull;
-
-  /// The browser cards in [turn]'s text, on this server, read once per text.
-  List<BrowserCard> cardsOf(Turn turn) => turn._cardsOf(_server?.uri);
-
-  /// Whether the chat on screen has used the everythingllm browser, as far as it can tell: an
-  /// answer has a card of it, or took browser steps while this app followed it.
-  bool get usedBrowser =>
-      _cardsHere.isNotEmpty ||
-      turns.any((turn) => turn.browserSteps.isNotEmpty);
 
   /// Whether [refresh] is reading the server again.
   bool get refreshing => _refreshing;
@@ -1104,8 +1011,8 @@ class ChatController extends ChangeNotifier {
         switch (event) {
           case TextChunk(:final text):
             answer._grow(text);
-          case StatusChunk(:final text, :final tool):
-            answer._setStatus(text, tool: tool);
+          case StatusChunk(:final text):
+            answer._setStatus(text);
           case WholeAnswer(:final text):
             answer._replace(text);
           case ApprovalRequest():
@@ -1746,44 +1653,13 @@ class ChatController extends ChangeNotifier {
     }
   }
 
-  /// The last frame of the image at [url] in an answer, read from this server, or null.
-  Uint8List? lastFrame(Uri url) => _images[url]?.frame;
-
-  /// The frames of the image at [url] in an answer, each kept as its [lastFrame]. An image
-  /// whose last read gave one frame and ended is given again without asking: a card's address
-  /// changes with what it shows, and a finished run's card no longer changes. A live one is
-  /// read again, so it shows its newest frame. Fails with [ApiException].
-  Stream<Uint8List> imageFrames(Uri url) {
-    final known = _images[url];
-    if (known != null && known.whole) return Stream.value(known.frame);
-    final server = _server;
-    var frames = 0;
-    Uint8List? previous;
-    return _api
-        .answerImage(url)
-        .transform(
-          StreamTransformer.fromHandlers(
-            handleData: (frame, sink) {
-              if (_server != server) return;
-              // Counted before the copy is dropped, so a live card that ended after its first
-              // frame and the copy is not taken for an image that will not change.
-              frames++;
-              // A live card sends a still frame again so a browser draws it at once; the copy
-              // would only be decoded again.
-              if (previous != null && listEquals(previous, frame)) return;
-              previous = frame;
-              _images[url] = (frame: frame, whole: false);
-              sink.add(frame);
-            },
-            handleDone: (sink) {
-              if (_server == server && frames == 1) {
-                _images[url] = (frame: _images[url]!.frame, whole: true);
-              }
-              sink.close();
-            },
-          ),
-        );
-  }
+  /// The bytes of the image at [url] in an answer, read once per server. Fails with
+  /// [ApiException], and a failed read is tried again next time.
+  Future<Uint8List> imageBytes(Uri url) =>
+      _images[url] ??= _api.answerImage(url).catchError((Object error) {
+        _images.remove(url);
+        throw error;
+      });
 
   /// Shows [text] as [problem], titled [title].
   void report(String title, String text) {

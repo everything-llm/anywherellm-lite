@@ -2,11 +2,11 @@ import 'package:anywherellm/core/markdown.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:markdown/markdown.dart' as md;
 
-/// The everythingllm browser's card for a page without a title, as an agent pasted it.
+/// A linked image whose description holds an address.
 const _card =
-    'Card: [![Browser: https://r.mail.recraft.ai/mk/un/v2/sh/WCPx/fqEYtNipp1Pg]'
-    '(https://owen.example:8445/_live/browser/bw-3aeecef2b460eeb7.jpg)]'
-    '(https://owen.example:8445/_live/browser/bw-3aeecef2b460eeb7)';
+    'Card: [![Page: https://r.mail.recraft.ai/mk/un/v2/sh/WCPx/fqEYtNipp1Pg]'
+    '(https://owen.example/pics/a.jpg)]'
+    '(https://owen.example/pics/a)';
 
 /// The elements of the one paragraph [text] is, as an answer is parsed.
 List<md.Element> _inline(String text) =>
@@ -39,24 +39,21 @@ void main() {
     );
   });
 
-  test("an address in a card's description leaves the card whole", () {
-    final link = _inline(_card).single;
-    expect(link.tag, 'a');
-    expect(
-      link.attributes['href'],
-      'https://owen.example:8445/_live/browser/bw-3aeecef2b460eeb7',
-    );
-    final image = link.children!.whereType<md.Element>().single;
-    expect(image.tag, 'img');
-    expect(
-      image.attributes['src'],
-      'https://owen.example:8445/_live/browser/bw-3aeecef2b460eeb7.jpg',
-    );
-    expect(
-      image.attributes['alt'],
-      'Browser: https://r.mail.recraft.ai/mk/un/v2/sh/WCPx/fqEYtNipp1Pg',
-    );
-  });
+  test(
+    "an address in an image's description leaves the linked image whole",
+    () {
+      final link = _inline(_card).single;
+      expect(link.tag, 'a');
+      expect(link.attributes['href'], 'https://owen.example/pics/a');
+      final image = link.children!.whereType<md.Element>().single;
+      expect(image.tag, 'img');
+      expect(image.attributes['src'], 'https://owen.example/pics/a.jpg');
+      expect(
+        image.attributes['alt'],
+        'Page: https://r.mail.recraft.ai/mk/un/v2/sh/WCPx/fqEYtNipp1Pg',
+      );
+    },
+  );
 
   test('a bare address in the text is still a link', () {
     expect(
