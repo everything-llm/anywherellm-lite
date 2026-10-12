@@ -135,6 +135,22 @@ class _Running {
 /// A chat not yet asked anything is a draft: it lives only here until its first message, which
 /// makes the thread on the server. Everything it knows is about the server in [_settings]; a new
 /// server starts it afresh.
+/// One read of an answer image: its bytes as they are read, and [done] once they are.
+class _ImageRead {
+  _ImageRead(Uri url, ChatController chat) {
+    bytes = chat._api.answerImage(url).then(
+      (value) => done = value,
+      onError: (Object error, StackTrace stack) {
+        if (identical(chat._images[url], this)) chat._images.remove(url);
+        Error.throwWithStackTrace(error, stack);
+      },
+    );
+  }
+
+  late final Future<Uint8List> bytes;
+  Uint8List? done;
+}
+
 class ChatController extends ChangeNotifier {
   ChatController(this._api, this._settings, this._prefs)
     : _server = _settings.connection?.withPassword(null),
@@ -247,8 +263,11 @@ class ChatController extends ChangeNotifier {
   /// The bytes of each file an agent made, by storage name, read once per server.
   final Map<String, Future<List<int>?>> _madeFiles = {};
 
-  /// The bytes of each image in an answer, by address, read once per server.
-  final Map<Uri, Future<Uint8List>> _images = {};
+  /// The [imagesKept] images in an answer read last, by address, oldest first.
+  final Map<Uri, _ImageRead> _images = {};
+
+  /// How many answer images [imageBytes] keeps.
+  static const imagesKept = 12;
 
   static const linkNoticeFor = Duration(seconds: 6);
 
@@ -1159,11 +1178,19 @@ class ChatController extends ChangeNotifier {
 
   /// The bytes of the image at [url] in an answer, read once per server. Fails with
   /// [ApiException], and a failed read is tried again next time.
-  Future<Uint8List> imageBytes(Uri url) =>
-      _images[url] ??= _api.answerImage(url).catchError((Object error) {
-        _images.remove(url);
-        throw error;
-      });
+  Future<Uint8List> imageBytes(Uri url) => _imageRead(url).bytes;
+
+  /// The bytes of the image at [url] when a read of it has already ended, else null.
+  Uint8List? imageNow(Uri url) =>
+      _images.containsKey(url) ? _imageRead(url).done : null;
+
+  /// The read of the image at [url], started when there is none, and now the newest kept.
+  _ImageRead _imageRead(Uri url) {
+    final read = _images.remove(url) ?? _ImageRead(url, this);
+    _images[url] = read;
+    if (_images.length > imagesKept) _images.remove(_images.keys.first);
+    return read;
+  }
 
   /// Shows [text] as [problem], titled [title].
   void report(String title, String text) {

@@ -8,6 +8,14 @@ import '../widgets/basics.dart';
 import '../widgets/fields.dart';
 import '../widgets/tappable.dart';
 
+/// A card's ground: [Tokens.panel], or [Tokens.bg] for a card in a sheet ([inSheet]), with
+/// the rounded [Tokens.line2] edge every card has.
+BoxDecoration cardDecoration(Tokens t, {bool inSheet = false}) => BoxDecoration(
+  color: inSheet ? t.bg : t.panel,
+  borderRadius: BorderRadius.circular(Sizes.phoneCard),
+  border: Border.all(color: t.line2),
+);
+
 /// A rounded panel holding [children] one above another, as Settings draws a card.
 class PanelCard extends StatelessWidget {
   const PanelCard({super.key, required this.children});
@@ -19,11 +27,7 @@ class PanelCard extends StatelessWidget {
     final t = Tokens.of(context);
     return Container(
       padding: const EdgeInsets.all(FieldCard.inset),
-      decoration: BoxDecoration(
-        color: t.panel,
-        borderRadius: BorderRadius.circular(Sizes.phoneCard),
-        border: Border.all(color: t.line2),
-      ),
+      decoration: cardDecoration(t),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         spacing: 10,
@@ -50,23 +54,81 @@ class FieldCard extends StatelessWidget {
     final t = Tokens.of(context);
     return Container(
       clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: inSheet ? t.bg : t.panel,
-        borderRadius: BorderRadius.circular(Sizes.phoneCard),
-        border: Border.all(color: t.line2),
-      ),
+      decoration: cardDecoration(t, inSheet: inSheet),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (final (i, row) in rows.indexed)
-            // The hairline is drawn over the row's top, inside its height, as a CSS border is.
-            i == 0
-                ? row
-                : CustomPaint(
-                    foregroundPainter: CardHairline(t.line2),
-                    child: row,
-                  ),
+          for (final (i, row) in rows.indexed) Ruled(ruled: i > 0, child: row),
         ],
+      ),
+    );
+  }
+}
+
+/// [child] under a hairline [FieldCard.inset] short of its sides when [ruled], as a row of a
+/// grouped card under another is. The hairline is drawn over the row's top, inside its height,
+/// as a CSS border is.
+class Ruled extends StatelessWidget {
+  const Ruled({super.key, required this.ruled, required this.child});
+
+  final bool ruled;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => !ruled
+      ? child
+      : CustomPaint(
+          foregroundPainter: CardHairline(Tokens.of(context).line2),
+          child: child,
+        );
+}
+
+/// A [FieldCard] in a scroll view whose [count] rows are built by [row] as they scroll into
+/// view, each keyed by [keyOf] when given, so a row keeps its state as rows come and go.
+class SliverFieldCard extends StatelessWidget {
+  const SliverFieldCard({
+    super.key,
+    required this.count,
+    required this.row,
+    this.keyOf,
+    this.inSheet = false,
+  });
+
+  final int count;
+  final IndexedWidgetBuilder row;
+  final Key Function(int i)? keyOf;
+  final bool inSheet;
+
+  @override
+  Widget build(BuildContext context) {
+    const corner = Radius.circular(Sizes.phoneCard - 1);
+    final keyOf = this.keyOf;
+    return DecoratedSliver(
+      decoration: cardDecoration(Tokens.of(context), inSheet: inSheet),
+      sliver: SliverPadding(
+        // Inside the edge, as a [FieldCard]'s rows are.
+        padding: const EdgeInsets.all(1),
+        sliver: SliverList.builder(
+          itemCount: count,
+          findChildIndexCallback: keyOf == null
+              ? null
+              : (key) {
+                  for (var i = 0; i < count; i++) {
+                    if (keyOf(i) == key) return i;
+                  }
+                  return null;
+                },
+          itemBuilder: (context, i) => ClipRRect(
+            key: keyOf?.call(i),
+            // The card's corners, clipped from its first and last rows.
+            borderRadius: BorderRadius.vertical(
+              top: i == 0 ? corner : Radius.zero,
+              bottom: i == count - 1 ? corner : Radius.zero,
+            ),
+            clipBehavior: i == 0 || i == count - 1 ? Clip.antiAlias : Clip.none,
+            child: Ruled(ruled: i > 0, child: row(context, i)),
+          ),
+        ),
       ),
     );
   }
@@ -550,11 +612,7 @@ class SummaryCard extends StatelessWidget {
     final t = Tokens.of(context);
     return Container(
       padding: const EdgeInsets.all(FieldCard.inset),
-      decoration: BoxDecoration(
-        color: t.panel,
-        borderRadius: BorderRadius.circular(Sizes.phoneCard),
-        border: Border.all(color: t.line2),
-      ),
+      decoration: cardDecoration(t),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         spacing: 8,

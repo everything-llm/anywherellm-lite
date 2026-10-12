@@ -166,7 +166,7 @@ class _WorkspaceItem extends StatelessWidget {
     // A press and hold starts the drag, since a touch would otherwise scroll.
     return ReorderableDelayedDragStartListener(
       index: index,
-      child: _Ruled(
+      child: Ruled(
         ruled: index > 0,
         child: Tappable(
           label: ready ? '${workspace.name}, answer ready' : workspace.name,
@@ -216,23 +216,6 @@ class _WorkspaceItem extends StatelessWidget {
       ),
     );
   }
-}
-
-/// [child] under a hairline [FieldCard.inset] short of its sides when [ruled], as a row of a
-/// grouped card under another is.
-class _Ruled extends StatelessWidget {
-  const _Ruled({required this.ruled, required this.child});
-
-  final bool ruled;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => !ruled
-      ? child
-      : CustomPaint(
-          foregroundPainter: CardHairline(Tokens.of(context).line2),
-          child: child,
-        );
 }
 
 /// A workspace as it looks while it is dragged.

@@ -159,99 +159,135 @@ class _ChatsTabState extends State<ChatsTab> {
       label: 'Chats',
       child: MinHeight(
         min: Sizes.panelMin,
-        child: ListenableBuilder(
-          listenable: Listenable.merge([
-            chat,
-            scope.prefs,
-            scope.settings,
-            _query,
-          ]),
-          builder: (context, _) {
-            final query = _query.value;
-            final searching = query.isNotEmpty;
-            final active = chat.active;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  height: 72,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 16, 0),
-                    child: Row(
-                      spacing: 8,
-                      children: [
-                        const Expanded(child: WorkspaceSwitcher()),
-                        if (active != null) ...[
-                          IconBtn(
-                            'settings',
-                            tooltip: 'Workspace settings',
-                            box: 48,
-                            filled: true,
-                            onPressed: () => shell.showPane(Pane.files),
-                          ),
-                          IconBtn(
-                            'plus',
-                            tooltip: 'New chat',
-                            box: 48,
-                            filled: true,
-                            onPressed: () {
-                              chat.newChat();
-                              shell.openChat();
-                            },
-                          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              height: 72,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 16, 0),
+                child: Row(
+                  children: [
+                    const Expanded(child: WorkspaceSwitcher()),
+                    ListenableBuilder(
+                      listenable: chat,
+                      builder: (context, _) => Row(
+                        // A gap after the title, then between the buttons.
+                        spacing: 8,
+                        children: [
+                          if (chat.active != null) ...[
+                            const SizedBox.shrink(),
+                            IconBtn(
+                              'settings',
+                              tooltip: 'Workspace settings',
+                              box: 48,
+                              filled: true,
+                              onPressed: () => shell.showPane(Pane.files),
+                            ),
+                            IconBtn(
+                              'plus',
+                              tooltip: 'New chat',
+                              box: 48,
+                              filled: true,
+                              onPressed: () {
+                                chat.newChat();
+                                shell.openChat();
+                              },
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    children: [
-                      _Search(_search, focus: shell.searchFocus),
-                      if (searching)
-                        ..._found(context, query)
-                      else ...[
-                        if (scope.settings.configured) ...[
-                          const SizedBox(height: 20),
-                          const UpcomingCard(),
-                        ],
-                        if (active != null) ...[
-                          const SizedBox(height: 20),
-                          const CardHeading('Chats'),
-                          const SizedBox(height: 10),
-                          FieldCard(_chats(context)),
-                        ],
-                      ],
+              ),
+            ),
+            Expanded(
+              child: ListenableBuilder(
+                listenable: Listenable.merge([
+                  chat,
+                  scope.prefs,
+                  scope.settings,
+                  _query,
+                ]),
+                builder: (context, _) {
+                  final query = _query.value;
+                  return CustomScrollView(
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                        sliver: SliverMainAxisGroup(
+                          slivers: [
+                            SliverToBoxAdapter(
+                              child: _Search(_search, focus: shell.searchFocus),
+                            ),
+                            if (query.isNotEmpty)
+                              SliverToBoxAdapter(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: _found(context, query),
+                                ),
+                              )
+                            else ...[
+                              if (scope.settings.configured)
+                                const SliverToBoxAdapter(
+                                  child: Padding(
+                                    padding: EdgeInsets.only(top: 20),
+                                    child: UpcomingCard(),
+                                  ),
+                                ),
+                              if (chat.activeSlug case final slug?) ...[
+                                const SliverToBoxAdapter(
+                                  child: Padding(
+                                    padding: EdgeInsets.only(
+                                      top: 20,
+                                      bottom: 10,
+                                    ),
+                                    child: CardHeading('Chats'),
+                                  ),
+                                ),
+                                _chats(context, slug),
+                              ],
+                            ],
+                          ],
+                        ),
+                      ),
                     ],
-                  ),
-                ),
-              ],
-            );
-          },
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  /// The open workspace's chats: the pinned ones, then the ones this device used last, then
-  /// the rest.
-  List<Widget> _chats(BuildContext context) {
+  /// The open workspace's chats, built as they scroll into view: the pinned ones, then the
+  /// ones this device used last, then the rest.
+  Widget _chats(BuildContext context, String slug) {
     final scope = AppScope.of(context);
-    final chat = scope.chat;
-    final slug = chat.activeSlug!;
     final groups = groupChats(
-      chat.threadsOf(slug),
+      scope.chat.threadsOf(slug),
       scope.prefs.pinnedIn(slug),
       scope.prefs.recentIn(slug),
     );
     final rows = [
-      for (final thread in groups.pinned)
-        _ChatRow(thread, workspace: slug, pinned: true),
-      for (final thread in [...groups.recent, ...groups.rest])
-        _ChatRow(thread, workspace: slug, pinned: false),
+      for (final thread in groups.pinned) (thread, true),
+      for (final thread in [...groups.recent, ...groups.rest]) (thread, false),
     ];
-    return rows.isEmpty ? [const _None('No chats yet.')] : rows;
+    if (rows.isEmpty) {
+      return const SliverToBoxAdapter(
+        child: FieldCard([_None('No chats yet.')]),
+      );
+    }
+    return SliverFieldCard(
+      count: rows.length,
+      keyOf: (i) => ValueKey(rows[i].$1.slug),
+      row: (context, i) =>
+          _ChatRow(rows[i].$1, workspace: slug, pinned: rows[i].$2),
+    );
   }
 
   /// What [query] finds: each workspace whose name or a chat of which matches, in a card with

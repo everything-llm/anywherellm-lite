@@ -58,8 +58,11 @@ class AnswerImage extends StatefulWidget {
 }
 
 class _AnswerImageState extends State<AnswerImage> {
-  /// The image's bytes as they are read, or null when it is not loaded.
+  /// The image's bytes as they are read, or null when it is not loaded or [_now] holds them.
   Future<Uint8List>? _bytes;
+
+  /// The image's bytes when they were already read as it was built.
+  Uint8List? _now;
 
   @override
   void initState() {
@@ -74,9 +77,13 @@ class _AnswerImageState extends State<AnswerImage> {
     if (old.uri != widget.uri || old.loadable != widget.loadable) _read();
   }
 
-  void _read() => _bytes = widget.loadable
-      ? AppScope.of(context).chat.imageBytes(widget.uri)
-      : null;
+  void _read() {
+    final chat = AppScope.of(context).chat;
+    _now = widget.loadable ? chat.imageNow(widget.uri) : null;
+    _bytes = widget.loadable && _now == null
+        ? chat.imageBytes(widget.uri)
+        : null;
+  }
 
   /// The image's description, drawn as a link: the host it is not loaded from, or that it did
   /// not load, with [failure] in its tooltip.
@@ -116,8 +123,42 @@ class _AnswerImageState extends State<AnswerImage> {
   Widget _unloaded(BuildContext context, {String? failure}) =>
       widget.unloaded?.call(context) ?? _described(context, failure: failure);
 
+  /// The image drawn from [frame].
+  Widget _image(BuildContext context, Uint8List frame) {
+    Widget broken(BuildContext context, Object _, StackTrace? _) =>
+        _unloaded(context);
+    if (widget.fit != BoxFit.contain) {
+      return Image.memory(
+        frame,
+        fit: widget.fit,
+        cacheWidth: widget.decodeWidth,
+        gaplessPlayback: true,
+        semanticLabel: widget.alt,
+        errorBuilder: broken,
+      );
+    }
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: widget.maxHeight),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.memory(
+          frame,
+          fit: BoxFit.contain,
+          cacheHeight:
+              (widget.maxHeight * MediaQuery.devicePixelRatioOf(context))
+                  .round(),
+          gaplessPlayback: true,
+          semanticLabel: widget.alt,
+          errorBuilder: broken,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final now = _now;
+    if (now != null) return _image(context, now);
     final bytes = _bytes;
     if (bytes == null) return _unloaded(context);
     return FutureBuilder<Uint8List>(
@@ -132,31 +173,7 @@ class _AnswerImageState extends State<AnswerImage> {
         }
         final frame = snapshot.data;
         if (frame == null) return const SizedBox.shrink();
-        Widget broken(BuildContext context, Object _, StackTrace? _) =>
-            _unloaded(context);
-        if (widget.fit != BoxFit.contain) {
-          return Image.memory(
-            frame,
-            fit: widget.fit,
-            cacheWidth: widget.decodeWidth,
-            gaplessPlayback: true,
-            semanticLabel: widget.alt,
-            errorBuilder: broken,
-          );
-        }
-        return ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: widget.maxHeight),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: Image.memory(
-              frame,
-              fit: BoxFit.contain,
-              gaplessPlayback: true,
-              semanticLabel: widget.alt,
-              errorBuilder: broken,
-            ),
-          ),
-        );
+        return _image(context, frame);
       },
     );
   }

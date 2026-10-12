@@ -227,6 +227,8 @@ class _MadeImageState extends State<_MadeImage> {
                     bytes,
                     gaplessPlayback: true,
                     fit: BoxFit.contain,
+                    cacheHeight: (360 * MediaQuery.devicePixelRatioOf(context))
+                        .round(),
                     semanticLabel: file.name,
                     errorBuilder: (_, _, _) => _MadeFile(file),
                   ),

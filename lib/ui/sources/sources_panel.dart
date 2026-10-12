@@ -75,6 +75,7 @@ class _Body extends StatelessWidget {
     final sources = scope.sources;
     final slug = scope.chat.activeSlug;
     final t = Tokens.of(context);
+    final card = files.isNotEmpty || sources.loading;
     return CustomScrollView(
       shrinkWrap: true,
       slivers: [
@@ -93,28 +94,38 @@ class _Body extends StatelessWidget {
               ),
               ..._notices(context),
               const SizedBox(height: 16),
-              if (files.isNotEmpty || sources.loading) ...[
-                FieldCard(inSheet: true, [
-                  if (files.isEmpty)
-                    Container(
-                      constraints: const BoxConstraints(minHeight: 64),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'Loading…',
-                        style: Type.sans(14, color: t.muted),
-                      ),
-                    ),
-                  for (final file in files)
-                    Rise(
-                      key: ValueKey(file.path),
-                      child: _FileRow(
-                        file,
-                        flashed: sources.flashed == file.path,
-                      ),
-                    ),
-                ]),
-                const SizedBox(height: 16),
-              ],
+            ],
+          ),
+        ),
+        if (card) ...[
+          if (files.isEmpty)
+            SliverToBoxAdapter(
+              child: FieldCard(inSheet: true, [
+                Container(
+                  constraints: const BoxConstraints(minHeight: 64),
+                  alignment: Alignment.center,
+                  child: Text('Loading…', style: Type.sans(14, color: t.muted)),
+                ),
+              ]),
+            )
+          else
+            SliverFieldCard(
+              inSheet: true,
+              count: files.length,
+              keyOf: (i) => ValueKey(files[i].path),
+              row: (context, i) => Rise(
+                child: _FileRow(
+                  files[i],
+                  flashed: sources.flashed == files[i].path,
+                ),
+              ),
+            ),
+          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+        ],
+        SliverToBoxAdapter(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               UploadQueue(
                 key: ValueKey(('queue', slug)),
                 onSend: sources.upload,

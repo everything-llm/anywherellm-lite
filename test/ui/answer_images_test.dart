@@ -14,8 +14,11 @@ FakeAnythingLlm _withChart() =>
     answering('Here:\n\n[![Chart]($_chart)]($_page)');
 
 /// The bytes of the answer image on screen.
-Uint8List _shown(WidgetTester tester) =>
-    (tester.widget<Image>(find.byType(Image)).image as MemoryImage).bytes;
+Uint8List _shown(WidgetTester tester) {
+  final image = tester.widget<Image>(find.byType(Image)).image;
+  final memory = image is ResizeImage ? image.imageProvider : image;
+  return (memory as MemoryImage).bytes;
+}
 
 int _reads(FakeAnythingLlm llm) =>
     llm.calls.where((c) => c == 'answerImage:$_chart').length;
