@@ -85,7 +85,7 @@ class AnswerBody extends StatelessWidget {
       selectable: !caret,
       extensionSet: caret ? _withCaret : answerMarkdown,
       onTapLink: (_, href, _) {
-        if (href != null) openLink(context, href);
+        if (href != null) openAnswerLink(context, href);
       },
       imageBuilder: (uri, _, alt) => AnswerImage(
         uri,
