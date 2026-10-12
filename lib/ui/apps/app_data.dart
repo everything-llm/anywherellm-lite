@@ -40,8 +40,8 @@ class AppDataPage extends StatelessWidget {
 
 /// What [future] gives, drawn by [done]; while it is read a muted line, and when it fails the
 /// failure.
-class _Read<T> extends StatelessWidget {
-  const _Read(this.future, {required this.done});
+class ReadFuture<T> extends StatelessWidget {
+  const ReadFuture(this.future, {super.key, required this.done});
 
   final Future<T> future;
   final Widget Function(BuildContext context, T value) done;
@@ -76,7 +76,7 @@ class _Read<T> extends StatelessWidget {
 }
 
 /// A header's title in the mono face, as a file's name is.
-Widget _monoTitle(BuildContext context, String text) => Semantics(
+Widget monoTitle(BuildContext context, String text) => Semantics(
   header: true,
   child: Text(
     text,
@@ -92,7 +92,7 @@ Widget _monoTitle(BuildContext context, String text) => Semantics(
 );
 
 /// The round button at a header's end that shows a file raw, filled in the accent while on.
-Widget _rawButton(BuildContext context, bool raw, VoidCallback onTap) {
+Widget rawButton(BuildContext context, bool raw, VoidCallback onTap) {
   final t = Tokens.of(context);
   return Tappable(
     label: 'Show the raw file',
@@ -118,8 +118,9 @@ Widget _rawButton(BuildContext context, bool raw, VoidCallback onTap) {
 }
 
 /// A row of the folder: [icon], [name] in the mono face over [about], and a chevron.
-class _EntryRow extends StatelessWidget {
-  const _EntryRow({
+class EntryRow extends StatelessWidget {
+  const EntryRow({
+    super.key,
     required this.icon,
     required this.name,
     required this.about,
@@ -196,7 +197,7 @@ class _Folder extends StatelessWidget {
           onBack: shell.appBack,
         ),
         Expanded(
-          child: _Read(
+          child: ReadFuture(
             apps.files(app.ref),
             done: (context, files) => ListView(
               padding: Sizes.pagePadding,
@@ -207,7 +208,7 @@ class _Folder extends StatelessWidget {
                 ),
                 FieldCard([
                   for (final file in files)
-                    _EntryRow(
+                    EntryRow(
                       icon: 'doc',
                       name: file.path,
                       about: [
@@ -225,7 +226,7 @@ class _Folder extends StatelessWidget {
                 FutureBuilder(
                   future: apps.commits(app.ref),
                   builder: (context, snapshot) => FieldCard([
-                    _EntryRow(
+                    EntryRow(
                       icon: 'clock',
                       name: '.git',
                       about: [
@@ -283,44 +284,83 @@ class _FileState extends State<_File> {
         PhonePageHeader(
           back: 'Back to the folder',
           onBack: scope.shell.appBack,
-          heading: _monoTitle(context, widget.path),
+          heading: monoTitle(context, widget.path),
           action: json
-              ? _rawButton(context, _raw, () => setState(() => _raw = !_raw))
+              ? rawButton(context, _raw, () => setState(() => _raw = !_raw))
               : null,
         ),
         Expanded(
-          child: _Read(
+          child: ReadFuture(
             scope.apps.text(widget.app.ref, widget.path),
-            done: (context, text) {
-              Object? parsed;
-              if (json && !_raw) {
-                try {
-                  parsed = jsonDecode(text);
-                } on FormatException {
-                  parsed = null;
-                }
-              }
-              final lines = const LineSplitter().convert(text).length;
-              return ListView(
-                padding: Sizes.pagePadding,
-                children: [
-                  MetaLine(
-                    'apps/${widget.app.ref.name}/${widget.path}',
-                    '${plural(lines, 'line', 'lines')} · '
-                        '${bytesText(utf8.encode(text).length)}',
-                  ),
-                  if (parsed != null)
-                    JsonCard(JsonView(parsed))
-                  else
-                    NumberedText(text),
-                ],
-              );
-            },
+            done: (context, text) => FileText(
+              text,
+              label: 'apps/${widget.app.ref.name}/${widget.path}',
+              asJson: json && !_raw,
+            ),
           ),
         ),
       ],
     );
   }
+}
+
+/// A file's [text] under [label] with its line count and size: read as JSON when [asJson] and
+/// it parses, else raw with its lines numbered. What it shows is worked out once per text.
+class FileText extends StatefulWidget {
+  const FileText(
+    this.text, {
+    super.key,
+    required this.label,
+    this.asJson = false,
+  });
+
+  final String text;
+  final String label;
+  final bool asJson;
+
+  @override
+  State<FileText> createState() => _FileTextState();
+}
+
+class _FileTextState extends State<FileText> {
+  late String _about;
+  Object? _json;
+
+  @override
+  void initState() {
+    super.initState();
+    _read();
+  }
+
+  @override
+  void didUpdateWidget(FileText old) {
+    super.didUpdateWidget(old);
+    if (old.text != widget.text) _read();
+  }
+
+  void _read() {
+    final text = widget.text;
+    final lines = const LineSplitter().convert(text).length;
+    _about =
+        '${plural(lines, 'line', 'lines')} · ${bytesText(utf8.encode(text).length)}';
+    try {
+      _json = jsonDecode(text);
+    } on FormatException {
+      _json = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => ListView(
+    padding: Sizes.pagePadding,
+    children: [
+      MetaLine(widget.label, _about),
+      if (widget.asJson && _json != null)
+        JsonCard(JsonView(_json!))
+      else
+        NumberedText(widget.text),
+    ],
+  );
 }
 
 /// The app's log read as its history: each line newest first under its day, with its event,
@@ -351,12 +391,12 @@ class _LogState extends State<_Log> {
         PhonePageHeader(
           back: 'Back to the folder',
           onBack: scope.shell.appBack,
-          heading: _monoTitle(context, 'log.jsonl'),
-          action: _rawButton(context, _raw, () => setState(() => _raw = !_raw)),
+          heading: monoTitle(context, 'log.jsonl'),
+          action: rawButton(context, _raw, () => setState(() => _raw = !_raw)),
         ),
         Expanded(
           child: _raw
-              ? _Read(
+              ? ReadFuture(
                   scope.apps.text(ref, 'log.jsonl'),
                   done: (context, text) => ListView(
                     padding: Sizes.pagePadding,
@@ -693,10 +733,10 @@ class _Git extends StatelessWidget {
         PhonePageHeader(
           back: 'Back to the folder',
           onBack: scope.shell.appBack,
-          heading: _monoTitle(context, 'git log'),
+          heading: monoTitle(context, 'git log'),
         ),
         Expanded(
-          child: _Read(
+          child: ReadFuture(
             scope.apps.commits(app.ref),
             done: (context, commits) => ListView(
               padding: Sizes.pagePadding,
