@@ -3,8 +3,6 @@ import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
-import 'package:anywherellm/core/embeds.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -30,99 +28,6 @@ Finder control(String label) => find.descendant(
 const phone = Size(360, 640);
 
 void main() {
-  testWidgets(
-    'Settings lists this app\'s pages and the Server page, which lists the rest',
-    (tester) async {
-      final h = await pumpApp(tester, llm: planningServer());
-      h.shell.openSettings();
-      await tester.pumpAndSettle();
-      expect(control('Connection'), findsOneWidget);
-      expect(control('Appearance'), findsOneWidget);
-      expect(control('Chat'), findsOneWidget);
-      expect(control('Server'), findsOneWidget);
-      // No switch, and the server's pages are not in the list but on the Server page.
-      expect(control('All settings'), findsNothing);
-      expect(control('Chat model'), findsNothing);
-      await tapShown(tester, control('Server'));
-      expect(h.shell.settingsPage, SettingsPage.server);
-      expect(find.text('ANSWERS'), findsOneWidget);
-      expect(find.text('FILES, VOICE AND IMAGES'), findsOneWidget);
-      expect(find.text('SHARING AND RECORDS'), findsOneWidget);
-      await tapShown(
-        tester,
-        control('Document storage, LanceDB \u00b7 796 passages'),
-      );
-      expect(h.shell.settingsPage, SettingsPage.storage);
-      expect(find.text('Stored passages'), findsOneWidget);
-      // The page open sits under Server in the list, and a link over its title goes back.
-      expect(control('Document storage'), findsOneWidget);
-      await tapShown(tester, control('Back to Server'));
-      expect(h.shell.settingsPage, SettingsPage.server);
-      expect(control('Document storage'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'the Server page folds what is not set up, the web page\'s pages and Advanced',
-    (tester) async {
-      final h = await pumpApp(tester, llm: planningServer());
-      h.shell.openSettings(SettingsPage.server);
-      await tester.pumpAndSettle();
-      expect(control('Not set up (1)'), findsOneWidget);
-      expect(control('Image generation, Set up'), findsNothing);
-      expect(control('Skills and tools, Opens in the browser'), findsNothing);
-      await tapShown(tester, control('Not set up (1)'));
-      expect(control('Image generation, Set up'), findsOneWidget);
-      await tapShown(tester, control('In AnythingLLM\'s web page (8)'));
-      expect(control('Skills and tools, Opens in the browser'), findsOneWidget);
-      expect(find.textContaining('rarely changed'), findsOneWidget);
-      await tapShown(tester, control('Skills and tools, Opens in the browser'));
-      expect(h.opened, isNotEmpty);
-      await tapShown(tester, control('Advanced'));
-      await tapShown(
-        tester,
-        control(
-          'Server settings as JSON, Every setting, as the server stores it',
-        ),
-      );
-      expect(h.shell.settingsPage, SettingsPage.json);
-    },
-  );
-
-  testWidgets('searching finds a page by its name, its line or a field', (
-    tester,
-  ) async {
-    final h = await pumpApp(tester, llm: planningServer());
-    h.shell.openSettings();
-    await tester.pumpAndSettle();
-    final search = find.descendant(
-      of: find.byType(SettingsDialog),
-      matching: find.byType(TextField),
-    );
-    await tester.enterText(search, 'voice');
-    await tester.pumpAndSettle();
-    expect(find.text('RESULTS'), findsOneWidget);
-    expect(control('Voice and speech'), findsOneWidget);
-    expect(control('Connection'), findsNothing);
-    // A field names the page it is on, and a page in the web page says so.
-    await tester.enterText(search, 'telemetry');
-    await tester.pumpAndSettle();
-    expect(control('Privacy and data, Anonymous telemetry'), findsOneWidget);
-    await tester.enterText(search, 'security');
-    await tester.pumpAndSettle();
-    expect(control('Security, In the browser'), findsOneWidget);
-    await tester.enterText(search, 'zzzz');
-    await tester.pumpAndSettle();
-    expect(find.text('NOTHING MATCHES'), findsOneWidget);
-    // A page found opens, and the search clears.
-    await tester.enterText(search, 'appearance');
-    await tester.pumpAndSettle();
-    await tapShown(tester, control('Appearance'));
-    expect(h.shell.settingsPage, SettingsPage.appearance);
-    expect(find.text('RESULTS'), findsNothing);
-    expect(control('Server'), findsOneWidget);
-  });
-
   testWidgets('a provider page folds the fields that are rarely changed', (
     tester,
   ) async {
@@ -132,19 +37,20 @@ void main() {
     final fold = find.textContaining('Advanced (');
     expect(fold, findsOneWidget);
     expect(find.text('Longest answer'), findsNothing);
-    await tester.tap(fold);
-    await tester.pumpAndSettle();
+    await tapShown(tester, fold);
     expect(find.text('Context window'), findsOneWidget);
   });
 
   testWidgets('with no server, only this device\'s pages show', (tester) async {
     final h = await pumpApp(tester, llm: planningServer(), connection: null);
+    // A server's page opens on signing in instead.
     h.shell.openSettings(SettingsPage.chatModel);
     await tester.pumpAndSettle();
-    expect(control('Chat model'), findsNothing);
-    expect(control('All settings'), findsNothing);
+    expect(control('Sign in'), findsOneWidget);
+    h.shell.openSettings();
+    await tester.pumpAndSettle();
     expect(control('Appearance'), findsOneWidget);
-    expect(find.text('AnythingLLM server'), findsOneWidget);
+    expect(control('Server'), findsNothing);
   });
 
   testWidgets('on a phone, the list opens a page, and Back returns to it', (
@@ -233,12 +139,13 @@ void main() {
     expect(h.shell.settingsOpen, isTrue);
   });
 
-  testWidgets('Connection says how the server signs in', (tester) async {
+  testWidgets('Test connection says whether the key still opens the server', (
+    tester,
+  ) async {
     final llm = planningServer()..auth = ServerAuth.password;
     final h = await pumpApp(tester, llm: llm);
     h.shell.openSettings(SettingsPage.connection);
     await tester.pumpAndSettle();
-    expect(find.text('AnythingLLM, single user, password on'), findsOneWidget);
     expect(find.text('Connected'), findsNothing);
     llm.verifyError = const ApiException('The server rejected the key.');
     await tapVisible(tester, control('Test connection'));
@@ -259,28 +166,6 @@ void main() {
     expect(find.text('Saved'), findsWidgets);
   });
 
-  testWidgets('titles are semibold, larger than section heads', (tester) async {
-    final h = await pumpApp(tester, llm: planningServer());
-    h.shell.openSettings(SettingsPage.chats);
-    await tester.pumpAndSettle();
-    // The last of a name is the page's own title, after the list of pages.
-    TextStyle style(String text) => tester
-        .widget<Text>(
-          find
-              .descendant(
-                of: find.byType(SettingsDialog),
-                matching: find.text(text),
-              )
-              .last,
-        )
-        .style!;
-    expect(style('Settings').fontWeight, FontWeight.w600);
-    expect(style('Settings').fontSize, 22);
-    expect(style('Workspace chats').fontWeight, FontWeight.w600);
-    expect(style('Workspace chats').fontSize, 26);
-    expect(style('Export').fontSize, lessThan(22));
-  });
-
   testWidgets('workspace chats show a page, then more, and export', (
     tester,
   ) async {
@@ -289,7 +174,7 @@ void main() {
         for (var i = 25; i > 0; i--)
           LoggedChat(workspace: 'Household', question: 'Question $i'),
       ];
-    final h = await pumpApp(tester, llm: llm, size: const Size(1400, 900));
+    final h = await pumpApp(tester, llm: llm, size: const Size(740, 900));
     h.saveChosen = false;
     h.shell.openSettings(SettingsPage.chats);
     await tester.pumpAndSettle();
@@ -329,25 +214,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Could not save the chats'), findsOneWidget);
     expect(find.text('Disk full'), findsOneWidget);
-  });
-
-  testWidgets('the Server page names the workspace its widgets answer from', (
-    tester,
-  ) async {
-    final llm = planningServer()
-      ..embedList = const [
-        Embed(
-          uuid: 'a',
-          workspace: 'Q3 planning',
-          mode: EmbedMode.chat,
-          enabled: true,
-        ),
-      ];
-    final h = await pumpApp(tester, llm: llm);
-    await h.system.readEmbeds();
-    h.shell.openSettings(SettingsPage.server);
-    await tester.pumpAndSettle();
-    expect(find.text('1 widget, on Q3 planning'), findsOneWidget);
   });
 
   testWidgets("a phone's Settings opens on the server, which it can test", (

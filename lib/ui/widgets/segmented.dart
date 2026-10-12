@@ -5,8 +5,8 @@ import '../tokens.dart';
 import '../type.dart';
 import 'tappable.dart';
 
-/// A row of equal segments, one of them chosen. [onChanged] null shows it disabled. On a phone
-/// each segment is at least 40 tall, its label at 14.5, as the design canvas draws it.
+/// A row of equal segments, one of them chosen. [onChanged] null shows it disabled. Each segment
+/// is at least 44 tall, its label at 14.5, as the design canvas draws it.
 class Segmented<T> extends StatelessWidget {
   const Segmented({
     super.key,
@@ -43,14 +43,13 @@ class Segmented<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final onChanged = this.onChanged;
-    final phone = ScreenClass.ofContext(context).isPhone;
     return Opacity(
       opacity: onChanged == null ? 0.55 : 1,
       child: Container(
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
           color: t.hover,
-          borderRadius: BorderRadius.circular(Sizes.controlOf(context)),
+          borderRadius: BorderRadius.circular(Sizes.phoneControl),
         ),
         child: _rows([
           for (final (option, label) in options)
@@ -58,12 +57,12 @@ class Segmented<T> extends StatelessWidget {
               label: label,
               selected: value == option,
               onTap: onChanged == null ? null : () => onChanged(option),
-              radius: BorderRadius.circular(phone ? 13 : 10),
+              radius: BorderRadius.circular(13),
               color: value == option ? t.panel : null,
               child: _centred(
                 Container(
-                  constraints: BoxConstraints(minHeight: phone ? 44 : 0),
-                  alignment: phone ? Alignment.center : null,
+                  constraints: const BoxConstraints(minHeight: 44),
+                  alignment: Alignment.center,
                   padding: EdgeInsets.symmetric(
                     vertical: 6,
                     horizontal: maxLines > 1 ? 4 : 0,
@@ -74,7 +73,7 @@ class Segmented<T> extends StatelessWidget {
                     maxLines: maxLines,
                     overflow: TextOverflow.ellipsis,
                     style: Type.sans(
-                      phone ? 14.5 : 13.5,
+                      14.5,
                       weight: value == option
                           ? FontWeight.w600
                           : FontWeight.w400,

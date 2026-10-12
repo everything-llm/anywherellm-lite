@@ -230,7 +230,6 @@ void main() {
       tester,
       llm: _server(),
       size: _phone,
-      sourcesOpen: false,
       connection: const Connection(
         baseUrl: 'https://anythingllm.example.ts.net',
         apiKey: 'K1',

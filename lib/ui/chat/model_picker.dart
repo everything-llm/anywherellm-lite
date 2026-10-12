@@ -10,7 +10,6 @@ import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/fields.dart';
-import 'composer_chip.dart';
 
 /// The model the open workspace answers with: its own, its own provider's name when it names no
 /// model, the system's, or `Chat model` while none is known.
@@ -25,46 +24,9 @@ String workspaceModel(AppScope scope) {
   };
 }
 
-/// The open workspace's own model, in the composer after the Answer from chip on a desktop, shown
-/// only while the workspace has a provider or model of its own, or while the picker shows; the
-/// choice is otherwise in the workspace's Answer settings. Tapped, it opens the [ModelPicker]. It
-/// asks for the system's settings once a server, for a provider chosen without a model.
-class ModelChip extends StatelessWidget {
-  const ModelChip({super.key, required this.open, required this.onTap});
-
-  /// Whether the picker shows.
-  final bool open;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    return ListenableBuilder(
-      listenable: Listenable.merge([scope.sources, scope.chat, scope.system]),
-      builder: (context, _) {
-        final sources = scope.sources;
-        final slug = scope.chat.activeSlug;
-        final own = sources.chatModel != null || sources.chatProvider != null;
-        if (sources.read == null || slug == null || !(own || open)) {
-          return const SizedBox.shrink();
-        }
-        scope.system.wantSettingsOnce();
-        final model = workspaceModel(scope);
-        return ComposerChip(
-          text: model,
-          label: 'Chat model, $model',
-          tooltip: 'The model this workspace answers with',
-          open: open,
-          onTap: scope.chat.answeringIn(slug) ? null : onTap,
-        );
-      },
-    );
-  }
-}
-
 /// The open workspace's own provider and model, over the composer's field: System default, or
-/// a provider and the model in its own name for it. Save writes them as the Files pane's
-/// settings.json does; Use system default clears both.
+/// a provider and the model in its own name for it. Save writes them as the workspace's answer
+/// settings do; Use system default clears both.
 class ModelPicker extends StatefulWidget {
   const ModelPicker({super.key, required this.onClose});
 

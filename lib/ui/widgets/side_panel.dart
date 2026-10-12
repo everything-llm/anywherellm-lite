@@ -1,19 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../icons.dart';
-import '../layout.dart';
-import '../tokens.dart';
-import '../type.dart';
-import 'buttons.dart';
-import 'min_height.dart';
 import 'sheet.dart';
 
-/// A panel beside the chat, such as Sources: [title] with [actions] and a close button, the line
-/// [about], when there is one, under it or after the title when [aboutBeside], and [child]
-/// filling the rest. It
-/// scrolls whole below [Sizes.panelMin]. A [live] [about] is read out when it changes.
-///
-/// On a phone it is a [SheetFrame] over the chat instead, [sheetHeight] tall.
+/// A panel over the chat, such as Sources: a [SheetFrame] [sheetHeight] tall with [title],
+/// [actions] and a close button, the line [about], when there is one, under it, and [child]
+/// filling the rest. A [live] [about] is read out when it changes.
 class SidePanel extends StatelessWidget {
   const SidePanel({
     super.key,
@@ -21,9 +12,7 @@ class SidePanel extends StatelessWidget {
     this.about,
     required this.onClose,
     required this.child,
-    this.width = Sizes.sources,
     this.live = false,
-    this.aboutBeside = false,
     this.actions = const [],
     this.sheetHeight = SheetHeight.tall,
   });
@@ -32,9 +21,7 @@ class SidePanel extends StatelessWidget {
   final String? about;
   final VoidCallback onClose;
   final Widget child;
-  final double width;
   final bool live;
-  final bool aboutBeside;
 
   /// Buttons before the close button, such as one that opens the panel's page elsewhere.
   final List<Widget> actions;
@@ -42,92 +29,13 @@ class SidePanel extends StatelessWidget {
   final SheetHeight sheetHeight;
 
   @override
-  Widget build(BuildContext context) {
-    if (ScreenClass.ofContext(context).isPhone) {
-      return SheetFrame(
-        title: title,
-        about: about,
-        live: live,
-        actions: actions,
-        onClose: onClose,
-        height: sheetHeight,
-        child: child,
-      );
-    }
-    final t = Tokens.of(context);
-    final heading = Semantics(
-      header: true,
-      child: Text(
-        title,
-        maxLines: aboutBeside ? 1 : null,
-        overflow: aboutBeside ? TextOverflow.ellipsis : null,
-        style: Type.sans(15, weight: FontWeight.w600, color: t.ink),
-      ),
-    );
-    final line = switch (about) {
-      final about? => Semantics(
-        liveRegion: live,
-        child: Text(
-          about,
-          maxLines: aboutBeside ? 1 : null,
-          overflow: aboutBeside ? TextOverflow.ellipsis : null,
-          style: Type.sans(aboutBeside ? 12.5 : 13, color: t.muted),
-        ),
-      ),
-      null => null,
-    };
-    return Semantics(
-      container: true,
-      label: title,
-      child: MinHeight(
-        min: Sizes.panelMin,
-        child: Container(
-          width: width,
-          decoration: BoxDecoration(
-            color: t.panel2,
-            border: Border(left: BorderSide(color: t.line)),
-          ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: aboutBeside
-                        ? Row(
-                            crossAxisAlignment: CrossAxisAlignment.baseline,
-                            textBaseline: TextBaseline.alphabetic,
-                            children: [
-                              Flexible(child: heading),
-                              if (line != null) ...[
-                                const SizedBox(width: 8),
-                                Flexible(child: line),
-                              ],
-                            ],
-                          )
-                        : heading,
-                  ),
-                  ...actions,
-                  IconBtn(
-                    'close',
-                    tooltip: 'Close',
-                    box: 28,
-                    size: IconSize.xs,
-                    onPressed: onClose,
-                  ),
-                ],
-              ),
-              if (!aboutBeside && line != null) ...[
-                const SizedBox(height: 4),
-                line,
-              ],
-              const SizedBox(height: 14),
-              Expanded(child: child),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => SheetFrame(
+    title: title,
+    about: about,
+    live: live,
+    actions: actions,
+    onClose: onClose,
+    height: sheetHeight,
+    child: child,
+  );
 }

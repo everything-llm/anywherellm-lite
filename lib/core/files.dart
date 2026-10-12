@@ -1,24 +1,12 @@
-// The server's data as one folder tree: what each node is, and the text a file node shows.
+// The workspaces' prompts, settings and documents as one folder tree, and the text a file node
+// shows.
 //
 // The tree is a view. Every node is made from what the server answered; nothing in it is stored.
 
 import 'dart:convert';
 
-import 'chat.dart';
 import 'errors.dart';
 import 'server_models.dart';
-
-/// What a node says about who owns it and whether it can be changed.
-enum NodeBadge {
-  /// Read from the server and written back through its API.
-  none,
-
-  /// Shown, but the API offers no way to change it.
-  readOnly,
-
-  /// Exists, but is never read: secrets and keys.
-  locked,
-}
 
 enum NodeKind {
   root,
@@ -27,37 +15,16 @@ enum NodeKind {
   prompt,
   settings,
   docs,
-  docLink,
-  chats,
-  chatLog,
-  library,
-  libraryFolder,
-  libraryDoc,
-  locked;
+  docLink;
 
   bool get isFolder => switch (this) {
-    root ||
-    workspaces ||
-    workspace ||
-    docs ||
-    chats ||
-    library ||
-    libraryFolder => true,
+    root || workspaces || workspace || docs => true,
     _ => false,
   };
 
   /// Whether the node's text can be edited and saved.
   bool get editable => this == prompt || this == settings;
-
-  NodeBadge get badge => switch (this) {
-    chatLog => NodeBadge.readOnly,
-    locked => NodeBadge.locked,
-    _ => NodeBadge.none,
-  };
 }
-
-/// The tree path of library folder or document [ref].
-String libraryPath(String ref) => '/library/$ref';
 
 /// The tree path of workspace [slug]'s docs folder.
 String docsPath(String slug) => '/workspaces/$slug/docs';
@@ -71,8 +38,7 @@ String promptPath(String slug) => '/workspaces/$slug/PROMPT.md';
 /// The tree path of workspace [slug]'s answer settings.
 String settingsPath(String slug) => '/workspaces/$slug/settings.json';
 
-/// What the Files pane's Essentials view lists for the open workspace. Each shows a node of the
-/// tree under a plain name.
+/// The pages of the open workspace. Each shows a node of the tree under a plain name.
 enum FilesSection {
   documents('Documents'),
   instructions('Instructions'),
@@ -88,17 +54,6 @@ enum FilesSection {
     instructions => promptPath(slug),
     answers => settingsPath(slug),
   };
-}
-
-/// Every folder path above [path], outermost first.
-Iterable<String> ancestorsOf(String path) sync* {
-  for (
-    var cut = path.indexOf('/', 1);
-    cut > 0;
-    cut = path.indexOf('/', cut + 1)
-  ) {
-    yield path.substring(0, cut);
-  }
 }
 
 /// One node of the tree. [path] is unique and stable across reloads; [name] is what is shown.
@@ -121,23 +76,18 @@ class FileNode {
   /// A document link whose whole text is always in its workspace's context.
   final bool pinned;
 
-  NodeBadge get badge => kind.badge;
-
   /// The workspace the node belongs to, when it belongs to one.
   final String? slug;
 
-  /// What the node points at: a thread slug for a chat, a `folder/name.json` path for a
-  /// document, a folder name for a library folder.
+  /// What the node points at: a `folder/name.json` path for a document.
   final String? ref;
 }
 
-/// The whole tree. A workspace's prompt, settings and documents appear once its [details] are
-/// read; its chats come from [threadsOf]. The library appears once [library] is read.
+/// The whole tree: each workspace, whose prompt, settings and documents appear once its
+/// [details] are read.
 FileNode buildTree({
   required List<Workspace> workspaces,
-  required List<Thread> Function(String slug) threadsOf,
   required Map<String, Workspace> details,
-  required List<LibraryFolder>? library,
 }) => FileNode(
   path: '/',
   name: '/',
@@ -147,40 +97,12 @@ FileNode buildTree({
       path: '/workspaces',
       name: 'workspaces',
       kind: NodeKind.workspaces,
-      children: [
-        for (final w in workspaces)
-          _workspace(w, threadsOf(w.slug), details[w.slug]),
-      ],
+      children: [for (final w in workspaces) _workspace(w, details[w.slug])],
     ),
-    FileNode(
-      path: '/library',
-      name: 'library',
-      kind: NodeKind.library,
-      children: [
-        for (final folder in library ?? const <LibraryFolder>[])
-          FileNode(
-            path: libraryPath(folder.name),
-            name: folder.name,
-            kind: NodeKind.libraryFolder,
-            ref: folder.name,
-            children: [
-              for (final file in folder.files)
-                FileNode(
-                  path: libraryPath(file.path),
-                  name: file.title,
-                  kind: NodeKind.libraryDoc,
-                  ref: file.path,
-                ),
-            ],
-          ),
-      ],
-    ),
-    const FileNode(path: '/.env', name: '.env', kind: NodeKind.locked),
-    const FileNode(path: '/keys', name: 'keys', kind: NodeKind.locked),
   ],
 );
 
-FileNode _workspace(Workspace w, List<Thread> threads, Workspace? detail) {
+FileNode _workspace(Workspace w, Workspace? detail) {
   final base = '/workspaces/${w.slug}';
   return FileNode(
     path: base,
@@ -220,22 +142,6 @@ FileNode _workspace(Workspace w, List<Thread> threads, Workspace? detail) {
           ],
         ),
       ],
-      FileNode(
-        path: '$base/chats',
-        name: 'chats',
-        kind: NodeKind.chats,
-        slug: w.slug,
-        children: [
-          for (final t in threads)
-            FileNode(
-              path: '$base/chats/${t.slug}',
-              name: '${t.name}.md',
-              kind: NodeKind.chatLog,
-              slug: w.slug,
-              ref: t.slug,
-            ),
-        ],
-      ),
     ],
   );
 }
@@ -252,25 +158,6 @@ FileNode? nodeAt(FileNode root, String path) {
   return null;
 }
 
-/// A chat as Markdown: its name as the heading, then each turn with the sources it cited.
-String chatMarkdown(String name, List<ChatMessage> turns) {
-  final out = StringBuffer('# $name\n');
-  for (final turn in turns) {
-    final user = turn.role == Role.user;
-    out
-      ..write('\n**${user ? 'You' : 'Answer'}**\n\n')
-      ..write('${user ? turn.text : splitReasoning(turn.text).answer}\n');
-    if (turn.citations.isNotEmpty) {
-      final sources = [
-        for (final c in turn.citations)
-          c.url == null ? c.title : '[${_linkText(c.title)}](<${c.url}>)',
-      ];
-      out.write('\nSources: ${sources.join(', ')}\n');
-    }
-  }
-  return out.toString();
-}
-
 final _notInFileName = RegExp(r'[\x00-\x1f/\\:*?"<>|]');
 
 final _plainText = RegExp(r'\.(txt|md|markdown)$', caseSensitive: false);
@@ -284,18 +171,14 @@ String textFileName(String title) {
   return _plainText.hasMatch(name) ? name : '$name.txt';
 }
 
-/// [text] safe inside a Markdown link's brackets.
-String _linkText(String text) =>
-    text.replaceAllMapped(RegExp(r'[\\\[\]]'), (m) => '\\${m[0]}');
-
 const _indented = JsonEncoder.withIndent('  ');
 
-/// [settings] as the JSON Files shows and edits.
+/// [settings] as the JSON the answer settings are saved through.
 String settingsText(WorkspaceSettings settings) =>
     '${_indented.convert(settings.values)}\n';
 
 /// The settings in [text] that differ from [was], ready to write. Throws [ApiException] when the
-/// text is not a JSON object, names a setting Files does not know, or gives one a value of the
+/// text is not a JSON object, names a setting the app does not know, or gives one a value of the
 /// wrong type or range.
 Map<String, Object?> parseSettings(String text, WorkspaceSettings was) {
   final Object? json;

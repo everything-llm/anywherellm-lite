@@ -50,21 +50,6 @@ void main() {
     expect(prefs.withOff(_s, 'a', []).switchedOff.keys, ['$_s b']);
   });
 
-  test(
-    'withoutDocs forgets the paths everywhere and drops emptied workspaces',
-    () {
-      const a = OffDoc(path: 'f/a.json', title: 'a');
-      const b = OffDoc(path: 'f/b.json', title: 'b');
-      final prefs = const Prefs()
-          .withOff(_s, 'w', [a, b])
-          .withOff(_s, 'v', [a])
-          .withOff(_t, 'v', [a]);
-      final next = prefs.withoutDocs(_s, {'f/a.json', 'f/c.json'});
-      expect(next.switchedOff.keys, ['$_s w', '$_t v']);
-      expect(next.offIn(_s, 'w').single.path, 'f/b.json');
-    },
-  );
-
   test('the order, theme and text size round-trip', () {
     final prefs = const Prefs()
         .withOrder(['b', 'a'])

@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/widgets.dart';
 
 import 'chat/dictation.dart';
@@ -19,9 +17,9 @@ import 'state/system_controller.dart';
 typedef LinkOpener = Future<bool> Function(Uri url);
 
 /// Asks where to save a file called [suggestedName], and writes what [bytes] gives there.
-/// Returns where it saved, or null when the person cancelled or [bytes] gave null. On Linux
-/// [bytes] runs only after a place is chosen; on Android it runs first, since the system's
-/// dialog takes the bytes with it. A browser downloads the file and never asks. Throws [Exception] when the file cannot be written.
+/// Returns where it saved, or null when the person cancelled or [bytes] gave null. [bytes] runs
+/// first, since the system's dialog takes the bytes with it. Throws [Exception] when the file
+/// cannot be written.
 typedef FileSaver = Future<String?> Function(
   String suggestedName,
   Future<List<int>?> Function() bytes,
@@ -32,9 +30,6 @@ typedef FileSharer = Future<void> Function(String name, List<int> bytes);
 
 /// A camera view that reads QR codes and calls [onCode] with the first one's text.
 typedef CodeScanner = Widget Function(void Function(String code) onCode);
-
-/// Reads the picture on the system clipboard as PNG bytes, or null when it holds none.
-typedef ImagePaster = Future<Uint8List?> Function();
 
 /// The app's controllers, put in the tree once by `main.dart`. Controllers are listenable, so
 /// this never notifies: widgets listen to the controller they read.
@@ -56,9 +51,7 @@ class AppScope extends InheritedWidget {
     this.shares,
     this.dictation,
     this.photos,
-    this.pasteImage,
     this.readAloud,
-    this.labelAnswers = false,
     this.canSpellcheck = false,
     required super.child,
   });
@@ -94,16 +87,8 @@ class AppScope extends InheritedWidget {
   /// where the device has neither, and Attach opens the file picker.
   final PhotoPicker? photos;
 
-  /// Reads a copied picture for the composer's paste, or null where the platform's own paste
-  /// brings pictures, through the keyboard on Android, or none, in a browser.
-  final ImagePaster? pasteImage;
-
   /// Reads an answer aloud, or null where the device has no speech to read with.
   final ReadAloud? readAloud;
-
-  /// Whether a finished answer carries its words as a semantics label, as in a browser, whose
-  /// semantics tree leaves out selectable text; elsewhere the text is already there.
-  final bool labelAnswers;
 
   /// Whether the platform has a spell checker the message box can use.
   final bool canSpellcheck;

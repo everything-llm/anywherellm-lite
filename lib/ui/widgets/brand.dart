@@ -5,12 +5,9 @@ import '../type.dart';
 import 'robin_mark.dart';
 
 /// The logo tile, the robin in [iconInk] on [iconGround] as on the launcher icon, and the
-/// wordmark: 19 beside the sidebar's chats, or [large] 34 on a screen of its own.
+/// wordmark at 34, on a screen of its own.
 class Brand extends StatelessWidget {
-  const Brand({super.key, this.large = false, this.logo = true});
-
-  final bool large;
-  final bool logo;
+  const Brand({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -18,20 +15,18 @@ class Brand extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (logo) ...[
-          Container(
-            width: 26,
-            height: 26,
-            // The launcher icon's colours, the same in both themes.
-            decoration: BoxDecoration(
-              color: iconGround,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const RobinMark(size: 26, color: iconInk),
+        Container(
+          width: 26,
+          height: 26,
+          // The launcher icon's colours, the same in both themes.
+          decoration: BoxDecoration(
+            color: iconGround,
+            borderRadius: BorderRadius.circular(8),
           ),
-          const SizedBox(width: 10),
-        ],
-        // Shrinks rather than overflows in a narrow sidebar or at a large text scale.
+          child: const RobinMark(size: 26, color: iconInk),
+        ),
+        const SizedBox(width: 10),
+        // Shrinks rather than overflows on a narrow screen or at a large text scale.
         Flexible(
           child: FittedBox(
             fit: BoxFit.scaleDown,
@@ -39,10 +34,10 @@ class Brand extends StatelessWidget {
             child: Text(
               'AnywhereLLM',
               style: Type.sans(
-                large ? 34 : 19,
-                weight: large ? FontWeight.w700 : FontWeight.w600,
+                34,
+                weight: FontWeight.w700,
                 color: t.ink,
-                letterSpacing: large ? -0.8 : -0.2,
+                letterSpacing: -0.8,
               ),
             ),
           ),

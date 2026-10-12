@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../icons.dart';
-import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/tappable.dart';
 
 /// A pill in the composer's row that names a setting and opens what changes it, such as the
-/// Answer from menu or the model picker: 26 px tall with a chevron, or 28 px and without one on
-/// a phone, where the row has less room. [tinted] fills it with the accent, for a setting that
+/// Answer from menu or the model picker: 28 px tall, without a chevron, since the row has little
+/// room. [tinted] fills it with the accent, for a setting that
 /// changes how answers read. A null [onTap] fades it.
 class ComposerChip extends StatelessWidget {
   const ComposerChip({
@@ -35,7 +33,6 @@ class ComposerChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final phone = ScreenClass.ofContext(context).isPhone;
     final ink = tinted ? t.accent : t.ink2;
     return Tappable(
       touchTarget: true,
@@ -52,9 +49,9 @@ class ComposerChip extends StatelessWidget {
           : Colors.transparent,
       side: BorderSide(color: tinted ? Colors.transparent : t.line),
       child: SizedBox(
-        height: phone ? 28 : 26,
+        height: 28,
         child: Padding(
-          padding: EdgeInsets.only(left: 9, right: phone ? 9 : 6),
+          padding: const EdgeInsets.symmetric(horizontal: 9),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -70,10 +67,6 @@ class ComposerChip extends StatelessWidget {
                   ),
                 ),
               ),
-              if (!phone) ...[
-                const SizedBox(width: 4),
-                AppIcon('down', size: IconSize.tiny, color: ink),
-              ],
             ],
           ),
         ),

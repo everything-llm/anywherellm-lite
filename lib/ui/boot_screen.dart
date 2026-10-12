@@ -19,7 +19,7 @@ class BootScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Brand(large: true),
+            const Brand(),
             const SizedBox(height: 16),
             Semantics(
               liveRegion: true,

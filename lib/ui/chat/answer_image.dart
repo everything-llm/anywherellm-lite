@@ -11,8 +11,8 @@ import '../tokens.dart';
 import '../type.dart';
 import '../widgets/tappable.dart';
 
-/// An image in an answer: loaded when it is on the [server]'s host over https, or over http
-/// when the [server] itself is http and [allowHttp] holds; otherwise its description. The
+/// An image in an answer: loaded when it is on the [server]'s host over https; otherwise its
+/// description. The
 /// description says whether the image was not loaded or failed to load, and why it failed. It
 /// opens the image's address when tapped, unless the image is [linked], where the link around
 /// it takes the tap.
@@ -22,7 +22,6 @@ class AnswerImage extends StatefulWidget {
     super.key,
     required this.alt,
     required this.server,
-    required this.allowHttp,
     required this.linked,
     this.maxHeight = 360,
     this.fit = BoxFit.contain,
@@ -33,7 +32,6 @@ class AnswerImage extends StatefulWidget {
   final Uri uri;
   final String? alt;
   final Uri? server;
-  final bool allowHttp;
 
   /// Whether the image sits inside a link, which then takes a tap on its description.
   final bool linked;
@@ -53,7 +51,7 @@ class AnswerImage extends StatefulWidget {
   /// small tile does not hold a large picture whole; null decodes it at its own size.
   final int? decodeWidth;
 
-  bool get loadable => loadableImage(uri, server, allowHttp: allowHttp);
+  bool get loadable => loadableImage(uri, server);
 
   @override
   State<AnswerImage> createState() => _AnswerImageState();

@@ -1,4 +1,4 @@
-import 'package:desktop_drop/desktop_drop.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/copy.dart';
@@ -8,7 +8,6 @@ import '../tokens.dart';
 import '../type.dart';
 import 'buttons.dart';
 import 'doc_details.dart';
-import 'drop_zone.dart';
 
 class _Pending {
   _Pending(this.file);
@@ -17,22 +16,22 @@ class _Pending {
   final details = DocDetailsController();
 }
 
-/// A [DropZone] whose files wait in a list, each with its own details and a remove button,
-/// until Add sends them all through [onSend].
+/// The files picked to add, which wait in a list, each with its own details and a remove
+/// button, until Add sends them all through [onSend].
 class UploadQueue extends StatefulWidget {
   const UploadQueue({
     super.key,
     required this.onSend,
     required this.onProblem,
-    this.trigger,
+    required this.trigger,
   });
 
   final Future<void> Function(List<UploadFile> files) onSend;
   final void Function(String title, String text) onProblem;
 
-  /// What stands in place of the [DropZone], given the way to open the file picker, such as an
-  /// Add a file button among others. Files dropped on it wait as well.
-  final Widget Function(VoidCallback browse)? trigger;
+  /// What opens the file picker, given the way to open it, such as an Add a file button among
+  /// others.
+  final Widget Function(VoidCallback browse) trigger;
 
   @override
   State<UploadQueue> createState() => _UploadQueueState();
@@ -80,21 +79,39 @@ class _UploadQueueState extends State<UploadQueue> {
     await widget.onSend(files);
   }
 
-  Widget _trigger(Widget Function(VoidCallback browse) trigger) => DropTarget(
-    onDragDone: (details) => _add(details.files.map(uploadOf).toList()),
-    child: trigger(
-      () => browseFiles(this, onFiles: _add, onProblem: widget.onProblem),
-    ),
-  );
+  /// Opens the system's file picker and lists what is picked, or says why the picker would not
+  /// open. Nothing is read until it is sent, and an unreadable file becomes a reason instead of
+  /// an error.
+  Future<void> _browse() async {
+    final List<PlatformFile> picked;
+    try {
+      picked = await FilePicker.pickFiles();
+    } catch (error) {
+      if (mounted) widget.onProblem('Could not open the file picker', '$error');
+      return;
+    }
+    // The picker may outlast the place it was opened for, as when the server changes.
+    if (!mounted) return;
+    await _add([
+      for (final file in picked)
+        UploadFile(
+          name: file.name,
+          read: () async {
+            try {
+              return await file.readAsBytes();
+            } on Exception {
+              throw const UnreadableFile('the file could not be read');
+            }
+          },
+        ),
+    ]);
+  }
 
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      switch (widget.trigger) {
-        final trigger? => _trigger(trigger),
-        null => DropZone(onFiles: _add, onProblem: widget.onProblem),
-      },
+      widget.trigger(_browse),
       if (_pending.isNotEmpty) ...[
         const SizedBox(height: 10),
         for (final p in _pending)

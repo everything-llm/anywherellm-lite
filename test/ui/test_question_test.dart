@@ -13,7 +13,9 @@ void main() {
     tester,
   ) async {
     final llm = planningServer();
-    final h = await pumpApp(tester, llm: llm);
+    final h = await pumpApp(tester, llm: llm, size: const Size(390, 1400));
+    h.shell.openSources();
+    await tester.pumpAndSettle();
     await tapVisible(tester, control('Test a question'));
     await tester.pumpAndSettle();
     expect(find.bySemanticsLabel('Test a question'), findsOneWidget);
@@ -34,19 +36,18 @@ void main() {
     await tapVisible(tester, control('Q3 roadmap.pdf, 90% match'));
     await tester.pump();
     expect(h.sources.flashed, isNotNull);
-    // The flash fills the file's row and rings it in the accent.
-    final ring = tester
+    // The flash fills the file's row.
+    final fill = tester
         .widgetList<AnimatedContainer>(
           find.ancestor(
             of: inSources(find.text('Q3 roadmap.pdf')),
             matching: find.byType(AnimatedContainer),
           ),
         )
-        .map((row) => (row.decoration as BoxDecoration?)?.border)
-        .whereType<Border>()
-        .single;
-    expect(ring.top.color, isNot(Colors.transparent));
-    expect(ring.top.width, 1);
+        .map((row) => (row.decoration as BoxDecoration?)?.color)
+        .nonNulls
+        .first;
+    expect(fill, isNot(Colors.transparent));
     await tester.pumpAndSettle(const Duration(seconds: 2));
     await tapVisible(tester, control('Done'));
     await tester.pumpAndSettle();
@@ -56,7 +57,9 @@ void main() {
 
   testWidgets('a question that finds nothing says so', (tester) async {
     final llm = planningServer();
-    await pumpApp(tester, llm: llm);
+    final h = await pumpApp(tester, llm: llm, size: const Size(390, 1400));
+    h.shell.openSources();
+    await tester.pumpAndSettle();
     await tapVisible(tester, control('Test a question'));
     await tester.pumpAndSettle();
     await tester.enterText(inSources(find.byType(TextField)).first, 'zebras');

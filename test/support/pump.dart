@@ -2,7 +2,7 @@ import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/ui/app.dart';
 import 'package:anywherellm/ui/app_scope.dart';
 import 'package:anywherellm/ui/chat/composer.dart';
-import 'package:file_selector/file_selector.dart' show XFile;
+import 'package:cross_file/cross_file.dart';
 import 'package:anywherellm/ui/chat/dictation.dart';
 import 'package:anywherellm/ui/chat/photo_picker.dart';
 import 'package:anywherellm/ui/chat/speaker.dart';
@@ -115,34 +115,22 @@ class Harness extends Rig {
     super.store,
     super.prefsStore,
     super.connection,
-    bool sourcesOpen = true,
     this.canScan = false,
     bool canDictate = false,
     bool canPickPhotos = false,
     bool canSpeak = false,
-    this.labelAnswers = false,
     this.canSpellcheck = false,
-    this.canPasteImages = false,
     this.canShare = false,
     this.shares,
   }) : dictation = canDictate ? FakeDictation() : null,
        photos = canPickPhotos ? FakePhotos() : null,
        speaker = canSpeak ? FakeSpeaker() : null,
-       shell = ShellController(sourcesPinned: sourcesOpen);
+       shell = ShellController();
 
   final ShellController shell;
 
-  /// Whether a finished answer carries its words as a semantics label, as in a browser.
-  final bool labelAnswers;
-
   /// Whether the message box may spellcheck, as on Android.
   final bool canSpellcheck;
-
-  /// Whether Ctrl+V reads a picture off the clipboard, as on Linux. It reads [clipboardImage].
-  final bool canPasteImages;
-
-  /// The picture on the fake clipboard, or null when it holds none.
-  Uint8List? clipboardImage;
 
   /// The device's photos and camera, or null where there are none.
   final FakePhotos? photos;
@@ -230,9 +218,7 @@ class Harness extends Rig {
       shares: shares?.stream,
       dictation: dictation,
       photos: photos,
-      pasteImage: canPasteImages ? () async => clipboardImage : null,
       readAloud: readAloud,
-      labelAnswers: labelAnswers,
       canSpellcheck: canSpellcheck,
       scanner: canScan
           ? (onCode) => TextButton(
@@ -245,26 +231,25 @@ class Harness extends Rig {
   );
 }
 
+/// A phone's window, upright.
+const phoneSize = Size(390, 844);
+
 /// Sizes the test window, builds the app on [llm] and lets the first loads finish. With no
 /// [connection], no server is set up. With [canScan], Settings offers a fake QR scanner, with
 /// [canDictate] the composer a microphone, with [canPickPhotos] the Attach sheet the device's
-/// photos and camera, with [canSpeak] each answer Read aloud, and with
-/// [labelAnswers] each finished answer a semantics label, as in a browser. With
-/// [canPasteImages], Ctrl+V in the composer reads [Harness.clipboardImage].
+/// photos and camera, and with [canSpeak] each answer Read aloud. The window is a phone's,
+/// [phoneSize], unless [size] says otherwise.
 Future<Harness> pumpApp(
   WidgetTester tester, {
   FakeAnythingLlm? llm,
   FakePrefsStore? prefsStore,
   Connection? connection = sampleConnection,
-  Size size = const Size(1280, 800),
-  bool sourcesOpen = true,
+  Size size = phoneSize,
   bool canScan = false,
   bool canDictate = false,
   bool canPickPhotos = false,
   bool canSpeak = false,
-  bool labelAnswers = false,
   bool canSpellcheck = false,
-  bool canPasteImages = false,
   bool canShare = false,
   StreamController<SharedItem>? shares,
 }) async {
@@ -275,16 +260,13 @@ Future<Harness> pumpApp(
     llm: llm,
     prefsStore: prefsStore,
     connection: connection,
-    sourcesOpen: sourcesOpen,
     canScan: canScan,
     canShare: canShare,
     shares: shares,
     canDictate: canDictate,
     canPickPhotos: canPickPhotos,
     canSpeak: canSpeak,
-    labelAnswers: labelAnswers,
     canSpellcheck: canSpellcheck,
-    canPasteImages: canPasteImages,
   );
   addTearDown(harness.dispose);
   await harness.prefs.load();
@@ -302,7 +284,7 @@ Finder typingField([Finder? of]) {
   return of == null ? field : find.descendant(of: of, matching: field);
 }
 
-/// The composer's field, apart from the sidebar's search and every other field on screen.
+/// The composer's field, apart from the drawer's search and every other field on screen.
 Finder get composerField => typingField(find.byType(Composer));
 
 /// The text field that has the focus, or else the composer.
@@ -344,28 +326,4 @@ Future<void> tapVisible(WidgetTester tester, Finder finder) async {
   await tester.ensureVisible(finder);
   await tester.pumpAndSettle();
   await tester.tap(finder);
-}
-
-/// The sidebar's workspace switcher.
-Finder get switcher => find.byWidgetPredicate(
-  (widget) =>
-      widget is Tappable &&
-      widget.label.startsWith('Workspaces') &&
-      widget.tooltip == 'Switch workspace',
-);
-
-/// Opens the sidebar's workspace menu and picks [item] in it.
-Future<void> fromMenu(WidgetTester tester, String item) async {
-  await tester.tap(switcher);
-  await tester.pumpAndSettle();
-  await tester.tap(control(item).last);
-  await tester.pumpAndSettle();
-}
-
-/// Opens the chat on screen's ⋯ in the sidebar and picks [item] in it.
-Future<void> chatAction(WidgetTester tester, String item) async {
-  await tester.tap(control('Chat actions: rename, pin, delete'));
-  await tester.pumpAndSettle();
-  await tester.tap(control(item).last);
-  await tester.pumpAndSettle();
 }

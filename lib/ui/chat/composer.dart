@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:desktop_drop/desktop_drop.dart';
-import 'package:file_selector/file_selector.dart';
+import 'package:cross_file/cross_file.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -51,15 +51,6 @@ class _ComposerState extends State<Composer> {
 
   /// Why the last pick added nothing, or null.
   String? _problem;
-
-  /// Whether files are being dragged over the composer.
-  bool _over = false;
-
-  /// The command in the menu that Enter picks.
-  int _highlight = 0;
-
-  /// Whether Esc closed the menu. It stays closed until the message changes.
-  bool _menuClosed = false;
 
   /// What the form follows besides the message, whose changes [_changed] handles.
   late final Listenable _shown;
@@ -212,11 +203,7 @@ class _ComposerState extends State<Composer> {
       _scope.dictation?.stop();
       _listening = false;
     }
-    setState(() {
-      _typed = widget.draft.text;
-      _highlight = 0;
-      _menuClosed = false;
-    });
+    setState(() => _typed = widget.draft.text);
   }
 
   /// Holds the message typed while this chat answers, to go when the answer ends.
@@ -250,8 +237,10 @@ class _ComposerState extends State<Composer> {
   }
 
   /// Attaches the files picked, unless another chat was shown while the picker was open.
-  Future<void> _attach() =>
-      _pickWith(openFiles, 'The file picker did not open');
+  Future<void> _attach() => _pickWith(
+    () async => [for (final f in await FilePicker.pickFiles()) f.xFile],
+    'The file picker did not open',
+  );
 
   /// Attaches what [pick] gives, unless another chat was shown meanwhile. A failure is put in
   /// [_problem] after [failed].
@@ -270,7 +259,7 @@ class _ComposerState extends State<Composer> {
     await _addFiles(picked, shown);
   }
 
-  /// A phone's Attach sheet, over the composer while [Popup.attach] is open.
+  /// The Attach sheet, over the composer while [Popup.attach] is open.
   Widget _attachSheet(Widget child) {
     final shell = _scope.shell;
     final photos = _scope.photos;
@@ -302,24 +291,12 @@ class _ComposerState extends State<Composer> {
     );
   }
 
-  /// Attaches the files dropped on the composer. Nothing is taken while a chat answers, as the
-  /// Attach button is off then.
-  Future<void> _dropped(DropDoneDetails details) async {
-    setState(() => _over = false);
-    if (_scope.chat.busy) return;
-    await _addFiles(details.files, _chatShown);
-  }
-
   /// Attaches [files], unless another chat than [shown] is on screen once they are read. A file
-  /// that is too big, a folder or one that cannot be read is named in [_problem] instead.
+  /// that is too big or cannot be read is named in [_problem] instead.
   Future<void> _addFiles(List<XFile> files, Object shown) async {
     final added = <Attachment>[];
     final problems = <String>[];
     for (final file in files) {
-      if (file is DropItemDirectory) {
-        problems.add('${file.name} is a folder; attach the files inside it.');
-        continue;
-      }
       try {
         final wrong = attachmentProblem(file.name, await file.length());
         if (wrong != null) {
@@ -350,24 +327,6 @@ class _ComposerState extends State<Composer> {
       _attached = [..._attached, ...added];
       _problem = problems.isEmpty ? null : problems.join(' ');
     });
-  }
-
-  /// Ctrl+V: attaches the picture on the clipboard, or pastes its text when it holds none.
-  Future<void> _pasteImage(ImagePaster read, VoidCallback pasteText) async {
-    final shown = _chatShown;
-    final Uint8List? image;
-    try {
-      image = await read();
-    } on Exception {
-      if (mounted) pasteText();
-      return;
-    }
-    if (!mounted) return;
-    if (image == null) {
-      pasteText();
-    } else {
-      _pasted(image, 'image/png', shown);
-    }
   }
 
   void _remove(Attachment attachment) => setState(() {
@@ -403,9 +362,7 @@ class _ComposerState extends State<Composer> {
     final scope = AppScope.of(context);
     final draft = widget.draft;
     return Padding(
-      padding: ScreenClass.ofContext(context).isPhone
-          ? const EdgeInsets.fromLTRB(16, 8, 16, 16)
-          : const EdgeInsets.fromLTRB(20, 8, 20, 20),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: Sizes.column),
@@ -413,31 +370,18 @@ class _ComposerState extends State<Composer> {
             listenable: _shown,
             builder: (context, _) {
               if (!scope.settings.configured) return const _NoKey();
-              final matches = scope.chat.busy || _menuClosed
+              final matches = scope.chat.busy
                   ? const <SlashCommand>[]
                   : commandsFor(draft.text, scope.chat.commands);
-              final read = scope.pasteImage;
-              final form = DropTarget(
-                enable: !scope.chat.busy,
-                onDragEntered: (_) => setState(() => _over = true),
-                onDragExited: (_) => setState(() => _over = false),
-                onDragDone: _dropped,
-                child: _Form(
+              return _attachSheet(
+                _Form(
                   draft: draft,
                   focus: widget.focus,
                   attached: _attached,
                   problem: _problem,
                   matches: matches,
-                  highlight: matches.isEmpty
-                      ? 0
-                      : _highlight.clamp(0, matches.length - 1),
-                  onHighlight: (i) => setState(() => _highlight = i),
                   onPick: _pick,
-                  onDismiss: () => setState(() => _menuClosed = true),
-                  onAttach: ScreenClass.ofContext(context).isPhone
-                      ? () => scope.shell.togglePopup(Popup.attach)
-                      : _attach,
-                  onRemove: _remove,
+                  onAttach: () => scope.shell.togglePopup(Popup.attach),
                   onSend: _send,
                   held: _held != null,
                   onHold: _hold,
@@ -447,10 +391,6 @@ class _ComposerState extends State<Composer> {
                   onDictate: scope.dictation == null ? null : _dictate,
                   listening: _listening,
                   micProblem: _micProblem,
-                  over: _over,
-                  onPaste: read == null
-                      ? null
-                      : (pasteText) => _pasteImage(read, pasteText),
                   onInserted: (content) => switch (content.data) {
                     final bytes? => _pasted(
                       bytes,
@@ -461,8 +401,6 @@ class _ComposerState extends State<Composer> {
                   },
                 ),
               );
-              final phone = ScreenClass.ofContext(context).isPhone;
-              return phone ? _attachSheet(form) : form;
             },
           ),
         ),
@@ -478,12 +416,8 @@ class _Form extends StatelessWidget {
     required this.attached,
     required this.problem,
     required this.matches,
-    required this.highlight,
-    required this.onHighlight,
     required this.onPick,
-    required this.onDismiss,
     required this.onAttach,
-    required this.onRemove,
     required this.onSend,
     required this.held,
     required this.onHold,
@@ -493,8 +427,6 @@ class _Form extends StatelessWidget {
     required this.onDictate,
     required this.listening,
     required this.micProblem,
-    required this.over,
-    required this.onPaste,
     required this.onInserted,
   });
 
@@ -503,16 +435,12 @@ class _Form extends StatelessWidget {
   final List<Attachment> attached;
   final String? problem;
 
-  /// The commands that match the message, or none when the menu is closed.
+  /// The commands that match the message, or none while the chat is busy.
   final List<SlashCommand> matches;
-  final int highlight;
-  final ValueChanged<int> onHighlight;
   final ValueChanged<SlashCommand> onPick;
-  final VoidCallback onDismiss;
 
-  /// Attaches files: the file picker, or on a phone the Attach sheet.
+  /// Opens the Attach sheet.
   final VoidCallback onAttach;
-  final ValueChanged<Attachment> onRemove;
   final ValueChanged<String> onSend;
 
   /// Whether the message waits for the answer running here to end.
@@ -531,25 +459,9 @@ class _Form extends StatelessWidget {
   /// Why dictation could not start, or null.
   final String? micProblem;
 
-  /// Whether files are being dragged over the composer, which lights its edge.
-  final bool over;
-
-  /// Ctrl+V, given the field's own paste of text, or null where the platform's paste is left
-  /// as it is.
-  final void Function(VoidCallback pasteText)? onPaste;
-
-  /// Attaches content a phone's keyboard inserts, such as a copied picture. Says whether it
-  /// was a picture a message can carry.
+  /// Attaches content the keyboard inserts, such as a copied picture. Says whether it was a
+  /// picture a message can carry.
   final bool Function(KeyboardInsertedContent content) onInserted;
-
-  /// The message [field], with Ctrl+V handed to [onPaste] when there is one.
-  Widget _pasting(Widget field) => switch (onPaste) {
-    final onPaste? => Actions(
-      actions: {PasteTextIntent: _PasteImage(onPaste)},
-      child: field,
-    ),
-    null => field,
-  };
 
   @override
   Widget build(BuildContext context) {
@@ -563,8 +475,6 @@ class _Form extends StatelessWidget {
         ? 'Clearing the chat…'
         : chat.workspaceAnswering
         ? 'Another chat in this workspace is still answering…'
-        : chat.atLimit
-        ? '${chat.maxRuns} chats are answering. Send when one ends.'
         : switch (scope.sources.chatMode.value) {
             ChatMode.automatic || ChatMode.chat => 'Ask anything…',
             ChatMode.query || null => 'Ask about your files…',
@@ -578,15 +488,14 @@ class _Form extends StatelessWidget {
     // While this chat answers, a message typed is held to go when the answer ends. Send when
     // done takes the chips' room, as they are off while the chat answers.
     final holdable = here && !held && draft.text.trim().isNotEmpty;
-    final phone = ScreenClass.ofContext(context).isPhone;
 
-    /// Enter picks the highlighted command, or sends the message once it is that command.
+    /// Enter picks the first command, or sends the message once it is that command.
     void enter() {
-      final command = matches[highlight].command;
+      final command = matches.first.command;
       if (draft.text.trim().toLowerCase() == command.toLowerCase()) {
         send();
       } else {
-        onPick(matches[highlight]);
+        onPick(matches.first);
       }
     }
 
@@ -599,15 +508,6 @@ class _Form extends StatelessWidget {
     final bindings = <ShortcutActivator, VoidCallback>{
       const SingleActivator(LogicalKeyboardKey.enter): onEnter,
       const SingleActivator(LogicalKeyboardKey.numpadEnter): onEnter,
-      if (menu) ...{
-        const SingleActivator(LogicalKeyboardKey.tab): () =>
-            onPick(matches[highlight]),
-        const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
-            onHighlight((highlight + 1) % matches.length),
-        const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
-            onHighlight((highlight - 1) % matches.length),
-        const SingleActivator(LogicalKeyboardKey.escape): onDismiss,
-      },
     };
 
     final card = AnswerFromAnchor(
@@ -615,23 +515,13 @@ class _Form extends StatelessWidget {
         if (!picking) onPickModel();
       },
       child: Container(
-        // A phone's buttons run nearer the card's edges than its text, as the design canvas
-        // draws them; what sits over them is indented to the text's edge.
-        padding: phone
-            ? const EdgeInsets.fromLTRB(8, 14, 8, 6)
-            : const EdgeInsets.fromLTRB(16, 12, 12, 10),
+        // The buttons run nearer the card's edges than its text, as the design canvas draws
+        // them; what sits over them is indented to the text's edge.
+        padding: const EdgeInsets.fromLTRB(8, 14, 8, 6),
         decoration: BoxDecoration(
           color: t.panel,
-          borderRadius: BorderRadius.circular(
-            phone ? Sizes.phoneComposer : Sizes.composer,
-          ),
-          border: Border.all(
-            color: over
-                ? t.accent
-                : phone
-                ? t.line2
-                : t.line,
-          ),
+          borderRadius: BorderRadius.circular(Sizes.phoneComposer),
+          border: Border.all(color: t.line2),
           boxShadow: [
             BoxShadow(
               color: t.shadow,
@@ -646,7 +536,7 @@ class _Form extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: EdgeInsets.only(left: phone ? 12 : 0),
+              padding: const EdgeInsets.only(left: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -674,31 +564,9 @@ class _Form extends StatelessWidget {
                     ModelPicker(onClose: onPickModel),
                     Divider(height: 21, thickness: 1, color: t.line),
                   ],
-                  if (menu && !phone) ...[
-                    SlashMenu(
-                      commands: matches,
-                      highlight: highlight,
-                      onPick: onPick,
-                      note: chat.commandsNote,
-                    ),
-                    Divider(height: 13, thickness: 1, color: t.line),
-                  ],
-                  // A phone names how many files go along beside Attach, and lists them in its
-                  // Attach sheet, so the composer keeps its height.
-                  if (attached.isNotEmpty && !phone) ...[
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        for (final a in attached)
-                          _AttachedChip(a, onRemove: () => onRemove(a)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                  ],
                   ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: phone ? 30 : 26,
+                    constraints: const BoxConstraints(
+                      minHeight: 30,
                       maxHeight: 140,
                     ),
                     child: CallbackShortcuts(
@@ -709,42 +577,40 @@ class _Form extends StatelessWidget {
                         // Only the field follows the prefs, for its spellcheck.
                         child: ListenableBuilder(
                           listenable: scope.prefs,
-                          builder: (context, _) => _pasting(
-                            TextField(
-                              controller: draft,
-                              focusNode: focus,
-                              // Open while this chat answers, for the next message.
-                              enabled: !chat.busy || here,
-                              spellCheckConfiguration:
-                                  scope.canSpellcheck &&
-                                      scope.prefs.prefs.isOn(
-                                        ChatSwitch.spellcheck,
-                                      )
-                                  ? const SpellCheckConfiguration()
-                                  : const SpellCheckConfiguration.disabled(),
-                              minLines: 1,
-                              maxLines: null,
-                              keyboardType: TextInputType.multiline,
-                              textInputAction: TextInputAction.newline,
-                              // A phone's keyboard starts each sentence with a capital.
-                              textCapitalization: TextCapitalization.sentences,
-                              style: Type.sans(15.5, color: t.ink, height: 1.5),
-                              cursorColor: t.accent,
-                              // A picture from a phone keyboard's clipboard; the rest goes in as text.
-                              contentInsertionConfiguration:
-                                  ContentInsertionConfiguration(
-                                    allowedMimeTypes: imageMimes.toList(),
-                                    onContentInserted: onInserted,
-                                  ),
-                              decoration: InputDecoration(
-                                isCollapsed: true,
-                                border: InputBorder.none,
-                                hintText: hint,
-                                hintStyle: Type.sans(
-                                  15.5,
-                                  color: t.muted,
-                                  height: 1.5,
+                          builder: (context, _) => TextField(
+                            controller: draft,
+                            focusNode: focus,
+                            // Open while this chat answers, for the next message.
+                            enabled: !chat.busy || here,
+                            spellCheckConfiguration:
+                                scope.canSpellcheck &&
+                                    scope.prefs.prefs.isOn(
+                                      ChatSwitch.spellcheck,
+                                    )
+                                ? const SpellCheckConfiguration()
+                                : const SpellCheckConfiguration.disabled(),
+                            minLines: 1,
+                            maxLines: null,
+                            keyboardType: TextInputType.multiline,
+                            textInputAction: TextInputAction.newline,
+                            // The keyboard starts each sentence with a capital.
+                            textCapitalization: TextCapitalization.sentences,
+                            style: Type.sans(15.5, color: t.ink, height: 1.5),
+                            cursorColor: t.accent,
+                            // A picture from the keyboard's clipboard; the rest goes in as text.
+                            contentInsertionConfiguration:
+                                ContentInsertionConfiguration(
+                                  allowedMimeTypes: imageMimes.toList(),
+                                  onContentInserted: onInserted,
                                 ),
+                            decoration: InputDecoration(
+                              isCollapsed: true,
+                              border: InputBorder.none,
+                              hintText: hint,
+                              hintStyle: Type.sans(
+                                15.5,
+                                color: t.muted,
+                                height: 1.5,
                               ),
                             ),
                           ),
@@ -755,7 +621,7 @@ class _Form extends StatelessWidget {
                 ],
               ),
             ),
-            SizedBox(height: phone ? 4 : 8),
+            const SizedBox(height: 4),
             Row(
               children: [
                 IconBtn(
@@ -765,46 +631,34 @@ class _Form extends StatelessWidget {
                   box: 30,
                   size: IconSize.small,
                 ),
-                // Typing / opens the commands, so there is no button for them.
-                if (phone && attached.isNotEmpty) ...[
+                // Typing / opens the commands, so there is no button for them. How many files go
+                // along shows beside Attach, and its sheet lists them, so the composer keeps its
+                // height.
+                if (attached.isNotEmpty) ...[
                   const SizedBox(width: 4),
                   _FilesPill(attached.length, onTap: onAttach),
                 ],
-                SizedBox(width: phone ? 2 : 4),
-                // Takes all the room left, so Send sits at the right edge. On a phone the model is
-                // a row in the Answer from menu, since the row has room for one chip.
+                const SizedBox(width: 2),
+                // Takes all the room left, so Send sits at the right edge. The model is a row in
+                // the Answer from sheet, since the row has room for one chip.
                 Expanded(
                   child: holdable
                       ? Align(
                           alignment: Alignment.centerRight,
                           child: _SendWhenDone(onTap: onHold),
                         )
-                      : Row(
-                          children: [
-                            const Flexible(child: AnswerFromChip()),
-                            if (!phone) ...[
-                              const SizedBox(width: 6),
-                              Flexible(
-                                child: ModelChip(
-                                  open: picking,
-                                  onTap: onPickModel,
-                                ),
-                              ),
-                            ],
-                          ],
+                      : const Row(
+                          children: [Flexible(child: AnswerFromChip())],
                         ),
                 ),
                 if (onDictate != null)
-                  Padding(
-                    padding: EdgeInsets.only(right: phone ? 0 : 4),
-                    child: IconBtn(
-                      'mic',
-                      tooltip: listening ? 'Stop dictating' : 'Dictate',
-                      active: listening,
-                      onPressed: chat.busy ? null : onDictate,
-                      box: 34,
-                      size: IconSize.small,
-                    ),
+                  IconBtn(
+                    'mic',
+                    tooltip: listening ? 'Stop dictating' : 'Dictate',
+                    active: listening,
+                    onPressed: chat.busy ? null : onDictate,
+                    box: 34,
+                    size: IconSize.small,
                   ),
                 if (holdable) const SizedBox(width: 8),
                 if (here)
@@ -824,8 +678,8 @@ class _Form extends StatelessWidget {
                 else
                   _RoundButton(
                     label: 'Send',
-                    // A phone's Send keeps the accent, as the design canvas draws it.
-                    color: sendable || phone ? t.accent : t.off,
+                    // Send keeps the accent, as the design canvas draws it.
+                    color: t.accent,
                     onTap: sendable ? send : null,
                     child: AppIcon(
                       'send',
@@ -839,7 +693,6 @@ class _Form extends StatelessWidget {
         ),
       ),
     );
-    if (!phone) return card;
     // The card keeps its place whether the commands show, so the field, and the keyboard with
     // it, is never built afresh as a slash is typed.
     return Column(
@@ -859,27 +712,7 @@ class _Form extends StatelessWidget {
   }
 }
 
-/// Paste in the message field, which hands [onPaste] the field's own paste of text, for a
-/// clipboard that holds no picture.
-class _PasteImage extends ContextAction<PasteTextIntent> {
-  _PasteImage(this.onPaste);
-
-  final void Function(VoidCallback pasteText) onPaste;
-
-  @override
-  bool isEnabled(PasteTextIntent intent, [BuildContext? context]) =>
-      callingAction?.isEnabled(intent) ?? true;
-
-  @override
-  Object? invoke(PasteTextIntent intent, [BuildContext? context]) {
-    // The field's own paste is known only while this runs.
-    final own = callingAction;
-    onPaste(() => own?.invoke(intent));
-    return null;
-  }
-}
-
-/// How many files go with the next message, on a phone, which opens the Attach sheet.
+/// How many files go with the next message, which opens the Attach sheet.
 class _FilesPill extends StatelessWidget {
   const _FilesPill(this.count, {required this.onTap});
 
@@ -907,66 +740,6 @@ class _FilesPill extends StatelessWidget {
   }
 }
 
-/// A file waiting to go with the next question, with a button that takes it off.
-class _AttachedChip extends StatelessWidget {
-  const _AttachedChip(this.attachment, {required this.onRemove});
-
-  final Attachment attachment;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Container(
-      padding: const EdgeInsets.only(left: 10),
-      decoration: BoxDecoration(
-        color: t.panel2,
-        borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: t.line),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (attachment.isImage)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: Image.memory(
-                attachment.bytes,
-                width: 22,
-                height: 22,
-                fit: BoxFit.cover,
-                cacheWidth: (22 * MediaQuery.devicePixelRatioOf(context))
-                    .round(),
-                excludeFromSemantics: true,
-                errorBuilder: (_, _, _) =>
-                    AppIcon('attach', size: IconSize.xs, color: t.muted),
-              ),
-            )
-          else
-            AppIcon('doc', size: IconSize.xs, color: t.muted),
-          const SizedBox(width: 6),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 200),
-            child: Text(
-              attachment.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Type.sans(13, color: t.ink),
-            ),
-          ),
-          IconBtn(
-            'close',
-            tooltip: 'Remove ${attachment.name}',
-            onPressed: onRemove,
-            box: 26,
-            size: IconSize.xs,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _RoundButton extends StatelessWidget {
   const _RoundButton({
     required this.label,
@@ -988,10 +761,7 @@ class _RoundButton extends StatelessWidget {
     onTap: onTap,
     shape: const CircleBorder(),
     color: color,
-    child: SizedBox.square(
-      dimension: ScreenClass.ofContext(context).isPhone ? 40 : 34,
-      child: Center(child: child),
-    ),
+    child: SizedBox.square(dimension: 40, child: Center(child: child)),
   );
 }
 

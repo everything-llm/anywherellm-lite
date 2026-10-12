@@ -20,7 +20,7 @@ InputDecoration editorDecoration(
   EdgeInsets? padding,
 }) {
   OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
-    borderRadius: BorderRadius.circular(Sizes.controlOf(context)),
+    borderRadius: BorderRadius.circular(Sizes.phoneControl),
     borderSide: BorderSide(color: color, width: width),
   );
   return InputDecoration(
@@ -32,7 +32,7 @@ InputDecoration editorDecoration(
   );
 }
 
-/// The input: one line 44px tall, 52 on a phone, or [maxLines] lines, rounded, a ring in the
+/// The input: one line 52px tall, or [maxLines] lines, rounded, a ring in the
 /// accent on focus.
 class AppField extends StatelessWidget {
   const AppField({
@@ -91,11 +91,11 @@ class AppField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final height = Sizes.fieldOf(context);
-    final size = ScreenClass.ofContext(context).isPhone ? 16.0 : 15.0;
+    const height = Sizes.field;
+    const size = 16.0;
     OutlineInputBorder border(Color color, [double width = 1]) =>
         OutlineInputBorder(
-          borderRadius: BorderRadius.circular(Sizes.controlOf(context)),
+          borderRadius: BorderRadius.circular(Sizes.phoneControl),
           borderSide: BorderSide(color: color, width: width),
           gapPadding: 0,
         );
@@ -181,9 +181,9 @@ class AppSelect extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final radius = BorderRadius.circular(Sizes.controlOf(context));
+    final radius = BorderRadius.circular(Sizes.phoneControl);
     return Container(
-      height: Sizes.fieldOf(context),
+      height: Sizes.field,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: fieldFill(context),

@@ -207,7 +207,6 @@ void main() {
       var sent = 0;
       final api = HttpAnythingLlmApi(
         holder: ConnectionHolder(plain),
-        allowHttp: false,
         client: MockClient((_) async {
           sent++;
           return http.Response('{"authenticated":true,"workspaces":[]}', 200);
@@ -233,7 +232,6 @@ void main() {
         var sent = 0;
         final api = HttpAnythingLlmApi(
           holder: ConnectionHolder(_connection),
-          allowHttp: false,
           client: MockClient((_) async {
             sent++;
             return http.Response('', 200);
@@ -248,7 +246,6 @@ void main() {
     test('an https address is used', () async {
       final api = HttpAnythingLlmApi(
         holder: ConnectionHolder(_connection),
-        allowHttp: false,
         client: MockClient(
           (_) async => http.Response('{"authenticated":true}', 200),
         ),
@@ -1491,7 +1488,6 @@ void main() {
         var sent = 0;
         final api = HttpAnythingLlmApi(
           holder: ConnectionHolder(),
-          allowHttp: false,
           client: MockClient((_) async {
             sent++;
             return http.Response('{}', 200);
@@ -1568,39 +1564,6 @@ void main() {
       },
     );
 
-    test('pinning posts the path and the state', () async {
-      final seen = <http.Request>[];
-      await _answering({
-        'message': 'ok',
-      }, seen: seen).pinDocument('w', 'c/a.json', pinned: true);
-      expect(seen.single.url.path, '/api/v1/workspace/w/update-pin');
-      expect(jsonDecode(seen.single.body), {
-        'docPath': 'c/a.json',
-        'pinStatus': true,
-      });
-    });
-
-    test('the library is the folders under the documents root', () async {
-      final seen = <http.Request>[];
-      final folders = await _answering({
-        'localFiles': {
-          'name': 'documents',
-          'type': 'folder',
-          'items': [
-            {
-              'name': 'claude',
-              'type': 'folder',
-              'items': [
-                {'name': 'a.json', 'type': 'file', 'title': 'a.md'},
-              ],
-            },
-          ],
-        },
-      }, seen: seen).libraryFolders();
-      expect(seen.single.url.path, '/api/v1/documents');
-      expect(folders.single.files.single.path, 'claude/a.json');
-    });
-
     test('a document is asked for by its file name alone', () async {
       final seen = <http.Request>[];
       final doc = await _answering({
@@ -1619,59 +1582,6 @@ void main() {
       expect(missing.status, 404);
     });
 
-    test('folder, move and delete send what the server expects', () async {
-      final seen = <http.Request>[];
-      final api = _answering({'success': true, 'message': null}, seen: seen);
-      await api.createFolder('notes');
-      await api.moveDocuments([('claude/a.json', 'notes/a.json')]);
-      await api.removeDocuments(['notes/a.json']);
-      await api.removeFolder('notes');
-      expect(
-        [for (final r in seen) '${r.method} ${r.url.path}'],
-        [
-          'POST /api/v1/document/create-folder',
-          'POST /api/v1/document/move-files',
-          'DELETE /api/v1/system/remove-documents',
-          'DELETE /api/v1/document/remove-folder',
-        ],
-      );
-      expect(
-        [for (final r in seen) jsonDecode(r.body)],
-        [
-          {'name': 'notes'},
-          {
-            'files': [
-              {'from': 'claude/a.json', 'to': 'notes/a.json'},
-            ],
-          },
-          {
-            'names': ['notes/a.json'],
-          },
-          {'name': 'notes'},
-        ],
-      );
-    });
-
-    test('success false with status 200 is a refusal', () async {
-      final api = _answering({'success': false, 'message': 'Folder exists'});
-      expect((await _failure(api.createFolder('x'))).message, 'Folder exists');
-      expect((await _failure(api.removeFolder('x'))).message, 'Folder exists');
-      final quiet = _answering({'success': false});
-      expect(
-        (await _failure(quiet.removeDocuments(['x']))).message,
-        'The server did not delete the documents.',
-      );
-    });
-
-    test('an upload into a folder goes to that folder\'s route', () async {
-      final seen = <http.Request>[];
-      await _answering({
-        'success': true,
-        'documents': <Object>[],
-      }, seen: seen).upload('a.md', const [1], folder: 'my notes');
-      expect(seen.single.url.path, '/api/v1/document/upload/my%20notes');
-    });
-
     test('the system settings are the settings object', () async {
       final seen = <http.Request>[];
       final settings = await _answering({
@@ -1685,12 +1595,7 @@ void main() {
       final api = _api((_) async => http.Response('{"error":"nope"}', 500));
       for (final call in <Future<void> Function()>[
         () => api.updateWorkspace('w', {'topN': 1}),
-        () => api.pinDocument('w', 'a', pinned: true),
-        api.libraryFolders,
         () => api.document('a'),
-        () => api.createFolder('a'),
-        () => api.moveDocuments([('a', 'b')]),
-        () => api.removeDocuments(['a']),
         api.systemSettings,
       ]) {
         expect((await _failure(call())).message, isNot(contains('SECRET-KEY')));
@@ -2141,10 +2046,8 @@ void main() {
       Stream<List<int>> body, {
       int status = 200,
       List<http.BaseRequest>? seen,
-      bool allowHttp = true,
     }) => HttpAnythingLlmApi(
       holder: ConnectionHolder(_connection.withPassword('PASS-WORD')),
-      allowHttp: allowHttp,
       client: MockClient.streaming((request, _) async {
         seen?.add(request);
         return http.StreamedResponse(
@@ -2171,9 +2074,9 @@ void main() {
       expect(seen.single.headers.values.join(), isNot(contains('SECRET-KEY')));
     });
 
-    test('refuses plain http when this device does not allow it', () async {
+    test('refuses plain http', () async {
       final seen = <http.BaseRequest>[];
-      final api = images(const Stream.empty(), seen: seen, allowHttp: false);
+      final api = images(const Stream.empty(), seen: seen);
       final error = await _failure(
         api.answerImage(Uri.parse('http://host.example.ts.net:8080/a.png')),
       );

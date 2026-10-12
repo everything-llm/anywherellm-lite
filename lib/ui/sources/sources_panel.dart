@@ -4,7 +4,6 @@ import '../../core/sources.dart';
 import '../app_scope.dart';
 import '../files/save_file.dart';
 import '../icons.dart';
-import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
@@ -33,9 +32,7 @@ class SourcesPanel extends StatelessWidget {
       child: ListenableBuilder(
         listenable: scope.sources,
         // Built afresh on each change, never const, so the files shown follow Sources.
-        builder: (context, _) => ScreenClass.ofContext(context).isPhone
-            ? _PhoneBody(scope.sources.files)
-            : _Body(scope.sources.files),
+        builder: (context, _) => _Body(scope.sources.files),
       ),
     );
   }
@@ -61,51 +58,10 @@ List<Widget> _notices(BuildContext context) {
   ];
 }
 
-/// The panel beside the chat: the drop zone, Add a link and Paste text, Test a question, then
-/// the files.
+/// The sheet: Add a file, Add a link and Paste text as buttons, the files with a rule between
+/// them, then Test a question. It is as tall as what it holds.
 class _Body extends StatelessWidget {
   const _Body(this.files);
-
-  /// The files as Sources has them now.
-  final List<SourceFile> files;
-
-  @override
-  Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    final sources = scope.sources;
-    // Everything below the heading scrolls together, so an open form or a long list of
-    // files waiting to be added never pushes past the panel.
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Keyed by workspace, so what waits to be added stays with it.
-              UploadQueue(
-                key: ValueKey(('queue', scope.chat.activeSlug)),
-                onSend: sources.upload,
-                onProblem: sources.report,
-              ),
-              const SizedBox(height: 8),
-              AddSource(key: ValueKey(('add', scope.chat.activeSlug))),
-              const SizedBox(height: 4),
-              TestQuestion(key: ValueKey(('test', scope.chat.activeSlug))),
-              ..._notices(context),
-              const SizedBox(height: 14),
-            ],
-          ),
-        ),
-        _fileSliver(context, files, phone: false),
-      ],
-    );
-  }
-}
-
-/// The sheet on a phone: Add a file, Add a link and Paste text as buttons, the files with a
-/// rule between them, then Test a question. It is as tall as what it holds.
-class _PhoneBody extends StatelessWidget {
-  const _PhoneBody(this.files);
 
   /// The files as Sources has them now.
   final List<SourceFile> files;
@@ -138,7 +94,7 @@ class _PhoneBody extends StatelessWidget {
             ],
           ),
         ),
-        _fileSliver(context, files, phone: true),
+        _fileSliver(context, files),
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.only(top: 4),
@@ -158,34 +114,27 @@ class _PhoneBody extends StatelessWidget {
   }
 }
 
-/// The [files], or a line saying there are none yet: on a [phone] with a rule between them,
-/// as the design canvas draws the sheet.
-Widget _fileSliver(
-  BuildContext context,
-  List<SourceFile> files, {
-  required bool phone,
-}) {
+/// The [files], or a line saying there are none yet, with a rule between them, as the design
+/// canvas draws the sheet.
+Widget _fileSliver(BuildContext context, List<SourceFile> files) {
   final sources = AppScope.of(context).sources;
   final t = Tokens.of(context);
   if (files.isEmpty) {
     return SliverToBoxAdapter(
       child: Padding(
-        padding: phone
-            ? const EdgeInsets.symmetric(vertical: 12)
-            : const EdgeInsets.only(top: 16),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         child: Text(
           sources.loading ? 'Loading…' : 'No files yet.',
           textAlign: TextAlign.center,
-          style: Type.sans(phone ? 14 : 13.5, color: t.muted),
+          style: Type.sans(14, color: t.muted),
         ),
       ),
     );
   }
   return SliverList.separated(
     itemCount: files.length,
-    separatorBuilder: (_, _) => phone
-        ? Divider(height: 1, thickness: 1, color: t.line2)
-        : const SizedBox(height: 6),
+    separatorBuilder: (_, _) =>
+        Divider(height: 1, thickness: 1, color: t.line2),
     itemBuilder: (context, i) => Rise(
       key: ValueKey(files[i].path),
       child: _FileRow(files[i], flashed: sources.flashed == files[i].path),
@@ -193,7 +142,7 @@ Widget _fileSliver(
   );
 }
 
-/// A file in the panel: on a phone 56 px tall, with a larger title, switch, download and trash.
+/// A file in the sheet: 56 px tall, with its switch, download and trash.
 class _FileRow extends StatelessWidget {
   const _FileRow(this.file, {required this.flashed});
 
@@ -204,11 +153,9 @@ class _FileRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
-    final phone = ScreenClass.ofContext(context).isPhone;
     final row = SourceRow(
       file,
       meta: file.meta,
-      large: phone,
       trailing: [
         AppSwitch(
           value: file.on,
@@ -220,73 +167,42 @@ class _FileRow extends StatelessWidget {
         IconBtn(
           'trash',
           tooltip: 'Remove ${file.title}',
-          box: phone ? 44 : 32,
-          size: phone ? IconSize.small : IconSize.xs,
+          box: 44,
+          size: IconSize.small,
           dangerHover: true,
           onPressed: () => scope.sources.remove(file),
         ),
       ],
     );
-    // A citation's flash fills the row and rings it in the accent; the ring is always there,
-    // clear, so the flash moves nothing. On a phone the flash fills it alone, between its
-    // rules.
-    if (phone) {
-      return AnimatedContainer(
-        duration: motion(context, const Duration(milliseconds: 300)),
-        constraints: const BoxConstraints(minHeight: 56),
-        alignment: Alignment.centerLeft,
-        color: flashed ? t.accentbg : Colors.transparent,
-        child: row,
-      );
-    }
+    // A citation's flash fills the row, between its rules.
     return AnimatedContainer(
       duration: motion(context, const Duration(milliseconds: 300)),
-      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
-      decoration: BoxDecoration(
-        color: flashed ? t.accentbg : Colors.transparent,
-        border: Border.all(color: flashed ? t.accent : Colors.transparent),
-        borderRadius: BorderRadius.circular(Sizes.control),
-      ),
+      constraints: const BoxConstraints(minHeight: 56),
+      alignment: Alignment.centerLeft,
+      color: flashed ? t.accentbg : Colors.transparent,
       child: row,
     );
   }
 }
 
-/// A document's row: its [TypeTile], its title with [meta] and anything [below] under it, then
-/// each of [trailing], such as its switch. [roomy] is how the Files pane draws it: a larger
-/// title, wider gaps, and [meta] on up to two lines. [large] is the phone's Documents sheet: a
-/// title at 14.5, with the gaps and [meta] of the panel.
+/// A document's row: its [TypeTile], its title with [meta] under it, then each of [trailing],
+/// such as its switch. [roomy] is how the workspace's Documents page draws it: wider gaps, and
+/// [meta] on up to two lines.
 class SourceRow extends StatelessWidget {
   SourceRow(
     SourceFile file, {
     super.key,
     required this.meta,
     required this.trailing,
-    this.below,
     this.roomy = false,
-    this.large = false,
   }) : tile = TypeTile(file),
        title = file.title;
-
-  /// A row of a file that is not a document, with its own [tile] and [title].
-  const SourceRow.label({
-    super.key,
-    required this.tile,
-    required this.title,
-    required this.meta,
-    required this.trailing,
-    this.below,
-    this.roomy = false,
-    this.large = false,
-  });
 
   final Widget tile;
   final String title;
   final String meta;
   final List<Widget> trailing;
-  final Widget? below;
   final bool roomy;
-  final bool large;
 
   @override
   Widget build(BuildContext context) {
@@ -304,11 +220,7 @@ class SourceRow extends StatelessWidget {
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Type.sans(
-                  large ? 14.5 : (roomy ? 14 : 13.5),
-                  weight: FontWeight.w500,
-                  color: t.ink,
-                ),
+                style: Type.sans(14.5, weight: FontWeight.w500, color: t.ink),
               ),
               if (meta.isNotEmpty)
                 Text(
@@ -317,7 +229,6 @@ class SourceRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: Type.sans(12, color: t.muted),
                 ),
-              ?below,
             ],
           ),
         ),
@@ -337,12 +248,11 @@ class DownloadTextButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
-    final phone = ScreenClass.ofContext(context).isPhone;
     return IconBtn(
       'download',
       tooltip: 'Download text of ${file.title}',
-      box: phone ? 44 : 32,
-      size: phone ? IconSize.small : IconSize.xs,
+      box: 44,
+      size: IconSize.small,
       onPressed: () => saveText(
         context,
         file.title,

@@ -2,20 +2,15 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:anywherellm/core/chat.dart';
-import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/ui/chat/chat_view.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
-import 'package:anywherellm/ui/sidebar.dart';
+import 'package:anywherellm/ui/phone_drawer.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
-import 'package:anywherellm/ui/widgets/confirm_box.dart';
 import 'package:anywherellm/ui/widgets/controls.dart';
-import 'package:anywherellm/ui/widgets/fields.dart';
-import 'package:anywherellm/ui/widgets/qr_mark.dart';
 import 'package:anywherellm/ui/widgets/sheet.dart';
-import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -25,7 +20,7 @@ import '../support/fake_api.dart';
 import '../support/pump.dart';
 
 Finder inSidebar(String text) =>
-    find.descendant(of: find.byType(Sidebar), matching: find.text(text));
+    find.descendant(of: find.byType(PhoneDrawer), matching: find.text(text));
 
 Finder inSources(Finder finder) =>
     find.descendant(of: find.byType(SourcesPanel), matching: finder);
@@ -35,48 +30,42 @@ Finder inChat(Finder finder) =>
 
 Finder get message => find.bySemanticsLabel('Message');
 
-void main() {
-  group('a wide window', () {
-    testWidgets('shows the workspaces, the chat and its Sources side by side', (
-      tester,
-    ) async {
-      await pumpApp(tester, llm: planningServer());
-      expect(inSidebar('Q3 planning'), findsOneWidget);
-      expect(inSidebar('2 docs'), findsOneWidget);
-      expect(inSidebar('Budget questions'), findsOneWidget);
-      expect(inSidebar('Quarter priorities'), findsOneWidget);
-      expect(inSidebar('Connected to h'), findsOneWidget);
-      expect(
-        find.byWidgetPredicate(
-          (w) => w is Tappable && w.tooltip == 'https://h:3001',
-        ),
-        findsOneWidget,
-      );
-      expect(find.text('About 40k.'), findsOneWidget);
-      expect(inSources(find.text('Q3 roadmap.pdf')), findsOneWidget);
-      expect(find.byTooltip('Workspaces'), findsNothing);
-    });
+/// The app with Documents open over the chat.
+Future<Harness> withDocuments(WidgetTester tester, FakeAnythingLlm llm) async {
+  final h = await pumpApp(tester, llm: llm);
+  h.shell.openSources();
+  await tester.pumpAndSettle();
+  return h;
+}
 
+/// The server's address in Settings: the first run's field or the one that edits a saved one.
+Finder get addressField =>
+    find.bySemanticsLabel(RegExp(r'^(AnythingLLM s|S)erver address$')).last;
+
+void main() {
+  group('the chat', () {
     testWidgets('says when the saved server does not answer', (tester) async {
       final llm = planningServer()
         ..errors['workspaces'] = const ApiException(
           'Could not reach the server.',
         );
-      await pumpApp(tester, llm: llm);
-      expect(inSidebar('Connection problem'), findsOneWidget);
-      expect(inSidebar('Connected to h'), findsNothing);
+      final h = await pumpApp(tester, llm: llm);
+      h.shell.openSettings();
+      await tester.pumpAndSettle();
+      expect(find.text('Connection problem'), findsOneWidget);
+      expect(find.text('Connected'), findsNothing);
     });
 
     testWidgets('a workspace with no chats invites a first question', (
       tester,
     ) async {
-      await pumpApp(tester, llm: planningServer());
-      await fromMenu(tester, 'Household');
+      final h = await pumpApp(tester, llm: planningServer());
+      await h.chat.select('household');
+      await tester.pumpAndSettle();
       expect(
         find.text('Ask about Household.', findRichText: true),
         findsOneWidget,
       );
-      expect(find.text('No files yet.'), findsOneWidget);
       await tester.tap(control('What can I do here?'));
       await tester.pump();
       expect(find.text('What can I do here?'), findsWidgets);
@@ -160,49 +149,6 @@ void main() {
       expect(h.files.reading?.title, 'Q3 roadmap.pdf');
     });
 
-    testWidgets('on a desktop a citation opens its passages beside the chat', (
-      tester,
-    ) async {
-      final llm = planningServer()..hold = true;
-      final h = await pumpApp(tester, llm: llm);
-      await typeAndEnter(tester, 'What is the budget?');
-      llm.chat!.add(const TextChunk('About 40k.'));
-      llm.chat!.add(
-        const ChatDone([
-          Citation(
-            'Q3 roadmap.pdf',
-            passages: [
-              Passage('Customer research: about 40k.', score: 0.82),
-              Passage('Cut the study first.', score: 0.47),
-            ],
-          ),
-        ]),
-      );
-      await llm.chat!.close();
-      await tester.pumpAndSettle();
-      expect(h.shell.sourcesOpen, isTrue);
-      await tester.tap(find.byTooltip('Passages read'));
-      await tester.pumpAndSettle();
-      expect(h.shell.passagesOpen, isTrue);
-      expect(find.text('Passages read from this file'), findsOneWidget);
-      expect(find.text('2 passages, closest first'), findsOneWidget);
-      expect(find.text('82% match'), findsOneWidget);
-      expect(find.byType(SheetFrame), findsNothing);
-      // Esc puts Documents back, as it was.
-      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-      await tester.pumpAndSettle();
-      expect(h.shell.passagesOpen, isFalse);
-      expect(h.shell.sourcesOpen, isTrue);
-      // A second tap on the same citation closes the panel again.
-      await tester.tap(find.byTooltip('Passages read'));
-      await tester.pumpAndSettle();
-      expect(h.shell.passagesOpen, isTrue);
-      await tester.tap(find.byTooltip('Passages read'));
-      await tester.pumpAndSettle();
-      expect(h.shell.passagesOpen, isFalse);
-      expect(h.shell.sourcesOpen, isTrue);
-    });
-
     testWidgets('Shift+Enter starts a new line instead of sending', (
       tester,
     ) async {
@@ -243,154 +189,6 @@ void main() {
       expect(h.chat.busy, isFalse);
     });
 
-    testWidgets('+ makes a workspace from the name typed', (tester) async {
-      final llm = planningServer();
-      await pumpApp(tester, llm: llm);
-      await fromMenu(tester, 'New workspace');
-      await typeAndEnter(tester, 'Reading notes');
-      expect(llm.calls, contains('createWorkspace:Reading notes'));
-      expect(inSidebar('Reading notes'), findsOneWidget);
-    });
-
-    testWidgets('a soft keyboard\'s Done makes the workspace too', (
-      tester,
-    ) async {
-      final llm = planningServer();
-      await pumpApp(tester, llm: llm);
-      await fromMenu(tester, 'New workspace');
-      await tester.enterText(typingInto, 'Travel');
-      await tester.testTextInput.receiveAction(TextInputAction.done);
-      await tester.pumpAndSettle();
-      expect(llm.calls, contains('createWorkspace:Travel'));
-    });
-
-    testWidgets('Esc leaves the new workspace name without making one', (
-      tester,
-    ) async {
-      final llm = planningServer();
-      await pumpApp(tester, llm: llm);
-      await fromMenu(tester, 'New workspace');
-      await tester.enterText(typingInto, 'x');
-      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-      await tester.pumpAndSettle();
-      expect(find.bySemanticsLabel('New workspace name'), findsNothing);
-      expect(llm.calls, isNot(contains('createWorkspace:x')));
-    });
-
-    testWidgets('the pencil renames the chat on Enter', (tester) async {
-      final llm = planningServer();
-      await pumpApp(tester, llm: llm);
-      await chatAction(tester, 'Rename chat');
-      await typeAndEnter(tester, 'Money');
-      expect(llm.calls, contains('renameThread:budget:Money'));
-      expect(inSidebar('Money'), findsOneWidget);
-    });
-
-    testWidgets('the trash deletes the chat', (tester) async {
-      final llm = planningServer();
-      final h = await pumpApp(tester, llm: llm);
-      await chatAction(tester, 'Delete chat');
-      expect(inSidebar('Budget questions'), findsNothing);
-      expect(h.chat.activeThread, 'priorities');
-      expect(inSidebar('Deleted Budget questions'), findsOneWidget);
-      expect(llm.calls, isNot(contains('deleteThread:budget')));
-      await tester.pump(const Duration(seconds: 7));
-      expect(llm.calls, contains('deleteThread:budget'));
-      await tester.pumpAndSettle();
-      expect(inSidebar('Deleted Budget questions'), findsNothing);
-    });
-
-    testWidgets('Undo puts a deleted chat back', (tester) async {
-      final llm = planningServer();
-      final h = await pumpApp(tester, llm: llm);
-      await chatAction(tester, 'Delete chat');
-      await tester.tap(control('Undo'));
-      await tester.pumpAndSettle();
-      expect(inSidebar('Budget questions'), findsOneWidget);
-      expect(h.chat.activeThread, 'budget');
-      await tester.pump(const Duration(seconds: 7));
-      expect(llm.calls, isNot(contains('deleteThread:budget')));
-    });
-
-    testWidgets('the pencil renames the workspace on Enter', (tester) async {
-      final llm = planningServer();
-      await pumpApp(tester, llm: llm);
-      await fromMenu(tester, 'Rename workspace');
-      await typeAndEnter(tester, 'Q4 planning');
-      expect(llm.calls, contains('renameWorkspace:q3:Q4 planning'));
-      expect(inSidebar('Q4 planning'), findsOneWidget);
-    });
-
-    testWidgets('the workspace trash asks first, and Cancel keeps it', (
-      tester,
-    ) async {
-      final llm = planningServer();
-      final h = await pumpApp(tester, llm: llm);
-      await fromMenu(tester, 'Delete workspace…');
-      expect(
-        find.text(
-          'Delete Q3 planning and its 2 chats? Its documents stay in the library.',
-        ),
-        findsOneWidget,
-      );
-      await tester.tap(control('Cancel'));
-      await tester.pumpAndSettle();
-      expect(llm.calls, isNot(contains('deleteWorkspace:q3')));
-      await fromMenu(tester, 'Delete workspace…');
-      await tester.tap(control('Delete'));
-      await tester.pumpAndSettle();
-      expect(llm.calls, contains('deleteWorkspace:q3'));
-      expect(inSidebar('Q3 planning'), findsNothing);
-      expect(h.chat.activeSlug, 'household');
-    });
-
-    testWidgets('Esc leaves the workspace delete question', (tester) async {
-      final llm = planningServer();
-      await pumpApp(tester, llm: llm);
-      await fromMenu(tester, 'Delete workspace…');
-      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-      await tester.pumpAndSettle();
-      expect(control('Cancel'), findsNothing);
-      expect(llm.calls, isNot(contains('deleteWorkspace:q3')));
-    });
-
-    testWidgets('the workspace delete question closes when another opens', (
-      tester,
-    ) async {
-      final h = await pumpApp(tester, llm: planningServer());
-      await fromMenu(tester, 'Delete workspace…');
-      await h.chat.select('household');
-      await tester.pumpAndSettle();
-      expect(find.byType(ConfirmBox), findsNothing);
-      await h.chat.select('q3');
-      await tester.pumpAndSettle();
-      expect(find.byType(ConfirmBox), findsNothing);
-    });
-
-    testWidgets(
-      'the workspace delete question closes when it starts answering',
-      (tester) async {
-        final h = await pumpApp(tester, llm: planningServer()..hold = true);
-        await fromMenu(tester, 'Delete workspace…');
-        await h.chat.send('Go');
-        await tester.pump(const Duration(milliseconds: 300));
-        expect(find.byType(ConfirmBox), findsNothing);
-      },
-    );
-
-    testWidgets('a workspace cannot be deleted while it answers', (
-      tester,
-    ) async {
-      final llm = planningServer()..hold = true;
-      await pumpApp(tester, llm: llm);
-      await typeAndEnter(tester, 'Go');
-      await tester.tap(switcher);
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.tap(control('Delete workspace…'));
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(control('Cancel'), findsNothing);
-    });
-
     testWidgets(
       'an empty chat names its workspace and suggests from its documents',
       (tester) async {
@@ -408,7 +206,10 @@ void main() {
         );
         expect(find.text('Ask anything…'), findsOneWidget);
         // A document switched off is not suggested.
+        h.shell.openSources();
+        await tester.pumpAndSettle();
         await tester.tap(find.byType(AppSwitch).first);
+        h.shell.closeSources();
         await tester.pumpAndSettle();
         expect(control('Summarise Customer interviews'), findsOneWidget);
         expect(control('Summarise Q3 roadmap'), findsNothing);
@@ -486,7 +287,7 @@ void main() {
           llm: planningServer(),
           connection: null,
         );
-        h.shell.openSettings();
+        h.shell.openSettings(SettingsPage.connection);
         await tester.pumpAndSettle();
         List<TextField> fields() => tester
             .widgetList<TextField>(
@@ -496,14 +297,14 @@ void main() {
               ),
             )
             .toList();
-        final [_, address, password] = fields();
+        final [address, password] = fields();
         expect(address.keyboardType, TextInputType.url);
         expect(address.autofillHints, [AutofillHints.url]);
         // Without suggestions, Flutter on Android would mark it a visible password.
         expect(address.enableSuggestions, isTrue);
         await tester.tap(control('Paste a key'));
         await tester.pumpAndSettle();
-        final [_, _, key] = fields();
+        final [_, key] = fields();
         for (final secret in [password, key]) {
           expect(secret.enableSuggestions, isFalse);
           expect(secret.keyboardType, TextInputType.visiblePassword);
@@ -529,53 +330,41 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Running web-browsing'), findsNothing);
         expect(h.chat.turns.last.text, 'Headline');
-        // Three by name in one line, the rest behind +6, which lists them all beside the chat.
+        // Three by name in one line, the rest behind +6, which lists them all in a sheet.
         expect(control('Source 3: Story 3'), findsOneWidget);
         expect(control('Source 4: Story 4'), findsNothing);
         await tester.tap(control('6 more sources'));
         await tester.pumpAndSettle();
         expect(h.shell.citedOpen, isTrue);
-        expect(find.text('Sources for this answer'), findsOneWidget);
+        expect(find.text('Sources'), findsOneWidget);
         expect(find.text('9 sources'), findsOneWidget);
         expect(control('Story 9'), findsOneWidget);
-        await tester.tap(control('6 more sources'));
+        await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(h.shell.citedOpen, isFalse);
       },
     );
 
-    testWidgets('the panel beside the chat is named Documents', (tester) async {
-      await pumpApp(tester, llm: planningServer());
+    testWidgets('the sheet over the chat is named Documents', (tester) async {
+      await withDocuments(tester, planningServer());
       expect(inSources(find.text('Documents')), findsOneWidget);
       expect(
         inSources(find.text('Answers draw on the ones switched on.')),
         findsOneWidget,
       );
       expect(inSources(find.text('Sources')), findsNothing);
-      expect(
-        find.descendant(
-          of: control('Documents, 2 on'),
-          matching: find.text('2 on'),
-        ),
-        findsOneWidget,
-      );
+      expect(find.text('Q3 planning · 2 docs in use'), findsOneWidget);
     });
 
     testWidgets('a file switched off fades only its type and is counted out', (
       tester,
     ) async {
       final llm = planningServer();
-      final h = await pumpApp(tester, llm: llm);
+      final h = await withDocuments(tester, llm);
       await tester.tap(find.byType(AppSwitch).first);
       await tester.pumpAndSettle();
       expect(h.sources.onCount, 1);
-      expect(
-        find.descendant(
-          of: control('Documents, 1 on'),
-          matching: find.text('1 on'),
-        ),
-        findsOneWidget,
-      );
+      expect(find.text('Q3 planning · 1 doc in use'), findsOneWidget);
       expect(inSources(find.text('Not used · 120 words')), findsOneWidget);
       double opacityOf(Finder finder) => tester
           .widgetList<Opacity>(
@@ -588,7 +377,7 @@ void main() {
 
     testWidgets('removing a file can be undone from the toast', (tester) async {
       final llm = planningServer();
-      final h = await pumpApp(tester, llm: llm);
+      final h = await withDocuments(tester, llm);
       await tester.tap(control('Remove Q3 roadmap.pdf'));
       await tester.pumpAndSettle();
       expect(find.text('Removed Q3 roadmap.pdf'), findsOneWidget);
@@ -601,7 +390,7 @@ void main() {
     testWidgets('a file\'s download saves the text the server read', (
       tester,
     ) async {
-      final h = await pumpApp(tester, llm: planningServer());
+      final h = await withDocuments(tester, planningServer());
       await tester.tap(control('Download text of Q3 roadmap.pdf'));
       await tester.pumpAndSettle();
       expect(
@@ -613,7 +402,7 @@ void main() {
     testWidgets('a file whose text cannot be read says why', (tester) async {
       final llm = planningServer()
         ..errors['document'] = const ApiException('The server is down.');
-      final h = await pumpApp(tester, llm: llm);
+      final h = await withDocuments(tester, llm);
       await tester.tap(control('Download text of Q3 roadmap.pdf'));
       await tester.pumpAndSettle();
       expect(h.saved, isEmpty);
@@ -623,16 +412,6 @@ void main() {
       );
       expect(inSources(find.text('The server is down.')), findsOneWidget);
     });
-
-    testWidgets('Sources closes and opens from the header', (tester) async {
-      final h = await pumpApp(tester, llm: planningServer());
-      await tester.tap(control('Close'));
-      await tester.pumpAndSettle();
-      expect(h.shell.sourcesOpen, isFalse);
-      await tester.tap(control('Documents, 2 on'));
-      await tester.pumpAndSettle();
-      expect(h.shell.sourcesOpen, isTrue);
-    });
   });
 
   group('Settings', () {
@@ -641,11 +420,11 @@ void main() {
     ) async {
       final h = await pumpApp(tester, connection: null);
       expect(find.text('Welcome to AnywhereLLM'), findsOneWidget);
-      expect(inSidebar('Not connected'), findsOneWidget);
-      await tester.tap(control('Open Settings'));
+      await tapVisible(tester, control('Open Settings'));
       await tester.pumpAndSettle();
       expect(h.shell.settingsOpen, isTrue);
-      expect(find.text('Missing'), findsOneWidget);
+      expect(h.shell.settingsPage, SettingsPage.connection);
+      expect(control('Sign in'), findsOneWidget);
     });
 
     testWidgets('a key the server takes is saved and the workspaces load', (
@@ -653,15 +432,16 @@ void main() {
     ) async {
       final llm = planningServer();
       final h = await pumpApp(tester, llm: llm, connection: null);
-      h.shell.openSettings();
+      h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
-      await tester.tap(control('Paste a key'));
+      await tester.enterText(addressField, 'https://h:3001');
+      await tapVisible(tester, control('Paste a key'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.bySemanticsLabel('AnythingLLM developer API key').last,
         'K9',
       );
-      await tester.tap(control('Save key'));
+      await tapVisible(tester, control('Save key'));
       await tester.pumpAndSettle();
       expect(h.store.saved?.apiKey, 'K9');
       expect(find.text('The key was saved.'), findsOneWidget);
@@ -675,17 +455,11 @@ void main() {
       String password,
     ) async {
       final h = await pumpApp(tester, llm: llm, connection: null);
-      h.shell.openSettings();
+      h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
-      await tester.enterText(
-        find.bySemanticsLabel('AnythingLLM server address').last,
-        'https://owen.example.ts.net:3001',
-      );
-      await tester.enterText(
-        find.bySemanticsLabel('Server password').last,
-        password,
-      );
-      await tester.tap(control('Sign in'));
+      await tester.enterText(addressField, 'https://owen.example.ts.net:3001');
+      await tester.enterText(find.bySemanticsLabel('Password').last, password);
+      await tapVisible(tester, control('Sign in'));
       await tester.pumpAndSettle();
       return h;
     }
@@ -733,7 +507,7 @@ void main() {
       );
       expect(control('Save key'), findsOneWidget);
       // A mistyped address can be put right: the password form comes back.
-      await tester.tap(control('Use password'));
+      await tapVisible(tester, control('Use password'));
       await tester.pumpAndSettle();
       expect(control('Sign in'), findsOneWidget);
       expect(control('Save key'), findsNothing);
@@ -741,15 +515,16 @@ void main() {
 
     Future<Harness> connected(WidgetTester tester, FakeAnythingLlm llm) async {
       final h = await pumpApp(tester, llm: llm, connection: null);
-      h.shell.openSettings();
+      h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
-      await tester.tap(control('Paste a key'));
+      await tester.enterText(addressField, 'https://h:3001');
+      await tapVisible(tester, control('Paste a key'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.bySemanticsLabel('AnythingLLM developer API key').last,
         'K9',
       );
-      await tester.tap(control('Save key'));
+      await tapVisible(tester, control('Save key'));
       await tester.pumpAndSettle();
       return h;
     }
@@ -766,7 +541,7 @@ void main() {
           find.bySemanticsLabel('Server password').last,
           'WRONG',
         );
-        await tester.tap(control('Save password'));
+        await tapVisible(tester, control('Save password'));
         await tester.pumpAndSettle();
         expect(
           find.text('The server did not accept the password.'),
@@ -777,12 +552,12 @@ void main() {
           find.bySemanticsLabel('Server password').last,
           'PASS-WORD',
         );
-        await tester.tap(control('Save password'));
+        await tapVisible(tester, control('Save password'));
         await tester.pumpAndSettle();
         expect(h.store.saved?.password, 'PASS-WORD');
         expect(find.text('The password was saved.'), findsOneWidget);
         expect(control('Save password'), findsNothing);
-        await tester.tap(control('Forget password'));
+        await tapVisible(tester, control('Forget password'));
         await tester.pumpAndSettle();
         expect(h.store.saved?.password, isNull);
         expect(h.store.saved?.apiKey, 'K9');
@@ -814,34 +589,36 @@ void main() {
       final llm = planningServer()
         ..verifyError = const ApiException('The server rejected the key.');
       final h = await pumpApp(tester, llm: llm, connection: null);
-      h.shell.openSettings();
+      h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
-      await tester.tap(control('Paste a key'));
+      await tester.enterText(addressField, 'https://h:3001');
+      await tapVisible(tester, control('Paste a key'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.bySemanticsLabel('AnythingLLM developer API key').last,
         'WRONG',
       );
-      await tester.tap(control('Save key'));
+      await tapVisible(tester, control('Save key'));
       await tester.pumpAndSettle();
       expect(h.store.saved, isNull);
       expect(find.text('The server rejected the key.'), findsOneWidget);
-      expect(find.text('Missing'), findsOneWidget);
+      expect(control('Save key'), findsOneWidget);
     });
 
     testWidgets('a replaced key closes the form once saved', (tester) async {
       final h = await pumpApp(tester, llm: planningServer());
-      h.shell.openSettings();
+      h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
-      await tester.tap(control('Edit connection'));
+      await tapVisible(tester, control('Edit connection'));
       await tester.pumpAndSettle();
-      await tester.tap(control('Paste a key'));
+      await tester.enterText(addressField, 'https://h:3001');
+      await tapVisible(tester, control('Paste a key'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.bySemanticsLabel('AnythingLLM developer API key').last,
         'K9',
       );
-      await tester.tap(control('Save key'));
+      await tapVisible(tester, control('Save key'));
       await tester.pumpAndSettle();
       expect(h.store.saved?.apiKey, 'K9');
       expect(control('Save key'), findsNothing);
@@ -850,12 +627,12 @@ void main() {
 
     testWidgets('Forget asks once more, then deletes the key', (tester) async {
       final h = await pumpApp(tester, llm: planningServer());
-      h.shell.openSettings();
+      h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
-      await tester.tap(control('Forget this server'));
+      await tapVisible(tester, control('Forget this server'));
       await tester.pumpAndSettle();
       expect(control('Really forget it?'), findsOneWidget);
-      await tester.tap(control('Really forget it?'));
+      await tapVisible(tester, control('Really forget it?'));
       await tester.pumpAndSettle();
       expect(h.settings.configured, isFalse);
       expect(find.text('The saved key was deleted.'), findsOneWidget);
@@ -865,9 +642,9 @@ void main() {
       tester,
     ) async {
       final h = await pumpApp(tester, llm: planningServer());
-      h.shell.openSettings();
+      h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
-      await tester.tap(control('Edit connection'));
+      await tapVisible(tester, control('Edit connection'));
       await tester.pumpAndSettle();
       await tester.tap(
         find
@@ -888,67 +665,25 @@ void main() {
       );
       tester.view.resetViewInsets();
       await tester.pumpAndSettle();
+      // Back goes from the page to the list, then closes Settings.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(h.shell.settingsPage, isNull);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(h.shell.settingsOpen, isFalse);
     });
 
-    testWidgets('the QR code shows the connection only when asked', (
-      tester,
-    ) async {
-      final h = await pumpApp(tester, llm: planningServer());
-      h.shell.openSettings();
-      await tester.pumpAndSettle();
-      expect(find.byType(QrMark), findsNothing);
-      await tester.tap(control('Connect a phone'));
-      await tester.pumpAndSettle();
-      final mark = tester.widget<QrMark>(find.byType(QrMark));
-      expect(mark.data, pairingCode(sampleConnection));
-      expect(find.text('Your phone cannot use this address'), findsNothing);
-      await tester.tap(control('Hide the code'));
-      await tester.pumpAndSettle();
-      expect(find.byType(QrMark), findsNothing);
-    });
-
-    testWidgets('the QR code warns when the phone cannot use the address', (
-      tester,
-    ) async {
-      final h = await pumpApp(
-        tester,
-        llm: planningServer(),
-        connection: const Connection(
-          baseUrl: 'http://localhost:3001',
-          apiKey: 'K1',
-        ),
-      );
-      h.shell.openSettings();
-      await tester.pumpAndSettle();
-      await tester.tap(control('Connect a phone'));
-      await tester.pumpAndSettle();
-      expect(find.text('Your phone cannot use this address'), findsOneWidget);
-      expect(find.textContaining('is the phone itself'), findsOneWidget);
-    });
-
     testWidgets('a scanned code connects as a typed key does', (tester) async {
       final llm = planningServer();
       final h = await pumpApp(tester, llm: llm, connection: null, canScan: true)
-        ..scanCode = pairingCode(
-          const Connection(
-            baseUrl: 'https://owen.example.ts.net',
-            apiKey: 'K9',
-          ),
-        );
-      h.shell.openSettings();
+        ..scanCode =
+            'anywherellm://connect?url=https%3A%2F%2Fowen.example.ts.net&key=K9';
+      h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
-      await tester.tap(control('Scan QR code'));
+      await tapVisible(tester, control('Scan QR code'));
       await tester.pumpAndSettle();
-      expect(
-        find.descendant(
-          of: find.byType(SettingsDialog),
-          matching: find.byType(AppField),
-        ),
-        findsNothing,
-      );
+      expect(h.shell.scanning, isTrue);
       await tester.tap(find.text('Fake scan'));
       await tester.pumpAndSettle();
       expect(find.text('Fake scan'), findsNothing);
@@ -966,15 +701,11 @@ void main() {
           'The server did not accept the key.',
         );
       final h = await pumpApp(tester, llm: llm, connection: null, canScan: true)
-        ..scanCode = pairingCode(
-          const Connection(
-            baseUrl: 'https://owen.example.ts.net',
-            apiKey: 'K9',
-          ),
-        );
-      h.shell.openSettings();
+        ..scanCode =
+            'anywherellm://connect?url=https%3A%2F%2Fowen.example.ts.net&key=K9';
+      h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
-      await tester.tap(control('Scan QR code'));
+      await tapVisible(tester, control('Scan QR code'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Fake scan'));
       await tester.pumpAndSettle();
@@ -995,9 +726,9 @@ void main() {
               canScan: true,
             )
             ..scanCode = 'https://example.com';
-      h.shell.openSettings();
+      h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
-      await tester.tap(control('Scan QR code'));
+      await tapVisible(tester, control('Scan QR code'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Fake scan'));
       await tester.pumpAndSettle();
@@ -1016,11 +747,11 @@ void main() {
         connection: null,
         canScan: true,
       );
-      h.shell.openSettings();
+      h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
-      await tester.tap(control('Scan QR code'));
+      await tapVisible(tester, control('Scan QR code'));
       await tester.pumpAndSettle();
-      await tester.tap(control('Cancel'));
+      await tapVisible(tester, control('Cancel'));
       await tester.pumpAndSettle();
       expect(find.text('Fake scan'), findsNothing);
       expect(control('Sign in'), findsOneWidget);
@@ -1028,22 +759,25 @@ void main() {
 
     testWidgets('without a camera there is no Scan button', (tester) async {
       final h = await pumpApp(tester, llm: planningServer(), connection: null);
-      h.shell.openSettings();
+      h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
       expect(control('Sign in'), findsOneWidget);
       expect(control('Scan QR code'), findsNothing);
     });
 
-    testWidgets('Esc and Done close it', (tester) async {
+    testWidgets('Esc and the back arrow step out of it', (tester) async {
       final h = await pumpApp(tester, llm: planningServer());
-      h.shell.openSettings();
+      h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(h.shell.settingsPage, isNull);
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
       expect(find.byType(SettingsDialog), findsNothing);
       h.shell.openSettings();
       await tester.pumpAndSettle();
-      await tester.tap(control('Done'));
+      await tapVisible(tester, control('Back to the chat'));
       await tester.pumpAndSettle();
       expect(h.shell.settingsOpen, isFalse);
     });
@@ -1088,27 +822,6 @@ void main() {
       expect(h.chat.refreshing, isFalse);
     });
 
-    testWidgets('below 1120, Sources is a drawer over the chat', (
-      tester,
-    ) async {
-      final h = await pumpApp(
-        tester,
-        llm: planningServer(),
-        size: const Size(1000, 800),
-        sourcesOpen: false,
-      );
-      expect(
-        tester.getTopLeft(find.byType(SourcesPanel)).dx,
-        greaterThanOrEqualTo(1000),
-      );
-      await tester.tap(control('Documents, 2 on'));
-      await tester.pumpAndSettle();
-      expect(tester.getTopRight(find.byType(SourcesPanel)).dx, 1000);
-      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-      await tester.pumpAndSettle();
-      expect(h.shell.sourcesOpen, isFalse);
-    });
-
     testWidgets('on a phone, Documents is a sheet over the chat', (
       tester,
     ) async {
@@ -1116,7 +829,6 @@ void main() {
         tester,
         llm: planningServer(),
         size: const Size(390, 844),
-        sourcesOpen: false,
       );
       expect(find.byType(SourcesPanel), findsNothing);
       h.shell.openSources();
@@ -1149,42 +861,6 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(h.shell.sourcesOpen, isFalse);
-    });
-
-    testWidgets('Sources open in the layout does not become an open drawer', (
-      tester,
-    ) async {
-      final h = await pumpApp(tester, llm: planningServer());
-      expect(h.shell.sourcesOpen, isTrue);
-      tester.view.physicalSize = const Size(1000, 800);
-      await tester.pumpAndSettle();
-      expect(h.shell.sourcesOpen, isFalse);
-      expect(
-        tester.getTopLeft(find.byType(SourcesPanel)).dx,
-        greaterThanOrEqualTo(1000),
-      );
-      tester.view.physicalSize = const Size(1280, 800);
-      await tester.pumpAndSettle();
-      expect(h.shell.sourcesOpen, isTrue);
-    });
-
-    testWidgets('below 820, the sidebar is a drawer behind the menu button', (
-      tester,
-    ) async {
-      final h = await pumpApp(
-        tester,
-        llm: planningServer(),
-        size: const Size(780, 800),
-        sourcesOpen: false,
-      );
-      expect(tester.getTopLeft(find.byType(Sidebar)).dx, lessThan(0));
-      await tester.tap(find.byTooltip('Workspaces'));
-      await tester.pumpAndSettle();
-      expect(tester.getTopLeft(find.byType(Sidebar)).dx, 0);
-      await tester.tap(inSidebar('Quarter priorities'));
-      await tester.pumpAndSettle();
-      expect(h.chat.activeThread, 'priorities');
-      expect(h.shell.sideOpen, isFalse);
     });
   });
 }

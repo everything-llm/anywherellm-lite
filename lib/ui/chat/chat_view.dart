@@ -4,14 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
 import '../icons.dart';
-import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/headline.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
-import '../widgets/controls.dart';
-import '../widgets/pane_header.dart';
 import '../widgets/tappable.dart';
 import '../state/shell_controller.dart';
 import 'composer.dart';
@@ -19,10 +16,7 @@ import 'message_list.dart';
 
 /// The chat on screen: its header, its turns and the composer.
 class ChatView extends StatefulWidget {
-  const ChatView({super.key, required this.showMenu});
-
-  /// Whether the header has a button to open the sidebar drawer.
-  final bool showMenu;
+  const ChatView({super.key});
 
   @override
   State<ChatView> createState() => _ChatViewState();
@@ -50,7 +44,7 @@ class _ChatViewState extends State<ChatView> {
     final top = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _Header(showMenu: widget.showMenu),
+        const _Header(),
         ListenableBuilder(
           listenable: Listenable.merge([scope.chat, scope.prefs]),
           builder: (context, _) {
@@ -146,7 +140,7 @@ class _Body extends StatelessWidget {
             ? ('Loading…', '')
             : (
                 'No workspaces yet',
-                'Make one with New workspace, in the workspace menu at the top of the sidebar.',
+                'Make one with New workspace, in the workspace menu at the top of the drawer.',
               );
         return Center(
           child: SingleChildScrollView(
@@ -172,128 +166,10 @@ class _Body extends StatelessWidget {
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header({required this.showMenu});
-
-  final bool showMenu;
-
-  @override
-  Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    final t = Tokens.of(context);
-    if (ScreenClass.ofContext(context).isPhone) return const _PhoneHeader();
-    return ListenableBuilder(
-      listenable: Listenable.merge([scope.chat, scope.sources, scope.shell]),
-      builder: (context, _) {
-        final chat = scope.chat;
-        final workspace = chat.active;
-        final title = PaneHeader.chatTitleStyle(context);
-        // A phone names the workspace small over the chat, and refreshes with a pull down on
-        // the chat rather than a button.
-        final phone = ScreenClass.ofContext(context).isPhone;
-        return PaneHeader(
-          showMenu: showMenu,
-          onMenu: scope.shell.toggleSide,
-          title: workspace == null
-              ? Text(
-                  'AnywhereLLM',
-                  style: title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                )
-              : phone
-              ? Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      workspace.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Type.sans(12, color: t.muted, height: 1.3),
-                    ),
-                    Text(
-                      chat.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: title.copyWith(fontSize: 16),
-                    ),
-                  ],
-                )
-              : Text.rich(
-                  TextSpan(
-                    style: title,
-                    children: [
-                      TextSpan(
-                        text: workspace.name,
-                        style: title.copyWith(
-                          color: t.muted,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                      TextSpan(
-                        text: ' / ',
-                        style: title.copyWith(
-                          color: t.fade,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                      TextSpan(text: chat.title),
-                    ],
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-          actions: workspace == null
-              ? null
-              : (compact) => [
-                  // A phone's buttons sit side by side, as the design canvas draws them.
-                  SizedBox(width: phone ? 4 : 12),
-                  if (!phone)
-                    _HeaderButton(
-                      label: 'Refresh',
-                      heard: 'Read this chat again from the server',
-                      icon: 'refresh',
-                      compact: true,
-                      onTap: chat.refreshing ? null : chat.refresh,
-                    ),
-                  // New chat sits at the top of the sidebar while it is in the layout.
-                  if (showMenu) ...[
-                    if (!phone) const SizedBox(width: 8),
-                    _HeaderButton(
-                      label: 'New chat',
-                      icon: 'plus',
-                      compact: compact,
-                      onTap: chat.newChat,
-                    ),
-                  ],
-                  SizedBox(width: phone ? 2 : 8),
-                  _HeaderButton(
-                    label: 'Documents',
-                    heard: 'Documents, ${scope.sources.onCount} on',
-                    icon: 'doc',
-                    compact: compact,
-                    pressed: scope.shell.sourcesOpen,
-                    onTap: scope.shell.toggleSources,
-                    trailing: AppBadge(
-                      compact
-                          ? '${scope.sources.onCount}'
-                          : '${scope.sources.onCount} on',
-                      kind: BadgeKind.accent,
-                      pill: true,
-                    ),
-                  ),
-                ],
-        );
-      },
-    );
-  }
-}
-
-/// A phone's header: the menu, the workspace and its documents over the chat's name, which
+/// The chat's header: the menu, the workspace and its documents over the chat's name, which
 /// opens the chat's sheet, or on a new chat the workspace's settings, then New chat.
-class _PhoneHeader extends StatelessWidget {
-  const _PhoneHeader();
+class _Header extends StatelessWidget {
+  const _Header();
 
   @override
   Widget build(BuildContext context) {
@@ -398,70 +274,6 @@ class _PhoneHeader extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _HeaderButton extends StatelessWidget {
-  const _HeaderButton({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-    this.pressed,
-    this.trailing,
-    this.compact = false,
-    this.heard,
-  });
-
-  final String label;
-
-  /// What a screen reader hears in place of [label], when it says more.
-  final String? heard;
-  final String icon;
-
-  /// Null while the button can do nothing.
-  final VoidCallback? onTap;
-  final bool? pressed;
-  final Widget? trailing;
-
-  /// Only the icon and [trailing] show, for a phone's narrow header. [label] is still heard.
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    // On a phone an icon alone sits in a 36 px square, and one with a count is padded 6, as
-    // the design canvas draws them.
-    final tight = compact && ScreenClass.ofContext(context).isPhone;
-    final gap = tight ? 6.0 : 7.0;
-    return Tappable(
-      touchTarget: true,
-      label: heard ?? label,
-      tooltip: compact ? label : null,
-      toggled: pressed,
-      onTap: onTap,
-      radius: BorderRadius.circular(Sizes.row),
-      color: pressed == true ? t.hover : null,
-      child: Container(
-        height: 36,
-        constraints: BoxConstraints(minWidth: tight ? 36 : 0),
-        alignment: Alignment.center,
-        padding: EdgeInsets.symmetric(horizontal: tight ? 6 : 12),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AppIcon(icon, size: IconSize.xs, color: compact ? t.ink2 : t.ink),
-            if (!compact) ...[
-              SizedBox(width: gap),
-              Text(
-                label,
-                style: Type.sans(14, weight: FontWeight.w500, color: t.ink),
-              ),
-            ],
-            if (trailing != null) ...[SizedBox(width: gap), trailing!],
-          ],
-        ),
-      ),
     );
   }
 }

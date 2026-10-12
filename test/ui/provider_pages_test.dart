@@ -45,7 +45,7 @@ Future<Harness> openPage(
   FakeAnythingLlm llm,
   SettingsPage page,
 ) async {
-  final h = await pumpApp(tester, llm: llm, size: const Size(1400, 2400));
+  final h = await pumpApp(tester, llm: llm, size: const Size(390, 2400));
   h.shell.openSettings(page);
   await tester.pumpAndSettle();
   return h;

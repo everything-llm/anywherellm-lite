@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/prefs.dart';
 import '../app_scope.dart';
-import '../layout.dart';
 import '../widgets/controls.dart';
 import '../widgets/fields.dart';
 import '../widgets/segmented.dart';
@@ -15,7 +14,6 @@ class AppearancePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final prefs = AppScope.of(context).prefs;
-    final phone = ScreenClass.ofContext(context).isPhone;
     return ListenableBuilder(
       listenable: prefs,
       builder: (context, _) {
@@ -39,25 +37,14 @@ class AppearancePage extends StatelessWidget {
         );
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: phone ? 20 : 12,
+          spacing: 20,
           children: [
-            // A phone puts each name over its choices in a card of its own, as the design
-            // canvas draws it.
-            if (phone) ...[
-              PanelCard(children: [NamedControl('Theme', theme, size: 17)]),
-              PanelCard(
-                children: [NamedControl('Chat text size', size, size: 17)],
-              ),
-            ] else
-              FieldCard([
-                FieldRow(label: 'Theme', control: theme),
-                FieldRow(
-                  label: 'Chat text size',
-                  help:
-                      'Scales the chat\'s turns, not the controls around them.',
-                  control: size,
-                ),
-              ]),
+            // Each name sits over its choices in a card of its own, as the design canvas
+            // draws it.
+            PanelCard(children: [NamedControl('Theme', theme, size: 17)]),
+            PanelCard(
+              children: [NamedControl('Chat text size', size, size: 17)],
+            ),
             if (prefs.problem case final problem?)
               HelpText('${problem.title}. ${problem.text}', status: true),
           ],
@@ -77,29 +64,13 @@ class ChatPage extends StatelessWidget {
     final prefs = scope.prefs;
     final rows = [
       if (scope.dictation != null)
-        (
-          ChatSwitch.sendDictation,
-          'Send dictation when I stop talking',
-          'Otherwise the words wait in the message box.',
-        ),
+        (ChatSwitch.sendDictation, 'Send dictation when I stop talking'),
       if (scope.readAloud != null)
-        (
-          ChatSwitch.readAnswers,
-          'Read answers aloud',
-          'Each finished answer is read as soon as it arrives.',
-        ),
+        (ChatSwitch.readAnswers, 'Read answers aloud'),
       if (scope.canSpellcheck)
-        (ChatSwitch.spellcheck, 'Spellcheck the message', ''),
-      (
-        ChatSwitch.followAnswer,
-        'Follow a streaming answer',
-        'Keeps the newest text in view unless you have scrolled up.',
-      ),
-      (
-        ChatSwitch.answerDetails,
-        'Show answer details',
-        'The model, time, tokens, speed and cost under every answer.',
-      ),
+        (ChatSwitch.spellcheck, 'Spellcheck the message'),
+      (ChatSwitch.followAnswer, 'Follow a streaming answer'),
+      (ChatSwitch.answerDetails, 'Show answer details'),
     ];
     return ListenableBuilder(
       listenable: prefs,
@@ -108,15 +79,13 @@ class ChatPage extends StatelessWidget {
         spacing: 12,
         children: [
           FieldCard([
-            // A phone names each switch alone, as the design canvas draws them.
-            for (final (which, label, help) in rows)
+            // Each switch is named alone, as the design canvas draws them.
+            for (final (which, label) in rows)
               FieldRow(
                 label: label,
-                help: ScreenClass.ofContext(context).isPhone ? '' : help,
                 small: true,
                 control: AppSwitch(
                   value: prefs.prefs.isOn(which),
-                  large: true,
                   label: label,
                   onChanged: (on) => prefs.setSwitch(which, on),
                 ),

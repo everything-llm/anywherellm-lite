@@ -89,17 +89,10 @@ String normalizeBaseUrl(String raw) {
       .toString();
 }
 
-/// The text a QR code carries to hand [connection] to another device:
-/// `anywherellm://connect?url=...&key=...`, with both values percent-encoded. The password
-/// stays behind: each device signs in for itself.
-String pairingCode(Connection connection) => Uri(
-  scheme: 'anywherellm',
-  host: 'connect',
-  queryParameters: {'url': connection.baseUrl, 'key': connection.apiKey},
-).toString();
-
-/// The connection a [pairingCode] carries, checked as [Connection.parse] checks a typed one.
-/// Throws [ApiException] when [raw] is not a pairing code or what it carries cannot be used.
+/// The connection an AnywhereLLM pairing code carries, checked as [Connection.parse] checks a
+/// typed one. The code is `anywherellm://connect?url=...&key=...`, with both values
+/// percent-encoded, and no password: each device signs in for itself. Throws [ApiException]
+/// when [raw] is not a pairing code or what it carries cannot be used.
 Connection parsePairingCode(String raw) {
   const notOurs = ApiException(
     'This QR code is not an AnywhereLLM connection.',
@@ -121,16 +114,3 @@ bool isLoopback(String host) =>
     host.startsWith('127.') ||
     host == '::1' ||
     host == '0.0.0.0';
-
-/// Why a phone cannot use [connection]'s [pairingCode], or null when it can.
-String? pairingProblem(Connection connection) {
-  final host = connection.host;
-  if (isLoopback(host)) {
-    return 'On the phone, $host is the phone itself. Use an address the phone can reach, '
-        "such as the server's Tailscale name.";
-  }
-  if (connection.uri.scheme == 'http') {
-    return 'AnywhereLLM on Android connects only over https.';
-  }
-  return null;
-}

@@ -318,7 +318,6 @@ class _EmbedRowState extends State<_EmbedRow> {
     final chats = plural(embed.chats, 'chat', 'chats');
     final on = AppSwitch(
       value: embed.enabled,
-      large: true,
       label: 'Embed for ${embed.workspace} on',
       onChanged: changing ? null : (on) => system.setEnabled(embed.uuid, on),
     );

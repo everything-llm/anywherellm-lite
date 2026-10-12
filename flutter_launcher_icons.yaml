@@ -1,4 +1,4 @@
-# The app's launcher icon and the web app's icons, made from assets/icon by `dart run flutter_launcher_icons`.
+# The app's launcher icon, made from assets/icon by `dart run flutter_launcher_icons`.
 flutter_launcher_icons:
   android: true
   ios: false
@@ -8,8 +8,3 @@ flutter_launcher_icons:
   # The foreground is drawn to the safe zone already, so the plugin adds no inset of its own.
   adaptive_icon_foreground_inset: 0
   min_sdk_android: 24
-  web:
-    generate: true
-    image_path: assets/icon/icon.png
-    background_color: "#181922"
-    theme_color: "#181922"

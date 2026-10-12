@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../core/copy.dart';
-import '../../core/files.dart';
 import '../../core/sources.dart';
 import '../app_scope.dart';
 import '../layout.dart';
@@ -17,88 +16,6 @@ import '../sources/add_source.dart';
 import '../sources/sources_panel.dart';
 import '../sources/test_question.dart';
 import '../settings/rows.dart';
-import 'doc_views.dart';
-
-/// The Essentials view's sections in the sidebar, each with a hint such as how many documents
-/// are switched on.
-class EssentialsList extends StatelessWidget {
-  const EssentialsList({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    final files = scope.files;
-    final sources = scope.sources;
-    return ListenableBuilder(
-      listenable: Listenable.merge([files, sources]),
-      builder: (context, _) => ListView(
-        children: [
-          for (final section in FilesSection.values)
-            _SectionRow(
-              section,
-              hint: section == FilesSection.documents && sources.read != null
-                  ? '${sources.onCount} on'
-                  : '',
-              selected: files.section == section,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionRow extends StatelessWidget {
-  const _SectionRow(this.section, {required this.hint, required this.selected});
-
-  final FilesSection section;
-  final String hint;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    final t = Tokens.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
-      child: Tappable(
-        label: hint.isEmpty ? section.title : '${section.title}, $hint',
-        selected: selected,
-        onTap: () {
-          scope.files.openSection(section);
-          scope.shell.closeSide();
-        },
-        radius: BorderRadius.circular(Sizes.row),
-        color: selected ? t.sel : null,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 40),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    section.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Type.sans(
-                      14,
-                      weight: selected ? FontWeight.w600 : FontWeight.w400,
-                      color: t.ink,
-                    ),
-                  ),
-                ),
-                if (hint.isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  Text(hint, style: Type.sans(12, color: t.muted)),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 /// A page of the Essentials view: its paragraphs at most 640 px wide, scrolling.
 class EssentialsPage extends StatelessWidget {
@@ -156,8 +73,7 @@ class EssentialDocs extends StatelessWidget {
                     : TextAction.plain(
                         'Test a question',
                         test,
-                        // As tall as the buttons, so it sits level with their first row; a
-                        // phone's are 44, which a TextAction is there at least.
+                        // A TextAction is at least 44 tall, as the buttons' row is.
                         height: 40,
                       ),
               ),
@@ -198,112 +114,44 @@ class EssentialDocs extends StatelessWidget {
   }
 }
 
-/// One document: its type, name and size, whether it is pinned, its switch, View extracted
-/// text, which moves under the name when the row is narrow, and Download text.
+/// One document: its type, name, size and switch; tapped, it opens the text the server read.
 class _DocRow extends StatelessWidget {
   const _DocRow(this.doc, {super.key});
 
   final SourceFile doc;
 
-  /// The narrowest row with View extracted text beside the switch.
-  static const _wide = 480.0;
-
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
-    // A phone's row is the document's name, its size and its switch; tapped, it opens the text.
-    if (ScreenClass.ofContext(context).isPhone) {
-      return Tappable(
-        label: 'View extracted text of ${doc.title}',
-        onTap: () => scope.files.viewText(doc.path, doc.title),
-        excludeSemantics: false,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 64),
-          padding: const EdgeInsets.only(left: FieldCard.inset, right: 8),
-          child: SourceRow(
-            doc,
-            meta: doc.filesMeta,
-            roomy: true,
-            large: true,
-            trailing: [
-              AppSwitch(
-                value: doc.on,
-                label: 'Use ${doc.title} in answers',
-                large: true,
-                onChanged: (_) => scope.sources.toggle(doc),
-              ),
-            ],
-          ),
+    return Tappable(
+      label: 'View extracted text of ${doc.title}',
+      onTap: () => scope.files.viewText(doc.path, doc.title),
+      excludeSemantics: false,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 64),
+        padding: const EdgeInsets.only(left: FieldCard.inset, right: 8),
+        child: SourceRow(
+          doc,
+          meta: doc.filesMeta,
+          roomy: true,
+          trailing: [
+            AppSwitch(
+              value: doc.on,
+              label: 'Use ${doc.title} in answers',
+              onChanged: (_) => scope.sources.toggle(doc),
+            ),
+          ],
         ),
-      );
-    }
-    final view = TextAction.plain(
-      'View extracted text',
-      () => scope.files.viewText(doc.path, doc.title),
-      semanticLabel: 'View extracted text of ${doc.title}',
-      height: 32,
-    );
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: LayoutBuilder(
-        builder: (context, box) {
-          final wide = box.maxWidth >= _wide;
-          return SourceRow(
-            doc,
-            meta: doc.filesMeta,
-            roomy: true,
-            // Under the name, its words line up with the name's.
-            below: wide
-                ? null
-                : Transform.translate(offset: const Offset(-6, 0), child: view),
-            trailing: [
-              if (doc.pinned) const AppBadge('Pinned', kind: BadgeKind.accent),
-              AppSwitch(
-                value: doc.on,
-                label: 'Use ${doc.title} in answers',
-                tooltip: 'Use in answers',
-                onChanged: (_) => scope.sources.toggle(doc),
-              ),
-              if (wide) view,
-              DownloadTextButton(doc),
-            ],
-          );
-        },
       ),
     );
   }
 }
 
-/// The text the server read from the document View extracted text opened, under the way back to
-/// the documents.
+/// The page of the text the server read from the document View extracted text opened, under
+/// the header that names it and offers Download: its kind and size, whether answers use it, the
+/// text in a card, and Remove from workspace.
 class TextViewer extends StatelessWidget {
   const TextViewer({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final files = AppScope.of(context).files;
-    if (ScreenClass.ofContext(context).isPhone) return const _PhoneText();
-    return EssentialsPage([
-      Align(
-        alignment: Alignment.centerLeft,
-        child: TextAction('back', 'Documents', files.closeText),
-      ),
-      const SizedBox(height: 12),
-      if (files.contentLoading)
-        Text(
-          'Loading…',
-          style: Type.sans(13.5, color: Tokens.of(context).muted),
-        )
-      else if (files.doc case final doc?)
-        DocBodyView(doc),
-    ]);
-  }
-}
-
-/// A phone's page of a document's text, under the header that names it and offers Download: its
-/// kind and size, whether answers use it, the text in a card, and Remove from workspace.
-class _PhoneText extends StatelessWidget {
-  const _PhoneText();
 
   @override
   Widget build(BuildContext context) {

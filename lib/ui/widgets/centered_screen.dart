@@ -22,10 +22,7 @@ class CenteredScreen extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Brand(large: true),
-                  ),
+                  const Align(alignment: Alignment.centerLeft, child: Brand()),
                   const SizedBox(height: 22),
                   ...children,
                 ],

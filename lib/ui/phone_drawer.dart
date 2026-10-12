@@ -90,7 +90,7 @@ class _PhoneDrawerState extends State<PhoneDrawer> {
                       height: 52,
                       child: Row(
                         children: [
-                          const Expanded(child: PhoneWorkspaceSwitcher()),
+                          const Expanded(child: WorkspaceSwitcher()),
                           if (active != null)
                             IconBtn(
                               'settings',

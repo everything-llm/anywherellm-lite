@@ -8,7 +8,6 @@ import 'package:markdown/markdown.dart' as md;
 import '../../core/gallery.dart';
 import '../../core/markdown.dart';
 import '../app_scope.dart';
-import '../layout.dart';
 import '../links.dart';
 import '../tokens.dart';
 import '../type.dart';
@@ -24,16 +23,14 @@ import '../icons.dart';
 /// An answer's text, drawn as Markdown and selectable. A code block, a table and display math
 /// scroll sideways rather than widen the chat, showing a scrollbar while they do, and a code
 /// block has its own Copy button. A link opens outside the app. An image loads only from the
-/// AnythingLLM server's own host, on any port, and only over https or the server's own scheme
-/// where plain http is allowed: loading any other would send its address, which a model could
-/// have filled with what it read, to that site. Any other image shows as its description, which
+/// AnythingLLM server's own host, on any port, and only over https: loading any other would send
+/// its address, which a model could have filled with what it read, to that site. Any other image shows as its description, which
 /// reads as a link: a tap opens the link around the image, or else the image's own address. Two
 /// or more pictures in a row are a [Gallery] ([answerParts]).
 class AnswerBody extends StatelessWidget {
   const AnswerBody(
     this.text, {
     super.key,
-    this.label = false,
     this.muted = false,
     this.caret = false,
   });
@@ -47,41 +44,26 @@ class AnswerBody extends StatelessWidget {
   /// Draws the words in the second ink, for an answer that stopped before its end.
   final bool muted;
 
-  /// Whether the answer carries its words as a semantics label, for a screen reader where the
-  /// selectable text is missing from the semantics tree ([AppScope.labelAnswers]).
-  final bool label;
-
   @override
   Widget build(BuildContext context) {
     final parts = answerParts(text);
-    final Widget body;
     if (parts case [TextPart(:final markdown)]) {
-      body = _markdown(context, markdown, caret: caret);
-    } else {
-      final phone = ScreenClass.ofContext(context).isPhone;
-      body = Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: phone ? 8 : 12,
-        children: [
-          for (final (i, part) in parts.indexed)
-            switch (part) {
-              TextPart(:final markdown) => _markdown(
-                context,
-                markdown,
-                caret: caret && i == parts.length - 1,
-              ),
-              GalleryPart(:final pictures) => Gallery(pictures),
-            },
-        ],
-      );
+      return _markdown(context, markdown, caret: caret);
     }
-    if (!label) return body;
-    // Explicit child nodes keep a link or a Copy code button from merging into the label.
-    return Semantics(
-      container: true,
-      explicitChildNodes: true,
-      label: plainText(text),
-      child: body,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 8,
+      children: [
+        for (final (i, part) in parts.indexed)
+          switch (part) {
+            TextPart(:final markdown) => _markdown(
+              context,
+              markdown,
+              caret: caret && i == parts.length - 1,
+            ),
+            GalleryPart(:final pictures) => Gallery(pictures),
+          },
+      ],
     );
   }
 
@@ -89,9 +71,8 @@ class AnswerBody extends StatelessWidget {
   Widget _markdown(BuildContext context, String text, {required bool caret}) {
     final t = Tokens.of(context);
     final ink = muted ? t.ink2 : t.ink;
-    // A phone sets its text a little tighter, as the design canvas draws it.
-    final phone = ScreenClass.ofContext(context).isPhone;
-    final lineHeight = phone ? 1.6 : 1.65;
+    // The text is set a little tighter, as the design canvas draws it.
+    const lineHeight = 1.6;
     final body = Type.sans(15.5, color: ink, height: lineHeight);
     final code = Type.mono(13.5, color: ink, height: 1.5);
     TextStyle heading(double size) =>
@@ -99,7 +80,6 @@ class AnswerBody extends StatelessWidget {
     final border = BorderSide(color: t.line);
     final settings = AppScope.of(context).settings;
     final server = settings.connection?.uri;
-    final allowHttp = settings.allowHttp;
     final linked = linkedImages(text);
     return TightListMarkdown(
       data: caret ? '$text$caretMark' : text,
@@ -112,7 +92,6 @@ class AnswerBody extends StatelessWidget {
         uri,
         alt: alt,
         server: server,
-        allowHttp: allowHttp,
         linked: linked.contains(uri),
       ),
       bulletBuilder: (bullet) => listBullet(bullet, body),
@@ -151,8 +130,8 @@ class AnswerBody extends StatelessWidget {
         blockquoteDecoration: BoxDecoration(
           border: Border(left: BorderSide(color: t.line, width: 3)),
         ),
-        blockSpacing: phone ? 8 : 12,
-        listIndent: phone ? 20 : 22,
+        blockSpacing: 8,
+        listIndent: 20,
         listBullet: body,
         tableHead: Type.sans(
           14,

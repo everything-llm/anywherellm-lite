@@ -91,7 +91,6 @@ void main() {
     expect(signed.withPassword(null), plain);
     expect(plain.withPassword(''), plain);
     expect('$signed', isNot(contains('PASS')));
-    expect(pairingCode(signed), isNot(contains('PASS')));
   });
 
   group('pairing code', () {
@@ -100,7 +99,7 @@ void main() {
         baseUrl: 'https://h.example.ts.net:3001/llm',
         apiKey: 'AB&C=D+E/F?G#H',
       );
-      final code = pairingCode(connection);
+      final code = _code(connection);
       expect(code, startsWith('anywherellm://connect?'));
       expect(code, isNot(contains('&C=D')));
       expect(parsePairingCode(code), connection);
@@ -128,43 +127,15 @@ void main() {
     });
 
     test('an address it carries is checked as a typed one', () {
-      final code = pairingCode(
-        const Connection(baseUrl: 'ftp://h', apiKey: 'k'),
-      );
+      final code = _code(const Connection(baseUrl: 'ftp://h', apiKey: 'k'));
       expect(() => parsePairingCode(code), throwsA(isA<ApiException>()));
-    });
-
-    test('says why a phone cannot use it', () {
-      for (final url in [
-        'https://localhost:3001',
-        'https://127.0.0.1:3001',
-        'https://[::1]:3001',
-        'https://0.0.0.0:3001',
-      ]) {
-        expect(
-          pairingProblem(Connection(baseUrl: url, apiKey: 'k')),
-          contains('is the phone itself'),
-          reason: url,
-        );
-      }
-      expect(
-        pairingProblem(
-          const Connection(
-            baseUrl: 'http://h.example.ts.net:3001',
-            apiKey: 'k',
-          ),
-        ),
-        contains('only over https'),
-      );
-      expect(
-        pairingProblem(
-          const Connection(
-            baseUrl: 'https://h.example.ts.net:3001',
-            apiKey: 'k',
-          ),
-        ),
-        isNull,
-      );
     });
   });
 }
+
+/// The pairing code that carries [connection], as AnywhereLLM on a computer drew it.
+String _code(Connection connection) => Uri(
+  scheme: 'anywherellm',
+  host: 'connect',
+  queryParameters: {'url': connection.baseUrl, 'key': connection.apiKey},
+).toString();

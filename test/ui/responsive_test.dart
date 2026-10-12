@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'dart:ui' show Offset, Size;
 
 import 'package:anywherellm/core/chat.dart';
@@ -11,34 +10,24 @@ import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
-import 'package:anywherellm/core/upload.dart';
-import 'package:desktop_drop/desktop_drop.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/files/workspace_pages.dart';
 import 'package:anywherellm/ui/phone_drawer.dart';
-import 'package:anywherellm/ui/quick_switcher.dart';
-import 'package:anywherellm/ui/sidebar.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
-import 'package:anywherellm/ui/widgets/drop_zone.dart';
+import 'package:file_picker_platform_interface/file_picker_platform_interface.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
-import 'package:flutter/material.dart'
-    show EditableText, Scrollable, SingleChildScrollView;
+import 'package:flutter/material.dart' show Scrollable, SingleChildScrollView;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
 import '../support/fake_settings.dart';
+import '../support/picker.dart';
 import '../support/pump.dart';
 
-/// One width per shell layout, and the window's own minimum (see my_application.cc).
-const sizes = [
-  Size(1400, 900),
-  Size(1000, 700),
-  Size(780, 700),
-  Size(500, 700),
-  Size(360, 480),
-];
+/// A large phone, a small one, a phone on its side, and a short window.
+const sizes = [Size(412, 915), Size(360, 640), Size(740, 360), Size(360, 480)];
 
 const longWord =
     'an-extremely-long-unbroken-name-that-has-no-place-to-wrap-and-must-not-overflow-anything';
@@ -148,29 +137,19 @@ void main() {
       }
     });
 
-    testWidgets('the QR code and the scanner fit at $at', (tester) async {
+    testWidgets('the scanner fits at $at', (tester) async {
       final h = await pumpApp(
         tester,
         llm: awkward(),
         size: size,
         connection: const Connection(
-          baseUrl: 'http://localhost:3001/$longWord',
+          baseUrl: 'https://localhost:3001/$longWord',
           apiKey: 'K1',
         ),
         canScan: true,
       );
       h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
-      // A phone shows its code to no other phone.
-      if (size.width >= 720) {
-        await tester.ensureVisible(find.text('Connect a phone'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Connect a phone'));
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
-      } else {
-        expect(find.text('Connect a phone'), findsNothing);
-      }
       await tester.ensureVisible(find.text('Edit connection'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Edit connection'));
@@ -279,37 +258,17 @@ void main() {
       final h = await pumpApp(tester, llm: awkward(), size: size);
       h.shell.openSources();
       await tester.pumpAndSettle();
-      final names = ['a-$longWord.pdf', 'b-$longWord.md'];
-      final zones = find.byType(DropZone);
-      if (zones.evaluate().isNotEmpty) {
-        await tester.widget<DropZone>(zones.last).onFiles([
-          for (final name in names)
-            UploadFile(name: name, read: () async => [1]),
-        ]);
-      } else {
-        // A phone's sheet has buttons rather than a drop zone; a drop on them still waits.
-        tester
-            .widget<DropTarget>(
-              find.descendant(
-                of: find.byType(SourcesPanel),
-                matching: find.byType(DropTarget),
-              ),
-            )
-            .onDragDone!(
-          DropDoneDetails(
-            files: [
-              for (final name in names)
-                DropItemFile.fromData(
-                  Uint8List.fromList([1]),
-                  path: name,
-                  length: 1,
-                ),
-            ],
-            localPosition: Offset.zero,
-            globalPosition: Offset.zero,
-          ),
-        );
-      }
+      FilePickerPlatform.instance = FakePicker([
+        Picked('a-$longWord.pdf'),
+        Picked('b-$longWord.md'),
+      ]);
+      await tapVisible(
+        tester,
+        find.descendant(
+          of: find.byType(SourcesPanel),
+          matching: control('Add a file'),
+        ),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsLabel('Details of a-$longWord.pdf'));
       await tester.pumpAndSettle();
@@ -318,8 +277,8 @@ void main() {
 
     testWidgets('renaming and deleting a workspace fit at $at', (tester) async {
       final h = await pumpApp(tester, llm: awkward(), size: size);
-      if (size.width < 720) {
-        // A phone renames and deletes from the workspace's settings, in sheets.
+      // Rename and delete are in the workspace's settings, in sheets.
+      {
         h.shell.showPane(Pane.files);
         await tester.pumpAndSettle();
         await tester.tap(control('Rename'));
@@ -337,25 +296,11 @@ void main() {
               )
               .first,
         );
-        await tester.tap(control('Delete workspace'));
+        await tapVisible(tester, control('Delete workspace'));
         await tester.pumpAndSettle();
         expect(control('Keep'), findsOneWidget);
         expect(tester.takeException(), isNull);
-        return;
       }
-      h.shell.toggleSide();
-      await tester.pumpAndSettle();
-      await tester.tap(switcher);
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      await tester.tap(find.bySemanticsLabel('Rename workspace').last);
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-      await tester.pumpAndSettle();
-      await fromMenu(tester, 'Delete workspace…');
-      expect(find.bySemanticsLabel('Cancel'), findsWidgets);
-      expect(tester.takeException(), isNull);
     });
 
     testWidgets('an agent answer fits at $at', (tester) async {
@@ -412,29 +357,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      // A menu on a desktop, a sheet titled in sentence case on a phone.
-      expect(
-        find.text(size.width < 720 ? 'This answer' : 'THIS ANSWER'),
-        findsOneWidget,
-      );
+      expect(find.text('This answer'), findsOneWidget);
       expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('the Ctrl K switcher fits at $at', (tester) async {
-      final h = await pumpApp(tester, llm: awkward(), size: size);
-      h.shell.toggleSwitcher();
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      await tester.enterText(
-        find.descendant(
-          of: find.byType(QuickSwitcher),
-          matching: find.byType(EditableText),
-        ),
-        'an-extremely',
-      );
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      expect(find.byType(QuickSwitcher), findsOneWidget);
     });
 
     testWidgets('a draft and the no-key banner fit at $at', (tester) async {
@@ -451,9 +375,7 @@ void main() {
   for (final size in sizes) {
     final at = '${size.width.toInt()}x${size.height.toInt()}';
 
-    testWidgets('the workspace\'s pages fit at $at', skip: size.width >= 720, (
-      tester,
-    ) async {
+    testWidgets('the workspace\'s pages fit at $at', (tester) async {
       final llm = awkward();
       llm.spaces.first.prompt = 'prompt-$longWord';
       final h = await pumpApp(tester, llm: llm, size: size);
@@ -470,83 +392,28 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull, reason: '$page');
       }
-      await tester.tap(find.text('Chat model').last);
+      await tester.scrollUntilVisible(
+        find.text('Chat model'),
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byType(WorkspacePages),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tapVisible(tester, find.text('Chat model').last);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });
 
-    // A phone shows the workspace's pages, with no tree.
-    testWidgets(
-      'Files and each kind of node fit at $at',
-      skip: size.width < 720,
-      (tester) async {
-        final llm = awkward();
-        llm.spaces.first.prompt = 'prompt-$longWord';
-        final h = await pumpApp(tester, llm: llm, size: size);
-        h.shell
-          ..showPane(Pane.files)
-          ..toggleSide();
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
-        for (final path in [
-          '/workspaces/w',
-          '/workspaces/w/docs',
-          '/workspaces/w/chats',
-          '/library/custom-documents',
-        ]) {
-          h.files.toggle(path);
-        }
-        for (final path in [
-          '/workspaces/w',
-          '/workspaces/w/docs',
-          '/workspaces/w/PROMPT.md',
-          '/workspaces/w/settings.json',
-          '/workspaces/w/chats/t',
-          '/workspaces/w/docs/custom-documents/file-$longWord.pdf.json',
-          '/library',
-          '/library/custom-documents',
-          '/library/custom-documents/file-$longWord.pdf.json',
-          '/keys',
-        ]) {
-          await h.files.select(path);
-          await tester.pumpAndSettle();
-          expect(h.files.node, isNotNull, reason: path);
-          expect(tester.takeException(), isNull, reason: path);
-        }
-        h.shell.closeSide();
-        await h.files.select('/library/custom-documents');
-        await tester.pumpAndSettle();
-        await tester.ensureVisible(find.text('Delete folder…'));
-        await tester.tap(find.text('Delete folder…'));
-        await tester.pumpAndSettle();
-        expect(find.bySemanticsLabel('Cancel'), findsWidgets);
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
-
-  for (final size in sizes) {
-    final at = '${size.width.toInt()}x${size.height.toInt()}';
-
-    testWidgets('Files\' Essentials and each section fit at $at', (
-      tester,
-    ) async {
+    testWidgets('each page of the workspace fits at $at', (tester) async {
       final llm = awkward();
       final path = 'custom-documents/file-$longWord.pdf.json';
-      await llm.pinDocument('w', path, pinned: true);
       final h = await pumpApp(tester, llm: llm, size: size);
-      h.shell
-        ..showPane(Pane.files)
-        ..toggleSide();
+      h.shell.showPane(Pane.files);
       await tester.pumpAndSettle();
-      expect(h.files.essentials, isTrue);
-      expect(tester.takeException(), isNull);
-      for (final section in FilesSection.values) {
-        await h.files.openSection(section);
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull, reason: section.name);
-      }
-      h.shell.closeSide();
+      h.shell.showWorkspacePage(FilesSection.documents);
       await h.files.openSection(FilesSection.documents);
       await tester.pumpAndSettle();
       await h.sources.toggle(h.sources.files.first);
@@ -558,26 +425,20 @@ void main() {
     });
   }
 
-  for (final size in const [Size(360, 640), Size(1000, 700)]) {
-    testWidgets('clear of a phone\'s bars at ${size.width.toInt()} wide', (
-      tester,
-    ) async {
-      tester.view.padding = const FakeViewPadding(top: 24, bottom: 24);
-      addTearDown(tester.view.resetPadding);
-      final h = await pumpApp(tester, llm: awkward(), size: size);
-      h.shell
-        ..toggleSide()
-        ..openSources();
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      final top = tester
-          .getTopLeft(find.byType(size.width < 720 ? PhoneDrawer : Sidebar))
-          .dy;
-      expect(top, greaterThanOrEqualTo(24));
-    });
-  }
+  testWidgets('clear of the phone\'s bars', (tester) async {
+    tester.view.padding = const FakeViewPadding(top: 24, bottom: 24);
+    addTearDown(tester.view.resetPadding);
+    final h = await pumpApp(tester, llm: awkward(), size: const Size(360, 640));
+    h.shell
+      ..toggleSide()
+      ..openSources();
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    final top = tester.getTopLeft(find.byType(PhoneDrawer)).dy;
+    expect(top, greaterThanOrEqualTo(24));
+  });
 
-  testWidgets('resizing through every layout keeps working', (tester) async {
+  testWidgets('turning and resizing the window keeps working', (tester) async {
     final h = await pumpApp(tester, llm: awkward(), size: sizes.first);
     for (final size in [...sizes, ...sizes.reversed]) {
       tester.view.physicalSize = size;

@@ -17,13 +17,11 @@ Future<Rig> started(
   FakeAnythingLlm llm, {
   Prefs prefs = const Prefs(),
   String? password,
-  int? maxRuns,
 }) async {
   final rig = Rig(
     llm: llm,
     connection: sampleConnection.withPassword(password),
     prefsStore: FakePrefsStore(prefs),
-    maxRuns: maxRuns,
   );
   addTearDown(rig.dispose);
   await rig.start();
@@ -563,9 +561,9 @@ void main() {
 
   group('answers in several workspaces', () {
     /// Starts an answer in a new chat of Household, then shows Q3's budget chat.
-    Future<Rig> householdAnswering(FakeAnythingLlm llm, {int? maxRuns}) async {
+    Future<Rig> householdAnswering(FakeAnythingLlm llm) async {
       llm.hold = true;
-      final rig = await started(llm, maxRuns: maxRuns);
+      final rig = await started(llm);
       await rig.chat.select('household');
       await rig.chat.send('Plan the meals');
       await pumpEventQueue();
@@ -630,18 +628,6 @@ void main() {
       await pumpEventQueue();
       expect(llm.chats['th-1']!.hasListener, isFalse);
       expect(llm.chats['budget']!.hasListener, isFalse);
-      expect(rig.chat.busy, isFalse);
-    });
-
-    test('at the limit, no other starts', () async {
-      final llm = planningServer();
-      final rig = await householdAnswering(llm, maxRuns: 1);
-      expect(rig.chat.atLimit, isTrue);
-      expect(rig.chat.busy, isTrue);
-      expect(await rig.chat.send('And next quarter?'), isFalse);
-      expect(llm.calls, isNot(contains('streamChat:budget:And next quarter?')));
-      await llm.chats['th-1']!.close();
-      await pumpEventQueue();
       expect(rig.chat.busy, isFalse);
     });
   });

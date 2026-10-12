@@ -14,17 +14,16 @@ import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/min_height.dart';
 import '../widgets/phone_page.dart';
-import 'files_view.dart';
+import 'section_view.dart';
 import 'save_file.dart';
 import '../settings/rows.dart';
 import '../settings/settings_pages.dart';
 
-/// What a phone calls the page of [section]: Answer settings is Answer from.
+/// What the page of [section] is called: Answer settings is Answer from.
 String _titleOf(FilesSection section) =>
     section == FilesSection.answers ? 'Answer from' : section.title;
 
-/// Files on a phone: the open workspace's settings rather than the server's tree. It opens on
-/// the workspace, with Rename and Delete workspace, and its Documents, Instructions and Answer
+/// The open workspace's pages, which [Pane.files] shows. They open on the workspace, with Rename and Delete workspace, and its Documents, Instructions and Answer
 /// from, each with a line of what it holds; a page opens under a back arrow, and the text of a
 /// document over that.
 class WorkspacePages extends StatefulWidget {
@@ -41,7 +40,6 @@ class _WorkspacePagesState extends State<WorkspacePages> {
   void initState() {
     super.initState();
     _files = AppScope.of(context).files;
-    if (!_files.essentials) _files.showEssentials(true);
     // Loading notifies, which must wait until the frame that builds the pages is done.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _files.ensureLoaded();
@@ -129,7 +127,7 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                 child: workspace == null
                     ? const Blank('No workspace is open.')
                     : reading != null || page != null
-                    ? essentialSection(context, node, phone: true)
+                    ? essentialSection(context, node)
                     : _overview(context, workspace.name),
               ),
             ],

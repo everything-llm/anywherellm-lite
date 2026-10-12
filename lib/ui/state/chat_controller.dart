@@ -130,13 +130,13 @@ class _Running {
 /// The workspaces and their chats, the chat on screen, and the answers running.
 ///
 /// One answer runs at a time in each workspace, since AnythingLLM gives an agent run no thread
-/// of its own, and at most [maxRuns] in all, when that is set.
+/// of its own.
 ///
 /// A chat not yet asked anything is a draft: it lives only here until its first message, which
 /// makes the thread on the server. Everything it knows is about the server in [_settings]; a new
 /// server starts it afresh.
 class ChatController extends ChangeNotifier {
-  ChatController(this._api, this._settings, this._prefs, {this.maxRuns})
+  ChatController(this._api, this._settings, this._prefs)
     : _server = _settings.connection?.withPassword(null),
       _password = _settings.connection?.password,
       _auth = _settings.auth {
@@ -147,10 +147,6 @@ class ChatController extends ChangeNotifier {
   final AnythingLlmApi _api;
   final SettingsController _settings;
   final PrefsController _prefs;
-
-  /// How many answers may run at once across workspaces, or null for no limit. In a browser
-  /// each holds a connection open, and the browser opens only a few to one server.
-  final int? maxRuns;
 
   /// The server the fields below describe: its address and key, without the password, so
   /// saving or forgetting one does not start afresh.
@@ -282,15 +278,12 @@ class ChatController extends ChangeNotifier {
   final _droppingIn = <String>{};
 
   /// Whether the chat on screen can take no message now: a chat of its workspace answers, this
-  /// one or another, [atLimit] holds, or this chat is being cleared or its exchanges dropped.
-  bool get busy => _changing(activeThread) || workspaceAnswering || atLimit;
+  /// one or another, or this chat is being cleared or its exchanges dropped.
+  bool get busy => _changing(activeThread) || workspaceAnswering;
 
   /// Whether chat [thread] is being cleared or its exchanges dropped on the server.
   bool _changing(String? thread) =>
       _clearingIn.contains(thread) || _droppingIn.contains(thread);
-
-  /// Whether [maxRuns] answers are running, so no other can start.
-  bool get atLimit => maxRuns != null && _runs.length >= maxRuns!;
 
   /// Whether the chat on screen can take a message: a draft, or a chat whose history is read.
   bool get ready => activeThread == null || _turns.containsKey(activeThread);

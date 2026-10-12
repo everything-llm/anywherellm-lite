@@ -289,18 +289,6 @@ class Prefs {
   Prefs withOff(String server, String slug, List<OffDoc> docs) =>
       _copy(switchedOff: _with(switchedOff, offKey(server, slug), docs));
 
-  /// These prefs with the documents at [paths] forgotten in every workspace on [server].
-  Prefs withoutDocs(String server, Set<String> paths) => _copy(
-    switchedOff: {
-      for (final MapEntry(:key, :value) in switchedOff.entries)
-        if (!key.startsWith('$server '))
-          key: value
-        else if (value.where((d) => !paths.contains(d.path)).toList()
-            case final kept when kept.isNotEmpty)
-          key: kept,
-    },
-  );
-
   /// These prefs with the workspaces arranged as [slugs], and every other slug in the order
   /// kept after them, as another server's workspaces are.
   Prefs withOrder(List<String> slugs) => _copy(

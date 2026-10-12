@@ -32,7 +32,7 @@ FakeAnythingLlm _remembering() {
 Future<Harness> _openMemory(
   WidgetTester tester,
   FakeAnythingLlm llm, {
-  Size size = const Size(1400, 1000),
+  Size size = const Size(390, 1000),
 }) async {
   final h = await pumpApp(tester, llm: llm, size: size);
   h.shell.openSettings(SettingsPage.memory);

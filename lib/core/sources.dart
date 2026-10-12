@@ -35,7 +35,7 @@ class SourceFile {
   /// switched off.
   String get meta => on ? size : _joined([_notUsed, size]);
 
-  /// The line under the file's name in the Files pane: [size], before `Not used in answers`
+  /// The line under the file's name on the workspace's Documents page: [size], before `Not used in answers`
   /// when it is switched off.
   String get filesMeta => on ? size : _joined([size, '$_notUsed in answers']);
 

@@ -140,7 +140,7 @@ void main() {
       final h = await pumpApp(
         tester,
         llm: llm,
-        size: const Size(1280, 500),
+        size: const Size(390, 500),
         prefsStore: withSwitch(ChatSwitch.followAnswer, follow),
       );
       await h.chat.send('Tell me everything.');
@@ -163,7 +163,7 @@ void main() {
     tester,
   ) async {
     final llm = planningServer()..hold = true;
-    final h = await pumpApp(tester, llm: llm, size: const Size(1280, 500));
+    final h = await pumpApp(tester, llm: llm, size: const Size(390, 500));
     await h.chat.send('Tell me everything.');
     await tester.pump(const Duration(milliseconds: 300));
     for (var i = 0; i < 12; i++) {

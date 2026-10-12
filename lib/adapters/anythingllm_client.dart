@@ -20,13 +20,11 @@ import 'anythingllm_stream.dart';
 /// [AnythingLlmApi] over the server's HTTP API, with the bearer key on every request.
 ///
 /// Every call but [verify] reads the connection from the holder when it is made. An error message
-/// never contains the key. Unless [allowHttp], a call to an `http://` address fails before the key
-/// is sent.
+/// never contains the key. A call to an `http://` address fails before the key is sent: Dart's
+/// HTTP client ignores Android's cleartext policy, so the client applies it.
 class HttpAnythingLlmApi implements AnythingLlmApi {
   HttpAnythingLlmApi({
     required this._holder,
-    this.allowHttp = true,
-    this.browserOrigin,
     http.Client? client,
     this.timeout = const Duration(seconds: 15),
     this.uploadTimeout = const Duration(minutes: 5),
@@ -35,13 +33,6 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
 
   final ConnectionHolder _holder;
 
-  /// Whether the key may go to an `http://` address. False on Android: Dart's HTTP client ignores
-  /// Android's cleartext policy, so the client applies it.
-  final bool allowHttp;
-
-  /// The page's origin when the app runs in a browser, where every request is cross-origin and a
-  /// server that does not allow it fails like one out of reach; null elsewhere.
-  final String? browserOrigin;
   final http.Client _client;
   final Duration timeout;
 
@@ -367,13 +358,10 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   Future<List<DocEntry>> upload(
     String name,
     List<int> bytes, {
-    String? folder,
     DocMeta meta = const DocMeta(),
   }) async {
     final connection = _current;
-    final path = folder == null
-        ? '/api/v1/document/upload'
-        : '/api/v1/document/upload/${Uri.encodeComponent(folder)}';
+    const path = '/api/v1/document/upload';
     final body = await _call(connection, uploadTimeout, () async {
       final request =
           http.MultipartRequest('POST', Uri.parse('${connection.baseUrl}$path'))
@@ -436,13 +424,6 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   }
 
   @override
-  Future<void> pinDocument(String slug, String path, {required bool pinned}) =>
-      _send('POST', '${_workspace(slug)}/update-pin', {
-        'docPath': path,
-        'pinStatus': pinned,
-      });
-
-  @override
   Future<List<SearchHit>> searchDocs(String slug, String query) async => [
     for (final json in jsonObjects(
       _field(
@@ -469,7 +450,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   @override
   Future<Uint8List> answerImage(Uri url) async {
     final connection = _current;
-    if (!allowHttp && url.scheme == 'http') {
+    if (url.scheme == 'http') {
       throw const ApiException(
         'This device does not load images over plain http.',
       );
@@ -525,12 +506,6 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     return response.bodyBytes;
   }
 
-  /// The server answers with its `documents` folder, whose items are the library's folders.
-  @override
-  Future<List<LibraryFolder>> libraryFolders() async => libraryOf(
-    _field(await _get(_current, '/api/v1/documents'), 'localFiles'),
-  );
-
   /// The server finds a document by its file name in any folder.
   @override
   Future<DocBody> document(String path) async {
@@ -544,38 +519,6 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     }
     return DocBody.fromJson(json);
   }
-
-  @override
-  Future<void> createFolder(String name) => _send(
-    'POST',
-    '/api/v1/document/create-folder',
-    {'name': name},
-    refused: 'The server did not make the folder $name.',
-  );
-
-  @override
-  Future<void> removeFolder(String name) => _send(
-    'DELETE',
-    '/api/v1/document/remove-folder',
-    {'name': name},
-    refused: 'The server did not delete the folder $name.',
-  );
-
-  @override
-  Future<void> moveDocuments(List<(String, String)> moves) =>
-      _send('POST', '/api/v1/document/move-files', {
-        'files': [
-          for (final (from, to) in moves) {'from': from, 'to': to},
-        ],
-      }, refused: 'The server did not move the documents.');
-
-  @override
-  Future<void> removeDocuments(List<String> paths) => _send(
-    'DELETE',
-    '/api/v1/system/remove-documents',
-    {'names': paths},
-    refused: 'The server did not delete the documents.',
-  );
 
   @override
   Future<Map<String, Object?>> systemSettings() async {
@@ -694,9 +637,9 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   Connection get _current =>
       _secure(_holder.current ?? (throw const NotConfigured()));
 
-  /// [connection], or an [ApiException] when it is `http://` and [allowHttp] is false.
+  /// [connection], or an [ApiException] when it is `http://`.
   Connection _secure(Connection connection) {
-    if (!allowHttp && connection.uri.scheme == 'http') {
+    if (connection.uri.scheme == 'http') {
       throw const ApiException(
         'Use an https:// address. This device does not sign in over plain http.',
       );
@@ -967,8 +910,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       'Could not reach ${connection.host}: $message',
     ),
     http.ClientException(:final message) => ApiException(
-      'Could not reach the server: $message'
-      '${browserOrigin == null ? '' : '. A browser also says this when the server does not allow requests from $browserOrigin.'}',
+      'Could not reach the server: $message',
     ),
     _ => ApiException('Could not reach the server: $error'),
   };

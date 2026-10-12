@@ -19,7 +19,7 @@ Future<void> _boot(
   FakeSettingsStore store, [
   FakePrefsStore? prefsStore,
 ]) async {
-  tester.view.physicalSize = const Size(1280, 800);
+  tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final llm = planningServer();
@@ -43,7 +43,7 @@ void main() {
   ) async {
     await _boot(tester, FakeSettingsStore());
     expect(find.byType(SettingsDialog), findsOneWidget);
-    expect(find.text('Missing'), findsOneWidget);
+    expect(find.text('Sign in'), findsOneWidget);
   });
 
   testWidgets('with a saved connection, the app opens on the first workspace', (

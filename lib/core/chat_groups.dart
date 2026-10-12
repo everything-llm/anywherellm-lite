@@ -1,6 +1,6 @@
 import 'server_models.dart';
 
-/// A workspace's chats as the sidebar lists them: the [pinned] ones, the [recent] ones this
+/// A workspace's chats as the drawer lists them: the [pinned] ones, the [recent] ones this
 /// device used last, and the [rest]. No chat is in two of them.
 typedef ChatGroups = ({
   List<Thread> pinned,

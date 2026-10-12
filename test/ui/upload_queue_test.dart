@@ -1,26 +1,30 @@
-import 'package:anywherellm/core/upload.dart';
-import 'package:anywherellm/ui/files/files_view.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
-import 'package:anywherellm/ui/state/shell_controller.dart';
-import 'package:anywherellm/ui/widgets/drop_zone.dart';
+import 'package:file_picker_platform_interface/file_picker_platform_interface.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
+import '../support/picker.dart';
 import '../support/pump.dart';
 
-UploadFile file(String name) => UploadFile(name: name, read: () async => [1]);
+/// Opens Documents over the chat.
+Future<Harness> openDocuments(WidgetTester tester, FakeAnythingLlm llm) async {
+  final h = await pumpApp(tester, llm: llm);
+  h.shell.openSources();
+  await tester.pumpAndSettle();
+  return h;
+}
 
-/// Hands [files] to the drop zone inside [area], as a drop or the picker would.
-Future<void> drop(
-  WidgetTester tester,
-  Type area,
-  List<UploadFile> files,
-) async {
-  final zone = tester.widget<DropZone>(
-    find.descendant(of: find.byType(area), matching: find.byType(DropZone)),
+/// Picks [names] with Documents' Add a file, as the file picker would give them.
+Future<void> pick(WidgetTester tester, List<String> names) async {
+  FilePickerPlatform.instance = FakePicker([for (final n in names) Picked(n)]);
+  await tapVisible(
+    tester,
+    find.descendant(
+      of: find.byType(SourcesPanel),
+      matching: control('Add a file'),
+    ),
   );
-  await zone.onFiles(files);
   await tester.pumpAndSettle();
 }
 
@@ -29,10 +33,10 @@ Finder field(String label) => find.byWidgetPredicate(
 );
 
 void main() {
-  testWidgets('dropped files wait in a list until Add', (tester) async {
+  testWidgets('picked files wait in a list until Add', (tester) async {
     final llm = planningServer();
-    await pumpApp(tester, llm: llm);
-    await drop(tester, SourcesPanel, [file('a.md'), file('b.md')]);
+    await openDocuments(tester, llm);
+    await pick(tester, ['a.md', 'b.md']);
     expect(find.text('a.md'), findsOneWidget);
     expect(llm.calls.where((c) => c.startsWith('upload')), isEmpty);
     expect(control('Add 2 files'), findsOneWidget);
@@ -50,8 +54,8 @@ void main() {
     tester,
   ) async {
     final llm = planningServer();
-    await pumpApp(tester, llm: llm);
-    await drop(tester, SourcesPanel, [file('a.md'), file('b.md')]);
+    await openDocuments(tester, llm);
+    await pick(tester, ['a.md', 'b.md']);
     await tapVisible(tester, control('Details of a.md'));
     await tester.pumpAndSettle();
     await tester.enterText(
@@ -75,13 +79,13 @@ void main() {
     expect(llm.metaOf['custom-documents/b.md.json']?.isEmpty, isTrue);
   });
 
-  testWidgets('Cancel sends nothing and a file dropped twice is listed once', (
+  testWidgets('Cancel sends nothing and a file picked twice is listed once', (
     tester,
   ) async {
     final llm = planningServer();
-    await pumpApp(tester, llm: llm);
-    await drop(tester, SourcesPanel, [file('a.md')]);
-    await drop(tester, SourcesPanel, [file('a.md')]);
+    await openDocuments(tester, llm);
+    await pick(tester, ['a.md']);
+    await pick(tester, ['a.md']);
     expect(find.text('a.md'), findsOneWidget);
     await tapVisible(tester, control('Cancel'));
     await tester.pumpAndSettle();
@@ -89,23 +93,9 @@ void main() {
     expect(llm.calls.where((c) => c.startsWith('upload')), isEmpty);
   });
 
-  testWidgets('a file for a Files folder waits for Add too', (tester) async {
-    final llm = planningServer();
-    final h = await pumpApp(tester, llm: llm);
-    h.shell.showPane(Pane.files);
-    await tester.pumpAndSettle();
-    await h.files.select('/library/custom-documents');
-    await tester.pumpAndSettle();
-    await drop(tester, FilesView, [file('a.md')]);
-    expect(llm.calls.where((c) => c.startsWith('upload')), isEmpty);
-    await tapVisible(tester, control('Add 1 file'));
-    await tester.pumpAndSettle();
-    expect(llm.calls, contains('upload:custom-documents/a.md'));
-  });
-
   testWidgets('a link goes with its details', (tester) async {
     final llm = planningServer();
-    await pumpApp(tester, llm: llm);
+    await openDocuments(tester, llm);
     await tapVisible(tester, control('Add a link'));
     await tester.pumpAndSettle();
     await tester.enterText(
@@ -130,29 +120,10 @@ void main() {
     );
   });
 
-  testWidgets('a file or a delete waiting in one Files folder stays there', (
-    tester,
-  ) async {
-    final llm = planningServer()..folders.add('drafts');
-    final h = await pumpApp(tester, llm: llm);
-    h.shell.showPane(Pane.files);
-    await tester.pumpAndSettle();
-    await h.files.select('/library/custom-documents');
-    await tester.pumpAndSettle();
-    await drop(tester, FilesView, [file('a.md')]);
-    await tapVisible(tester, control('Delete folder…'));
-    await tester.pumpAndSettle();
-    await h.files.select('/library/drafts');
-    await tester.pumpAndSettle();
-    expect(find.text('a.md'), findsNothing);
-    expect(control('Add 1 file'), findsNothing);
-    expect(control('Delete'), findsNothing);
-  });
-
   testWidgets('what waits in Sources stays with its workspace', (tester) async {
     final llm = planningServer();
-    final h = await pumpApp(tester, llm: llm);
-    await drop(tester, SourcesPanel, [file('a.md')]);
+    final h = await openDocuments(tester, llm);
+    await pick(tester, ['a.md']);
     await tapVisible(tester, control('Add a link'));
     await tester.pumpAndSettle();
     await h.chat.select('household');
@@ -166,7 +137,7 @@ void main() {
     tester,
   ) async {
     final llm = planningServer();
-    final h = await pumpApp(tester, llm: llm);
+    final h = await openDocuments(tester, llm);
     await tapVisible(tester, control('Add a link'));
     await tester.pumpAndSettle();
     await tester.enterText(

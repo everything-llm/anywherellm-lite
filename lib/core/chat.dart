@@ -9,21 +9,16 @@ import 'server_models.dart';
 import 'upload.dart';
 
 /// A workspace's chat mode on the server, which every message in it answers in. Its [name] is
-/// the server's value.
+/// the server's value: Agent (`automatic`), Chat or Query.
 enum ChatMode {
   automatic(
-    'Agent',
     'Files, knowledge & tools',
     'Can also search the web and use skills.',
   ),
-  chat('Chat', 'Files & knowledge', 'No tools: no web search or skills.'),
-  query('Query', 'Files only', 'Says so when the files do not cover it.');
+  chat('Files & knowledge', 'No tools: no web search or skills.'),
+  query('Files only', 'Says so when the files do not cover it.');
 
-  const ChatMode(this.label, this.title, this.detail);
-
-  /// The server's own name for the mode, as AnythingLLM's web UI and the Files pane's
-  /// settings.json form show it.
-  final String label;
+  const ChatMode(this.title, this.detail);
 
   /// What the mode answers from, in plain words, as the composer's Answer from chip names it.
   final String title;
@@ -114,13 +109,9 @@ Uri? openableLink(String href) {
 }
 
 /// Whether an image at [uri] in an answer may load: only from [server]'s own host, on any port,
-/// over https, or over http where the server itself is http and [allowHttp] lets it be. So an
-/// answer cannot make the app fetch an address off that host.
-bool loadableImage(Uri uri, Uri? server, {required bool allowHttp}) =>
-    server != null &&
-    uri.host == server.host &&
-    (uri.scheme == 'https' ||
-        (uri.scheme == 'http' && server.scheme == 'http' && allowHttp));
+/// over https. So an answer cannot make the app fetch an address off that host.
+bool loadableImage(Uri uri, Uri? server) =>
+    server != null && uri.host == server.host && uri.scheme == 'https';
 
 /// The failure an agent's [answer] reports in place of an answer, or null when it is an answer.
 /// AnythingLLM's agent sends a model's failure as the answer's text, starting with

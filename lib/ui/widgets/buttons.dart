@@ -8,8 +8,8 @@ import '../tokens.dart';
 import '../type.dart';
 import 'tappable.dart';
 
-/// The button: bordered, with a filled `primary` form. On a phone it is 52 tall with its label
-/// at 16, as the design canvas draws it. In an [ActionRow.even] it keeps 8 px either side of its
+/// The button: bordered, with a filled `primary` form, 52 tall with its label at 16, as the
+/// design canvas draws it. In an [ActionRow.even] it keeps 8 px either side of its
 /// label rather than 16.
 class AppButton extends StatelessWidget {
   const AppButton(
@@ -34,8 +34,7 @@ class AppButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final phone = ScreenClass.ofContext(context).isPhone;
-    final height = phone ? 52.0 : 40.0;
+    const height = 52.0;
     final fg = primary
         ? t.onaccent
         : danger
@@ -44,7 +43,7 @@ class AppButton extends StatelessWidget {
     return Tappable(
       label: label,
       onTap: onPressed,
-      radius: BorderRadius.circular(Sizes.controlOf(context)),
+      radius: BorderRadius.circular(Sizes.phoneControl),
       color: primary ? t.accent : t.panel,
       side: BorderSide(color: primary ? t.accent : t.line),
       hoverColor: primary ? t.onaccent.withValues(alpha: 0.1) : null,
@@ -64,11 +63,7 @@ class AppButton extends StatelessWidget {
                 child: Text(
                   label,
                   textAlign: TextAlign.center,
-                  style: Type.sans(
-                    phone ? 16 : 14,
-                    weight: FontWeight.w500,
-                    color: fg,
-                  ),
+                  style: Type.sans(16, weight: FontWeight.w500, color: fg),
                 ),
               ),
               if (icon case final icon?) ...[
@@ -234,31 +229,23 @@ class TextAction extends StatelessWidget {
   final String? semanticLabel;
 
   /// The least height, with the words in its middle, as beside buttons whose row it shares.
-  /// On a phone it is at least 44.
+  /// It is at least 44.
   final double? height;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final phone = ScreenClass.ofContext(context).isPhone;
-    final height = phone ? math.max(44.0, this.height ?? 0) : this.height;
+    final height = math.max(44.0, this.height ?? 0);
     final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (icon case final icon?) ...[
-          AppIcon(
-            icon,
-            size: phone ? IconSize.small : IconSize.xs,
-            color: t.accent,
-          ),
+          AppIcon(icon, size: IconSize.small, color: t.accent),
           const SizedBox(width: 6),
         ],
         // Wraps where the line is too narrow for it.
         Flexible(
-          child: Text(
-            label,
-            style: Type.sans(phone ? 14 : 13, color: t.accent),
-          ),
+          child: Text(label, style: Type.sans(14, color: t.accent)),
         ),
       ],
     );
@@ -266,19 +253,13 @@ class TextAction extends StatelessWidget {
       label: semanticLabel ?? label,
       onTap: onTap,
       radius: BorderRadius.circular(6),
-      child: switch (height) {
-        final height? => ConstrainedBox(
-          constraints: BoxConstraints(minHeight: height),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Align(widthFactor: 1, heightFactor: 1, child: content),
-          ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: height),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Align(widthFactor: 1, heightFactor: 1, child: content),
         ),
-        null => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-          child: content,
-        ),
-      },
+      ),
     );
   }
 }

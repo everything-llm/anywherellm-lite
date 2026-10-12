@@ -20,7 +20,15 @@ Finder get chip => find.byWidgetPredicate(
 
 Finder get menuNote => find.text('Applies to every chat in Q3 planning.');
 
-const phone = Size(390, 844);
+Finder inSheet(Finder finder) =>
+    find.descendant(of: find.byType(SheetFrame), matching: finder);
+
+/// A mode's card in the sheet, by its title.
+Finder mode(ChatMode mode) => inSheet(
+  find.byWidgetPredicate(
+    (w) => w is Tappable && w.label.startsWith('${mode.title}.'),
+  ),
+);
 
 /// The planning server with its first workspace on Files & knowledge, so the chip shows.
 FakeAnythingLlm onChat() =>
@@ -60,17 +68,14 @@ void main() {
     await tester.tap(chip);
     await tester.pumpAndSettle();
     expect(h.shell.answerFromOpen, isTrue);
-    expect(find.text('ANSWER FROM'), findsOneWidget);
-    for (final mode in ChatMode.values) {
-      expect(control(mode.title), findsOneWidget);
-      expect(find.text(mode.detail), findsOneWidget);
+    expect(inSheet(find.text('Answer from')), findsOneWidget);
+    for (final m in ChatMode.values) {
+      expect(mode(m), findsOneWidget);
+      expect(inSheet(find.text(m.detail)), findsOneWidget);
     }
     expect(menuNote, findsOneWidget);
-    expect(
-      tester.widget<Tappable>(control(ChatMode.chat.title)).selected,
-      isTrue,
-    );
-    await tester.tap(control('Files only'));
+    expect(tester.widget<Tappable>(mode(ChatMode.chat)).selected, isTrue);
+    await tester.tap(mode(ChatMode.query));
     await tester.pumpAndSettle();
     expect(llm.spaces.first.settings['chatMode'], 'query');
     expect(h.sources.chatMode.value, ChatMode.query);
@@ -80,7 +85,7 @@ void main() {
     // Back on the default, the chip goes.
     await tester.tap(chip);
     await tester.pumpAndSettle();
-    await tester.tap(control(ChatMode.automatic.title));
+    await tester.tap(mode(ChatMode.automatic));
     await tester.pumpAndSettle();
     expect(llm.spaces.first.settings['chatMode'], 'automatic');
     expect(chip, findsNothing);
@@ -99,9 +104,7 @@ void main() {
     expect(fill(), isNot(Colors.transparent));
   });
 
-  testWidgets('Esc, a tap outside and the chip again close the menu', (
-    tester,
-  ) async {
+  testWidgets('Esc, Back and a tap above the sheet close it', (tester) async {
     final h = await pumpApp(tester, llm: onChat());
     await tester.tap(chip);
     await tester.pumpAndSettle();
@@ -110,13 +113,12 @@ void main() {
     expect(menuNote, findsNothing);
     await tester.tap(chip);
     await tester.pumpAndSettle();
-    await tester.tapAt(const Offset(640, 200));
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(menuNote, findsNothing);
     await tester.tap(chip);
     await tester.pumpAndSettle();
-    expect(menuNote, findsOneWidget);
-    await tester.tap(chip);
+    await tester.tapAt(const Offset(195, 40));
     await tester.pumpAndSettle();
     expect(menuNote, findsNothing);
     expect(h.shell.answerFromOpen, isFalse);
@@ -146,21 +148,14 @@ void main() {
     expect(h.shell.answerFromOpen, isFalse);
   });
 
-  testWidgets('on a phone the sheet holds the model, which opens the picker', (
+  testWidgets('the sheet holds the model, which opens the picker', (
     tester,
   ) async {
-    await pumpApp(tester, llm: onChat(), size: phone);
+    await pumpApp(tester, llm: onChat());
     // No model chip in the row: the row has room for one.
     expect(inComposer(find.text('qwen3:8b')), findsNothing);
     await tester.tap(chip);
     await tester.pumpAndSettle();
-    expect(
-      find.descendant(
-        of: find.byType(SheetFrame),
-        matching: find.text('Answer from'),
-      ),
-      findsOneWidget,
-    );
     expect(menuNote, findsOneWidget);
     await tester.tap(control('Chat model, qwen3:8b'));
     await tester.pumpAndSettle();
@@ -168,30 +163,20 @@ void main() {
     expect(menuNote, findsNothing);
   });
 
-  for (final size in const [Size(360, 480), Size(780, 700), Size(1400, 900)]) {
+  for (final size in const [Size(360, 480), Size(412, 915), Size(740, 360)]) {
     testWidgets(
       'the menu fits at ${size.width.toInt()}x${size.height.toInt()}',
       (tester) async {
         await pumpApp(tester, llm: onChat(), size: size);
         await tester.tap(chip);
         await tester.pumpAndSettle();
-        final choice = find.byWidgetPredicate(
-          (w) => w is Tappable && w.label.startsWith('Files only'),
-        );
+        final choice = mode(ChatMode.query);
         await tester.ensureVisible(choice);
         await tester.pumpAndSettle();
         final menu = tester.getRect(choice);
         expect(menu.top, greaterThanOrEqualTo(0));
         expect(menu.right, lessThanOrEqualTo(size.width));
-        // A phone's sheet covers the composer; a menu sits above it.
-        expect(
-          menu.bottom,
-          lessThanOrEqualTo(
-            size.width < 720
-                ? size.height
-                : tester.getRect(find.byType(Composer)).top,
-          ),
-        );
+        expect(menu.bottom, lessThanOrEqualTo(size.height));
       },
     );
   }

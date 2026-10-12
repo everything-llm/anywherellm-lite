@@ -484,85 +484,16 @@ class DocEntry {
   String get path => '$folder/$name';
 }
 
-/// A folder of the server's document library, the shared pool workspaces take documents from.
-class LibraryFolder {
-  const LibraryFolder({required this.name, this.files = const []});
-
-  /// A folder entry of the `localFiles` tree; entries that are not files are skipped.
-  factory LibraryFolder.fromJson(Map<String, dynamic> json) {
-    final name = _text(json, 'name');
-    return LibraryFolder(
-      name: name,
-      files: [
-        for (final item in jsonObjects(json['items']))
-          if (item['type'] == 'file') LibraryFile.fromJson(name, item),
-      ],
-    );
-  }
-
-  final String name;
-  final List<LibraryFile> files;
-}
-
-/// A document in the library, as the server parsed it from an upload.
-class LibraryFile {
-  const LibraryFile({
-    required this.folder,
-    required this.name,
-    required this.title,
-  });
-
-  factory LibraryFile.fromJson(String folder, Map<String, dynamic> json) {
-    final name = _text(json, 'name');
-    return LibraryFile(
-      folder: folder,
-      name: name,
-      title: _known(json, 'title') ?? name,
-    );
-  }
-
-  final String folder;
-
-  /// The stored file's name, such as `notes.md-1f2e.json`.
-  final String name;
-  final String title;
-
-  /// `folder/name`: how a workspace names it, the same as [WorkspaceDoc.path].
-  String get path => '$folder/$name';
-}
-
-/// The folders of a `localFiles` tree, whose root is the `documents` folder itself.
-List<LibraryFolder> libraryOf(Object? localFiles) => [
-  if (localFiles is Map<String, dynamic>)
-    for (final item in jsonObjects(localFiles['items']))
-      if (item['type'] == 'folder') LibraryFolder.fromJson(item),
-];
-
-/// The document fields Files shows, in order, with their labels.
-const docDetailLabels = {
-  'docAuthor': 'Author',
-  'description': 'Description',
-  'docSource': 'Source',
-  'chunkSource': 'Read from',
-  'published': 'Published',
-  'wordCount': 'Words',
-  'token_count_estimate': 'Tokens (estimate)',
-  'url': 'Address',
-};
-
-/// One library document as the server describes it on its own: its details and, when the server
+/// One library document as the server describes it on its own: its title and, when the server
 /// sends it, its text.
 class DocBody {
-  const DocBody({required this.title, this.text, this.details = const {}});
+  const DocBody({required this.title, this.text});
 
   factory DocBody.fromJson(Map<String, dynamic> json) {
     final text = json['pageContent'];
     return DocBody(
       title: _known(json, 'title') ?? _text(json, 'name'),
       text: text is String ? text : null,
-      details: {
-        for (final key in docDetailLabels.keys) key: ?_known(json, key),
-      },
     );
   }
 
@@ -570,9 +501,6 @@ class DocBody {
 
   /// The parsed text, or null when the server left it out.
   final String? text;
-
-  /// The known keys of [docDetailLabels], in its order.
-  final Map<String, String> details;
 }
 
 final _metadataBlock = RegExp(

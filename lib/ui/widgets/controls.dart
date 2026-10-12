@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import 'tappable.dart';
@@ -48,7 +47,6 @@ class AppSwitch extends StatelessWidget {
     required this.onChanged,
     required this.label,
     this.tooltip,
-    this.large = false,
   });
 
   final bool value;
@@ -57,9 +55,6 @@ class AppSwitch extends StatelessWidget {
   /// What a screen reader hears.
   final String label;
   final String? tooltip;
-
-  /// The 38 by 22 track of a settings row, rather than the 34 by 20 of a file row.
-  final bool large;
 
   @override
   Widget build(BuildContext context) {
@@ -72,11 +67,9 @@ class AppSwitch extends StatelessWidget {
       radius: BorderRadius.circular(8),
       dimWhenDisabled: 0.5,
       child: SizedBox(
-        width: ScreenClass.ofContext(context).isPhone ? 52 : 44,
-        height: ScreenClass.ofContext(context).isPhone ? 44 : 40,
-        child: Center(
-          child: SwitchTrack(value: value, large: large),
-        ),
+        width: 52,
+        height: 44,
+        child: Center(child: SwitchTrack(value: value)),
       ),
     );
   }
@@ -84,24 +77,14 @@ class AppSwitch extends StatelessWidget {
 
 /// The look of an [AppSwitch] alone, for a row that is itself the switch, as a menu's is.
 class SwitchTrack extends StatelessWidget {
-  const SwitchTrack({super.key, required this.value, this.large = false});
+  const SwitchTrack({super.key, required this.value});
 
   final bool value;
-
-  /// The 38 by 22 track of a settings row, rather than the 34 by 20 of a file row.
-  final bool large;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    // A phone draws every switch at the larger size, as the design canvas does.
-    final (
-      width,
-      height,
-      knob,
-    ) = large || ScreenClass.ofContext(context).isPhone
-        ? (38.0, 22.0, 18.0)
-        : (34.0, 20.0, 16.0);
+    const width = 38.0, height = 22.0, knob = 18.0;
     return AnimatedContainer(
       duration: motion(context, const Duration(milliseconds: 150)),
       width: width,

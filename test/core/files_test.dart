@@ -19,14 +19,9 @@ const _settings = WorkspaceSettings({
   'chatMode': 'automatic',
 });
 
-FileNode _tree({
-  Map<String, Workspace> details = const {},
-  List<LibraryFolder>? library,
-}) => buildTree(
+FileNode _tree({Map<String, Workspace> details = const {}}) => buildTree(
   workspaces: const [Workspace(slug: 'q3', name: 'Q3 planning')],
-  threadsOf: (_) => const [Thread(slug: 'budget', name: 'Budget')],
   details: details,
-  library: library,
 );
 
 List<String> _paths(FileNode node) => [
@@ -41,18 +36,8 @@ String _edited(String key, Object? value) {
 
 void main() {
   group('the tree', () {
-    test('a workspace not yet read shows only its chats', () {
-      final tree = _tree();
-      expect(_paths(tree), [
-        '/',
-        '/workspaces',
-        '/workspaces/q3',
-        '/workspaces/q3/chats',
-        '/workspaces/q3/chats/budget',
-        '/library',
-        '/.env',
-        '/keys',
-      ]);
+    test('a workspace not yet read shows nothing in it', () {
+      expect(_paths(_tree()), ['/', '/workspaces', '/workspaces/q3']);
     });
 
     test('a read workspace adds its prompt, settings and document links', () {
@@ -65,68 +50,22 @@ void main() {
             documents: [WorkspaceDoc(path: 'custom/a.json', title: 'A')],
           ),
         },
-        library: const [
-          LibraryFolder(
-            name: 'custom',
-            files: [LibraryFile(folder: 'custom', name: 'a.json', title: 'A')],
-          ),
-        ],
       );
       final q3 = nodeAt(tree, '/workspaces/q3')!;
       expect(
         [for (final c in q3.children) c.name],
-        ['PROMPT.md', 'settings.json', 'docs', 'chats'],
+        ['PROMPT.md', 'settings.json', 'docs'],
       );
       final link = nodeAt(tree, '/workspaces/q3/docs/custom/a.json')!;
       expect(
         (link.kind, link.name, link.ref),
         (NodeKind.docLink, 'A', 'custom/a.json'),
       );
-      final doc = nodeAt(tree, '/library/custom/a.json')!;
-      expect((doc.kind, doc.ref), (NodeKind.libraryDoc, 'custom/a.json'));
-    });
-
-    test('badges mark chats read only, secrets locked', () {
-      final tree = _tree();
-      expect(
-        nodeAt(tree, '/workspaces/q3/chats/budget')!.badge,
-        NodeBadge.readOnly,
-      );
-      expect(nodeAt(tree, '/workspaces/q3/chats/budget')!.name, 'Budget.md');
-      expect(nodeAt(tree, '/.env')!.badge, NodeBadge.locked);
-      expect(nodeAt(tree, '/keys')!.badge, NodeBadge.locked);
     });
 
     test('nodeAt finds nothing for a path not in the tree', () {
       expect(nodeAt(_tree(), '/workspaces/q3/PROMPT.md'), isNull);
-      expect(nodeAt(_tree(), '/library/x'), isNull);
     });
-  });
-
-  test('a chat renders as Markdown with each turn and its sources, without reasoning', () {
-    expect(
-      chatMarkdown('Budget', const [
-        ChatMessage(role: Role.user, text: 'What is the budget?'),
-        ChatMessage(
-          role: Role.assistant,
-          text: '<think>Check the roadmap.</think>About 40k.\n',
-          citations: [Citation('Q3 roadmap.pdf'), Citation('Notes.md')],
-        ),
-      ]),
-      '# Budget\n'
-      '\n**You**\n\nWhat is the budget?\n'
-      '\n**Answer**\n\nAbout 40k.\n'
-      '\nSources: Q3 roadmap.pdf, Notes.md\n',
-    );
-  });
-
-  test('a question keeps a think tag in chat Markdown', () {
-    expect(
-      chatMarkdown('Chat', const [
-        ChatMessage(role: Role.user, text: 'What does <think> do?'),
-      ]),
-      contains('What does <think> do?'),
-    );
   });
 
   group('settings', () {
@@ -211,37 +150,8 @@ void main() {
     });
   });
 
-  group('library JSON', () {
-    test('reads the folders of the documents tree and their files', () {
-      final folders = libraryOf({
-        'name': 'documents',
-        'type': 'folder',
-        'items': [
-          {
-            'name': 'custom-documents',
-            'type': 'folder',
-            'items': [
-              {
-                'name': 'notes.md-1f2e.json',
-                'type': 'file',
-                'title': 'notes.md',
-                'wordCount': 120,
-              },
-              {'name': 'odd', 'type': 'link'},
-            ],
-          },
-          {'name': 'stray.json', 'type': 'file'},
-        ],
-      });
-      expect(folders.single.name, 'custom-documents');
-      final file = folders.single.files.single;
-      expect(
-        (file.path, file.title),
-        ('custom-documents/notes.md-1f2e.json', 'notes.md'),
-      );
-    });
-
-    test('a document without its text says so, and keeps its details', () {
+  group('documents JSON', () {
+    test('a document without its text says so', () {
       final doc = DocBody.fromJson({
         'name': 'notes.md-1f2e.json',
         'title': 'notes.md',
@@ -250,10 +160,7 @@ void main() {
         'wordCount': 120,
       });
       expect(doc.text, isNull);
-      expect(doc.details, {
-        'docSource': 'a file uploaded by the user.',
-        'wordCount': '120',
-      });
+      expect(doc.title, 'notes.md');
     });
 
     test('pinned and watched read from numbers or booleans', () {
@@ -313,36 +220,8 @@ void main() {
           ('Uploaded page', null),
         ],
       );
-      expect(
-        chatMarkdown('Chat', [
-          ChatMessage(role: Role.assistant, text: 'Hi', citations: cited),
-        ]),
-        contains(
-          'Sources: [A story](<https://news.test/a?b=1>), '
-          '[A story](<https://news.test/other>), Q3 roadmap.pdf',
-        ),
-      );
     },
   );
-
-  test('a web citation\'s title is escaped in chat Markdown', () {
-    final text = chatMarkdown('Chat', [
-      ChatMessage(
-        role: Role.assistant,
-        text: 'Hi',
-        citations: [
-          Citation(
-            r'Results ] [2026] \ end',
-            url: Uri.parse('https://x.test/a(b'),
-          ),
-        ],
-      ),
-    ]);
-    expect(
-      text,
-      contains(r'[Results \] \[2026\] \\ end](<https://x.test/a(b>)'),
-    );
-  });
 
   test('a document\'s text is saved under its title, as a text file', () {
     expect(textFileName('Q3 roadmap.pdf'), 'Q3 roadmap.pdf.txt');

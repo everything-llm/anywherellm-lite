@@ -20,7 +20,7 @@ Finder control(String label) => find.descendant(
 Future<Harness> openEmbeds(
   WidgetTester tester,
   FakeAnythingLlm llm, {
-  Size size = const Size(1400, 1000),
+  Size size = const Size(740, 1000),
 }) async {
   final h = await pumpApp(tester, llm: llm, size: size);
   h.shell.openSettings(SettingsPage.embeds);
@@ -52,25 +52,30 @@ const _embed = Embed(
 );
 
 void main() {
-  testWidgets('an embed shows as a row of columns, its HTML on asking', (
+  testWidgets(
+    'a wide screen shows an embed as a row of columns, and its HTML',
+    (tester) async {
+      final llm = planningServer()..embedList = [_embed];
+      await openEmbeds(tester, llm);
+      for (final column in ['WORKSPACE', 'MODE', 'CHATS', 'ON']) {
+        expect(find.text(column), findsOneWidget);
+      }
+      Finder onPage(String text) => find.descendant(
+        of: find.byType(EmbedsPage),
+        matching: find.text(text),
+      );
+      final row = tester.getCenter(onPage('3')).dy;
+      expect(tester.getCenter(onPage('Q3 planning').first).dy, row);
+      expect(find.textContaining('data-embed-id="e-1"'), findsNothing);
+      await tapVisible(tester, control('HTML'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('data-embed-id="e-1"'), findsOneWidget);
+    },
+  );
+
+  testWidgets('a narrow screen stacks an embed, with no columns', (
     tester,
   ) async {
-    final llm = planningServer()..embedList = [_embed];
-    await openEmbeds(tester, llm);
-    for (final column in ['WORKSPACE', 'MODE', 'CHATS', 'ON']) {
-      expect(find.text(column), findsOneWidget);
-    }
-    Finder onPage(String text) =>
-        find.descendant(of: find.byType(EmbedsPage), matching: find.text(text));
-    final row = tester.getCenter(onPage('3')).dy;
-    expect(tester.getCenter(onPage('Q3 planning').first).dy, row);
-    expect(find.textContaining('data-embed-id="e-1"'), findsNothing);
-    await tapVisible(tester, control('HTML'));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('data-embed-id="e-1"'), findsOneWidget);
-  });
-
-  testWidgets('on a phone an embed stacks, with no columns', (tester) async {
     final llm = planningServer()..embedList = [_embed];
     await openEmbeds(tester, llm, size: const Size(360, 640));
     expect(find.text('WORKSPACE'), findsNothing);

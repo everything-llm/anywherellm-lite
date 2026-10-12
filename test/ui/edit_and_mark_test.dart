@@ -8,7 +8,7 @@ void main() {
   testWidgets('Edit shows that sending replaces the message, and Send as new '
       'stops that', (tester) async {
     await pumpApp(tester, llm: withChatIds());
-    await tester.tap(control('Edit'));
+    await tester.longPress(find.text('What is the budget?'));
     await tester.pump();
     expect(find.textContaining('Editing a sent message'), findsOneWidget);
     await tester.tap(control('Send as new'));
@@ -22,7 +22,7 @@ void main() {
     final llm = withChatIds()
       ..errors['dropFrom'] = const ApiException('no', status: 500);
     await pumpApp(tester, llm: llm);
-    await tester.tap(control('Edit'));
+    await tester.longPress(find.text('What is the budget?'));
     await tester.pump();
     await tester.enterText(composerField, 'What is the Q3 budget?');
     await tester.pump();

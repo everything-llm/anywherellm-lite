@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../core/memory.dart';
 import '../app_scope.dart';
 import '../icons.dart';
-import '../layout.dart';
 import '../state/memory_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
@@ -97,7 +96,6 @@ class _MemoryPageState extends State<MemoryPage> {
             small: true,
             control: AppSwitch(
               value: switches.enabled,
-              large: true,
               label: 'Saved memories',
               onChanged: memory.busy
                   ? null
@@ -111,7 +109,6 @@ class _MemoryPageState extends State<MemoryPage> {
               small: true,
               control: AppSwitch(
                 value: switches.learn,
-                large: true,
                 label: 'Learn from chats',
                 onChanged: memory.busy
                     ? null
@@ -197,21 +194,19 @@ class _Item extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final phone = ScreenClass.ofContext(context).isPhone;
-    final side = phone ? FieldCard.inset : 16.0;
-    final size = phone ? 16.0 : 14.5;
+    const side = FieldCard.inset;
     final words = Text(
       text,
       style: Type.sans(
-        size,
+        16,
         weight: add ? FontWeight.w600 : FontWeight.w400,
         color: add ? t.accent : t.ink,
         height: 1.4,
       ),
     );
     final head = Container(
-      constraints: BoxConstraints(minHeight: phone ? 60 : 48),
-      padding: EdgeInsets.symmetric(horizontal: side, vertical: 10),
+      constraints: const BoxConstraints(minHeight: 60),
+      padding: const EdgeInsets.symmetric(horizontal: side, vertical: 10),
       child: Row(
         spacing: 12,
         children: [
@@ -232,7 +227,7 @@ class _Item extends StatelessWidget {
         if (open)
           if (panel case final panel?)
             Padding(
-              padding: EdgeInsets.fromLTRB(side, 0, side, 14),
+              padding: const EdgeInsets.fromLTRB(side, 0, side, 14),
               child: panel,
             ),
       ],
@@ -248,16 +243,12 @@ class _Line extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final phone = ScreenClass.ofContext(context).isPhone;
     return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: phone ? FieldCard.inset : 16,
+      padding: const EdgeInsets.symmetric(
+        horizontal: FieldCard.inset,
         vertical: 14,
       ),
-      child: Text(
-        text,
-        style: Type.sans(phone ? 15 : 13.5, color: Tokens.of(context).muted),
-      ),
+      child: Text(text, style: Type.sans(15, color: Tokens.of(context).muted)),
     );
   }
 }

@@ -11,15 +11,12 @@ import 'chat/cited_sources.dart';
 import 'chat/gallery.dart';
 import 'chat_sheet.dart';
 import 'chat/passages_sheet.dart';
-import 'files/files_view.dart';
 import 'files/workspace_pages.dart';
 import 'layout.dart';
-import 'quick_switcher.dart';
 import 'settings/settings_dialog.dart';
 import 'share/share_sheet.dart';
 import 'share/shared_item.dart';
 import 'phone_drawer.dart';
-import 'sidebar.dart';
 import 'workspace_sheets.dart';
 import 'sources/sources_panel.dart';
 import 'upcoming.dart';
@@ -28,37 +25,10 @@ import 'tokens.dart';
 import 'widgets/basics.dart';
 import 'widgets/rise.dart';
 
-/// Ctrl and these open the workspaces in the sidebar's order.
-const _digits = [
-  LogicalKeyboardKey.digit1,
-  LogicalKeyboardKey.digit2,
-  LogicalKeyboardKey.digit3,
-  LogicalKeyboardKey.digit4,
-  LogicalKeyboardKey.digit5,
-  LogicalKeyboardKey.digit6,
-  LogicalKeyboardKey.digit7,
-  LogicalKeyboardKey.digit8,
-  LogicalKeyboardKey.digit9,
-];
-
-/// Opens the [index]th workspace in the order the sidebar's menu lists them.
-void _openWorkspace(AppScope scope, int index) {
-  final ordered = scope.prefs.prefs.inOrder(
-    scope.chat.workspaces,
-    (w) => w.slug,
-  );
-  scope.shell.closePopup(Popup.workspaces);
-  if (index < ordered.length && ordered[index].slug != scope.chat.activeSlug) {
-    scope.chat.select(ordered[index].slug);
-  }
-}
-
-/// The window: sidebar, chat and Sources, arranged for the width they have, with Settings over
-/// them when it is open.
-///
-/// Below 820 the sidebar is a drawer from the left; below 1120 Sources is a drawer from the
-/// right. On a phone the panel to the right is a sheet over the chat instead. Esc and Back close
-/// the topmost thing open: the popup, Settings, then a drawer.
+/// The window: the chat, with the drawer from the left, the panel to the right as a sheet over
+/// the chat, and Settings as a page over everything when it is open. Esc and Back close the
+/// topmost thing open: the popup, a page over the chat, Settings, the drawer, the sheet, then
+/// the workspace's pages.
 class AppShell extends StatelessWidget {
   const AppShell({super.key});
 
@@ -72,42 +42,32 @@ class AppShell extends StatelessWidget {
     final t = Tokens.of(context);
     final duration = motion(context, const Duration(milliseconds: 250));
 
-    /// What closes the thing on top, or null when nothing is open that Esc or Back closes:
-    /// where Settings shows one page at a time, a page goes back first. The sidebar counts only
-    /// while it is a drawer, and the panel to the right only while it is a drawer or a sheet,
-    /// since one in the layout has nothing to close.
-    VoidCallback? topClose({
-      required bool settingsSideBySide,
-      required bool sidebarDrawer,
-      required bool phone,
-      required bool rightClosable,
-    }) {
+    /// What closes the thing on top, or null when nothing is open that Esc or Back closes: in
+    /// Settings, a page goes back to the list first.
+    VoidCallback? topClose() {
       if (shell.shared != null) return shell.closeShared;
       if (shell.popup.value != null) return shell.closePopup;
       if (shell.scanning) return () => shell.setScanning(false);
-      // What the panel to the right shows, which a phone draws as a sheet over its pages.
+      // What the sheet over the chat shows, which sits over a page too.
       VoidCallback? side() {
         if (shell.passagesOpen) return shell.closePassages;
         if (shell.citedOpen) return shell.closeCited;
-        if (rightClosable && shell.rightOpen) return shell.closeSources;
+        if (shell.rightOpen) return shell.closeSources;
         return null;
       }
 
       if (shell.phonePage != null && !shell.settingsOpen) {
-        if (phone) {
-          if (side() case final close?) return close;
-        }
-        return shell.closePhonePage;
+        return side() ?? shell.closePhonePage;
       }
       if (shell.settingsOpen) {
-        return !settingsSideBySide && shell.settingsPage != null
+        return shell.settingsPage != null
             ? shell.settingsBack
             : shell.closeSettings;
       }
-      if (sidebarDrawer && shell.sideOpen) return shell.closeSide;
+      if (shell.sideOpen) return shell.closeSide;
       if (side() case final close?) return close;
-      // A phone's workspace pages step back: a document's text, a page, then the chat.
-      if (phone && shell.pane == Pane.files) {
+      // The workspace's pages step back: a document's text, a page, then the chat.
+      if (shell.pane == Pane.files) {
         if (scope.files.reading != null) return scope.files.closeText;
         if (shell.workspacePage != null) {
           return () => shell.showWorkspacePage(null);
@@ -118,226 +78,128 @@ class AppShell extends StatelessWidget {
     }
 
     return LayoutBuilder(
-      builder: (context, box) {
-        final screen = ScreenClass.of(box.maxWidth);
-        final sourcesInline = ScreenClass.sourcesInline(box.maxWidth);
-        final settingsSideBySide = ScreenClass.settingsSideBySide(box.maxWidth);
-        shell.fit(sourcesInline: sourcesInline);
-        return ListenableBuilder(
-          listenable: shell,
-          builder: (context, _) {
-            final sideDrawer = screen.sidebarDrawer && shell.sideOpen;
-            final files = shell.pane == Pane.files;
-            // On a phone the panel to the right is a sheet over the chat, not a drawer.
-            final sheet = screen.isPhone;
-            final sourcesDrawer = !sourcesInline && !sheet && shell.rightOpen;
-            final sheetOpen = sheet && shell.rightOpen;
-            // A phone's drawer is wider, leaving the chat a strip to tap to close it.
-            final drawerWidth = screen.isPhone
-                ? max(Sizes.sidebar, min(360.0, box.maxWidth * 0.82))
-                : Sizes.sidebar;
-            const rightWidth = Sizes.sources;
-            final right = switch (shell.beside) {
-              Beside.sources => const SourcesPanel(),
-              Beside.passages => const PassagesPanel(),
-              Beside.cited => const CitedPanel(),
-            };
-            VoidCallback? close() => topClose(
-              settingsSideBySide: settingsSideBySide,
-              sidebarDrawer: screen.sidebarDrawer,
-              phone: screen.isPhone,
-              rightClosable: sourcesDrawer || sheetOpen,
-            );
-            return _BackGuard(
-              popup: shell.popup,
-              open: close() != null,
-              onBack: () => close()?.call(),
-              child: CallbackShortcuts(
-                bindings: {
-                  // The browser takes these keys before a page sees them.
-                  if (!kIsWeb) ...{
-                    const SingleActivator(
-                      LogicalKeyboardKey.keyK,
-                      control: true,
-                    ): shell.toggleSwitcher,
-                    for (final (i, key) in _digits.indexed)
-                      SingleActivator(key, control: true): () =>
-                          _openWorkspace(scope, i),
-                  },
-                  const SingleActivator(LogicalKeyboardKey.escape): () =>
-                      close()?.call(),
-                },
-                child: Focus(
-                  autofocus: true,
-                  // InkWell needs a Material above it, and the shell has no Scaffold.
-                  child: Material(
-                    color: t.bg,
-                    child: _AboveKeyboard(
-                      // Clear of the status and navigation bars on a phone; no inset on a
-                      // desktop.
-                      child: SafeArea(
-                        child: Stack(
-                          children: [
-                            Row(
+      builder: (context, box) => ListenableBuilder(
+        listenable: shell,
+        builder: (context, _) {
+          final files = shell.pane == Pane.files;
+          // The drawer leaves the chat a strip to tap to close it.
+          final drawerWidth = max(
+            Sizes.drawer,
+            min(360.0, box.maxWidth * 0.82),
+          );
+          final right = switch (shell.beside) {
+            Beside.sources => const SourcesPanel(),
+            Beside.passages => const PassagesPanel(),
+            Beside.cited => const CitedPanel(),
+          };
+          return _BackGuard(
+            popup: shell.popup,
+            open: topClose() != null,
+            onBack: () => topClose()?.call(),
+            child: CallbackShortcuts(
+              bindings: {
+                const SingleActivator(LogicalKeyboardKey.escape): () =>
+                    topClose()?.call(),
+              },
+              child: Focus(
+                autofocus: true,
+                // InkWell needs a Material above it, and the shell has no Scaffold.
+                child: Material(
+                  color: t.bg,
+                  child: _AboveKeyboard(
+                    // Clear of the status and navigation bars.
+                    child: SafeArea(
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: Stack(
+                              fit: StackFit.expand,
                               children: [
-                                if (screen.sidebarInline) const Sidebar(),
-                                // Keyed, so the chat keeps its state when the panels on both
-                                // sides come or go in one resize.
-                                Expanded(
-                                  key: const ValueKey('main'),
-                                  child: Stack(
-                                    fit: StackFit.expand,
-                                    children: [
-                                      // The chat stays built while Files is on screen, so a draft
-                                      // and a running answer survive the switch.
-                                      Offstage(
-                                        offstage: files,
-                                        child: TickerMode(
-                                          enabled: !files,
-                                          child: ExcludeFocus(
-                                            excluding: files,
-                                            child: ChatView(
-                                              showMenu: screen.sidebarDrawer,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      if (files)
-                                        screen.isPhone
-                                            ? const WorkspacePages()
-                                            : FilesView(
-                                                showMenu: screen.sidebarDrawer,
-                                              ),
-                                    ],
-                                  ),
-                                ),
-                                if (sourcesInline)
-                                  AnimatedContainer(
-                                    duration: duration,
-                                    curve: Curves.easeOut,
-                                    width: shell.rightOpen ? rightWidth : 0,
-                                    child: ClipRect(
-                                      child: OverflowBox(
-                                        alignment: Alignment.centerLeft,
-                                        minWidth: rightWidth,
-                                        maxWidth: rightWidth,
-                                        child: _Hidden(
-                                          hidden: !shell.rightOpen,
-                                          child: right,
-                                        ),
-                                      ),
+                                // The chat stays built while the workspace's pages show, so a
+                                // draft and a running answer survive the switch.
+                                Offstage(
+                                  offstage: files,
+                                  child: TickerMode(
+                                    enabled: !files,
+                                    child: ExcludeFocus(
+                                      excluding: files,
+                                      child: const ChatView(),
                                     ),
                                   ),
+                                ),
+                                if (files) const WorkspacePages(),
                               ],
                             ),
-                            if (sideDrawer || sourcesDrawer)
-                              _Scrim(onTap: shell.closeDrawers),
-                            if (screen.sidebarDrawer)
-                              _Drawer(
-                                open: sideDrawer,
-                                left: true,
-                                width: drawerWidth,
-                                duration: duration,
-                                child: screen.isPhone
-                                    ? PhoneDrawer(width: drawerWidth)
-                                    : const Sidebar(),
-                              ),
-                            if (!sourcesInline && !sheet)
-                              _Drawer(
-                                open: sourcesDrawer,
-                                left: false,
-                                width: rightWidth,
-                                duration: duration,
-                                child: right,
-                              ),
-                            if (shell.phonePage case final page?)
-                              Positioned.fill(
-                                child: switch (page) {
-                                  PhonePage.upcoming => const UpcomingPage(),
-                                },
-                              ),
-                            // The sheet's own scrim closes it. It sits over a phone page, as
-                            // the drawer that opens a page cannot be reached under it.
-                            if (sheetOpen) Positioned.fill(child: right),
-                            // A phone puts back a deleted chat from over the chat, as its
-                            // drawer has closed.
-                            if (screen.isPhone && !shell.settingsOpen)
-                              const _PhoneUndo(),
-                            // A phone's Settings is a page over the window.
-                            if (shell.settingsOpen && screen.isPhone)
-                              const Positioned.fill(
-                                child: SettingsDialog(
-                                  sideBySide: false,
-                                  phone: true,
-                                ),
-                              )
-                            else if (shell.settingsOpen) ...[
-                              _Scrim(onTap: shell.closeSettings),
-                              Center(
-                                child: SettingsDialog(
-                                  sideBySide: settingsSideBySide,
-                                ),
-                              ),
-                            ],
-                            // What another app shared, over everything but a popup.
-                            if (shell.shared case final item?)
-                              Positioned.fill(
-                                child: ShareSheet(item, key: ObjectKey(item)),
-                              ),
+                          ),
+                          if (shell.sideOpen) _Scrim(onTap: shell.closeSide),
+                          _Drawer(
+                            open: shell.sideOpen,
+                            width: drawerWidth,
+                            duration: duration,
+                            child: PhoneDrawer(width: drawerWidth),
+                          ),
+                          if (shell.phonePage case final page?)
                             Positioned.fill(
-                              child: ValueListenableBuilder(
-                                valueListenable: shell.popup,
-                                builder: (context, popup, _) => Stack(
-                                  children: [
-                                    if (popup case final GalleryOpen open)
-                                      Positioned.fill(
-                                        child: GalleryPage(
-                                          open,
-                                          key: ObjectKey(open),
-                                        ),
+                              child: switch (page) {
+                                PhonePage.upcoming => const UpcomingPage(),
+                              },
+                            ),
+                          // The sheet's own scrim closes it. It sits over a page, as the
+                          // drawer that opens a page cannot be reached under it.
+                          if (shell.rightOpen) Positioned.fill(child: right),
+                          // A deleted chat is put back from over the chat, as the drawer has
+                          // closed.
+                          if (!shell.settingsOpen) const _PhoneUndo(),
+                          if (shell.settingsOpen)
+                            const Positioned.fill(child: SettingsDialog()),
+                          // What another app shared, over everything but a popup.
+                          if (shell.shared case final item?)
+                            Positioned.fill(
+                              child: ShareSheet(item, key: ObjectKey(item)),
+                            ),
+                          Positioned.fill(
+                            child: ValueListenableBuilder(
+                              valueListenable: shell.popup,
+                              builder: (context, popup, _) => Stack(
+                                children: [
+                                  if (popup case final GalleryOpen open)
+                                    Positioned.fill(
+                                      child: GalleryPage(
+                                        open,
+                                        key: ObjectKey(open),
                                       ),
-                                    if (popup case final WorkspaceSheet kind)
-                                      Positioned.fill(
-                                        child: WorkspaceSheetView(
-                                          kind,
-                                          key: ValueKey(kind),
-                                        ),
+                                    ),
+                                  if (popup case final WorkspaceSheet kind)
+                                    Positioned.fill(
+                                      child: WorkspaceSheetView(
+                                        kind,
+                                        key: ValueKey(kind),
                                       ),
-                                    if (popup case final ChatSheetFor of)
-                                      Positioned.fill(
-                                        child: ChatSheet(
-                                          of,
-                                          key: ValueKey((
-                                            of.thread.slug,
-                                            of.deleting,
-                                          )),
-                                        ),
+                                    ),
+                                  if (popup case final ChatSheetFor of)
+                                    Positioned.fill(
+                                      child: ChatSheet(
+                                        of,
+                                        key: ValueKey((
+                                          of.thread.slug,
+                                          of.deleting,
+                                        )),
                                       ),
-                                    if (popup == Popup.switcher) ...[
-                                      _Scrim(
-                                        onTap: () =>
-                                            shell.closePopup(Popup.switcher),
-                                      ),
-                                      const Align(
-                                        alignment: Alignment(0, -0.5),
-                                        child: QuickSwitcher(),
-                                      ),
-                                    ],
-                                  ],
-                                ),
+                                    ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
               ),
-            );
-          },
-        );
-      },
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -402,16 +264,12 @@ class _Hidden extends StatelessWidget {
 class _Drawer extends StatelessWidget {
   const _Drawer({
     required this.open,
-    required this.left,
     required this.width,
     required this.duration,
     required this.child,
   });
 
   final bool open;
-
-  /// Slides from the left edge, or else from the right.
-  final bool left;
   final double width;
   final Duration duration;
   final Widget child;
@@ -420,15 +278,14 @@ class _Drawer extends StatelessWidget {
   Widget build(BuildContext context) => Positioned(
     top: 0,
     bottom: 0,
-    left: left ? 0 : null,
-    right: left ? null : 0,
+    left: 0,
     width: width,
     child: _Hidden(
       hidden: !open,
       child: AnimatedSlide(
         duration: duration,
         curve: Curves.easeOut,
-        offset: Offset(open ? 0 : (left ? -1.05 : 1.05), 0),
+        offset: Offset(open ? 0 : -1.05, 0),
         child: child,
       ),
     ),

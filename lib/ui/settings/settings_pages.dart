@@ -78,52 +78,7 @@ enum SettingsPage {
       needsServer && this != server && this != memory ? server : null;
 }
 
-/// A page of AnythingLLM's own web page that the app does not have, which Settings links to.
-class WebPage {
-  const WebPage(this.label, this.about);
-
-  final String label;
-
-  /// What the page is for, in a line.
-  final String about;
-}
-
-/// AnythingLLM's pages the app leaves to its web page, in the order the Server page lists them.
-const webPages = [
-  WebPage(
-    'Document splitting',
-    'How new documents are cut into passages before they are stored. AnythingLLM calls this '
-        'the text splitter.',
-  ),
-  WebPage(
-    'Skills and tools',
-    'What answers may do when a chat is set to use tools. AnythingLLM calls these agent '
-        'skills.',
-  ),
-  WebPage(
-    'Default instructions',
-    'What a new workspace starts with. AnythingLLM calls this the system prompt. It can use '
-        'variables such as {date}.',
-  ),
-  WebPage(
-    'Instruction variables',
-    'Values the instructions fill in, written in braces like {date}. AnythingLLM calls these '
-        'prompt variables.',
-  ),
-  WebPage(
-    'Scheduled jobs',
-    'Prompts that run on a schedule and keep their results.',
-  ),
-  WebPage('Activity log', 'What happened on the server, newest first.'),
-  WebPage(
-    'API keys',
-    'Keys for programs that talk to AnythingLLM. AnythingLLM calls this the developer API.',
-  ),
-  WebPage('Security', 'Who can open this server.'),
-];
-
-/// The providers each provider page chooses among, which the page draws and a search reads the
-/// names of.
+/// The providers each provider page chooses among, which the page draws.
 const providerPages = {
   SettingsPage.chatModel: [chatProviders],
   SettingsPage.searchModel: [embedderProviders],

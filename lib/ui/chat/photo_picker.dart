@@ -1,4 +1,4 @@
-import 'package:file_selector/file_selector.dart' show XFile;
+import 'package:cross_file/cross_file.dart';
 
 /// Pictures for the composer from the device's own photos and camera.
 abstract interface class PhotoPicker {

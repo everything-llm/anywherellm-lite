@@ -133,13 +133,12 @@ abstract interface class AnythingLlmApi {
   /// The file extensions the server can read in, lower case with the dot: `.md`.
   Future<Set<String>> acceptedExtensions();
 
-  /// Sends [bytes] as the file [name] into library [folder], or the server's default folder
-  /// when it is null, with the details in [meta], and returns the documents the server made of
-  /// it. Attaches them to no workspace.
+  /// Sends [bytes] as the file [name] into the server's default library folder, with the
+  /// details in [meta], and returns the documents the server made of it. Attaches them to no
+  /// workspace.
   Future<List<DocEntry>> upload(
     String name,
     List<int> bytes, {
-    String? folder,
     DocMeta meta = const DocMeta(),
   });
 
@@ -162,27 +161,8 @@ abstract interface class AnythingLlmApi {
   /// rest as they are.
   Future<void> updateWorkspace(String slug, Map<String, Object?> fields);
 
-  /// Pins the document at [path] in the workspace, so its whole text is always in context, or
-  /// unpins it.
-  Future<void> pinDocument(String slug, String path, {required bool pinned});
-
-  /// The library's folders and the documents in each.
-  Future<List<LibraryFolder>> libraryFolders();
-
   /// The library document at [path], `folder/name.json`.
   Future<DocBody> document(String path);
-
-  Future<void> createFolder(String name);
-
-  /// Deletes the library folder [name] and the documents in it, which takes them out of every
-  /// workspace too.
-  Future<void> removeFolder(String name);
-
-  /// Moves each library document from its first path to its second.
-  Future<void> moveDocuments(List<(String from, String to)> moves);
-
-  /// Deletes the library documents at [paths], which takes them out of every workspace too.
-  Future<void> removeDocuments(List<String> paths);
 
   /// The passages of workspace [slug]'s documents that [query] finds, closest first, with the
   /// workspace's own number and threshold, as an answer would get them.

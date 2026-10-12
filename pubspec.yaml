@@ -1,5 +1,5 @@
 name: anywherellm
-description: "A lightweight Linux and Android front end for an AnythingLLM server."
+description: "A lightweight Android front end for an AnythingLLM server."
 publish_to: 'none'
 version: 2.16.0+23
 
@@ -11,10 +11,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  file_selector: ">=1.1.0 <1.2.0"
   file_picker: ">=13.1.0 <13.2.0"
-  desktop_drop: ">=0.8.4 <0.9.0"
-  pasteboard: ">=0.5.0 <0.6.0"
+  cross_file: ">=0.3.5 <0.4.0"
   path_drawing: ">=1.0.1 <1.1.0"
   http: ">=1.6.0 <1.7.0"
   flutter_secure_storage: ">=11.2.0 <11.3.0"
@@ -24,11 +22,9 @@ dependencies:
   re_highlight: ">=0.0.3 <0.1.0"
   markdown: ">=7.3.1 <7.4.0"
   url_launcher: ">=6.3.2 <6.4.0"
-  qr: ">=4.0.0 <4.1.0"
   mobile_scanner: ">=7.4.2 <7.5.0"
   speech_to_text: ">=7.5.0 <7.6.0"
   flutter_tts: ">=4.2.5 <4.3.0"
-  web: ">=1.1.1 <1.2.0"
   characters: ">=1.4.0 <1.5.0"
   share_plus: ">=13.3.1 <13.4.0"
   receive_sharing_intent: ">=1.9.0 <1.10.0"
@@ -38,7 +34,6 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ">=6.0.0 <6.1.0"
-  file_selector_platform_interface: ">=2.7.0 <2.8.0"
   file_picker_platform_interface: ">=4.0.0 <4.1.0"
   flutter_launcher_icons: ">=0.14.4 <0.15.0"
   flutter_native_splash: ">=2.4.8 <2.5.0"

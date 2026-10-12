@@ -80,9 +80,6 @@ class FakeAnythingLlm implements AnythingLlmApi {
   /// The library documents, by path, whose text `document` leaves out, as the server may.
   final Set<String> textless = {};
 
-  /// Library folders made with [createFolder], which show even while empty.
-  final Set<String> folders = {};
-
   /// What [systemSettings] answers.
   Map<String, Object?> system = const {
     'LLMProvider': 'ollama',
@@ -485,16 +482,12 @@ class FakeAnythingLlm implements AnythingLlmApi {
   Future<List<DocEntry>> upload(
     String name,
     List<int> bytes, {
-    String? folder,
     DocMeta meta = const DocMeta(),
   }) => _run('upload', () {
-    final doc = DocEntry(
-      folder: folder ?? 'custom-documents',
-      name: '$name.json',
-    );
+    final doc = DocEntry(folder: 'custom-documents', name: '$name.json');
     _keep(doc, name, meta, words: bytes.length);
     return [doc];
-  }, folder == null ? name : '$folder/$name');
+  }, name);
 
   /// A page the server reads in as `custom-documents/url-<host>.json`.
   @override
@@ -554,94 +547,15 @@ class FakeAnythingLlm implements AnythingLlmApi {
       }, slug);
 
   @override
-  Future<void> pinDocument(String slug, String path, {required bool pinned}) =>
-      _run('pinDocument', () {
-        final docs = _space(slug).docs;
-        final at = docs.indexWhere((d) => d.path == path);
-        final doc = docs[at];
-        docs[at] = WorkspaceDoc(
-          path: doc.path,
-          title: doc.title,
-          words: doc.words,
-          pinned: pinned,
-        );
-      }, '$path:$pinned');
-
-  @override
-  Future<List<LibraryFolder>> libraryFolders() => _run('libraryFolders', () {
-    final byFolder = <String, List<LibraryFile>>{
-      for (final folder in folders) folder: [],
-    };
-    for (final doc in library.values) {
-      final folder = docFolder(doc.path);
-      (byFolder[folder] ??= []).add(
-        LibraryFile(folder: folder, name: docName(doc.path), title: doc.title),
-      );
-    }
-    return [
-      for (final MapEntry(:key, :value) in byFolder.entries)
-        LibraryFolder(name: key, files: value),
-    ];
-  });
-
-  @override
   Future<DocBody> document(String path) => _run('document', () {
     final doc = library[path];
     if (doc == null) throw ApiException('There is no document $path.');
     return DocBody(
       title: doc.title,
       text: textless.contains(path) ? null : 'The text of ${doc.title}.',
-      details: {'docAuthor': 'Ada'},
     );
   }, path);
 
-  @override
-  Future<void> createFolder(String name) =>
-      _run('createFolder', () => folders.add(name), name);
-
-  @override
-  Future<void> removeFolder(String name) => _run('removeFolder', () {
-    final paths = [
-      for (final path in library.keys)
-        if (docFolder(path) == name) path,
-    ];
-    for (final path in paths) {
-      library.remove(path);
-      for (final w in spaces) {
-        w.docs.removeWhere((d) => d.path == path);
-      }
-    }
-    folders.remove(name);
-  }, name);
-
-  /// Moves documents that no workspace uses, as the server does, and leaves the others.
-  @override
-  Future<void> moveDocuments(List<(String, String)> moves) =>
-      _run('moveDocuments', () {
-        for (final (from, to) in moves) {
-          if (spaces.any((w) => w.docs.any((d) => d.path == from))) continue;
-          final doc = library.remove(from)!;
-          library[to] = WorkspaceDoc(
-            path: to,
-            title: doc.title,
-            words: doc.words,
-          );
-        }
-      }, [for (final (from, to) in moves) '$from>$to'].join(','));
-
-  @override
-  Future<void> removeDocuments(List<String> paths) =>
-      _run('removeDocuments', () {
-        for (final path in paths) {
-          library.remove(path);
-          for (final w in spaces) {
-            w.docs.removeWhere((d) => d.path == path);
-          }
-        }
-      }, paths.join(','));
-
-  /// Finds a passage in each document of the workspace whose title shares a word with the
-  /// question, closest first.
   @override
   Future<List<SearchHit>> searchDocs(String slug, String query) => _run(
     'searchDocs',

@@ -75,7 +75,7 @@ void main() {
       expect(left, orderedEquals([...left]..sort()));
       await tester.tap(more);
       await tester.pumpAndSettle();
-      expect(find.text('THIS ANSWER'), findsOneWidget);
+      expect(find.text('This answer'), findsOneWidget);
       for (final (name, value) in [
         ('Model', 'glm-5.3'),
         ('Time', '4.3 s'),
@@ -91,50 +91,13 @@ void main() {
       expect(control('Good answer'), findsOneWidget);
       expect(control('Bad answer'), findsOneWidget);
       expect(control(_always), findsOneWidget);
-      // The menu opens over the button.
-      expect(
-        tester.getBottomLeft(find.text(_always)).dy,
-        lessThan(tester.getTopLeft(more).dy),
-      );
     },
   );
 
-  testWidgets('the menu closes on Esc, Back and a tap outside', (tester) async {
-    final h = await pumpApp(tester, llm: measured());
-    await ask(tester, 'Second');
-    Future<void> open() async {
-      await tester.tap(control(_more));
-      await tester.pumpAndSettle();
-      expect(find.text('THIS ANSWER'), findsOneWidget);
-    }
-
-    await open();
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-    await tester.pumpAndSettle();
-    expect(find.text('THIS ANSWER'), findsNothing);
-    expect(h.shell.answerMenu, isNull);
-
-    await open();
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(find.text('THIS ANSWER'), findsNothing);
-    expect(h.shell.answerMenu, isNull);
-
-    await open();
-    await tester.tapAt(const Offset(700, 120));
-    await tester.pumpAndSettle();
-    expect(find.text('THIS ANSWER'), findsNothing);
-    expect(h.shell.answerMenu, isNull);
-  });
-
-  testWidgets('on a phone More is a sheet, closed by Back and the scrim', (
+  testWidgets('More is a sheet, closed by Esc, Back and the scrim', (
     tester,
   ) async {
-    final h = await pumpApp(
-      tester,
-      llm: measured(),
-      size: const Size(390, 844),
-    );
+    final h = await pumpApp(tester, llm: measured());
     await ask(tester, 'Second');
     await tester.tap(control(_more));
     await tester.pumpAndSettle();
@@ -158,6 +121,11 @@ void main() {
     expect(find.byType(SheetFrame), findsNothing);
     await tester.tap(control(_more));
     await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(h.shell.answerMenu, isNull);
+    await tester.tap(control(_more));
+    await tester.pumpAndSettle();
     await tester.tapAt(const Offset(195, 30));
     await tester.pumpAndSettle();
     expect(h.shell.answerMenu, isNull);
@@ -172,7 +140,7 @@ void main() {
     await tester.pumpAndSettle();
     await h.chat.open('priorities');
     await tester.pumpAndSettle();
-    expect(find.text('THIS ANSWER'), findsNothing);
+    expect(find.text('This answer'), findsNothing);
     expect(h.shell.answerMenu, isNull);
   });
 
@@ -212,10 +180,6 @@ void main() {
     );
     h.shell.openSettings(SettingsPage.chat);
     await tester.pumpAndSettle();
-    expect(
-      find.text('The model, time, tokens, speed and cost under every answer.'),
-      findsOneWidget,
-    );
     await tester.tap(control('Show answer details'));
     await tester.pumpAndSettle();
     expect(h.prefs.prefs.isOn(ChatSwitch.answerDetails), isFalse);

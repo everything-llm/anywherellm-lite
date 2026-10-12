@@ -1,7 +1,7 @@
 import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/ui/chat/slash_menu.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -35,28 +35,27 @@ void main() {
   ) async {
     await pumpApp(tester, llm: planningServer()..presets = const [_research]);
     await _type(tester, '/');
-    expect(find.byType(SlashMenu), findsOneWidget);
+    expect(find.byType(SlashStrip), findsOneWidget);
     expect(find.text('/reset'), findsOneWidget);
-    expect(find.text('Research a question in depth'), findsOneWidget);
+    expect(find.text('/deep-research'), findsOneWidget);
 
     await _type(tester, '/de');
     expect(find.text('/reset'), findsNothing);
     expect(find.text('/deep-research'), findsOneWidget);
 
     await _type(tester, '/deep-research tides');
-    expect(find.byType(SlashMenu), findsNothing);
+    expect(find.byType(SlashStrip), findsNothing);
   });
 
-  testWidgets('arrows move, Enter fills the command, Enter again sends', (
+  testWidgets('Enter fills the first command, and Enter again sends', (
     tester,
   ) async {
     final llm = planningServer()..presets = const [_research];
     await pumpApp(tester, llm: llm);
-    await _type(tester, '/');
-    await _key(tester, LogicalKeyboardKey.arrowDown);
+    await _type(tester, '/de');
     await _key(tester, LogicalKeyboardKey.enter);
     expect(_draft(tester), '/deep-research ');
-    expect(find.byType(SlashMenu), findsNothing);
+    expect(find.byType(SlashStrip), findsNothing);
     expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
 
     await _type(tester, '/reset');
@@ -66,35 +65,10 @@ void main() {
     expect(find.text('About 40k.'), findsNothing);
   });
 
-  testWidgets('Esc closes the menu until the message changes', (tester) async {
-    await pumpApp(tester, llm: planningServer());
-    await _type(tester, '/re');
-    await _key(tester, LogicalKeyboardKey.escape);
-    expect(find.byType(SlashMenu), findsNothing);
-    await _type(tester, '/r');
-    expect(find.byType(SlashMenu), findsOneWidget);
-  });
-
   testWidgets(
-    'a desktop has no slash button, since typing / opens the commands',
+    'there is no Commands button; typing / opens them over the composer',
     (tester) async {
       await pumpApp(tester, llm: planningServer());
-      expect(
-        find.byWidgetPredicate((w) => w is Tappable && w.label == 'Commands'),
-        findsNothing,
-      );
-    },
-  );
-
-  testWidgets(
-    'a phone has no Commands button; typing / opens them over the composer',
-    (tester) async {
-      await pumpApp(
-        tester,
-        llm: planningServer(),
-        size: const Size(390, 844),
-        sourcesOpen: false,
-      );
       expect(
         find.byWidgetPredicate((w) => w is Tappable && w.label == 'Commands'),
         findsNothing,
@@ -111,14 +85,9 @@ void main() {
   );
 
   testWidgets(
-    'on a phone the commands are suggestions that leave the field and its focus alone',
+    'the commands are suggestions that leave the field and its focus alone',
     (tester) async {
-      await pumpApp(
-        tester,
-        llm: planningServer()..presets = const [_research],
-        size: const Size(390, 844),
-        sourcesOpen: false,
-      );
+      await pumpApp(tester, llm: planningServer()..presets = const [_research]);
       await tester.showKeyboard(composerField);
       final field = tester.state(composerField);
       await _type(tester, '/');

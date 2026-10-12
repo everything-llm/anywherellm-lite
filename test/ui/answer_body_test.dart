@@ -76,8 +76,8 @@ void main() {
       'Plan:\n\n- Alpha\n- Beta\n\nThen:\n\n- Gamma\n\n- Delta',
     );
     expect(_gap(tester, 'Alpha', 'Beta'), 0);
-    expect(_gap(tester, 'Gamma', 'Delta'), 12);
-    expect(_gap(tester, 'Plan:', 'Alpha'), 12);
+    expect(_gap(tester, 'Gamma', 'Delta'), 8);
+    expect(_gap(tester, 'Plan:', 'Alpha'), 8);
   });
 
   testWidgets('a table wider than the chat shows its scrollbar', (
@@ -218,40 +218,6 @@ $$\frac{a}{b}$$
       await _show(tester, '```\ndef add(a, b): pass\n```');
       expect(colours(tester), hasLength(1));
     });
-  });
-
-  testWidgets('in a browser an answer carries its words for a screen reader', (
-    tester,
-  ) async {
-    final semantics = tester.ensureSemantics();
-    await pumpApp(tester, llm: _server(), labelAnswers: true);
-    expect(
-      find.bySemanticsLabel(RegExp(r'^The plan\nFirst step\nSecond step')),
-      findsOneWidget,
-    );
-    expect(
-      tester.getSemantics(find.bySemanticsLabel('Copy code')),
-      isSemantics(label: 'Copy code', isButton: true),
-    );
-    semantics.dispose();
-  });
-
-  testWidgets('an answer is labelled only once it has finished', (
-    tester,
-  ) async {
-    final semantics = tester.ensureSemantics();
-    final llm = planningServer()..hold = true;
-    final h = await pumpApp(tester, llm: llm, labelAnswers: true);
-    await h.chat.send('Go');
-    llm.chat!.add(const TextChunk('Words so far'));
-    await tester.pump(const Duration(milliseconds: 100));
-    final label = find.bySemanticsLabel('Words so far');
-    expect(label, findsNothing);
-    llm.chat!.add(const ChatDone([]));
-    await llm.chat!.close();
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(label, findsOneWidget);
-    semantics.dispose();
   });
 
   testWidgets('a model failure shows as a failure, with Retry and no Copy', (

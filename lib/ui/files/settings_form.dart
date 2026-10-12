@@ -5,62 +5,23 @@ import 'package:flutter/material.dart';
 import '../../core/chat.dart';
 import '../../core/server_models.dart';
 import '../app_scope.dart';
-import '../tokens.dart';
-import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../chat/model_picker.dart';
 import '../widgets/fields.dart';
 import '../widgets/phone_page.dart';
 import '../widgets/radio_card.dart';
-import '../widgets/setting_row.dart';
-import '../widgets/segmented.dart';
 import '../settings/rows.dart';
 
-/// The similarity thresholds the web UI offers, with the score each one stands for.
-const similarityPresets = [
-  (0, 'None'),
-  (0.25, 'Low'),
-  (0.5, 'Medium'),
-  (0.75, 'High'),
-];
-
-/// What each chat mode does, as the web UI says it.
-const _modeHelp = {
-  'automatic': 'Agent uses tools on its own when the model supports them. Otherwise type @agent to use them.',
-  'chat': 'Chat answers from the model and the workspace documents.',
-  'query': 'Query answers only from the workspace documents.',
-};
-
-/// What each chat mode does, in the words of the composer's Answer from chip.
-const _plainModeHelp =
-    'The same choice as the chip in the message box. It applies to every chat in this workspace.';
-
-/// A workspace's answer settings as a form, in place of `settings.json`. Saving sends only what
-/// changed, through the same checks as the JSON editor. Its key changes each time the settings
-/// are read afresh, which drops the draft.
+/// A workspace's answer settings as a form, in place of `settings.json`, in the composer's words:
+/// Answer from as a card for each mode, the chat model, which opens the [ModelPicker], and what
+/// Files only says when the files do not cover a question. The rest is kept as the server has it.
+/// Saving sends only what changed, through the same checks as `settings.json`. Its key changes
+/// each time the settings are read afresh, which drops the draft.
 class SettingsForm extends StatefulWidget {
-  const SettingsForm({
-    super.key,
-    required this.slug,
-    required this.onJson,
-    this.plain = false,
-    this.phone = false,
-  });
+  const SettingsForm({super.key, required this.slug});
 
   final String slug;
-
-  /// Shows only what a phone does, in the composer's words: Answer from as a card for each
-  /// mode, the chat model, which opens the [ModelPicker], and what Files only says when the
-  /// files do not cover a question. The rest is kept as the server has it.
-  final bool phone;
-
-  /// Names the chat mode and the refusal as the Essentials view does, in the composer's words,
-  /// rather than AnythingLLM's.
-  final bool plain;
-
-  /// Switches to the JSON editor.
-  final VoidCallback onJson;
 
   @override
   State<SettingsForm> createState() => _SettingsFormState();
@@ -84,9 +45,8 @@ class _SettingsFormState extends State<SettingsForm> {
   late String? _search;
   late Object? _similarity;
   bool _saving = false;
-  bool _checked = false;
 
-  /// Whether the model picker shows, on a phone.
+  /// Whether the model picker shows.
   bool _picking = false;
 
   @override
@@ -157,10 +117,7 @@ class _SettingsFormState extends State<SettingsForm> {
 
   Future<void> _save() async {
     final (values, problems) = _read();
-    if (problems.isNotEmpty) {
-      setState(() => _checked = true);
-      return;
-    }
+    if (problems.isNotEmpty) return;
     setState(() => _saving = true);
     await AppScope.of(context).files.save(jsonEncode(values));
     if (mounted) setState(() => _saving = false);
@@ -173,202 +130,33 @@ class _SettingsFormState extends State<SettingsForm> {
     _mode = _saved['chatMode'] as String?;
     _search = _saved['vectorSearchMode'] as String?;
     _similarity = _saved['similarityThreshold'];
-    _checked = false;
   });
-
-  Widget _field(
-    String key,
-    String label,
-    String help, {
-    String? hint,
-    TextInputType? keyboard,
-    int maxLines = 1,
-    String? problem,
-  }) => SettingRow(
-    label: label,
-    help: help,
-    problem: _checked ? problem : null,
-    child: AppField(
-      controller: _text[key]!,
-      label: label,
-      hint: hint,
-      keyboardType: keyboard,
-      maxLines: maxLines,
-      onChanged: (_) => setState(() {}),
-    ),
-  );
 
   @override
   Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    final (_, problems) = _read();
-    const system = 'System default';
-    final similarity = _similarity;
-    final preset = similarityPresets
-        .where((p) => similarity is num && p.$1 == similarity)
-        .firstOrNull;
     final dirty = _dirty;
-    final buttons = ActionRow(even: widget.phone, [
-      AppButton('Revert', onPressed: dirty && !_saving ? _revert : null),
-      AppButton(
-        _saving ? 'Saving…' : 'Save',
-        primary: true,
-        onPressed: dirty && !_saving ? _save : null,
-      ),
-    ]);
-    // A phone shows its buttons only once something has changed, as the design canvas draws
-    // the page at rest.
-    if (widget.phone) return _phone(context, dirty || _saving ? buttons : null);
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        Align(
-          alignment: Alignment.topLeft,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Leave a field empty to use the system default.',
-                        style: Type.sans(13, color: t.muted),
-                      ),
-                    ),
-                    TextAction('doc', 'Edit as JSON', widget.onJson),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                const SectionLabel('Answers'),
-                const SizedBox(height: 12),
-                SettingRow(
-                  label: widget.plain ? 'Answer from' : 'Chat mode',
-                  help: widget.plain
-                      ? _plainModeHelp
-                      : _modeHelp[_mode] ?? 'The workspace has no chat mode.',
-                  child: Segmented<String>(
-                    // AnythingLLM's own names, or the plain words of the composer's Answer
-                    // from chip.
-                    options: [
-                      for (final m in ChatMode.values)
-                        (m.name, widget.plain ? m.title : m.label),
-                    ],
-                    value: _mode,
-                    maxLines: widget.plain ? 3 : 1,
-                    onChanged: (mode) => setState(() => _mode = mode),
-                  ),
-                ),
-                _field(
-                  'openAiHistory',
-                  'Chat history',
-                  'How many earlier chats the model remembers. 20 is recommended.',
-                  hint: system,
-                  keyboard: TextInputType.number,
-                  problem: problems['openAiHistory'],
-                ),
-                _field(
-                  'openAiTemp',
-                  'Temperature',
-                  'Higher is more creative. Too high can make some models incoherent.',
-                  hint: system,
-                  keyboard: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  problem: problems['openAiTemp'],
-                ),
-                _field(
-                  'queryRefusalResponse',
-                  widget.plain
-                      ? 'When the files do not cover it'
-                      : 'Query refusal response',
-                  widget.plain
-                      ? 'What Files only says when no document matches.'
-                      : 'What Query mode says when no document matches.',
-                  hint: system,
-                  maxLines: 4,
-                ),
-                const SizedBox(height: 6),
-                const SectionLabel('Model'),
-                const SizedBox(height: 12),
-                _field(
-                  'chatProvider',
-                  'LLM provider',
-                  'The provider this workspace uses instead of the system one.',
-                  hint: system,
-                ),
-                _field(
-                  'chatModel',
-                  'LLM model',
-                  'The model, in the provider\'s own name for it.',
-                  hint: system,
-                ),
-                _field(
-                  'agentProvider',
-                  'Agent provider',
-                  'The provider behind @agent in this workspace.',
-                  hint: system,
-                ),
-                _field(
-                  'agentModel',
-                  'Agent model',
-                  'The agent\'s model, in the provider\'s own name for it.',
-                  hint: system,
-                ),
-                const SizedBox(height: 6),
-                const SectionLabel('Documents'),
-                const SizedBox(height: 12),
-                SettingRow(
-                  label: 'Search preference',
-                  help: 'Accuracy optimized re-ranks the passages. It is slower but finds more relevant ones.',
-                  child: Segmented<String>(
-                    options: const [
-                      ('default', 'Default'),
-                      ('rerank', 'Accuracy optimized'),
-                    ],
-                    value: _search,
-                    onChanged: (mode) => setState(() => _search = mode),
-                  ),
-                ),
-                _field(
-                  'topN',
-                  'Max context snippets',
-                  'The most passages sent to the model per message. 4 is recommended.',
-                  hint: system,
-                  keyboard: TextInputType.number,
-                  problem: problems['topN'],
-                ),
-                SettingRow(
-                  label: 'Minimum relevance',
-                  help: preset != null
-                      ? 'How closely a passage must match the question to be used. '
-                            '${preset.$2} needs a similarity score of ${preset.$1}; '
-                            'AnythingLLM calls this the similarity threshold.'
-                      : similarity == null
-                      ? 'Using the system default.'
-                      : 'Set to $similarity on the server. Pick one to replace it.',
-                  child: Segmented<num>(
-                    options: [
-                      for (final (score, name) in similarityPresets)
-                        (score, name),
-                    ],
-                    value: preset?.$1,
-                    onChanged: (score) => setState(() => _similarity = score),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                buttons,
-              ],
-            ),
-          ),
-        ),
-      ],
+    // The buttons show only once something has changed, as the design canvas draws the page at
+    // rest.
+    return _form(
+      context,
+      dirty || _saving
+          ? ActionRow(even: true, [
+              AppButton(
+                'Revert',
+                onPressed: dirty && !_saving ? _revert : null,
+              ),
+              AppButton(
+                _saving ? 'Saving…' : 'Save',
+                primary: true,
+                onPressed: dirty && !_saving ? _save : null,
+              ),
+            ])
+          : null,
     );
   }
 
-  /// The phone's three settings, then [buttons], when there are any.
-  Widget _phone(BuildContext context, Widget? buttons) {
+  /// The three settings, then [buttons], when there are any.
+  Widget _form(BuildContext context, Widget? buttons) {
     final scope = AppScope.of(context);
     final workspace = scope.chat.active?.name ?? 'this workspace';
     return ListView(
@@ -389,7 +177,6 @@ class _SettingsFormState extends State<SettingsForm> {
                   child: RadioCard(
                     title: mode.title,
                     about: mode.detail,
-                    restWeight: FontWeight.w500,
                     selected: _mode == mode.name,
                     onTap: () => setState(() => _mode = mode.name),
                   ),
@@ -433,7 +220,7 @@ class _SettingsFormState extends State<SettingsForm> {
         const SizedBox(height: 8),
         HelpText(
           'What Files only says when no document matches. These apply to every chat in '
-          '$workspace. Chat history, temperature and document search are in the desktop app.',
+          '$workspace. Chat history, temperature and document search stay as the server has them.',
         ),
         if (buttons != null) ...[const SizedBox(height: 16), buttons],
       ],

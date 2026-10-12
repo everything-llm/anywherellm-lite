@@ -3,10 +3,10 @@ import 'dart:io';
 import '../core/ports.dart';
 import '../core/prefs.dart';
 
-/// [PrefsStore] in one JSON file, `anywherellm/prefs.json` under `$XDG_CONFIG_HOME` or `~/.config`.
-/// Holds nothing secret: the key stays in the keyring.
+/// [PrefsStore] in one JSON [File], `prefs.json` in the app's private storage. Holds nothing
+/// secret: the key stays in the keyring.
 class JsonPrefsStore implements PrefsStore {
-  JsonPrefsStore([File? file]) : _file = file ?? _defaultFile();
+  JsonPrefsStore(this._file);
 
   final File _file;
 
@@ -19,15 +19,6 @@ class JsonPrefsStore implements PrefsStore {
 
   /// Whether the file's folder is known to exist.
   bool _folder = false;
-
-  static File _defaultFile() {
-    final env = Platform.environment;
-    final config = switch (env['XDG_CONFIG_HOME']) {
-      final String dir when dir.isNotEmpty => dir,
-      _ => '${env['HOME'] ?? '.'}/.config',
-    };
-    return File('$config/anywherellm/prefs.json');
-  }
 
   @override
   Future<Prefs> load() async {

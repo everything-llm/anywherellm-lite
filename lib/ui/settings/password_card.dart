@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/ports.dart';
 import '../app_scope.dart';
-import '../layout.dart';
 import '../state/settings_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
@@ -55,7 +54,6 @@ class _PasswordCardState extends State<PasswordCard> {
         return const SizedBox.shrink();
       }
       final t = Tokens.of(context);
-      final phone = ScreenClass.ofContext(context).isPhone;
       final checking = _settings.checkingPassword;
       final editing = !set || _replacing;
       return Padding(
@@ -72,13 +70,13 @@ class _PasswordCardState extends State<PasswordCard> {
                       Text(
                         'Server password',
                         style: Type.sans(
-                          phone ? 15 : 14.5,
+                          15,
                           weight: FontWeight.w500,
                           color: t.ink,
                         ),
                       ),
-                      // A phone says nothing more of a saved one, as the design canvas draws it.
-                      if (!(phone && set))
+                      // Nothing more is said of a saved one, as the design canvas draws it.
+                      if (!set)
                         Text(
                           auth == ServerAuth.multiUser && !set
                               ? 'This server has several users. Signing in with a user name is not supported, so its own commands, feedback, and Retry and Edit that replace the old exchange stay off.'
@@ -100,7 +98,7 @@ class _PasswordCardState extends State<PasswordCard> {
               ],
             ),
             if (set)
-              ActionRow(even: phone, [
+              ActionRow(even: true, [
                 AppButton(
                   _replacing ? 'Cancel' : 'Change password',
                   onPressed: () => setState(() => _replacing = !_replacing),

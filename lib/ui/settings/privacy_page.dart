@@ -35,7 +35,6 @@ class PrivacyPage extends StatelessWidget {
             small: true,
             control: AppSwitch(
               value: telemetry,
-              large: true,
               label: 'Anonymous telemetry',
               onChanged: system.saving
                   ? null

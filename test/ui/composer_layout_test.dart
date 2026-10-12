@@ -16,15 +16,8 @@ void main() {
     expect((field.right - send.right).abs(), lessThan(16));
   });
 
-  testWidgets('on a phone, a tap beside a small control still reaches it', (
-    tester,
-  ) async {
-    final h = await pumpApp(
-      tester,
-      llm: planningServer(),
-      size: const Size(390, 844),
-      sourcesOpen: false,
-    );
+  testWidgets('a tap beside a small control still reaches it', (tester) async {
+    final h = await pumpApp(tester, llm: planningServer());
     // Attach is drawn 30 px across; its target is 44.
     final attach = tester.getCenter(
       find.byTooltip('Attach files to this message'),
@@ -43,29 +36,13 @@ void main() {
       .whereType<BoxDecoration>()
       .firstWhere((d) => d.boxShadow != null);
 
-  testWidgets(
-    'on a phone, the composer has a fainter edge and rounder corners',
-    (tester) async {
-      await pumpApp(
-        tester,
-        llm: planningServer(),
-        size: const Size(390, 844),
-        sourcesOpen: false,
-      );
-      final t = Tokens.of(tester.element(composerField));
-      final phone = card(tester);
-      expect((phone.border! as Border).top.color, t.line2);
-      expect(phone.borderRadius, BorderRadius.circular(28));
-    },
-  );
-
-  testWidgets('on a desktop, the composer keeps its edge and corners', (
+  testWidgets('the composer has a faint edge and round corners', (
     tester,
   ) async {
     await pumpApp(tester, llm: planningServer());
     final t = Tokens.of(tester.element(composerField));
-    final desktop = card(tester);
-    expect((desktop.border! as Border).top.color, t.line);
-    expect(desktop.borderRadius, BorderRadius.circular(24));
+    final phone = card(tester);
+    expect((phone.border! as Border).top.color, t.line2);
+    expect(phone.borderRadius, BorderRadius.circular(28));
   });
 }

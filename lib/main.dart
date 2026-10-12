@@ -1,16 +1,11 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui' show AppExitResponse;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:pasteboard/pasteboard.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'adapters/anythingllm_client.dart';
-import 'adapters/browser_prefs_store_stub.dart'
-    if (dart.library.js_interop) 'adapters/browser_prefs_store.dart';
 import 'adapters/json_prefs_store.dart';
 import 'adapters/keyring_settings_store.dart';
 import 'core/connection.dart';
@@ -25,7 +20,6 @@ import 'ui/chat/photo_picker.dart';
 import 'ui/chat/speaker.dart';
 import 'ui/chat/speech_dictation.dart';
 import 'ui/files/save_android.dart';
-import 'ui/files/save_file.dart';
 import 'ui/files/share_file.dart';
 import 'ui/settings/scan_code.dart';
 import 'ui/share/android_shares.dart';
@@ -43,36 +37,23 @@ import 'ui/state/system_controller.dart';
 
 /// The composition root: the one place that knows the adapters and the UI.
 ///
-/// The app talks only to the AnythingLLM server set up in Settings. The address and key live in
-/// the system keyring; the other preferences in a JSON file. Android uses https only and keeps
-/// the file in the app's private storage. In a browser both live in the page's local storage, and
-/// a page served over https uses https only, since the browser blocks http from it.
+/// The app talks only to the AnythingLLM server set up in Settings, over https. The address and
+/// key live in the Android Keystore; the other preferences in a JSON file in the app's private
+/// storage.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final allowHttp = !_android && !(kIsWeb && Uri.base.scheme == 'https');
-  final prefsFile = _android
-      ? File('${(await getApplicationSupportDirectory()).path}/prefs.json')
-      : null;
+  final prefsFile = File(
+    '${(await getApplicationSupportDirectory()).path}/prefs.json',
+  );
   final holder = ConnectionHolder();
-  final llm = HttpAnythingLlmApi(
-    holder: holder,
-    allowHttp: allowHttp,
-    browserOrigin: kIsWeb ? Uri.base.origin : null,
-  );
-  final prefs = PrefsController(
-    kIsWeb ? BrowserPrefsStore() : JsonPrefsStore(prefsFile),
-  );
+  final llm = HttpAnythingLlmApi(holder: holder);
+  final prefs = PrefsController(JsonPrefsStore(prefsFile));
   runApp(
     AnywhereLlmApp(
       prefs: prefs,
       home: SessionHost(
         llm: llm,
-        settings: SettingsController(
-          llm,
-          KeyringSettingsStore(failureHint: _keyringHint),
-          holder,
-          allowHttp: allowHttp,
-        ),
+        settings: SettingsController(llm, KeyringSettingsStore(), holder),
         prefs: prefs,
         shell: ShellController(),
         launch: (url) => launchUrl(url, mode: _launchMode(url)),
@@ -81,29 +62,9 @@ Future<void> main() async {
   );
 }
 
-/// Whether the app runs on Android. `Platform` throws in a browser, so it is asked only outside one.
-final _android = !kIsWeb && Platform.isAndroid;
-final _linux = !kIsWeb && Platform.isLinux;
-
-/// Saves a file: a download in a browser, the system's save dialog elsewhere.
-final FileSaver _save = kIsWeb
-    ? saveAsDownload
-    : _android
-    ? saveWithPicker
-    : saveWithDialog;
-
-/// What to check when the keyring fails, after a space, or empty.
-final _keyringHint = kIsWeb
-    ? ' A browser keeps it only for a page served over https or from localhost.'
-    : Platform.isLinux
-    ? ' Is a secret service such as gnome-keyring running and unlocked?'
-    : '';
-
-/// How [url] opens: a web page in the in-app browser on Android, which Back closes, and
-/// anything else, or anything on Linux, in the app the system picks, which in a browser is a
-/// new tab. The in-app browser takes only http and https.
-LaunchMode _launchMode(Uri url) =>
-    _android && (url.scheme == 'http' || url.scheme == 'https')
+/// How [url] opens: a web page in the in-app browser, which Back closes, and anything else, as
+/// a `mailto:` link, in the app the system picks. The in-app browser takes only http and https.
+LaunchMode _launchMode(Uri url) => url.scheme == 'http' || url.scheme == 'https'
     ? LaunchMode.inAppBrowserView
     : LaunchMode.externalApplication;
 
@@ -137,54 +98,33 @@ class _SessionHostState extends State<SessionHost> {
   late final SystemController _system;
   late final MemoryController _memory;
 
-  /// Reads answers aloud on Android, and is null where the device has no such engine to use.
-  ReadAloud? _readAloud;
+  /// Reads answers aloud with the device's engine.
+  late final ReadAloud _readAloud;
 
-  /// Listens for speech on Android, and is null where the device has no such service to use.
-  final Dictation? _dictation = _android ? SpeechDictation() : null;
+  /// Listens for speech with the device's recognition service.
+  final Dictation _dictation = SpeechDictation();
 
-  /// The device's photos and camera on Android, for the composer's Attach sheet.
-  final PhotoPicker? _photos = _android ? DevicePhotos() : null;
+  /// The device's photos and camera, for the composer's Attach sheet.
+  final PhotoPicker _photos = DevicePhotos();
 
-  /// What other apps share with AnywhereLLM on Android, read once for the app's life.
-  final Stream<SharedItem>? _shares = _android
-      ? androidShares().asBroadcastStream()
-      : null;
+  /// What other apps share with AnywhereLLM, read once for the app's life.
+  final Stream<SharedItem> _shares = androidShares().asBroadcastStream();
 
   /// The controllers listen before the keyring is read, so reading a saved connection is what
   /// loads the workspaces.
   @override
   void initState() {
     super.initState();
-    // A browser opens only six connections to one server over HTTP/1.1, and each answer
-    // holds one.
-    _chat = ChatController(
-      widget.llm,
-      widget.settings,
-      widget.prefs,
-      maxRuns: kIsWeb ? 3 : null,
-    );
+    _chat = ChatController(widget.llm, widget.settings, widget.prefs);
     _sources = SourcesController(widget.llm, _chat, widget.prefs);
-    _files = FilesController(
-      widget.llm,
-      widget.settings,
-      _chat,
-      widget.prefs,
-      _sources,
-    );
+    _files = FilesController(widget.llm, widget.settings, _chat, _sources);
     _system = SystemController(widget.llm, widget.settings);
     _memory = MemoryController(widget.llm, widget.settings, _chat);
-    if (_android) {
-      _readAloud = ReadAloud(DeviceSpeaker(), _chat, widget.prefs);
-    }
-    // A deleted chat waiting to be undone is deleted before the app may be closed: Android can
-    // end a hidden app without a word.
+    _readAloud = ReadAloud(DeviceSpeaker(), _chat, widget.prefs);
+    // A deleted chat waiting to be undone is deleted as the app hides: Android can end a hidden
+    // app without a word.
     _lifecycle = AppLifecycleListener(
       onHide: () => unawaited(_chat.flushDelete()),
-      onExitRequested: () async {
-        await _chat.flushDelete();
-        return AppExitResponse.exit;
-      },
     );
     _loaded = _load();
   }
@@ -194,7 +134,7 @@ class _SessionHostState extends State<SessionHost> {
   @override
   void dispose() {
     _lifecycle.dispose();
-    _readAloud?.dispose();
+    _readAloud.dispose();
     _memory.dispose();
     _system.dispose();
     _files.dispose();
@@ -236,15 +176,13 @@ class _SessionHostState extends State<SessionHost> {
         system: _system,
         memory: _memory,
         launch: widget.launch,
-        save: _save,
-        scanner: _android ? cameraScanner : null,
-        share: _android ? shareBytes : null,
+        save: saveWithPicker,
+        scanner: cameraScanner,
+        share: shareBytes,
         shares: _shares,
         dictation: _dictation,
         photos: _photos,
-        pasteImage: _linux ? () => Pasteboard.image : null,
         readAloud: _readAloud,
-        labelAnswers: kIsWeb,
         canSpellcheck: WidgetsBinding
             .instance
             .platformDispatcher

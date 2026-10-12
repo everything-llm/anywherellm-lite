@@ -372,7 +372,7 @@ class SourcesController extends ChangeNotifier {
       };
 
   /// Makes the workspace answer with [provider] and [model], null for the system's, the same
-  /// columns the Files pane's settings.json writes. Says why the server refused, or null.
+  /// columns the workspace's answer settings write. Says why the server refused, or null.
   Future<String?> setChatModel(String? provider, String? model) async {
     final slug = _slug;
     final server = _chat.server;

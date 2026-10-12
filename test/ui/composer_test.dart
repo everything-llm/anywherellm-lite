@@ -2,87 +2,39 @@ import 'dart:async';
 
 import 'package:anywherellm/ui/chat/composer.dart';
 import 'package:anywherellm/ui/widgets/sheet.dart';
-import 'package:desktop_drop/desktop_drop.dart';
-import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
+import 'package:cross_file/cross_file.dart';
+import 'package:file_picker_platform_interface/file_picker_platform_interface.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:flutter/material.dart';
 
 import '../support/fake_api.dart';
+import '../support/picker.dart';
 import '../support/pixels.dart';
 import '../support/pump.dart';
-
-/// A file picker that picks [files], once [picked] completes when it is given.
-class _Picker extends FileSelectorPlatform {
-  _Picker(this.files, {this.picked});
-
-  final List<XFile> files;
-  final Future<void>? picked;
-
-  @override
-  Future<List<XFile>> openFiles({
-    List<XTypeGroup>? acceptedTypeGroups,
-    String? initialDirectory,
-    String? confirmButtonText,
-  }) async {
-    await picked;
-    return files;
-  }
-}
 
 /// A one-pixel `photo.png`.
 XFile photo() => XFile.fromData(pixel, path: 'photo.png', length: pixel.length);
 
-/// A one-byte `contract.pdf`.
-XFile contract() =>
-    XFile.fromData(Uint8List.fromList([1]), path: 'contract.pdf', length: 1);
+/// A one-byte `contract.pdf`, as the file picker gives it.
+PlatformFile contract() => Picked('contract.pdf');
 
-/// The composer's drop target; Sources has its own.
-final _composerDrop = find.descendant(
-  of: find.byType(Composer),
-  matching: find.byType(DropTarget),
-);
+Finder _inSheet(Finder f) =>
+    find.descendant(of: find.byType(SheetFrame), matching: f);
 
-/// Drops [files] on the composer, as a file manager does.
-Future<void> drop(WidgetTester tester, List<DropItem> files) async {
-  tester.widget<DropTarget>(_composerDrop).onDragDone!(
-    DropDoneDetails(
-      files: files,
-      localPosition: Offset.zero,
-      globalPosition: Offset.zero,
-    ),
-  );
+/// Attaches what the file picker gives, through the Attach sheet's Files.
+Future<void> attachFiles(WidgetTester tester) async {
+  await tester.tap(find.byTooltip('Attach files to this message'));
   await tester.pumpAndSettle();
-}
-
-/// Ctrl+V in the composer, with [text] as the clipboard's text.
-Future<void> paste(WidgetTester tester, {String text = ''}) async {
-  tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-    SystemChannels.platform,
-    (call) async => switch (call.method) {
-      'Clipboard.getData' => {'text': text},
-      'Clipboard.hasStrings' => {'value': text.isNotEmpty},
-      _ => null,
-    },
-  );
-  addTearDown(
-    () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      SystemChannels.platform,
-      null,
-    ),
-  );
-  await tester.tap(composerField);
-  await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
-  await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
-  await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+  await tester.tap(control('Files'));
+  await tester.pumpAndSettle();
+  await tester.tap(control('Done'));
   await tester.pumpAndSettle();
 }
 
 void main() {
-  testWidgets("a phone's keyboard starts the message with a capital", (
-    tester,
-  ) async {
+  testWidgets("the keyboard starts the message with a capital", (tester) async {
     await pumpApp(tester);
     expect(
       tester.widget<EditableText>(composerField).textCapitalization,
@@ -90,15 +42,16 @@ void main() {
     );
   });
 
-  testWidgets('a picture shows small in the composer and in its question, '
-      'and a document by its name', (tester) async {
-    FileSelectorPlatform.instance = _Picker([photo(), contract()]);
+  testWidgets('a picture shows small in its question, and a document by its '
+      'name', (tester) async {
+    FilePickerPlatform.instance = FakePicker([
+      Picked('photo.png', pixel),
+      contract(),
+    ]);
     final llm = planningServer()..hold = true;
     await pumpApp(tester, llm: llm);
-    await tester.tap(find.byTooltip('Attach files to this message'));
-    await tester.pumpAndSettle();
-    expect(find.byType(Image), findsOneWidget);
-    expect(find.text('contract.pdf'), findsOneWidget);
+    await attachFiles(tester);
+    expect(control('2 files attached. Review'), findsOneWidget);
     await tester.enterText(composerField, 'What is this?');
     await tester.pump();
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
@@ -113,15 +66,14 @@ void main() {
   testWidgets(
     'files attached in one chat do not go with a message in another',
     (tester) async {
-      FileSelectorPlatform.instance = _Picker([contract()]);
+      FilePickerPlatform.instance = FakePicker([contract()]);
       final llm = planningServer();
       final h = await pumpApp(tester, llm: llm);
-      await tester.tap(find.byTooltip('Attach files to this message'));
-      await tester.pumpAndSettle();
-      expect(find.text('contract.pdf'), findsOneWidget);
+      await attachFiles(tester);
+      expect(control('1 file attached. Review'), findsOneWidget);
       await h.chat.select('household');
       await tester.pumpAndSettle();
-      expect(find.text('contract.pdf'), findsNothing);
+      expect(control('1 file attached. Review'), findsNothing);
       await tester.enterText(composerField, 'Hi');
       await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
@@ -135,78 +87,22 @@ void main() {
     tester,
   ) async {
     final picked = Completer<void>();
-    FileSelectorPlatform.instance = _Picker([
+    FilePickerPlatform.instance = FakePicker([
       contract(),
     ], picked: picked.future);
     final h = await pumpApp(tester, llm: planningServer());
     await tester.tap(find.byTooltip('Attach files to this message'));
+    await tester.pumpAndSettle();
+    await tester.tap(control('Files'));
     await tester.pump();
     await h.chat.select('household');
     await tester.pumpAndSettle();
     picked.complete();
     await tester.pumpAndSettle();
-    expect(find.text('contract.pdf'), findsNothing);
+    expect(_inSheet(find.text('contract.pdf')), findsNothing);
   });
 
-  testWidgets('files dropped on the composer go with the next message', (
-    tester,
-  ) async {
-    final llm = planningServer();
-    await pumpApp(tester, llm: llm);
-    await drop(tester, [
-      DropItemFile.fromData(pixel, path: 'photo.png', length: pixel.length),
-      DropItemDirectory('/home/me/notes', const [], name: 'notes'),
-    ]);
-    expect(find.byType(Image), findsOneWidget);
-    expect(find.textContaining('notes is a folder'), findsOneWidget);
-    await tester.enterText(composerField, 'What is this?');
-    await tester.pump();
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(llm.lastAttachments.map((a) => a.name), ['photo.png']);
-  });
-
-  testWidgets('nothing dropped is taken while a chat answers', (tester) async {
-    final llm = planningServer()..hold = true;
-    await pumpApp(tester, llm: llm);
-    await tester.enterText(composerField, 'Hi');
-    await tester.pump();
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(tester.widget<DropTarget>(_composerDrop).enable, isFalse);
-  });
-
-  testWidgets('Ctrl+V attaches a copied picture and leaves the message alone', (
-    tester,
-  ) async {
-    final llm = planningServer();
-    final h = await pumpApp(tester, llm: llm, canPasteImages: true)
-      ..clipboardImage = pixel;
-    await tester.enterText(composerField, 'Look');
-    await paste(tester, text: 'not this');
-    await paste(tester, text: 'not this');
-    expect(find.text('Pasted image.png'), findsOneWidget);
-    expect(find.text('Pasted image 2.png'), findsOneWidget);
-    expect(h.chat.problem, isNull);
-    expect(tester.widget<EditableText>(composerField).controller.text, 'Look');
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(llm.lastAttachments.map((a) => a.mime), ['image/png', 'image/png']);
-  });
-
-  testWidgets('Ctrl+V pastes text when the clipboard holds no picture', (
-    tester,
-  ) async {
-    await pumpApp(tester, canPasteImages: true);
-    await paste(tester, text: 'copied words');
-    expect(
-      tester.widget<EditableText>(composerField).controller.text,
-      'copied words',
-    );
-    expect(find.textContaining('Pasted image'), findsNothing);
-  });
-
-  testWidgets("a picture from a phone keyboard's clipboard is attached", (
+  testWidgets("a picture from the keyboard's clipboard is attached", (
     tester,
   ) async {
     await pumpApp(tester);
@@ -219,20 +115,23 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Pasted image.gif'), findsOneWidget);
+    expect(control('1 file attached. Review'), findsOneWidget);
+    await tester.tap(control('1 file attached. Review'));
+    await tester.pumpAndSettle();
+    expect(_inSheet(find.text('Pasted image.gif')), findsOneWidget);
   });
 
   group('the next question while an answer runs', () {
     Finder sendWhenDone() => find.byTooltip('Send when done');
 
-    Future<FakeAnythingLlm> answering(WidgetTester tester) async {
+    Future<(Harness, FakeAnythingLlm)> answering(WidgetTester tester) async {
       final llm = planningServer()..hold = true;
-      await pumpApp(tester, llm: llm);
+      final h = await pumpApp(tester, llm: llm);
       await tester.enterText(composerField, 'First');
       await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pump(const Duration(milliseconds: 300));
-      return llm;
+      return (h, llm);
     }
 
     int sent(FakeAnythingLlm llm, String message) =>
@@ -241,7 +140,7 @@ void main() {
     testWidgets('can be typed, and is held to go when the answer ends', (
       tester,
     ) async {
-      final llm = await answering(tester);
+      final (_, llm) = await answering(tester);
       expect(sendWhenDone(), findsNothing);
       await tester.enterText(composerField, 'Second');
       await tester.pump();
@@ -259,7 +158,7 @@ void main() {
     });
 
     testWidgets('Enter holds it too, and Stop sends it', (tester) async {
-      final llm = await answering(tester);
+      final (_, llm) = await answering(tester);
       await tester.enterText(composerField, 'Second');
       await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
@@ -273,7 +172,7 @@ void main() {
     });
 
     testWidgets("typing more or Don't send lets it go", (tester) async {
-      final llm = await answering(tester);
+      final (_, llm) = await answering(tester);
       await tester.enterText(composerField, 'Second');
       await tester.pump();
       await tester.tap(sendWhenDone());
@@ -292,12 +191,12 @@ void main() {
     });
 
     testWidgets('another chat shown lets it go', (tester) async {
-      final llm = await answering(tester);
+      final (h, llm) = await answering(tester);
       await tester.enterText(composerField, 'Second');
       await tester.pump();
       await tester.tap(sendWhenDone());
       await tester.pump();
-      await tester.tap(find.bySemanticsLabel('Quarter priorities').first);
+      await h.chat.open('priorities');
       await tester.pump(const Duration(milliseconds: 300));
       await llm.chat!.close();
       await tester.pump(const Duration(milliseconds: 300));
@@ -315,8 +214,8 @@ void main() {
     testWidgets(
       'the box stays off while another chat of the workspace answers',
       (tester) async {
-        await answering(tester);
-        await tester.tap(find.bySemanticsLabel('Quarter priorities').first);
+        final (h, _) = await answering(tester);
+        await h.chat.open('priorities');
         await tester.pump(const Duration(milliseconds: 300));
         expect(field(tester).enabled, isFalse);
         expect(
@@ -345,23 +244,19 @@ void main() {
     });
   });
 
-  group('on a phone', () {
-    const phone = Size(390, 844);
-    Finder inSheet(Finder f) =>
-        find.descendant(of: find.byType(SheetFrame), matching: f);
-
+  group('the Attach sheet', () {
     testWidgets(
       'Attach opens a sheet that lists the files and takes them off',
       (tester) async {
-        FileSelectorPlatform.instance = _Picker([contract()]);
-        await pumpApp(tester, llm: planningServer(), size: phone);
+        FilePickerPlatform.instance = FakePicker([contract()]);
+        await pumpApp(tester, llm: planningServer());
         await tester.tap(find.byTooltip('Attach files to this message'));
         await tester.pumpAndSettle();
         // No photos on this device: Files alone.
-        expect(inSheet(find.text('Photo library')), findsNothing);
+        expect(_inSheet(find.text('Photo library')), findsNothing);
         await tester.tap(control('Files'));
         await tester.pumpAndSettle();
-        expect(inSheet(find.text('contract.pdf')), findsOneWidget);
+        expect(_inSheet(find.text('contract.pdf')), findsOneWidget);
         await tester.tap(control('Done'));
         await tester.pumpAndSettle();
         expect(find.byType(SheetFrame), findsNothing);
@@ -372,7 +267,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.byTooltip('Remove contract.pdf'));
         await tester.pumpAndSettle();
-        expect(inSheet(find.text('contract.pdf')), findsNothing);
+        expect(_inSheet(find.text('contract.pdf')), findsNothing);
         await tester.tap(control('Done'));
         await tester.pumpAndSettle();
         expect(control('1 file attached. Review'), findsNothing);
@@ -385,7 +280,6 @@ void main() {
         final h = await pumpApp(
           tester,
           llm: planningServer(),
-          size: phone,
           canPickPhotos: true,
         );
         h.photos!
@@ -395,7 +289,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(control('Photo library'));
         await tester.pumpAndSettle();
-        expect(inSheet(find.text('photo.png')), findsOneWidget);
+        expect(_inSheet(find.text('photo.png')), findsOneWidget);
         await tester.tap(control('Take a photo'));
         await tester.pumpAndSettle();
         await tester.tap(control('Done'));

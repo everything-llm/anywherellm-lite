@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../layout.dart';
-
 /// The one way a control is tappable: an optional tooltip, a button's semantics, a surface and
 /// an ink well, in that order.
 ///
@@ -55,8 +53,8 @@ class Tappable extends StatelessWidget {
   /// True hides what [child] says from a screen reader, so [label] is all it hears.
   final bool excludeSemantics;
 
-  /// True gives a control drawn smaller than a finger a square of [touchSide] to be tapped in
-  /// on a phone, where a tap beside it does what [onTap] does.
+  /// True gives a control drawn smaller than a finger a square of [touchSide] to be tapped in,
+  /// where a tap beside it does what [onTap] does.
   final bool touchTarget;
 
   /// The least a finger needs.
@@ -102,7 +100,7 @@ class Tappable extends StatelessWidget {
       result = Opacity(opacity: enabled ? 1 : dim, child: result);
     }
     if (tooltip != null) result = Tooltip(message: tooltip, child: result);
-    if (!touchTarget || !ScreenClass.ofContext(context).isPhone) return result;
+    if (!touchTarget) return result;
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,

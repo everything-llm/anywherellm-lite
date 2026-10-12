@@ -66,9 +66,4 @@ void main() {
     expect(h.shell.phonePage, isNull);
     expect(h.shell.settingsOpen, isTrue);
   });
-
-  testWidgets('a desktop has no Upcoming in the sidebar', (tester) async {
-    await pumpApp(tester, llm: planningServer());
-    expect(find.text('Upcoming'), findsNothing);
-  });
 }

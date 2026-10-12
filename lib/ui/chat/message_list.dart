@@ -134,9 +134,7 @@ class _MessageListState extends State<MessageList> {
   Widget _turns(BuildContext context, List<Turn> turns) {
     final scope = AppScope.of(context);
     final chat = scope.chat;
-    // On a phone a pull down past the oldest turn reads the chat again, in place of the
-    // header's Refresh.
-    final phone = ScreenClass.ofContext(context).isPhone;
+    // A pull down past the oldest turn reads the chat again.
     // The list is reversed, so a long chat opens at its newest turn; it is as tall as its turns
     // and sits at the top, so a short chat starts under the header, as the design canvas
     // draws it.
@@ -146,12 +144,10 @@ class _MessageListState extends State<MessageList> {
       controller: _scroll,
       reverse: true,
       shrinkWrap: true,
-      physics: phone ? const AlwaysScrollableScrollPhysics() : null,
+      physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         SliverPadding(
-          padding: phone
-              ? const EdgeInsets.fromLTRB(16, 16, 16, 12)
-              : const EdgeInsets.fromLTRB(20, 12, 20, 28),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
           sliver: _HoldPlace(
             newest: _newest,
             holds: () => _holds(turns.lastOrNull, scope.prefs),
@@ -171,7 +167,6 @@ class _MessageListState extends State<MessageList> {
       ],
     );
     final top = Align(alignment: Alignment.topCenter, child: list);
-    if (!phone) return top;
     // MessageList is built afresh as the chat changes, so this follows refreshing.
     return PullRefresh(
       refreshing: chat.refreshing,
@@ -184,13 +179,7 @@ class _MessageListState extends State<MessageList> {
   Widget _turn(ChatController chat, List<Turn> turns, int i) {
     final turn = turns[turns.length - 1 - i];
     final first = i == turns.length - 1;
-    // An answer sits closer to its own question than a question to the answer before it. On a
-    // phone every turn is 14 from the one before.
-    final answering =
-        !first &&
-        turn.role != Role.user &&
-        turns[turns.length - 2 - i].role == Role.user;
-    final phone = ScreenClass.ofContext(context).isPhone;
+    // Every turn is 14 from the one before.
     return _Measured(
       key: _keyOf(turn),
       into: i == 0 ? _newest : null,
@@ -201,15 +190,7 @@ class _MessageListState extends State<MessageList> {
         child: SizedBox(
           width: Sizes.column,
           child: Padding(
-            padding: EdgeInsets.only(
-              top: first
-                  ? 0
-                  : phone
-                  ? 14
-                  : answering
-                  ? 16
-                  : 26,
-            ),
+            padding: EdgeInsets.only(top: first ? 0 : 14),
             child: Rise(
               child: turn.role == Role.user
                   ? _UserBubble(
@@ -354,13 +335,10 @@ class _Empty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sources = AppScope.of(context).sources;
-    // A phone stacks the suggestions under the headline, as the design canvas draws them.
-    final phone = ScreenClass.ofContext(context).isPhone;
+    // The suggestions stack under the headline, as the design canvas draws them.
     return Center(
       child: SingleChildScrollView(
-        padding: phone
-            ? const EdgeInsets.fromLTRB(16, 12, 16, 16)
-            : const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         child: Rise(
           duration: const Duration(milliseconds: 400),
           child: Column(
@@ -375,7 +353,7 @@ class _Empty extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
               ),
-              SizedBox(height: phone ? 14 : 22),
+              const SizedBox(height: 14),
               ListenableBuilder(
                 listenable: sources,
                 builder: (context, _) {
@@ -389,14 +367,7 @@ class _Empty extends StatelessWidget {
                     ]))
                       _Suggestion(s.label, onTap: () => onSuggest(s.prompt)),
                   ];
-                  return phone
-                      ? Column(spacing: 14, children: suggestions)
-                      : Wrap(
-                          alignment: WrapAlignment.center,
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: suggestions,
-                        );
+                  return Column(spacing: 14, children: suggestions);
                 },
               ),
             ],
@@ -407,51 +378,36 @@ class _Empty extends StatelessWidget {
   }
 }
 
-class _Suggestion extends StatefulWidget {
+class _Suggestion extends StatelessWidget {
   const _Suggestion(this.text, {required this.onTap});
 
   final String text;
   final VoidCallback onTap;
 
   @override
-  State<_Suggestion> createState() => _SuggestionState();
-}
-
-class _SuggestionState extends State<_Suggestion> {
-  bool _hover = false;
-
-  @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final lit = _hover ? t.accent : null;
-    final phone = ScreenClass.ofContext(context).isPhone;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: Tappable(
-        label: widget.text,
-        onTap: widget.onTap,
-        // A pill on one line; a label that wraps keeps its corners rather than bulging.
-        radius: BorderRadius.circular(phone ? 24 : 19),
-        color: t.panel,
-        side: BorderSide(color: lit ?? (phone ? t.line2 : t.line)),
-        hoverColor: Colors.transparent,
-        child: Container(
-          constraints: BoxConstraints(
-            minHeight: phone ? 44 : 0,
-            // A phone's column of suggestions keeps to the screen's width.
-            maxWidth: phone ? MediaQuery.sizeOf(context).width - 32 : 520,
-          ),
-          padding: phone
-              ? const EdgeInsets.symmetric(horizontal: 18, vertical: 10)
-              : const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          child: Text(
-            widget.text,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: Type.sans(phone ? 15 : 14, color: lit ?? t.ink),
-          ),
+    return Tappable(
+      label: text,
+      onTap: onTap,
+      // A pill on one line; a label that wraps keeps its corners rather than bulging.
+      radius: BorderRadius.circular(24),
+      color: t.panel,
+      side: BorderSide(color: t.line2),
+      hoverColor: Colors.transparent,
+      child: Container(
+        constraints: BoxConstraints(
+          minHeight: 44,
+          // The column of suggestions keeps to the screen's width.
+          maxWidth: MediaQuery.sizeOf(context).width - 32,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        child: Text(
+          text,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: Type.sans(15, color: t.ink),
         ),
       ),
     );
@@ -489,12 +445,10 @@ class _UserBubble extends StatelessWidget {
   /// Puts [text] back in the composer, to replace the question when the app is signed in.
   final VoidCallback onEdit;
 
-  /// Edit sits beside the bubble, at its foot, so nothing stands between it and the answer. On
-  /// a phone the bubble stands alone, at most 300 wide, as the design canvas draws it, and a
-  /// long press on it is Edit.
+  /// The bubble stands alone, at most 300 wide, as the design canvas draws it, and a long press
+  /// on it is Edit.
   @override
   Widget build(BuildContext context) {
-    if (!ScreenClass.ofContext(context).isPhone) return _beside(context);
     return Align(
       alignment: Alignment.centerRight,
       child: Semantics(
@@ -512,43 +466,17 @@ class _UserBubble extends StatelessWidget {
     );
   }
 
-  Widget _beside(BuildContext context) => LayoutBuilder(
-    builder: (context, box) => Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        IconBtn(
-          'pencil',
-          tooltip: 'Edit',
-          onPressed: onEdit,
-          box: 28,
-          size: IconSize.xs,
-        ),
-        const SizedBox(width: 4),
-        Flexible(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: box.maxWidth * 0.8),
-            child: _bubble(context),
-          ),
-        ),
-      ],
-    ),
-  );
-
   Widget _bubble(BuildContext context) {
     final t = Tokens.of(context);
-    final phone = ScreenClass.ofContext(context).isPhone;
     return Container(
-      padding: phone
-          ? const EdgeInsets.symmetric(horizontal: 16, vertical: 12)
-          : const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: t.bubble,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(phone ? 24 : 20),
-          topRight: Radius.circular(phone ? 24 : 20),
-          bottomLeft: Radius.circular(phone ? 24 : 20),
-          bottomRight: Radius.circular(phone ? 8 : 6),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+          bottomLeft: Radius.circular(24),
+          bottomRight: Radius.circular(8),
         ),
       ),
       child: Column(
@@ -651,8 +579,7 @@ class _AnswerState extends State<_Answer> {
     final rate = answered ? _feedbackOf(context, turn) : null;
     // An answer cut short shows what came in the second ink, under why it stopped.
     final cut = !turn.streaming && (turn.stopped || turn.error != null);
-    final phone = ScreenClass.ofContext(context).isPhone;
-    final action = answerAction(context);
+    const action = answerAction;
     // The red box asks again itself, so Retry does not show twice.
     final askAgain = turn.error != null && retry?.onPressed != null;
     return Column(
@@ -661,12 +588,7 @@ class _AnswerState extends State<_Answer> {
         if (failure != null)
           AlertBox(AlertKind.bad, 'The model did not answer', text: failure)
         else if (split.answer.isNotEmpty)
-          AnswerBody(
-            split.answer,
-            label: AppScope.of(context).labelAnswers && !turn.streaming,
-            muted: cut,
-            caret: inline,
-          ),
+          AnswerBody(split.answer, muted: cut, caret: inline),
         if (turn.streaming && turn.status != null) _Status(turn.status!),
         if (turn.streaming && !inline)
           // The caret alone, as the design canvas draws it, from the send on, while a
@@ -684,7 +606,7 @@ class _AnswerState extends State<_Answer> {
           ),
         ],
         if (!turn.streaming && turn.citations.isNotEmpty) ...[
-          SizedBox(height: phone ? 10 : 12),
+          const SizedBox(height: 10),
           _Citations(turn.citations),
         ],
         if (!turn.streaming && turn.files.isNotEmpty) ...[
@@ -692,13 +614,12 @@ class _AnswerState extends State<_Answer> {
           GeneratedFiles(turn.files),
         ],
         if (!turn.streaming && (answered || (retry != null && !askAgain))) ...[
-          SizedBox(height: phone ? 10 : 6),
-          // On a phone the buttons are 44 wide, side by side, and the row starts 12 to the
-          // left, so the first icon lines up with the text.
+          const SizedBox(height: 10),
+          // The buttons are 44 wide, side by side, and the row starts 12 to the left, so the
+          // first icon lines up with the text.
           Transform.translate(
-            offset: Offset(phone ? -12 : 0, 0),
+            offset: const Offset(-12, 0),
             child: Wrap(
-              spacing: phone ? 0 : 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 if (answered)
@@ -756,12 +677,11 @@ class _ReadAloudButton extends StatelessWidget {
     listenable: aloud,
     builder: (context, _) {
       final reading = identical(aloud.reading, turn);
-      final action = answerAction(context);
       return IconBtn(
         reading ? 'stop' : 'speaker',
         tooltip: reading ? 'Stop reading' : 'Read aloud',
         onPressed: () => aloud.toggle(turn),
-        box: action,
+        box: answerAction,
         size: IconSize.xs,
       );
     },
@@ -798,8 +718,8 @@ class _Status extends StatelessWidget {
 }
 
 /// The sources an answer drew on, in one line that never wraps, so the answer keeps its height:
-/// the first three by name, then the rest folded into one "+N" chip that lists them all in the
-/// panel to the right, or on a phone in a sheet. A web page is named by its site.
+/// the first three by name, then the rest folded into one "+N" chip that lists them all in a
+/// sheet. A web page is named by its site.
 class _Citations extends StatelessWidget {
   const _Citations(this.citations);
 
@@ -850,30 +770,24 @@ class _MoreSources extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final phone = ScreenClass.ofContext(context).isPhone;
     return Tappable(
       touchTarget: true,
       label: '$count more sources',
       toggled: open,
       onTap: onTap,
       radius: BorderRadius.circular(99),
-      color: open ? t.sel : (phone ? t.panel : t.hover),
-      side: phone ? BorderSide(color: t.line) : null,
+      color: open ? t.sel : t.panel,
+      side: BorderSide(color: t.line),
       child: ConstrainedBox(
-        constraints: BoxConstraints(minHeight: phone ? 36 : 0),
+        constraints: const BoxConstraints(minHeight: 36),
         child: Padding(
-          padding: phone
-              ? const EdgeInsets.symmetric(horizontal: 12)
-              : const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Center(
             widthFactor: 1,
             heightFactor: 1,
             child: Text(
               '+$count',
-              style: Type.sans(
-                phone ? 13.5 : 12.5,
-                color: open ? t.accent : (phone ? t.ink2 : t.muted),
-              ),
+              style: Type.sans(13.5, color: open ? t.accent : t.ink2),
             ),
           ),
         ),
@@ -882,8 +796,8 @@ class _MoreSources extends StatelessWidget {
   }
 }
 
-/// One source. A file in Sources lights up there when tapped, or on a phone, where Documents
-/// is a sheet, opens the passages the answer read from it, when the server sent them; a web
+/// One source. A file in Sources opens the passages the answer read from it in a sheet, when
+/// the server sent them, or else lights up in Documents; a web
 /// page an agent read opens in the browser; anything else, such as a file since removed, only
 /// shows its title.
 class _Citation extends StatefulWidget {
@@ -933,7 +847,6 @@ class _CitationState extends State<_Citation> {
     final present = scope.sources.byTitle(title) != null;
     final live = present || url != null;
     final passages = present && citation.passages.isNotEmpty;
-    final phone = ScreenClass.ofContext(context).isPhone;
     void close() => scope.shell.closePopup(citation);
     final chip = Tappable(
       label: present || url == null
@@ -944,11 +857,8 @@ class _CitationState extends State<_Citation> {
           : present
           ? 'Show in Documents'
           : url?.toString(),
-      // A phone shows the passages in a sheet over the chat, a desktop beside it.
       onTap: passages
-          ? () => ScreenClass.ofContext(context).isPhone
-                ? scope.shell.togglePopup(citation)
-                : scope.shell.togglePassages(number, citation)
+          ? () => scope.shell.togglePopup(citation)
           : present
           ? () {
               scope.shell.openSources();
@@ -958,16 +868,13 @@ class _CitationState extends State<_Citation> {
           ? null
           : () => openLink(context, url.toString()),
       radius: BorderRadius.circular(99),
-      // On a phone a chip is the panel's colour, outlined, 32 tall, as the design canvas
-      // draws it.
-      color: phone ? t.panel : (live ? t.accentbg : t.hover),
-      side: phone ? BorderSide(color: t.line) : null,
+      // A chip is the panel's colour, outlined, as the design canvas draws it.
+      color: t.panel,
+      side: BorderSide(color: t.line),
       child: ConstrainedBox(
-        constraints: BoxConstraints(minHeight: phone ? 36 : 0),
+        constraints: const BoxConstraints(minHeight: 36),
         child: Padding(
-          padding: phone
-              ? const EdgeInsets.fromLTRB(8, 0, 12, 0)
-              : const EdgeInsets.fromLTRB(6, 4, 10, 4),
+          padding: const EdgeInsets.fromLTRB(8, 0, 12, 0),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -981,9 +888,7 @@ class _CitationState extends State<_Citation> {
                     url?.host ?? title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: phone
-                        ? Type.sans(13.5, color: t.ink2)
-                        : Type.sans(12.5, color: live ? t.accent : t.ink2),
+                    style: Type.sans(13.5, color: t.ink2),
                   ),
                 ),
               ),
@@ -1001,8 +906,7 @@ class _CitationState extends State<_Citation> {
         open: identical(popup, citation),
         onClose: close,
         title: 'Passages read',
-        sheet: (context) =>
-            PassagesView(number: number, citation: citation, onClose: close),
+        sheet: (context) => PassagesView(citation: citation, onClose: close),
         child: chip!,
       ),
     );

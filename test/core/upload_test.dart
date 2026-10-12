@@ -93,9 +93,9 @@ void main() {
         meta: const DocMeta(author: 'Ada'),
       ),
       UploadFile(name: 'b.md', read: () async => [2]),
-    ], folder: 'notes');
-    expect(llm.metaOf['notes/a.md.json']?.author, 'Ada');
-    expect(llm.metaOf['notes/b.md.json']?.isEmpty, isTrue);
+    ]);
+    expect(llm.metaOf['custom-documents/a.md.json']?.author, 'Ada');
+    expect(llm.metaOf['custom-documents/b.md.json']?.isEmpty, isTrue);
   });
 
   test('sendEach stops when cancelled while file bytes are read', () async {

@@ -104,7 +104,6 @@ class _ChatSheetState extends State<ChatSheet> {
                   control: AppSwitch(
                     value: pinned,
                     label: 'Pin to the top',
-                    large: true,
                     onChanged: (on) => unawaited(
                       scope.prefs.setPinned(workspace, thread.slug, on: on),
                     ),
