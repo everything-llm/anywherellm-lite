@@ -400,16 +400,26 @@ FakeApps _sampleApps() {
       t: at(0, 7, 40).toUtc(),
       by: 'agent',
       chat: 'Swedish practice',
-      message: 'Marks a card missed this session with Again',
+      message:
+          'Marks a card missed this session with Again\n\n'
+          'A missed card shows Again until it is answered right.',
+      subject: 'Marks a card missed this session with Again',
+      body: 'A missed card shows Again until it is answered right.',
       files: const ['app.json', 'page.html'],
+      revertable: true,
     ),
     AppCommit(
       commit: 'c9ddf09a1b2c3d4e5f60718293a4b5c6d7e8f901',
       t: at(1, 20, 30).toUtc(),
       by: 'agent',
       chat: 'Swedish practice',
-      message: 'Raised the daily goal from 10 to 12 cards',
+      message:
+          'Raised the daily goal from 10 to 12 cards\n\n'
+          'You asked for a little more practice each day.',
+      subject: 'Raised the daily goal from 10 to 12 cards',
+      body: 'You asked for a little more practice each day.',
       files: const ['app.json'],
+      revertable: true,
     ),
     AppCommit(
       commit: 'bc3a7790a1b2c3d4e5f60718293a4b5c6d7e8f90',
@@ -417,7 +427,10 @@ FakeApps _sampleApps() {
       by: 'agent',
       chat: 'Swedish practice',
       message: 'Make Flashcards',
+      subject: 'Make Flashcards',
+      body: '',
       files: const ['app.json', 'page.html'],
+      revertable: false,
     ),
   ];
   apps.diffs['c9ddf09a1b2c3d4e5f60718293a4b5c6d7e8f901'] =
