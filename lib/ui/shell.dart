@@ -79,9 +79,15 @@ class AppShell extends StatelessWidget {
       builder: (context, _) {
         final files = shell.pane == Pane.files;
         final app = shell.app;
-        final chatShown = shell.chatOpen && !files;
+        // An app's sheet shows over the chat or the tab; its data, full screen, covers them.
+        final appData = app != null && shell.appDataOnly;
+        final chatShown = shell.chatOpen && !files && !appData;
         final homeCovered =
-            shell.chatOpen || files || shell.upcomingOpen || shell.settingsOpen;
+            shell.chatOpen ||
+            files ||
+            shell.upcomingOpen ||
+            shell.settingsOpen ||
+            appData;
         // The Apps tab shows only while the apps server is there.
         final appsTab =
             shell.tab == HomeTab.apps && scope.apps.available == true;

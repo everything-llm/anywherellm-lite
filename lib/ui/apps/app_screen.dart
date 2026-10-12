@@ -5,10 +5,8 @@ import 'package:flutter/material.dart';
 import '../../core/apps.dart';
 import '../app_scope.dart';
 import '../chat/answer_image.dart';
-import '../icons.dart';
 import '../layout.dart';
 import '../links.dart';
-import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../widgets/buttons.dart';
 import '../widgets/sheet.dart';
@@ -21,11 +19,11 @@ abstract interface class AppView {
   Widget show(Uri page, {required void Function(Uri url) onLeave});
 }
 
-/// An app in a tall sheet over the home or the chat: its title over its kind and workspace, More,
-/// which opens its data, and Close; under them its working page, in the app's own theme, or
+/// An app in a tall sheet over the home or the chat: its title over its kind and workspace, and
+/// Close; under them its working page, in the app's own theme, or
 /// where the device has no web view its card with a way to the page in the browser. Dragging the
-/// sheet down or tapping the scrim closes it. A page of its data shows full screen over it, and
-/// Back steps back through them.
+/// sheet down or tapping the scrim closes it. Its data, opened from the Apps tab's menu, shows
+/// full screen alone, and Back steps back through its pages.
 class AppScreen extends StatefulWidget {
   const AppScreen(this.app, {super.key});
 
@@ -47,13 +45,18 @@ class _AppScreenState extends State<AppScreen> {
     });
   }
 
+  /// Whether the app's sheet showed last, rather than its data alone.
+  bool _sheet = true;
+
   @override
   void dispose() {
     // The chat stayed on screen under the sheet, so its card of this app is read again only
     // when the app changed meanwhile, as through its page.
-    final apps = _apps;
-    final app = widget.app;
-    scheduleMicrotask(() => unawaited(apps.check(app)));
+    if (_sheet) {
+      final apps = _apps;
+      final app = widget.app;
+      scheduleMicrotask(() => unawaited(apps.check(app)));
+    }
     super.dispose();
   }
 
@@ -66,41 +69,24 @@ class _AppScreenState extends State<AppScreen> {
       builder: (context, _) {
         final app = scope.apps.appOf(widget.app);
         final pages = scope.shell.appPages;
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            Offstage(
-              offstage: pages.isNotEmpty,
-              child: SheetFrame(
-                title: app.title,
-                about: _about(context, app),
-                height: SheetHeight.tall,
-                padding: EdgeInsets.zero,
-                onClose: scope.shell.closeApp,
-                actions: [
-                  IconBtn(
-                    'more',
-                    tooltip: 'Data and history for ${app.title}',
-                    box: 44,
-                    filled: true,
-                    size: IconSize.small,
-                    onPressed: () => scope.shell.showAppPage(const AppFolder()),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                child: _Page(app),
-              ),
-            ),
-            if (pages.isNotEmpty)
-              ColoredBox(
-                color: t.bg,
-                child: AppDataPage(
-                  pages.last,
-                  app: app,
-                  key: ValueKey((pages.length, pages.last)),
-                ),
-              ),
-          ],
+        _sheet = pages.isEmpty;
+        if (_sheet) {
+          return SheetFrame(
+            title: app.title,
+            about: _about(context, app),
+            height: SheetHeight.tall,
+            padding: EdgeInsets.zero,
+            onClose: scope.shell.closeApp,
+            child: _Page(app),
+          );
+        }
+        return ColoredBox(
+          color: t.bg,
+          child: AppDataPage(
+            pages.last,
+            app: app,
+            key: ValueKey((pages.length, pages.last)),
+          ),
         );
       },
     );

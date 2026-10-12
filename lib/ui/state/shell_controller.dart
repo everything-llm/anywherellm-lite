@@ -134,13 +134,18 @@ class ShellController extends ChangeNotifier {
   AppRef? _app;
   final List<AppPage> _appPages = [];
 
-  /// The app shown full screen, over the home and the chat, or null.
+  /// The app shown in its sheet, or whose data shows, over the home and the chat, or null.
   AppRef? get app => _app;
+
+  /// Whether the app's data shows, full screen, rather than its sheet: it opens only from
+  /// outside the app, with no sheet under it.
+  bool get appDataOnly => _appPages.isNotEmpty;
 
   /// The pages of the app's data open over it, the top one last.
   List<AppPage> get appPages => List.unmodifiable(_appPages);
 
-  /// Shows [ref]'s working page full screen, or with [data] its folder over it.
+  /// Shows [ref]'s working page in its sheet, or with [data] its folder alone, which Back
+  /// closes.
   void openApp(AppRef ref, {bool data = false}) {
     _shelfOpen = false;
     _app = ref;
@@ -163,7 +168,7 @@ class ShellController extends ChangeNotifier {
 
   /// Steps back from the top page of the app's data, or closes the app when none is open.
   void appBack() {
-    if (_appPages.isEmpty) return closeApp();
+    if (_appPages.length <= 1) return closeApp();
     _appPages.removeLast();
     notifyListeners();
   }

@@ -40,11 +40,12 @@ Future<void> _appsTab(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-/// Opens Groceries and its data folder.
+/// Opens Groceries' data folder from its menu on the Apps tab.
 Future<void> _folder(WidgetTester tester, Harness h) async {
-  h.shell.openApp(_groceries);
+  await _appsTab(tester);
+  await tester.tap(find.byTooltip('Open, rename or delete Groceries'));
   await tester.pumpAndSettle();
-  await tester.tap(find.byTooltip('Data and history for Groceries'));
+  await tester.tap(find.text('Files and history'));
   await tester.pumpAndSettle();
 }
 
@@ -124,6 +125,8 @@ void main() {
       expect(find.byType(AppScreen), findsOneWidget);
       expect(find.text('Web view of $_page?theme=light'), findsOneWidget);
       expect(find.text('List · Q3 planning'), findsOneWidget);
+      // Its files are opened from the Apps tab's menu, not from inside the app.
+      expect(find.byTooltip('Data and history for Groceries'), findsNothing);
       await tester.tap(find.byTooltip('Close'));
       await tester.pumpAndSettle();
       expect(find.byType(AppScreen), findsNothing);
@@ -160,13 +163,12 @@ void main() {
       expect(find.textContaining('2 commits'), findsOneWidget);
       expect(find.textContaining('.cache/'), findsOneWidget);
 
-      // Back steps from the folder to the app, then closes it.
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(find.text('Web view of $_page?theme=light'), findsOneWidget);
+      // The folder opens alone, never over the app's page, and Back goes back to Apps.
+      expect(find.textContaining('Web view of'), findsNothing);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(h.shell.app, isNull);
+      expect(find.byType(AppsTab), findsOneWidget);
     });
 
     testWidgets('app.json reads as JSON, or raw', (tester) async {
@@ -641,11 +643,13 @@ void main() {
         );
         await tester.pumpAndSettle();
         h.shell.closePopup();
-        h.shell.appBack();
-        h.shell.appBack();
-        h.shell.appBack();
-        h.shell.appBack();
-        h.shell.appBack();
+        // Back steps through the data's pages, then closes them, as nothing is under them.
+        for (var i = 0; i < 5; i++) {
+          h.shell.appBack();
+        }
+        await tester.pumpAndSettle();
+        expect(h.shell.app, isNull);
+        h.shell.openApp(_groceries);
         await tester.pumpAndSettle();
         expect(find.byType(AppScreen), findsOneWidget);
       });

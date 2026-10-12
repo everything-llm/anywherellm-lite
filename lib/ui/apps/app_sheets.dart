@@ -143,6 +143,11 @@ class _AppSheetViewState extends State<AppSheetView> {
         FieldCard([
           CardRow('Open', icon: 'grid', onTap: () => shell.openApp(app)),
           CardRow(
+            'Files and history',
+            icon: 'folder',
+            onTap: () => shell.openApp(app, data: true),
+          ),
+          CardRow(
             'Rename',
             icon: 'pencil',
             onTap: () => shell.togglePopup(AppRenameSheet(app)),

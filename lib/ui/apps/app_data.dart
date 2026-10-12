@@ -193,7 +193,7 @@ class _Folder extends StatelessWidget {
       children: [
         PhonePageHeader(
           title: app.title,
-          back: 'Back to ${app.title}',
+          back: 'Back to Apps',
           onBack: shell.appBack,
         ),
         Expanded(
