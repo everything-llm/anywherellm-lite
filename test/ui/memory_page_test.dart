@@ -162,12 +162,9 @@ void main() {
 
   testWidgets('another workspace shows its own memories', (tester) async {
     await _openMemory(tester, _remembering());
-    await tapVisible(
-      tester,
-      _inPage(find.byType(DropdownButton<String>)).first,
-    );
+    await tapVisible(tester, control('Workspace: Q3 planning. Choose another'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Household').last);
+    await tester.tap(control('Household'));
     await tester.pumpAndSettle();
     expect(_inPage(find.text('The boiler is from 2019.')), findsOneWidget);
     expect(find.text('Reports go to Maja on Fridays.'), findsNothing);

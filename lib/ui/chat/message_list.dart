@@ -147,7 +147,7 @@ class _MessageListState extends State<MessageList> {
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           sliver: _HoldPlace(
             newest: _newest,
             holds: () => _holds(turns.lastOrNull, scope.prefs),

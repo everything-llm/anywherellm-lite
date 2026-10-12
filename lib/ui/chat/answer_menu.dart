@@ -195,6 +195,7 @@ class _AnswerMenu extends StatelessWidget {
                   return FieldRow(
                     label: 'Show details under every answer',
                     small: true,
+                    inSheet: true,
                     control: AppSwitch(
                       value: on,
                       label: 'Show details under every answer',

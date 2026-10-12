@@ -7,6 +7,7 @@ import '../links.dart';
 import '../settings/rows.dart';
 import '../tokens.dart';
 import '../type.dart';
+import '../widgets/sheet.dart';
 import '../widgets/side_panel.dart';
 import '../widgets/tappable.dart';
 import 'passages_sheet.dart';
@@ -22,15 +23,15 @@ class CitedPanel extends StatelessWidget {
     final cited = shell.cited ?? const <Citation>[];
     return SidePanel(
       title: 'Sources',
-      about: plural(cited.length, 'source', 'sources'),
       onClose: shell.closeCited,
+      sheetHeight: SheetHeight.fit,
       child: CitedSources(cited),
     );
   }
 }
 
-/// [citations], each a row that opens what it names: a web page in the browser, a file's
-/// passages, or the file in Documents.
+/// How many [citations] there are, under the sheet's title, then each a row that opens what it
+/// names: a web page in the browser, a file's passages, or the file in Documents.
 class CitedSources extends StatelessWidget {
   const CitedSources(this.citations, {super.key});
 
@@ -38,9 +39,21 @@ class CitedSources extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final web = citations.every((c) => c.url != null);
     return ListView(
+      shrinkWrap: true,
       padding: EdgeInsets.zero,
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+          child: Text(
+            web
+                ? '${plural(citations.length, 'web page', 'web pages')} the agent read.'
+                : plural(citations.length, 'source', 'sources'),
+            style: Type.sans(13, color: t.muted, height: 1.45),
+          ),
+        ),
         FieldCard(inSheet: true, [
           for (final (i, c) in citations.indexed) _CitedRow(c, number: i + 1),
         ]),
@@ -89,13 +102,9 @@ class _CitedRow extends StatelessWidget {
           vertical: 8,
         ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           spacing: 14,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: CitationNumber(number, live: open != null),
-            ),
+            CitationNumber(number, live: open != null),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

@@ -8,91 +8,129 @@ import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
-import '../widgets/confirm_box.dart';
+import '../state/shell_controller.dart';
+import '../widgets/phone_page.dart';
+import '../widgets/radio_card.dart';
+import '../widgets/sheet.dart';
 import '../widgets/controls.dart';
 import '../widgets/fields.dart';
-import '../widgets/segmented.dart';
 import '../widgets/tappable.dart';
 import 'rows.dart';
 
-/// What chats are shown about the person, for one workspace, picked at the top: AnythingLLM's
-/// saved memories, with its switches, those for every workspace and the workspace's own. A row
-/// opens under itself to change or delete it, one at a time.
-class MemoryPage extends StatefulWidget {
-  const MemoryPage({super.key});
+/// The Memory page's sheet for one saved memory, or a new one, in the shell's popup, so Back
+/// closes it: [key] is `g:<id>` or `w:<id>` for a saved memory, `g:new` or `w:new` for a new
+/// one.
+class MemorySheet {
+  const MemorySheet(this.key);
+
+  final String key;
 
   @override
-  State<MemoryPage> createState() => _MemoryPageState();
+  bool operator ==(Object other) => other is MemorySheet && other.key == key;
+
+  @override
+  int get hashCode => key.hashCode;
 }
 
-class _MemoryPageState extends State<MemoryPage> {
-  /// The row open under itself: `g:<id>` or `w:<id>` for a saved memory, `g:new` or `w:new` for
-  /// a new one.
-  String? _open;
-
-  void _toggle(String key) => setState(() => _open = _open == key ? null : key);
-
-  void _close() => setState(() => _open = null);
+/// What chats are shown about the person, for one workspace, picked at the top in a sheet:
+/// AnythingLLM's saved memories, with its switches, those for every workspace and the
+/// workspace's own. A row opens a sheet to change or delete it.
+class MemoryPage extends StatelessWidget {
+  const MemoryPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
+    final shell = scope.shell;
     return ListenableBuilder(
-      listenable: Listenable.merge([scope.memory, scope.chat]),
+      listenable: Listenable.merge([scope.memory, scope.chat, shell.popup]),
       builder: (context, _) {
         final memory = scope.memory;
         memory.want();
         final slug = memory.slug;
         final names = {for (final w in scope.chat.workspaces) w.slug: w.name};
         final name = names[slug] ?? slug ?? 'this workspace';
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 16,
-          children: [
-            FieldCard([
-              FieldRow(
-                label: 'Workspace',
-                help: 'Memories for every workspace show whichever you pick.',
-                control: AppSelect(
-                  value: slug,
-                  choices: names.keys.toList(),
-                  labelOf: (s) => names[s] ?? s,
-                  hint: 'No workspace',
-                  onChanged: memory.busy
-                      ? null
-                      : (s) {
-                          if (s == null) return;
-                          setState(() => _open = null);
-                          memory.show(s);
-                        },
-                ),
-              ),
-            ]),
-            const SubHead('Saved memories'),
-            const PageNote(
-              'Every chat is shown them, word for word. AnythingLLM keeps '
-              '$globalMemoryLimit for every workspace and $workspaceMemoryLimit for each one.',
+        final open = switch (shell.popup.value) {
+          final MemorySheet sheet => sheet,
+          _ => null,
+        };
+        return PopupSheet(
+          open: open != null,
+          onClose: shell.closePopup,
+          title: open?.key.endsWith(':new') ?? false
+              ? 'New memory'
+              : 'Saved memory',
+          sheet: (context) => _SavedEditor(
+            key: ValueKey(open?.key),
+            memory: _memoryOf(memory, open?.key),
+            global: open?.key.startsWith('g:') ?? true,
+            name: name,
+            onDone: shell.closePopup,
+          ),
+          child: PopupSheet(
+            open: shell.popup.value == Popup.memoryWorkspace,
+            onClose: shell.closePopup,
+            title: 'Workspace',
+            sheet: (context) => _WorkspaceChoice(names, slug),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                FieldCard([
+                  NavRow(
+                    icon: 'grid',
+                    title: 'Workspace',
+                    about: names[slug] ?? 'No workspace',
+                    heard:
+                        'Workspace: ${names[slug] ?? 'none'}. Choose another',
+                    onTap: memory.busy
+                        ? null
+                        : () => shell.togglePopup(Popup.memoryWorkspace),
+                  ),
+                ]),
+                ..._saved(context, memory, name),
+              ],
             ),
-            ..._saved(memory, name),
-          ],
+          ),
         );
       },
     );
   }
 
-  List<Widget> _saved(MemoryController memory, String name) {
+  /// The saved memory [key] names, or null for a new one.
+  static SavedMemory? _memoryOf(MemoryController memory, String? key) {
+    if (key == null || key.endsWith(':new')) return null;
+    final saved = memory.saved;
+    final id = int.tryParse(key.substring(2));
+    return [
+      ...?saved?.global,
+      ...?saved?.workspace,
+    ].where((m) => m.id == id).firstOrNull;
+  }
+
+  List<Widget> _saved(
+    BuildContext context,
+    MemoryController memory,
+    String name,
+  ) {
     final switches = memory.switches;
     final saved = memory.saved;
     return [
-      if (memory.savedProblem case final problem?)
+      if (memory.savedProblem case final problem?) ...[
+        const SizedBox(height: 20),
         AlertBox(AlertKind.bad, problem.title, text: problem.text),
+      ],
       if (switches == null)
-        if (memory.loading) const HelpText('Loading…', status: true) else ...[]
+        if (memory.loading) ...[
+          const SizedBox(height: 20),
+          const HelpText('Loading…', status: true),
+        ] else
+          ...[]
       else ...[
+        ..._heading('Saved memories'),
         FieldCard([
           FieldRow(
             label: 'Saved memories',
-            help: 'Chats are shown them, and AnythingLLM keeps them.',
+            help: 'Every chat is shown them',
             small: true,
             control: AppSwitch(
               value: switches.enabled,
@@ -105,7 +143,7 @@ class _MemoryPageState extends State<MemoryPage> {
           if (switches.enabled)
             FieldRow(
               label: 'Learn from chats',
-              help: 'AnythingLLM saves what it notices in chats.',
+              help: 'AnythingLLM saves what it notices',
               small: true,
               control: AppSwitch(
                 value: switches.learn,
@@ -116,29 +154,41 @@ class _MemoryPageState extends State<MemoryPage> {
               ),
             ),
         ]),
-        if (!switches.enabled)
-          const PageNote(
-            'Off: chats are shown no saved memories, and none are saved.',
-          )
-        else if (saved != null) ...[
-          SectionLabel(
+        if (!switches.enabled) ...[
+          const SizedBox(height: 20),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: FieldCard.inset),
+            child: PageNote(
+              'Off: chats are shown no saved memories, and none are saved.',
+            ),
+          ),
+        ] else if (saved != null) ...[
+          ..._heading(
             'Every workspace · ${saved.global.length} of $globalMemoryLimit',
           ),
-          _savedList(saved.global, global: true, name: name),
-          SectionLabel(
+          _savedList(context, saved.global, global: true),
+          ..._heading(
             'Only $name · ${saved.workspace.length} of $workspaceMemoryLimit',
           ),
-          _savedList(saved.workspace, global: false, name: name),
+          _savedList(context, saved.workspace, global: false),
         ],
       ],
     ];
   }
 
+  /// A heading over a card, with the page's space above it.
+  static List<Widget> _heading(String text) => [
+    const SizedBox(height: 20),
+    CardHeading(text),
+    const SizedBox(height: 10),
+  ];
+
   Widget _savedList(
+    BuildContext context,
     List<SavedMemory> list, {
     required bool global,
-    required String name,
   }) {
+    final shell = AppScope.of(context).shell;
     final scope = global ? 'g' : 'w';
     final limit = global ? globalMemoryLimit : workspaceMemoryLimit;
     return FieldCard([
@@ -147,14 +197,7 @@ class _MemoryPageState extends State<MemoryPage> {
           key: ValueKey('$scope:${m.id}'),
           text: m.text,
           heard: '${m.text} Change or delete',
-          open: _open == '$scope:${m.id}',
-          onTap: () => _toggle('$scope:${m.id}'),
-          panel: _SavedEditor(
-            memory: m,
-            global: global,
-            name: name,
-            onDone: _close,
-          ),
+          onTap: () => shell.togglePopup(MemorySheet('$scope:${m.id}')),
         ),
       if (list.length >= limit)
         _Line('All $limit in use. Delete one to add another.')
@@ -163,74 +206,97 @@ class _MemoryPageState extends State<MemoryPage> {
           key: ValueKey('$scope:new'),
           add: true,
           text: 'Add a memory',
-          open: _open == '$scope:new',
-          onTap: () => _toggle('$scope:new'),
-          panel: _SavedEditor(global: global, name: name, onDone: _close),
+          onTap: () => shell.togglePopup(MemorySheet('$scope:new')),
         ),
     ]);
   }
 }
 
-/// A row of a memory's card: its [text], which a tap opens [panel] under while [open]. An [add]
-/// row is a plus and its words in the accent.
+/// The Workspace sheet: each workspace, the one shown checked, then what the choice changes.
+class _WorkspaceChoice extends StatelessWidget {
+  const _WorkspaceChoice(this.names, this.slug);
+
+  final Map<String, String> names;
+  final String? slug;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final t = Tokens.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 16,
+      children: [
+        FieldCard(inSheet: true, [
+          for (final MapEntry(key: each, value: name) in names.entries)
+            CardRow(
+              name,
+              checked: each == slug,
+              onTap: () {
+                scope.shell.closePopup();
+                scope.memory.show(each);
+              },
+            ),
+        ]),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Text(
+            'Memories for every workspace show whichever you pick.',
+            style: Type.sans(13, color: t.muted, height: 1.45),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A row of a memory's card: its [text], wrapped, which a tap opens in a sheet. An [add] row
+/// is a plus and its words in the accent.
 class _Item extends StatelessWidget {
   const _Item({
     super.key,
     required this.text,
-    required this.open,
     required this.onTap,
     this.heard,
-    this.panel,
     this.add = false,
   });
 
   final String text;
   final String? heard;
-  final bool open;
   final VoidCallback onTap;
-  final Widget? panel;
   final bool add;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    const side = FieldCard.inset;
-    final words = Text(
-      text,
-      style: Type.sans(
-        16,
-        weight: add ? FontWeight.w600 : FontWeight.w400,
-        color: add ? t.accent : t.ink,
-        height: 1.4,
-      ),
-    );
-    final head = Container(
-      constraints: const BoxConstraints(minHeight: 60),
-      padding: const EdgeInsets.symmetric(horizontal: side, vertical: 10),
-      child: Row(
-        spacing: 12,
-        children: [
-          if (add) AppIcon('plus', size: IconSize.small, color: t.accent),
-          Expanded(child: words),
-        ],
-      ),
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Tappable(
-          label: heard ?? text,
-          expanded: panel == null ? null : open,
-          onTap: onTap,
-          child: head,
+    return Tappable(
+      label: heard ?? text,
+      onTap: onTap,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 64),
+        padding: const EdgeInsets.symmetric(
+          horizontal: FieldCard.inset,
+          vertical: 12,
         ),
-        if (open)
-          if (panel case final panel?)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(side, 0, side, 14),
-              child: panel,
+        child: Row(
+          spacing: 12,
+          children: [
+            if (add) AppIcon('plus', color: t.accent),
+            Expanded(
+              child: Text(
+                text,
+                style: Type.sans(
+                  16,
+                  weight: add ? FontWeight.w600 : FontWeight.w500,
+                  color: add ? t.accent : t.ink,
+                  height: 1.35,
+                ),
+              ),
             ),
-      ],
+          ],
+        ),
+      ),
     );
   }
 }
@@ -243,12 +309,17 @@ class _Line extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return Container(
+      constraints: const BoxConstraints(minHeight: 64),
       padding: const EdgeInsets.symmetric(
         horizontal: FieldCard.inset,
-        vertical: 14,
+        vertical: 12,
       ),
-      child: Text(text, style: Type.sans(15, color: Tokens.of(context).muted)),
+      alignment: Alignment.centerLeft,
+      child: Text(
+        text,
+        style: Type.sans(15.5, color: Tokens.of(context).muted),
+      ),
     );
   }
 }
@@ -257,6 +328,7 @@ class _Line extends StatelessWidget {
 /// saved.
 class _SavedEditor extends StatefulWidget {
   const _SavedEditor({
+    super.key,
     this.memory,
     required this.global,
     required this.name,
@@ -325,56 +397,84 @@ class _SavedEditorState extends State<_SavedEditor> {
     final memory = AppScope.of(context).memory;
     final t = Tokens.of(context);
     final existing = widget.memory;
-    if (_asking && existing != null) {
-      return ConfirmBox(
-        text: 'Delete this memory? Chats are no longer shown it.',
-        onCancel: () => setState(() => _asking = false),
-        onConfirm: () async {
-          if (await memory.delete(existing) && mounted) widget.onDone();
-        },
-      );
-    }
+    final saved = memory.saved;
+    // A list that is full takes no memory from the other, as the design canvas draws it.
+    bool full(bool global) =>
+        saved != null &&
+        (existing == null || existing.global != global) &&
+        (global
+            ? saved.global.length >= globalMemoryLimit
+            : saved.workspace.length >= workspaceMemoryLimit);
+    RadioCard choice(bool global, String title, int limit) => RadioCard(
+      title: title,
+      about: full(global) ? 'Full' : '$limit at most',
+      selected: _global == global,
+      onTap: () => setState(() => _global = global),
+    );
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 10,
+      spacing: 16,
       children: [
         AppField(
           controller: _text,
           label: 'Memory',
           hint: 'One short fact, such as: Prefers metric units.',
-          maxLines: 3,
+          maxLines: 4,
           autofocus: existing == null,
         ),
-        NamedControl(
-          'Shown in',
-          Segmented<bool>(
-            options: [
-              (true, 'Every workspace'),
-              (false, 'Only ${widget.name}'),
-            ],
-            value: _global,
-            onChanged: (g) => setState(() => _global = g),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: SectionLabel('Shown in', header: false),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 8,
+          children: [
+            choice(true, 'Every workspace', globalMemoryLimit),
+            choice(false, 'Only ${widget.name}', workspaceMemoryLimit),
+          ],
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Text(
+            'Every chat there is shown it, word for word.',
+            style: Type.sans(13, color: t.muted, height: 1.45),
           ),
-          size: 13.5,
         ),
         if (_problem case final problem?)
-          Text(problem, style: Type.sans(13.5, color: t.badfg)),
-        ActionRow([
-          if (existing != null)
-            AppButton(
-              'Delete',
-              danger: true,
-              onPressed: memory.busy
-                  ? null
-                  : () => setState(() => _asking = true),
-            ),
-          AppButton('Cancel', onPressed: widget.onDone),
-          AppButton(
-            existing == null ? 'Add' : 'Save',
-            primary: true,
-            onPressed: memory.busy ? null : _save,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(problem, style: Type.sans(13.5, color: t.badfg)),
           ),
-        ], alignment: WrapAlignment.start),
+        if (_asking && existing != null)
+          SheetQuestion(
+            'Delete this memory? Chats are no longer shown it.',
+            onKeep: () => setState(() => _asking = false),
+            onDelete: memory.busy
+                ? null
+                : () async {
+                    if (await memory.delete(existing) && mounted) {
+                      widget.onDone();
+                    }
+                  },
+          )
+        else
+          ActionRow(even: true, [
+            if (existing != null)
+              AppButton(
+                'Delete',
+                danger: true,
+                onPressed: memory.busy
+                    ? null
+                    : () => setState(() => _asking = true),
+              ),
+            AppButton(
+              existing == null ? 'Add' : 'Save',
+              primary: true,
+              onPressed: memory.busy ? null : _save,
+            ),
+          ]),
       ],
     );
   }

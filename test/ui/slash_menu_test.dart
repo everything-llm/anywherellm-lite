@@ -35,7 +35,7 @@ void main() {
   ) async {
     await pumpApp(tester, llm: planningServer()..presets = const [_research]);
     await _type(tester, '/');
-    expect(find.byType(SlashStrip), findsOneWidget);
+    expect(find.byType(SlashMenu), findsOneWidget);
     expect(find.text('/reset'), findsOneWidget);
     expect(find.text('/deep-research'), findsOneWidget);
 
@@ -44,7 +44,7 @@ void main() {
     expect(find.text('/deep-research'), findsOneWidget);
 
     await _type(tester, '/deep-research tides');
-    expect(find.byType(SlashStrip), findsNothing);
+    expect(find.byType(SlashMenu), findsNothing);
   });
 
   testWidgets('Enter fills the first command, and Enter again sends', (
@@ -55,7 +55,7 @@ void main() {
     await _type(tester, '/de');
     await _key(tester, LogicalKeyboardKey.enter);
     expect(_draft(tester), '/deep-research ');
-    expect(find.byType(SlashStrip), findsNothing);
+    expect(find.byType(SlashMenu), findsNothing);
     expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
 
     await _type(tester, '/reset');
@@ -75,10 +75,10 @@ void main() {
       );
       await tester.enterText(composerField, '/');
       await tester.pump();
-      expect(find.byType(SlashStrip), findsOneWidget);
+      expect(find.byType(SlashMenu), findsOneWidget);
       // The commands are a card of their own, above the composer's card.
       expect(
-        tester.getRect(find.byType(SlashStrip)).bottom,
+        tester.getRect(find.byType(SlashMenu)).bottom,
         lessThan(tester.getRect(composerField).top),
       );
     },
@@ -91,19 +91,22 @@ void main() {
       await tester.showKeyboard(composerField);
       final field = tester.state(composerField);
       await _type(tester, '/');
-      expect(find.byType(SlashStrip), findsOneWidget);
+      expect(find.byType(SlashMenu), findsOneWidget);
       // The field is the same one, so the keyboard stays as it was.
       expect(identical(tester.state(composerField), field), isTrue);
       expect(
         tester.widget<EditableText>(composerField).focusNode.hasFocus,
         isTrue,
       );
-      // One line of suggestions, not a card of them.
-      expect(tester.getSize(find.byType(SlashStrip)).height, lessThan(80));
+      // A card of them, a row for each, as the design canvas draws it.
+      expect(
+        tester.getSize(find.byType(SlashMenu)).height,
+        lessThanOrEqualTo(SlashMenu.maxHeight),
+      );
       await tester.tap(control('/deep-research: Research a question in depth'));
       await tester.pump();
       expect(_draft(tester), '/deep-research ');
-      expect(find.byType(SlashStrip), findsNothing);
+      expect(find.byType(SlashMenu), findsNothing);
       expect(identical(tester.state(composerField), field), isTrue);
       expect(
         tester.widget<EditableText>(composerField).focusNode.hasFocus,

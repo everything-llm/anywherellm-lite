@@ -36,7 +36,10 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.descendant(of: sheet, matching: find.text('7 sources')),
+        find.descendant(
+          of: sheet,
+          matching: find.text('7 web pages the agent read.'),
+        ),
         findsOneWidget,
       );
       await tester.tap(control('Page 6, site6.example'));

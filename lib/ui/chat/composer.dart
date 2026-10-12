@@ -605,6 +605,10 @@ class _Form extends StatelessWidget {
                                 ),
                             decoration: InputDecoration(
                               isCollapsed: true,
+                              // One line sits in the middle of the field's 30 px.
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 3,
+                              ),
                               border: InputBorder.none,
                               hintText: hint,
                               hintStyle: Type.sans(
@@ -699,12 +703,8 @@ class _Form extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (menu) ...[
-          SlashStrip(
-            commands: matches,
-            onPick: onPick,
-            note: chat.commandsNote,
-          ),
-          const SizedBox(height: 8),
+          SlashMenu(commands: matches, onPick: onPick, note: chat.commandsNote),
+          const SizedBox(height: 12),
         ],
         card,
       ],

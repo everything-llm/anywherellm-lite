@@ -81,9 +81,8 @@ class PassagesView extends StatelessWidget {
                     Text(
                       '${(score * 100).round()}% match',
                       textAlign: TextAlign.end,
-                      style: Type.sans(12.5, color: t.muted, height: 1.4),
+                      style: Type.sans(13.5, color: t.muted, height: 1.5),
                     ),
-                    const SizedBox(height: 4),
                   ],
                   SelectableText(
                     passage.text,

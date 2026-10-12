@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../../core/chat.dart';
 import '../../core/server_models.dart';
 import '../app_scope.dart';
-import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../chat/model_picker.dart';
 import '../widgets/fields.dart';
@@ -160,36 +159,35 @@ class _SettingsFormState extends State<SettingsForm> {
     final scope = AppScope.of(context);
     final workspace = scope.chat.active?.name ?? 'this workspace';
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
-        const SizedBox(height: 18),
-        const SectionLabel('Answer from'),
-        const SizedBox(height: 6),
+        const CardHeading('Answer from'),
+        const SizedBox(height: 10),
         Semantics(
           container: true,
           label: 'Answer from',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: 8,
             children: [
               for (final mode in ChatMode.values)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: RadioCard(
-                    title: mode.title,
-                    about: mode.detail,
-                    selected: _mode == mode.name,
-                    onTap: () => setState(() => _mode = mode.name),
-                  ),
+                RadioCard(
+                  title: mode.title,
+                  about: mode.detail,
+                  selected: _mode == mode.name,
+                  onTap: () => setState(() => _mode = mode.name),
                 ),
             ],
           ),
         ),
-        const SizedBox(height: 12),
-        const SectionLabel('Model'),
-        const SizedBox(height: 6),
+        const SizedBox(height: 20),
+        const CardHeading('Model'),
+        const SizedBox(height: 10),
         ListenableBuilder(
           listenable: Listenable.merge([scope.sources, scope.system]),
           builder: (context, _) {
+            // The system's model names the row while the workspace has none of its own.
+            scope.system.wantSettingsOnce();
             final own = scope.sources.chatModel;
             final model = workspaceModel(scope);
             return FieldCard([
@@ -207,9 +205,9 @@ class _SettingsFormState extends State<SettingsForm> {
           const SizedBox(height: 8),
           ModelPicker(onClose: () => setState(() => _picking = false)),
         ],
-        const SizedBox(height: 18),
-        const SectionLabel('When the files do not cover it'),
-        const SizedBox(height: 6),
+        const SizedBox(height: 20),
+        const CardHeading('When the files do not cover it'),
+        const SizedBox(height: 10),
         AppField(
           controller: _text['queryRefusalResponse']!,
           label: 'When the files do not cover it',
@@ -222,7 +220,7 @@ class _SettingsFormState extends State<SettingsForm> {
           'What Files only says when no document matches. These apply to every chat in '
           '$workspace. Chat history, temperature and document search stay as the server has them.',
         ),
-        if (buttons != null) ...[const SizedBox(height: 16), buttons],
+        if (buttons != null) ...[const SizedBox(height: 20), buttons],
       ],
     );
   }
