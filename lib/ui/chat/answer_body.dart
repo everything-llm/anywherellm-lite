@@ -71,8 +71,7 @@ class AnswerBody extends StatelessWidget {
   Widget _markdown(BuildContext context, String text, {required bool caret}) {
     final t = Tokens.of(context);
     final ink = muted ? t.ink2 : t.ink;
-    // The text is set a little tighter, as the design canvas draws it.
-    const lineHeight = 1.6;
+    const lineHeight = 1.65;
     final body = Type.sans(15.5, color: ink, height: lineHeight);
     final code = Type.mono(13.5, color: ink, height: 1.5);
     TextStyle heading(double size) =>

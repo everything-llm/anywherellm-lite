@@ -41,24 +41,21 @@ class ScanView extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      spacing: 10,
-                      children: [
-                        Text(
-                          'On your computer, open AnywhereLLM\'s Settings, Connection, '
-                          'and choose Connect a phone.',
-                          style: note,
-                        ),
-                        Text(
-                          'The code holds the server\'s address and your key. Nothing is '
-                          'sent anywhere but your server.',
-                          style: note,
-                        ),
-                      ],
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    spacing: 20,
+                    children: [
+                      Text(
+                        'On your computer, open AnywhereLLM\'s Settings, Connection, '
+                        'and choose Connect a phone.',
+                        style: note,
+                      ),
+                      Text(
+                        'The code holds the server\'s address and your key. Nothing is '
+                        'sent anywhere but your server.',
+                        style: note,
+                      ),
+                    ],
                   ),
                 ],
               ),

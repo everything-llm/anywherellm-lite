@@ -229,19 +229,9 @@ class _Ruled extends StatelessWidget {
   @override
   Widget build(BuildContext context) => !ruled
       ? child
-      : Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Divider(
-              height: 1,
-              thickness: 1,
-              indent: FieldCard.inset,
-              endIndent: FieldCard.inset,
-              color: Tokens.of(context).line2,
-            ),
-            child,
-          ],
+      : CustomPaint(
+          foregroundPainter: CardHairline(Tokens.of(context).line2),
+          child: child,
         );
 }
 

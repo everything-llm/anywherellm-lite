@@ -96,7 +96,7 @@ class _CitedRow extends StatelessWidget {
       label: [citation.title, ?about].join(', '),
       onTap: open,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 64),
+        constraints: const BoxConstraints(minHeight: 80),
         padding: const EdgeInsets.symmetric(
           horizontal: FieldCard.inset,
           vertical: 8,
@@ -116,7 +116,10 @@ class _CitedRow extends StatelessWidget {
                     style: Type.sans(15, color: t.ink),
                   ),
                   if (about != null)
-                    Text(about, style: Type.sans(13, color: t.muted)),
+                    Text(
+                      about,
+                      style: Type.sans(13, color: t.muted, height: 1.45),
+                    ),
                 ],
               ),
             ),

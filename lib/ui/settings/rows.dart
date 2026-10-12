@@ -58,21 +58,35 @@ class FieldCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (final (i, row) in rows.indexed) ...[
-            if (i > 0)
-              Divider(
-                height: 1,
-                thickness: 1,
-                indent: inset,
-                endIndent: inset,
-                color: t.line2,
-              ),
-            row,
-          ],
+          for (final (i, row) in rows.indexed)
+            // The hairline is drawn over the row's top, inside its height, as a CSS border is.
+            i == 0
+                ? row
+                : CustomPaint(
+                    foregroundPainter: CardHairline(t.line2),
+                    child: row,
+                  ),
         ],
       ),
     );
   }
+}
+
+/// A line across the top of what it paints over, [FieldCard.inset] short of either side: the
+/// rule between two rows of a grouped card.
+class CardHairline extends CustomPainter {
+  const CardHairline(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) => canvas.drawRect(
+    Rect.fromLTWH(FieldCard.inset, 0, size.width - 2 * FieldCard.inset, 1),
+    Paint()..color = color,
+  );
+
+  @override
+  bool shouldRepaint(CardHairline old) => old.color != color;
 }
 
 /// A setting in a [FieldCard]: its [label] and [help] on the left and its [control] on the
