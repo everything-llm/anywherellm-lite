@@ -184,11 +184,7 @@ void main() {
   testWidgets('on a phone, Settings and a workspace\'s page open Memory', (
     tester,
   ) async {
-    final h = await pumpApp(
-      tester,
-      llm: _remembering(),
-      size: const Size(390, 844),
-    );
+    final h = await pumpApp(tester, llm: _remembering());
     h.shell.openSettings();
     await tester.pumpAndSettle();
     await tapVisible(tester, control('Memory, Saved memories'));

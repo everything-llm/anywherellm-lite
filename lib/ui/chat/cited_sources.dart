@@ -8,7 +8,6 @@ import '../settings/rows.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/sheet.dart';
-import '../widgets/side_panel.dart';
 import '../widgets/tappable.dart';
 import 'passages_sheet.dart';
 
@@ -21,10 +20,10 @@ class CitedPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final shell = AppScope.of(context).shell;
     final cited = shell.cited ?? const <Citation>[];
-    return SidePanel(
+    return SheetFrame(
       title: 'Sources',
       onClose: shell.closeCited,
-      sheetHeight: SheetHeight.fit,
+
       child: CitedSources(cited),
     );
   }

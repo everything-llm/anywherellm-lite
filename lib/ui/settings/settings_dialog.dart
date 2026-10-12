@@ -243,11 +243,9 @@ class _PageView extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // The pages the design canvas draws need no line about them; the server's
-              // other pages say what they are for.
-              if (!_bare.contains(page)) ...[
+              if (page.about case final about?) ...[
                 Text(
-                  page.about,
+                  about,
                   style: Type.sans(14.5, color: t.ink2, height: 1.5),
                 ),
                 const SizedBox(height: 14),
@@ -259,15 +257,6 @@ class _PageView extends StatelessWidget {
       ),
     );
   }
-
-  /// The pages shown with no line about them, as the design canvas draws them.
-  static const _bare = {
-    SettingsPage.connection,
-    SettingsPage.appearance,
-    SettingsPage.chat,
-    SettingsPage.server,
-    SettingsPage.memory,
-  };
 
   static Widget _body(SettingsPage page) => switch (page) {
     SettingsPage.connection => const ConnectionPage(),

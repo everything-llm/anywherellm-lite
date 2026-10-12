@@ -21,7 +21,7 @@ class TextViewer extends StatelessWidget {
     final t = Tokens.of(context);
     final path = files.reading?.path;
     final file = scope.sources.files.where((f) => f.path == path).firstOrNull;
-    final text = files.doc?.text;
+    final text = files.text;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [

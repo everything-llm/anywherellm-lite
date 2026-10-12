@@ -84,12 +84,11 @@ class AlertBox extends StatelessWidget {
 }
 
 /// The accent dot beside a chat or workspace whose answer finished while it was not on
-/// screen, with room either side unless [gap] is false, or in [color] for another meaning.
+/// screen, with room either side unless [gap] is false.
 class ReadyDot extends StatelessWidget {
-  const ReadyDot({super.key, this.gap = true, this.color});
+  const ReadyDot({super.key, this.gap = true});
 
   final bool gap;
-  final Color? color;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -98,7 +97,7 @@ class ReadyDot extends StatelessWidget {
       width: 7,
       height: 7,
       decoration: BoxDecoration(
-        color: color ?? Tokens.of(context).accent,
+        color: Tokens.of(context).accent,
         shape: BoxShape.circle,
       ),
     ),

@@ -216,7 +216,7 @@ void main() {
     tester,
   ) async {
     final llm = planningServer();
-    final h = await pumpApp(tester, llm: llm, size: const Size(390, 844));
+    final h = await pumpApp(tester, llm: llm);
     h.shell.openSettings();
     await tester.pumpAndSettle();
     expect(find.text('AnythingLLM'), findsWidgets);

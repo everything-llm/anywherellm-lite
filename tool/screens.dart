@@ -32,7 +32,6 @@ import '../test/support/fake_api.dart';
 import '../test/support/fake_settings.dart';
 import '../test/support/pump.dart';
 
-const _phone = Size(390, 844);
 const _server = 'https://anythingllm.example.ts.net:3001';
 
 final _out = Directory(Platform.environment['SCREENS'] ?? 'build/screens');
@@ -375,7 +374,7 @@ final _screens = <String, _Setup>{
   'chatmodel': (tester, h) => _settings(tester, h, SettingsPage.chatModel),
   'privacy': (tester, h) => _settings(tester, h, SettingsPage.privacy),
   'upcoming': (tester, h) async {
-    h.shell.openPhonePage(PhonePage.upcoming);
+    h.shell.openUpcoming();
     await _settle(tester);
   },
   'workspace': _workspace,
@@ -484,7 +483,6 @@ void main() {
           final h = await pumpApp(
             tester,
             llm: _sample(),
-            size: _phone,
             onChat: false,
             canScan: !connected,
             canDictate: true,

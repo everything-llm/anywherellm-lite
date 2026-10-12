@@ -1,7 +1,6 @@
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/widgets/sheet.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
@@ -12,7 +11,7 @@ void main() {
     "a phone's sources fold into +N, which lists them by site in a sheet",
     (tester) async {
       final llm = planningServer()..hold = true;
-      final h = await pumpApp(tester, llm: llm, size: const Size(390, 844));
+      final h = await pumpApp(tester, llm: llm);
       await h.chat.send('How do teams recruit?');
       await tester.pump();
       llm.chat!

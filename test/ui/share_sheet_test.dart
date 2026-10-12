@@ -9,8 +9,6 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/fake_api.dart';
 import '../support/pump.dart';
 
-const phone = Size(390, 844);
-
 /// Shares [item] with the app, as another app's share sheet does.
 Future<void> share(
   WidgetTester tester,
@@ -44,7 +42,7 @@ void main() {
   ) async {
     final shares = StreamController<SharedItem>();
     final llm = planningServer();
-    final h = await pumpApp(tester, llm: llm, size: phone, shares: shares);
+    final h = await pumpApp(tester, llm: llm, shares: shares);
     await share(
       tester,
       shares,
@@ -69,7 +67,7 @@ void main() {
   ) async {
     final shares = StreamController<SharedItem>();
     final llm = planningServer();
-    final h = await pumpApp(tester, llm: llm, size: phone, shares: shares);
+    final h = await pumpApp(tester, llm: llm, shares: shares);
     await share(tester, shares, const SharedText('Service due in May.'));
     await tester.tap(inSheet(control('Ask about it')));
     await tester.pumpAndSettle();
@@ -89,7 +87,7 @@ void main() {
   ) async {
     final shares = StreamController<SharedItem>();
     final llm = planningServer();
-    await pumpApp(tester, llm: llm, size: phone, shares: shares);
+    await pumpApp(tester, llm: llm, shares: shares);
     await share(
       tester,
       shares,
@@ -125,7 +123,7 @@ void main() {
     (tester) async {
       final shares = StreamController<SharedItem>();
       final llm = planningServer();
-      await pumpApp(tester, llm: llm, size: phone, shares: shares);
+      await pumpApp(tester, llm: llm, shares: shares);
       await share(
         tester,
         shares,
@@ -148,12 +146,7 @@ void main() {
 
   testWidgets('with no server the sheet says to connect first', (tester) async {
     final shares = StreamController<SharedItem>();
-    final h = await pumpApp(
-      tester,
-      size: phone,
-      connection: null,
-      shares: shares,
-    );
+    final h = await pumpApp(tester, connection: null, shares: shares);
     await share(tester, shares, const SharedText('Notes'));
     expect(inSheet(find.textContaining('Connect to your')), findsOneWidget);
     await tester.tap(inSheet(control('Open Settings')));
@@ -165,12 +158,7 @@ void main() {
 
   testWidgets('Back puts the sheet away', (tester) async {
     final shares = StreamController<SharedItem>();
-    final h = await pumpApp(
-      tester,
-      llm: planningServer(),
-      size: phone,
-      shares: shares,
-    );
+    final h = await pumpApp(tester, llm: planningServer(), shares: shares);
     await share(tester, shares, const SharedText('Notes'));
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();

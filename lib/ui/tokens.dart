@@ -27,11 +27,9 @@ class Tokens extends ThemeExtension<Tokens> {
     required this.badfg,
     required this.badbg,
     required this.badln,
-    required this.fade,
     required this.scrim,
     required this.shadow,
     required this.bubble,
-    required this.okdot,
     required this.off,
   });
 
@@ -56,15 +54,11 @@ class Tokens extends ThemeExtension<Tokens> {
   final Color badfg;
   final Color badbg;
   final Color badln;
-  final Color fade;
   final Color scrim;
   final Color shadow;
 
   /// The fill behind the person's own messages.
   final Color bubble;
-
-  /// The status dot when a key is set.
-  final Color okdot;
 
   /// A switch that is off, and a send button with nothing to send.
   final Color off;
@@ -91,11 +85,9 @@ class Tokens extends ThemeExtension<Tokens> {
     badfg: oklch(0.47, 0.16, 20),
     badbg: oklch(0.95, 0.025, 20),
     badln: oklch(0.8, 0.09, 20),
-    fade: oklch(0.62, 0.02, 280),
     scrim: oklch(0.25, 0.03, 280, 0.4),
     shadow: oklch(0.35, 0.04, 280, 0.14),
     bubble: oklch(0.945, 0.026, 272),
-    okdot: oklch(0.62, 0.14, 160),
     off: oklch(0.84, 0.012, 75),
   );
 
@@ -121,11 +113,9 @@ class Tokens extends ThemeExtension<Tokens> {
     badfg: oklch(0.83, 0.085, 20),
     badbg: oklch(0.33, 0.06, 20),
     badln: oklch(0.5, 0.1, 20),
-    fade: oklch(0.6, 0.018, 280),
     scrim: oklch(0.1, 0.02, 280, 0.6),
     shadow: oklch(0, 0, 0, 0.35),
     bubble: oklch(0.31, 0.04, 272),
-    okdot: oklch(0.72, 0.14, 160),
     off: oklch(0.42, 0.02, 280),
   );
 

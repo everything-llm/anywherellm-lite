@@ -132,6 +132,7 @@ class ChatsTab extends StatefulWidget {
 
 class _ChatsTabState extends State<ChatsTab> {
   final _search = TextEditingController();
+  final _searchFocus = FocusNode(debugLabel: 'Search chats');
 
   /// What the search holds, trimmed: it changes only with the words, not with the cursor.
   final _query = ValueNotifier('');
@@ -145,6 +146,7 @@ class _ChatsTabState extends State<ChatsTab> {
   @override
   void dispose() {
     _search.dispose();
+    _searchFocus.dispose();
     _query.dispose();
     super.dispose();
   }
@@ -219,7 +221,7 @@ class _ChatsTabState extends State<ChatsTab> {
                         sliver: SliverMainAxisGroup(
                           slivers: [
                             SliverToBoxAdapter(
-                              child: _Search(_search, focus: shell.searchFocus),
+                              child: _Search(_search, focus: _searchFocus),
                             ),
                             if (query.isNotEmpty)
                               SliverToBoxAdapter(

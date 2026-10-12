@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/widgets.dart';
 
 import '../../core/files.dart';
 import '../../core/gallery.dart';
@@ -37,9 +36,6 @@ class ChatSheetFor {
   final bool deleting;
 }
 
-/// A page shown over the Chats tab, from its Upcoming card: the server's scheduled jobs.
-enum PhonePage { upcoming }
-
 /// A phone's sheet about the open workspace: a new workspace's name, the open one's new name,
 /// or whether to delete it.
 enum WorkspaceSheet { create, rename, delete }
@@ -57,14 +53,10 @@ class ShellController extends ChangeNotifier {
 
   bool _chatOpen = false;
 
-  /// The Chats tab's search field.
-  final searchFocus = FocusNode(debugLabel: 'Search chats');
-
   final _popup = ValueNotifier<Object?>(null);
 
   @override
   void dispose() {
-    searchFocus.dispose();
     _popup.dispose();
     super.dispose();
   }
@@ -111,22 +103,23 @@ class ShellController extends ChangeNotifier {
   bool _rightOpen = false;
   FilesSection? _workspacePage;
   bool _scanning = false;
-  PhonePage? _phonePage;
+  bool _upcomingOpen = false;
 
-  /// The page a phone shows over the chat, or null: one at a time.
-  PhonePage? get phonePage => _phonePage;
+  /// Whether the page of the server's scheduled jobs shows over the Chats tab, from its
+  /// Upcoming card.
+  bool get upcomingOpen => _upcomingOpen;
 
-  /// Shows [page] over the chat in place of any other, closing the popup open.
-  void openPhonePage(PhonePage page) {
-    if (_phonePage == page) return;
-    _phonePage = page;
+  /// Shows the Upcoming page over the Chats tab, closing the popup open.
+  void openUpcoming() {
+    if (_upcomingOpen) return;
+    _upcomingOpen = true;
     _popup.value = null;
     notifyListeners();
   }
 
-  void closePhonePage() {
-    if (_phonePage == null) return;
-    _phonePage = null;
+  void closeUpcoming() {
+    if (!_upcomingOpen) return;
+    _upcomingOpen = false;
     notifyListeners();
   }
 
@@ -198,7 +191,7 @@ class ShellController extends ChangeNotifier {
   /// Settings' list.
   bool get atHome => _settingsOpen
       ? _settingsPage == null
-      : !_chatOpen && _pane == Pane.chats && _phonePage == null;
+      : !_chatOpen && _pane == Pane.chats && !_upcomingOpen;
 
   /// Whether the sheet over the chat, or over the workspace's pages, is open.
   bool get rightOpen => _rightOpen;
@@ -219,10 +212,7 @@ class ShellController extends ChangeNotifier {
   /// Shows the chat full screen over the home, closing Settings, the workspace's pages and a
   /// page over the Chats tab.
   void openChat() {
-    if (_chatOpen &&
-        !_settingsOpen &&
-        _pane == Pane.chats &&
-        _phonePage == null) {
+    if (_chatOpen && !_settingsOpen && _pane == Pane.chats && !_upcomingOpen) {
       return;
     }
     _chatOpen = true;
@@ -231,7 +221,7 @@ class ShellController extends ChangeNotifier {
     _sourcesUnder = null;
     _pane = Pane.chats;
     _workspacePage = null;
-    _phonePage = null;
+    _upcomingOpen = false;
     notifyListeners();
   }
 
@@ -252,7 +242,7 @@ class ShellController extends ChangeNotifier {
     _sourcesUnder = null;
     _pane = Pane.chats;
     _workspacePage = null;
-    _phonePage = null;
+    _upcomingOpen = false;
     _scanning = false;
     _settingsOpen = tab == HomeTab.settings;
     _settingsPage = null;
@@ -400,17 +390,9 @@ class ShellController extends ChangeNotifier {
   }
 
   void _setRight({required bool open, required Beside beside}) {
-    if (beside != _beside) {
-      _beside = beside;
-      notifyListeners();
-    }
-    _set(right: open);
-  }
-
-  void _set({bool? right}) {
-    final next = right ?? _rightOpen;
-    if (next == _rightOpen) return;
-    _rightOpen = next;
+    if (beside == _beside && open == _rightOpen) return;
+    _beside = beside;
+    _rightOpen = open;
     notifyListeners();
   }
 }

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../core/files.dart';
 import '../../core/sources.dart';
 import '../app_scope.dart';
 import '../settings/rows.dart';
@@ -15,7 +14,6 @@ import '../widgets/upload_queue.dart';
 import '../widgets/rise.dart';
 import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
-import '../widgets/side_panel.dart';
 import 'add_source.dart';
 import 'test_question.dart';
 
@@ -27,10 +25,10 @@ class SourcesPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
-    return SidePanel(
+    return SheetFrame(
       title: 'Documents',
       onClose: scope.shell.closeSources,
-      sheetHeight: SheetHeight.fit,
+
       child: ListenableBuilder(
         listenable: scope.sources,
         // Built afresh on each change, never const, so the files shown follow Sources.
@@ -178,11 +176,7 @@ class _FileRow extends StatelessWidget {
               excludeSemantics: false,
               onTap: () {
                 scope.shell.showDocText();
-                unawaited(
-                  scope.files
-                      .openSection(FilesSection.documents)
-                      .then((_) => scope.files.viewText(file.path, file.title)),
-                );
+                unawaited(scope.files.viewText(file.path, file.title));
               },
               child: Container(
                 constraints: const BoxConstraints(minHeight: 64),

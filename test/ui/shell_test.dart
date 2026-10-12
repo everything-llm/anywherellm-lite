@@ -107,7 +107,7 @@ void main() {
       tester,
     ) async {
       final llm = planningServer()..hold = true;
-      final h = await pumpApp(tester, llm: llm, size: const Size(390, 844));
+      final h = await pumpApp(tester, llm: llm);
       await typeAndEnter(tester, 'What is the budget?');
       llm.chat!.add(const TextChunk('About 40k.'));
       llm.chat!.add(
@@ -816,11 +816,7 @@ void main() {
     testWidgets(
       'a phone\'s chat header names the workspace and its documents over the chat',
       (tester) async {
-        final h = await pumpApp(
-          tester,
-          llm: planningServer(),
-          size: const Size(390, 844),
-        );
+        final h = await pumpApp(tester, llm: planningServer());
         expect(find.text('Q3 planning · 2 docs in use'), findsOneWidget);
         // A pull down refreshes, and Documents is under the workspace's settings.
         expect(find.byTooltip('Refresh'), findsNothing);
@@ -838,7 +834,7 @@ void main() {
       tester,
     ) async {
       final llm = planningServer();
-      final h = await pumpApp(tester, llm: llm, size: const Size(390, 844));
+      final h = await pumpApp(tester, llm: llm);
       final reads = llm.calls.where((c) => c == 'workspaces').length;
       final list = find.byType(CustomScrollView).first;
       // A short pull does nothing; a long one, let go, refreshes.
@@ -854,11 +850,7 @@ void main() {
     testWidgets('on a phone, Documents is a sheet over the chat', (
       tester,
     ) async {
-      final h = await pumpApp(
-        tester,
-        llm: planningServer(),
-        size: const Size(390, 844),
-      );
+      final h = await pumpApp(tester, llm: planningServer());
       expect(find.byType(SourcesPanel), findsNothing);
       h.shell.openSources();
       await tester.pumpAndSettle();

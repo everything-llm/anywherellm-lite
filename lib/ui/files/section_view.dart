@@ -6,7 +6,7 @@ import '../tokens.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';
 import '../widgets/fields.dart';
-import 'essentials.dart';
+import 'text_viewer.dart';
 import 'settings_form.dart';
 
 /// A line of muted text in the middle of the pane.
@@ -31,9 +31,10 @@ class Blank extends StatelessWidget {
 /// The editor for a workspace's `PROMPT.md`, as prose, with Revert and Save sharing the line.
 /// Its key changes each time the text is read afresh, which drops the draft.
 class _Editor extends StatefulWidget {
-  const _Editor({super.key, required this.node});
+  const _Editor({super.key, required this.prompt});
 
-  final FileNode node;
+  /// The workspace's prompt as last read.
+  final String prompt;
 
   @override
   State<_Editor> createState() => _EditorState();
@@ -47,7 +48,7 @@ class _EditorState extends State<_Editor> {
   @override
   void initState() {
     super.initState();
-    _saved = AppScope.of(context).files.text ?? '';
+    _saved = widget.prompt;
     _draft = TextEditingController(text: _saved);
   }
 
@@ -76,7 +77,7 @@ class _EditorState extends State<_Editor> {
         children: [
           Expanded(
             child: Semantics(
-              label: widget.node.name,
+              label: 'PROMPT.md',
               textField: true,
               child: TextField(
                 controller: _draft,
@@ -126,26 +127,27 @@ class _EditorState extends State<_Editor> {
   }
 }
 
-/// A page of the open workspace: its instructions or its answer settings, the node
+/// A page of the open workspace: its instructions or its answer settings, the section
 /// [FilesController.section] picks, or the text of one of its documents.
-Widget essentialSection(BuildContext context, FileNode? node) {
+Widget workspaceSection(BuildContext context) {
   final scope = AppScope.of(context);
   final files = scope.files;
   final workspace = scope.chat.active;
   if (workspace == null) return const Blank('No workspace is open.');
   if (files.reading != null) return const TextViewer();
   final section = files.section;
-  final key = ValueKey('${node?.path}#${files.revision}');
+  final detail = files.detail(workspace.slug);
+  final key = ValueKey('${workspace.slug}#$section#${files.revision}');
   return switch (section) {
-    // The documents are a sheet over the pages; this shows only until the text picked reads.
-    FilesSection.documents => const Blank('Loading…'),
-    _ when files.contentLoading || (node == null && files.loading) =>
-      const Blank('Loading…'),
-    _ when node == null => Blank(
+    _ when detail == null && files.loading => const Blank('Loading…'),
+    _ when detail == null => Blank(
       'The server did not send this workspace\'s '
       '${section == FilesSection.instructions ? 'prompt' : 'settings'}.',
     ),
-    FilesSection.instructions => _Editor(key: key, node: node),
-    FilesSection.answers => SettingsForm(key: key, slug: node.slug!),
+    FilesSection.instructions => _Editor(key: key, prompt: detail.prompt ?? ''),
+    FilesSection.answers when detail.settings == null => const Blank(
+      'The server did not send this workspace\'s settings.',
+    ),
+    FilesSection.answers => SettingsForm(key: key, slug: workspace.slug),
   };
 }

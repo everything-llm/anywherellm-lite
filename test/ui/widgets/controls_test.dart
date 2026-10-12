@@ -55,7 +55,7 @@ void main() {
       'close',
       'doc',
       'send',
-      'hamburger',
+      'search',
     ];
     await show(
       tester,

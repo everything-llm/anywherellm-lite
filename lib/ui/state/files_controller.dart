@@ -12,19 +12,20 @@ import 'notice.dart';
 import 'settings_controller.dart';
 import 'sources_controller.dart';
 
-/// The open workspace's pages: its documents, prompt and settings under plain names, each a node
-/// of the server's data as one folder tree, the node on screen and its text, and saving it.
+/// The open workspace's pages: its prompt and its answer settings, the text of one of its
+/// documents, and saving them.
 ///
-/// The workspaces and their chats come from [ChatController]; this reads each workspace's prompt,
-/// settings and documents itself; the server's own settings belong to `SystemController`. A new
-/// server starts it afresh. A change to a workspace's documents is shown in Sources when that
-/// workspace is active.
+/// The workspace comes as [SourcesController] last read it, and as this reads it again after a
+/// change; the server's own settings belong to `SystemController`. A new server starts it
+/// afresh. A change to a workspace's documents is shown in Sources when that workspace is
+/// active.
 class FilesController extends ChangeNotifier {
   FilesController(this._api, this._settings, this._chat, this._sources)
     : _server = _settings.connection?.withPassword(null) {
     _settings.addListener(_serverChanged);
     _chat.addListener(_chatChanged);
     _sources.addListener(_sourcesChanged);
+    _sourcesChanged();
   }
 
   final AnythingLlmApi _api;
@@ -35,58 +36,42 @@ class FilesController extends ChangeNotifier {
   /// The connection the fields below describe.
   Connection? _server;
 
-  /// Each workspace read on its own, with its prompt, settings and documents, by slug.
+  /// Each workspace as last read, with its prompt, settings and documents, by slug.
   final Map<String, Workspace> _details = {};
 
-  /// The workspaces asked for on their own, read or not, so each is asked once.
-  final Set<String> _asked = {};
-
-  /// The tree as last built, or null when what it is built from has changed since.
-  FileNode? _tree;
-
-  bool _loaded = false;
-  bool loading = false;
-
-  /// Whether the pages have been shown, so a new server's are read as soon as its workspaces
-  /// are.
-  bool _wanted = false;
+  /// Whether Sources was reading when it last told this, so a read ending is passed on.
+  bool _sourcesLoading = false;
 
   /// Whether the pages are on screen, so they follow another workspace opened only while they
   /// show, and catch up when they show again.
   bool _showing = false;
 
-  /// The path of the node on screen.
-  String? selected;
-
-  /// The selected file's text, or null while it loads or when it has none.
-  String? text;
-
-  /// The document whose text [reading] shows.
-  DocBody? doc;
-
   /// The section the pages show.
   FilesSection get section => _section;
-  FilesSection _section = FilesSection.documents;
+  FilesSection _section = FilesSection.instructions;
 
-  /// The workspace the pages last showed, so they follow when another one opens.
-  String? _essentialSlug;
+  /// The workspace the pages show, so they follow when another one opens.
+  String? get workspace => _pagesSlug;
+  String? _pagesSlug;
 
-  /// The document whose extracted text shows in place of the documents, or null for the list.
+  /// The document whose extracted text shows in place of the page, or null for the page.
   ({String path, String title})? get reading => _reading;
   ({String path, String title})? _reading;
 
-  /// Counts each time [text] is read afresh, so an editor knows to drop its draft.
+  /// The text of the document [reading] shows, or null while it loads or when it has none.
+  String? text;
+
+  /// Counts each time the workspace the pages show is read afresh, so an editor knows to drop
+  /// its draft.
   int revision = 0;
 
   bool contentLoading = false;
 
+  /// Whether the workspace the pages show is still being read.
+  bool get loading => _pagesSlug != null && _sources.loading;
+
   /// Why the last load or change failed.
   List<Notice> problems = const [];
-
-  FileNode get tree =>
-      _tree ??= buildTree(workspaces: _chat.workspaces, details: _details);
-
-  FileNode? get node => selected == null ? null : nodeAt(tree, selected!);
 
   Workspace? detail(String slug) => _details[slug];
 
@@ -104,128 +89,79 @@ class FilesController extends ChangeNotifier {
     if (now == _server) return;
     _server = now;
     _details.clear();
-    _asked.clear();
-    _tree = null;
-    _essentialSlug = null;
-    _loaded = false;
-    loading = false;
-    selected = null;
+    _pagesSlug = null;
+    _reading = null;
     _clearContent();
     problems = const [];
     notifyListeners();
   }
 
-  /// Follows the workspaces: one made after [load] is read on its own too, and a deleted one is
-  /// forgotten.
+  /// Follows the open workspace, and forgets a deleted one.
   void _chatChanged() {
-    _tree = null;
     _followWorkspace();
-    final gone = _details.keys.followedBy(_asked).toSet().difference({
-      for (final w in _chat.workspaces) w.slug,
-    });
-    for (final slug in gone) {
-      _details.remove(slug);
-      _asked.remove(slug);
-      if (selected != null && _under(selected!, slug)) {
-        selected = '/workspaces';
-        _clearContent();
-      }
-    }
-    notifyListeners();
-    if (!_loaded) {
-      if (_wanted && !loading && !_chat.loading && _server != null) {
-        unawaited(load());
-      }
-      return;
-    }
-    for (final w in _chat.workspaces) {
-      if (_asked.add(w.slug)) unawaited(_show(_readWorkspace(w.slug)));
-    }
+    final slugs = {for (final w in _chat.workspaces) w.slug};
+    final before = _details.length;
+    _details.removeWhere((slug, _) => !slugs.contains(slug));
+    if (_details.length != before) notifyListeners();
   }
 
   /// Takes the workspace Sources last read, so a change made there shows here too.
   void _sourcesChanged() {
     final read = _sources.read;
-    if (!_loaded || read == null || identical(read, _details[read.slug])) {
+    final ended = _sourcesLoading && !_sources.loading;
+    _sourcesLoading = _sources.loading;
+    if (read != null && !identical(read, _details[read.slug])) {
+      _take(read);
+    } else if (!ended) {
       return;
     }
-    if (!_chat.workspaces.any((w) => w.slug == read.slug)) return;
+    notifyListeners();
+  }
+
+  /// Keeps [read] as its workspace's, the one the pages show afresh when it is that one.
+  void _take(Workspace read) {
     _details[read.slug] = read;
-    _tree = null;
-    // The workspace's prompt or settings on show are its new ones, so a save compares against
-    // what the editor shows. The path is checked first, since the node needs the tree built.
-    if (selected case final path? when _under(path, read.slug)) {
-      switch (node?.kind) {
-        case NodeKind.prompt:
-          text = read.prompt ?? '';
-          revision++;
-        case NodeKind.settings when read.settings != null:
-          text = settingsText(read.settings!);
-          revision++;
-        default:
-      }
-    }
-    notifyListeners();
+    if (read.slug == _pagesSlug) revision++;
   }
 
-  static bool _under(String path, String slug) =>
-      path == '/workspaces/$slug' || path.startsWith('/workspaces/$slug/');
-
-  /// Waits for [read], and shows why it failed when it did.
-  Future<void> _show(Future<Notice?> read) async {
-    if (await read case final failed?) problems = [...problems, failed];
-    notifyListeners();
-  }
-
-  /// Reads every workspace, unless already read, as the pages show.
+  /// Follows the open workspace, as the pages show.
   Future<void> ensureLoaded() async {
-    _wanted = _showing = true;
+    _showing = true;
     _followWorkspace();
-    if (!_loaded && !loading) await load();
   }
 
   /// Notes that the pages are no longer on screen. It tells no listener.
   void hidden() => _showing = false;
 
   /// Shows [section] of the open workspace.
-  Future<void> openSection(FilesSection section) {
+  Future<void> openSection(FilesSection section) async {
     _section = section;
-    _essentialSlug = _chat.activeSlug;
-    return _openSection();
-  }
-
-  Future<void> _openSection() {
-    final path = switch (_essentialSlug) {
-      final slug? => _section.pathIn(slug),
-      null => null,
-    };
-    if (path != null) return _select(path);
+    _pagesSlug = _chat.activeSlug;
     _reading = null;
-    selected = null;
     _clearContent();
+    problems = const [];
     notifyListeners();
-    return Future.value();
   }
 
   /// Keeps the pages on the open workspace while they are on screen.
   void _followWorkspace() {
-    if (!_showing || _chat.activeSlug == _essentialSlug) return;
-    _essentialSlug = _chat.activeSlug;
-    unawaited(_openSection());
+    if (!_showing || _chat.activeSlug == _pagesSlug) return;
+    unawaited(openSection(_section));
   }
 
   /// Reads the text the server keeps of the document at [path], called [title], and shows it in
-  /// place of the documents.
+  /// place of the page.
   Future<void> viewText(String path, String title) async {
     final reading = _reading = (path: path, title: title);
-    doc = null;
+    _pagesSlug = _chat.activeSlug;
+    text = null;
     contentLoading = true;
     notifyListeners();
     final server = _server;
     try {
       final read = await _api.document(path);
       if (_reading != reading || _server != server) return;
-      doc = read;
+      text = read.text;
       problems = const [];
     } on ApiException catch (error) {
       if (_reading != reading || _server != server) return;
@@ -240,7 +176,7 @@ class FilesController extends ChangeNotifier {
   Future<String> textOf(String path) async =>
       (await _api.document(path)).text ?? (throw const ApiException(noDocText));
 
-  /// Puts the extracted text away, back to the documents.
+  /// Puts the extracted text away, back to the page.
   void closeText() {
     if (_reading == null) return;
     _reading = null;
@@ -248,105 +184,37 @@ class FilesController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Reads every workspace on its own, all at once. A workspace that cannot be read is left
-  /// without its files and says why.
-  Future<void> load() async {
-    if (_server == null) return;
-    final server = _server;
-    loading = true;
-    notifyListeners();
-    _asked.addAll([for (final w in _chat.workspaces) w.slug]);
-    final failed = await Future.wait([
-      for (final w in _chat.workspaces) _readWorkspace(w.slug),
-    ]);
-    if (_server != server) return;
-    loading = false;
-    _loaded = true;
-    // Showing the node clears the problems, so the failed reads are added after it.
-    // The text being read is read again with the rest, rather than put away.
-    if (_reading case final reading?) {
-      await viewText(reading.path, reading.title);
-      if (_server != server) return;
-    } else if (selected != null) {
-      await _select(selected!);
-      if (_server != server) return;
-    }
-    problems = [...failed.nonNulls, if (selected != null) ...problems];
-    notifyListeners();
-  }
-
-  Future<void> _select(String path) async {
-    _reading = null;
-    selected = path;
-    _clearContent();
-    final node = this.node;
-    if (node == null || node.kind.isFolder) {
-      notifyListeners();
-      return;
-    }
-    contentLoading = true;
-    notifyListeners();
-    final server = _server;
-    try {
-      final (text, doc) = await _content(node);
-      if (selected != path || _server != server) return;
-      this.text = text;
-      this.doc = doc;
-      revision++;
-      problems = const [];
-    } on ApiException catch (error) {
-      if (selected != path || _server != server) return;
-      problems = [Notice('Could not read ${node.name}', error.message)];
-    }
-    contentLoading = false;
-    notifyListeners();
-  }
-
-  Future<(String?, DocBody?)> _content(FileNode node) async {
-    final detail = node.slug == null ? null : _details[node.slug];
-    return switch (node.kind) {
-      NodeKind.prompt => (detail?.prompt ?? '', null),
-      NodeKind.settings => (settingsText(detail!.settings!), null),
-      _ => (null, null),
-    };
-  }
-
-  /// Saves [draft] as the selected prompt or settings file. Returns whether it was saved.
+  /// Saves [draft] as the open section's prompt or settings. Returns whether it was saved.
   Future<bool> save(String draft) async {
-    final node = this.node;
-    final slug = node?.slug;
-    if (node == null || slug == null || !node.kind.editable) return false;
+    final slug = _pagesSlug;
+    final detail = slug == null ? null : _details[slug];
+    if (slug == null || detail == null) return false;
+    final prompt = _section == FilesSection.instructions;
+    final title = 'Could not save ${prompt ? 'PROMPT.md' : 'settings.json'}';
     final Map<String, Object?> fields;
     try {
-      fields = node.kind == NodeKind.prompt
+      fields = prompt
           // An empty prompt is no prompt, so the default applies again.
           ? {'openAiPrompt': draft.trim().isEmpty ? null : draft}
-          : parseSettings(draft, _details[slug]!.settings!);
+          : parseSettings(draft, detail.settings!);
     } on ApiException catch (error) {
-      problems = [Notice('Could not save ${node.name}', error.message)];
+      problems = [Notice(title, error.message)];
       notifyListeners();
       return false;
     }
     if (fields.isEmpty) return true;
-    final changed = await _change(
-      'Could not save ${node.name}',
-      () => _api.updateWorkspace(slug, fields),
-      slug: slug,
-    );
-    // When the workspace could not be read again, the draft stays on screen with why.
-    if (changed == _Changed.done) await _select(node.path);
-    return changed != _Changed.failed;
+    return _change(title, () => _api.updateWorkspace(slug, fields), slug: slug);
   }
 
-  /// Shows a failure that is not about one node, such as a file picker that would not open.
+  /// Shows a failure that is not about one page, such as a file picker that would not open.
   void report(String title, String text) {
     problems = [...problems, Notice(title, text)];
     notifyListeners();
   }
 
-  /// Runs [op], then reads workspace [slug] again. Says whether [op] failed, worked but the
-  /// workspace could not be read again, or worked and was read again.
-  Future<_Changed> _change(
+  /// Runs [op], then reads workspace [slug] again. Says whether [op] worked; when the workspace
+  /// could not be read again, the draft stays on screen with why.
+  Future<bool> _change(
     String failTitle,
     Future<void> Function() op, {
     required String slug,
@@ -358,27 +226,23 @@ class FilesController extends ChangeNotifier {
     } on ApiException catch (error) {
       failed = Notice(failTitle, error.message);
     }
-    if (_server != server) return _Changed.failed;
-    final unread = await _readWorkspace(slug);
-    if (_server != server) return _Changed.failed;
+    if (_server != server) return false;
+    final unread = await _readWorkspace(slug, keepDraft: failed != null);
+    if (_server != server) return false;
     problems = [?failed, ?unread];
     notifyListeners();
-    return failed != null
-        ? _Changed.failed
-        : unread != null
-        ? _Changed.unread
-        : _Changed.done;
+    return failed == null;
   }
 
-  /// Reads workspace [slug] again and tells Sources and the drawer what changed. Returns why it
-  /// could not, or null; the tree then keeps what it last read.
-  Future<Notice?> _readWorkspace(String slug) async {
+  /// Reads workspace [slug] again and hands it to Sources. Returns why it could not, or null.
+  /// A draft is dropped only when the read [keepDraft] is not.
+  Future<Notice?> _readWorkspace(String slug, {bool keepDraft = false}) async {
     final server = _server;
     try {
       final w = await _api.workspace(slug);
       if (_server != server) return null;
       _details[slug] = w;
-      _tree = null;
+      if (slug == _pagesSlug && !keepDraft) revision++;
       if (slug == _chat.activeSlug) {
         _sources.show(w);
       } else {
@@ -392,11 +256,6 @@ class FilesController extends ChangeNotifier {
 
   void _clearContent() {
     text = null;
-    doc = null;
     contentLoading = false;
   }
 }
-
-/// How a change Files made went: [failed], worked but what it changed could not be read again
-/// ([unread]), or worked and was read again ([done]).
-enum _Changed { failed, unread, done }

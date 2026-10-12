@@ -8,7 +8,6 @@ import 'app_scope.dart';
 import 'links.dart';
 import 'settings/rows.dart';
 import 'settings/settings_pages.dart';
-import 'state/shell_controller.dart';
 import 'tokens.dart';
 import 'type.dart';
 import 'widgets/basics.dart';
@@ -62,7 +61,7 @@ class _UpcomingCardState extends State<UpcomingCard> {
             icon: 'clock',
             title: 'Upcoming',
             about: about,
-            onTap: () => scope.shell.openPhonePage(PhonePage.upcoming),
+            onTap: () => scope.shell.openUpcoming(),
           ),
         ]);
       },
@@ -104,7 +103,7 @@ class _UpcomingPageState extends State<UpcomingPage> {
           PhonePageHeader(
             title: 'Upcoming',
             back: 'Back to the chats',
-            onBack: shell.closePhonePage,
+            onBack: shell.closeUpcoming,
           ),
           Expanded(
             child: ListenableBuilder(
@@ -129,7 +128,7 @@ class _UpcomingPageState extends State<UpcomingPage> {
                           'Open Connection',
                           onPressed: () {
                             shell
-                              ..closePhonePage()
+                              ..closeUpcoming()
                               ..openSettings(SettingsPage.connection);
                           },
                         ),

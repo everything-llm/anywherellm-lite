@@ -19,55 +19,12 @@ const _settings = WorkspaceSettings({
   'chatMode': 'automatic',
 });
 
-FileNode _tree({Map<String, Workspace> details = const {}}) => buildTree(
-  workspaces: const [Workspace(slug: 'q3', name: 'Q3 planning')],
-  details: details,
-);
-
-List<String> _paths(FileNode node) => [
-  node.path,
-  for (final child in node.children) ..._paths(child),
-];
-
 String _edited(String key, Object? value) {
   final json = {..._settings.values, key: value};
   return jsonEncode(json);
 }
 
 void main() {
-  group('the tree', () {
-    test('a workspace not yet read shows nothing in it', () {
-      expect(_paths(_tree()), ['/', '/workspaces', '/workspaces/q3']);
-    });
-
-    test('a read workspace adds its prompt, settings and document links', () {
-      final tree = _tree(
-        details: {
-          'q3': const Workspace(
-            slug: 'q3',
-            name: 'Q3 planning',
-            settings: _settings,
-            documents: [WorkspaceDoc(path: 'custom/a.json', title: 'A')],
-          ),
-        },
-      );
-      final q3 = nodeAt(tree, '/workspaces/q3')!;
-      expect(
-        [for (final c in q3.children) c.name],
-        ['PROMPT.md', 'settings.json', 'docs'],
-      );
-      final link = nodeAt(tree, '/workspaces/q3/docs/custom/a.json')!;
-      expect(
-        (link.kind, link.name, link.ref),
-        (NodeKind.docLink, 'A', 'custom/a.json'),
-      );
-    });
-
-    test('nodeAt finds nothing for a path not in the tree', () {
-      expect(nodeAt(_tree(), '/workspaces/q3/PROMPT.md'), isNull);
-    });
-  });
-
   group('settings', () {
     test('round-trip unchanged to no changes', () {
       expect(parseSettings(settingsText(_settings), _settings), isEmpty);
@@ -163,13 +120,9 @@ void main() {
       expect(doc.title, 'notes.md');
     });
 
-    test('pinned and watched read from numbers or booleans', () {
-      final doc = WorkspaceDoc.fromJson({
-        'docpath': 'c/a.json',
-        'pinned': 1,
-        'watched': false,
-      });
-      expect((doc.pinned, doc.watched), (true, false));
+    test('pinned reads from a number or a boolean', () {
+      final doc = WorkspaceDoc.fromJson({'docpath': 'c/a.json', 'pinned': 1});
+      expect(doc.pinned, isTrue);
     });
   });
 
@@ -232,10 +185,7 @@ void main() {
     expect(textFileName('  '), 'document.txt');
   });
 
-  test('each Essentials section is a node of the tree', () {
-    expect(FilesSection.documents.pathIn('q3'), docsPath('q3'));
-    expect(FilesSection.instructions.pathIn('q3'), '/workspaces/q3/PROMPT.md');
-    expect(FilesSection.answers.pathIn('q3'), '/workspaces/q3/settings.json');
+  test('the pages are named plainly', () {
     expect(FilesSection.answers.title, 'Answer settings');
   });
 }

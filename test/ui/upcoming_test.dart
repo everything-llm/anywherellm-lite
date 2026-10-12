@@ -1,14 +1,10 @@
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/ui/upcoming.dart';
-import 'package:anywherellm/ui/state/shell_controller.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
 import '../support/pump.dart';
-
-const phone = Size(390, 844);
 
 void main() {
   testWidgets('the phone\'s drawer counts the jobs and opens Upcoming', (
@@ -29,7 +25,7 @@ void main() {
           enabled: false,
         ),
       ];
-    final h = await pumpApp(tester, llm: llm, size: phone, onChat: false);
+    final h = await pumpApp(tester, llm: llm, onChat: false);
     expect(find.textContaining('2 jobs · next today'), findsOneWidget);
     await tester.tap(find.text('Upcoming'));
     await tester.pumpAndSettle();
@@ -44,7 +40,7 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(h.shell.phonePage, isNull);
+    expect(h.shell.upcomingOpen, isFalse);
   });
 
   testWidgets('without the password Upcoming says why and offers Connection', (
@@ -55,13 +51,13 @@ void main() {
         'This needs the server password. Add it in Settings.',
         status: 401,
       );
-    final h = await pumpApp(tester, llm: llm, size: phone);
-    h.shell.openPhonePage(PhonePage.upcoming);
+    final h = await pumpApp(tester, llm: llm);
+    h.shell.openUpcoming();
     await tester.pumpAndSettle();
     expect(find.textContaining('server password'), findsOneWidget);
     await tester.tap(control('Open Connection'));
     await tester.pumpAndSettle();
-    expect(h.shell.phonePage, isNull);
+    expect(h.shell.upcomingOpen, isFalse);
     expect(h.shell.settingsOpen, isTrue);
   });
 }

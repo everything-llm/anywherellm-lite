@@ -123,8 +123,10 @@ class AppField extends StatelessWidget {
         onChanged: onChanged,
         onSubmitted: onSubmitted,
         // Several lines are set apart, as the design canvas sets a text area.
-        style: Type.sans(size, height: maxLines > 1 ? 1.5 : null)
-            .copyWith(color: t.ink),
+        style: Type.sans(
+          size,
+          height: maxLines > 1 ? 1.5 : null,
+        ).copyWith(color: t.ink),
         cursorColor: t.accent,
         decoration: InputDecoration(
           isDense: true,

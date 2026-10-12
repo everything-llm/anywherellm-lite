@@ -94,7 +94,6 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                 'Back to the chat',
                 () => shell.showPane(Pane.chats),
               );
-        final node = _files.node;
         return MinHeight(
           min: Sizes.panelMin,
           child: Column(
@@ -134,7 +133,7 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                 child: workspace == null
                     ? const Blank('No workspace is open.')
                     : reading != null || page != null
-                    ? essentialSection(context, node)
+                    ? workspaceSection(context)
                     : _overview(context, workspace.name),
               ),
             ],

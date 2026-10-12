@@ -1,5 +1,4 @@
 import 'package:anywherellm/ui/chat/gallery.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
@@ -22,7 +21,7 @@ void main() {
   testWidgets(
     'pictures from a search are one row of four, the last saying how many more',
     (tester) async {
-      await pumpApp(tester, llm: _searched(8), size: const Size(390, 844));
+      await pumpApp(tester, llm: _searched(8));
       expect(find.byType(Gallery), findsOneWidget);
       expect(control('Picture 1: Unit 1, from site1.example'), findsOneWidget);
       expect(control('Picture 4 and 4 more'), findsOneWidget);
@@ -40,11 +39,7 @@ void main() {
   testWidgets(
     'a tile opens the pictures one at a time, with Previous and Next',
     (tester) async {
-      final h = await pumpApp(
-        tester,
-        llm: _searched(3),
-        size: const Size(390, 844),
-      );
+      final h = await pumpApp(tester, llm: _searched(3));
       await tester.tap(control('Picture 2: Unit 2, from site2.example'));
       await tester.pumpAndSettle();
       expect(find.byType(GalleryPage), findsOneWidget);
@@ -72,7 +67,7 @@ void main() {
   ) async {
     final llm = _searched(2)
       ..images.remove(Uri.parse('https://h:3001/p/2.jpg'));
-    await pumpApp(tester, llm: llm, size: const Size(390, 844));
+    await pumpApp(tester, llm: llm);
     expect(
       find.descendant(
         of: find.byType(Gallery),

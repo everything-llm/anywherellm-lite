@@ -3,27 +3,11 @@ import '../../core/providers.dart';
 /// The pages of Settings. Connection, Appearance and Chat are about this device; Server lists
 /// the pages about AnythingLLM, which open from it, and Memory sits beside it.
 enum SettingsPage {
-  connection(
-    'Connection',
-    'How this device reaches AnythingLLM. The address, key and password stay in this '
-        'device\'s keyring.',
-    needsServer: false,
-  ),
-  appearance(
-    'Appearance',
-    'How AnywhereLLM looks on this device.',
-    needsServer: false,
-  ),
-  chat('Chat', 'How the chat behaves on this device.', needsServer: false),
-  memory(
-    'Memory',
-    'What chats are shown about you, which AnythingLLM calls saved memories.',
-  ),
-  server(
-    'Server',
-    'What AnythingLLM runs with. A change here changes the server for every device and '
-        'workspace.',
-  ),
+  connection('Connection', null, needsServer: false),
+  appearance('Appearance', null, needsServer: false),
+  chat('Chat', null, needsServer: false),
+  memory('Memory', null),
+  server('Server', null),
   chatModel(
     'Chat model',
     'The provider and model every workspace uses unless its own settings name another.',
@@ -66,8 +50,8 @@ enum SettingsPage {
 
   final String label;
 
-  /// The line under the page's title.
-  final String about;
+  /// The line under the page's title, or null for a page the design canvas draws without one.
+  final String? about;
 
   /// Whether the page is about the server, and so shows only once one is saved.
   final bool needsServer;

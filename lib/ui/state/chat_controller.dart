@@ -138,13 +138,15 @@ class _Running {
 /// One read of an answer image: its bytes as they are read, and [done] once they are.
 class _ImageRead {
   _ImageRead(Uri url, ChatController chat) {
-    bytes = chat._api.answerImage(url).then(
-      (value) => done = value,
-      onError: (Object error, StackTrace stack) {
-        if (identical(chat._images[url], this)) chat._images.remove(url);
-        Error.throwWithStackTrace(error, stack);
-      },
-    );
+    bytes = chat._api
+        .answerImage(url)
+        .then(
+          (value) => done = value,
+          onError: (Object error, StackTrace stack) {
+            if (identical(chat._images[url], this)) chat._images.remove(url);
+            Error.throwWithStackTrace(error, stack);
+          },
+        );
   }
 
   late final Future<Uint8List> bytes;

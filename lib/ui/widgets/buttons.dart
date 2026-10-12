@@ -88,7 +88,6 @@ class IconBtn extends StatelessWidget {
     required this.onPressed,
     this.box = 34,
     this.size = IconSize.normal,
-    this.dangerHover = false,
     this.active,
     this.filled = false,
     this.heard,
@@ -116,9 +115,6 @@ class IconBtn extends StatelessWidget {
   final bool? expanded;
   final IconSize size;
 
-  /// A destructive action: the bad colour fills it on hover.
-  final bool dangerHover;
-
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
@@ -135,7 +131,6 @@ class IconBtn extends StatelessWidget {
           : filled
           ? t.hover
           : null,
-      hoverColor: dangerHover ? t.badbg : null,
       dimWhenDisabled: 0.4,
       child: SizedBox.square(
         dimension: box,

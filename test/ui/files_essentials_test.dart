@@ -173,7 +173,7 @@ void main() {
       ..spaces[0].prompt = 'Answer from the documents.';
     final h = await openPages(tester, llm: llm);
     await openPage(tester, 'Instructions');
-    expect(h.files.selected, promptPath('q3'));
+    expect(h.files.section, FilesSection.instructions);
     // Save shows once the text has changed.
     expect(inPages(control('Save')), findsNothing);
     await tester.enterText(
@@ -213,6 +213,6 @@ void main() {
     await openPage(tester, 'Instructions');
     await h.chat.select('household');
     await tester.pumpAndSettle();
-    expect(h.files.selected, promptPath('household'));
+    expect(h.files.workspace, 'household');
   });
 }

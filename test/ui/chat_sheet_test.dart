@@ -5,8 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/fake_api.dart';
 import '../support/pump.dart';
 
-const _phone = Size(390, 844);
-
 /// Opens the sheet of the chat on screen from the header's title.
 Future<void> _openSheet(WidgetTester tester) async {
   await tester.tap(find.text('Q3 planning · 2 docs in use'));
@@ -20,7 +18,7 @@ Finder get _nameField => find.descendant(
 
 void main() {
   testWidgets('the name renames the chat as it is typed', (tester) async {
-    final h = await pumpApp(tester, llm: planningServer(), size: _phone);
+    final h = await pumpApp(tester, llm: planningServer());
     final thread = h.chat.activeThread!;
     await _openSheet(tester);
     await tester.enterText(_nameField, 'Launch plan');
@@ -41,7 +39,7 @@ void main() {
   });
 
   testWidgets('Pin to the top pins the chat', (tester) async {
-    final h = await pumpApp(tester, llm: planningServer(), size: _phone);
+    final h = await pumpApp(tester, llm: planningServer());
     final thread = h.chat.activeThread!;
     await _openSheet(tester);
     await tester.tap(control('Pin to the top'));
@@ -50,7 +48,7 @@ void main() {
   });
 
   testWidgets('Delete chat asks first, and Keep keeps it', (tester) async {
-    final h = await pumpApp(tester, llm: planningServer(), size: _phone);
+    final h = await pumpApp(tester, llm: planningServer());
     final thread = h.chat.activeThread!;
     final name = h.chat.title;
     await _openSheet(tester);
@@ -72,7 +70,7 @@ void main() {
   });
 
   testWidgets('on a new chat the title opens the workspace', (tester) async {
-    final h = await pumpApp(tester, llm: planningServer(), size: _phone);
+    final h = await pumpApp(tester, llm: planningServer());
     h.chat.newChat();
     await tester.pumpAndSettle();
     await tester.tap(find.text('Q3 planning · 2 docs in use'));
@@ -84,12 +82,7 @@ void main() {
   testWidgets('the Chats tab leads to the workspace, the chats and Settings', (
     tester,
   ) async {
-    final h = await pumpApp(
-      tester,
-      llm: planningServer(),
-      size: _phone,
-      onChat: false,
-    );
+    final h = await pumpApp(tester, llm: planningServer(), onChat: false);
     expect(find.text('Chats'), findsOneWidget);
     expect(find.text('Upcoming'), findsOneWidget);
     // A chat's More opens its sheet over the tab.
@@ -124,7 +117,7 @@ void main() {
   testWidgets('a chat deleted from its sheet can be put back over the chat', (
     tester,
   ) async {
-    final h = await pumpApp(tester, llm: planningServer(), size: _phone);
+    final h = await pumpApp(tester, llm: planningServer());
     final thread = h.chat.activeThread!;
     await _openSheet(tester);
     await tester.tap(control('Delete chat'));

@@ -53,7 +53,7 @@ class AppShell extends StatelessWidget {
       if (shell.passagesOpen) return shell.closePassages;
       if (shell.citedOpen) return shell.closeCited;
       if (shell.rightOpen) return shell.closeSources;
-      if (shell.phonePage != null) return shell.closePhonePage;
+      if (shell.upcomingOpen) return shell.closeUpcoming;
       // The workspace's pages step back: a document's text, a page, then what they opened over.
       if (shell.pane == Pane.files) {
         if (scope.files.reading != null) return () => closeDocText(scope);
@@ -72,10 +72,7 @@ class AppShell extends StatelessWidget {
         final files = shell.pane == Pane.files;
         final chatShown = shell.chatOpen && !files;
         final homeCovered =
-            shell.chatOpen ||
-            files ||
-            shell.phonePage != null ||
-            shell.settingsOpen;
+            shell.chatOpen || files || shell.upcomingOpen || shell.settingsOpen;
         final right = switch (shell.beside) {
           Beside.sources => const SourcesPanel(),
           Beside.passages => const PassagesPanel(),
@@ -140,12 +137,8 @@ class AppShell extends StatelessWidget {
                               child: const WorkspacePages(),
                             ),
                           ),
-                        if (shell.phonePage case final page?)
-                          Positioned.fill(
-                            child: switch (page) {
-                              PhonePage.upcoming => const UpcomingPage(),
-                            },
-                          ),
+                        if (shell.upcomingOpen)
+                          const Positioned.fill(child: UpcomingPage()),
                         // The sheet's own scrim closes it.
                         if (shell.rightOpen) Positioned.fill(child: right),
                         // A deleted chat is put back from over the chat or the Chats tab.

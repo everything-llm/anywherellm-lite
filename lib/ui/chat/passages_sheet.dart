@@ -2,14 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../core/files.dart';
 import '../../core/server_models.dart';
 import '../app_scope.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
+import '../widgets/sheet.dart';
 import '../widgets/buttons.dart';
-import '../widgets/side_panel.dart';
 
 /// What an answer read from one file, in a sheet opened from an answer's list of sources. Close,
 /// Esc and Back put back what the sheet showed.
@@ -20,9 +19,10 @@ class PassagesPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final shell = AppScope.of(context).shell;
     final citation = shell.passages!;
-    return SidePanel(
+    return SheetFrame(
       title: 'Passages read from this file',
       onClose: shell.closePassages,
+      height: SheetHeight.tall,
       child: PassagesView(citation: citation, onClose: shell.closePassages),
     );
   }
@@ -101,11 +101,7 @@ class PassagesView extends StatelessWidget {
                 onPressed: () {
                   onClose();
                   final files = scope.files;
-                  unawaited(
-                    files
-                        .openSection(FilesSection.documents)
-                        .then((_) => files.viewText(file.path, file.title)),
-                  );
+                  unawaited(files.viewText(file.path, file.title));
                   scope.shell.showPane(Pane.files);
                 },
               ),

@@ -390,7 +390,6 @@ class WorkspaceDoc {
     required this.title,
     this.words,
     this.pinned = false,
-    this.watched = false,
   });
 
   /// The `metadata` field is the document's own JSON as a string.
@@ -408,7 +407,6 @@ class WorkspaceDoc {
           docName(path),
       words: metadata == null ? null : _int(metadata, 'wordCount'),
       pinned: _bool(json, 'pinned'),
-      watched: _bool(json, 'watched'),
     );
   }
 
@@ -419,9 +417,6 @@ class WorkspaceDoc {
 
   /// Whether its whole text is always in the workspace's context.
   final bool pinned;
-
-  /// Whether the server re-reads it from its source.
-  final bool watched;
 
   static Map<String, dynamic>? _decode(String text) {
     try {

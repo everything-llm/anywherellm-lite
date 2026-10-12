@@ -1,7 +1,4 @@
 abstract final class Sizes {
-  /// The drawer's least width.
-  static const drawer = 264.0;
-
   /// The widest the chat's turns and composer are laid out.
   static const column = 720.0;
 

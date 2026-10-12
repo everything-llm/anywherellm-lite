@@ -1,161 +1,19 @@
-// The workspaces' prompts, settings and documents as one folder tree, and the text a file node
-// shows.
-//
-// The tree is a view. Every node is made from what the server answered; nothing in it is stored.
+// The open workspace's pages, the name a document's text is saved under, and the answer
+// settings as JSON.
 
 import 'dart:convert';
 
 import 'errors.dart';
 import 'server_models.dart';
 
-enum NodeKind {
-  root,
-  workspaces,
-  workspace,
-  prompt,
-  settings,
-  docs,
-  docLink;
-
-  bool get isFolder => switch (this) {
-    root || workspaces || workspace || docs => true,
-    _ => false,
-  };
-
-  /// Whether the node's text can be edited and saved.
-  bool get editable => this == prompt || this == settings;
-}
-
-/// The tree path of workspace [slug]'s docs folder.
-String docsPath(String slug) => '/workspaces/$slug/docs';
-
-/// The tree path of workspace [slug]'s link to library document [ref].
-String docLinkPath(String slug, String ref) => '${docsPath(slug)}/$ref';
-
-/// The tree path of workspace [slug]'s prompt.
-String promptPath(String slug) => '/workspaces/$slug/PROMPT.md';
-
-/// The tree path of workspace [slug]'s answer settings.
-String settingsPath(String slug) => '/workspaces/$slug/settings.json';
-
-/// The pages of the open workspace. Each shows a node of the tree under a plain name.
+/// The pages of the open workspace.
 enum FilesSection {
-  documents('Documents'),
   instructions('Instructions'),
   answers('Answer settings');
 
   const FilesSection(this.title);
 
   final String title;
-
-  /// The tree path of what the section shows in workspace [slug].
-  String pathIn(String slug) => switch (this) {
-    documents => docsPath(slug),
-    instructions => promptPath(slug),
-    answers => settingsPath(slug),
-  };
-}
-
-/// One node of the tree. [path] is unique and stable across reloads; [name] is what is shown.
-class FileNode {
-  const FileNode({
-    required this.path,
-    required this.name,
-    required this.kind,
-    this.children = const [],
-    this.slug,
-    this.ref,
-    this.pinned = false,
-  });
-
-  final String path;
-  final String name;
-  final NodeKind kind;
-  final List<FileNode> children;
-
-  /// A document link whose whole text is always in its workspace's context.
-  final bool pinned;
-
-  /// The workspace the node belongs to, when it belongs to one.
-  final String? slug;
-
-  /// What the node points at: a `folder/name.json` path for a document.
-  final String? ref;
-}
-
-/// The whole tree: each workspace, whose prompt, settings and documents appear once its
-/// [details] are read.
-FileNode buildTree({
-  required List<Workspace> workspaces,
-  required Map<String, Workspace> details,
-}) => FileNode(
-  path: '/',
-  name: '/',
-  kind: NodeKind.root,
-  children: [
-    FileNode(
-      path: '/workspaces',
-      name: 'workspaces',
-      kind: NodeKind.workspaces,
-      children: [for (final w in workspaces) _workspace(w, details[w.slug])],
-    ),
-  ],
-);
-
-FileNode _workspace(Workspace w, Workspace? detail) {
-  final base = '/workspaces/${w.slug}';
-  return FileNode(
-    path: base,
-    name: w.name,
-    kind: NodeKind.workspace,
-    slug: w.slug,
-    children: [
-      if (detail != null) ...[
-        FileNode(
-          path: promptPath(w.slug),
-          name: 'PROMPT.md',
-          kind: NodeKind.prompt,
-          slug: w.slug,
-        ),
-        if (detail.settings != null)
-          FileNode(
-            path: settingsPath(w.slug),
-            name: 'settings.json',
-            kind: NodeKind.settings,
-            slug: w.slug,
-          ),
-        FileNode(
-          path: docsPath(w.slug),
-          name: 'docs',
-          kind: NodeKind.docs,
-          slug: w.slug,
-          children: [
-            for (final doc in detail.documents)
-              FileNode(
-                path: docLinkPath(w.slug, doc.path),
-                name: doc.title,
-                kind: NodeKind.docLink,
-                slug: w.slug,
-                ref: doc.path,
-                pinned: doc.pinned,
-              ),
-          ],
-        ),
-      ],
-    ],
-  );
-}
-
-/// The node at [path] under [root], or null when there is none.
-FileNode? nodeAt(FileNode root, String path) {
-  if (root.path == path) return root;
-  for (final child in root.children) {
-    if (path == child.path || path.startsWith('${child.path}/')) {
-      final found = nodeAt(child, path);
-      if (found != null) return found;
-    }
-  }
-  return null;
 }
 
 final _notInFileName = RegExp(r'[\x00-\x1f/\\:*?"<>|]');
