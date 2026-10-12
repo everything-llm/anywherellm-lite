@@ -142,6 +142,7 @@ class ShellController extends ChangeNotifier {
 
   /// Shows [ref]'s working page full screen, or with [data] its folder over it.
   void openApp(AppRef ref, {bool data = false}) {
+    _shelfOpen = false;
     _app = ref;
     _appPages
       ..clear()
@@ -187,6 +188,7 @@ class ShellController extends ChangeNotifier {
   /// Shows the Upcoming page over the Chats tab, closing the popup open.
   void openUpcoming() {
     if (_upcomingOpen) return;
+    _shelfOpen = false;
     _upcomingOpen = true;
     _popup.value = null;
     notifyListeners();
@@ -284,16 +286,37 @@ class ShellController extends ChangeNotifier {
 
   Pane get pane => _pane;
 
-  /// Shows the chat full screen over the home, closing Settings, the workspace's pages and a
-  /// page over the Chats tab.
+  bool _shelfOpen = false;
+
+  /// Whether the Chats tab shows as a shelf from the left over the chat.
+  bool get shelfOpen => _shelfOpen;
+
+  /// Slides the Chats tab in from the left over the chat.
+  void openShelf() {
+    if (_shelfOpen || !_chatOpen) return;
+    _shelfOpen = true;
+    _popup.value = null;
+    notifyListeners();
+  }
+
+  void closeShelf() {
+    if (!_shelfOpen) return;
+    _shelfOpen = false;
+    notifyListeners();
+  }
+
+  /// Shows the chat full screen over the home, closing the Chats shelf, Settings, the
+  /// workspace's pages and a page over the Chats tab.
   void openChat() {
     if (_chatOpen &&
+        !_shelfOpen &&
         !_settingsOpen &&
         _pane == Pane.chats &&
         !_upcomingOpen &&
         _app == null) {
       return;
     }
+    _shelfOpen = false;
     _chatOpen = true;
     _settingsOpen = false;
     _scanning = false;
@@ -310,6 +333,7 @@ class ShellController extends ChangeNotifier {
   /// running answer survive.
   void closeChat() {
     if (!_chatOpen) return;
+    _shelfOpen = false;
     _chatOpen = false;
     _rightOpen = false;
     closePopup();
@@ -318,6 +342,7 @@ class ShellController extends ChangeNotifier {
 
   /// Shows [tab] with nothing over it.
   void showTab(HomeTab tab) {
+    _shelfOpen = false;
     _chatOpen = false;
     _rightOpen = false;
     _sourcesUnder = null;
@@ -399,6 +424,7 @@ class ShellController extends ChangeNotifier {
   void openSettings([SettingsPage? page]) {
     if (page == null) return showTab(HomeTab.settings);
     _settingsDirect = !_settingsOpen || _settingsDirect;
+    _shelfOpen = false;
     _settingsPage = page;
     _systemShown = _systemTop;
     _settingsOpen = true;
@@ -457,6 +483,7 @@ class ShellController extends ChangeNotifier {
 
   void showPane(Pane pane) {
     if (pane == _pane) return;
+    _shelfOpen = false;
     _pane = pane;
     _workspacePage = null;
     _rightOpen = false;

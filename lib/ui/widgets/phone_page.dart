@@ -16,6 +16,7 @@ class PhonePageHeader extends StatelessWidget {
     this.heading,
     required this.back,
     required this.onBack,
+    this.backIcon = 'back',
     this.action,
   });
 
@@ -27,6 +28,9 @@ class PhonePageHeader extends StatelessWidget {
   /// What the back button is heard as, such as Back to the chat.
   final String back;
   final VoidCallback onBack;
+
+  /// The back button's icon: an arrow, or the chat's menu, which opens the Chats shelf.
+  final String backIcon;
 
   /// A button at the bar's end, such as Download.
   final Widget? action;
@@ -41,7 +45,7 @@ class PhonePageHeader extends StatelessWidget {
         child: Row(
           children: [
             IconBtn(
-              'back',
+              backIcon,
               tooltip: back,
               box: 48,
               filled: true,

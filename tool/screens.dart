@@ -619,6 +619,11 @@ final _screens = <String, _Setup>{
     h.shell.toggleCited(h.chat.turns[1].citations);
     await _settle(tester);
   },
+  'shelf': (tester, h) async {
+    await _openChat(tester, h, 'errands');
+    h.shell.openShelf();
+    await _settle(tester);
+  },
   'apps': (tester, h) async {
     h.shell.showTab(HomeTab.apps);
     await _settle(tester);

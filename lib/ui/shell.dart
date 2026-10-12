@@ -16,6 +16,7 @@ import 'chat/passages_sheet.dart';
 import 'files/workspace_pages.dart';
 import 'settings/settings_dialog.dart';
 import 'share/share_sheet.dart';
+import 'shelf.dart';
 import 'share/shared_item.dart';
 import 'home.dart';
 import 'workspace_sheets.dart';
@@ -53,6 +54,7 @@ class AppShell extends StatelessWidget {
             ? shell.settingsBack
             : shell.closeSettings;
       }
+      if (shell.shelfOpen) return shell.closeShelf;
       if (shell.app != null) return shell.appBack;
       if (shell.passagesOpen) return shell.closePassages;
       if (shell.citedOpen) return shell.closeCited;
@@ -152,6 +154,9 @@ class AppShell extends StatelessWidget {
                             ),
                           ),
                         ),
+                        // The Chats tab as a shelf from the left over the chat.
+                        if (shell.shelfOpen && chatShown)
+                          const Positioned.fill(child: ChatsShelf()),
                         if (files)
                           Positioned.fill(
                             child: ColoredBox(

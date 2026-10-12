@@ -167,7 +167,7 @@ class _Body extends StatelessWidget {
   }
 }
 
-/// The chat's header: Back to the chats, the workspace and its documents over the chat's
+/// The chat's header: Chats, which opens the Chats shelf, the workspace and its documents over the chat's
 /// name, which opens the chat's sheet, or on a new chat the workspace's settings, then New chat.
 class _Header extends StatelessWidget {
   const _Header();
@@ -195,8 +195,9 @@ class _Header extends StatelessWidget {
           style: Type.sans(18, weight: FontWeight.w600, color: t.ink),
         );
         return PhonePageHeader(
-          back: 'Back to the chats',
-          onBack: scope.shell.closeChat,
+          back: 'Chats',
+          backIcon: 'menu',
+          onBack: scope.shell.openShelf,
           heading: workspace == null
               ? Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
