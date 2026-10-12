@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../icons.dart';
@@ -114,20 +116,26 @@ class AppField extends StatelessWidget {
         obscureText: obscure,
         keyboardType:
             keyboardType ?? (maxLines > 1 ? TextInputType.multiline : null),
-        minLines: maxLines > 1 ? 3 : null,
+        minLines: maxLines > 1 ? math.min(4, maxLines) : null,
         maxLines: maxLines,
         autofillHints: autofillHints,
         enableIMEPersonalizedLearning: !obscure,
         onChanged: onChanged,
         onSubmitted: onSubmitted,
-        style: Type.sans(size).copyWith(color: t.ink),
+        // Several lines are set apart, as the design canvas sets a text area.
+        style: Type.sans(size, height: maxLines > 1 ? 1.5 : null)
+            .copyWith(color: t.ink),
         cursorColor: t.accent,
         decoration: InputDecoration(
           isDense: true,
           filled: true,
           fillColor: fieldFill(context),
           hintText: hint,
-          hintStyle: Type.sans(size, color: t.muted),
+          hintStyle: Type.sans(
+            size,
+            color: t.muted,
+            height: maxLines > 1 ? 1.5 : null,
+          ),
           prefixIcon: icon == null
               ? null
               : Center(
