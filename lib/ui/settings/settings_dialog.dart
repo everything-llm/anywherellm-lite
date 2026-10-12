@@ -20,6 +20,7 @@ import 'provider_page.dart';
 import 'rows.dart';
 import 'server_page.dart';
 import 'settings_pages.dart';
+import 'system_files_page.dart';
 
 /// Settings: its list as the Settings tab, under its title and over the bar of tabs, in two
 /// groups, This app and AnythingLLM, whose Server row opens the Server page, which lists the
@@ -85,6 +86,7 @@ class _Frame extends StatelessWidget {
     if (page == SettingsPage.connection && !configured) {
       return const _PageView(SettingsPage.connection);
     }
+    if (page != null && page.ownsPage) return _PageView._body(page);
     if (page == null) {
       return const Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -110,7 +112,8 @@ class _Frame extends StatelessWidget {
 }
 
 /// The list of Settings: once a server is saved, a card with it, whether it answers and Test
-/// connection; This app's pages; then AnythingLLM's Server and Memory rows.
+/// connection; This app's pages; then AnythingLLM's Server and Memory rows, and System files
+/// where the apps server serves them.
 class _Nav extends StatelessWidget {
   const _Nav();
 
@@ -120,7 +123,7 @@ class _Nav extends StatelessWidget {
     final shell = scope.shell;
     final settings = scope.settings;
     return ListenableBuilder(
-      listenable: Listenable.merge([scope.system, settings]),
+      listenable: Listenable.merge([scope.system, settings, scope.apps]),
       builder: (context, _) {
         final connection = settings.connection;
         return ListView(
@@ -155,6 +158,14 @@ class _Nav extends StatelessWidget {
                   about: 'Saved memories',
                   onTap: () => shell.showSettingsPage(SettingsPage.memory),
                 ),
+                if (scope.apps.systemFiles == true)
+                  NavRow(
+                    icon: 'folder',
+                    title: SettingsPage.systemFiles.label,
+                    about: 'Apps, skill and runner, read only',
+                    onTap: () =>
+                        shell.showSettingsPage(SettingsPage.systemFiles),
+                  ),
               ]),
             ],
           ],
@@ -283,5 +294,6 @@ class _PageView extends StatelessWidget {
     SettingsPage.embeds => const EmbedsPage(),
     SettingsPage.privacy => const PrivacyPage(),
     SettingsPage.json => const JsonPage(),
+    SettingsPage.systemFiles => const SystemFilesPage(),
   };
 }

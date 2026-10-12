@@ -10,6 +10,7 @@ import 'memory.dart';
 import 'prefs.dart';
 import 'schedule.dart';
 import 'server_models.dart';
+import 'system_files.dart';
 
 export 'errors.dart';
 
@@ -254,6 +255,17 @@ abstract interface class AppsApi {
 
   /// Deletes [app] with its data.
   Future<void> delete(AppRef app);
+
+  /// Whether the apps server serves System files, as its `/health` says; remembered with
+  /// [available]'s answer. Never throws.
+  Future<bool> systemFiles();
+
+  /// The System files folder at [path], `""` for the top: everything that decides what the
+  /// agent and the apps do, read only.
+  Future<List<SystemEntry>> systemFolder(String path);
+
+  /// The System files file at [path] as text, or null when it is not text.
+  Future<String?> systemFile(String path);
 
   /// The picture at [url], an app's card read once. Sent without the key. With [last], the
   /// card as read before, it sends [CardPicture.etag] as `If-None-Match`, and answers [last]

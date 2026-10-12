@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:anywherellm/core/apps.dart';
 import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/system_files.dart';
 
 import 'pixels.dart';
 
@@ -13,7 +14,11 @@ import 'pixels.dart';
 /// Each app's `line`, `restorable_from` and `version` follow its folder: its log's newest and
 /// oldest lines and its newest commit. With [older] it is an apps server from before those
 /// fields: no `version`, `restorable_from`, `revertable`, `subject`, `body` or diff `files`,
-/// no `ETag` on a card, and neither `GET /apps/<workspace>/<name>` nor `GET .../log`.
+/// no `ETag` on a card, neither `GET /apps/<workspace>/<name>` nor `GET .../log`, and no
+/// System files in its `/health`.
+///
+/// System files are [system]: each file's text by its path, null for a file that is not text,
+/// its folders made from the paths.
 class FakeApps implements AppsApi {
   FakeApps({this.present = false, this.older = false});
 
@@ -53,6 +58,16 @@ class FakeApps implements AppsApi {
 
   /// Every card address answered `304 Not Modified`, in order.
   final List<Uri> cardsUnchanged = [];
+
+  /// System files: each file's text by its path, null for one that is not text.
+  final Map<String, String?> system = {
+    'apps/home/groceries/app.json': '{"title": "Groceries", "kind": "list"}',
+    'skill/handler.js': 'module.exports.runtime = {}',
+    'skill/lib/hostrpc.js': '// the socket',
+    'runner/DEPLOYED': 'commit 4232f38',
+    'runner/anythingllm_apps_v2/assets/fonts/Sans.ttf': null,
+    'settings/apps.env': 'ANYTHINGLLM_API_KEY=(set)',
+  };
 
   void _fail(String method) {
     if (errors[method] case final error?) throw error;
@@ -364,6 +379,51 @@ class FakeApps implements AppsApi {
     final app = spaces[ref.workspace]?.where((a) => a.ref == ref).firstOrNull;
     final version = app == null ? 'gone' : _now(app).version;
     return version == null ? null : '"$version-$theme"';
+  }
+
+  @override
+  Future<bool> systemFiles() async => await available() && !older;
+
+  @override
+  Future<List<SystemEntry>> systemFolder(String path) async {
+    calls.add('systemFolder:$path');
+    _fail('systemFolder');
+    final prefix = path.isEmpty ? '' : '$path/';
+    final folders = <String>{};
+    final files = <String>[];
+    for (final file in system.keys.where((f) => f.startsWith(prefix))) {
+      final rest = file.substring(prefix.length).split('/');
+      rest.length == 1 ? files.add(rest.single) : folders.add(rest.first);
+    }
+    if (path.isNotEmpty && folders.isEmpty && files.isEmpty) {
+      throw ApiException("No folder '$path'.", status: 404);
+    }
+    int count(String folder) => {
+      for (final file in system.keys.where(
+        (f) => f.startsWith('$prefix$folder/'),
+      ))
+        file.substring('$prefix$folder/'.length).split('/').first,
+    }.length;
+    return [
+      for (final folder in folders.toList()..sort())
+        SystemEntry(folder, folder: true, count: count(folder)),
+      for (final file in files..sort())
+        SystemEntry(
+          file,
+          folder: false,
+          size: utf8.encode(system['$prefix$file'] ?? 'xx').length,
+        ),
+    ];
+  }
+
+  @override
+  Future<String?> systemFile(String path) async {
+    calls.add('systemFile:$path');
+    _fail('systemFile');
+    if (!system.containsKey(path)) {
+      throw ApiException("No file '$path'.", status: 404);
+    }
+    return system[path];
   }
 }
 

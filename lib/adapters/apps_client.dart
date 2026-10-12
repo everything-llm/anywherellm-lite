@@ -7,9 +7,11 @@ import 'package:http/http.dart' as http;
 import '../core/apps.dart';
 import '../core/connection.dart';
 import '../core/ports.dart';
+import '../core/system_files.dart';
 
 /// [AppsApi] over the apps server's client API, on the AnythingLLM server's host at
-/// [appsCardsPort], with the connection's developer key on every `/apps/` call.
+/// [appsCardsPort], with the connection's developer key on every `/apps/` and `/system/`
+/// call.
 ///
 /// Every call reads the connection from the holder when it is made, and goes over https only.
 /// An error message never contains the key.
@@ -28,8 +30,9 @@ class HttpAppsApi implements AppsApi {
   /// How long `/health` may take before the apps server is taken to be absent.
   final Duration healthTimeout;
 
-  /// Whether the apps server answered, by the address of the AnythingLLM server beside it.
-  final _found = <String, Future<bool>>{};
+  /// The apps server's `/health` answer, null when it is not there, by the address of the
+  /// AnythingLLM server beside it.
+  final _found = <String, Future<Object?>>{};
 
   /// The routes an older apps server answered as unknown, by the address of the AnythingLLM
   /// server beside it and the route's kind (`app`, `log`), so they are not asked again until
@@ -47,10 +50,17 @@ class HttpAppsApi implements AppsApi {
       _found.remove(key);
       _missing.removeWhere((missing) => missing.startsWith('$key '));
     }
-    return _found[key] ??= _health(connection);
+    return (_found[key] ??= _health(connection)).then((json) => json != null);
   }
 
-  Future<bool> _health(Connection connection) async {
+  @override
+  Future<bool> systemFiles() async {
+    final connection = _holder.current;
+    if (connection == null || !await available()) return false;
+    return hasAppsFeature(await _found[connection.baseUrl], 'system-files');
+  }
+
+  Future<Object?> _health(Connection connection) async {
     try {
       final response = await _client
           .get(
@@ -58,10 +68,11 @@ class HttpAppsApi implements AppsApi {
             headers: const {'Accept': 'application/json'},
           )
           .timeout(healthTimeout);
-      if (response.statusCode != 200) return false;
-      return isAppsHealth(jsonDecode(utf8.decode(response.bodyBytes)));
+      if (response.statusCode != 200) return null;
+      final json = jsonDecode(utf8.decode(response.bodyBytes));
+      return isAppsHealth(json) ? json : null;
     } on Object {
-      return false;
+      return null;
     }
   }
 
@@ -167,6 +178,25 @@ class HttpAppsApi implements AppsApi {
   Future<void> delete(AppRef app) => _json('DELETE', _of(app));
 
   @override
+  Future<List<SystemEntry>> systemFolder(String path) async => systemEntriesOf(
+    await _json('GET', ['tree'], root: 'system', query: {'path': path}),
+  );
+
+  @override
+  Future<String?> systemFile(String path) async {
+    final response = await _call(
+      'GET',
+      ['file'],
+      root: 'system',
+      query: {'path': path},
+    );
+    if (!(response.headers['content-type'] ?? '').startsWith('text/')) {
+      return null;
+    }
+    return utf8.decode(response.bodyBytes, allowMalformed: true);
+  }
+
+  @override
   Future<CardPicture> card(Uri url, {CardPicture? last}) async {
     if (url.scheme != 'https') {
       throw const ApiException('Cards load over https only.');
@@ -204,14 +234,21 @@ class HttpAppsApi implements AppsApi {
     return connection;
   }
 
-  /// The decoded JSON of a [method] to `/apps/<path>`.
+  /// The decoded JSON of a [method] to `/<root>/<path>`.
   Future<Object?> _json(
     String method,
     List<String> path, {
+    String root = 'apps',
     Map<String, String> query = const {},
     Map<String, Object?>? body,
   }) async {
-    final response = await _call(method, path, query: query, body: body);
+    final response = await _call(
+      method,
+      path,
+      root: root,
+      query: query,
+      body: body,
+    );
     try {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } on FormatException {
@@ -219,17 +256,18 @@ class HttpAppsApi implements AppsApi {
     }
   }
 
-  /// A [method] to `/apps/<path>` with the key, failing with the server's words on any status
-  /// but a success.
+  /// A [method] to `/<root>/<path>` with the key, failing with the server's words on any
+  /// status but a success.
   Future<http.Response> _call(
     String method,
     List<String> path, {
+    String root = 'apps',
     Map<String, String> query = const {},
     Map<String, Object?>? body,
   }) async {
     final connection = _current;
     final url = appsBase(connection.uri).replace(
-      pathSegments: ['apps', ...path],
+      pathSegments: [root, ...path],
       queryParameters: query.isEmpty ? null : query,
     );
     final request = http.Request(method, url)

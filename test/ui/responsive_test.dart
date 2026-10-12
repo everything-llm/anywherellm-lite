@@ -17,11 +17,12 @@ import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:file_picker_platform_interface/file_picker_platform_interface.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
-import 'package:flutter/material.dart' show Scrollable, SingleChildScrollView;
+import 'package:flutter/material.dart' show AxisDirection, Scrollable;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
+import '../support/fake_apps.dart';
 import '../support/fake_settings.dart';
 import '../support/picker.dart';
 import '../support/pump.dart';
@@ -123,6 +124,7 @@ void main() {
         size: size,
         canDictate: true,
         canSpeak: true,
+        appsServer: groceriesServer(),
       );
       h.shell.openSettings();
       await tester.pumpAndSettle();
@@ -132,7 +134,11 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull, reason: page.name);
         await tester.drag(
-          find.byType(SingleChildScrollView).last,
+          find
+              .byWidgetPredicate(
+                (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+              )
+              .last,
           const Offset(0, -2000),
         );
         await tester.pumpAndSettle();

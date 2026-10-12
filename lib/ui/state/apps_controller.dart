@@ -5,12 +5,13 @@ import 'package:flutter/foundation.dart';
 import '../../core/apps.dart';
 import '../../core/connection.dart';
 import '../../core/ports.dart';
+import '../../core/system_files.dart';
 import 'chat_controller.dart';
 import 'log_pages.dart';
 import 'settings_controller.dart';
 
 /// What the app knows of the apps server beside the server in use: whether it is there
-/// ([available]), the open workspace's apps, what one app's folder holds while its data shows,
+/// ([available]) and has System files ([systemFiles]), the open workspace's apps, what one app's folder holds while its data shows,
 /// the changes made to an app, and its cards in answers. Another server starts it afresh, and
 /// Test connection asks again whether the apps server is there.
 class AppsController extends ChangeNotifier {
@@ -36,6 +37,9 @@ class AppsController extends ChangeNotifier {
 
   /// Whether the apps server answers beside the server in use: null until it is asked.
   bool? available;
+
+  /// Whether the apps server serves System files, as its `/health` says: null until asked.
+  bool? systemFiles;
 
   /// Each workspace's apps as last read, by slug.
   final _lists = <String, List<ServerApp>>{};
@@ -74,6 +78,7 @@ class AppsController extends ChangeNotifier {
   void _reset() {
     _epoch++;
     available = null;
+    systemFiles = null;
     _lists.clear();
     _problems.clear();
     _reading.clear();
@@ -90,11 +95,21 @@ class AppsController extends ChangeNotifier {
     final epoch = _epoch;
     final found = await _api.available(again: again);
     if (epoch != _epoch) return;
-    if (found == available) return;
+    final system = found && await _api.systemFiles();
+    if (epoch != _epoch) return;
+    if (found == available && system == systemFiles) return;
     available = found;
+    systemFiles = system;
     notifyListeners();
     if (found && _wanted) unawaited(read());
   }
+
+  /// The System files folder at [path], `""` for the top, read afresh.
+  Future<List<SystemEntry>> systemFolder(String path) =>
+      _api.systemFolder(path);
+
+  /// The System files file at [path] as text, or null when it is not text.
+  Future<String?> systemFile(String path) => _api.systemFile(path);
 
   void _chatChanged() {
     final shown = (_chat.activeSlug, _chat.activeThread);

@@ -400,6 +400,7 @@ class ShellController extends ChangeNotifier {
     if (page == null) return showTab(HomeTab.settings);
     _settingsDirect = !_settingsOpen || _settingsDirect;
     _settingsPage = page;
+    _systemShown = _systemTop;
     _settingsOpen = true;
     _popup.value = null;
     notifyListeners();
@@ -418,15 +419,34 @@ class ShellController extends ChangeNotifier {
     if (page == _settingsPage) return;
     if (_settingsPage == null) _settingsDirect = false;
     _settingsPage = page;
+    _systemShown = _systemTop;
     notifyListeners();
   }
 
-  /// Goes back from the Settings page shown to the page it is reached from: the Server page,
-  /// the list, or what showed under Settings when it opened on the page. From the list,
+  static const _systemTop = (path: '', folder: true);
+  ({String path, bool folder}) _systemShown = _systemTop;
+
+  /// What the System files page shows: a folder or a file by its path, `""` the top.
+  ({String path, bool folder}) get systemShown => _systemShown;
+
+  /// Shows the System files folder or file at [path]; Back goes to the folder that holds it.
+  void showSystemPath(String path, {required bool folder}) {
+    _systemShown = (path: path, folder: folder);
+    notifyListeners();
+  }
+
+  /// Goes back from the Settings page shown to the page it is reached from: the folder above in
+  /// System files, the Server page, the list, or what showed under Settings when it opened on the page. From the list,
   /// Settings closes, back to the Chats tab.
   void settingsBack() {
     final page = _settingsPage;
-    if (page == null) {
+    if (page == SettingsPage.systemFiles && _systemShown.path.isNotEmpty) {
+      final path = _systemShown.path;
+      showSystemPath(
+        path.substring(0, path.lastIndexOf('/').clamp(0, path.length)),
+        folder: true,
+      );
+    } else if (page == null) {
       closeSettings();
     } else if (page.parent == null && _settingsDirect) {
       closeSettings();

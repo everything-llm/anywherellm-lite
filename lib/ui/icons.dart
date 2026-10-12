@@ -17,6 +17,7 @@ const _paths = {
   'trash': 'M3.5 4.5h9 M6 4.5V3h4v1.5 M4.5 4.5l.5 8.5h6l.5-8.5',
   'close': 'M4 4l8 8M12 4l-8 8',
   'doc': 'M4 2h5l3 3v9H4z M9 2v3h3',
+  'folder': 'M2 4.5h4l1.5 1.5H14v6.5H2z',
   'send': 'M8 13V3M3.5 7.5 8 3l4.5 4.5',
   'chevron': 'M6 4l4 4-4 4',
   'down': 'M4 6l4 4 4-4',

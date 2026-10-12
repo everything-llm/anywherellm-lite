@@ -19,6 +19,13 @@ const appsPagesPort = 8465;
 bool isAppsHealth(Object? json) =>
     json is Map && json['service'] == appsService;
 
+/// Whether [json], the apps server's answer to `GET /health`, names [feature] among its
+/// `features`, as `system-files`; an older server names none.
+bool hasAppsFeature(Object? json, String feature) =>
+    json is Map &&
+    json['features'] is List &&
+    (json['features'] as List).contains(feature);
+
 /// The apps server's client API beside the AnythingLLM server at [server]: the same host on
 /// [appsCardsPort], over https.
 Uri appsBase(Uri server) =>
@@ -124,7 +131,9 @@ String kindLabel(String? kind) => switch (kind) {
 };
 
 /// A time in seconds since 1970, as the apps server sends it, or null.
-DateTime? _seconds(Object? value) => value is num
+/// [value], seconds since 1970 as the apps server sends a time, in UTC; null when it is not a
+/// number.
+DateTime? fromSeconds(Object? value) => value is num
     ? DateTime.fromMillisecondsSinceEpoch((value * 1000).round(), isUtc: true)
     : null;
 
@@ -160,7 +169,7 @@ class ServerApp {
       title: _text(json['title']) ?? name,
       kind: _text(json['kind']),
       summary: json['summary'] is String ? json['summary'] as String : '',
-      modified: _seconds(json['modified']),
+      modified: fromSeconds(json['modified']),
       line: json['line'] is int ? json['line'] as int : null,
       restorableFrom: json['restorable_from'] is int
           ? json['restorable_from'] as int
@@ -292,7 +301,7 @@ List<AppFile> appFilesOf(Object? json) {
           AppFile(
             entry['path'] as String,
             size: entry['size'] is int ? entry['size'] as int : 0,
-            modified: _seconds(entry['modified']),
+            modified: fromSeconds(entry['modified']),
           ),
   ];
   files.sort((a, b) => a.path.compareTo(b.path));
