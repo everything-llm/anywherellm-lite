@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 
-import '../../core/activity.dart';
 import '../../core/chat_log.dart';
 import '../../core/connection.dart';
 import '../../core/embeds.dart';
@@ -51,54 +50,6 @@ class SystemController extends ChangeNotifier {
       jobsProblem = Notice('Could not read the scheduled jobs', error.message);
     }
     notifyListeners();
-  }
-
-  /// The answers the relay holds, those running and those that ended, each newest first, or null
-  /// until read.
-  ({List<RelayRun> running, List<RelayRun> ended})? activity;
-
-  /// Why the last read of the activity failed.
-  Notice? activityProblem;
-
-  Future<void>? _readingActivity;
-
-  /// How many answers the relay is writing, or null until the activity is read.
-  int? get running => activity?.running.length;
-
-  /// Reads the answers the relay holds; a second ask joins the read going.
-  Future<void> readActivity() =>
-      _server == null ? Future.value() : _readingActivity ??= _readActivity();
-
-  Future<void> _readActivity() async {
-    final server = _server;
-    try {
-      final read = activityGroups(await _api.relayRuns());
-      if (_server != server) return;
-      activity = read;
-      activityProblem = null;
-    } on ApiException catch (error) {
-      if (_server != server) return;
-      activityProblem = Notice('Could not read the activity', error.message);
-    } finally {
-      _readingActivity = null;
-    }
-    notifyListeners();
-  }
-
-  /// Stops [run] on the relay, then reads the activity again.
-  Future<void> stopRun(RelayRun run) async {
-    final id = run.id;
-    if (id == null) return;
-    final server = _server;
-    try {
-      await _api.cancelRun(id);
-    } on ApiException catch (error) {
-      if (_server != server) return;
-      activityProblem = Notice('Could not stop the answer', error.message);
-      notifyListeners();
-      return;
-    }
-    await readActivity();
   }
 
   /// The server's settings, with every secret replaced by whether it is set, or null until read.
@@ -411,8 +362,6 @@ class SystemController extends ChangeNotifier {
     vectors = null;
     jobs = null;
     jobsProblem = null;
-    activity = null;
-    activityProblem = null;
     problem = null;
     settings = null;
     settingsProblem = null;

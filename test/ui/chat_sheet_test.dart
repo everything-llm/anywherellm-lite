@@ -88,7 +88,7 @@ void main() {
       h.shell.toggleSide();
       await tester.pumpAndSettle();
       expect(find.text('Chats'), findsOneWidget);
-      expect(control('Activity'), findsOneWidget);
+      expect(find.text('Upcoming'), findsOneWidget);
       // A chat's More opens its sheet, and closes the drawer.
       await tester.tap(control('Rename, pin or delete Budget questions'));
       await tester.pumpAndSettle();

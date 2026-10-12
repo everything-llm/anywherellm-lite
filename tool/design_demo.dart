@@ -1,6 +1,6 @@
 // The app over the design canvas's sample data, for comparing in Chrome.
 // flutter build web -t tool/design_demo.dart -o build/demo
-// ?screen= new | chat | documents | drawer | activity | settings | server | connection |
+// ?screen= new | chat | documents | drawer | settings | server | connection |
 //          appearance | chatprefs | workspaces | files | upcoming | instructions |
 //          answers | signin | running
 import 'dart:async';
@@ -39,7 +39,7 @@ class _NoDictation implements Dictation {
 const _host = 'https://anythingllm.example.ts.net';
 
 FakeAnythingLlm _server() {
-  final llm = FakeAnythingLlm()..relay = true;
+  final llm = FakeAnythingLlm();
   llm.system = const {
     'LLMProvider': 'ollama',
     'OllamaLLMModelPref': 'llama3.1:8b',
@@ -104,7 +104,6 @@ FakeAnythingLlm _server() {
       ),
     ),
   ];
-  final now = DateTime.now().toUtc();
   final today = DateTime.now();
   DateTime at(int day, int h, int m) =>
       DateTime(today.year, today.month, today.day + day, h, m).toUtc();
@@ -132,44 +131,6 @@ FakeAnythingLlm _server() {
       nextRun: at(0, 22, 0),
       lastRun: at(0, 16, 0),
       lastStatus: 'failed',
-    ),
-  ];
-  llm.allRuns = [
-    RelayRun(
-      workspace: 'q3',
-      thread: 'kickoff',
-      status: 'running',
-      id: 'r1',
-      question: 'Draft an agenda for the interview kickoff.',
-      started: now.subtract(const Duration(seconds: 40)),
-    ),
-    RelayRun(
-      workspace: 'household',
-      thread: 'boiler',
-      status: 'running',
-      id: 'r2',
-      question:
-          'Compare the three boiler quotes and book a visit with the cheapest.',
-      started: now.subtract(const Duration(minutes: 3)),
-    ),
-    RelayRun(
-      workspace: 'q3',
-      thread: 'themes',
-      status: 'done',
-      id: 'r3',
-      question: 'Put the three interview themes in a one-page PDF I can send to the team.',
-      started: now.subtract(const Duration(minutes: 14)),
-      finished: now.subtract(const Duration(minutes: 12)),
-    ),
-    RelayRun(
-      workspace: 'q3',
-      thread: 'budget',
-      status: 'done',
-      id: 'r4',
-      question:
-          'What is the budget for the customer research work this quarter?',
-      started: now.subtract(const Duration(hours: 1)),
-      finished: now.subtract(const Duration(hours: 1)),
     ),
   ];
   return llm;
@@ -244,8 +205,6 @@ Future<void> main() async {
     case 'workspaces':
       shell.toggleSide();
       shell.togglePopup(Popup.workspaces);
-    case 'activity':
-      shell.openPhonePage(PhonePage.activity);
     case 'upcoming':
       shell.openPhonePage(PhonePage.upcoming);
     case 'settings':

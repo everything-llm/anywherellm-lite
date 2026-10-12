@@ -4,7 +4,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'copy.dart';
 import 'outputs.dart';
 
 /// A string or number field as text, trimmed, or empty when it is missing.
@@ -626,65 +625,4 @@ enum ChatExport {
   /// The name a saved export gets by default.
   String get fileName =>
       'anythingllm-chats${this == jsonAlpaca ? '-alpaca' : ''}.$extension';
-}
-
-/// An answer the relay ran: its [id], [workspace] and [thread], its [status] (`running`,
-/// `done`, `failed` or `cancelled`), the [question] it answers (the first 200 characters), why
-/// it [error]ed, when it [started] and, once it has, when it [finished].
-class RelayRun {
-  const RelayRun({
-    required this.workspace,
-    required this.thread,
-    required this.status,
-    this.id,
-    this.question,
-    this.error,
-    this.started,
-    this.finished,
-  });
-
-  /// One run as the relay lists it, or null when it names no workspace or chat. A time is an
-  /// ISO 8601 text or milliseconds since the epoch.
-  static RelayRun? fromJson(Map<String, dynamic> json) {
-    final workspace = json['workspace'];
-    final thread = json['thread'];
-    final status = json['status'];
-    if (workspace is! String || thread is! String) return null;
-    DateTime? time(Object? value) => switch (value) {
-      final String text => DateTime.tryParse(text),
-      final int ms => DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true),
-      _ => null,
-    };
-    return RelayRun(
-      workspace: workspace,
-      thread: thread,
-      status: status is String ? status : '',
-      id: textOrNull(json['id']),
-      question: textOrNull(json['question']),
-      error: textOrNull(json['error']),
-      started: time(json['createdAt']),
-      finished: time(json['finishedAt']),
-    );
-  }
-
-  final String? id;
-  final String workspace;
-  final String thread;
-  final String status;
-  final String? question;
-  final String? error;
-  final DateTime? started;
-  final DateTime? finished;
-
-  /// When the answer ended, or else when it started.
-  DateTime? get endedAt => finished ?? started;
-
-  /// Whether the answer is still being written.
-  bool get running => status == 'running';
-
-  /// Whether the answer failed.
-  bool get failed => status == 'failed';
-
-  /// Whether the answer ran to its end, neither failing nor stopped.
-  bool get done => status == 'done';
 }

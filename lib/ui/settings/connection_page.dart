@@ -23,7 +23,7 @@ import 'scan_view.dart';
 import '../widgets/sheet.dart';
 
 /// How this device reaches the server: the address and key, the server's password, and what
-/// the server and the relay say. The server reads Connected once Test connection passes here,
+/// the server says. The server reads Connected once Test connection passes here,
 /// until the page closes or the connection changes or fails a test.
 class ConnectionPage extends StatefulWidget {
   const ConnectionPage({super.key});
@@ -92,123 +92,53 @@ class _Welcome extends StatelessWidget {
   }
 }
 
-/// The relay and how the server signs in, and a test of the saved connection, once one is saved.
-class _ServerStatus extends StatefulWidget {
+/// How the server signs in, and a test of the saved connection, once one is saved.
+class _ServerStatus extends StatelessWidget {
   const _ServerStatus({required this.onTest});
 
   final VoidCallback onTest;
 
   @override
-  State<_ServerStatus> createState() => _ServerStatusState();
-}
-
-class _ServerStatusState extends State<_ServerStatus> {
-  late final SettingsController _settings = AppScope.of(context).settings;
-
-  @override
-  void initState() {
-    super.initState();
-    if (_settings.connection != null && _settings.relay == RelayState.unknown) {
-      unawaited(_settings.readRelay());
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: _settings,
-    builder: (context, _) {
-      if (_settings.connection == null) return const SizedBox.shrink();
-      final testing = _settings.check == ConnectionCheck.testing;
-      final phone = ScreenClass.ofContext(context).isPhone;
-      // A phone's Test connection takes the line, as the design canvas draws it.
-      final test = ActionRow(even: phone, alignment: WrapAlignment.start, [
-        AppButton(
-          testing ? 'Testing…' : 'Test connection',
-          onPressed: testing ? null : widget.onTest,
-        ),
-      ]);
-      return Padding(
-        padding: const EdgeInsets.only(top: 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: phone ? 14 : 20,
-          children: [
-            FieldCard([
-              // A phone says only whether answers keep running, the word under its name, as
-              // the design canvas draws it.
-              if (phone)
-                _PhoneRelayRow(_settings.relay)
-              else ...[
-                ReadOnlyRow(
-                  label: 'Background answers',
-                  help: 'Provided by the everythingllm relay on the server.',
-                  value: switch (_settings.relay) {
-                    RelayState.found => 'Available. Answers keep running after the app lets go of them.',
-                    RelayState.absent =>
-                      'Not available. Answers come straight from AnythingLLM.',
-                    RelayState.unreachable => 'Could not check.',
-                    RelayState.unknown => 'Checking…',
-                  },
-                ),
-                ReadOnlyRow(
-                  label: 'Server',
-                  value: switch (_settings.auth) {
-                    ServerAuth.none => 'AnythingLLM, single user, no password',
-                    ServerAuth.password =>
-                      'AnythingLLM, single user, password on',
-                    ServerAuth.multiUser => 'AnythingLLM, several users',
-                    null => 'Not known yet',
-                  },
-                ),
-              ],
-            ]),
-            test,
-          ],
-        ),
-      );
-    },
-  );
-}
-
-/// Background answers on a phone: its name, and under it whether answers keep running.
-class _PhoneRelayRow extends StatelessWidget {
-  const _PhoneRelayRow(this.relay);
-
-  final RelayState relay;
-
-  @override
   Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Container(
-      constraints: const BoxConstraints(minHeight: 68),
-      padding: const EdgeInsets.symmetric(
-        horizontal: FieldCard.inset,
-        vertical: 10,
-      ),
-      alignment: Alignment.centerLeft,
-      child: Semantics(
-        container: true,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Background answers',
-              style: Type.sans(17, weight: FontWeight.w500, color: t.ink),
-            ),
-            Text(
-              switch (relay) {
-                RelayState.found => 'Available',
-                RelayState.absent => 'Not available',
-                RelayState.unreachable => 'Could not check',
-                RelayState.unknown => 'Checking…',
-              },
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Type.sans(13, color: t.muted),
-            ),
-          ],
-        ),
-      ),
+    final settings = AppScope.of(context).settings;
+    return ListenableBuilder(
+      listenable: settings,
+      builder: (context, _) {
+        if (settings.connection == null) return const SizedBox.shrink();
+        final testing = settings.check == ConnectionCheck.testing;
+        final phone = ScreenClass.ofContext(context).isPhone;
+        // A phone's Test connection takes the line, as the design canvas draws it.
+        final test = ActionRow(even: phone, alignment: WrapAlignment.start, [
+          AppButton(
+            testing ? 'Testing…' : 'Test connection',
+            onPressed: testing ? null : onTest,
+          ),
+        ]);
+        return Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: phone ? 14 : 20,
+            children: [
+              if (!phone)
+                FieldCard([
+                  ReadOnlyRow(
+                    label: 'Server',
+                    value: switch (settings.auth) {
+                      ServerAuth.none =>
+                        'AnythingLLM, single user, no password',
+                      ServerAuth.password =>
+                        'AnythingLLM, single user, password on',
+                      ServerAuth.multiUser => 'AnythingLLM, several users',
+                      null => 'Not known yet',
+                    },
+                  ),
+                ]),
+              test,
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/core/server_models.dart';
@@ -36,49 +34,7 @@ Future<void> _scrollUp(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('an answer the relay goes on writing is not shown as a failure', (
-    tester,
-  ) async {
-    final llm = planningServer()..hold = true;
-    final h = await pumpApp(tester, llm: llm);
-    await h.chat.send('And next quarter?');
-    await tester.pump();
-    llm.chat!.addError(const AnswerStillRunning());
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Still being written'), findsOneWidget);
-    expect(find.text('The answer stopped'), findsNothing);
-    expect(h.chat.turns.last.unfinished, isTrue);
-  });
-
-  testWidgets('an answer the relay goes on writing can be checked or stopped', (
-    tester,
-  ) async {
-    final llm = planningServer()..hold = true;
-    final h = await pumpApp(tester, llm: llm);
-    await h.chat.send('And next quarter?');
-    await tester.pump();
-    llm.chat!.addError(const AnswerStillRunning());
-    await tester.pump(const Duration(milliseconds: 300));
-    llm.allRuns = [
-      RelayRun(
-        id: 'r1',
-        workspace: 'q3',
-        thread: 'budget',
-        status: 'running',
-        started: DateTime.utc(2026, 10, 10, 9),
-      ),
-    ];
-    await tester.tap(find.text('Check now'));
-    await tester.pump();
-    expect(llm.calls, contains('relayRuns'));
-    await tester.tap(find.text('Stop'));
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(llm.calls, contains('cancelRun:r1'));
-    expect(find.text('Still being written'), findsNothing);
-    expect(h.chat.turns.last.stopped, isTrue);
-  });
-
-  testWidgets('any other failure is', (tester) async {
+  testWidgets('a failed answer says the answer stopped', (tester) async {
     final llm = planningServer()..hold = true;
     final h = await pumpApp(tester, llm: llm);
     await h.chat.send('And next quarter?');
@@ -86,7 +42,6 @@ void main() {
     llm.chat!.addError(const ApiException('The server stopped the answer.'));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('The answer stopped'), findsOneWidget);
-    expect(find.text('Still being written'), findsNothing);
   });
 
   testWidgets('a failed last answer can be asked again', (tester) async {
@@ -155,43 +110,6 @@ void main() {
       tester.getTopLeft(answers.last).dx,
       tester.getTopLeft(answers.first).dx,
     );
-  });
-
-  testWidgets('a lost connection offers no Ask again', (tester) async {
-    final llm = planningServer()..hold = true;
-    final h = await pumpApp(tester, llm: llm);
-    await h.chat.send('And next quarter?');
-    await tester.pump();
-    llm.chat!.addError(const AnswerStillRunning());
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Ask again'), findsNothing);
-  });
-
-  testWidgets('an answer found still running says it kept going', (
-    tester,
-  ) async {
-    final llm = planningServer();
-    // Closed below, not in a tear-down: one would wait on the test's fake clock, which no
-    // longer runs then.
-    final events = StreamController<ChatEvent>();
-    llm.running['budget'] = (question: 'And next quarter?', events: events);
-    // Held until the app has settled: a streaming answer's caret never lets it settle.
-    final found = llm.gates['rejoinChat'] = Completer<void>();
-    final h = await pumpApp(tester, llm: llm);
-    found.complete();
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(
-      find.text('Kept answering while the app was closed.'),
-      findsOneWidget,
-    );
-    expect(h.chat.busy, isTrue);
-    events
-      ..add(const TextChunk('About 45k.'))
-      ..add(const ChatDone([]));
-    await events.close();
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Kept answering while the app was closed.'), findsNothing);
-    expect(find.text('About 45k.'), findsOneWidget);
   });
 
   testWidgets('sending while scrolled up brings the new question into view', (

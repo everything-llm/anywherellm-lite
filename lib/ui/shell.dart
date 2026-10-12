@@ -22,7 +22,6 @@ import 'phone_drawer.dart';
 import 'sidebar.dart';
 import 'workspace_sheets.dart';
 import 'sources/sources_panel.dart';
-import 'activity.dart';
 import 'upcoming.dart';
 import 'state/shell_controller.dart';
 import 'tokens.dart';
@@ -255,7 +254,6 @@ class AppShell extends StatelessWidget {
                               Positioned.fill(
                                 child: switch (page) {
                                   PhonePage.upcoming => const UpcomingPage(),
-                                  PhonePage.activity => const ActivityPage(),
                                 },
                               ),
                             // The sheet's own scrim closes it. It sits over a phone page, as

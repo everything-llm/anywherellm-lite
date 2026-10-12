@@ -268,31 +268,4 @@ void main() {
       });
     });
   });
-
-  test('when each chat was seen is kept, moved and forgotten with it', () {
-    final at = DateTime.utc(2026, 10, 8, 12);
-    final prefs = Prefs.decode(
-      const Prefs().withSeen('https://h', 'q3', 'budget', at).encode(),
-    );
-    expect(prefs.seenAt('https://h', 'q3', 'budget'), at);
-    expect(prefs.seenAt('https://h', 'q3', 'other'), isNull);
-    expect(
-      prefs
-          .withRenamedWorkspace('https://h', 'q3', 'q4')
-          .seenAt('https://h', 'q4', 'budget'),
-      at,
-    );
-    expect(
-      prefs
-          .withoutChat('https://h', 'q3', 'budget')
-          .seenAt('https://h', 'q3', 'budget'),
-      isNull,
-    );
-    expect(
-      prefs
-          .withoutWorkspace('https://h', 'q3')
-          .seenAt('https://h', 'q3', 'budget'),
-      isNull,
-    );
-  });
 }

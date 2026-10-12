@@ -63,65 +63,6 @@ class WholeAnswer extends ChatEvent {
   final String text;
 }
 
-/// A tool the agent will not run until the person allows it, asked on the relay's run [runId].
-/// The server refuses the tool by itself at [expires], by the relay's clock.
-class ApprovalRequest extends ChatEvent {
-  const ApprovalRequest({
-    required this.runId,
-    required this.id,
-    required this.skill,
-    required this.expires,
-    this.description,
-    this.payload = const {},
-  });
-
-  final String runId;
-
-  /// The server's id for this request, which the answer names.
-  final String id;
-
-  /// The tool's name, such as `create-text-file`.
-  final String skill;
-
-  /// What the tool will do, in the tool's words, when it says.
-  final String? description;
-
-  /// The tool's arguments, as the server shows them.
-  final Map<String, dynamic> payload;
-  final DateTime expires;
-
-  /// The request in a relay's `approval` event for run [runId], or null when it names no
-  /// request.
-  static ApprovalRequest? fromJson(String runId, Map<String, dynamic> json) {
-    final id = json['requestId'];
-    final expires = json['expiresAt'];
-    if (id is! String || id.isEmpty || expires is! num) return null;
-    return ApprovalRequest(
-      runId: runId,
-      id: id,
-      skill: switch (json['skillName']) {
-        final String name when name.trim().isNotEmpty => name.trim(),
-        _ => 'a tool',
-      },
-      description: switch (json['description']) {
-        final String text when text.trim().isNotEmpty => text.trim(),
-        _ => null,
-      },
-      payload: switch (json['payload']) {
-        final Map<String, dynamic> map => map,
-        _ => const {},
-      },
-      expires: DateTime.fromMillisecondsSinceEpoch((expires * 1000).round()),
-    );
-  }
-}
-
-/// Approval request [id] was answered, here or on another device.
-class ApprovalSettled extends ChatEvent {
-  const ApprovalSettled(this.id);
-  final String id;
-}
-
 /// An agent's status [thought] in plain words: `@agent: Using SearXNG…` loses its prefix, and
 /// `@agent is executing `web-browsing` tool {…}` becomes `Running web-browsing`.
 String agentStatus(String thought) {

@@ -75,7 +75,7 @@ Future<void> _capture(
 
 /// A server with a few workspaces and a budget chat worth looking at.
 FakeAnythingLlm _server() {
-  final llm = FakeAnythingLlm()..relay = true;
+  final llm = FakeAnythingLlm();
   llm.spaces = [
     FakeWorkspace(
       'q3',
@@ -117,18 +117,8 @@ FakeAnythingLlm _server() {
       docs: [libraryDoc(llm, 'Itinerary.pdf', words: 1280)],
     ),
   ];
-  // The drawer counts what the relay is writing and the jobs the server runs.
+  // The drawer counts the jobs the server runs.
   final now = DateTime.now().toUtc();
-  llm.allRuns = [
-    RelayRun(
-      workspace: 'household',
-      thread: 'boiler',
-      status: 'running',
-      id: 'r1',
-      question: 'Compare the three boiler quotes and book the cheapest.',
-      started: now.subtract(const Duration(minutes: 2)),
-    ),
-  ];
   llm.jobs = [
     ScheduledJob(
       name: 'Morning brief',

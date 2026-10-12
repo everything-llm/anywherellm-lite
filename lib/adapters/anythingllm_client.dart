@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -23,12 +22,6 @@ import 'anythingllm_stream.dart';
 /// Every call but [verify] reads the connection from the holder when it is made. An error message
 /// never contains the key. Unless [allowHttp], a call to an `http://` address fails before the key
 /// is sent.
-///
-/// The everythingllm relay may sit beside AnythingLLM at [relayPath] on the same address and take
-/// the same key: it keeps an answer going after the app lets go of it, as a run. A server has the
-/// relay when its `GET /everythingllm/health` answers the relay's JSON, asked once per connection.
-/// With the relay, [streamChat] starts a run and follows its events, rejoining after the last one
-/// it saw when the connection drops.
 class HttpAnythingLlmApi implements AnythingLlmApi {
   HttpAnythingLlmApi({
     required this._holder,
@@ -37,15 +30,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     http.Client? client,
     this.timeout = const Duration(seconds: 15),
     this.uploadTimeout = const Duration(minutes: 5),
-    this.quiet = const Duration(seconds: 45),
     this.idle = const Duration(minutes: 5),
-    this.rejoinDelays = const [
-      Duration(seconds: 1),
-      Duration(seconds: 2),
-      Duration(seconds: 4),
-      Duration(seconds: 8),
-      Duration(seconds: 16),
-    ],
   }) : _client = client ?? http.Client();
 
   final ConnectionHolder _holder;
@@ -63,36 +48,13 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   /// The server reads an upload in before it answers, which takes a while for a long PDF.
   final Duration uploadTimeout;
 
-  /// How long a relay's run may send nothing before its connection counts as dropped. The relay
-  /// pings every 15 s.
-  final Duration quiet;
-
-  /// How long a direct answer or a reset may send nothing before it is given up. AnythingLLM
+  /// How long an answer or a reset may send nothing before it is given up. AnythingLLM
   /// sends no pings, and an agent's tool can run a while without a word.
   final Duration idle;
-
-  /// The waits before each try at rejoining a run whose connection dropped. A run fails once
-  /// they are used up without an event coming in between.
-  final List<Duration> rejoinDelays;
-
-  /// Whether each connection asked so far is a relay.
-  final _relays = <Connection, bool>{};
-
-  /// The servers whose relay takes a tool's approval, found with [_relays].
-  final _approvals = <Connection, bool>{};
-
-  /// The run [streamChat] is following in each chat, by workspace and thread: its id once the
-  /// relay answers the start, or null when it did not start it.
-  final _runs = <(String, String), (Connection, Future<String?>)>{};
-
-  final _random = Random.secure();
 
   /// The web UI's login token for each connection signed in so far, kept only while the app
   /// runs. The password is what is saved; a token lapses after 30 days or a new password.
   final _tokens = <Connection, String>{};
-
-  /// Where the relay sits on AnythingLLM's address.
-  static const relayPath = '/everythingllm';
 
   @override
   Future<void> verify(Connection connection) async {
@@ -254,8 +216,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     String thread,
     String message, {
     List<Attachment> attachments = const [],
-  }) async* {
-    final connection = _current;
+  }) {
     // No `mode`: the server then answers in the workspace's own chat mode.
     final body = {
       'message': message,
@@ -263,376 +224,8 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
         'attachments': [for (final a in attachments) attachmentJson(a)],
     };
     final limit = attachments.isEmpty ? timeout : uploadTimeout;
-    if (await _isRelay(connection)) {
-      yield* _run(connection, slug, thread, body, limit);
-    } else {
-      yield* _events('${_thread(slug, thread)}/stream-chat', body, limit);
-    }
+    return _events('${_thread(slug, thread)}/stream-chat', body, limit);
   }
-
-  /// Cancels the chat's run on the relay, once the relay has said which run it is. The run is
-  /// forgotten before the call is sent, so the subscription can be cancelled at once.
-  @override
-  Future<void> stopChat(String slug, String thread) async {
-    final run = _runs.remove((slug, thread));
-    if (run == null) return;
-    final (connection, started) = run;
-    final id = await started;
-    if (id == null) return;
-    await _cancel(connection, id);
-  }
-
-  /// The running run of the chat on the relay, which `GET /everythingllm/v1/runs?status=running`
-  /// lists, followed from its first event. The list is read as JSON holding runs, or an object
-  /// with them under `runs`; each names its `id`, `workspace` and `thread`, and may carry the
-  /// question that started it, as `message` or `question`, or in its `body`. A run whose body is a
-  /// `reset` clears the chat and is no answer. A route or an answer that is not there, or no
-  /// server set up, reads as no run: opening a chat never fails for this.
-  @override
-  Future<RejoinedAnswer?> rejoinChat(String slug, String thread) async {
-    try {
-      final connection = _current;
-      if (!await _isRelay(connection)) return null;
-      for (final run in await _listRuns(connection, 'running')) {
-        final id = run['id'];
-        final status = run['status'];
-        if (id is! String ||
-            run['workspace'] != slug ||
-            run['thread'] != thread ||
-            (status is String && status != 'running')) {
-          continue;
-        }
-        final known = Future<String>.value(id);
-        return (
-          question: _questionOf(run),
-          events: _letGo(
-            (gone) =>
-                _followRun(connection, (slug, thread), known, known, gone),
-          ),
-        );
-      }
-    } on ApiException {
-      return null;
-    }
-    return null;
-  }
-
-  @override
-  Future<List<RelayRun>> relayRuns() async {
-    final connection = _current;
-    if (!await _isRelay(connection)) {
-      throw const ApiException(
-        'This server has no everythingllm relay, so it keeps no list of answers.',
-      );
-    }
-    return [
-      for (final run in await _listRuns(connection, null))
-        ?RelayRun.fromJson(run),
-    ];
-  }
-
-  @override
-  Future<void> cancelRun(String id) => _cancel(_current, id);
-
-  @override
-  Future<void> answerApproval(ApprovalRequest request, bool allow) {
-    final connection = _current;
-    return _call(
-      connection,
-      timeout,
-      () async => http.Response.fromStream(
-        await _client.send(
-          _request(
-            connection,
-            'POST',
-            '$relayPath/v1/runs/${Uri.encodeComponent(request.runId)}'
-                '/approvals/${Uri.encodeComponent(request.id)}',
-            {'approved': allow},
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Cancels the relay's run [id] on [connection]: the run ends `cancelled`.
-  Future<void> _cancel(Connection connection, String id) => _call(
-    connection,
-    timeout,
-    () async => http.Response.fromStream(
-      await _client.send(
-        _request(
-          connection,
-          'POST',
-          '$relayPath/v1/runs/${Uri.encodeComponent(id)}/cancel',
-        ),
-      ),
-    ),
-  );
-
-  /// The relay's runs of [status], or every kept run when it is null, read as JSON holding runs
-  /// or an object with them under `runs`, less those that clear a chat.
-  Future<List<Map<String, dynamic>>> _listRuns(
-    Connection connection,
-    String? status,
-  ) async {
-    final listed = await _get(
-      connection,
-      status == null
-          ? '$relayPath/v1/runs'
-          : '$relayPath/v1/runs?status=$status',
-    );
-    return [
-      for (final run in jsonObjects(listed is Map ? listed['runs'] : listed))
-        if (!_isReset(run)) run,
-    ];
-  }
-
-  /// Whether [run] clears its chat, which the relay lists with the question `/reset`, and which
-  /// is no answer.
-  static bool _isReset(Map<String, dynamic> run) =>
-      run['question'] == '/reset' ||
-      (run['body'] is Map && (run['body'] as Map)['reset'] == true);
-
-  /// The question a listed [run] was started with, or null when it does not say.
-  String? _questionOf(Map<String, dynamic> run) {
-    final body = run['body'];
-    for (final said in [
-      run['message'],
-      run['question'],
-      if (body is Map) body['message'],
-    ]) {
-      if (said is String && said.trim().isNotEmpty) return said.trim();
-    }
-    return null;
-  }
-
-  /// Follows run [id] as [chat]'s run until it ends or [gone] completes. [started] is [id], or
-  /// null when the run did not start; [stopChat] reaches the run through it while it is followed.
-  Stream<ChatEvent> _followRun(
-    Connection connection,
-    (String, String) chat,
-    Future<String?> started,
-    Future<String> id,
-    Future<void> gone,
-  ) async* {
-    _runs[chat] = (connection, started);
-    try {
-      yield* chatEventsOf(_runChunks(connection, await id, gone));
-    } finally {
-      if (identical(_runs[chat]?.$2, started)) _runs.remove(chat);
-    }
-  }
-
-  /// Whether the server at [connection] has the relay: its `GET /everythingllm/health` answers
-  /// JSON naming the `everythingllm` service with `runs` among its features. The route is open, so
-  /// the key is not sent. AnythingLLM answers a path it does not know with its web page and a 200,
-  /// so the body decides. A 5xx is not remembered, so a relay failing for a moment is asked again
-  /// on the next message. In a browser a failed request is remembered as no relay, so answers go
-  /// to AnythingLLM itself: a relay that does not allow requests from [browserOrigin] fails so on
-  /// every ask.
-  Future<bool> _isRelay(Connection connection) async {
-    final server = connection.withPassword(null);
-    if (_relays[server] case final known?) return known;
-    final http.Response response;
-    try {
-      response = await _fetch(
-        connection,
-        timeout,
-        () => _client.get(Uri.parse('${connection.baseUrl}$relayPath/health')),
-      );
-    } on ApiException {
-      if (browserOrigin == null) rethrow;
-      return _relays[server] = false;
-    }
-    if (response.statusCode >= 500) return false;
-    final health = response.statusCode == 200 ? _json(response) : null;
-    final features = health is Map ? health['features'] : null;
-    final found =
-        health is Map &&
-        health['service'] == 'everythingllm' &&
-        features is List &&
-        features.contains('runs');
-    _approvals[server] = found && features.contains('approvals');
-    return _relays[server] = found;
-  }
-
-  /// The answer to [body] as a run on the relay at [connection].
-  Stream<ChatEvent> _run(
-    Connection connection,
-    String slug,
-    String thread,
-    Map<String, Object?> body,
-    Duration limit,
-  ) => _letGo((gone) => _startRun(connection, slug, thread, body, limit, gone));
-
-  /// The events [start] makes, until [gone] completes. Cancelling the stream completes it, which
-  /// closes the connection that follows the run at once, as an `async*` body waiting for the next
-  /// event would not; the run itself goes on.
-  Stream<ChatEvent> _letGo(
-    Stream<ChatEvent> Function(Future<void> gone) start,
-  ) {
-    final gone = Completer<void>();
-    StreamSubscription<ChatEvent>? answer;
-    late final StreamController<ChatEvent> out;
-    out = StreamController<ChatEvent>(
-      onListen: () =>
-          answer = start(gone.future)
-              .listen(out.add, onError: out.addError, onDone: out.close),
-      onPause: () => answer?.pause(),
-      onResume: () => answer?.resume(),
-      onCancel: () {
-        if (!gone.isCompleted) gone.complete();
-        return answer?.cancel();
-      },
-    );
-    return out.stream;
-  }
-
-  /// Starts the run of [body] and follows it until it ends or [gone] completes. The chat's run
-  /// is known before the relay answers, so a stop sent meanwhile cancels it once it has an id.
-  /// A chat that already has a run going fails with [AlreadyAnswering].
-  Stream<ChatEvent> _startRun(
-    Connection connection,
-    String slug,
-    String thread,
-    Map<String, Object?> body,
-    Duration limit,
-    Future<void> gone,
-  ) {
-    final id = _beginRun(connection, slug, thread, body, limit);
-    final started = id.then<String?>(
-      (id) => id,
-      onError: (Object error) {
-        // A relay that is gone, or whose route is, is asked about again on the next message.
-        if (error is ApiException &&
-            (error.status == 404 || (error.status ?? 0) >= 500)) {
-          _relays.remove(connection.withPassword(null));
-        }
-        return null;
-      },
-    );
-    return _followRun(connection, (slug, thread), started, id, gone);
-  }
-
-  /// Asks the relay to run [body], and gives the run's id. The relay answers a chat that already
-  /// has a run going with 409 and says so, which fails with [AlreadyAnswering].
-  Future<String> _beginRun(
-    Connection connection,
-    String slug,
-    String thread,
-    Map<String, Object?> body,
-    Duration limit,
-  ) async {
-    final Object? run;
-    try {
-      run = await _call(
-        connection,
-        limit,
-        () async => http.Response.fromStream(
-          await _client.send(
-            _request(connection, 'POST', '$relayPath/v1/runs', {
-              'workspace': slug,
-              'thread': thread,
-              'clientId': _clientId(),
-              'body': body,
-              // The relay asks for approvals through the web login, so it needs the password, for
-              // this run only; a relay without approvals is not given it.
-              if (connection.password case final password?
-                  when _approvals[connection.withPassword(null)] == true)
-                'password': password,
-            }),
-          ),
-        ),
-        refused: 'The relay did not start the answer.',
-      );
-    } on ApiException catch (error) {
-      if (error.status == 409) throw AlreadyAnswering(error.message);
-      rethrow;
-    }
-    final id = _field(run, 'id');
-    if (id is! String) {
-      throw const ApiException('The relay did not start the answer.');
-    }
-    return id;
-  }
-
-  /// The `stream-chat` chunks of run [id], as the relay hands them back, until the run ends or
-  /// [gone] completes. A connection that drops, or stays [quiet] too long, is opened again after
-  /// the last event seen, after each of [rejoinDelays] in turn; an event coming in starts them
-  /// over. So is one the relay answers with a 5xx.
-  Stream<Map<String, dynamic>> _runChunks(
-    Connection connection,
-    String id,
-    Future<void> gone,
-  ) async* {
-    var left = false;
-    unawaited(gone.then((_) => left = true));
-    var after = 0;
-    var misses = 0;
-    while (!left) {
-      final request = _request(
-        connection,
-        'GET',
-        '$relayPath/v1/runs/${Uri.encodeComponent(id)}/events',
-      )..headers['Accept'] = 'text/event-stream';
-      if (after > 0) request.headers['Last-Event-ID'] = '$after';
-      try {
-        final response = await _client.send(request).timeout(timeout);
-        if (response.statusCode < 200 || response.statusCode >= 300) {
-          _decode(await http.Response.fromStream(response));
-        }
-        await for (final event in serverSentEvents(
-          _until(response.stream.timeout(quiet), gone),
-        )) {
-          if (event.id case final seen?) after = seen;
-          misses = 0;
-          switch (event.name) {
-            case 'chunk':
-              if (jsonOrNull(event.data) case final Map<String, dynamic> c) {
-                yield c;
-              }
-            case 'failed':
-              final data = jsonOrNull(event.data);
-              final plain = event.data.trim();
-              throw ApiException(
-                _said(data) ??
-                    (data == null && plain.isNotEmpty
-                        ? plain
-                        : 'The relay could not finish the answer.'),
-              );
-            case 'approval':
-              if (jsonOrNull(event.data)
-                  case final Map<String, dynamic> asked) {
-                yield {'type': 'toolApproval', 'runId': id, 'approval': asked};
-              }
-            case 'approval-settled':
-              if (jsonOrNull(event.data) case final Map<String, dynamic> done) {
-                yield {'type': 'toolApprovalSettled', ...done};
-              }
-            case 'done':
-              return;
-            case 'cancelled':
-              // Stopped elsewhere: this app's own Stop cancels the subscription instead.
-              throw const ApiException('The answer was stopped on the server.');
-          }
-        }
-      } on ApiException catch (error) {
-        if ((error.status ?? 0) < 500) rethrow;
-        // The relay failed for a moment: rejoin below.
-      } on Exception {
-        // Dropped or silent: rejoin below.
-      }
-      if (left) return;
-      if (misses == rejoinDelays.length) {
-        throw const AnswerStillRunning();
-      }
-      await Future.any([Future<void>.delayed(rejoinDelays[misses++]), gone]);
-    }
-  }
-
-  /// A new id for one message's run, so a request sent twice starts it once.
-  String _clientId() =>
-      'c_${List.generate(16, (_) => _random.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
 
   /// A `stream-chat` with `reset` and no message, which clears the history and answers with
   /// one closing chunk.
@@ -1089,14 +682,6 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   );
 
   @override
-  Future<bool> relayFound({bool again = false}) {
-    if (again) {
-      _relays.remove(_current.withPassword(null));
-    }
-    return _isRelay(_current);
-  }
-
-  @override
   Future<int> vectorCount() async => switch (_field(
     await _get(_current, '/api/v1/system/vector-count'),
     'vectorCount',
@@ -1482,24 +1067,3 @@ const _documentTypes = {
   '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 };
-
-/// [source] until [gone] completes, when it is cancelled and the stream ends.
-Stream<T> _until<T>(Stream<T> source, Future<void> gone) {
-  StreamSubscription<T>? from;
-  late final StreamController<T> out;
-  out = StreamController<T>(
-    onListen: () {
-      from = source.listen(out.add, onError: out.addError, onDone: out.close);
-      unawaited(
-        gone.then((_) async {
-          await from?.cancel();
-          await out.close();
-        }),
-      );
-    },
-    onPause: () => from?.pause(),
-    onResume: () => from?.resume(),
-    onCancel: () => from?.cancel(),
-  );
-  return out.stream;
-}

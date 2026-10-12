@@ -62,37 +62,16 @@ class PrefsController extends ChangeNotifier {
   }
 
   /// Notes the chat on screen in one write: chat [thread] of workspace [slug] as the last chat
-  /// and, when it is no draft, the last used, as a chat opened is, and each chat of [seen]
-  /// on screen until [at].
-  Future<void> showChat(
-    String slug,
-    String? thread, {
-    required Iterable<({String slug, String thread})> seen,
-    required DateTime at,
-  }) async {
+  /// and, when it is no draft, the last used, as a chat opened is.
+  Future<void> showChat(String slug, String? thread) async {
     final server = _server;
-    if (server == null) return;
-    var next = prefs;
-    if (prefs.lastChat != LastChat(slug, thread, server)) {
-      next = next.withLastChat(server, slug, thread);
-      if (thread != null) next = next.withUse(server, slug, thread);
+    if (server == null || prefs.lastChat == LastChat(slug, thread, server)) {
+      return;
     }
-    for (final chat in seen) {
-      next = next.withSeen(server, chat.slug, chat.thread, at);
-    }
-    if (!identical(next, prefs)) await _change(next);
+    var next = prefs.withLastChat(server, slug, thread);
+    if (thread != null) next = next.withUse(server, slug, thread);
+    await _change(next);
   }
-
-  /// Notes that chat [thread] of workspace [slug] was on screen [at].
-  Future<void> setSeen(String slug, String thread, DateTime at) async {
-    if (_server case final server?) {
-      await _change(prefs.withSeen(server, slug, thread, at));
-    }
-  }
-
-  /// When chat [thread] of workspace [slug] was last on screen, or null when it never was.
-  DateTime? seenAt(String slug, String thread) =>
-      _server == null ? null : prefs.seenAt(_server!, slug, thread);
 
   /// The chats pinned in workspace [slug] of the server in use.
   List<String> pinnedIn(String slug) =>

@@ -8,10 +8,6 @@ import 'notice.dart';
 
 enum ConnectionCheck { idle, testing, ok, failed }
 
-/// Whether the server in use has the everythingllm relay: not yet asked, found, not there, or
-/// the question could not be answered.
-enum RelayState { unknown, found, absent, unreachable }
-
 /// The AnythingLLM address and key: the one in use, testing a candidate, signing in to get one,
 /// saving and removing; and the server's password, for the web UI's own routes, when the server
 /// has one. Listeners
@@ -50,9 +46,6 @@ class SettingsController extends ChangeNotifier {
   /// failed. Settings asks for the password when it is [ServerAuth.password].
   ServerAuth? auth;
 
-  /// Whether the server in use has the relay, once [readRelay] has asked.
-  RelayState relay = RelayState.unknown;
-
   /// Whether a password is being checked.
   bool checkingPassword = false;
 
@@ -79,14 +72,13 @@ class SettingsController extends ChangeNotifier {
     if (candidate != null) await _check(candidate);
   }
 
-  /// Asks the server whether the saved connection still opens it, then how it signs in and
-  /// whether it has the relay.
+  /// Asks the server whether the saved connection still opens it, then how it signs in.
   Future<void> testSaved() async {
     final server = connection;
     if (server == null) return;
     await _check(server);
     if (connection != server) return;
-    await Future.wait([readAuth(), readRelay(again: true)]);
+    await readAuth();
   }
 
   /// Asks the server whether [candidate] opens it, into [check] and [message].
@@ -102,24 +94,6 @@ class SettingsController extends ChangeNotifier {
       check = ConnectionCheck.failed;
       message = error.message;
     }
-    notifyListeners();
-  }
-
-  /// Asks the server in use whether it has the relay, into [relay]; [again] asks afresh rather
-  /// than taking what was found before.
-  Future<void> readRelay({bool again = false}) async {
-    final server = connection;
-    if (server == null) return;
-    RelayState found;
-    try {
-      found = await _api.relayFound(again: again)
-          ? RelayState.found
-          : RelayState.absent;
-    } on ApiException {
-      found = RelayState.unreachable;
-    }
-    if (connection?.baseUrl != server.baseUrl || found == relay) return;
-    relay = found;
     notifyListeners();
   }
 
@@ -204,10 +178,7 @@ class SettingsController extends ChangeNotifier {
   /// If the keyring refuses, it is still used for this run and the refusal is shown.
   Future<void> _use(Connection candidate, String saved) async {
     final kept = connection;
-    if (kept?.baseUrl != candidate.baseUrl) {
-      auth = null;
-      relay = RelayState.unknown;
-    }
+    if (kept?.baseUrl != candidate.baseUrl) auth = null;
     passwordMessage = null;
     _holder.current = candidate;
     check = ConnectionCheck.idle;
@@ -293,7 +264,6 @@ class SettingsController extends ChangeNotifier {
   Future<void> clear() async {
     _holder.current = null;
     auth = null;
-    relay = RelayState.unknown;
     needsKey = false;
     passwordMessage = null;
     check = ConnectionCheck.idle;

@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' show Offset, Size;
 
@@ -418,24 +417,6 @@ void main() {
         find.text(size.width < 720 ? 'This answer' : 'THIS ANSWER'),
         findsOneWidget,
       );
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('a message refused as the chat answers fits at $at', (
-      tester,
-    ) async {
-      final llm = awkward();
-      final h = await pumpApp(tester, llm: llm, size: size);
-      final events = StreamController<ChatEvent>();
-      addTearDown(() => unawaited(events.close()));
-      llm
-        ..running['t'] = (question: 'phone-$longWord', events: events)
-        ..errors['streamChat'] = const AlreadyAnswering('Busy.');
-      await h.chat.send('question-$longWord');
-      // The answer streams, and its caret never settles.
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(find.textContaining('maybe on another device'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

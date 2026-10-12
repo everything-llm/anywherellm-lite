@@ -73,17 +73,6 @@ Stream<ChatEvent> chatEventsOf(Stream<Map<String, dynamic>> chunks) async* {
         return;
       case 'usageMetrics':
         break;
-      case 'toolApproval':
-        if (chunk case {
-          'runId': final String runId,
-          'approval': final Map<String, dynamic> asked,
-        }) {
-          if (ApprovalRequest.fromJson(runId, asked) case final request?) {
-            yield request;
-          }
-        }
-      case 'toolApprovalSettled':
-        if (chunk['requestId'] case final String id) yield ApprovalSettled(id);
       default:
         if (text is String && text.isNotEmpty) {
           final apart =
@@ -117,41 +106,5 @@ Object? jsonOrNull(String text) {
     return jsonDecode(text);
   } on FormatException {
     return null;
-  }
-}
-
-/// One server-sent event: its [id] when it has a number for one, its [name], and its [data].
-typedef ServerSentEvent = ({int? id, String name, String data});
-
-/// The events in [bytes], each ended by a blank line. A comment (`: ping`) is skipped, an event
-/// with no `event:` field is named `message`, and the lines of a multi-line `data` are joined
-/// with newlines.
-Stream<ServerSentEvent> serverSentEvents(Stream<List<int>> bytes) async* {
-  int? id;
-  String? name;
-  final data = <String>[];
-  await for (final line
-      in bytes.transform(utf8.decoder).transform(const LineSplitter())) {
-    if (line.isEmpty) {
-      if (name != null || data.isNotEmpty) {
-        yield (id: id, name: name ?? 'message', data: data.join('\n'));
-      }
-      (id, name) = (null, null);
-      data.clear();
-      continue;
-    }
-    if (line.startsWith(':')) continue;
-    final colon = line.indexOf(':');
-    final field = colon < 0 ? line : line.substring(0, colon);
-    var value = colon < 0 ? '' : line.substring(colon + 1);
-    if (value.startsWith(' ')) value = value.substring(1);
-    switch (field) {
-      case 'id':
-        id = int.tryParse(value);
-      case 'event':
-        name = value;
-      case 'data':
-        data.add(value);
-    }
   }
 }

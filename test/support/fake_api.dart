@@ -314,19 +314,6 @@ class FakeAnythingLlm implements AnythingLlmApi {
     ]);
   }
 
-  /// What [rejoinChat] finds running, by thread: the question and the events, which the test adds
-  /// to.
-  final Map<String, ({String? question, StreamController<ChatEvent> events})>
-  running = {};
-
-  @override
-  Future<RejoinedAnswer?> rejoinChat(String slug, String thread) =>
-      _run('rejoinChat', () {
-        final found = running[thread];
-        if (found == null) return null;
-        return (question: found.question, events: found.events.stream);
-      }, thread);
-
   /// What [memorySwitches] answers, and [setMemorySwitches] changes.
   MemorySwitches switches = const MemorySwitches(enabled: true, learn: true);
 
@@ -453,42 +440,6 @@ class FakeAnythingLlm implements AnythingLlmApi {
   @override
   Future<List<ScheduledJob>> scheduledJobs() =>
       _run('scheduledJobs', () => jobs);
-
-  /// What [relayRuns] answers.
-  List<RelayRun> allRuns = const [];
-
-  @override
-  Future<List<RelayRun>> relayRuns() => _run('relayRuns', () => allRuns);
-
-  @override
-  Future<void> cancelRun(String id) => _run('cancelRun', () {
-    allRuns = [
-      for (final run in allRuns)
-        if (run.id == id && run.running)
-          RelayRun(
-            id: run.id,
-            workspace: run.workspace,
-            thread: run.thread,
-            status: 'cancelled',
-            question: run.question,
-            started: run.started,
-            finished: DateTime.now().toUtc(),
-          )
-        else
-          run,
-    ];
-  }, id);
-
-  @override
-  Future<void> answerApproval(ApprovalRequest request, bool allow) => _run(
-    'answerApproval',
-    () {},
-    '${request.id}:${allow ? 'allow' : 'deny'}',
-  );
-
-  @override
-  Future<void> stopChat(String slug, String thread) =>
-      _run('stopChat', () {}, thread);
 
   @override
   Future<void> resetChat(String slug, String thread) =>
@@ -728,13 +679,6 @@ class FakeAnythingLlm implements AnythingLlmApi {
       more: chatLog.length > start + size,
     );
   }, '$page');
-
-  /// What [relayFound] answers.
-  bool relay = false;
-
-  @override
-  Future<bool> relayFound({bool again = false}) =>
-      _run('relayFound', () => relay, again ? 'again' : null);
 
   /// Writes each change into [system]; a secret, which the server reports only as set, becomes
   /// true.

@@ -173,8 +173,8 @@ class _ComposerState extends State<Composer> {
       (_scope.chat.server, _scope.chat.activeSlug, _scope.chat.activeThread);
 
   /// Drops the attachments when another chat, workspace or server is shown, so they never go
-  /// with a message they were not picked for. Puts back a message the relay refused because the
-  /// chat was already answering, with its files, unless something else was typed meanwhile.
+  /// with a message they were not picked for. Puts in what another app shared, with its files,
+  /// unless something else was typed meanwhile.
   void _chatChanged() {
     final shown = _chatOnScreen();
     if (shown != _chatShown && (_held != null || _picking)) {
@@ -193,17 +193,12 @@ class _ComposerState extends State<Composer> {
         });
       }
     }
-    // Taken only when it can go back: a message taken and not put back would be lost. One
-    // held is held here, as Send when done holds it, and is not focused.
+    // Taken only when it can go back: a message taken and not put back would be lost.
     if (widget.draft.text.isEmpty && _attached.isEmpty) {
       if (_scope.chat.takeForComposer() case final back?) {
         _setDraft(back.text);
         setState(() => _attached = back.attachments);
-        if (back.hold && _scope.chat.runningHere != null) {
-          _hold();
-        } else {
-          widget.focus.requestFocus();
-        }
+        widget.focus.requestFocus();
       }
     }
   }
@@ -467,18 +462,7 @@ class _ComposerState extends State<Composer> {
                 ),
               );
               final phone = ScreenClass.ofContext(context).isPhone;
-              if (!scope.chat.alreadyAnswering) {
-                return phone ? _attachSheet(form) : form;
-              }
-              final column = Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const _AlreadyAnswering(),
-                  const SizedBox(height: 8),
-                  form,
-                ],
-              );
-              return phone ? _attachSheet(column) : column;
+              return phone ? _attachSheet(form) : form;
             },
           ),
         ),
@@ -1037,7 +1021,7 @@ class _FormNote extends StatelessWidget {
 }
 
 /// Holds the message typed while this chat answers, to go when the answer ends. There is no
-/// Send now: the relay runs one answer a chat.
+/// Send now: a chat runs one answer at a time.
 class _SendWhenDone extends StatelessWidget {
   const _SendWhenDone({required this.onTap});
 
@@ -1070,23 +1054,6 @@ class _SendWhenDone extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Over the composer while the chat on screen answers a message sent elsewhere, after the relay
-/// refused the one sent here.
-class _AlreadyAnswering extends StatelessWidget {
-  const _AlreadyAnswering();
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    container: true,
-    liveRegion: true,
-    child: const AlertBox(
-      AlertKind.warn,
-      'This chat is still answering, maybe on another device. Send when it ends, or stop it.',
-      plain: true,
-    ),
-  );
 }
 
 /// In place of the composer until a key is saved.

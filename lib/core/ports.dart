@@ -16,9 +16,6 @@ export 'errors.dart';
 /// password, which the app does not do.
 enum ServerAuth { none, password, multiUser }
 
-/// A running answer found again: see [AnythingLlmApi.rejoinChat].
-typedef RejoinedAnswer = ({String? question, Stream<ChatEvent> events});
-
 /// The AnythingLLM server, as the UI sees it. Every method throws [ApiException] on failure.
 /// Every method but [verify] uses the connection in use, and throws [NotConfigured] when there
 /// is none.
@@ -68,30 +65,14 @@ abstract interface class AnythingLlmApi {
 
   /// Asks [message] in the chat, with [attachments] for this message only, and streams the
   /// answer in the workspace's own chat mode. The stream fails with [ApiException]. Cancelling
-  /// the subscription lets go of the answer: a server that keeps answers going without the app
-  /// finishes it and saves it to the chat, and any other stops it.
+  /// the subscription lets go of the answer, which stops it, though an agent may still finish
+  /// it and save it to the chat.
   Stream<ChatEvent> streamChat(
     String slug,
     String thread,
     String message, {
     List<Attachment> attachments = const [],
   });
-
-  /// The answer a server that keeps answers going without the app is still writing in the chat,
-  /// which the app did not start in this run: its [question], when the server says it, and its
-  /// [events] from the start. Cancelling the subscription lets go of it, and [stopChat] stops it.
-  /// Null when there is no such answer, the server has no such relay, or it cannot be asked: a
-  /// chat never fails to open for this.
-  Future<RejoinedAnswer?> rejoinChat(String slug, String thread);
-
-  /// Every answer the server that keeps answers going without the app holds, running, finished,
-  /// failed or stopped, in the 7 days it keeps them, oldest first. Fails with [ApiException],
-  /// saying so, when the server has no such relay.
-  Future<List<RelayRun>> relayRuns();
-
-  /// Stops the relay's run [id], whichever chat it answers in. Does nothing for a run that has
-  /// ended.
-  Future<void> cancelRun(String id);
 
   /// The jobs AnythingLLM runs on a schedule. It takes the server's web login, as the presets
   /// do: on a server with a password it needs one saved.
@@ -124,15 +105,6 @@ abstract interface class AnythingLlmApi {
   /// Shows memory [id] in every workspace's chats, or, given [toWorkspace], in that workspace's
   /// only.
   Future<SavedMemory> moveMemory(int id, {String? toWorkspace});
-
-  /// Tells the server whether the tool [request] asks about may run. Fails with [ApiException]
-  /// when it was answered already, or the server stopped waiting.
-  Future<void> answerApproval(ApprovalRequest request, bool allow);
-
-  /// Stops the answer [streamChat] is running in the chat, on a server that keeps answers going
-  /// without the app. Does nothing when there is none. Call it before cancelling the
-  /// subscription.
-  Future<void> stopChat(String slug, String thread);
 
   /// Clears the chat's history, so the model no longer sees its turns and history no longer
   /// lists them.
@@ -221,10 +193,6 @@ abstract interface class AnythingLlmApi {
 
   /// Page [page] of every chat the server recorded, newest first, [ChatLog.pageSize] a page.
   Future<ChatLog> workspaceChats({int page = 0});
-
-  /// Whether the server in use has the everythingllm relay, which keeps an answer running after
-  /// the app lets go of it. The answer is kept for the server, unless [again] asks afresh.
-  Future<bool> relayFound({bool again = false});
 
   /// The bytes of a file or image an agent made, by the [storageName] the server gave it.
   Future<List<int>> generatedFile(String storageName);

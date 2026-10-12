@@ -18,14 +18,12 @@ Future<Rig> started(
   Prefs prefs = const Prefs(),
   String? password,
   int? maxRuns,
-  List<Duration>? checkEvery,
 }) async {
   final rig = Rig(
     llm: llm,
     connection: sampleConnection.withPassword(password),
     prefsStore: FakePrefsStore(prefs),
     maxRuns: maxRuns,
-    checkEvery: checkEvery,
   );
   addTearDown(rig.dispose);
   await rig.start();
@@ -175,29 +173,6 @@ void main() {
     expect(rig.chat.turns.last.text, 'Half');
   });
 
-  test('stop stops the answer on the server too', () async {
-    final llm = planningServer()..hold = true;
-    final rig = await started(llm);
-    await rig.chat.send('one');
-    final thread = rig.chat.activeThread;
-    rig.chat.stop();
-    await pumpEventQueue();
-    expect(llm.calls, contains('stopChat:$thread'));
-    expect(rig.chat.problem, isNull);
-  });
-
-  test('a stop the server refuses says the answer goes on there', () async {
-    final llm = planningServer()
-      ..hold = true
-      ..errors['stopChat'] = const ApiException('Could not reach the relay.');
-    final rig = await started(llm);
-    await rig.chat.send('one');
-    rig.chat.stop();
-    await pumpEventQueue();
-    expect(rig.chat.problem?.title, 'Could not stop the answer on the server');
-    expect(rig.chat.busy, isFalse);
-  });
-
   test('a failed answer says why and frees the chat', () async {
     final llm = planningServer()
       ..errors['streamChat'] = const ApiException('No LLM set');
@@ -242,12 +217,10 @@ void main() {
       final llm = planningServer()..hold = true;
       final rig = await started(llm);
       await rig.chat.send('And next quarter?');
-      final thread = rig.chat.activeThread;
       await rig.chat.refresh();
       expect(rig.chat.busy, isFalse);
       expect(rig.chat.turns.last.unfinished, isTrue);
       expect(rig.chat.turns.last.error, startsWith('Let go of'));
-      expect(llm.calls, isNot(contains('stopChat:$thread')));
       expect(llm.chat!.hasListener, isFalse);
 
       // Once the server has saved it, the next refresh shows it.
@@ -297,7 +270,7 @@ void main() {
     final llm = planningServer()..hold = true;
     final rig = await started(llm);
     await rig.chat.send('And next quarter?');
-    llm.chat!.addError(const ApiException('Lost the connection to the relay.'));
+    llm.chat!.addError(const ApiException('The answer was cut off.'));
     await pumpEventQueue();
     llm.histories['budget'] = [
       ...llm.histories['budget']!,
@@ -314,7 +287,7 @@ void main() {
     final llm = planningServer()..hold = true;
     final rig = await started(llm);
     await rig.chat.send('And next quarter?');
-    llm.chat!.addError(const ApiException('Lost the connection to the relay.'));
+    llm.chat!.addError(const ApiException('The answer was cut off.'));
     await pumpEventQueue();
     await rig.chat.open('priorities');
     await rig.chat.open('budget');
@@ -345,401 +318,6 @@ void main() {
       expect(rig.chat.turns, isEmpty);
     },
   );
-
-  group('an answer the relay kept going', () {
-    StreamController<ChatEvent> running(
-      FakeAnythingLlm llm, {
-      String? question = 'And next quarter?',
-    }) {
-      final events = StreamController<ChatEvent>();
-      llm.running['budget'] = (question: question, events: events);
-      // Not waited for: closing a stream nobody followed never finishes.
-      addTearDown(() => unawaited(events.close()));
-      return events;
-    }
-
-    test('is followed again when its chat is opened', () async {
-      final llm = planningServer();
-      final events = running(llm);
-      final rig = await started(llm);
-      await pumpEventQueue();
-      expect(rig.chat.busy, isTrue);
-      expect(rig.chat.turns.map((t) => t.text), [
-        'What is the budget?',
-        'About 40k.',
-        'And next quarter?',
-        '',
-      ]);
-      expect(rig.chat.turns.last.rejoined, isTrue);
-      expect(rig.chat.turns.last.streaming, isTrue);
-      events
-        ..add(const TextChunk('About '))
-        ..add(const TextChunk('45k.'));
-      await pumpEventQueue();
-      expect(rig.chat.turns.last.text, 'About 45k.');
-    });
-
-    test('ends as any answer does, and the saved chat replaces it', () async {
-      final llm = planningServer();
-      final events = running(llm);
-      final rig = await started(llm);
-      await pumpEventQueue();
-      final answer = rig.chat.turns.last;
-      events.add(const TextChunk('About 45k.'));
-      llm.histories['budget'] = [
-        ...llm.histories['budget']!,
-        const ChatMessage(
-          role: Role.user,
-          text: 'And next quarter?',
-          chatId: 7,
-        ),
-        const ChatMessage(role: Role.assistant, text: 'About 45k.', chatId: 7),
-      ];
-      events.add(const ChatDone([]));
-      await events.close();
-      await pumpEventQueue();
-      expect(rig.chat.busy, isFalse);
-      expect(rig.chat.turns.last.text, 'About 45k.');
-      expect(rig.chat.turns.last.rejoined, isFalse);
-      expect(rig.chat.turns.last.chatId, 7);
-      // The same turn, so what follows it, as Read aloud does, keeps it.
-      expect(rig.chat.turns.last, same(answer));
-    });
-
-    test('keeps what came when the server has not saved it yet', () async {
-      final llm = planningServer();
-      final events = running(llm);
-      final rig = await started(llm);
-      await pumpEventQueue();
-      events
-        ..add(const TextChunk('About 45k.'))
-        ..add(const ChatDone([], chatId: 9));
-      await events.close();
-      await pumpEventQueue();
-      expect(rig.chat.busy, isFalse);
-      expect(rig.chat.turns.last.text, 'About 45k.');
-      expect(rig.chat.turns.last.chatId, 9);
-    });
-
-    test('is not followed in a chat whose history could not be read', () async {
-      final llm = planningServer()
-        ..errors['history'] = const ApiException('No.');
-      running(llm);
-      final rig = await started(llm);
-      await pumpEventQueue();
-      expect(rig.chat.busy, isFalse);
-      expect(rig.chat.ready, isFalse);
-    });
-
-    test('is not followed once a message was sent meanwhile', () async {
-      final llm = planningServer();
-      running(llm);
-      final found = llm.gates['rejoinChat'] = Completer<void>();
-      final rig = await started(llm);
-      await rig.chat.send('Something else?');
-      await pumpEventQueue();
-      found.complete();
-      await pumpEventQueue();
-      expect(rig.chat.turns.where((t) => t.rejoined), isEmpty);
-      expect(
-        rig.chat.turns.where((t) => t.text == 'And next quarter?'),
-        isEmpty,
-      );
-    });
-
-    test('is not asked about for a chat with nothing running', () async {
-      final llm = planningServer();
-      final rig = await started(llm);
-      await pumpEventQueue();
-      expect(llm.calls, contains('rejoinChat:budget'));
-      expect(rig.chat.busy, isFalse);
-      expect(rig.chat.turns, hasLength(2));
-    });
-
-    test('takes the place of the answer the app lost touch with', () async {
-      final llm = planningServer()..hold = true;
-      final rig = await started(llm);
-      await rig.chat.send('And next quarter?');
-      llm.chat!.addError(const AnswerStillRunning());
-      await pumpEventQueue();
-      expect(rig.chat.turns.last.stillRunning, isTrue);
-      final events = running(llm);
-      await rig.chat.open('priorities');
-      await rig.chat.open('budget');
-      await pumpEventQueue();
-      expect(
-        rig.chat.turns.where((t) => t.text == 'And next quarter?'),
-        hasLength(1),
-      );
-      expect(rig.chat.turns.last.rejoined, isTrue);
-      expect(rig.chat.turns.last.error, isNull);
-      expect(rig.chat.busy, isTrue);
-      events.add(const TextChunk('About 45k.'));
-      await pumpEventQueue();
-      expect(rig.chat.turns.last.text, 'About 45k.');
-    });
-
-    test('can be stopped', () async {
-      final llm = planningServer();
-      running(llm);
-      final rig = await started(llm);
-      await pumpEventQueue();
-      rig.chat.stop();
-      await pumpEventQueue();
-      expect(llm.calls, contains('stopChat:budget'));
-      expect(rig.chat.busy, isFalse);
-      expect(rig.chat.turns.last.stopped, isTrue);
-    });
-
-    test('with no question said, shows the answer alone', () async {
-      final llm = planningServer();
-      running(llm, question: null);
-      final rig = await started(llm);
-      await pumpEventQueue();
-      expect(rig.chat.turns, hasLength(3));
-      expect(rig.chat.turns.last.rejoined, isTrue);
-    });
-
-    test('a failed lookup does not fail the chat', () async {
-      final llm = planningServer()
-        ..errors['rejoinChat'] = const ApiException('No.');
-      final rig = await started(llm);
-      await pumpEventQueue();
-      expect(rig.chat.problem, isNull);
-      expect(rig.chat.turns, hasLength(2));
-    });
-  });
-
-  group('an answer the app lost touch with', () {
-    RelayRun run(String status, {String? error}) => RelayRun(
-      id: 'r1',
-      workspace: 'q3',
-      thread: 'budget',
-      status: status,
-      error: error,
-      started: DateTime.utc(2026, 10, 10, 9),
-    );
-
-    /// Starts the app on the budget chat and loses touch with the answer to its next message.
-    Future<Rig> lost(FakeAnythingLlm llm, {List<Duration>? checkEvery}) async {
-      llm.hold = true;
-      final rig = await started(llm, checkEvery: checkEvery);
-      await rig.chat.send('And next quarter?');
-      llm.chat!.addError(const AnswerStillRunning());
-      await pumpEventQueue();
-      expect(rig.chat.turns.last.stillRunning, isTrue);
-      return rig;
-    }
-
-    /// Saves the answer to the budget chat, as the relay does when it ends.
-    void save(FakeAnythingLlm llm) => llm.histories['budget'] = [
-      ...?llm.histories['budget'],
-      const ChatMessage(role: Role.user, text: 'And next quarter?'),
-      const ChatMessage(role: Role.assistant, text: 'About 45k.'),
-    ];
-
-    test('is followed again while the relay still writes it', () async {
-      final llm = planningServer();
-      final rig = await lost(llm);
-      llm.allRuns = [run('running')];
-      final events = StreamController<ChatEvent>();
-      addTearDown(() => unawaited(events.close()));
-      llm.running['budget'] = (question: 'And next quarter?', events: events);
-      await rig.chat.checkAnswer();
-      expect(rig.chat.turns.last.rejoined, isTrue);
-      expect(rig.chat.answeringHere, isTrue);
-      events.add(const TextChunk('About 45k.'));
-      await pumpEventQueue();
-      expect(rig.chat.turns.last.text, 'About 45k.');
-    });
-
-    test('shows what the chat saved once the relay is done', () async {
-      final llm = planningServer();
-      final rig = await lost(llm);
-      llm.allRuns = [run('done')];
-      save(llm);
-      await rig.chat.checkAnswer();
-      expect(rig.chat.turns.last.text, 'About 45k.');
-      expect(rig.chat.turns.last.unfinished, isFalse);
-    });
-
-    test('waits while the chat does not have it yet', () async {
-      final llm = planningServer();
-      final rig = await lost(llm);
-      llm.allRuns = [run('done')];
-      await rig.chat.checkAnswer();
-      expect(rig.chat.turns.last.stillRunning, isTrue);
-    });
-
-    test('fails in the relay\'s words when the relay failed it', () async {
-      final llm = planningServer();
-      final rig = await lost(llm);
-      llm.allRuns = [run('failed', error: 'The model ran out of time.')];
-      await rig.chat.checkAnswer();
-      expect(rig.chat.turns.last.stillRunning, isFalse);
-      expect(rig.chat.turns.last.error, 'The model ran out of time.');
-    });
-
-    test('fails when it was stopped elsewhere', () async {
-      final llm = planningServer();
-      final rig = await lost(llm);
-      llm.allRuns = [run('cancelled')];
-      await rig.chat.checkAnswer();
-      expect(
-        rig.chat.turns.last.error,
-        'The answer was stopped on the server.',
-      );
-    });
-
-    test('fails when the relay has no record of it', () async {
-      final llm = planningServer();
-      final rig = await lost(llm);
-      await rig.chat.checkAnswer();
-      expect(rig.chat.turns.last.stillRunning, isFalse);
-      expect(rig.chat.turns.last.error, contains('no record'));
-    });
-
-    test('stays as it is while the relay cannot be asked', () async {
-      final llm = planningServer()
-        ..errors['relayRuns'] = const ApiException('Out of reach.');
-      final rig = await lost(llm);
-      await rig.chat.checkAnswer();
-      expect(rig.chat.turns.last.stillRunning, isTrue);
-      expect(rig.chat.problem, isNull);
-    });
-
-    test('is checked on by itself until it ends', () async {
-      final llm = planningServer();
-      final rig = await lost(
-        llm,
-        checkEvery: const [Duration(milliseconds: 5)],
-      );
-      llm.allRuns = [run('done')];
-      await Future<void>.delayed(const Duration(milliseconds: 30));
-      expect(rig.chat.turns.last.stillRunning, isTrue);
-      save(llm);
-      await Future<void>.delayed(const Duration(milliseconds: 30));
-      expect(rig.chat.turns.last.text, 'About 45k.');
-      final asked = llm.calls.where((c) => c == 'relayRuns').length;
-      await Future<void>.delayed(const Duration(milliseconds: 30));
-      expect(llm.calls.where((c) => c == 'relayRuns'), hasLength(asked));
-    });
-
-    test('is not checked on while another chat shows', () async {
-      final llm = planningServer();
-      final rig = await lost(
-        llm,
-        checkEvery: const [Duration(milliseconds: 5)],
-      );
-      await rig.chat.open('priorities');
-      final asked = llm.calls.where((c) => c == 'relayRuns').length;
-      await Future<void>.delayed(const Duration(milliseconds: 30));
-      expect(llm.calls.where((c) => c == 'relayRuns'), hasLength(asked));
-    });
-
-    test('can be stopped on the relay', () async {
-      final llm = planningServer();
-      final rig = await lost(llm);
-      llm.allRuns = [run('running')];
-      await rig.chat.stopLost();
-      expect(llm.calls, contains('cancelRun:r1'));
-      expect(rig.chat.turns.last.stillRunning, isFalse);
-      expect(rig.chat.turns.last.stopped, isTrue);
-      expect(rig.chat.turns.last.error, isNull);
-    });
-  });
-
-  group('a message refused as the chat is already answering', () {
-    const refusal = AlreadyAnswering(
-      'That thread already has an answer running.',
-    );
-
-    /// The answer running in the chat on another device, which the relay lists.
-    StreamController<ChatEvent> elsewhere(FakeAnythingLlm llm) {
-      final events = StreamController<ChatEvent>();
-      llm.running['budget'] = (question: 'Asked on the phone', events: events);
-      addTearDown(() => unawaited(events.close()));
-      return events;
-    }
-
-    test('is given back, and the answer running is followed', () async {
-      final llm = planningServer();
-      final rig = await started(llm);
-      await pumpEventQueue();
-      final events = elsewhere(llm);
-      llm.errors['streamChat'] = refusal;
-      final notes = Attachment.of('notes.txt', utf8.encode('Notes'));
-      expect(
-        await rig.chat.send('And a shorter one?', attachments: [notes]),
-        isTrue,
-      );
-      await pumpEventQueue();
-      expect(rig.chat.alreadyAnswering, isTrue);
-      expect(rig.chat.problem, isNull);
-      expect(rig.chat.turns.map((t) => t.text), [
-        'What is the budget?',
-        'About 40k.',
-        'Asked on the phone',
-        '',
-      ]);
-      final answer = rig.chat.turns.last;
-      expect(answer.error, isNull);
-      expect(answer.rejoined, isFalse);
-      expect(rig.chat.runningHere, same(answer));
-      final back = rig.chat.takeForComposer()!;
-      expect(back.text, 'And a shorter one?');
-      expect(back.attachments.single.name, 'notes.txt');
-      expect(rig.chat.takeForComposer(), isNull);
-      events.add(const TextChunk('Short.'));
-      await events.close();
-      await pumpEventQueue();
-      expect(answer.text, 'Short.');
-      expect(rig.chat.busy, isFalse);
-      expect(rig.chat.alreadyAnswering, isFalse);
-    });
-
-    test('Stop stops the answer running', () async {
-      final llm = planningServer();
-      final rig = await started(llm);
-      await pumpEventQueue();
-      elsewhere(llm);
-      llm.errors['streamChat'] = refusal;
-      await rig.chat.send('And a shorter one?');
-      await pumpEventQueue();
-      rig.chat.stop();
-      await pumpEventQueue();
-      expect(llm.calls, contains('stopChat:budget'));
-      expect(rig.chat.busy, isFalse);
-      expect(rig.chat.alreadyAnswering, isFalse);
-      expect(rig.chat.turns.last.stopped, isTrue);
-    });
-
-    test('with nothing found running, can simply be sent again', () async {
-      final llm = planningServer();
-      final rig = await started(llm);
-      await pumpEventQueue();
-      llm.errors['streamChat'] = refusal;
-      await rig.chat.send('And a shorter one?');
-      await pumpEventQueue();
-      expect(rig.chat.alreadyAnswering, isFalse);
-      expect(rig.chat.busy, isFalse);
-      expect(rig.chat.turns, hasLength(2));
-      expect(rig.chat.takeForComposer()!.text, 'And a shorter one?');
-    });
-
-    test('is given back only in its own chat', () async {
-      final llm = planningServer();
-      final rig = await started(llm);
-      await pumpEventQueue();
-      llm.errors['streamChat'] = refusal;
-      await rig.chat.send('And a shorter one?');
-      await pumpEventQueue();
-      await rig.chat.open('priorities');
-      expect(rig.chat.takeForComposer(), isNull);
-      await rig.chat.open('budget');
-      expect(rig.chat.takeForComposer(), isNull);
-    });
-  });
 
   test('a finished answer\'s chat is not read again', () async {
     final llm = planningServer();
@@ -1022,8 +600,7 @@ void main() {
       await pumpEventQueue();
       rig.chat.stop();
       await pumpEventQueue();
-      expect(llm.calls, contains('stopChat:budget'));
-      expect(llm.calls, isNot(contains('stopChat:th-1')));
+      expect(llm.chats['budget']!.hasListener, isFalse);
       expect(rig.chat.answeringIn('q3'), isFalse);
       expect(rig.chat.answeringIn('household'), isTrue);
       expect(llm.chats['th-1']!.hasListener, isTrue);
@@ -1066,54 +643,6 @@ void main() {
       await llm.chats['th-1']!.close();
       await pumpEventQueue();
       expect(rig.chat.busy, isFalse);
-    });
-
-    test(
-      'a run the relay kept going is followed while another answers',
-      () async {
-        final llm = planningServer();
-        final events = StreamController<ChatEvent>();
-        addTearDown(() => unawaited(events.close()));
-        llm.running['budget'] = (question: 'And next quarter?', events: events);
-        final rig = await householdAnswering(llm);
-        expect(rig.chat.runningHere, isNotNull);
-        expect(rig.chat.turns.last.rejoined, isTrue);
-        expect(rig.chat.answeringIn('household'), isTrue);
-      },
-    );
-
-    test('a refused message shows only in its own chat', () async {
-      final llm = planningServer();
-      final rig = await householdAnswering(llm);
-      final events = StreamController<ChatEvent>();
-      addTearDown(() => unawaited(events.close()));
-      llm.running['budget'] = (question: 'Asked on the phone', events: events);
-      llm.errors['streamChat'] = const AlreadyAnswering('Already answering.');
-      await rig.chat.send('And a shorter one?');
-      await pumpEventQueue();
-      expect(rig.chat.alreadyAnswering, isTrue);
-      await rig.chat.select('household', thread: 'th-1');
-      expect(rig.chat.alreadyAnswering, isFalse);
-      await rig.chat.select('q3', thread: 'budget');
-      expect(rig.chat.alreadyAnswering, isTrue);
-      await events.close();
-      await pumpEventQueue();
-      expect(rig.chat.alreadyAnswering, isFalse);
-      expect(rig.chat.answeringIn('household'), isTrue);
-    });
-
-    test('a refusal in another chat keeps the first one', () async {
-      final llm = planningServer();
-      final rig = await started(llm);
-      await pumpEventQueue();
-      llm.errors['streamChat'] = const AlreadyAnswering('Already answering.');
-      unawaited(rig.chat.send('And a shorter one?'));
-      unawaited(rig.chat.select('household'));
-      await pumpEventQueue();
-      await rig.chat.send('Plan the meals');
-      await pumpEventQueue();
-      await rig.chat.select('q3', thread: 'budget');
-      expect(rig.chat.takeForComposer()!.text, 'And a shorter one?');
     });
   });
 
@@ -1454,27 +983,6 @@ void main() {
       await clearing;
       await rig.chat.select('q3', thread: 'budget');
       expect(rig.chat.turns, isEmpty);
-    });
-
-    test('a run in another chat is followed while one clears', () async {
-      final llm = planningServer();
-      final events = StreamController<ChatEvent>();
-      addTearDown(() => unawaited(events.close()));
-      final rig = await started(llm);
-      await pumpEventQueue();
-      final gate = llm.gates['resetChat'] = Completer<void>();
-      final clearing = rig.chat.send('/reset');
-      await pumpEventQueue();
-      llm.running['priorities'] = (
-        question: 'Asked on the phone',
-        events: events,
-      );
-      await rig.chat.select('q3', thread: 'priorities');
-      await pumpEventQueue();
-      expect(rig.chat.isAnswering('priorities'), isTrue);
-      expect(rig.chat.turns.last.rejoined, isTrue);
-      gate.complete();
-      await clearing;
     });
 
     test('a preset whose prompt is /reset clears the chat too', () async {

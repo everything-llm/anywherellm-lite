@@ -4,7 +4,6 @@ import '../core/chat_groups.dart';
 import '../core/copy.dart';
 import '../core/find.dart';
 import '../core/server_models.dart';
-import 'activity.dart';
 import 'app_scope.dart';
 import 'icons.dart';
 import 'layout.dart';
@@ -21,8 +20,8 @@ import 'workspace_switcher.dart';
 
 /// A phone's drawer, in flat rows on its ground as the design canvas draws it: the workspace
 /// switcher beside Workspace settings; the search, New chat and the open workspace's chats under
-/// Chats, each with a More button that opens its sheet; then, under a hairline, Activity,
-/// Upcoming and Settings. Only the chats scroll, unless the drawer is shorter than
+/// Chats, each with a More button that opens its sheet; then, under a hairline, Upcoming and
+/// Settings. Only the chats scroll, unless the drawer is shorter than
 /// [minHeight].
 class PhoneDrawer extends StatefulWidget {
   const PhoneDrawer({super.key, required this.width});
@@ -150,10 +149,7 @@ class _PhoneDrawerState extends State<PhoneDrawer> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         spacing: 2,
                         children: [
-                          if (scope.settings.configured) ...const [
-                            ActivityRow(),
-                            UpcomingRow(),
-                          ],
+                          if (scope.settings.configured) const UpcomingRow(),
                           DrawerRow(
                             icon: 'settings',
                             title: 'Settings',

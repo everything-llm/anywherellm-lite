@@ -28,7 +28,6 @@ import '../widgets/tappable.dart';
 import 'answer_body.dart';
 import 'markdown_lists.dart';
 import 'answer_menu.dart';
-import 'approval_card.dart';
 import 'generated_files.dart';
 import 'passages_sheet.dart';
 import 'speaker.dart';
@@ -622,26 +621,6 @@ class _Picture extends StatelessWidget {
   );
 }
 
-/// Check now and Stop, for the last answer when the app lost touch with it on the relay.
-class _LostActions extends StatelessWidget {
-  const _LostActions();
-
-  @override
-  Widget build(BuildContext context) {
-    final chat = AppScope.of(context).chat;
-    return ListenableBuilder(
-      listenable: chat,
-      builder: (context, _) => ActionRow(alignment: WrapAlignment.start, [
-        AppButton(
-          chat.checking ? 'Checking…' : 'Check now',
-          onPressed: chat.checking ? null : () => unawaited(chat.checkAnswer()),
-        ),
-        AppButton('Stop', onPressed: () => unawaited(chat.stopLost())),
-      ]),
-    );
-  }
-}
-
 class _Answer extends StatefulWidget {
   const _Answer(this.turn, {this.last = false, this.retry});
 
@@ -675,26 +654,10 @@ class _AnswerState extends State<_Answer> {
     final phone = ScreenClass.ofContext(context).isPhone;
     final action = answerAction(context);
     // The red box asks again itself, so Retry does not show twice.
-    final askAgain =
-        turn.error != null && !turn.stillRunning && retry?.onPressed != null;
+    final askAgain = turn.error != null && retry?.onPressed != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (turn.rejoined && turn.streaming) ...[
-          Row(
-            children: [
-              const ReadyDot(gap: false),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  'Kept answering while the app was closed.',
-                  style: Type.sans(12.5, color: Tokens.of(context).muted),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-        ],
         if (failure != null)
           AlertBox(AlertKind.bad, 'The model did not answer', text: failure)
         else if (split.answer.isNotEmpty)
@@ -705,36 +668,20 @@ class _AnswerState extends State<_Answer> {
             caret: inline,
           ),
         if (turn.streaming && turn.status != null) _Status(turn.status!),
-        if (turn.streaming)
-          for (final request in turn.approvals)
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: ApprovalCard(turn, request),
-            ),
         if (turn.streaming && !inline)
           // The caret alone, as the design canvas draws it, from the send on, while a
           // model's reasoning is hidden too.
           const Padding(padding: EdgeInsets.only(top: 6), child: Caret()),
         if (turn.error case final error?) ...[
           const SizedBox(height: 10),
-          if (turn.stillRunning)
-            AlertBox(
-              AlertKind.info,
-              'Still being written',
-              text:
-                  'The connection dropped, but the answer keeps going on the server. It will '
-                  'appear here when it’s done.',
-              action: widget.last ? const _LostActions() : null,
-            )
-          else
-            AlertBox(
-              AlertKind.bad,
-              'The answer stopped',
-              text: error,
-              action: askAgain
-                  ? AppButton('Ask again', onPressed: retry!.onPressed)
-                  : null,
-            ),
+          AlertBox(
+            AlertKind.bad,
+            'The answer stopped',
+            text: error,
+            action: askAgain
+                ? AppButton('Ask again', onPressed: retry!.onPressed)
+                : null,
+          ),
         ],
         if (!turn.streaming && turn.citations.isNotEmpty) ...[
           SizedBox(height: phone ? 10 : 12),

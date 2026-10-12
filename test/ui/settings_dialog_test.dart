@@ -233,26 +233,11 @@ void main() {
     expect(h.shell.settingsOpen, isTrue);
   });
 
-  testWidgets('Connection says how the server signs in and finds the relay', (
-    tester,
-  ) async {
-    final llm = planningServer()
-      ..auth = ServerAuth.password
-      ..relay = true;
+  testWidgets('Connection says how the server signs in', (tester) async {
+    final llm = planningServer()..auth = ServerAuth.password;
     final h = await pumpApp(tester, llm: llm);
     h.shell.openSettings(SettingsPage.connection);
     await tester.pumpAndSettle();
-    expect(find.text('Background answers'), findsOneWidget);
-    expect(
-      find.text('Provided by the everythingllm relay on the server.'),
-      findsOneWidget,
-    );
-    expect(
-      find.text(
-        'Available. Answers keep running after the app lets go of them.',
-      ),
-      findsOneWidget,
-    );
     expect(find.text('AnythingLLM, single user, password on'), findsOneWidget);
     expect(find.text('Connected'), findsNothing);
     llm.verifyError = const ApiException('The server rejected the key.');
@@ -272,18 +257,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Connected'), findsNothing);
     expect(find.text('Saved'), findsWidgets);
-  });
-
-  testWidgets('a relay that is not there says answers come straight', (
-    tester,
-  ) async {
-    final h = await pumpApp(tester, llm: planningServer()..relay = false);
-    h.shell.openSettings(SettingsPage.connection);
-    await tester.pumpAndSettle();
-    expect(
-      find.text('Not available. Answers come straight from AnythingLLM.'),
-      findsOneWidget,
-    );
   });
 
   testWidgets('titles are semibold, larger than section heads', (tester) async {
@@ -306,15 +279,6 @@ void main() {
     expect(style('Workspace chats').fontWeight, FontWeight.w600);
     expect(style('Workspace chats').fontSize, 26);
     expect(style('Export').fontSize, lessThan(22));
-  });
-
-  testWidgets('a relay that cannot be asked says so', (tester) async {
-    final llm = planningServer()
-      ..errors['relayFound'] = const ApiException('Down');
-    final h = await pumpApp(tester, llm: llm);
-    h.shell.openSettings(SettingsPage.connection);
-    await tester.pumpAndSettle();
-    expect(find.text('Could not check.'), findsOneWidget);
   });
 
   testWidgets('workspace chats show a page, then more, and export', (

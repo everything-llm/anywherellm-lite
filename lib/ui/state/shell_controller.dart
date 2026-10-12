@@ -37,9 +37,8 @@ class ChatSheetFor {
   final bool deleting;
 }
 
-/// A page a phone shows over the chat, from its drawer: the server's scheduled jobs, or the
-/// answers the relay ran.
-enum PhonePage { upcoming, activity }
+/// A page a phone shows over the chat, from its drawer: the server's scheduled jobs.
+enum PhonePage { upcoming }
 
 /// A phone's sheet about the open workspace: a new workspace's name, the open one's new name,
 /// or whether to delete it.

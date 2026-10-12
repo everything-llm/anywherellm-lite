@@ -55,14 +55,6 @@ class Turn extends ChangeNotifier {
   /// Why the answer failed, or null.
   String? error;
 
-  /// Whether the answer [error] names is still being written by the relay the app lost touch
-  /// with, so it will be in the chat when it is done.
-  bool stillRunning = false;
-
-  /// Whether the answer was found already running on the relay when the chat was opened, so it
-  /// was written while the app was closed or out of touch.
-  bool rejoined = false;
-
   /// Whether the person stopped the answer.
   bool stopped = false;
 
@@ -72,27 +64,6 @@ class Turn extends ChangeNotifier {
 
   /// What an agent is doing while the answer runs, such as a tool it runs, or null.
   String? status;
-
-  /// The tools the agent waits for the person to allow or refuse, oldest first.
-  List<ApprovalRequest> approvals = const [];
-
-  void _ask(ApprovalRequest request) {
-    approvals = [
-      for (final asked in approvals)
-        if (asked.id != request.id) asked,
-      request,
-    ];
-    notifyListeners();
-  }
-
-  void _settle(String id) {
-    if (!approvals.any((asked) => asked.id == id)) return;
-    approvals = [
-      for (final asked in approvals)
-        if (asked.id != id) asked,
-    ];
-    notifyListeners();
-  }
 
   void _grow(String more) {
     text += more;
@@ -158,27 +129,17 @@ class _Running {
 
 /// The workspaces and their chats, the chat on screen, and the answers running.
 ///
-/// One answer runs at a time in each workspace, since agent runs in one workspace share its
-/// browser on the server, and at most [maxRuns] in all, when that is set.
+/// One answer runs at a time in each workspace, since AnythingLLM gives an agent run no thread
+/// of its own, and at most [maxRuns] in all, when that is set.
 ///
 /// A chat not yet asked anything is a draft: it lives only here until its first message, which
 /// makes the thread on the server. Everything it knows is about the server in [_settings]; a new
 /// server starts it afresh.
 class ChatController extends ChangeNotifier {
-  ChatController(
-    this._api,
-    this._settings,
-    this._prefs, {
-    this.maxRuns,
-    this.checkEvery = const [
-      Duration(seconds: 10),
-      Duration(seconds: 20),
-      Duration(seconds: 40),
-      Duration(seconds: 60),
-    ],
-  }) : _server = _settings.connection?.withPassword(null),
-       _password = _settings.connection?.password,
-       _auth = _settings.auth {
+  ChatController(this._api, this._settings, this._prefs, {this.maxRuns})
+    : _server = _settings.connection?.withPassword(null),
+      _password = _settings.connection?.password,
+      _auth = _settings.auth {
     _settings.addListener(_serverChanged);
     unawaited(_prefs.useServer(_server?.baseUrl));
   }
@@ -190,10 +151,6 @@ class ChatController extends ChangeNotifier {
   /// How many answers may run at once across workspaces, or null for no limit. In a browser
   /// each holds a connection open, and the browser opens only a few to one server.
   final int? maxRuns;
-
-  /// The waits between checks on the answer the chat on screen lost touch with, while it shows;
-  /// the last one repeats.
-  final List<Duration> checkEvery;
 
   /// The server the fields below describe: its address and key, without the password, so
   /// saving or forgetting one does not start afresh.
@@ -249,42 +206,23 @@ class ChatController extends ChangeNotifier {
   Turn? get finished => _finished;
   Turn? _finished;
 
-  /// The answers running, at most one in each workspace but for one found running on the relay.
+  /// The answers running, at most one in each workspace.
   final _runs = <_Running>[];
 
-  /// The chats whose last message the relay refused because they were already answering, maybe
-  /// on another device, while that answer may still run.
-  final _refusedIn = <String>{};
-
-  /// What waits for each chat's composer, by chat (null for a new one): a message the relay
-  /// refused, or what another app shared or the browser's message bar sent ([putInComposer]).
-  /// The composer takes it with [takeForComposer].
+  /// What waits for each chat's composer, by chat (null for a new one): what another app shared
+  /// ([putInComposer]). The composer takes it with [takeForComposer].
   final _forComposer =
-      <String?, ({String text, List<Attachment> attachments, bool hold})>{};
+      <String?, ({String text, List<Attachment> attachments})>{};
 
-  /// Whether the chat on screen refused the last message because it was already answering,
-  /// maybe on another device: its answer is followed here, and the message waits in the
-  /// composer to be sent when it ends.
-  bool get alreadyAnswering => _refusedIn.contains(activeThread);
-
-  /// What waits for the chat on screen's composer, with its files and whether it is held to go
-  /// when the answer running ends; null once taken, or when it waits in another chat.
-  ({String text, List<Attachment> attachments, bool hold})? takeForComposer() =>
+  /// What waits for the chat on screen's composer, with its files; null once taken, or when it
+  /// waits in another chat.
+  ({String text, List<Attachment> attachments})? takeForComposer() =>
       _forComposer.remove(activeThread);
 
   /// Puts [text] and [attachments] in the composer of the chat on screen, for the person to
-  /// ask about them, or, with [hold], to go when the answer running in it ends, as Send when
-  /// done holds a message.
-  void putInComposer(
-    String text,
-    List<Attachment> attachments, {
-    bool hold = false,
-  }) {
-    _forComposer[activeThread] = (
-      text: text,
-      attachments: attachments,
-      hold: hold,
-    );
+  /// ask about them.
+  void putInComposer(String text, List<Attachment> attachments) {
+    _forComposer[activeThread] = (text: text, attachments: attachments);
     notifyListeners();
   }
 
@@ -441,7 +379,6 @@ class ChatController extends ChangeNotifier {
       running.stream?.cancel();
     }
     _linkTimer?.cancel();
-    _checkTimer?.cancel();
     unreachable.dispose();
     super.dispose();
   }
@@ -469,14 +406,11 @@ class ChatController extends ChangeNotifier {
       running.stream?.cancel();
     }
     _runs.clear();
-    _refusedIn.clear();
     _forComposer.clear();
     workspaces = const [];
     _threads.clear();
     _turns.clear();
     _ready.clear();
-    _runsRead = false;
-    _onScreen = null;
     _draft = [];
     _madeFiles.clear();
     _images.clear();
@@ -532,15 +466,7 @@ class ChatController extends ChangeNotifier {
     }
     unawaited(_countDocs());
     unawaited(_readCommands());
-    // Once a server here; the app showing again asks again.
-    if (!_runsRead) {
-      _runsRead = true;
-      unawaited(readFinishedRuns());
-    }
   }
-
-  /// Whether this server's finished runs were read at its first load.
-  bool _runsRead = false;
 
   /// Reads the server's presets. Best effort: a server that will not list them leaves `/reset`
   /// alone in the menu with [commandsNote] saying why, and a preset typed in full still runs,
@@ -606,70 +532,9 @@ class ChatController extends ChangeNotifier {
 
   /// Remembers the chat on screen as the one to open at start.
   void _rememberChat() {
-    final shown = switch ((activeSlug, activeThread)) {
-      (final slug?, final thread?) => (slug: slug, thread: thread),
-      _ => null,
-    };
-    // The chat that leaves the screen was seen until now, and so was the one that comes.
-    final left = _onScreen;
-    _onScreen = shown;
     if (activeSlug case final slug?) {
-      unawaited(
-        _prefs.showChat(
-          slug,
-          activeThread,
-          seen: [if (left != null && left != shown) left, ?shown],
-          at: DateTime.now().toUtc(),
-        ),
-      );
+      unawaited(_prefs.showChat(slug, activeThread));
     }
-  }
-
-  /// The chat on screen as [_rememberChat] last noted it.
-  ({String slug, String thread})? _onScreen;
-
-  /// Notes that the chat on screen was seen until now, as when the app hides.
-  void noteSeen() {
-    if (_onScreen case final shown?) {
-      unawaited(
-        _prefs.setSeen(shown.slug, shown.thread, DateTime.now().toUtc()),
-      );
-    }
-  }
-
-  /// Reads the answers the relay holds, and marks ready each chat whose answer it finished,
-  /// neither failed nor stopped, after the chat was last on screen on this device, as when the
-  /// app had let go of it or was closed. A chat never seen here, and the chat on screen, get
-  /// none.
-  Future<void> readFinishedRuns() async {
-    final server = _server;
-    if (server == null) return;
-    final List<RelayRun> runs;
-    try {
-      runs = await _api.relayRuns();
-    } on ApiException {
-      // A server with no relay, or one that cannot be asked, has none to mark.
-      return;
-    }
-    if (_server != server) return;
-    final threads = {
-      for (final MapEntry(:key, :value) in _threads.entries)
-        for (final t in value) (key, t.slug),
-    };
-    var marked = false;
-    for (final run in runs) {
-      final finished = run.finished;
-      if (!run.done || finished == null) continue;
-      if (run.thread == activeThread || _ready.containsKey(run.thread)) {
-        continue;
-      }
-      if (!threads.contains((run.workspace, run.thread))) continue;
-      final seen = _prefs.seenAt(run.workspace, run.thread);
-      if (seen == null || !finished.isAfter(seen)) continue;
-      _ready[run.thread] = run.workspace;
-      marked = true;
-    }
-    if (marked) notifyListeners();
   }
 
   void setDocCount(String slug, int count) {
@@ -696,7 +561,6 @@ class ChatController extends ChangeNotifier {
   Future<void> open(String? threadSlug, {bool again = false}) async {
     activeThread = threadSlug;
     if (threadSlug != null) _ready.remove(threadSlug);
-    _watchLost(fresh: true);
     // What waits for the composer goes back only in its own chat.
     _forComposer.removeWhere((thread, _) => thread != threadSlug);
     editing = null;
@@ -725,10 +589,6 @@ class ChatController extends ChangeNotifier {
       }
       _turns[threadSlug] = [for (final m in history) Turn.saved(m)];
     });
-    // Not waited for: a chat is open once its turns are read, and the lookup may take a while.
-    if (_server == server && activeThread == threadSlug) {
-      unawaited(_rejoin(slug, threadSlug, server));
-    }
   }
 
   /// Starts a draft, unless the chat on screen is already empty.
@@ -989,20 +849,17 @@ class ChatController extends ChangeNotifier {
       answer,
       _api.streamChat(slug, thread, text, attachments: attachments),
       user: user,
-      sent: (text: text, attachments: attachments),
     );
     return true;
   }
 
   /// Reads [events] into [answer], the answer [running] is, until it ends or fails. [user] is
-  /// the question just sent, whose id the server's closing event also carries, and [sent] its
-  /// message as typed; both null for an answer found again, whose chat is read once it ends.
+  /// the question just sent, whose id the server's closing event also carries.
   void _follow(
     _Running running,
     Turn answer,
     Stream<ChatEvent> events, {
-    Turn? user,
-    ({String text, List<Attachment> attachments})? sent,
+    required Turn user,
   }) {
     final slug = running.slug;
     final thread = running.thread!;
@@ -1015,10 +872,6 @@ class ChatController extends ChangeNotifier {
             answer._setStatus(text);
           case WholeAnswer(:final text):
             answer._replace(text);
-          case ApprovalRequest():
-            answer._ask(event);
-          case ApprovalSettled(:final id):
-            answer._settle(id);
           case ChatDone(
             :final citations,
             :final files,
@@ -1030,324 +883,21 @@ class ChatController extends ChangeNotifier {
               ..files = files
               ..metrics = metrics
               ..chatId = chatId;
-            user?.chatId = chatId;
+            user.chatId = chatId;
         }
       },
-      onError: (Object error) {
-        if ((error, user, sent) case (
-          AlreadyAnswering(),
-          final user?,
-          final sent?,
-        )) {
-          _refuse(running, user, sent);
-          return;
-        }
-        if (error is AnswerStillRunning) answer.stillRunning = true;
-        _finish(
-          running,
-          error: error is ApiException ? error.message : '$error',
-        );
-        if (error is AnswerStillRunning) _watchLost(fresh: true);
-      },
+      onError: (Object error) => _finish(
+        running,
+        error: error is ApiException ? error.message : '$error',
+      ),
       onDone: () {
         _finish(running);
-        if (user == null) {
-          unawaited(_readAgain(slug, thread, answer));
-        } else if (answer.chatId == null && signedIn) {
+        if (answer.chatId == null && signedIn) {
           unawaited(_learnIds(slug, thread, user, answer));
         }
       },
       cancelOnError: true,
     );
-  }
-
-  /// Takes back the message [running] was to answer, which the relay refused because its chat
-  /// already has an answer running, maybe started on another device: the question [user] leaves
-  /// the chat with the answer, [sent] waits for the composer to take it back, and the answer
-  /// already running is followed in their place, so Stop stops it and a message held for its end
-  /// goes when it ends.
-  void _refuse(
-    _Running running,
-    Turn user,
-    ({String text, List<Attachment> attachments}) sent,
-  ) {
-    if (!_runs.remove(running)) return;
-    final slug = running.slug;
-    final thread = running.thread!;
-    if (_turns[thread] case final turns?) {
-      _turns[thread] = [
-        for (final turn in turns)
-          if (!identical(turn, user) && !identical(turn, running.answer)) turn,
-      ];
-    }
-    _refusedIn.add(thread);
-    _forComposer[thread] = (
-      text: sent.text,
-      attachments: sent.attachments,
-      hold: false,
-    );
-    notifyListeners();
-    final server = _server;
-    unawaited(
-      _rejoin(slug, thread, server, elsewhere: true).then((_) {
-        // Nothing found running: it ended meanwhile, and the message can simply be sent.
-        if (_disposed || _server != server || !_refusedIn.contains(thread)) {
-          return;
-        }
-        if (isAnswering(thread)) return;
-        _refusedIn.remove(thread);
-        notifyListeners();
-      }),
-    );
-  }
-
-  /// Follows the answer the relay is still writing in chat [thread], if there is one that this
-  /// run of the app did not start, as when it was closed meanwhile or lost touch with it, or when
-  /// it was started [elsewhere], on another device. The answer the app let go of, which the chat
-  /// shows as unfinished, is the one followed again. Only a chat whose history was read, and that
-  /// nothing changed while the relay was asked: a message sent, a clear or a read meanwhile is
-  /// newer than what the relay listed. Another chat answering does not keep it from being
-  /// followed, as the relay already runs it.
-  Future<void> _rejoin(
-    String slug,
-    String thread,
-    Connection? server, {
-    bool elsewhere = false,
-  }) async {
-    final shown = _turns[thread];
-    if (shown == null || _following(thread)) return;
-    final RejoinedAnswer? found;
-    try {
-      found = await _api.rejoinChat(slug, thread);
-    } on ApiException {
-      return;
-    }
-    if (found == null ||
-        _disposed ||
-        _server != server ||
-        _following(thread) ||
-        activeSlug != slug ||
-        activeThread != thread ||
-        !identical(_turns[thread], shown)) {
-      return;
-    }
-    final turns = [...shown];
-    if (turns.lastOrNull case final last?
-        when last.role == Role.assistant && last.unfinished) {
-      turns.removeLast();
-    }
-    if (found.question case final question?
-        when turns.lastOrNull?.role != Role.user ||
-            turns.last.text != question) {
-      turns.add(Turn.user(question));
-    }
-    final answer = Turn.answer()..rejoined = !elsewhere;
-    _turns[thread] = [...turns, answer];
-    final running = _Running(answer, slug)..thread = thread;
-    _runs.add(running);
-    editing = null;
-    _sends++;
-    notifyListeners();
-    _follow(running, answer, found.events);
-  }
-
-  /// The last answer of the chat on screen when the app lost touch with it while the relay goes
-  /// on writing it, or null.
-  Turn? get _lost => switch (turns.lastOrNull) {
-    final last? when last.stillRunning => last,
-    _ => null,
-  };
-
-  /// Whether [checkAnswer] is asking about the answer the chat on screen lost touch with.
-  bool get checking => _checking;
-  bool _checking = false;
-
-  Timer? _checkTimer;
-
-  /// How many checks [_watchLost] has made since it started over.
-  int _checks = 0;
-
-  /// Checks after the next of [checkEvery] on the answer the chat on screen lost touch with,
-  /// while there is one, or stops checking when there is none; [fresh] starts the waits over.
-  void _watchLost({bool fresh = false}) {
-    if (fresh) _checks = 0;
-    _checkTimer?.cancel();
-    _checkTimer = null;
-    if (_disposed || _lost == null || checkEvery.isEmpty) return;
-    final wait = checkEvery[_checks.clamp(0, checkEvery.length - 1)];
-    _checks++;
-    _checkTimer = Timer(wait, () => unawaited(_check()));
-  }
-
-  /// Asks the relay now about the answer the chat on screen lost touch with, as when the app
-  /// shows again or the person asks, and checks on it from the first of [checkEvery] after.
-  Future<void> checkAnswer() {
-    _checks = 0;
-    return _check();
-  }
-
-  /// Shows the answer the chat on screen lost touch with as the relay has it: followed again
-  /// while it runs, read from the chat once it is saved, and failed, in the relay's words, when
-  /// it failed, was stopped or is not known to the relay. Stays as it is while the relay cannot
-  /// be asked or the chat does not have it yet.
-  Future<void> _check() async {
-    final (slug, thread, lost) = (activeSlug, activeThread, _lost);
-    if (slug == null || thread == null || lost == null || _checking) return;
-    final server = _server;
-    bool still() =>
-        !_disposed &&
-        _server == server &&
-        activeThread == thread &&
-        identical(_lost, lost);
-    _checking = true;
-    notifyListeners();
-    try {
-      final RelayRun? run;
-      try {
-        run = await _runOf(slug, thread);
-      } on ApiException {
-        return;
-      }
-      if (!still()) return;
-      if (run != null && run.running) {
-        await _rejoin(slug, thread, server);
-      } else if (!await _readSaved(slug, thread, lost) &&
-          still() &&
-          (run == null || !run.done)) {
-        lost
-          ..stillRunning = false
-          ..error =
-              run?.error ??
-              switch (run?.status) {
-                null => 'The relay has no record of this answer, so it will not finish.',
-                'cancelled' => 'The answer was stopped on the server.',
-                _ => 'The relay could not finish the answer.',
-              }
-          ..notifyListeners();
-      }
-    } finally {
-      _checking = false;
-      if (!_disposed) {
-        notifyListeners();
-        _watchLost();
-      }
-    }
-  }
-
-  /// The newest run the relay keeps for chat [thread] of workspace [slug], or null when it keeps
-  /// none. Fails when the relay cannot be asked.
-  Future<RelayRun?> _runOf(String slug, String thread) async {
-    RelayRun? newest;
-    for (final run in await _api.relayRuns()) {
-      if (run.workspace != slug || run.thread != thread) continue;
-      final (at, best) = (run.started, newest?.started);
-      if (newest == null ||
-          (at != null && (best == null || at.isAfter(best)))) {
-        newest = run;
-      }
-    }
-    return newest;
-  }
-
-  /// Reads chat [thread] and shows what the server saved in place of the turns on screen, once
-  /// it holds as many as they do, so [lost] is saved too. Whether it did.
-  Future<bool> _readSaved(String slug, String thread, Turn lost) async {
-    final server = _server;
-    final shown = _turns[thread];
-    if (shown == null) return false;
-    final List<ChatMessage> history;
-    try {
-      history = await _api.history(slug, thread);
-    } on ApiException {
-      return false;
-    }
-    if (_disposed ||
-        _server != server ||
-        !identical(_turns[thread], shown) ||
-        !identical(_lost, lost) ||
-        history.length < shown.length) {
-      return false;
-    }
-    _turns[thread] = [for (final m in history) Turn.saved(m)];
-    notifyListeners();
-    return true;
-  }
-
-  /// Stops on the relay the answer the chat on screen lost touch with, keeping what came so
-  /// far, or shows how it ended when it is no longer running there.
-  Future<void> stopLost() async {
-    final (slug, thread, lost) = (activeSlug, activeThread, _lost);
-    if (slug == null || thread == null || lost == null) return;
-    final server = _server;
-    try {
-      final run = await _runOf(slug, thread);
-      if (run == null || !run.running || run.id == null) {
-        await checkAnswer();
-        return;
-      }
-      await _api.cancelRun(run.id!);
-    } on ApiException catch (error) {
-      if (_server != server) return;
-      problem = Notice(
-        'Could not stop the answer on the server',
-        error.message,
-      );
-      notifyListeners();
-      return;
-    }
-    if (_disposed || _server != server || !identical(_lost, lost)) return;
-    lost
-      ..stillRunning = false
-      ..error = null
-      ..stopped = true;
-    if (lost.text.isEmpty) lost.text = 'Stopped.';
-    lost.notifyListeners();
-    _watchLost();
-    notifyListeners();
-  }
-
-  /// Whether chat [thread] is followed already, or is being cleared or its exchanges dropped,
-  /// which a run found meanwhile would race.
-  bool _following(String thread) => isAnswering(thread) || _changing(thread);
-
-  /// Reads chat [thread] once [answer], found again, has ended, so the turns on screen are the
-  /// saved ones, with their ids. [answer] stays the same turn and takes what the server saved,
-  /// so what follows it, as Read aloud does, keeps it. Keeps what is shown when the server has
-  /// not saved it yet, or when the chat changed or a question is being edited meanwhile.
-  Future<void> _readAgain(String slug, String thread, Turn answer) async {
-    final server = _server;
-    final shown = _turns[thread];
-    if (shown == null || !identical(shown.lastOrNull, answer)) return;
-    try {
-      final history = await _api.history(slug, thread);
-      if (_disposed ||
-          _server != server ||
-          !identical(_turns[thread], shown) ||
-          (editing != null && shown.contains(editing))) {
-        return;
-      }
-      // The answer is saved once it ends; until the history is as long as the turns shown, it
-      // does not have it yet.
-      if (history.lastOrNull case final saved?
-          when saved.role == Role.assistant && history.length >= shown.length) {
-        answer
-          ..text = saved.text
-          ..citations = saved.citations
-          ..files = saved.files
-          ..metrics = saved.metrics
-          ..chatId = saved.chatId
-          ..feedback = saved.feedback
-          ..rejoined = false
-          ..notifyListeners();
-        _turns[thread] = [
-          for (final m in history.take(history.length - 1)) Turn.saved(m),
-          answer,
-        ];
-        notifyListeners();
-      }
-    } on ApiException {
-      // The turns on screen are the answer; nothing else depends on the read.
-    }
   }
 
   /// Whether [retry] can ask the last question again: nothing runs, the chat is not being read
@@ -1403,25 +953,6 @@ class ChatController extends ChangeNotifier {
     if (editing == null) return;
     editing = null;
     notifyListeners();
-  }
-
-  /// Allows or refuses the tool [request] asks about in [answer]. The question goes at once; it
-  /// comes back with a [problem] when the server could not be told, unless it had been answered
-  /// already or stopped waiting, which no answer can change.
-  Future<void> approve(Turn answer, ApprovalRequest request, bool allow) async {
-    answer._settle(request.id);
-    final server = _server;
-    try {
-      await _api.answerApproval(request, allow);
-    } on ApiException catch (error) {
-      if (_server != server) return;
-      if (error.status != 409) answer._ask(request);
-      problem = Notice(
-        allow ? 'Could not allow the tool' : 'Could not refuse the tool',
-        error.message,
-      );
-      notifyListeners();
-    }
   }
 
   /// Marks [answer] good or bad on the server, or neither when it is marked so already. Shows at
@@ -1506,39 +1037,20 @@ class ChatController extends ChangeNotifier {
     }
   }
 
-  /// Stops the answer running in the chat on screen, on the server too, keeping what came so far.
+  /// Stops the answer running in the chat on screen, keeping what came so far. Letting go of the
+  /// response is what stops it on the server.
   void stop() {
     final running = _here;
     if (running == null) return;
-    if (running.thread case final thread? when running.stream != null) {
-      unawaited(_stopOnServer(running.slug, thread));
-    }
     running.stream?.cancel();
     running.answer.stopped = true;
     if (running.answer.text.isEmpty) running.answer.text = 'Stopped.';
     _finish(running);
   }
 
-  /// Stops the chat's answer on the server, and says so when that fails: the answer then goes
-  /// on there and is saved to the chat.
-  Future<void> _stopOnServer(String slug, String thread) async {
-    final server = _server;
-    try {
-      await _api.stopChat(slug, thread);
-    } on ApiException catch (error) {
-      if (_server != server) return;
-      problem = Notice(
-        'Could not stop the answer on the server',
-        error.message,
-      );
-      notifyListeners();
-    }
-  }
-
   /// Ends [running], with [error] when it failed, unless it was already stopped or dropped.
   void _finish(_Running running, {String? error}) {
     if (!_runs.remove(running)) return;
-    _refusedIn.remove(running.thread);
     if ((running.thread, running.nameAs) case (final thread?, final message?)
         when !_named.contains(thread)) {
       unawaited(_nameAfter(running.slug, thread, message));
@@ -1557,7 +1069,6 @@ class ChatController extends ChangeNotifier {
     running.answer
       ..streaming = false
       ..status = null
-      ..approvals = const []
       ..error = error
       ..notifyListeners();
     notifyListeners();
