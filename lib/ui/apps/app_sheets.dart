@@ -38,15 +38,28 @@ class AppDeleteSheet extends AppSheet {
   const AppDeleteSheet(super.app);
 }
 
-/// One log line and the app's data after it, with Restore unless it is the [latest].
+/// One log line and the app's data after it, with Restore unless it is the [latest] or comes
+/// before [restorableFrom], the first line the log holds.
 class LineSheet extends AppSheet {
-  const LineSheet(super.app, this.line, {required this.latest});
+  const LineSheet(
+    super.app,
+    this.line, {
+    required this.latest,
+    this.restorableFrom,
+  });
 
   final LogLine line;
   final bool latest;
+
+  /// The first line the log holds, when the server says; a line before it cannot be replayed.
+  final int? restorableFrom;
+
+  /// Whether the log no longer holds what came before [line], so it cannot be put back to.
+  bool get compacted => restorableFrom != null && line.n < restorableFrom!;
 }
 
-/// One commit and its diff, with Revert unless it is the [first], which cannot be reverted.
+/// One commit and its diff, with Revert when the server would revert it: as the commit's
+/// `revertable` says, or from a server that does not say, unless it is the [first].
 class CommitSheet extends AppSheet {
   const CommitSheet(super.app, this.commit, {required this.first});
 
@@ -199,25 +212,33 @@ class _AppSheetViewState extends State<AppSheetView> {
         MetaLine('log.jsonl', 'line ${line.n}'),
         CodeBox.text(prettyJson(line.json)),
         const MetaLine('State · derived from the log', ''),
-        FutureBuilder(
-          future: scope.apps.state(sheet.app, line.n),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              final error = snapshot.error;
-              return AlertBox(
-                AlertKind.warn,
-                'Could not read the state',
-                text: error is ApiException ? error.message : '$error',
-              );
-            }
-            final state = snapshot.data;
-            return state == null
-                ? Text('Reading…', style: Type.sans(14, color: t.muted))
-                : CodeBox.text(prettyJson(state.data));
-          },
-        ),
+        if (sheet.compacted)
+          _note(
+            context,
+            'Not kept: the log was compacted at line ${sheet.restorableFrom}, '
+            'so the state after this line can no longer be worked out, and '
+            'the app cannot be put back to it.',
+          )
+        else
+          FutureBuilder(
+            future: scope.apps.state(sheet.app, line.n),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                final error = snapshot.error;
+                return AlertBox(
+                  AlertKind.warn,
+                  'Could not read the state',
+                  text: error is ApiException ? error.message : '$error',
+                );
+              }
+              final state = snapshot.data;
+              return state == null
+                  ? Text('Reading…', style: Type.sans(14, color: t.muted))
+                  : CodeBox.text(prettyJson(state.data));
+            },
+          ),
         _problem(context),
-        if (!sheet.latest)
+        if (!sheet.latest && !sheet.compacted)
           if (_asking) ...[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -259,6 +280,7 @@ class _AppSheetViewState extends State<AppSheetView> {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
     final commit = sheet.commit;
+    final revertable = commit.canRevert(first: sheet.first);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       spacing: 12,
@@ -266,10 +288,23 @@ class _AppSheetViewState extends State<AppSheetView> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Text(
-            commit.message,
-            style: Type.sans(16, color: t.ink, height: 1.45),
+            commit.title,
+            style: Type.sans(
+              16,
+              weight: FontWeight.w600,
+              color: t.ink,
+              height: 1.45,
+            ),
           ),
         ),
+        if (commit.details case final details when details.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              details,
+              style: Type.sans(15, color: t.ink2, height: 1.5),
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Text(
@@ -289,13 +324,32 @@ class _AppSheetViewState extends State<AppSheetView> {
               );
             }
             final diff = snapshot.data;
-            return diff == null
-                ? Text('Reading…', style: Type.sans(14, color: t.muted))
-                : CodeBox(diffLines(diffBody(diff)));
+            if (diff == null) {
+              return Text('Reading…', style: Type.sans(14, color: t.muted));
+            }
+            final files = diff.files;
+            if (files == null) return CodeBox(diffLines(diffBody(diff.diff)));
+            if (files.isEmpty) return _note(context, 'No file changed.');
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              spacing: 12,
+              children: [for (final file in files) FileDiffView(file)],
+            );
           },
         ),
         _problem(context),
-        if (!sheet.first)
+        if (!revertable && commit.revertable == false)
+          _note(
+            context,
+            sheet.first
+                ? 'Not revertable: it made the app, so there is nothing '
+                      'before it.'
+                : commit.files.contains('log.jsonl')
+                ? 'Not revertable: it holds the log. Put the app back to a '
+                      'line of the log instead.'
+                : 'Not revertable: the apps server refuses it.',
+          ),
+        if (revertable)
           if (_asking) ...[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -333,6 +387,12 @@ class _AppSheetViewState extends State<AppSheetView> {
     );
   }
 }
+
+/// [text] as a muted note in a sheet.
+Widget _note(BuildContext context, String text) => Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 8),
+  child: Text(text, style: Type.note(Tokens.of(context).muted)),
+);
 
 /// The app's title in a field, then what renaming changes, then Save.
 class _RenameForm extends StatefulWidget {

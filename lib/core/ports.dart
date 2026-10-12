@@ -219,6 +219,10 @@ abstract interface class AppsApi {
   /// Workspace [workspace]'s apps, newest change first.
   Future<List<ServerApp>> apps(String workspace);
 
+  /// [app] as the list would show it now, read alone. Null from an apps server without the
+  /// route; throws [ApiException] with status 404 when there is no such app.
+  Future<ServerApp?> app(AppRef app);
+
   /// The files of [app]'s folder, less its caches and git.
   Future<List<AppFile>> files(AppRef app);
 
@@ -228,11 +232,16 @@ abstract interface class AppsApi {
   /// [app]'s data after log line [line], or now when [line] is null.
   Future<AppState> state(AppRef app, {int? line});
 
+  /// A page of [app]'s log, newest first: the newest [limit] lines numbered below [before], or
+  /// the newest of all when [before] is null. Null from an apps server without the route,
+  /// which is then read whole as the file `log.jsonl`.
+  Future<LogPage?> log(AppRef app, {int? before, int limit = 100});
+
   /// The commits of [app]'s folder, newest first.
   Future<List<AppCommit>> history(AppRef app);
 
-  /// `git show` of [app]'s commit [commit].
-  Future<String> diff(AppRef app, String commit);
+  /// [app]'s commit [commit]: `git show` whole, and file by file where the server splits it.
+  Future<AppDiff> diff(AppRef app, String commit);
 
   /// Puts [app]'s data back as it was after line [line], as a new line, and returns its number.
   Future<int> restore(AppRef app, int line);
@@ -246,8 +255,10 @@ abstract interface class AppsApi {
   /// Deletes [app] with its data.
   Future<void> delete(AppRef app);
 
-  /// The picture at [url], an app's card read once. Sent without the key.
-  Future<Uint8List> card(Uri url);
+  /// The picture at [url], an app's card read once. Sent without the key. With [last], the
+  /// card as read before, it sends [CardPicture.etag] as `If-None-Match`, and answers [last]
+  /// itself when the server says the card has not changed.
+  Future<CardPicture> card(Uri url, {CardPicture? last});
 }
 
 /// Where the connection is kept between runs.

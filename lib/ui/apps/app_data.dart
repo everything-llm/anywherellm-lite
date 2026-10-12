@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -9,10 +10,12 @@ import '../app_scope.dart';
 import '../icons.dart';
 import '../layout.dart';
 import '../settings/rows.dart';
+import '../state/log_pages.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
+import '../widgets/buttons.dart';
 import '../widgets/phone_page.dart';
 import '../widgets/tappable.dart';
 import 'app_sheets.dart';
@@ -321,8 +324,9 @@ class _FileState extends State<_File> {
 }
 
 /// The app's log read as its history: each line newest first under its day, with its event,
-/// its fields, who wrote it and when. Tapped, a line shows the data after it. Shown raw, the
-/// file's lines numbered.
+/// its fields, who wrote it and when, a page at a time, an older page read as the list nears
+/// its end or on Show older. Tapped, a line shows the data after it. Shown raw, the file's
+/// lines numbered.
 class _Log extends StatefulWidget {
   const _Log(this.app);
 
@@ -340,6 +344,7 @@ class _LogState extends State<_Log> {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
     final ref = widget.app.ref;
+    final pages = scope.apps.log(ref);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -364,9 +369,9 @@ class _LogState extends State<_Log> {
                     ],
                   ),
                 )
-              : _Read(
-                  scope.apps.log(ref),
-                  done: (context, lines) => _picker(context, lines),
+              : ListenableBuilder(
+                  listenable: pages,
+                  builder: (context, _) => _history(context, pages),
                 ),
         ),
         if (!_raw)
@@ -376,10 +381,10 @@ class _LogState extends State<_Log> {
               color: t.bg,
               border: Border(top: BorderSide(color: t.line2)),
             ),
-            child: FutureBuilder(
-              future: scope.apps.log(ref),
-              builder: (context, snapshot) {
-                final newest = snapshot.data?.firstOrNull;
+            child: ListenableBuilder(
+              listenable: pages,
+              builder: (context, _) {
+                final newest = pages.lines.firstOrNull;
                 return _NowButton(
                   newest,
                   onTap: newest == null
@@ -395,10 +400,46 @@ class _LogState extends State<_Log> {
     );
   }
 
-  Widget _picker(BuildContext context, List<LogLine> lines) {
+  /// The lines read so far, or why the first page could not be read.
+  Widget _history(BuildContext context, LogPages pages) {
+    final t = Tokens.of(context);
+    if (!pages.loaded) {
+      return Padding(
+        padding: Sizes.pagePadding,
+        child: Text('Reading…', style: Type.sans(14, color: t.muted)),
+      );
+    }
+    if (pages.lines.isEmpty && pages.problem != null) {
+      return Padding(
+        padding: Sizes.pagePadding,
+        child: AlertBox(
+          AlertKind.warn,
+          'Could not read this',
+          text: pages.problem,
+        ),
+      );
+    }
+    return NotificationListener<ScrollNotification>(
+      onNotification: (note) {
+        if (note.metrics.extentAfter < 400 &&
+            pages.more &&
+            !pages.reading &&
+            pages.problem == null) {
+          // A read tells its listeners at once, so it waits for the scroll to be handled.
+          scheduleMicrotask(pages.older);
+        }
+        return false;
+      },
+      child: _picker(context, pages),
+    );
+  }
+
+  Widget _picker(BuildContext context, LogPages pages) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
     final now = DateTime.now();
+    final lines = pages.lines;
+    final from = pages.first ?? widget.app.restorableFrom;
     final children = <Widget>[];
     String? day;
     for (final (i, line) in lines.indexed) {
@@ -414,7 +455,12 @@ class _LogState extends State<_Log> {
             line,
             now: now,
             onTap: () => scope.shell.togglePopup(
-              LineSheet(widget.app.ref, line, latest: i == 0),
+              LineSheet(
+                widget.app.ref,
+                line,
+                latest: i == 0,
+                restorableFrom: from,
+              ),
             ),
           ),
         ),
@@ -427,15 +473,44 @@ class _LogState extends State<_Log> {
           const FieldCard([CardNote('The log is empty.')])
         else ...[
           ...children,
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: Center(
+          if (pages.problem case final problem?)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: AlertBox(
+                AlertKind.warn,
+                'Could not read older lines',
+                text: problem,
+              ),
+            ),
+          if (pages.more)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: ActionRow(even: true, [
+                AppButton(
+                  pages.reading ? 'Reading…' : 'Show older',
+                  onPressed: pages.reading
+                      ? null
+                      : () => unawaited(pages.older()),
+                ),
+              ]),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                FieldCard.inset,
+                12,
+                FieldCard.inset,
+                0,
+              ),
               child: Text(
-                'The beginning',
+                from != null && from > 1
+                    ? 'The log starts at line $from, where it was compacted. '
+                          'The app cannot be put back to a line before it.'
+                    : 'The beginning',
+                textAlign: TextAlign.center,
                 style: Type.sans(14, color: t.muted),
               ),
             ),
-          ),
         ],
       ],
     );
@@ -633,7 +708,7 @@ class _Git extends StatelessWidget {
                 FieldCard([
                   for (final (i, commit) in commits.indexed)
                     Tappable(
-                      label: '${commit.message}, ${commit.short}',
+                      label: '${commit.title}, ${commit.short}',
                       onTap: () => scope.shell.togglePopup(
                         CommitSheet(
                           app.ref,
@@ -663,7 +738,7 @@ class _Git extends StatelessWidget {
                                 spacing: 2,
                                 children: [
                                   Text(
-                                    commit.message,
+                                    commit.title,
                                     style: Type.sans(
                                       15,
                                       weight: FontWeight.w600,
@@ -671,6 +746,18 @@ class _Git extends StatelessWidget {
                                       height: 1.35,
                                     ),
                                   ),
+                                  if (commit.details case final details
+                                      when details.isNotEmpty)
+                                    Text(
+                                      details,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Type.sans(
+                                        13.5,
+                                        color: t.ink2,
+                                        height: 1.4,
+                                      ),
+                                    ),
                                   Text(
                                     commitAbout(commit, now),
                                     maxLines: 1,

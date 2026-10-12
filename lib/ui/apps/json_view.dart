@@ -213,6 +213,71 @@ class CodeBox extends StatelessWidget {
   }
 }
 
+/// One file of a commit: its path in the mono face beside what the commit did to it, then its
+/// hunks coloured as a diff is, without git's headers.
+class FileDiffView extends StatelessWidget {
+  const FileDiffView(this.file, {super.key});
+
+  final FileDiff file;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final (label, fg, bg) = switch (file.status) {
+      FileChange.added => ('Added', t.okfg, t.okbg),
+      FileChange.modified => ('Changed', t.accent, t.accentbg),
+      FileChange.deleted => ('Deleted', t.badfg, t.badbg),
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 8,
+      children: [
+        Semantics(
+          label: '${file.path}, ${label.toLowerCase()}',
+          excludeSemantics: true,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              spacing: 10,
+              children: [
+                Expanded(
+                  child: Text(
+                    file.path,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Type.mono(14, weight: FontWeight.w600, color: t.ink),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: bg,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text(
+                    label,
+                    style: Type.sans(11.5, weight: FontWeight.w600, color: fg),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (file.patch.trim().isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text('No lines to show.', style: Type.note(t.muted)),
+          )
+        else
+          CodeBox(patchLines(file.patch)),
+      ],
+    );
+  }
+}
+
 /// A line over a card in an app's data: what is shown on the left, in the mono face, and how
 /// much on the right.
 class MetaLine extends StatelessWidget {

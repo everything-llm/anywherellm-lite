@@ -1,6 +1,9 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'copy.dart';
+
+export 'app_history.dart';
 
 /// What `GET /health` on the apps server's port names itself, which tells it from anything
 /// else that might answer there.
@@ -84,6 +87,16 @@ AppRef? _ref(String workspace, String name) =>
 Uri onceCard(Uri card, {required bool light}) =>
     card.replace(queryParameters: {'once': '1', if (light) 'theme': 'light'});
 
+/// An app's card as last read: the picture, and the `ETag` it came with (`"<version>-<theme>"`),
+/// which the next read sends back so that an unchanged card is not sent again. An apps server
+/// that sends no `ETag` leaves [etag] null, and each read then fetches the picture.
+class CardPicture {
+  const CardPicture(this.bytes, {this.etag});
+
+  final Uint8List bytes;
+  final String? etag;
+}
+
 /// [page] with `theme` set to the app's own, so the page keeps to it whatever the device's.
 Uri themedPage(Uri page, {required bool dark}) => page.replace(
   queryParameters: {...page.queryParameters, 'theme': dark ? 'dark' : 'light'},
@@ -115,9 +128,6 @@ DateTime? _seconds(Object? value) => value is num
     ? DateTime.fromMillisecondsSinceEpoch((value * 1000).round(), isUtc: true)
     : null;
 
-DateTime? _time(Object? value) =>
-    value is String ? DateTime.tryParse(value) : null;
-
 String? _text(Object? value) =>
     value is String && value.isNotEmpty ? value : null;
 
@@ -132,12 +142,15 @@ class ServerApp {
     this.summary = '',
     this.modified,
     this.line,
+    this.restorableFrom,
+    this.version,
     this.page,
     this.card,
     this.error,
   });
 
-  /// One entry of `GET /apps/<workspace>`'s `apps`, or null when it names no app.
+  /// One entry of `GET /apps/<workspace>`'s `apps`, or `GET /apps/<workspace>/<name>`'s
+  /// answer, or null when it names no app.
   static ServerApp? fromJson(String workspace, Object? json) {
     if (json is! Map) return null;
     final name = json['name'];
@@ -149,6 +162,10 @@ class ServerApp {
       summary: json['summary'] is String ? json['summary'] as String : '',
       modified: _seconds(json['modified']),
       line: json['line'] is int ? json['line'] as int : null,
+      restorableFrom: json['restorable_from'] is int
+          ? json['restorable_from'] as int
+          : null,
+      version: _text(json['version']),
       page: _uri(json['page']),
       card: _uri(json['card']),
       error: _text(json['error']),
@@ -175,6 +192,14 @@ class ServerApp {
   /// How many lines its log holds.
   final int? line;
 
+  /// The first line its `log.jsonl` holds: 1, or the line a compaction left. The app can be
+  /// put back only to a line from this one on. Null from an apps server that does not say.
+  final int? restorableFrom;
+
+  /// `<line>-<newest commit>`, which changes whenever its data, `app.json` or `page.html`
+  /// does. Null for an app that cannot be read, or from an apps server that does not say.
+  final String? version;
+
   /// Its working page.
   final Uri? page;
 
@@ -191,24 +216,30 @@ class ServerApp {
     if (modified case final at?) whenShort(at, now),
   ].join(' · ');
 
-  /// Whether [other] shows the same data, so its card need not be read again.
-  bool sameAs(ServerApp other) =>
-      other.title == title &&
-      other.line == line &&
-      other.modified == modified &&
-      other.summary == summary;
+  /// Whether [other] shows the same data, so its card need not be read again: the same
+  /// [version] when both have one, otherwise the same title, line count, time and summary.
+  bool sameAs(ServerApp other) => version != null && other.version != null
+      ? other.version == version
+      : other.title == title &&
+            other.line == line &&
+            other.modified == modified &&
+            other.summary == summary;
 }
 
 /// `GET /apps/<workspace>`'s apps, newest change first.
 List<ServerApp> appsOf(String workspace, Object? json) {
   final list = json is Map ? json['apps'] : null;
-  final apps = [
+  return appsInOrder([
     if (list is List)
       for (final entry in list) ?ServerApp.fromJson(workspace, entry),
-  ];
+  ]);
+}
+
+/// [apps] newest change first, sorted in place.
+List<ServerApp> appsInOrder(List<ServerApp> apps) {
   final epoch = DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
-  apps.sort((a, b) => (b.modified ?? epoch).compareTo(a.modified ?? epoch));
-  return apps;
+  return apps
+    ..sort((a, b) => (b.modified ?? epoch).compareTo(a.modified ?? epoch));
 }
 
 /// When [at] was, short, in local time from [now]: `Today 08:14`, `Yesterday 20:30`,
@@ -274,185 +305,6 @@ String bytesText(int bytes) => bytes < 1024
     : bytes < 1024 * 1024
     ? '${(bytes / 1024).toStringAsFixed(1)} KB'
     : '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
-
-/// Who wrote a log line or made a commit, in words: `you` is You, `host` is the server.
-String byText(String? by) => switch (by) {
-  'you' => 'You',
-  'agent' => 'Agent',
-  'device' => 'Device',
-  'host' => 'Server',
-  null || '' => 'Unknown',
-  final other => other,
-};
-
-/// The fields of a log line that only say what it is, never read to compute the state.
-const _lineKeys = {'n', 't', 'by', 'ev', 'patch', 'chat', 'wake', 'woke'};
-
-/// One line of an app's `log.jsonl`: its number, time, writer and event, the fields that
-/// describe it, and the line as it was written.
-class LogLine {
-  const LogLine({
-    required this.n,
-    required this.json,
-    this.t,
-    this.by,
-    this.ev,
-    this.chat,
-    this.fields = const {},
-  });
-
-  /// The line [text] says, or null when it is not a JSON object with a line number.
-  static LogLine? parse(String text) {
-    final Object? json;
-    try {
-      json = jsonDecode(text);
-    } on FormatException {
-      return null;
-    }
-    if (json is! Map<String, dynamic>) return null;
-    final n = json['n'];
-    if (n is! int) return null;
-    return LogLine(
-      n: n,
-      json: json,
-      t: _time(json['t']),
-      by: _text(json['by']),
-      ev: _text(json['ev']),
-      chat: _text(json['chat']),
-      fields: {
-        for (final MapEntry(:key, :value) in json.entries)
-          if (!_lineKeys.contains(key)) key: value,
-      },
-    );
-  }
-
-  final int n;
-  final DateTime? t;
-  final String? by;
-  final String? ev;
-
-  /// The AnythingLLM thread an agent's change came from.
-  final String? chat;
-
-  /// What the line says beyond its number, time, writer, event and patch.
-  final Map<String, Object?> fields;
-
-  /// The line as written.
-  final Map<String, dynamic> json;
-
-  /// What happened, by its event's name: `made`, `tick`, or `change` for a line with none.
-  String get title => ev ?? 'change';
-
-  /// Its fields in one line: `text: Eggs · to: 3`.
-  String get detail => [
-    for (final MapEntry(:key, :value) in fields.entries)
-      '$key: ${value is String ? value : jsonEncode(value)}',
-  ].join(' · ');
-}
-
-/// The lines of [jsonl], newest first. A line that is not one is left out.
-List<LogLine> logLinesOf(String jsonl) => [
-  for (final text in const LineSplitter().convert(jsonl))
-    if (text.trim().isNotEmpty) ?LogLine.parse(text),
-]..sort((a, b) => b.n.compareTo(a.n));
-
-/// An app's data after one line of its log.
-class AppState {
-  const AppState(this.line, this.data);
-
-  /// `GET .../state`'s answer.
-  static AppState fromJson(Object? json) => AppState(
-    json is Map && json['line'] is int ? json['line'] as int : 0,
-    json is Map ? json['data'] : null,
-  );
-
-  final int line;
-  final Object? data;
-}
-
-/// A commit of an app's folder: a change to `app.json` or `page.html`.
-class AppCommit {
-  const AppCommit({
-    required this.commit,
-    this.t,
-    this.by,
-    this.chat,
-    this.message = '',
-    this.files = const [],
-  });
-
-  final String commit;
-  final DateTime? t;
-  final String? by;
-  final String? chat;
-  final String message;
-  final List<String> files;
-
-  /// Its hash, short: the first seven hex digits.
-  String get short => commit.length > 7 ? commit.substring(0, 7) : commit;
-}
-
-/// `GET .../history`'s commits, newest first.
-List<AppCommit> commitsOf(Object? json) {
-  final list = json is Map ? json['commits'] : null;
-  return [
-    if (list is List)
-      for (final entry in list)
-        if (entry is Map && entry['commit'] is String)
-          AppCommit(
-            commit: entry['commit'] as String,
-            t: _time(entry['t']),
-            by: _text(entry['by']),
-            chat: _text(entry['chat']),
-            message: entry['message'] is String
-                ? (entry['message'] as String).trim()
-                : '',
-            files: [
-              if (entry['files'] case final List files)
-                for (final file in files)
-                  if (file is String) file,
-            ],
-          ),
-  ];
-}
-
-/// What a line of a diff is: the commit's header or a file's, a line added, one removed, or
-/// one kept as context.
-enum DiffKind { header, added, removed, context }
-
-/// [diff], the text of `git show`, a line at a time with what each is.
-List<(DiffKind, String)> diffLines(String diff) {
-  const headers = [
-    'diff --git',
-    '+++',
-    '---',
-    'index ',
-    'new file',
-    'deleted file',
-    '@@',
-  ];
-  var inFile = false;
-  final lines = <(DiffKind, String)>[];
-  for (final line in const LineSplitter().convert(diff)) {
-    if (line.startsWith('diff --git')) inFile = true;
-    final kind = !inFile || headers.any(line.startsWith)
-        ? DiffKind.header
-        : line.startsWith('+')
-        ? DiffKind.added
-        : line.startsWith('-')
-        ? DiffKind.removed
-        : DiffKind.context;
-    lines.add((kind, line));
-  }
-  return lines;
-}
-
-/// [diff], the text of `git show`, from its first file on: the commit's own header says what
-/// the sheet already shows. A diff with no file is kept whole.
-String diffBody(String diff) {
-  final start = diff.indexOf('diff --git');
-  return start < 0 ? diff : diff.substring(start);
-}
 
 /// [json] as indented JSON, two spaces a level.
 String prettyJson(Object? json) =>

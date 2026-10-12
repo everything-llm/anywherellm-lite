@@ -153,6 +153,35 @@ void main() {
       expect(app.about(DateTime.now()), 'App · Cannot be read');
     });
 
+    test('reads where the log can be put back from, and the version', () {
+      final app = ServerApp.fromJson('home', {
+        'name': 'groceries',
+        'line': 7,
+        'restorable_from': 4,
+        'version': '7-5f6c11f0a2b4',
+      })!;
+      expect(app.restorableFrom, 4);
+      expect(app.version, '7-5f6c11f0a2b4');
+      final older = ServerApp.fromJson('home', {'name': 'groceries'})!;
+      expect(older.restorableFrom, isNull);
+      expect(older.version, isNull);
+    });
+
+    test('an app is the same by its version, or else by what it shows', () {
+      ServerApp app({String? version, String title = 'Groceries'}) => ServerApp(
+        ref: const AppRef('home', 'groceries'),
+        title: title,
+        line: 7,
+        version: version,
+      );
+      expect(app(version: '7-aaa').sameAs(app(version: '7-aaa')), isTrue);
+      // A commit changes the version though the data and title do not.
+      expect(app(version: '7-aaa').sameAs(app(version: '7-bbb')), isFalse);
+      // Without a version on either, what it shows decides.
+      expect(app().sameAs(app(version: '7-aaa')), isTrue);
+      expect(app().sameAs(app(title: 'Food')), isFalse);
+    });
+
     test('each kind in words', () {
       expect(kindLabel('flashcards'), 'Deck');
       expect(kindLabel('pomodoro'), 'Timer');
@@ -197,6 +226,26 @@ void main() {
       expect(lines[1].json['patch'], isList);
     });
 
+    test('a page reads its lines newest first, where the log starts, and '
+        'whether more remain', () {
+      final page = LogPage.fromJson({
+        'lines': [
+          {'n': 6, 'ev': 'add'},
+          {'n': 7, 'ev': 'tick'},
+          'nonsense',
+          {'ev': 'no number'},
+        ],
+        'first': 4,
+        'last': 7,
+        'more': true,
+      });
+      expect([for (final line in page.lines) line.n], [7, 6]);
+      expect(page.first, 4);
+      expect(page.last, 7);
+      expect(page.more, isTrue);
+      expect(LogPage.fromJson({}).more, isFalse);
+    });
+
     test('a line without an event is a change', () {
       expect(LogLine.parse('{"n":4,"by":"agent","patch":[]}')!.title, 'change');
       expect(LogLine.parse('{"by":"agent"}'), isNull);
@@ -227,6 +276,61 @@ void main() {
     expect(commits.single.short, '5f6c11f');
     expect(commits.single.message, 'Change app.json');
     expect(commits.single.files, ['app.json']);
+  });
+
+  test('a commit\'s title and body come from the server, or else from its '
+      'message', () {
+    final [split, older] = commitsOf({
+      'commits': [
+        {
+          'commit': 'aaaa',
+          'message': 'Sort ticks\n\nThey sink.',
+          'subject': 'Sort ticks',
+          'body': 'They sink.',
+          'revertable': false,
+        },
+        {'commit': 'bbbb', 'message': 'Raise the goal\n\nTo 12 cards.'},
+      ],
+    });
+    expect(split.title, 'Sort ticks');
+    expect(split.details, 'They sink.');
+    expect(split.revertable, isFalse);
+    expect(split.canRevert(first: false), isFalse);
+    expect(older.title, 'Raise the goal');
+    expect(older.details, 'To 12 cards.');
+    expect(older.revertable, isNull);
+    expect(older.canRevert(first: false), isTrue);
+    expect(older.canRevert(first: true), isFalse);
+  });
+
+  test('a diff reads file by file, or whole from an older server', () {
+    final diff = AppDiff.fromJson({
+      'commit': 'aaaa',
+      'diff': 'commit aaaa\n',
+      'files': [
+        {
+          'path': 'app.json',
+          'status': 'modified',
+          'patch': '@@ -1 +1 @@\n-a\n+b\n',
+        },
+        {'path': 'notes.txt', 'status': 'added', 'patch': ''},
+        {'path': 'old.txt', 'status': 'deleted', 'patch': ''},
+        {'status': 'added'},
+      ],
+    });
+    expect(
+      [for (final f in diff.files!) f.status],
+      [FileChange.modified, FileChange.added, FileChange.deleted],
+    );
+    expect(AppDiff.fromJson({'diff': 'commit aaaa\n'}).files, isNull);
+    expect(
+      [for (final (kind, _) in patchLines(diff.files!.first.patch)) kind],
+      [DiffKind.header, DiffKind.removed, DiffKind.added],
+    );
+    expect(
+      patchLines('+x\n\\ No newline at end of file\n').last.$1,
+      DiffKind.header,
+    );
   });
 
   test('a diff tells its header from what it adds and removes', () {
@@ -273,8 +377,11 @@ void main() {
     final state = AppState.fromJson({
       'line': 7,
       'data': {'items': []},
+      'restorable_from': 3,
     });
     expect(state.line, 7);
+    expect(state.restorableFrom, 3);
+    expect(AppState.fromJson({'line': 7}).restorableFrom, isNull);
     expect(prettyJson(state.data), '{\n  "items": []\n}');
   });
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/apps.dart';
@@ -40,7 +42,7 @@ class _AppScreenState extends State<AppScreen> {
     final apps = AppScope.of(context).apps;
     // A read tells the controller's listeners at once, so it waits for the frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) apps.know(widget.app);
+      if (mounted) unawaited(apps.check(widget.app));
     });
   }
 

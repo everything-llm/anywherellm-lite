@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:anywherellm/core/apps.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/ui/apps/app_screen.dart';
@@ -302,6 +304,211 @@ void main() {
       expect(find.text('commit 5f6c11f'), findsOneWidget);
     });
 
+    testWidgets('the log is read a page at a time, an older page on Show '
+        'older', (tester) async {
+      final h = await _withApps(tester, apps: groceriesServer()..pageMax = 2);
+      await _folder(tester, h);
+      await tester.tap(find.text('log.jsonl'));
+      await tester.pumpAndSettle();
+      expect(find.text('tick'), findsOneWidget);
+      expect(find.text('add'), findsOneWidget);
+      expect(find.text('made'), findsNothing);
+      expect(find.text('The beginning'), findsNothing);
+      expect(h.appsServer.calls, isNot(contains('file:log.jsonl')));
+
+      await tapVisible(tester, find.text('Show older'));
+      await tester.pumpAndSettle();
+      expect(h.appsServer.calls, containsAllInOrder(['log:newest', 'log:2']));
+      expect(find.text('made'), findsOneWidget);
+      expect(find.text('Show older'), findsNothing);
+      expect(find.text('The beginning'), findsOneWidget);
+
+      // The raw view is still the file whole.
+      await tester.tap(control('Show the raw file'));
+      await tester.pumpAndSettle();
+      expect(h.appsServer.calls, contains('file:log.jsonl'));
+      expect(find.text('1\n2\n3'), findsOneWidget);
+    });
+
+    testWidgets('a compacted log says the app cannot be put back before it', (
+      tester,
+    ) async {
+      final apps = groceriesServer();
+      final folder = apps.folders[_groceries]!;
+      final kept = const LineSplitter()
+          .convert(folder['log.jsonl']!)
+          .skip(1)
+          .toList();
+      kept[0] = kept[0].replaceFirst('"ev":"add"', '"ev":"compacted"');
+      folder['log.jsonl'] = '${kept.join('\n')}\n';
+      final h = await _withApps(tester, apps: apps);
+      await _folder(tester, h);
+      await tester.tap(find.text('log.jsonl'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'The log starts at line 2, where it was compacted. The app cannot '
+          'be put back to a line before it.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('compacted'));
+      await tester.pumpAndSettle();
+      expect(find.text('Put the app back to this'), findsOneWidget);
+      h.shell.closePopup();
+      await tester.pumpAndSettle();
+
+      // A line from before the compaction, as a page read earlier still shows.
+      final made = logLinesOf(
+        groceriesServer().folders[_groceries]!['log.jsonl']!,
+      ).last;
+      h.shell.togglePopup(
+        LineSheet(_groceries, made, latest: false, restorableFrom: 2),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Put the app back to this'), findsNothing);
+      expect(find.textContaining('compacted at line 2'), findsOneWidget);
+      expect(h.appsServer.calls, isNot(contains('state:1')));
+    });
+
+    testWidgets('a commit shows its subject over its body, and its diff file '
+        'by file', (tester) async {
+      final h = await _withApps(tester);
+      await _folder(tester, h);
+      await tester.tap(find.text('.git'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('A ticked item sinks below the ones left.'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Ticks move to the bottom'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('A ticked item sinks below the ones left.'),
+        findsNWidgets(2),
+      );
+      expect(find.text('page.html'), findsOneWidget);
+      expect(find.text('Changed'), findsOneWidget);
+      expect(find.textContaining('class="sorted"'), findsOneWidget);
+      expect(find.textContaining('diff --git'), findsNothing);
+      expect(find.textContaining('+++ b/page.html'), findsNothing);
+    });
+
+    testWidgets('a commit the server will not revert offers no Revert, and '
+        'says why', (tester) async {
+      final apps = groceriesServer();
+      final was = apps.commits[_groceries]!.first;
+      apps.commits[_groceries]!.first = AppCommit(
+        commit: was.commit,
+        message: 'Keep the log up to line 3 before compacting it',
+        subject: 'Keep the log up to line 3 before compacting it',
+        body: '',
+        by: 'host',
+        files: const ['log.jsonl'],
+        revertable: false,
+      );
+      final h = await _withApps(tester, apps: apps);
+      await _folder(tester, h);
+      await tester.tap(find.text('.git'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.text('Keep the log up to line 3 before compacting it'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Revert this commit'), findsNothing);
+      expect(
+        find.textContaining('Not revertable: it holds the log'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('an app opening is checked alone, and a change reads it '
+        'alone', (tester) async {
+      final h = await _withApps(tester);
+      await _appsTab(tester);
+      h.appsServer.calls.clear();
+      h.shell.openApp(_groceries);
+      await tester.pumpAndSettle();
+      expect(h.appsServer.calls, ['app:groceries']);
+      h.appsServer.calls.clear();
+      await h.apps.rename(_groceries, 'Food');
+      await tester.pumpAndSettle();
+      expect(h.appsServer.calls, ['rename:Food', 'app:groceries']);
+      expect(h.apps.appOf(_groceries).title, 'Food');
+    });
+
+    testWidgets('an app\'s data is read again when its version changes', (
+      tester,
+    ) async {
+      final h = await _withApps(tester);
+      await _appsTab(tester);
+      await _folder(tester, h);
+      await tester.tap(find.text('log.jsonl'));
+      await tester.pumpAndSettle();
+      expect(find.text('restore'), findsNothing);
+      // The page writes a line meanwhile, which the next check sees.
+      await h.appsServer.restore(_groceries, 1);
+      final revision = h.apps.dataRevision;
+      await h.apps.check(_groceries);
+      await tester.pumpAndSettle();
+      expect(h.apps.dataRevision, revision + 1);
+      expect(find.text('restore'), findsOneWidget);
+    });
+  });
+
+  group('beside an older apps server', () {
+    FakeApps older() => groceriesServer()..older = true;
+
+    testWidgets('the log is the whole file, every line but the newest to '
+        'put back', (tester) async {
+      final h = await _withApps(tester, apps: older());
+      await _folder(tester, h);
+      await tester.tap(find.text('log.jsonl'));
+      await tester.pumpAndSettle();
+      expect(
+        h.appsServer.calls,
+        containsAllInOrder(['log:newest', 'file:log.jsonl']),
+      );
+      for (final title in ['tick', 'add', 'made']) {
+        expect(find.text(title), findsOneWidget, reason: title);
+      }
+      expect(find.text('The beginning'), findsOneWidget);
+      expect(find.text('Show older'), findsNothing);
+      await tester.tap(find.text('made'));
+      await tester.pumpAndSettle();
+      expect(find.text('Put the app back to this'), findsOneWidget);
+    });
+
+    testWidgets('a commit shows its message and its diff whole, Revert on all '
+        'but the first', (tester) async {
+      final h = await _withApps(tester, apps: older());
+      await _folder(tester, h);
+      await tester.tap(find.text('.git'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ticks move to the bottom'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('diff --git a/page.html'), findsOneWidget);
+      expect(find.text('Changed'), findsNothing);
+      expect(find.text('Revert this commit'), findsOneWidget);
+      h.shell.closePopup();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Make Groceries'));
+      await tester.pumpAndSettle();
+      expect(find.text('Revert this commit'), findsNothing);
+      expect(find.textContaining('Not revertable'), findsNothing);
+    });
+
+    testWidgets('an app opening reads its workspace\'s apps', (tester) async {
+      final h = await _withApps(tester, apps: older());
+      await _appsTab(tester);
+      h.appsServer.calls.clear();
+      h.shell.openApp(_groceries);
+      await tester.pumpAndSettle();
+      expect(h.appsServer.calls, ['app:groceries', 'apps:q3']);
+    });
+  });
+
+  group('beside the apps server, its menu', () {
     testWidgets('an app is renamed from its menu', (tester) async {
       final h = await _withApps(tester);
       await _appsTab(tester);
@@ -428,6 +635,10 @@ void main() {
           h.appsServer.folders[_groceries]!['log.jsonl']!,
         );
         h.shell.togglePopup(LineSheet(_groceries, lines.last, latest: false));
+        await tester.pumpAndSettle();
+        h.shell.togglePopup(
+          LineSheet(_groceries, lines.last, latest: false, restorableFrom: 3),
+        );
         await tester.pumpAndSettle();
         h.shell.closePopup();
         h.shell.appBack();

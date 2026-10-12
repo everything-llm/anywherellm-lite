@@ -6,6 +6,7 @@ import '../../core/apps.dart';
 import '../../core/connection.dart';
 import '../../core/ports.dart';
 import 'chat_controller.dart';
+import 'log_pages.dart';
 import 'settings_controller.dart';
 
 /// What the app knows of the apps server beside the server in use: whether it is there
@@ -77,6 +78,7 @@ class AppsController extends ChangeNotifier {
     _problems.clear();
     _reading.clear();
     _cards.clear();
+    _pictures.clear();
     _wanted = false;
     _forgetData();
     notifyListeners();
@@ -139,7 +141,7 @@ class AppsController extends ChangeNotifier {
       final before = {for (final app in _lists[workspace] ?? []) app.ref: app};
       for (final app in found) {
         final was = before[app.ref];
-        if (was != null && !was.sameAs(app)) _dropCard(app.ref);
+        if (was != null && !was.sameAs(app)) _changed(app.ref);
       }
       _lists[workspace] = found;
       _problems.remove(workspace);
@@ -163,12 +165,41 @@ class AppsController extends ChangeNotifier {
     return ServerApp.unread(ref, server);
   }
 
-  /// Whether [ref]'s workspace's apps are read, or being read; reads them when not.
-  void know(AppRef ref) {
-    if (_lists.containsKey(ref.workspace) || _reading.contains(ref.workspace)) {
-      return;
+  /// Reads [ref] as it is now, as an app does when it opens: its workspace's apps when they
+  /// are not read yet, otherwise [ref] alone (`GET /apps/<workspace>/<name>`), whose
+  /// [ServerApp.version] says whether its card and data must be read again. An apps server
+  /// without that route, an app it does not know and a failed read fall back to reading the
+  /// workspace's apps. After a change, [dataRead] says the app's data is already being read
+  /// again.
+  Future<void> check(AppRef ref, {bool dataRead = false}) async {
+    if (available != true) return;
+    if (_reading.contains(ref.workspace)) return;
+    if (!_lists.containsKey(ref.workspace)) return read(ref.workspace);
+    final epoch = _epoch;
+    ServerApp? found;
+    try {
+      found = await _api.app(ref);
+    } on ApiException {
+      found = null;
     }
-    unawaited(read(ref.workspace));
+    if (epoch != _epoch) return;
+    final list = _lists[ref.workspace];
+    final at = list?.indexWhere((app) => app.ref == ref) ?? -1;
+    if (found == null || list == null || at < 0) return read(ref.workspace);
+    if (!list[at].sameAs(found)) _changed(ref, dataRead: dataRead);
+    _lists[ref.workspace] = appsInOrder([...list]..[at] = found);
+    notifyListeners();
+  }
+
+  /// Lets go of what is read of [ref], which changed: its cards, and its data unless
+  /// [dataRead].
+  void _changed(AppRef ref, {bool dataRead = false}) {
+    _dropCard(ref);
+    if (_data == ref && !dataRead) {
+      _forgetData();
+      _data = ref;
+      dataRevision++;
+    }
   }
 
   // ---- One app's folder, while its data shows.
@@ -176,9 +207,9 @@ class AppsController extends ChangeNotifier {
   AppRef? _data;
   Future<List<AppFile>>? _files;
   final _texts = <String, Future<String>>{};
-  Future<List<LogLine>>? _log;
+  LogPages? _log;
   Future<List<AppCommit>>? _commits;
-  final _diffs = <String, Future<String>>{};
+  final _diffs = <String, Future<AppDiff>>{};
   final _states = <int?, Future<AppState>>{};
 
   /// Counts the changes to the app whose data shows, so its pages read it again.
@@ -188,6 +219,7 @@ class AppsController extends ChangeNotifier {
     _data = null;
     _files = null;
     _texts.clear();
+    _log?.leave();
     _log = null;
     _commits = null;
     _diffs.clear();
@@ -213,10 +245,10 @@ class AppsController extends ChangeNotifier {
     return _texts[path] ??= _api.file(app, path);
   }
 
-  /// [app]'s log, newest line first.
-  Future<List<LogLine>> log(AppRef app) {
+  /// [app]'s log, newest line first, read a page at a time from its newest.
+  LogPages log(AppRef app) {
     _for(app);
-    return _log ??= _api.file(app, 'log.jsonl').then(logLinesOf);
+    return _log ??= LogPages(_api, app)..start();
   }
 
   /// [app]'s data after line [line], or now when null.
@@ -231,8 +263,8 @@ class AppsController extends ChangeNotifier {
     return _commits ??= _api.history(app);
   }
 
-  /// `git show` of [app]'s commit [commit].
-  Future<String> diff(AppRef app, String commit) {
+  /// [app]'s commit [commit], whole and file by file.
+  Future<AppDiff> diff(AppRef app, String commit) {
     _for(app);
     return _diffs[commit] ??= _api.diff(app, commit);
   }
@@ -274,7 +306,7 @@ class AppsController extends ChangeNotifier {
       dataRevision++;
       _dropCard(app);
       notifyListeners();
-      unawaited(read(app.workspace));
+      unawaited(check(app, dataRead: true));
     }
   }
 
@@ -318,15 +350,30 @@ class AppsController extends ChangeNotifier {
   /// Each card read once, by the address read.
   final _cards = <Uri, Future<Uint8List>>{};
 
+  /// Each card's last picture and its `ETag`, by the address read, kept when the card is let
+  /// go of so that reading it again costs no picture while it has not changed.
+  final _pictures = <Uri, CardPicture>{};
+
   /// The card at [card] as one picture, light or dark, read once until the app changes or
-  /// another chat opens, or read afresh when [fresh], as when its chat shows again.
+  /// another chat opens, or read afresh when [fresh], as when its chat shows again. A card
+  /// read again sends the last one's `ETag`, and keeps its picture when the server answers
+  /// that it has not changed.
   Future<Uint8List> card(Uri card, {required bool light, bool fresh = false}) {
     final url = onceCard(card, light: light);
     if (fresh) _cards.remove(url);
-    return _cards[url] ??= _api.card(url).catchError((Object error) {
-      _cards.remove(url);
-      throw error;
-    });
+    final epoch = _epoch;
+    return _cards[url] ??= _api
+        .card(url, last: _pictures[url])
+        .then(
+          (picture) {
+            if (epoch == _epoch) _pictures[url] = picture;
+            return picture.bytes;
+          },
+          onError: (Object error) {
+            _cards.remove(url);
+            throw error;
+          },
+        );
   }
 
   void _dropCard(AppRef app) {

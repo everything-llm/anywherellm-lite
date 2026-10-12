@@ -17,11 +17,12 @@ Future<Harness> _withApps(
   WidgetTester tester, {
   required FakeAnythingLlm llm,
   bool onChat = true,
+  bool older = false,
 }) async {
   final h = await pumpApp(
     tester,
     llm: llm,
-    appsServer: groceriesServer(),
+    appsServer: groceriesServer()..older = older,
     canViewApps: true,
     onChat: onChat,
   );
@@ -101,6 +102,63 @@ void main() {
       await h.apps.rename(_groceries, 'Food');
       await tester.pumpAndSettle();
       expect(h.appsServer.cardAsks, hasLength(3));
+    });
+
+    testWidgets('a card read again keeps its picture while its ETag matches, '
+        'and is sent again once its app changes', (tester) async {
+      final h = await _withApps(
+        tester,
+        llm: answering('Here:\n\n[![Groceries]($_card)]($_page)'),
+      );
+      final light = Uri.parse('$_card?once=1&theme=light');
+      expect(h.appsServer.cardsUnchanged, isEmpty);
+      h.shell.closeChat();
+      await tester.pumpAndSettle();
+      h.shell.openChat();
+      await tester.pumpAndSettle();
+      expect(h.appsServer.cardAsks, [light, light]);
+      expect(h.appsServer.cardsUnchanged, [light]);
+      expect(find.byType(Image), findsOneWidget);
+
+      await h.apps.rename(_groceries, 'Food');
+      await tester.pumpAndSettle();
+      expect(h.appsServer.cardAsks, hasLength(3));
+      expect(h.appsServer.cardsUnchanged, [light]);
+    });
+
+    testWidgets('a list read whose version is unchanged reads no card', (
+      tester,
+    ) async {
+      final h = await _withApps(
+        tester,
+        llm: answering('Here:\n\n[![Groceries]($_card)]($_page)'),
+      );
+      await h.apps.read('q3');
+      await tester.pumpAndSettle();
+      await h.apps.read('q3');
+      await tester.pumpAndSettle();
+      expect(h.appsServer.cardAsks, hasLength(1));
+      await h.appsServer.restore(_groceries, 1);
+      await h.apps.read('q3');
+      await tester.pumpAndSettle();
+      expect(h.appsServer.cardAsks, hasLength(2));
+    });
+
+    testWidgets('beside an older apps server a card is read whole each time', (
+      tester,
+    ) async {
+      final h = await _withApps(
+        tester,
+        llm: answering('Here:\n\n[![Groceries]($_card)]($_page)'),
+        older: true,
+      );
+      h.shell.closeChat();
+      await tester.pumpAndSettle();
+      h.shell.openChat();
+      await tester.pumpAndSettle();
+      expect(h.appsServer.cardAsks, hasLength(2));
+      expect(h.appsServer.cardsUnchanged, isEmpty);
+      expect(find.byType(Image), findsOneWidget);
     });
 
     testWidgets('a bare card opens its app too', (tester) async {

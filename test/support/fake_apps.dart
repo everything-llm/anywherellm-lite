@@ -9,11 +9,22 @@ import 'pixels.dart';
 /// An [AppsApi] for widget tests that keeps its apps in memory. It is absent, as beside a stock
 /// AnythingLLM, until [present] is set. Put an error in [errors] under a method's name to make
 /// it fail. Every call is recorded in [calls] as `name` or `name:arg`.
+///
+/// Each app's `line`, `restorable_from` and `version` follow its folder: its log's newest and
+/// oldest lines and its newest commit. With [older] it is an apps server from before those
+/// fields: no `version`, `restorable_from`, `revertable`, `subject`, `body` or diff `files`,
+/// no `ETag` on a card, and neither `GET /apps/<workspace>/<name>` nor `GET .../log`.
 class FakeApps implements AppsApi {
-  FakeApps({this.present = false});
+  FakeApps({this.present = false, this.older = false});
 
   /// Whether `/health` names the apps server.
   bool present;
+
+  /// Whether it is an apps server from before the paged log, versions and split diffs.
+  bool older;
+
+  /// The most lines a page of the log holds, whatever the client asks: 500, as the server's.
+  int pageMax = 500;
 
   /// How many times [available] asked the server, rather than remembering.
   int asked = 0;
@@ -40,6 +51,9 @@ class FakeApps implements AppsApi {
   /// Every card address asked, in order.
   final List<Uri> cardAsks = [];
 
+  /// Every card address answered `304 Not Modified`, in order.
+  final List<Uri> cardsUnchanged = [];
+
   void _fail(String method) {
     if (errors[method] case final error?) throw error;
   }
@@ -58,7 +72,64 @@ class FakeApps implements AppsApi {
   Future<List<ServerApp>> apps(String workspace) async {
     calls.add('apps:$workspace');
     _fail('apps');
-    return [...?spaces[workspace]];
+    return [for (final app in spaces[workspace] ?? <ServerApp>[]) _now(app)];
+  }
+
+  @override
+  Future<ServerApp?> app(AppRef app) async {
+    calls.add('app:${app.name}');
+    if (older) return null;
+    _fail('app');
+    final found = spaces[app.workspace]?.where((a) => a.ref == app).firstOrNull;
+    if (found == null) throw const ApiException('No such app.', status: 404);
+    return _now(found);
+  }
+
+  /// [app] as the server would list it now, its line, first line and version read from its
+  /// folder.
+  ServerApp _now(ServerApp app) {
+    final log = folders[app.ref]?['log.jsonl'];
+    final lines = log == null ? null : logLinesOf(log);
+    final line = lines?.firstOrNull?.n ?? app.line;
+    final head = commits[app.ref]?.firstOrNull?.commit ?? '000000000000';
+    final readable = app.error == null && !older;
+    return ServerApp(
+      ref: app.ref,
+      title: app.title,
+      kind: app.kind,
+      summary: app.summary,
+      modified: app.modified,
+      line: line,
+      restorableFrom: readable ? lines?.lastOrNull?.n ?? 1 : null,
+      version: readable
+          ? '$line-${head.substring(0, head.length < 12 ? head.length : 12)}'
+          : null,
+      page: app.page,
+      card: app.card,
+      error: app.error,
+    );
+  }
+
+  @override
+  Future<LogPage?> log(AppRef app, {int? before, int limit = 100}) async {
+    calls.add('log:${before ?? 'newest'}');
+    if (older) return null;
+    _fail('log');
+    final log =
+        folders[app]?['log.jsonl'] ??
+        (throw const ApiException('No such app.', status: 404));
+    final all = logLinesOf(log);
+    final below = [
+      for (final line in all)
+        if (before == null || line.n < before) line,
+    ];
+    final size = limit < pageMax ? limit : pageMax;
+    return LogPage(
+      lines: below.take(size).toList(),
+      first: all.lastOrNull?.n,
+      last: all.firstOrNull?.n,
+      more: below.length > size,
+    );
   }
 
   @override
@@ -89,6 +160,10 @@ class FakeApps implements AppsApi {
     calls.add('state:${line ?? 'now'}');
     _fail('state');
     final lines = logLinesOf(folders[app]?['log.jsonl'] ?? '').reversed;
+    final first = lines.firstOrNull?.n;
+    if (line != null && first != null && line < first) {
+      throw const ApiException('That line was compacted.', status: 404);
+    }
     Object? data;
     var upto = 0;
     for (final entry in lines) {
@@ -98,7 +173,7 @@ class FakeApps implements AppsApi {
         data = _apply(data, op as Map);
       }
     }
-    return AppState(upto, data);
+    return AppState(upto, data, restorableFrom: older ? null : first);
   }
 
   /// [data] with the JSON Patch operation [op] applied: `add`, `replace` and `remove`, enough
@@ -138,14 +213,51 @@ class FakeApps implements AppsApi {
   Future<List<AppCommit>> history(AppRef app) async {
     calls.add('history:${app.name}');
     _fail('history');
-    return [...?commits[app]];
+    return [
+      for (final commit in commits[app] ?? <AppCommit>[])
+        older
+            ? AppCommit(
+                commit: commit.commit,
+                t: commit.t,
+                by: commit.by,
+                chat: commit.chat,
+                message: commit.message,
+                files: commit.files,
+              )
+            : commit,
+    ];
   }
 
   @override
-  Future<String> diff(AppRef app, String commit) async {
+  Future<AppDiff> diff(AppRef app, String commit) async {
     calls.add('diff:$commit');
     _fail('diff');
-    return diffs[commit] ?? '';
+    final show = diffs[commit] ?? '';
+    return AppDiff(show, files: older ? null : _filesOf(show));
+  }
+
+  /// The files of [show], the text of `git show`, as the server splits them: each one's path,
+  /// what was done to it, and its hunks from its first `@@` line.
+  static List<FileDiff> _filesOf(String show) {
+    final files = <FileDiff>[];
+    for (final part in show.split('\ndiff --git ').skip(1)) {
+      final lines = const LineSplitter().convert(part);
+      final path = lines.first.split(' b/').last;
+      final status = lines.any((l) => l.startsWith('new file'))
+          ? FileChange.added
+          : lines.any((l) => l.startsWith('deleted file'))
+          ? FileChange.deleted
+          : FileChange.modified;
+      final hunks = lines.indexWhere((l) => l.startsWith('@@'));
+      files.add(
+        FileDiff(
+          path,
+          status,
+          hunks < 0 ? '' : '${lines.skip(hunks).join('\n')}\n',
+        ),
+      );
+    }
+    return files;
   }
 
   @override
@@ -155,7 +267,7 @@ class FakeApps implements AppsApi {
     final folder = folders[app]!;
     final log = folder['log.jsonl'] ?? '';
     final state = await this.state(app, line: line);
-    final n = logLinesOf(log).length + 1;
+    final n = (logLinesOf(log).firstOrNull?.n ?? 0) + 1;
     folder['log.jsonl'] =
         '$log${jsonEncode({
           'n': n,
@@ -174,12 +286,16 @@ class FakeApps implements AppsApi {
   Future<String> revert(AppRef app, String commit) async {
     calls.add('revert:$commit');
     _fail('revert');
+    final message =
+        'Revert "${commits[app]!.firstWhere((c) => c.commit == commit).title}"';
     final made = AppCommit(
       commit: 'ffffffff${commits[app]!.length}',
       by: 'you',
-      message:
-          'Revert "${commits[app]!.firstWhere((c) => c.commit == commit).message}"',
+      message: message,
+      subject: message,
+      body: '',
       files: const ['app.json'],
+      revertable: true,
     );
     commits[app]!.insert(0, made);
     return made.commit;
@@ -192,6 +308,18 @@ class FakeApps implements AppsApi {
     final list = spaces[app.workspace]!;
     final i = list.indexWhere((a) => a.ref == app);
     final was = list[i];
+    commits[app]?.insert(
+      0,
+      AppCommit(
+        commit: 'eeeeeeee${commits[app]!.length}',
+        by: 'you',
+        message: 'Rename to $title',
+        subject: 'Rename to $title',
+        body: '',
+        files: const ['app.json'],
+        revertable: true,
+      ),
+    );
     list[i] = ServerApp(
       ref: was.ref,
       title: title,
@@ -212,11 +340,30 @@ class FakeApps implements AppsApi {
     folders.remove(app);
   }
 
+  /// The card at [url], with its `ETag` from its app's version and theme unless [older]; a
+  /// [last] whose tag still matches is answered as `304 Not Modified`.
   @override
-  Future<Uint8List> card(Uri url) async {
+  Future<CardPicture> card(Uri url, {CardPicture? last}) async {
     cardAsks.add(url);
     _fail('card');
-    return cards[url] ?? pixel;
+    final tag = older ? null : _tagOf(url);
+    if (tag != null && last != null && last.etag == tag) {
+      cardsUnchanged.add(url);
+      return last;
+    }
+    return CardPicture(cards[url] ?? pixel, etag: tag);
+  }
+
+  /// The `ETag` of the card at [url]: `"<version>-<theme>"`, or `"gone-<theme>"` for an app
+  /// that is not there.
+  String? _tagOf(Uri url) {
+    final parts = url.pathSegments;
+    if (parts.length != 3 || parts[0] != 'cards') return null;
+    final ref = AppRef(parts[1], parts[2].replaceAll('.png', ''));
+    final theme = url.queryParameters['theme'] == 'light' ? 'light' : 'dark';
+    final app = spaces[ref.workspace]?.where((a) => a.ref == ref).firstOrNull;
+    final version = app == null ? 'gone' : _now(app).version;
+    return version == null ? null : '"$version-$theme"';
   }
 }
 
@@ -286,15 +433,21 @@ FakeApps groceriesServer({String workspace = 'q3'}) {
       t: DateTime.utc(2026, 10, 12, 8, 20),
       by: 'agent',
       chat: '8f11958e-7dec-446e-81bd-b46e6d2b3eb0',
-      message: 'Ticks move to the bottom',
+      message: 'Ticks move to the bottom\n\nA ticked item sinks below the ones left.',
+      subject: 'Ticks move to the bottom',
+      body: 'A ticked item sinks below the ones left.',
       files: const ['page.html'],
+      revertable: true,
     ),
     AppCommit(
       commit: '1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d',
       t: DateTime.utc(2026, 10, 12, 8, 0),
       by: 'agent',
       message: 'Make Groceries',
+      subject: 'Make Groceries',
+      body: '',
       files: const ['app.json', 'page.html'],
+      revertable: false,
     ),
   ];
   apps.diffs['5f6c11f0a1b2c3d4e5f60718293a4b5c6d7e8f90'] =

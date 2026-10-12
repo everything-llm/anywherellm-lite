@@ -153,7 +153,11 @@ void main() {
         'file' => http.Response('{"n":1}\n', 200),
         'state' => http.Response('{"line":3,"data":{"a":1}}', 200),
         'history' => http.Response('{"commits":[{"commit":"abcdef12"}]}', 200),
-        'diff' => http.Response('{"commit":"abcd","diff":"+x"}', 200),
+        'diff' => http.Response(
+          '{"commit":"abcd","diff":"+x","files":[{"path":"app.json",'
+          '"status":"added","patch":"@@ -0,0 +1 @@\\n+x\\n"}]}',
+          200,
+        ),
         _ => http.Response('{}', 404),
       };
     });
@@ -162,7 +166,11 @@ void main() {
     expect((await api.state(_app, line: 3)).data, {'a': 1});
     await api.state(_app);
     expect((await api.history(_app)).single.short, 'abcdef1');
-    expect(await api.diff(_app, 'abcd'), '+x');
+    final diff = await api.diff(_app, 'abcd');
+    expect(diff.diff, '+x');
+    expect(diff.files!.single.path, 'app.json');
+    expect(diff.files!.single.status, FileChange.added);
+    expect(diff.files!.single.patch, '@@ -0,0 +1 @@\n+x\n');
     expect(seen, [
       'GET /apps/home/groceries/files?',
       'GET /apps/home/groceries/file?path=log.jsonl',
@@ -256,8 +264,118 @@ void main() {
     final url = Uri.parse(
       'https://host.example.ts.net:8466/cards/home/groceries.png?once=1',
     );
-    expect(await api.card(url), [1, 2, 3]);
+    final card = await api.card(url);
+    expect(card.bytes, [1, 2, 3]);
+    expect(card.etag, isNull);
     expect(seen.single.url, url);
     expect(seen.single.headers.containsKey('Authorization'), isFalse);
+    expect(seen.single.headers.containsKey('If-None-Match'), isFalse);
+  });
+
+  test('a card read again sends its ETag, and keeps its picture when the '
+      'server answers 304', () async {
+    final seen = <http.Request>[];
+    var version = '7-5f6c11f0a2b4';
+    final api = _api((request) async {
+      seen.add(request);
+      final tag = '"$version-dark"';
+      if (request.headers['If-None-Match'] == tag) {
+        return http.Response('', 304, headers: {'etag': tag});
+      }
+      return http.Response.bytes([version.length], 200, headers: {'etag': tag});
+    });
+    final url = Uri.parse(
+      'https://host.example.ts.net:8466/cards/home/groceries.png?once=1',
+    );
+    final first = await api.card(url);
+    expect(first.etag, '"7-5f6c11f0a2b4-dark"');
+    final again = await api.card(url, last: first);
+    expect(seen[1].headers['If-None-Match'], '"7-5f6c11f0a2b4-dark"');
+    expect(identical(again, first), isTrue);
+
+    version = '8-0a1b2c3d4e5f';
+    final changed = await api.card(url, last: first);
+    expect(changed.etag, '"8-0a1b2c3d4e5f-dark"');
+    expect(changed.bytes, [14]);
+  });
+
+  group('one app', () {
+    test('is read from /apps/<workspace>/<name>', () async {
+      final seen = <http.Request>[];
+      final app = await _answering({
+        'name': 'groceries',
+        'title': 'Groceries',
+        'line': 7,
+        'restorable_from': 1,
+        'version': '7-5f6c11f0a2b4',
+      }, seen: seen).app(_app);
+      expect(app!.version, '7-5f6c11f0a2b4');
+      expect(app.restorableFrom, 1);
+      expect(seen.single.url.path, '/apps/home/groceries');
+      expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
+    });
+
+    test('that the server does not know fails with its words', () async {
+      final error = await _failure(
+        _answering({'error': 'no such app'}, status: 404).app(_app),
+      );
+      expect(error.status, 404);
+      expect(error.message, 'No such app.');
+    });
+
+    test('is null from an older server, which is not asked again until '
+        'the server is', () async {
+      for (final status in [404, 405]) {
+        var asked = 0;
+        final api = _api((request) async {
+          if (request.url.path == '/health') {
+            return http.Response('{"service":"anythingllm-apps-v2"}', 200);
+          }
+          asked++;
+          return http.Response('{"detail":"Not Found"}', status);
+        });
+        expect(await api.app(_app), isNull, reason: '$status');
+        expect(await api.app(_app), isNull, reason: '$status');
+        expect(asked, 1, reason: '$status');
+        await api.available(again: true);
+        expect(await api.app(_app), isNull, reason: '$status');
+        expect(asked, 2, reason: '$status');
+      }
+    });
+  });
+
+  group('the log', () {
+    test('is read a page at a time, newest first', () async {
+      final seen = <http.Request>[];
+      final page = await _answering({
+        'lines': [
+          {'n': 6, 'ev': 'add'},
+          {'n': 7, 'ev': 'tick'},
+        ],
+        'first': 1,
+        'last': 7,
+        'more': true,
+      }, seen: seen).log(_app, before: 8, limit: 2);
+      expect([for (final line in page!.lines) line.n], [7, 6]);
+      expect(page.first, 1);
+      expect(page.last, 7);
+      expect(page.more, isTrue);
+      expect(seen.single.url.path, '/apps/home/groceries/log');
+      expect(seen.single.url.queryParameters, {'before': '8', 'limit': '2'});
+    });
+
+    test('is null from an older server', () async {
+      final api = _api(
+        (_) async => http.Response('{"detail":"Not Found"}', 404),
+      );
+      expect(await api.log(_app), isNull);
+    });
+
+    test('of an app the server does not know fails with its words', () async {
+      final error = await _failure(
+        _answering({'error': 'no such app'}, status: 404).log(_app),
+      );
+      expect(error.status, 404);
+    });
   });
 }

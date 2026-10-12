@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -32,6 +31,11 @@ class HttpAppsApi implements AppsApi {
   /// Whether the apps server answered, by the address of the AnythingLLM server beside it.
   final _found = <String, Future<bool>>{};
 
+  /// The routes an older apps server answered as unknown, by the address of the AnythingLLM
+  /// server beside it and the route's kind (`app`, `log`), so they are not asked again until
+  /// [available] asks again.
+  final _missing = <String>{};
+
   @override
   Future<bool> available({bool again = false}) {
     final connection = _holder.current;
@@ -39,7 +43,10 @@ class HttpAppsApi implements AppsApi {
       return Future.value(false);
     }
     final key = connection.baseUrl;
-    if (again) _found.remove(key);
+    if (again) {
+      _found.remove(key);
+      _missing.removeWhere((missing) => missing.startsWith('$key '));
+    }
     return _found[key] ??= _health(connection);
   }
 
@@ -61,6 +68,41 @@ class HttpAppsApi implements AppsApi {
   @override
   Future<List<ServerApp>> apps(String workspace) async =>
       appsOf(workspace, await _json('GET', [workspace]));
+
+  @override
+  Future<ServerApp?> app(AppRef app) async {
+    final json = await _unlessMissing('app', () => _json('GET', _of(app)));
+    return json == null ? null : ServerApp.fromJson(app.workspace, json);
+  }
+
+  @override
+  Future<LogPage?> log(AppRef app, {int? before, int limit = 100}) async {
+    final json = await _unlessMissing(
+      'log',
+      () => _json(
+        'GET',
+        [..._of(app), 'log'],
+        query: {'before': ?before?.toString(), 'limit': '$limit'},
+      ),
+    );
+    return json == null ? null : LogPage.fromJson(json);
+  }
+
+  /// What [read] answers, or null when the apps server does not know its route, [kind], which
+  /// is then remembered for the connection.
+  Future<Object?> _unlessMissing(
+    String kind,
+    Future<Object?> Function() read,
+  ) async {
+    final key = '${_current.baseUrl} $kind';
+    if (_missing.contains(key)) return null;
+    try {
+      return await read();
+    } on _NoRoute {
+      _missing.add(key);
+      return null;
+    }
+  }
 
   @override
   Future<List<AppFile>> files(AppRef app) async =>
@@ -90,14 +132,9 @@ class HttpAppsApi implements AppsApi {
       commitsOf(await _json('GET', [..._of(app), 'history']));
 
   @override
-  Future<String> diff(AppRef app, String commit) async {
-    final body = await _json(
-      'GET',
-      [..._of(app), 'diff'],
-      query: {'commit': commit},
-    );
-    return body is Map && body['diff'] is String ? body['diff'] as String : '';
-  }
+  Future<AppDiff> diff(AppRef app, String commit) async => AppDiff.fromJson(
+    await _json('GET', [..._of(app), 'diff'], query: {'commit': commit}),
+  );
 
   @override
   Future<int> restore(AppRef app, int line) async {
@@ -130,22 +167,29 @@ class HttpAppsApi implements AppsApi {
   Future<void> delete(AppRef app) => _json('DELETE', _of(app));
 
   @override
-  Future<Uint8List> card(Uri url) async {
+  Future<CardPicture> card(Uri url, {CardPicture? last}) async {
     if (url.scheme != 'https') {
       throw const ApiException('Cards load over https only.');
     }
     final connection = _current;
+    final tag = last?.etag;
     final response = await _fetch(
       connection,
-      () => _client.get(url, headers: const {'Accept': 'image/png'}),
+      () => _client.get(
+        url,
+        headers: {'Accept': 'image/png', 'If-None-Match': ?tag},
+      ),
     );
+    if (response.statusCode == 304 && last != null && tag != null) {
+      return last;
+    }
     if (response.statusCode != 200) {
       throw ApiException(
         'The card could not be read: the server answered ${response.statusCode}.',
         status: response.statusCode,
       );
     }
-    return response.bodyBytes;
+    return CardPicture(response.bodyBytes, etag: response.headers['etag']);
   }
 
   static List<String> _of(AppRef app) => [app.workspace, app.name];
@@ -208,8 +252,13 @@ class HttpAppsApi implements AppsApi {
         status: 401,
       );
     }
+    final said = _said(response);
+    // The server words every failure of its own; a bare 404 or 405 is a route it lacks.
+    if (said == null && (status == 404 || status == 405)) {
+      throw _NoRoute(status);
+    }
     throw ApiException(
-      _said(response) ?? 'The apps server answered HTTP $status.',
+      said ?? 'The apps server answered HTTP $status.',
       status: status,
     );
   }
@@ -250,4 +299,11 @@ class HttpAppsApi implements AppsApi {
       return null;
     }
   }
+}
+
+/// A route the apps server does not have, as an older one answers: a 404 or 405 without the
+/// `error` it words its own failures with.
+class _NoRoute extends ApiException {
+  _NoRoute(int status)
+    : super('The apps server answered HTTP $status.', status: status);
 }
