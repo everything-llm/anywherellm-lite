@@ -44,39 +44,9 @@ class SettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Where each companion runs, by [Companion.service], when the person or a pairing code said.
-  Map<String, Uri> get companions => _holder.companions;
-
   /// Where [companion] runs beside the server in use: as said, or else [Companion.base]'s
   /// guess. Null with no server.
   Uri? addressOf(Companion companion) => _holder.addressOf(companion);
-
-  /// Says where [companion] runs, from [raw] as typed, or forgets that when [raw] is empty, so
-  /// it is guessed again. Kept in the keyring with the connection. False, with [message] saying
-  /// why, when [raw] cannot be used.
-  Future<bool> setCompanion(Companion companion, String raw) async {
-    final server = connection;
-    if (server == null) return false;
-    final Uri? address;
-    try {
-      address = raw.trim().isEmpty ? null : companionAddress(raw);
-    } on ApiException catch (error) {
-      message = error.message;
-      notifyListeners();
-      return false;
-    }
-    _holder.companions = {
-      for (final MapEntry(:key, :value) in _holder.companions.entries)
-        if (key != companion.service) key: value,
-      companion.service: ?address,
-    };
-    notifyListeners();
-    await _keyring(
-      'Could not save the address',
-      () => _store.save(Pairing(server, _holder.companions)),
-    );
-    return true;
-  }
 
   /// Connects as [pairing] says, once the server takes its key, keeping where its companions
   /// run. True when it did.

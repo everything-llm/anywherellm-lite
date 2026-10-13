@@ -117,13 +117,13 @@ Pairing parsePairingCode(String raw) {
   return Pairing(Connection.parse(url, key), {
     for (final companion in const [appsCompanion, toolkitCompanion])
       if (uri.queryParameters[companion.code] case final address?)
-        companion.service: companionAddress(address),
+        companion.service: _companionAddress(address),
   });
 }
 
-/// A companion's address as typed or paired, cleaned as [normalizeBaseUrl] cleans the server's:
+/// A companion's address as a pairing code gives it, cleaned as [normalizeBaseUrl] cleans the server's:
 /// https, or http on a private network, with no query, no fragment and no trailing slash.
-Uri companionAddress(String raw) => Uri.parse(normalizeBaseUrl(raw));
+Uri _companionAddress(String raw) => Uri.parse(normalizeBaseUrl(raw));
 
 /// Why a plain http address is refused.
 const plainHttpRefused =

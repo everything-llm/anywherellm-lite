@@ -151,45 +151,17 @@ void main() {
       },
     );
 
-    test('an address is set, kept with the key, and forgotten', () async {
-      await settings.connect('https://h:3001', 'K1');
-      expect(
-        await settings.setCompanion(toolkitCompanion, 'http://toolkit.lan/'),
-        isTrue,
-      );
+    test('another key keeps them, and another server forgets them', () async {
+      await settings.pair(Pairing(_saved, {toolkitCompanion.service: toolkit}));
+      await settings.save(_saved.baseUrl, 'K2');
+      expect(settings.addressOf(toolkitCompanion), toolkit);
+      expect(store.savedCompanions, isNotEmpty);
+      await settings.connect('https://other.example:3001', 'K1');
       expect(
         settings.addressOf(toolkitCompanion),
-        Uri.parse('http://toolkit.lan'),
+        Uri.parse('https://other.example:8467'),
+        reason: 'guessed again on another server',
       );
-      await settings.save('https://h:3001', 'K2');
-      expect(
-        store.savedCompanions,
-        isNotEmpty,
-        reason: 'the same server keeps them',
-      );
-      expect(await settings.setCompanion(toolkitCompanion, ''), isTrue);
-      expect(settings.addressOf(toolkitCompanion), Uri.parse('https://h:8467'));
     });
-
-    test(
-      'a public http address is refused, and another server forgets them',
-      () async {
-        await settings.connect('https://h:3001', 'K1');
-        expect(
-          await settings.setCompanion(
-            toolkitCompanion,
-            'http://toolkit.example.com',
-          ),
-          isFalse,
-        );
-        expect(settings.message, plainHttpRefused);
-        await settings.setCompanion(
-          toolkitCompanion,
-          'https://toolkit.example.com',
-        );
-        await settings.connect('https://other.example:3001', 'K1');
-        expect(settings.companions, isEmpty);
-      },
-    );
   });
 }

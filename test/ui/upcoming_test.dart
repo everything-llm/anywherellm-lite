@@ -1,4 +1,4 @@
-import 'package:anywherellm/ui/settings/settings_pages.dart';
+import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/toolkit.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/schedule.dart';
@@ -86,21 +86,21 @@ void main() {
     expect(h.toolkitServer.calls, isNot(contains('scheduledJobs')));
   });
 
-  testWidgets('an address said for the toolkit asks it there', (tester) async {
+  testWidgets('an address a pairing code said for the toolkit asks it there', (
+    tester,
+  ) async {
     final toolkit = FakeToolkit(present: false);
     final h = await pumpApp(tester, toolkitServer: toolkit, onChat: false);
     expect(h.toolkit.available, isFalse);
     toolkit.present = true;
-    await h.settings.setCompanion(
-      toolkitCompanion,
-      'https://toolkit.example.com',
+    await h.settings.pair(
+      Pairing(sampleConnection, {
+        toolkitCompanion.service: Uri.parse('https://toolkit.example.com'),
+      }),
     );
     await tester.pumpAndSettle();
     expect(h.toolkit.available, isTrue);
     expect(find.text('Upcoming'), findsOneWidget);
-    h.shell.openSettings(SettingsPage.addOns);
-    await tester.pumpAndSettle();
-    expect(find.text('https://toolkit.example.com'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
