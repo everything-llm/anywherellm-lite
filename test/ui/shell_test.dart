@@ -266,21 +266,6 @@ void main() {
       expect(find.text('Ask about your files…'), findsOneWidget);
     });
 
-    testWidgets('the slash menu says why the server\'s commands are missing', (
-      tester,
-    ) async {
-      final llm = planningServer()
-        ..errors['slashCommands'] = const ApiException('no', status: 403);
-      await pumpApp(tester, llm: llm);
-      await tester.enterText(typingInto, '/');
-      await tester.pumpAndSettle();
-      expect(
-        control('/reset: Clear the chat history and begin a new chat'),
-        findsOneWidget,
-      );
-      expect(find.textContaining('This server has a password'), findsOneWidget);
-    });
-
     testWidgets(
       'the server address is a web address, and the password and the key are left out of autofill',
       (tester) async {

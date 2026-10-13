@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'apps.dart';
 import 'chat.dart';
 import 'chat_log.dart';
-import 'commands.dart';
 import 'connection.dart';
 import 'embeds.dart';
 import 'memory.dart';
@@ -117,14 +116,6 @@ abstract interface class AnythingLlmApi {
   /// Shows memory [id] in every workspace's chats, or, given [toWorkspace], in that workspace's
   /// only.
   Future<SavedMemory> moveMemory(int id, {String? toWorkspace});
-
-  /// Clears the chat's history, so the model no longer sees its turns and history no longer
-  /// lists them.
-  Future<void> resetChat(String slug, String thread);
-
-  /// The server's slash-command presets. They are read outside the developer API, with the
-  /// server's password when it has one; without it this fails with status 401.
-  Future<List<SlashCommand>> slashCommands();
 
   /// Deletes the chat's exchanges from [chatId] on, that one included, so a question asked again
   /// replaces them. Needs the server's password when it has one.

@@ -1,4 +1,3 @@
-import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/ui/chat/composer.dart';
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/ui/files/workspace_pages.dart';
@@ -80,22 +79,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expectAboveKeyboard(tester, composerField, side, sideKeyboard);
-  });
-
-  testWidgets('the slash menu above the keyboard does not overflow', (
-    tester,
-  ) async {
-    final llm = planningServer()
-      ..presets = [
-        for (var i = 0; i < 8; i++)
-          SlashCommand(command: '/cmd$i', prompt: 'p', description: 'd$i'),
-      ];
-    await pumpApp(tester, llm: llm, size: phone);
-    raiseKeyboard(tester, keyboard);
-    await tester.enterText(composerField, '/');
-    await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull);
-    expectAboveKeyboard(tester, composerField, phone, keyboard);
   });
 
   testWidgets(

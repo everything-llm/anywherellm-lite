@@ -7,7 +7,6 @@ import 'package:http/http.dart' as http;
 
 import '../core/chat.dart';
 import '../core/chat_log.dart';
-import '../core/commands.dart';
 import '../core/connection.dart';
 import '../core/embeds.dart';
 import '../core/memory.dart';
@@ -218,28 +217,6 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     final limit = attachments.isEmpty ? timeout : uploadTimeout;
     return _events('${_thread(slug, thread)}/stream-chat', body, limit);
   }
-
-  /// A `stream-chat` with `reset` and no message, which clears the history and answers with
-  /// one closing chunk.
-  @override
-  Future<void> resetChat(String slug, String thread) => _events(
-    '${_thread(slug, thread)}/stream-chat',
-    {'reset': true},
-    timeout,
-  ).drain<void>();
-
-  /// The presets live under `/api/system`, not `/api/v1`, and take the web UI's login, so they
-  /// answer with the server's password, or on a server that has none.
-  @override
-  Future<List<SlashCommand>> slashCommands() async => [
-    for (final json in jsonObjects(
-      _field(
-        await _session('GET', '/api/system/slash-command-presets'),
-        'presets',
-      ),
-    ))
-      ?SlashCommand.fromJson(json),
-  ];
 
   @override
   Future<String> pushKey() async {

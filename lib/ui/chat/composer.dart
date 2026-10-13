@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/chat.dart';
-import '../../core/commands.dart';
 import '../../core/prefs.dart';
 import '../app_scope.dart';
 import '../icons.dart';
@@ -24,7 +23,6 @@ import 'answer_from.dart';
 import 'attach_sheet.dart';
 import 'dictation.dart';
 import 'model_picker.dart';
-import 'slash_menu.dart';
 
 /// Whether [text] can be sent in the chat on screen: nothing runs, the chat is ready, a workspace
 /// is open and there is something to send.
@@ -33,8 +31,7 @@ bool canSend(ChatController chat, String text) =>
 
 /// Where a question is written. Enter sends it and Shift+Enter starts a new line. While this
 /// chat answers, Send becomes Stop; while another chat answers, nothing can be sent. Files
-/// attached go with the next question only. A message that starts with a slash offers the
-/// commands that match it.
+/// attached go with the next question only.
 class Composer extends StatefulWidget {
   const Composer({super.key, required this.draft, required this.focus});
 
@@ -230,12 +227,6 @@ class _ComposerState extends State<Composer> {
     });
   }
 
-  /// Puts [command] in the message, ready for the rest of it.
-  void _pick(SlashCommand command) {
-    _setDraft('${command.command} ');
-    widget.focus.requestFocus();
-  }
-
   /// Attaches the files picked, unless another chat was shown while the picker was open.
   Future<void> _attach() => _pickWith(
     () async => [for (final f in await FilePicker.pickFiles()) f.xFile],
@@ -370,17 +361,12 @@ class _ComposerState extends State<Composer> {
             listenable: _shown,
             builder: (context, _) {
               if (!scope.settings.configured) return const _NoKey();
-              final matches = scope.chat.busy
-                  ? const <SlashCommand>[]
-                  : commandsFor(draft.text, scope.chat.commands);
               return _attachSheet(
                 _Form(
                   draft: draft,
                   focus: widget.focus,
                   attached: _attached,
                   problem: _problem,
-                  matches: matches,
-                  onPick: _pick,
                   onAttach: () => scope.shell.togglePopup(Popup.attach),
                   onSend: _send,
                   held: _held != null,
@@ -415,8 +401,6 @@ class _Form extends StatelessWidget {
     required this.focus,
     required this.attached,
     required this.problem,
-    required this.matches,
-    required this.onPick,
     required this.onAttach,
     required this.onSend,
     required this.held,
@@ -434,10 +418,6 @@ class _Form extends StatelessWidget {
   final FocusNode focus;
   final List<Attachment> attached;
   final String? problem;
-
-  /// The commands that match the message, or none while the chat is busy.
-  final List<SlashCommand> matches;
-  final ValueChanged<SlashCommand> onPick;
 
   /// Opens the Attach sheet.
   final VoidCallback onAttach;
@@ -471,8 +451,6 @@ class _Form extends StatelessWidget {
     final here = chat.answeringHere;
     final hint = here
         ? 'Answering…'
-        : chat.clearing
-        ? 'Clearing the chat…'
         : chat.workspaceAnswering
         ? 'Another chat in this workspace is still answering…'
         : switch (scope.sources.chatMode.value) {
@@ -489,22 +467,7 @@ class _Form extends StatelessWidget {
     // done takes the chips' room, as they are off while the chat answers.
     final holdable = here && !held && draft.text.trim().isNotEmpty;
 
-    /// Enter picks the first command, or sends the message once it is that command.
-    void enter() {
-      final command = matches.first.command;
-      if (draft.text.trim().toLowerCase() == command.toLowerCase()) {
-        send();
-      } else {
-        onPick(matches.first);
-      }
-    }
-
-    final menu = matches.isNotEmpty;
-    final VoidCallback onEnter = menu
-        ? enter
-        : here
-        ? onHold
-        : send;
+    final VoidCallback onEnter = here ? onHold : send;
     final bindings = <ShortcutActivator, VoidCallback>{
       const SingleActivator(LogicalKeyboardKey.enter): onEnter,
       const SingleActivator(LogicalKeyboardKey.numpadEnter): onEnter,
@@ -631,9 +594,8 @@ class _Form extends StatelessWidget {
                   box: 30,
                   size: IconSize.small,
                 ),
-                // Typing / opens the commands, so there is no button for them. How many files go
-                // along shows beside Attach, and its sheet lists them, so the composer keeps its
-                // height.
+                // How many files go along shows beside Attach, and its sheet lists them, so the
+                // composer keeps its height.
                 if (attached.isNotEmpty) ...[
                   const SizedBox(width: 4),
                   _FilesPill(attached.length, onTap: onAttach),
@@ -693,18 +655,7 @@ class _Form extends StatelessWidget {
         ),
       ),
     );
-    // The card keeps its place whether the commands show, so the field, and the keyboard with
-    // it, is never built afresh as a slash is typed.
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (menu) ...[
-          SlashMenu(commands: matches, onPick: onPick, note: chat.commandsNote),
-          const SizedBox(height: 12),
-        ],
-        card,
-      ],
-    );
+    return SizedBox(width: double.infinity, child: card);
   }
 }
 

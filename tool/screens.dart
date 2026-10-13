@@ -20,7 +20,6 @@ import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/core/server_models.dart';
-import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/ui/apps/app_sheets.dart';
 import 'package:anywherellm/ui/settings/memory_page.dart';
@@ -95,18 +94,6 @@ const _metrics = AnswerMetrics(
 /// memories and the scheduled jobs.
 FakeAnythingLlm _sample() {
   final llm = FakeAnythingLlm()
-    ..presets = const [
-      SlashCommand(
-        command: '/standup',
-        prompt: 'Turn my notes into a standup update.',
-        description: 'Turn my notes into a standup update',
-      ),
-      SlashCommand(
-        command: '/tldr',
-        prompt: 'Sum up this chat in three lines.',
-        description: 'Sum up this chat in three lines',
-      ),
-    ]
     ..answer =
         'This is a sample answer. The prototype does not reach a server, so '
         'every question gets this reply.';
@@ -592,11 +579,6 @@ final _screens = <String, _Setup>{
   'attach': (tester, h) async {
     await _openChat(tester, h, 'errands');
     h.shell.togglePopup(Popup.attach);
-    await _settle(tester);
-  },
-  'slash': (tester, h) async {
-    await _openChat(tester, h, 'errands');
-    await tester.enterText(composerField, '/');
     await _settle(tester);
   },
   'more': (tester, h) async {

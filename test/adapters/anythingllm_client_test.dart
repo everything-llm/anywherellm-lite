@@ -1087,39 +1087,6 @@ void main() {
         await body.close();
       },
     );
-
-    test('reset posts only the reset flag and reads the reply', () async {
-      Object? sent;
-      final api = HttpAnythingLlmApi(
-        holder: ConnectionHolder(_connection),
-        client: MockClient.streaming((request, body) async {
-          expect(request.url.path, '/api/v1/workspace/w/thread/t/stream-chat');
-          sent = jsonDecode(utf8.decode(await body.expand((b) => b).toList()));
-          return http.StreamedResponse(
-            Stream.value(
-              utf8.encode(
-                data({
-                  'textResponse': 'Chat history was reset!',
-                  'close': true,
-                }),
-              ),
-            ),
-            200,
-          );
-        }),
-      );
-      await api.resetChat('w', 't');
-      expect(sent, {'reset': true});
-    });
-
-    test('a reset the server fails says why', () async {
-      final error = await _failure(
-        streaming([
-          data({'type': 'abort', 'error': 'Thread t not found.'}),
-        ]).resetChat('w', 't'),
-      );
-      expect(error.message, 'Thread t not found.');
-    });
   });
 
   group('push', () {
@@ -1301,67 +1268,13 @@ void main() {
     });
   });
 
-  group('slash commands', () {
-    test('reads the presets from the system route, signed in', () async {
-      final server = _SignInServer()
-        ..routes['/api/system/slash-command-presets'] = {
-          'presets': [
-            {
-              'id': 1,
-              'command': '/deep-research',
-              'prompt': '@agent Research:',
-              'description': 'Research in depth',
-            },
-            {'id': 2, 'command': 'broken'},
-          ],
-        };
-      final presets = await server.api().slashCommands();
-      expect(server.seen.map((r) => r.url.path), [
-        '/api/request-token',
-        '/api/system/slash-command-presets',
-      ]);
-      expect(jsonDecode(server.seen.first.body), {'password': 'PASS-WORD'});
-      expect(server.seen.last.headers['Authorization'], 'Bearer TOKEN-1');
-      expect([for (final p in presets) p.command], ['/deep-research']);
-      expect(presets.single.description, 'Research in depth');
-    });
-
-    test('a protected server without a saved password asks for one', () async {
-      final server = _SignInServer();
-      final error = await _failure(server.api(password: null).slashCommands());
-      expect(error.status, 401);
-      expect(error.message, contains('Add it in Settings'));
-      expect(server.seen.single.url.path, '/api/system/slash-command-presets');
-      expect(server.seen.single.headers.containsKey('Authorization'), isFalse);
-    });
-
-    test(
-      'a password-free server lists its presets without signing in',
-      () async {
-        final api = _api((request) async {
-          expect(request.url.path, '/api/system/slash-command-presets');
-          expect(request.headers.containsKey('Authorization'), isFalse);
-          return http.Response(
-            jsonEncode({
-              'presets': [
-                {'id': 1, 'command': '/brief', 'prompt': 'Be brief:'},
-              ],
-            }),
-            200,
-          );
-        }, current: _connection.withPassword(null));
-        expect((await api.slashCommands()).single.command, '/brief');
-      },
-    );
-  });
-
   group('signed in', () {
     test('signs in once and keeps the token for later calls', () async {
       final server = _SignInServer()
-        ..routes['/api/system/slash-command-presets'] = {'presets': []};
+        ..routes['/api/scheduled-jobs'] = {'jobs': []};
       final api = server.api();
-      await api.slashCommands();
-      await api.slashCommands();
+      await api.scheduledJobs();
+      await api.scheduledJobs();
       expect(
         server.seen.where((r) => r.url.path == '/api/request-token'),
         hasLength(1),
@@ -1370,17 +1283,17 @@ void main() {
 
     test('a token the server refuses is replaced once', () async {
       final server = _SignInServer()
-        ..routes['/api/system/slash-command-presets'] = {'presets': []};
+        ..routes['/api/scheduled-jobs'] = {'jobs': []};
       final api = server.api();
-      await api.slashCommands();
+      await api.scheduledJobs();
       server.valid = 'none';
-      await api.slashCommands();
+      await api.scheduledJobs();
       expect(server.seen.map((r) => r.url.path).toList(), [
         '/api/request-token',
-        '/api/system/slash-command-presets',
-        '/api/system/slash-command-presets',
+        '/api/scheduled-jobs',
+        '/api/scheduled-jobs',
         '/api/request-token',
-        '/api/system/slash-command-presets',
+        '/api/scheduled-jobs',
       ]);
       expect(server.seen.last.headers['Authorization'], 'Bearer TOKEN-2');
     });
@@ -1414,10 +1327,10 @@ void main() {
 
     test('no error message carries the password or the token', () async {
       final server = _SignInServer()
-        ..routes['/api/system/slash-command-presets'] = {'error': 'boom'}
+        ..routes['/api/scheduled-jobs'] = {'error': 'boom'}
         ..status = 500;
       final api = server.api();
-      final error = await _failure(api.slashCommands());
+      final error = await _failure(api.scheduledJobs());
       expect(error.message, isNot(contains('PASS-WORD')));
       expect(error.message, isNot(contains('TOKEN')));
       final refused = await _failure(

@@ -2,13 +2,11 @@ import 'dart:ui' show Offset, Size;
 
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/chat_log.dart';
-import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/embeds.dart';
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/prefs.dart';
-import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/files/workspace_pages.dart';
@@ -174,22 +172,6 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('the slash menu fits at $at', (tester) async {
-      final llm = awkward()
-        ..presets = [
-          for (var i = 0; i < 8; i++)
-            SlashCommand(
-              command: '/cmd$i-$longWord',
-              prompt: 'p',
-              description: 'description-$longWord',
-            ),
-        ];
-      await pumpApp(tester, llm: llm, size: size);
-      await tester.enterText(composerField, '/');
-      await tester.pump();
-      expect(tester.takeException(), isNull);
-    });
-
     testWidgets('the microphone and a dictation problem fit at $at', (
       tester,
     ) async {
@@ -215,16 +197,6 @@ void main() {
         longWord.substring(0, 5),
       );
       await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('the slash menu with its note fits at $at', (tester) async {
-      final llm = awkward()
-        ..errors['slashCommands'] = const ApiException('no', status: 401);
-      await pumpApp(tester, llm: llm, size: size);
-      await tester.enterText(composerField, '/');
-      await tester.pump();
-      expect(find.textContaining('has a password'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

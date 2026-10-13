@@ -368,9 +368,10 @@ class ChatController extends ChangeNotifier {
   /// what shows may be stale or stuck. An answer still running in this chat is let go of first,
   /// not stopped: the server may finish it, and it shows when the chat is read again. A chat
   /// deleted on the server gives way to its workspace's newest chat. Does nothing while the
-  /// chat is being cleared or its exchanges dropped, which the reading would race.
+  /// chat's exchanges are being dropped, which the reading would race.
   Future<void> refresh() async {
-    if (_server == null || _refreshing || _droppingIn.contains(activeThread)) return;
+    final dropping = _droppingIn.contains(activeThread);
+    if (_server == null || _refreshing || dropping) return;
     _refreshing = true;
     if (_here case final running?) {
       unawaited(running.stream?.cancel());

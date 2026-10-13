@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'dart:async';
 
 import 'package:anywherellm/core/chat.dart';
-import 'package:anywherellm/core/commands.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/server_models.dart';
@@ -888,161 +887,17 @@ void main() {
     expect(question.attachments.last.picture, isNull);
   });
 
-  group('slash commands', () {
-    const clear = SlashCommand(command: '/clear', prompt: '/reset');
-
-    test('offers /reset, then the server\'s presets', () async {
-      final llm = planningServer()..presets = const [clear];
-      final rig = await started(llm);
-      await pumpEventQueue();
-      expect(
-        [for (final c in rig.chat.commands) c.command],
-        ['/reset', '/clear'],
-      );
-    });
-
-    test('presets that cannot be read leave /reset alone', () async {
-      final llm = planningServer()
-        ..errors['slashCommands'] = const ApiException('No login');
-      final rig = await started(llm);
-      await pumpEventQueue();
-      expect(rig.chat.problem, isNull);
-      expect([for (final c in rig.chat.commands) c.command], ['/reset']);
-    });
-
-    test('/reset clears the chat on the server and on screen', () async {
+  test(
+    'a message that starts with a slash goes to the server as typed',
+    () async {
       final llm = planningServer();
       final rig = await started(llm);
       await rig.chat.send('/reset');
-      expect(llm.calls, contains('resetChat:budget'));
-      expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
-      expect(rig.chat.turns, isEmpty);
-      expect(rig.chat.threadsOf('q3').map((t) => t.name), [
-        'Quarter priorities',
-        'Budget questions',
-      ]);
-    });
-
-    test('a message sent while the chat is clearing is not sent', () async {
-      final llm = planningServer();
-      final rig = await started(llm);
-      final gate = llm.gates['resetChat'] = Completer<void>();
-      final clearing = rig.chat.send('/reset');
       await pumpEventQueue();
-      expect(rig.chat.busy, isTrue);
-      await rig.chat.send('Hello');
-      expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
-      gate.complete();
-      await clearing;
-      expect(rig.chat.busy, isFalse);
-      expect(rig.chat.turns, isEmpty);
-    });
-
-    test('a new server while a chat clears leaves nothing busy', () async {
-      final llm = planningServer();
-      final rig = await started(llm);
-      final gate = llm.gates['resetChat'] = Completer<void>();
-      final clearing = rig.chat.send('/reset');
-      await pumpEventQueue();
-      expect(rig.chat.busy, isTrue);
-      await rig.settings.clear();
-      expect(rig.chat.busy, isFalse);
-      llm.errors['resetChat'] = const ApiException('Gone');
-      gate.complete();
-      await clearing;
-      expect(rig.chat.busy, isFalse);
-      expect(rig.chat.problem, isNull);
-    });
-
-    test('another chat takes a message while one clears', () async {
-      final llm = planningServer();
-      final rig = await started(llm);
-      final gate = llm.gates['resetChat'] = Completer<void>();
-      final clearing = rig.chat.send('/reset');
-      await pumpEventQueue();
-      await rig.chat.select('q3', thread: 'priorities');
-      expect(rig.chat.clearing, isFalse);
-      expect(rig.chat.busy, isFalse);
-      await rig.chat.send('Hello');
-      expect(llm.calls, contains('streamChat:priorities:Hello'));
-      gate.complete();
-      await clearing;
-      await rig.chat.select('q3', thread: 'budget');
-      expect(rig.chat.turns, isEmpty);
-    });
-
-    test('a preset whose prompt is /reset clears the chat too', () async {
-      final llm = planningServer()..presets = const [clear];
-      final rig = await started(llm);
-      await pumpEventQueue();
-      await rig.chat.send('/clear');
-      expect(llm.calls, contains('resetChat:budget'));
-      expect(rig.chat.turns, isEmpty);
-    });
-
-    test('a failed reset keeps the turns and says why', () async {
-      final llm = planningServer()
-        ..errors['resetChat'] = const ApiException('Refused');
-      final rig = await started(llm);
-      await rig.chat.send('/reset');
-      expect(rig.chat.turns, hasLength(2));
-      expect(rig.chat.problem?.title, 'Could not clear the chat');
-    });
-
-    test('/reset in a draft only empties it, making no thread', () async {
-      final llm = planningServer();
-      final rig = await started(llm);
-      await rig.chat.select('household');
-      await rig.chat.send('/reset');
-      expect(llm.calls, isNot(contains('createThread:household')));
-      expect(llm.calls.where((c) => c.startsWith('resetChat')), isEmpty);
-      expect(rig.chat.turns, isEmpty);
-    });
-
-    test('any other preset goes to the server as typed', () async {
-      final llm = planningServer();
-      final rig = await started(llm);
-      await rig.chat.send('/deep-research tides');
-      await pumpEventQueue();
-      expect(llm.calls, contains('streamChat:budget:/deep-research tides'));
-    });
-  });
-
-  group('slash command note', () {
-    test(
-      'a password on the server says why its commands are missing',
-      () async {
-        final llm = planningServer()
-          ..errors['slashCommands'] = const ApiException('no', status: 401);
-        final rig = await started(llm);
-        await pumpEventQueue();
-        expect(rig.chat.commandsNote, contains('has a password'));
-        expect(rig.chat.commands.map((c) => c.command), ['/reset']);
-      },
-    );
-
-    test('another failure says only that they could not be listed', () async {
-      final llm = planningServer()
-        ..errors['slashCommands'] = const ApiException('down', status: 500);
-      final rig = await started(llm);
-      await pumpEventQueue();
-      expect(rig.chat.commandsNote, contains('could not be listed'));
-    });
-
-    test(
-      'a server that lists them has no note, and a new server clears it',
-      () async {
-        final llm = planningServer()
-          ..errors['slashCommands'] = const ApiException('no', status: 401);
-        final rig = await started(llm);
-        await pumpEventQueue();
-        llm.errors.remove('slashCommands');
-        await rig.settings.save('https://other:3001', 'K2');
-        await pumpEventQueue();
-        expect(rig.chat.commandsNote, isNull);
-      },
-    );
-  });
+      expect(llm.calls, contains('streamChat:budget:/reset'));
+      expect(rig.chat.turns, hasLength(4));
+    },
+  );
 
   group('retry', () {
     test('asks the last question again in place of its answer', () async {
@@ -1372,30 +1227,16 @@ void main() {
       expect(rig.chat.problem?.title, 'Could not mark the answer');
     });
 
-    test(
-      'saving a password keeps the chat and lists the commands again',
-      () async {
-        final llm = withChatIds()
-          ..errors['slashCommands'] = const ApiException('no', status: 401);
-        final rig = await started(llm);
-        await pumpEventQueue();
-        final turns = rig.chat.turns;
-        llm.errors.remove('slashCommands');
-        await rig.settings.savePassword('PASS-WORD');
-        await pumpEventQueue();
-        expect(rig.chat.signedIn, isTrue);
-        expect(rig.chat.turns, same(turns));
-        expect(rig.chat.commandsNote, isNull);
-        expect(llm.calls.where((c) => c == 'workspaces'), hasLength(1));
-      },
-    );
-
-    test('a refused saved password says to replace it', () async {
-      final llm = withChatIds()
-        ..errors['slashCommands'] = const ApiException('no', status: 403);
-      final rig = await started(llm, password: 'PASS-WORD');
+    test('saving a password keeps the chat', () async {
+      final llm = withChatIds();
+      final rig = await started(llm);
       await pumpEventQueue();
-      expect(rig.chat.commandsNote, contains('Replace it in Settings'));
+      final turns = rig.chat.turns;
+      await rig.settings.savePassword('PASS-WORD');
+      await pumpEventQueue();
+      expect(rig.chat.signedIn, isTrue);
+      expect(rig.chat.turns, same(turns));
+      expect(llm.calls.where((c) => c == 'workspaces'), hasLength(1));
     });
   });
 }
