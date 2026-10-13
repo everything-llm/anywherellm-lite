@@ -1,6 +1,6 @@
 # Muse compared with AnywhereLLM in Chrome: quick run
 
-Run on 2026-10-08, 15:43-15:59 CEST, by the runbook `docs/parity-protocol.md`, cut to the probes that finish in about a minute and need no approval. AnywhereLLM: commit `60878c6`, `flutter build web`, served from `http://localhost:8765`, already signed in to the home server, so answers went straight to `stream-chat`. Workspace `parity-scratch` from the 2026-10-07 run, in Agent mode; model `glm-5.3`. Muse: muse.ai, free plan, each probe in a new side chat. Probes run: C1-C7, A1, A2, A7, A8, A10. Skipped: A3, A4, A9 and A11 as long, A5 as needing the user's OK and leaving a job, A6 as the server has no image tool.
+Run on 2026-10-08, 15:43-15:59 CEST, by the runbook `docs/protocols/parity-protocol.md`, cut to the probes that finish in about a minute and need no approval. AnywhereLLM: commit `60878c6`, `flutter build web`, served from `http://localhost:8765`, already signed in to the home server, so answers went straight to `stream-chat`. Workspace `parity-scratch` from the 2026-10-07 run, in Agent mode; model `glm-5.3`. Muse: muse.ai, free plan, each probe in a new side chat. Probes run: C1-C7, A1, A2, A7, A8, A10. Skipped: A3, A4, A9 and A11 as long, A5 as needing the user's OK and leaving a job, A6 as the server has no image tool.
 
 ## Verdict
 

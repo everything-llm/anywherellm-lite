@@ -1,6 +1,6 @@
 # In-chat browser UX comparison: how it is run
 
-How the comparisons of AnywhereLLM's in-chat browser with Muse's live browser were run on 2026-10-07 and, with the U probes and a focus on the widgets, on 2026-10-08, so they can be repeated. It continues `docs/notes/muse-parity-process.md` and narrows it to the browser: the same two tools side by side, with probes and measures for watching, steering and handing over a browser rather than for answers.
+How the comparisons of AnywhereLLM's in-chat browser with Muse's live browser were run on 2026-10-07 and, with the U probes and a focus on the widgets, on 2026-10-08, so they can be repeated. It continues `docs/protocols/muse-parity-process.md` and narrows it to the browser: the same two tools side by side, with probes and measures for watching, steering and handing over a browser rather than for answers.
 
 Both runs used Claude Code with the Claude in Chrome extension driving the user's own Chrome, with Muse and AnythingLLM already signed in, plus SSH to owen (`diot@192.168.0.29`).
 

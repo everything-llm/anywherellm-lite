@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../core/chat.dart';
-import '../../core/commands.dart';
 import '../../core/connection.dart';
 import '../../core/outputs.dart';
 import '../../core/ports.dart';
@@ -231,15 +230,6 @@ class ChatController extends ChangeNotifier {
   /// The chats whose names the person chose, which the first message does not rename.
   final Set<String> _named = {};
 
-  /// The server's slash-command presets, or none when they cannot be read.
-  List<SlashCommand> _presets = const [];
-
-  /// Why the server's presets are missing from [commands], or null when they were read.
-  String? commandsNote;
-
-  /// The commands a message can start with: `/reset`, then the server's presets.
-  List<SlashCommand> get commands => withBuiltIns(_presets);
-
   /// The last answer that ran to its end, neither stopped nor failed, or that the server saved
   /// after the connection dropped.
   Turn? get finished => _finished?.turn;
@@ -335,22 +325,12 @@ class ChatController extends ChangeNotifier {
   List<Turn> get turns =>
       activeThread == null ? _draft : (_turns[activeThread] ?? const []);
 
-  /// Whether the chat on screen is being cleared on the server.
-  bool get clearing => _clearingIn.contains(activeThread);
-
-  /// The chats being cleared on the server.
-  final _clearingIn = <String>{};
-
   /// The chats whose exchanges are being deleted on the server, for Retry or an edit.
   final _droppingIn = <String>{};
 
   /// Whether the chat on screen can take no message now: a chat of its workspace answers, this
-  /// one or another, or this chat is being cleared or its exchanges dropped.
-  bool get busy => _changing(activeThread) || workspaceAnswering;
-
-  /// Whether chat [thread] is being cleared or its exchanges dropped on the server.
-  bool _changing(String? thread) =>
-      _clearingIn.contains(thread) || _droppingIn.contains(thread);
+  /// one or another, or this chat's exchanges are being dropped.
+  bool get busy => _droppingIn.contains(activeThread) || workspaceAnswering;
 
   /// Whether the chat on screen can take a message: a draft, or a chat whose history is read.
   bool get ready => activeThread == null || _turns.containsKey(activeThread);
@@ -390,7 +370,7 @@ class ChatController extends ChangeNotifier {
   /// deleted on the server gives way to its workspace's newest chat. Does nothing while the
   /// chat is being cleared or its exchanges dropped, which the reading would race.
   Future<void> refresh() async {
-    if (_server == null || _refreshing || _changing(activeThread)) return;
+    if (_server == null || _refreshing || _droppingIn.contains(activeThread)) return;
     _refreshing = true;
     if (_here case final running?) {
       unawaited(running.stream?.cancel());
@@ -448,12 +428,10 @@ class ChatController extends ChangeNotifier {
     final now = _settings.connection;
     if (now?.withPassword(null) == _server) {
       if (now?.password == _password && _settings.auth == _auth) return;
-      final newPassword = now?.password != _password;
       _password = now?.password;
       _auth = _settings.auth;
       if (!signedIn) editing = null;
       notifyListeners();
-      if (newPassword && _server != null) unawaited(_readCommands());
       return;
     }
     // A delete still waiting to be undone goes to the server it was made on.
@@ -479,10 +457,7 @@ class ChatController extends ChangeNotifier {
     docCounts.clear();
     loading = false;
     unreachable.value = false;
-    _clearingIn.clear();
     _droppingIn.clear();
-    _presets = const [];
-    commandsNote = null;
     activeSlug = null;
     activeThread = null;
     problem = null;
@@ -527,30 +502,7 @@ class ChatController extends ChangeNotifier {
       notifyListeners();
     }
     unawaited(_countDocs());
-    unawaited(_readCommands());
   }
-
-  /// Reads the server's presets. Best effort: a server that will not list them leaves `/reset`
-  /// alone in the menu with [commandsNote] saying why, and a preset typed in full still runs,
-  /// since the server expands it. The list needs the web UI's session, which a server with a
-  /// password refuses.
-  Future<void> _readCommands() async {
-    final server = _server;
-    final read = ++_commandReads;
-    try {
-      final presets = await _api.slashCommands();
-      if (_server != server || read != _commandReads) return;
-      _presets = presets;
-      commandsNote = null;
-    } on ApiException catch (error) {
-      if (_server != server || read != _commandReads) return;
-      commandsNote = whyNoPresets(error, signedIn: signedIn);
-    }
-    notifyListeners();
-  }
-
-  /// Counts the reads of the presets, so only the latest one's answer is kept.
-  var _commandReads = 0;
 
   /// Asks each workspace how many documents it holds, all at once. Best effort: a count that
   /// cannot be read is left out. Sources reports the active workspace's own count.
@@ -839,8 +791,7 @@ class ChatController extends ChangeNotifier {
   }
 
   /// Asks [message], with [attachments], in the chat on screen, making its thread first when it
-  /// is a draft. A message that [resetsChat] clears the chat instead. True when the message was
-  /// taken; false when nothing was sent, as when the old exchange of an edit could not be
+  /// is a draft. True when the message was taken; false when nothing was sent, as when the old exchange of an edit could not be
   /// deleted, so the person still has it to send.
   Future<bool> send(
     String message, {
@@ -850,10 +801,6 @@ class ChatController extends ChangeNotifier {
     final text = message.trim();
     if (slug == null || text.isEmpty || busy || !ready) return false;
     _clearLinkNotice();
-    if (resetsChat(text, _presets)) {
-      await _reset(slug);
-      return true;
-    }
     if (editing case final edited?) {
       final at = this.turns.indexOf(edited);
       if (at >= 0) {
@@ -1072,34 +1019,6 @@ class ChatController extends ChangeNotifier {
       // A new server has started afresh, dropping included.
       if (_server == server) {
         _droppingIn.remove(thread);
-        notifyListeners();
-      }
-    }
-  }
-
-  /// Clears the history of the chat on screen, on the server and here. A draft has none, so it
-  /// is only emptied.
-  Future<void> _reset(String slug) async {
-    editing = null;
-    final thread = activeThread;
-    if (thread == null) {
-      _draft = [];
-      notifyListeners();
-      return;
-    }
-    final server = _server;
-    _clearingIn.add(thread);
-    notifyListeners();
-    try {
-      await _try('Could not clear the chat', () async {
-        await _api.resetChat(slug, thread);
-        if (_server != server) return;
-        _turns[thread] = [];
-      });
-    } finally {
-      // A new server has started afresh, clearing included.
-      if (_server == server) {
-        _clearingIn.remove(thread);
         notifyListeners();
       }
     }
