@@ -265,11 +265,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   @override
   Future<Uint8List> answerImage(Uri url) async {
     final connection = _current;
-    if (url.scheme == 'http') {
-      throw const ApiException(
-        'This device does not load images over plain http.',
-      );
-    }
+    if (!keySafe(url)) throw const ApiException(plainHttpRefused);
     final response = await _fetch(
       connection,
       timeout,
@@ -454,11 +450,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
 
   /// [connection], or an [ApiException] when it is `http://`.
   Connection _secure(Connection connection) {
-    if (connection.uri.scheme == 'http') {
-      throw const ApiException(
-        'Use an https:// address. This device does not sign in over plain http.',
-      );
-    }
+    if (!keySafe(connection.uri)) throw const ApiException(plainHttpRefused);
     return connection;
   }
 

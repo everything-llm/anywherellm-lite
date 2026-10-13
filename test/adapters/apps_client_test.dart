@@ -203,7 +203,7 @@ void main() {
       expect(error.message, isNot(contains('SECRET-KEY')));
     });
 
-    test('an http server is refused before the key is sent', () async {
+    test('a public http address is refused before the key is sent', () async {
       var asked = 0;
       final error = await _failure(
         _api(
@@ -211,9 +211,10 @@ void main() {
             asked++;
             return http.Response('{}', 200);
           },
-          holder: ConnectionHolder(
-            const Connection(baseUrl: 'http://h:3001', apiKey: 'K'),
-          ),
+          holder: ConnectionHolder(_connection)
+            ..companions = {
+              appsCompanion.service: Uri.parse('http://apps.example.com'),
+            },
         ).apps('home'),
       );
       expect(error.message, contains('https://'));

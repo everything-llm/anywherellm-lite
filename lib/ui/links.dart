@@ -40,7 +40,7 @@ Future<void> openAnswerLink(BuildContext context, String href) async {
   final url = Uri.tryParse(href.trim());
   final app = url == null || scope.apps.available != true
       ? null
-      : appRefOf(url, scope.settings.connection?.uri);
+      : appRefOf(url, cards: scope.apps.cards, pages: scope.apps.pages);
   if (app != null) return scope.shell.openApp(app);
   await openLink(context, href);
 }

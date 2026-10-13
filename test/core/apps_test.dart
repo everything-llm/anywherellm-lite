@@ -2,6 +2,8 @@ import 'package:anywherellm/core/apps.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 final _server = Uri.parse('https://h.example.ts.net:3001');
+final _cards = appsCompanion.base(_server);
+final _pages = appPagesGuess(_server);
 
 void main() {
   group('the apps server', () {
@@ -34,7 +36,7 @@ void main() {
       expect(
         appCardRef(
           Uri.parse('https://h.example.ts.net:8466/cards/home/groceries.png'),
-          _server,
+          _cards,
         ),
         const AppRef('home', 'groceries'),
       );
@@ -47,7 +49,7 @@ void main() {
         'https://h.example.ts.net:8465/home/groceries/?theme=dark',
       ]) {
         expect(
-          appPageRef(Uri.parse(page), _server),
+          appPageRef(Uri.parse(page), _pages),
           const AppRef('home', 'groceries'),
           reason: page,
         );
@@ -64,16 +66,51 @@ void main() {
         'https://h.example.ts.net:8466/apps/home',
         'https://h.example.ts.net:8465/home/groceries/extra',
       ]) {
-        expect(appRefOf(Uri.parse(url), _server), isNull, reason: url);
+        expect(
+          appRefOf(Uri.parse(url), cards: _cards, pages: _pages),
+          isNull,
+          reason: url,
+        );
       }
       expect(
         appRefOf(
           Uri.parse('https://h.example.ts.net:8466/cards/home/groceries.png'),
-          null,
         ),
         isNull,
       );
     });
+  });
+
+  test('an app is found under addresses of its own, path prefix and all', () {
+    final cards = Uri.parse('https://apps.example.com/v2');
+    final pages = Uri.parse('http://pages.lan');
+    expect(
+      appRefOf(
+        Uri.parse('https://apps.example.com/v2/cards/home/groceries.png'),
+        cards: cards,
+        pages: pages,
+      ),
+      const AppRef('home', 'groceries'),
+    );
+    expect(
+      appRefOf(
+        Uri.parse('http://pages.lan/home/groceries/'),
+        cards: cards,
+        pages: pages,
+      ),
+      const AppRef('home', 'groceries'),
+    );
+    expect(
+      appRefOf(
+        Uri.parse('https://apps.example.com/cards/home/groceries.png'),
+        cards: cards,
+      ),
+      isNull,
+    );
+    expect(
+      appPage(pages, const AppRef('home', 'groceries')).toString(),
+      'http://pages.lan/home/groceries/',
+    );
   });
 
   test('a card is read once, light or dark', () {
@@ -95,7 +132,7 @@ void main() {
       'theme=light',
     );
     expect(
-      appPage(_server, const AppRef('home', 'groceries')).toString(),
+      appPage(_pages, const AppRef('home', 'groceries')).toString(),
       'https://h.example.ts.net:8465/home/groceries/',
     );
   });

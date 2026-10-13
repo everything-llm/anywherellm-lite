@@ -1,3 +1,5 @@
+import 'package:anywherellm/core/toolkit.dart';
+import 'package:anywherellm/core/apps.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/ui/state/settings_controller.dart';
@@ -127,5 +129,67 @@ void main() {
         'Could not remove the saved connection',
       );
     });
+  });
+
+  group('companions', () {
+    final toolkit = Uri.parse('https://toolkit.example.com');
+
+    test(
+      'a pairing code saves where they run, once the key opens the server',
+      () async {
+        final saved = await settings.pair(
+          Pairing(_saved, {toolkitCompanion.service: toolkit}),
+        );
+        expect(saved, isTrue);
+        expect(settings.addressOf(toolkitCompanion), toolkit);
+        expect(store.savedCompanions, {toolkitCompanion.service: toolkit});
+        expect(
+          settings.addressOf(appsCompanion),
+          Uri.parse('https://h:8466'),
+          reason: 'one the code does not name is guessed',
+        );
+      },
+    );
+
+    test('an address is set, kept with the key, and forgotten', () async {
+      await settings.connect('https://h:3001', 'K1');
+      expect(
+        await settings.setCompanion(toolkitCompanion, 'http://toolkit.lan/'),
+        isTrue,
+      );
+      expect(
+        settings.addressOf(toolkitCompanion),
+        Uri.parse('http://toolkit.lan'),
+      );
+      await settings.save('https://h:3001', 'K2');
+      expect(
+        store.savedCompanions,
+        isNotEmpty,
+        reason: 'the same server keeps them',
+      );
+      expect(await settings.setCompanion(toolkitCompanion, ''), isTrue);
+      expect(settings.addressOf(toolkitCompanion), Uri.parse('https://h:8467'));
+    });
+
+    test(
+      'a public http address is refused, and another server forgets them',
+      () async {
+        await settings.connect('https://h:3001', 'K1');
+        expect(
+          await settings.setCompanion(
+            toolkitCompanion,
+            'http://toolkit.example.com',
+          ),
+          isFalse,
+        );
+        expect(settings.message, plainHttpRefused);
+        await settings.setCompanion(
+          toolkitCompanion,
+          'https://toolkit.example.com',
+        );
+        await settings.connect('https://other.example:3001', 'K1');
+        expect(settings.companions, isEmpty);
+      },
+    );
   });
 }

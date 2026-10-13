@@ -1,16 +1,21 @@
-/// A companion server: one that may run beside AnythingLLM on its host, on its own [port], over
-/// https, takes the same developer key, and says what it is at `GET /health` under `service`.
-/// The app works without any, and shows what one adds only while it answers.
+/// A companion server: one that may run beside AnythingLLM, takes the same developer key, and
+/// says what it is at `GET /health` under `service`. It runs where it was said to, or else on its
+/// own [port] of the AnythingLLM host over https ([base]). The app works without any, and shows
+/// what one adds only while it answers.
 class Companion {
   const Companion({
     required this.service,
     required this.port,
     required this.name,
+    required this.code,
   });
 
   /// What its `/health` names itself, as `anythingllm-apps-v2`.
   final String service;
   final int port;
+
+  /// What a pairing code names its address by, as `apps` in `&apps=...`.
+  final String code;
 
   /// How a message names it, as `The apps server`.
   final String name;
@@ -21,3 +26,17 @@ class Companion {
   /// Whether [json], an answer to `GET /health`, is this companion's.
   bool isHealth(Object? json) => json is Map && json['service'] == service;
 }
+
+/// The parts of [uri]'s path, without empty ones.
+List<String> segmentsOf(Uri uri) => [
+  for (final part in uri.pathSegments)
+    if (part.isNotEmpty) part,
+];
+
+/// [path] under [base]'s own path, with [query]: how a companion behind a path prefix, as
+/// `https://host/apps`, is reached.
+Uri under(Uri base, List<String> path, [Map<String, String>? query]) =>
+    base.replace(
+      pathSegments: [...segmentsOf(base), ...path],
+      queryParameters: query == null || query.isEmpty ? null : query,
+    );

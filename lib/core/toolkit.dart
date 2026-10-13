@@ -7,6 +7,7 @@ const toolkitCompanion = Companion(
   service: 'anythingllm-toolkit',
   port: 8467,
   name: 'The toolkit',
+  code: 'toolkit',
 );
 
 /// The features the toolkit's `/health` names that the app uses.

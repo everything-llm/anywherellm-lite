@@ -103,25 +103,46 @@ void main() {
       expect(asked, 3);
     });
 
-    test('are null with no server, or an http one, without asking', () async {
-      var asked = 0;
-      Future<http.Response> count(http.Request _) async {
-        asked++;
-        return http.Response('{"service":"anythingllm-apps-v2"}', 200);
-      }
+    test(
+      'are null with no server, or at a public http address, without asking',
+      () async {
+        var asked = 0;
+        Future<http.Response> count(http.Request _) async {
+          asked++;
+          return http.Response('{"service":"anythingllm-apps-v2"}', 200);
+        }
 
-      expect(await _api(count, holder: ConnectionHolder()).features(), isNull);
-      expect(
-        await _api(
-          count,
-          holder: ConnectionHolder(
-            const Connection(baseUrl: 'http://h:3001', apiKey: 'K'),
-          ),
-        ).features(),
-        isNull,
-      );
-      expect(asked, 0);
-    });
+        expect(
+          await _api(count, holder: ConnectionHolder()).features(),
+          isNull,
+        );
+        expect(
+          await _api(
+            count,
+            holder: ConnectionHolder(_connection)
+              ..companions = {
+                appsCompanion.service: Uri.parse('http://apps.example.com'),
+              },
+          ).features(),
+          isNull,
+        );
+        expect(asked, 0);
+      },
+    );
+  });
+
+  test('are asked at the address said, under its path', () async {
+    final seen = <Uri>[];
+    final api = _api(
+      (request) async {
+        seen.add(request.url);
+        return http.Response('{"service":"anythingllm-apps-v2"}', 200);
+      },
+      holder: ConnectionHolder(_connection)
+        ..companions = {appsCompanion.service: Uri.parse('http://apps.lan/v2')},
+    );
+    expect(await api.features(), isEmpty);
+    expect(seen.single.toString(), 'http://apps.lan/v2/health');
   });
 
   group('calls', () {

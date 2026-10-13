@@ -248,10 +248,11 @@ void main() {
       expect(loads('https://owen.example.ts.net/a.png'), isFalse);
     });
 
-    test('never over http, even from an http server', () {
-      final plain = Uri.parse('http://box.local:3001');
-      expect(loads('http://owen.example.ts.net/a.png', from: server), isFalse);
-      expect(loads('http://box.local:8080/a.png', from: plain), isFalse);
+    test('over http only on a private network', () {
+      final public = Uri.parse('https://ai.example.com');
+      final home = Uri.parse('http://box.local:3001');
+      expect(loads('http://ai.example.com/a.png', from: public), isFalse);
+      expect(loads('http://box.local:8080/a.png', from: home), isTrue);
     });
   });
 }

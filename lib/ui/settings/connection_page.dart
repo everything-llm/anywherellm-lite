@@ -134,8 +134,11 @@ class _KeyCardState extends State<_KeyCard> {
     super.dispose();
   }
 
-  Future<void> _save() async {
-    final saved = await _settings.connect(_url.text, _key.text);
+  Future<void> _save() async =>
+      _saved(await _settings.connect(_url.text, _key.text));
+
+  /// Closes the form once a connection was saved.
+  void _saved(bool saved) {
     if (mounted && saved) {
       setState(() {
         _key.clear();
@@ -144,11 +147,12 @@ class _KeyCardState extends State<_KeyCard> {
     }
   }
 
-  /// Uses a scanned [code] as if its address and key had been typed, and connects with them.
+  /// Uses a scanned [code] as if its address and key had been typed, and connects with them,
+  /// keeping where the code says its companions run.
   Future<void> _scanned(String code) async {
-    final Connection connection;
+    final Pairing pairing;
     try {
-      connection = parsePairingCode(code);
+      pairing = parsePairingCode(code);
     } on ApiException catch (error) {
       setState(() {
         _shell.setScanning(false);
@@ -160,10 +164,10 @@ class _KeyCardState extends State<_KeyCard> {
       _shell.setScanning(false);
       _scanProblem = null;
       // A key the server refuses then shows in its field, under why.
-      _url.text = connection.baseUrl;
-      _key.text = connection.apiKey;
+      _url.text = pairing.connection.baseUrl;
+      _key.text = pairing.connection.apiKey;
     });
-    await _save();
+    _saved(await _settings.pair(pairing));
   }
 
   Future<void> _forget() async {
@@ -214,6 +218,15 @@ class _KeyCardState extends State<_KeyCard> {
                 about: 'Stored in this phone\'s keyring and never shown',
               ),
             ]),
+            // Plain http to a private address: the key crosses that network unencrypted.
+            if (connection.plainHttp)
+              const AlertBox(
+                AlertKind.warn,
+                'Plain http',
+                text:
+                    'This address is not encrypted, so the key travels as plain text on this '
+                    'network. Use it only on a network you trust.',
+              ),
             if (_scanner case final scan? when editing && _shell.scanning)
               _scan(scan),
             if (editing && !_shell.scanning)

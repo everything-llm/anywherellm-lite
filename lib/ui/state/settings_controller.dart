@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../core/companion.dart';
 import '../../core/connection.dart';
 import '../../core/ports.dart';
 import 'notice.dart';
@@ -34,10 +35,53 @@ class SettingsController extends ChangeNotifier {
   /// start.
   Future<void> load() async {
     await _keyring('Could not read the saved connection', () async {
-      _holder.current = await _store.load();
+      if (await _store.load() case final saved?) {
+        _holder
+          ..current = saved.connection
+          ..companions = saved.companions;
+      }
     });
     notifyListeners();
   }
+
+  /// Where each companion runs, by [Companion.service], when the person or a pairing code said.
+  Map<String, Uri> get companions => _holder.companions;
+
+  /// Where [companion] runs beside the server in use: as said, or else [Companion.base]'s
+  /// guess. Null with no server.
+  Uri? addressOf(Companion companion) => _holder.addressOf(companion);
+
+  /// Says where [companion] runs, from [raw] as typed, or forgets that when [raw] is empty, so
+  /// it is guessed again. Kept in the keyring with the connection. False, with [message] saying
+  /// why, when [raw] cannot be used.
+  Future<bool> setCompanion(Companion companion, String raw) async {
+    final server = connection;
+    if (server == null) return false;
+    final Uri? address;
+    try {
+      address = raw.trim().isEmpty ? null : companionAddress(raw);
+    } on ApiException catch (error) {
+      message = error.message;
+      notifyListeners();
+      return false;
+    }
+    _holder.companions = {
+      for (final MapEntry(:key, :value) in _holder.companions.entries)
+        if (key != companion.service) key: value,
+      companion.service: ?address,
+    };
+    notifyListeners();
+    await _keyring(
+      'Could not save the address',
+      () => _store.save(Pairing(server, _holder.companions)),
+    );
+    return true;
+  }
+
+  /// Connects as [pairing] says, once the server takes its key, keeping where its companions
+  /// run. True when it did.
+  Future<bool> pair(Pairing pairing) =>
+      _connect(pairing.connection, pairing.companions);
 
   /// Asks the server whether [url] and [key] open it. Saves nothing.
   Future<void> test(String url, String key) async {
@@ -75,9 +119,18 @@ class SettingsController extends ChangeNotifier {
 
   /// Saves [url] and [key] only once the server accepts them. True when it did.
   Future<bool> connect(String url, String key) async {
-    await test(url, key);
+    final candidate = _parse(url, key);
+    return candidate != null && await _connect(candidate, null);
+  }
+
+  /// Uses [candidate] once the server takes its key, with [companions] as in [_use].
+  Future<bool> _connect(
+    Connection candidate,
+    Map<String, Uri>? companions,
+  ) async {
+    await _check(candidate);
     if (check != ConnectionCheck.ok) return false;
-    await save(url, key);
+    await _use(candidate, 'The key was saved.', companions: companions);
     return true;
   }
 
@@ -90,14 +143,25 @@ class SettingsController extends ChangeNotifier {
   }
 
   /// Uses [candidate] from now on and keeps it in the keyring, saying [saved] once it is there.
-  /// If the keyring refuses, it is still used for this run and the refusal is shown.
-  Future<void> _use(Connection candidate, String saved) async {
-    _holder.current = candidate;
+  /// Where companions run is [companions] when given, kept when the server's address stays, and
+  /// forgotten for another server. If the keyring refuses, it is still used for this run and
+  /// the refusal is shown.
+  Future<void> _use(
+    Connection candidate,
+    String saved, {
+    Map<String, Uri>? companions,
+  }) async {
+    final kept = connection?.baseUrl == candidate.baseUrl
+        ? _holder.companions
+        : const <String, Uri>{};
+    _holder
+      ..current = candidate
+      ..companions = companions ?? kept;
     check = ConnectionCheck.idle;
     notifyListeners();
     await _keyring(
       'Could not save the connection',
-      () => _store.save(candidate),
+      () => _store.save(Pairing(candidate, _holder.companions)),
     );
     message = keyringProblem == null ? saved : null;
     notifyListeners();
@@ -105,7 +169,9 @@ class SettingsController extends ChangeNotifier {
 
   /// Forgets the connection and removes it from the keyring.
   Future<void> clear() async {
-    _holder.current = null;
+    _holder
+      ..current = null
+      ..companions = const {};
     check = ConnectionCheck.idle;
     notifyListeners();
     await _keyring(

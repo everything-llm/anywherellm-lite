@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:characters/characters.dart';
 
+import 'connection.dart';
 import 'outputs.dart';
 import 'server_models.dart';
 import 'upload.dart';
@@ -109,9 +110,10 @@ Uri? openableLink(String href) {
 }
 
 /// Whether an image at [uri] in an answer may load: only from [server]'s own host, on any port,
-/// over https. So an answer cannot make the app fetch an address off that host.
+/// over https, or over http on a private network ([keySafe]). So an answer cannot make the app
+/// fetch an address off that host.
 bool loadableImage(Uri uri, Uri? server) =>
-    server != null && uri.host == server.host && uri.scheme == 'https';
+    server != null && uri.host == server.host && keySafe(uri);
 
 /// The failure an agent's [answer] reports in place of an answer, or null when it is an answer.
 /// AnythingLLM's agent sends a model's failure as the answer's text, starting with

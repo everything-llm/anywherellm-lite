@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
 
+import '../core/companion.dart';
 import '../core/connection.dart';
 import '../core/memory.dart';
 import '../core/ports.dart';
@@ -24,6 +25,9 @@ class HttpToolkitApi implements ToolkitApi {
        );
 
   final CompanionClient _companion;
+
+  @override
+  Companion get companion => _companion.companion;
 
   @override
   Future<Set<String>?> features({bool again = false}) =>

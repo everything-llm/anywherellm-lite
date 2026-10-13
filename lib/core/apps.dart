@@ -22,6 +22,7 @@ const appsCompanion = Companion(
   service: appsService,
   port: appsCardsPort,
   name: 'The apps server',
+  code: 'apps',
 );
 
 /// The features the apps server's `/health` names that the app uses; an older one names none.
@@ -50,37 +51,47 @@ class AppRef {
 
 final _appName = RegExp(r'^[a-z0-9-]{1,63}$');
 
-/// The app whose live card is at [url], on the apps server beside [server]
-/// (`https://<host>:8466/cards/<workspace>/<name>.png`), or null for any other address.
-AppRef? appCardRef(Uri url, Uri? server) {
-  if (!_onAppsHost(url, server, appsCardsPort)) return null;
-  final parts = url.pathSegments;
-  if (parts.length != 3 || parts[0] != 'cards' || !parts[2].endsWith('.png')) {
+/// The app whose live card is at [url] on the apps server at [cards]
+/// (`<cards>/cards/<workspace>/<name>.png`), or null for any other address.
+AppRef? appCardRef(Uri url, Uri? cards) {
+  final parts = _under(url, cards);
+  if (parts == null ||
+      parts.length != 3 ||
+      parts[0] != 'cards' ||
+      !parts[2].endsWith('.png')) {
     return null;
   }
   return appRefNamed(parts[1], parts[2].substring(0, parts[2].length - 4));
 }
 
-/// The app whose working page is at [url], on the apps server beside [server]
-/// (`https://<host>:8465/<workspace>/<name>/`), or null for any other address.
-AppRef? appPageRef(Uri url, Uri? server) {
-  if (!_onAppsHost(url, server, appsPagesPort)) return null;
-  final parts = [
-    for (final part in url.pathSegments)
-      if (part.isNotEmpty) part,
-  ];
-  return parts.length == 2 ? appRefNamed(parts[0], parts[1]) : null;
+/// The app whose working page is at [url] on the apps server's [pages]
+/// (`<pages>/<workspace>/<name>/`), or null for any other address.
+AppRef? appPageRef(Uri url, Uri? pages) => switch (_under(url, pages)) {
+  [final workspace, final name] => appRefNamed(workspace, name),
+  _ => null,
+};
+
+/// The app [url] names, as its card at [cards] or its page at [pages], or null.
+AppRef? appRefOf(Uri url, {Uri? cards, Uri? pages}) =>
+    appCardRef(url, cards) ?? appPageRef(url, pages);
+
+/// The path of [url] after [base]'s, without empty parts, or null when [url] is not under
+/// [base]: another scheme, host, port or path.
+List<String>? _under(Uri url, Uri? base) {
+  if (base == null ||
+      url.scheme != base.scheme ||
+      url.host != base.host ||
+      url.port != base.port) {
+    return null;
+  }
+  final prefix = segmentsOf(base);
+  final path = segmentsOf(url);
+  if (path.length < prefix.length) return null;
+  for (var i = 0; i < prefix.length; i++) {
+    if (path[i] != prefix[i]) return null;
+  }
+  return path.sublist(prefix.length);
 }
-
-/// The app [url] names, as its card or its page, or null.
-AppRef? appRefOf(Uri url, Uri? server) =>
-    appCardRef(url, server) ?? appPageRef(url, server);
-
-bool _onAppsHost(Uri url, Uri? server, int port) =>
-    server != null &&
-    url.scheme == 'https' &&
-    url.host == server.host &&
-    url.port == port;
 
 /// The app [name] of workspace [workspace], or null when [name] is not a folder name an app can
 /// have.
@@ -110,13 +121,14 @@ Uri themedPage(Uri page, {required bool dark}) => page.replace(
   queryParameters: {...page.queryParameters, 'theme': dark ? 'dark' : 'light'},
 );
 
-/// The working page of [ref] on the apps server beside [server].
-Uri appPage(Uri server, AppRef ref) => Uri(
-  scheme: 'https',
-  host: server.host,
-  port: appsPagesPort,
-  pathSegments: [ref.workspace, ref.name, ''],
-);
+/// Where the apps server's working pages are when it does not say: beside the AnythingLLM
+/// server at [server], on [appsPagesPort].
+Uri appPagesGuess(Uri server) =>
+    Uri(scheme: 'https', host: server.host, port: appsPagesPort);
+
+/// The working page of [ref] on the apps server's [pages].
+Uri appPage(Uri pages, AppRef ref) =>
+    under(pages, [ref.workspace, ref.name, '']);
 
 /// The starter an app was made from, in words: `list` is List, `pomodoro` is Timer.
 String kindLabel(String? kind) => switch (kind) {

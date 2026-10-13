@@ -5,8 +5,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../core/connection.dart';
 import '../core/ports.dart';
 
-/// [SettingsStore] in the Android Keystore, as one entry holding the address and the key. An
-/// entry an older version saved with the server's password is written again without it.
+/// [SettingsStore] in the Android Keystore, as one entry holding the address, the key and where
+/// its companions run, when said. An entry an older version saved with the server's password
+/// is written again without it.
 class KeyringSettingsStore implements SettingsStore {
   KeyringSettingsStore({FlutterSecureStorage? storage})
     : _storage = storage ?? const FlutterSecureStorage();
@@ -16,10 +17,11 @@ class KeyringSettingsStore implements SettingsStore {
   final FlutterSecureStorage _storage;
 
   @override
-  Future<Connection?> load() async {
+  Future<Pairing?> load() async {
     final stored = await _guard('read', () => _storage.read(key: _entry));
     if (stored == null) return null;
     final Connection connection;
+    final Map<String, Uri> companions;
     final bool hadPassword;
     try {
       final json = jsonDecode(stored) as Map<String, dynamic>;
@@ -27,6 +29,12 @@ class KeyringSettingsStore implements SettingsStore {
         baseUrl: json['baseUrl'] as String,
         apiKey: json['apiKey'] as String,
       );
+      final named = json['companions'];
+      companions = {
+        if (named is Map)
+          for (final MapEntry(:key, :value) in named.entries)
+            if (key is String && value is String) key: Uri.parse(value),
+      };
       hadPassword = json.containsKey('password');
     } on Object {
       throw const ApiException(
@@ -35,22 +43,27 @@ class KeyringSettingsStore implements SettingsStore {
     }
     if (hadPassword) {
       try {
-        await save(connection);
+        await save(Pairing(connection, companions));
       } on ApiException {
         // The entry is written again on the next save; the connection works meanwhile.
       }
     }
-    return connection;
+    return Pairing(connection, companions);
   }
 
   @override
-  Future<void> save(Connection connection) => _guard(
+  Future<void> save(Pairing saved) => _guard(
     'written',
     () => _storage.write(
       key: _entry,
       value: jsonEncode({
-        'baseUrl': connection.baseUrl,
-        'apiKey': connection.apiKey,
+        'baseUrl': saved.connection.baseUrl,
+        'apiKey': saved.connection.apiKey,
+        if (saved.companions.isNotEmpty)
+          'companions': {
+            for (final MapEntry(:key, :value) in saved.companions.entries)
+              key: '$value',
+          },
       }),
     ),
   );

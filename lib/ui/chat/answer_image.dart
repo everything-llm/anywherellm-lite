@@ -27,6 +27,7 @@ class AnswerImage extends StatefulWidget {
     super.key,
     required this.alt,
     required this.server,
+    this.cards,
     required this.linked,
     this.maxHeight = 360,
     this.fit = BoxFit.contain,
@@ -37,6 +38,9 @@ class AnswerImage extends StatefulWidget {
   final Uri uri;
   final String? alt;
   final Uri? server;
+
+  /// Where the apps server's cards are, when it is there.
+  final Uri? cards;
 
   /// Whether the image sits inside a link, which then takes a tap on its description.
   final bool linked;
@@ -56,10 +60,11 @@ class AnswerImage extends StatefulWidget {
   /// small tile does not hold a large picture whole; null decodes it at its own size.
   final int? decodeWidth;
 
-  bool get loadable => loadableImage(uri, server);
+  /// Whether it may load: from the server's own host ([loadableImage]), or an app's card.
+  bool get loadable => loadableImage(uri, server) || app != null;
 
   /// The app whose card this is, or null.
-  AppRef? get app => appCardRef(uri, server);
+  AppRef? get app => appCardRef(uri, cards);
 
   @override
   State<AnswerImage> createState() => _AnswerImageState();

@@ -201,7 +201,10 @@ void main() {
   });
 
   group('without http', () {
-    const plain = Connection(baseUrl: 'http://h:3001', apiKey: 'SECRET-KEY');
+    const plain = Connection(
+      baseUrl: 'http://ai.example.com:3001',
+      apiKey: 'SECRET-KEY',
+    );
 
     test('an http address fails before the key is sent', () async {
       var sent = 0;
@@ -1641,9 +1644,9 @@ void main() {
       final seen = <http.BaseRequest>[];
       final api = images(const Stream.empty(), seen: seen);
       final error = await _failure(
-        api.answerImage(Uri.parse('http://host.example.ts.net:8080/a.png')),
+        api.answerImage(Uri.parse('http://host.example.com:8080/a.png')),
       );
-      expect(error.message, contains('plain http'));
+      expect(error.message, plainHttpRefused);
       expect(seen, isEmpty);
     });
 

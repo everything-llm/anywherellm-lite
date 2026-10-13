@@ -13,8 +13,8 @@ void main() {
 
     test('trims, and drops trailing slashes and /api', () {
       expect(
-        normalizeBaseUrl('  http://100.1.2.3:3001/  '),
-        'http://100.1.2.3:3001',
+        normalizeBaseUrl('  http://100.101.2.3:3001/  '),
+        'http://100.101.2.3:3001',
       );
       expect(normalizeBaseUrl('http://h:3001/api'), 'http://h:3001');
       expect(normalizeBaseUrl('http://h:3001/api/'), 'http://h:3001');
@@ -23,6 +23,43 @@ void main() {
     test('keeps a path prefix behind a proxy', () {
       expect(normalizeBaseUrl('https://h/llm/'), 'https://h/llm');
       expect(normalizeBaseUrl('https://h/llm/api'), 'https://h/llm');
+    });
+
+    test('plain http only on a private network', () {
+      for (final home in [
+        'http://localhost:3001',
+        'http://nas:3001',
+        'http://box.local',
+        'http://owen.tail30d4c5.ts.net:3001',
+        'http://owen.tail30d4c5.ts.net.:3001',
+        'http://192.168.1.20:3001',
+        'http://10.0.2.2:3001',
+        'http://172.20.0.5',
+        'http://100.101.2.3',
+        'http://[::1]:3001',
+        'http://[fd12::3]',
+      ]) {
+        expect(normalizeBaseUrl(home), isNotEmpty, reason: home);
+      }
+      for (final public in [
+        'http://ai.example.com',
+        'http://8.8.8.8',
+        'http://100.1.2.3',
+        'http://172.32.0.1',
+        'http://[2001:db8::1]',
+      ]) {
+        expect(
+          () => normalizeBaseUrl(public),
+          throwsA(
+            isA<ApiException>().having(
+              (e) => e.message,
+              'message',
+              plainHttpRefused,
+            ),
+          ),
+          reason: public,
+        );
+      }
     });
 
     test('empty is refused', () {
@@ -93,7 +130,26 @@ void main() {
       final code = _code(connection);
       expect(code, startsWith('anywherellm://connect?'));
       expect(code, isNot(contains('&C=D')));
-      expect(parsePairingCode(code), connection);
+      expect(parsePairingCode(code).connection, connection);
+    });
+
+    test('carries companions\' addresses when it names them', () {
+      final pairing = parsePairingCode(
+        'anywherellm://connect?url=https%3A%2F%2Fai.example.com&key=K'
+        '&toolkit=https%3A%2F%2Ftoolkit.example.com%2F&apps=http%3A%2F%2Fapps.lan',
+      );
+      expect(pairing.connection.baseUrl, 'https://ai.example.com');
+      expect(pairing.companions, {
+        'anythingllm-toolkit': Uri.parse('https://toolkit.example.com'),
+        'anythingllm-apps-v2': Uri.parse('http://apps.lan'),
+      });
+      expect(
+        () => parsePairingCode(
+          'anywherellm://connect?url=https%3A%2F%2Fai.example.com&key=K'
+          '&toolkit=http%3A%2F%2Ftoolkit.example.com',
+        ),
+        throwsA(isA<ApiException>()),
+      );
     });
 
     test('anything else is refused', () {

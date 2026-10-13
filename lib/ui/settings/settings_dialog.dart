@@ -12,6 +12,7 @@ import 'chats_page.dart';
 import 'connection_page.dart';
 import 'device_pages.dart';
 import 'embeds_page.dart';
+import 'add_ons_page.dart';
 import 'json_page.dart';
 import 'memory_page.dart';
 import 'notifications_page.dart';
@@ -173,6 +174,15 @@ class _Nav extends StatelessWidget {
                     onTap: () =>
                         shell.showSettingsPage(SettingsPage.systemFiles),
                   ),
+                NavRow(
+                  icon: 'grid',
+                  title: SettingsPage.addOns.label,
+                  about: addOnsSummary(
+                    apps: scope.apps.available,
+                    toolkit: scope.toolkit.available,
+                  ),
+                  onTap: () => shell.showSettingsPage(SettingsPage.addOns),
+                ),
               ]),
             ],
           ],
@@ -303,5 +313,6 @@ class _PageView extends StatelessWidget {
     SettingsPage.privacy => const PrivacyPage(),
     SettingsPage.json => const JsonPage(),
     SettingsPage.systemFiles => const SystemFilesPage(),
+    SettingsPage.addOns => const AddOnsPage(),
   };
 }

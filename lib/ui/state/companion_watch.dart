@@ -14,8 +14,9 @@ mixin CompanionWatch on ChangeNotifier {
   late final CompanionApi _companion;
   late final SettingsController _watched;
 
-  /// The server in use, as last seen.
+  /// The server in use, and where the companion was said to run beside it, as last seen.
   Connection? _server;
+  Uri? _address;
   int _tests = 0;
 
   /// Counts the connection changes, so an answer from the server before is dropped.
@@ -33,13 +34,15 @@ mixin CompanionWatch on ChangeNotifier {
     _companion = companion;
     _watched = settings;
     _server = settings.connection;
+    _address = settings.addressOf(companion.companion);
     _tests = settings.tests;
     settings.addListener(_settingsChanged);
     if (_server != null) unawaited(_detect());
   }
 
-  /// Another server is in use: forget what was read from the one before. [available] and the
-  /// features are cleared already, and listeners are told afterwards.
+  /// Another server is in use, or the companion was said to run elsewhere: forget what was read
+  /// from the one before. [available] and the features are cleared already, and listeners are
+  /// told afterwards.
   @protected
   void serverChanged() {}
 
@@ -49,15 +52,19 @@ mixin CompanionWatch on ChangeNotifier {
 
   void _settingsChanged() {
     final here = _watched.connection;
-    if (here != _server) {
+    final address = _watched.addressOf(_companion.companion);
+    if (here != _server || address != _address) {
+      // The same server with the companion said to run elsewhere asks there afresh.
+      final moved = here == _server;
       _server = here;
+      _address = address;
       _tests = _watched.tests;
       epoch++;
       available = null;
       _features = const {};
       serverChanged();
       notifyListeners();
-      if (here != null) unawaited(_detect());
+      if (here != null) unawaited(_detect(again: moved));
       return;
     }
     if (_watched.tests != _tests) {

@@ -1,7 +1,7 @@
 import '../../core/providers.dart';
 
 /// The pages of Settings. Connection, Appearance, Chat and Notifications are about this device; Server lists
-/// the pages about AnythingLLM, which open from it, and Memory and System files sit beside it.
+/// the pages about AnythingLLM, which open from it, and Memory, System files and Add-ons sit beside it.
 enum SettingsPage {
   connection('Connection', null, needsServer: false),
   appearance('Appearance', null, needsServer: false),
@@ -9,6 +9,10 @@ enum SettingsPage {
   notifications('Notifications', null, needsServer: false),
   memory('Memory', null),
   systemFiles('System files', null, ownsPage: true),
+  addOns(
+    'Add-ons',
+    'Servers that may run beside AnythingLLM and add to the app. Each shows once it is found.',
+  ),
   server('Server', null),
   chatModel(
     'Chat model',
@@ -69,7 +73,7 @@ enum SettingsPage {
   /// The page this one is reached from and goes back to: [server] for a page about the server
   /// other than [server] itself, [memory] and [systemFiles], or null, the list, for the others.
   SettingsPage? get parent =>
-      needsServer && !const [server, memory, systemFiles].contains(this)
+      needsServer && !const [server, memory, systemFiles, addOns].contains(this)
       ? server
       : null;
 }

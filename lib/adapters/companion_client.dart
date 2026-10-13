@@ -35,17 +35,25 @@ class CompanionClient {
   /// AnythingLLM server beside it.
   final _found = <String, Future<Object?>>{};
 
-  /// The features the companion's `/health` names beside the server in use, or null when it is
-  /// not there or there is no https server. Remembered for the server; [again] asks afresh.
-  /// Never throws.
-  Future<Set<String>?> features({bool again = false}) async {
-    final connection = _holder.current;
-    if (connection == null || connection.uri.scheme != 'https') return null;
-    final key = connection.baseUrl;
+  /// Where the companion runs beside the server in use: where it was said to
+  /// ([ConnectionHolder.companions]), or else [Companion.base]'s guess. Null with no server.
+  Uri? get address => _holder.addressOf(companion);
+
+  /// The companion's `/health` at [address], or null when it is not there, or the key could not
+  /// go there ([keySafe]). Remembered by the address; [again] asks afresh. Never throws.
+  Future<Object?> health({bool again = false}) {
+    final at = address;
+    if (at == null || !keySafe(at)) return Future.value();
+    final key = '$at';
     if (again) _found.remove(key);
-    final health = await (_found[key] ??= _health(connection));
-    if (health == null) return null;
-    final named = health is Map ? health['features'] : null;
+    return _found[key] ??= _health(at);
+  }
+
+  /// The features [health] names, or null when the companion is not there. Never throws.
+  Future<Set<String>?> features({bool again = false}) async {
+    final found = await health(again: again);
+    if (found == null) return null;
+    final named = found is Map ? found['features'] : null;
     return {
       if (named is List)
         for (final feature in named)
@@ -53,11 +61,11 @@ class CompanionClient {
     };
   }
 
-  Future<Object?> _health(Connection connection) async {
+  Future<Object?> _health(Uri at) async {
     try {
       final response = await client
           .get(
-            companion.base(connection.uri).replace(path: '/health'),
+            under(at, const ['health']),
             headers: const {'Accept': 'application/json'},
           )
           .timeout(healthTimeout);
@@ -69,14 +77,10 @@ class CompanionClient {
     }
   }
 
-  /// The connection in use, which must be https.
+  /// The connection in use, whose key may go to [address] ([keySafe]).
   Connection get current {
     final connection = _holder.current ?? (throw const NotConfigured());
-    if (connection.uri.scheme != 'https') {
-      throw const ApiException(
-        'Use an https:// address. This device does not sign in over plain http.',
-      );
-    }
+    if (!keySafe(address!)) throw const ApiException(plainHttpRefused);
     return connection;
   }
 
@@ -104,12 +108,7 @@ class CompanionClient {
     Map<String, Object?>? body,
   }) async {
     final connection = current;
-    final url = companion
-        .base(connection.uri)
-        .replace(
-          pathSegments: path,
-          queryParameters: query.isEmpty ? null : query,
-        );
+    final url = under(address!, path, query);
     final request = http.Request(method, url)
       ..headers['Authorization'] = 'Bearer ${connection.apiKey}'
       ..headers['Accept'] = 'application/json';
@@ -119,7 +118,6 @@ class CompanionClient {
         ..body = jsonEncode(body);
     }
     final response = await fetch(
-      connection,
       () async => http.Response.fromStream(await client.send(request)),
     );
     final status = response.statusCode;
@@ -142,7 +140,7 @@ class CompanionClient {
   }
 
   /// What [send] gets within [timeout], or an [ApiException] in plain words.
-  Future<T> fetch<T>(Connection connection, Future<T> Function() send) async {
+  Future<T> fetch<T>(Future<T> Function() send) async {
     final name = companion.name;
     try {
       return await send().timeout(timeout);
@@ -154,7 +152,7 @@ class CompanionClient {
       throw ApiException('$name\'s certificate could not be verified.');
     } on SocketException catch (error) {
       throw ApiException(
-        'Could not reach ${_lower(name)} on ${connection.host}: ${error.message}',
+        'Could not reach ${_lower(name)} on ${address?.host}: ${error.message}',
       );
     } on http.ClientException catch (error) {
       throw ApiException('Could not reach ${_lower(name)}: ${error.message}');

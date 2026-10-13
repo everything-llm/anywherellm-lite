@@ -33,6 +33,15 @@ class FakeApps with FakeCompanion implements AppsApi {
   /// The most lines a page of the log holds, whatever the client asks: 500, as the server's.
   int pageMax = 500;
 
+  @override
+  Companion get companion => appsCompanion;
+
+  /// Where [pages] says the working pages are, while [present].
+  Uri pagesAt = Uri.parse('https://h:8465');
+
+  @override
+  Future<Uri?> pages() async => present ? pagesAt : null;
+
   /// An older apps server names no features.
   @override
   Set<String> get served =>

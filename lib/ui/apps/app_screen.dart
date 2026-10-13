@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/apps.dart';
+import '../../core/connection.dart';
 import '../app_scope.dart';
 import '../chat/answer_image.dart';
 import '../layout.dart';
@@ -115,12 +116,14 @@ class _Page extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final server = scope.settings.connection?.uri;
-    if (server == null) return const SizedBox.shrink();
+    final pages = scope.apps.pages;
+    if (server == null || pages == null) return const SizedBox.shrink();
     final page = themedPage(
-      app.page ?? appPage(server, app.ref),
+      app.page ?? appPage(pages, app.ref),
       dark: Theme.of(context).brightness == Brightness.dark,
     );
-    if (scope.appView case final view?) {
+    // Android lets the web view load plain http; the app's own rule keeps it to private hosts.
+    if (scope.appView case final view? when keySafe(page)) {
       return view.show(
         page,
         onLeave: (url) => openLink(context, url.toString()),
@@ -134,6 +137,7 @@ class _Page extends StatelessWidget {
             card,
             alt: app.title,
             server: server,
+            cards: scope.apps.cards,
             linked: true,
             maxHeight: 480,
           ),

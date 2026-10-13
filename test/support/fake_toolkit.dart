@@ -1,3 +1,4 @@
+import 'package:anywherellm/core/companion.dart';
 import 'package:anywherellm/core/memory.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/schedule.dart';
@@ -13,6 +14,9 @@ class FakeToolkit with FakeCompanion implements ToolkitApi {
 
   @override
   bool present;
+
+  @override
+  Companion get companion => toolkitCompanion;
 
   @override
   Set<String> served = {ToolkitFeature.memories, ToolkitFeature.jobs};

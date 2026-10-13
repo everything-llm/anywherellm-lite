@@ -29,6 +29,13 @@ class AppsController extends ChangeNotifier with CompanionWatch {
   /// The chat on screen, whose cards are read afresh when another opens.
   (String?, String?) _chatShown = (null, null);
 
+  /// Where the apps server's cards and client API are: where they were said to be, or else
+  /// beside the AnythingLLM server ([SettingsController.addressOf]).
+  Uri? get cards => _settings.addressOf(appsCompanion);
+
+  /// Where the apps server's working pages are, once it is found ([AppsApi.pages]).
+  Uri? pages;
+
   /// Whether the apps server serves System files, as its `/health` says.
   bool get systemFiles => serves(AppsFeature.systemFiles);
 
@@ -47,6 +54,7 @@ class AppsController extends ChangeNotifier with CompanionWatch {
 
   @override
   void serverChanged() {
+    pages = null;
     _lists.clear();
     _problems.clear();
     _reading.clear();
@@ -60,6 +68,14 @@ class AppsController extends ChangeNotifier with CompanionWatch {
   /// them.
   @override
   void detected() {
+    final asked = epoch;
+    unawaited(
+      _api.pages().then((found) {
+        if (asked != epoch || found == pages) return;
+        pages = found;
+        notifyListeners();
+      }),
+    );
     if (available == true && _wanted) unawaited(read());
   }
 
@@ -351,8 +367,8 @@ class AppsController extends ChangeNotifier with CompanionWatch {
   }
 
   void _dropCard(AppRef app) {
-    final server = _settings.connection?.uri;
-    _cards.removeWhere((url, _) => appCardRef(url, server) == app);
+    final at = cards;
+    _cards.removeWhere((url, _) => appCardRef(url, at) == app);
   }
 
   @override
