@@ -301,7 +301,8 @@ class SheetHeader extends StatelessWidget {
 /// [child], with what [overlay] builds over the whole window while [open]. The overlay
 /// inherits from where [child] is, so it reads the app's scope. Its place in the window's
 /// overlay is always taken and empty while closed, since a portal cannot be shown or hidden
-/// while the tree builds.
+/// while the tree builds; each time it opens it is brought over every other, just after that
+/// frame, so the one opened last lies on top.
 class OverlayWhile extends StatefulWidget {
   const OverlayWhile({
     super.key,
@@ -320,6 +321,16 @@ class OverlayWhile extends StatefulWidget {
 
 class _OverlayWhileState extends State<OverlayWhile> {
   final _portal = OverlayPortalController()..show();
+
+  @override
+  void didUpdateWidget(OverlayWhile old) {
+    super.didUpdateWidget(old);
+    if (widget.open && !old.open) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.open) _portal.show();
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) => OverlayPortal(

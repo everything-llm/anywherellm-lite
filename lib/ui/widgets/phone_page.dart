@@ -27,7 +27,9 @@ class PhonePageHeader extends StatelessWidget {
 
   /// What the back button is heard as, such as Back to the chat.
   final String back;
-  final VoidCallback onBack;
+
+  /// Null leaves the back button's room empty, as on a guide's first screen.
+  final VoidCallback? onBack;
 
   /// The back button's icon: an arrow, or the chat's menu, which opens the Chats shelf.
   final String backIcon;
@@ -44,14 +46,17 @@ class PhonePageHeader extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(
           children: [
-            IconBtn(
-              backIcon,
-              tooltip: back,
-              box: 48,
-              filled: true,
-              size: IconSize.small,
-              onPressed: onBack,
-            ),
+            if (onBack case final onBack?)
+              IconBtn(
+                backIcon,
+                tooltip: back,
+                box: 48,
+                filled: true,
+                size: IconSize.small,
+                onPressed: onBack,
+              )
+            else
+              const SizedBox(width: 48),
             const SizedBox(width: 4),
             Expanded(
               child:
