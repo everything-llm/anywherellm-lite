@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../core/apps.dart';
 import '../../core/ports.dart';
 import '../../core/push.dart';
 import '../push/pusher.dart';
@@ -135,7 +136,7 @@ class PushController extends ChangeNotifier {
             PushStatus.unavailable,
             'No apps server runs beside this server.',
           ),
-          true when !await _appsApi.canPush() => const PushState(
+          true when !_apps.serves(AppsFeature.push) => const PushState(
             PushStatus.unavailable,
             'This apps server cannot send notifications. Update it.',
           ),

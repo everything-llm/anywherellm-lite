@@ -7,21 +7,23 @@ void main() {
   group('the apps server', () {
     test('is told apart by its health answer', () {
       expect(
-        isAppsHealth({
+        appsCompanion.isHealth({
           'service': 'anythingllm-apps-v2',
           'server': 'cards',
           'ok': true,
         }),
         isTrue,
       );
-      expect(isAppsHealth({'service': 'everythingllm'}), isFalse);
-      expect(isAppsHealth('<html>'), isFalse);
-      expect(isAppsHealth(null), isFalse);
+      expect(appsCompanion.isHealth({'service': 'everythingllm'}), isFalse);
+      expect(appsCompanion.isHealth('<html>'), isFalse);
+      expect(appsCompanion.isHealth(null), isFalse);
     });
 
     test('sits on the same host at 8466, over https', () {
       expect(
-        appsBase(Uri.parse('http://h.example.ts.net:3001')).toString(),
+        appsCompanion
+            .base(Uri.parse('http://h.example.ts.net:3001'))
+            .toString(),
         'https://h.example.ts.net:8466',
       );
     });

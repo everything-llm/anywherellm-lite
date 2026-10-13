@@ -13,7 +13,6 @@ import 'package:http/testing.dart';
 const _connection = Connection(
   baseUrl: 'https://host.example.ts.net:3001',
   apiKey: 'SECRET-KEY',
-  password: 'PASS',
 );
 
 const _app = AppRef('home', 'groceries');
@@ -46,87 +45,6 @@ Future<ApiException> _failure(Future<void> call) async {
 }
 
 void main() {
-  group('available', () {
-    test('asks /health on 8466 without the key, and believes only the apps '
-        'server', () async {
-      final seen = <http.Request>[];
-      final api = _answering({
-        'service': 'anythingllm-apps-v2',
-        'server': 'cards',
-        'ok': true,
-      }, seen: seen);
-      expect(await api.available(), isTrue);
-      expect(
-        seen.single.url.toString(),
-        'https://host.example.ts.net:8466/health',
-      );
-      expect(seen.single.headers.containsKey('Authorization'), isFalse);
-    });
-
-    test('is false for anything else that answers, or nothing', () async {
-      expect(await _answering({'service': 'other'}).available(), isFalse);
-      expect(
-        await _api((_) async => http.Response('<html>AnythingLLM</html>', 200))
-            .available(),
-        isFalse,
-      );
-      expect(
-        await _answering({
-          'service': 'anythingllm-apps-v2',
-        }, status: 502).available(),
-        isFalse,
-      );
-      expect(
-        await _api((_) async => throw const SocketException('refused'))
-            .available(),
-        isFalse,
-      );
-    });
-
-    test('is remembered per connection, until asked again', () async {
-      var asked = 0;
-      final holder = ConnectionHolder(_connection);
-      final api = _api((request) async {
-        asked++;
-        return http.Response('{"service":"anythingllm-apps-v2"}', 200);
-      }, holder: holder);
-      await api.available();
-      await api.available();
-      expect(asked, 1);
-      await api.available(again: true);
-      expect(asked, 2);
-      holder.current = const Connection(
-        baseUrl: 'https://other.example:3001',
-        apiKey: 'K',
-      );
-      await api.available();
-      expect(asked, 3);
-    });
-
-    test('is false with no server, or an http one, without asking', () async {
-      var asked = 0;
-      Future<http.Response> count(http.Request _) async {
-        asked++;
-        return http.Response('{"service":"anythingllm-apps-v2"}', 200);
-      }
-
-      expect(
-        await _api(count, holder: ConnectionHolder()).available(),
-        isFalse,
-      );
-      expect(
-        await _api(
-          count,
-          holder: ConnectionHolder(
-            const Connection(baseUrl: 'http://h:3001', apiKey: 'K'),
-          ),
-        ).available(),
-        isFalse,
-      );
-      expect(asked, 0);
-    });
-  });
-
   test('the app list goes to /apps/<workspace> with the bearer key', () async {
     final seen = <http.Request>[];
     final apps = await _answering({
@@ -222,18 +140,13 @@ void main() {
     },
   );
 
-  test('push is offered only by a server whose health names it', () async {
-    for (final (features, pushes) in [
-      (['system-files', 'push'], true),
-      (['system-files'], false),
-    ]) {
-      final api = _answering({
-        'service': 'anythingllm-apps-v2',
-        'ok': true,
-        'features': features,
-      });
-      expect(await api.canPush(), pushes);
-    }
+  test('its features are what its health names', () async {
+    final api = _answering({
+      'service': 'anythingllm-apps-v2',
+      'ok': true,
+      'features': ['system-files', 'push', 7],
+    });
+    expect(await api.features(), {AppsFeature.systemFiles, AppsFeature.push});
   });
 
   test('each change posts its body to its route', () async {
@@ -281,15 +194,13 @@ void main() {
       expect(error.message, isNot(contains('SECRET-KEY')));
     });
 
-    test('a server out of reach says where, and never holds the key or '
-        'password', () async {
+    test('a server out of reach says where, and never holds the key', () async {
       final error = await _failure(
         _api((_) async => throw const SocketException('Connection refused'))
             .apps('home'),
       );
       expect(error.message, contains('host.example.ts.net'));
       expect(error.message, isNot(contains('SECRET-KEY')));
-      expect(error.message, isNot(contains('PASS')));
     });
 
     test('an http server is refused before the key is sent', () async {
@@ -392,7 +303,7 @@ void main() {
         expect(await api.app(_app), isNull, reason: '$status');
         expect(await api.app(_app), isNull, reason: '$status');
         expect(asked, 1, reason: '$status');
-        await api.available(again: true);
+        await api.features(again: true);
         expect(await api.app(_app), isNull, reason: '$status');
         expect(asked, 2, reason: '$status');
       }

@@ -209,15 +209,18 @@ abstract interface class AnythingLlmApi {
   Future<List<EmbedChat>> embedChats(String uuid);
 }
 
-/// The apps server, anythingllm-apps-v2, which may run beside AnythingLLM on its host and
-/// takes the same developer key. Every method but [available] and [card] uses the connection
-/// in use and throws [ApiException] on failure, [NotConfigured] when there is none.
-abstract interface class AppsApi {
-  /// Whether the apps server answers beside the server in use: its `/health`, asked without
-  /// the key, names [appsService]. The answer is remembered for the connection; [again] asks
-  /// afresh. Never throws: anything else is false.
-  Future<bool> available({bool again = false});
+/// A [Companion]: a server that may run beside AnythingLLM on its host and takes the same
+/// developer key.
+abstract interface class CompanionApi {
+  /// The features the companion's `/health` names beside the server in use, asked without the
+  /// key, or null when it is not there. Remembered for the connection; [again] asks afresh.
+  /// Never throws.
+  Future<Set<String>?> features({bool again = false});
+}
 
+/// The apps server, anythingllm-apps-v2. Every method but [features] and [card] uses the
+/// connection in use and throws [ApiException] on failure, [NotConfigured] when there is none.
+abstract interface class AppsApi implements CompanionApi {
   /// Workspace [workspace]'s apps, newest change first.
   Future<List<ServerApp>> apps(String workspace);
 
@@ -256,14 +259,6 @@ abstract interface class AppsApi {
 
   /// Deletes [app] with its data.
   Future<void> delete(AppRef app);
-
-  /// Whether the apps server serves System files, as its `/health` says; remembered with
-  /// [available]'s answer. Never throws.
-  Future<bool> systemFiles();
-
-  /// Whether the apps server pushes notifications, as its `/health` says; remembered with
-  /// [available]'s answer. Never throws.
-  Future<bool> canPush();
 
   /// The apps server's VAPID public key, base64url.
   Future<String> pushKey();

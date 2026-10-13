@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -9,6 +8,7 @@ import '../core/connection.dart';
 import '../core/ports.dart';
 import '../core/push.dart';
 import '../core/system_files.dart';
+import 'companion_client.dart';
 
 /// [AppsApi] over the apps server's client API, on the AnythingLLM server's host at
 /// [appsCardsPort], with the connection's developer key on every `/apps/` and `/system/`
@@ -20,20 +20,18 @@ class HttpAppsApi implements AppsApi {
   HttpAppsApi({
     required this._holder,
     http.Client? client,
-    this.timeout = const Duration(seconds: 15),
-    this.healthTimeout = const Duration(seconds: 5),
-  }) : _client = client ?? http.Client();
+    Duration timeout = const Duration(seconds: 15),
+    Duration healthTimeout = const Duration(seconds: 5),
+  }) : _companion = CompanionClient(
+         appsCompanion,
+         holder: _holder,
+         client: client ?? http.Client(),
+         timeout: timeout,
+         healthTimeout: healthTimeout,
+       );
 
   final ConnectionHolder _holder;
-  final http.Client _client;
-  final Duration timeout;
-
-  /// How long `/health` may take before the apps server is taken to be absent.
-  final Duration healthTimeout;
-
-  /// The apps server's `/health` answer, null when it is not there, by the address of the
-  /// AnythingLLM server beside it.
-  final _found = <String, Future<Object?>>{};
+  final CompanionClient _companion;
 
   /// The routes an older apps server answered as unknown, by the address of the AnythingLLM
   /// server beside it and the route's kind (`app`, `log`), so they are not asked again until
@@ -41,31 +39,12 @@ class HttpAppsApi implements AppsApi {
   final _missing = <String>{};
 
   @override
-  Future<bool> available({bool again = false}) {
-    final connection = _holder.current;
-    if (connection == null || connection.uri.scheme != 'https') {
-      return Future.value(false);
-    }
-    final key = connection.baseUrl;
+  Future<Set<String>?> features({bool again = false}) {
     if (again) {
-      _found.remove(key);
+      final key = _holder.current?.baseUrl;
       _missing.removeWhere((missing) => missing.startsWith('$key '));
     }
-    return (_found[key] ??= _health(connection)).then((json) => json != null);
-  }
-
-  @override
-  Future<bool> systemFiles() async {
-    final connection = _holder.current;
-    if (connection == null || !await available()) return false;
-    return hasAppsFeature(await _found[connection.baseUrl], 'system-files');
-  }
-
-  @override
-  Future<bool> canPush() async {
-    final connection = _holder.current;
-    if (connection == null || !await available()) return false;
-    return hasAppsFeature(await _found[connection.baseUrl], 'push');
+    return _companion.features(again: again);
   }
 
   @override
@@ -89,22 +68,6 @@ class HttpAppsApi implements AppsApi {
     root: 'push',
     body: {'endpoint': endpoint},
   );
-
-  Future<Object?> _health(Connection connection) async {
-    try {
-      final response = await _client
-          .get(
-            appsBase(connection.uri).replace(path: '/health'),
-            headers: const {'Accept': 'application/json'},
-          )
-          .timeout(healthTimeout);
-      if (response.statusCode != 200) return null;
-      final json = jsonDecode(utf8.decode(response.bodyBytes));
-      return isAppsHealth(json) ? json : null;
-    } on Object {
-      return null;
-    }
-  }
 
   @override
   Future<List<ServerApp>> apps(String workspace) async =>
@@ -135,11 +98,11 @@ class HttpAppsApi implements AppsApi {
     String kind,
     Future<Object?> Function() read,
   ) async {
-    final key = '${_current.baseUrl} $kind';
+    final key = '${_companion.current.baseUrl} $kind';
     if (_missing.contains(key)) return null;
     try {
       return await read();
-    } on _NoRoute {
+    } on NoRoute {
       _missing.add(key);
       return null;
     }
@@ -231,11 +194,11 @@ class HttpAppsApi implements AppsApi {
     if (url.scheme != 'https') {
       throw const ApiException('Cards load over https only.');
     }
-    final connection = _current;
+    final connection = _companion.current;
     final tag = last?.etag;
-    final response = await _fetch(
+    final response = await _companion.fetch(
       connection,
-      () => _client.get(
+      () => _companion.client.get(
         url,
         headers: {'Accept': 'image/png', 'If-None-Match': ?tag},
       ),
@@ -254,16 +217,6 @@ class HttpAppsApi implements AppsApi {
 
   static List<String> _of(AppRef app) => [app.workspace, app.name];
 
-  Connection get _current {
-    final connection = _holder.current ?? (throw const NotConfigured());
-    if (connection.uri.scheme != 'https') {
-      throw const ApiException(
-        'Use an https:// address. This device does not sign in over plain http.',
-      );
-    }
-    return connection;
-  }
-
   /// The decoded JSON of a [method] to `/<root>/<path>`.
   Future<Object?> _json(
     String method,
@@ -271,107 +224,13 @@ class HttpAppsApi implements AppsApi {
     String root = 'apps',
     Map<String, String> query = const {},
     Map<String, Object?>? body,
-  }) async {
-    final response = await _call(
-      method,
-      path,
-      root: root,
-      query: query,
-      body: body,
-    );
-    try {
-      return jsonDecode(utf8.decode(response.bodyBytes));
-    } on FormatException {
-      throw const ApiException('The apps server did not answer with JSON.');
-    }
-  }
+  }) => _companion.json(method, [root, ...path], query: query, body: body);
 
-  /// A [method] to `/<root>/<path>` with the key, failing with the server's words on any
-  /// status but a success.
+  /// A [method] to `/<root>/<path>` with the key.
   Future<http.Response> _call(
     String method,
     List<String> path, {
     String root = 'apps',
     Map<String, String> query = const {},
-    Map<String, Object?>? body,
-  }) async {
-    final connection = _current;
-    final url = appsBase(connection.uri).replace(
-      pathSegments: [root, ...path],
-      queryParameters: query.isEmpty ? null : query,
-    );
-    final request = http.Request(method, url)
-      ..headers['Authorization'] = 'Bearer ${connection.apiKey}'
-      ..headers['Accept'] = 'application/json';
-    if (body != null) {
-      request
-        ..headers['Content-Type'] = 'application/json'
-        ..body = jsonEncode(body);
-    }
-    final response = await _fetch(
-      connection,
-      () async => http.Response.fromStream(await _client.send(request)),
-    );
-    final status = response.statusCode;
-    if (status >= 200 && status < 300) return response;
-    if (status == 401) {
-      throw const ApiException(
-        'The apps server did not accept the key.',
-        status: 401,
-      );
-    }
-    final said = _said(response);
-    // The server words every failure of its own; a bare 404 or 405 is a route it lacks.
-    if (said == null && (status == 404 || status == 405)) {
-      throw _NoRoute(status);
-    }
-    throw ApiException(
-      said ?? 'The apps server answered HTTP $status.',
-      status: status,
-    );
-  }
-
-  /// What [send] gets within [timeout], or an [ApiException] in plain words.
-  Future<T> _fetch<T>(Connection connection, Future<T> Function() send) async {
-    try {
-      return await send().timeout(timeout);
-    } on TimeoutException {
-      throw ApiException(
-        'The apps server did not answer within ${timeout.inSeconds} seconds.',
-      );
-    } on HandshakeException {
-      throw const ApiException(
-        'The apps server\'s certificate could not be verified.',
-      );
-    } on SocketException catch (error) {
-      throw ApiException(
-        'Could not reach the apps server on ${connection.host}: ${error.message}',
-      );
-    } on http.ClientException catch (error) {
-      throw ApiException('Could not reach the apps server: ${error.message}');
-    }
-  }
-
-  /// The `error` the apps server put in a failed answer, with its first letter raised.
-  static String? _said(http.Response response) {
-    try {
-      final body = jsonDecode(utf8.decode(response.bodyBytes));
-      final said = body is Map ? body['error'] : null;
-      if (said is! String || said.trim().isEmpty) return null;
-      final text = said.trim();
-      return '${text[0].toUpperCase()}${text.substring(1)}.'.replaceAll(
-        RegExp(r'\.\.$'),
-        '.',
-      );
-    } on FormatException {
-      return null;
-    }
-  }
-}
-
-/// A route the apps server does not have, as an older one answers: a 404 or 405 without the
-/// `error` it words its own failures with.
-class _NoRoute extends ApiException {
-  _NoRoute(int status)
-    : super('The apps server answered HTTP $status.', status: status);
+  }) => _companion.call(method, [root, ...path], query: query);
 }

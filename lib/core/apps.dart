@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'companion.dart';
 import 'copy.dart';
 
 export 'app_history.dart';
+export 'companion.dart';
 
 /// What `GET /health` on the apps server's port names itself, which tells it from anything
 /// else that might answer there.
@@ -15,21 +17,18 @@ const appsCardsPort = 8466;
 /// The port of the apps server's working pages.
 const appsPagesPort = 8465;
 
-/// Whether [json], the answer to `GET /health`, is the apps server's.
-bool isAppsHealth(Object? json) =>
-    json is Map && json['service'] == appsService;
+/// The apps server as a [Companion]: its cards and client API.
+const appsCompanion = Companion(
+  service: appsService,
+  port: appsCardsPort,
+  name: 'The apps server',
+);
 
-/// Whether [json], the apps server's answer to `GET /health`, names [feature] among its
-/// `features`, as `system-files`; an older server names none.
-bool hasAppsFeature(Object? json, String feature) =>
-    json is Map &&
-    json['features'] is List &&
-    (json['features'] as List).contains(feature);
-
-/// The apps server's client API beside the AnythingLLM server at [server]: the same host on
-/// [appsCardsPort], over https.
-Uri appsBase(Uri server) =>
-    Uri(scheme: 'https', host: server.host, port: appsCardsPort);
+/// The features the apps server's `/health` names that the app uses; an older one names none.
+abstract final class AppsFeature {
+  static const systemFiles = 'system-files';
+  static const push = 'push';
+}
 
 /// One app of a workspace, by the workspace's slug and the app's folder name.
 class AppRef {

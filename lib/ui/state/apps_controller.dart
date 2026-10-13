@@ -3,43 +3,34 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../core/apps.dart';
-import '../../core/connection.dart';
 import '../../core/ports.dart';
 import '../../core/system_files.dart';
 import 'chat_controller.dart';
+import 'companion_watch.dart';
 import 'log_pages.dart';
 import 'settings_controller.dart';
 
 /// What the app knows of the apps server beside the server in use: whether it is there
-/// ([available]) and has System files ([systemFiles]), the open workspace's apps, what one app's folder holds while its data shows,
-/// the changes made to an app, and its cards in answers. Another server starts it afresh, and
-/// Test connection asks again whether the apps server is there.
-class AppsController extends ChangeNotifier {
+/// ([CompanionWatch.available]) and has System files ([systemFiles]), the open workspace's apps,
+/// what one app's folder holds while its data shows, the changes made to an app, and its cards
+/// in answers. Another server starts it afresh, and Test connection asks again whether the apps
+/// server is there.
+class AppsController extends ChangeNotifier with CompanionWatch {
   AppsController(this._api, this._settings, this._chat) {
-    _settings.addListener(_settingsChanged);
     _chat.addListener(_chatChanged);
-    _server = _key(_settings.connection);
-    _tests = _settings.tests;
     _chatShown = (_chat.activeSlug, _chat.activeThread);
-    if (_server != null) unawaited(_detect());
+    watch(_api, _settings);
   }
 
   final AppsApi _api;
   final SettingsController _settings;
   final ChatController _chat;
 
-  /// The server in use, by its address and key: its password does not touch the apps server.
-  Connection? _server;
-  int _tests = 0;
-
   /// The chat on screen, whose cards are read afresh when another opens.
   (String?, String?) _chatShown = (null, null);
 
-  /// Whether the apps server answers beside the server in use: null until it is asked.
-  bool? available;
-
-  /// Whether the apps server serves System files, as its `/health` says: null until asked.
-  bool? systemFiles;
+  /// Whether the apps server serves System files, as its `/health` says.
+  bool get systemFiles => serves(AppsFeature.systemFiles);
 
   /// Each workspace's apps as last read, by slug.
   final _lists = <String, List<ServerApp>>{};
@@ -54,31 +45,8 @@ class AppsController extends ChangeNotifier {
   /// read as it opens.
   bool _wanted = false;
 
-  /// Counts the connection changes, so an answer from the server before is dropped.
-  int _epoch = 0;
-
-  static Connection? _key(Connection? connection) =>
-      connection?.withPassword(null);
-
-  void _settingsChanged() {
-    final here = _key(_settings.connection);
-    if (here != _server) {
-      _server = here;
-      _tests = _settings.tests;
-      _reset();
-      if (here != null) unawaited(_detect());
-      return;
-    }
-    if (_settings.tests != _tests) {
-      _tests = _settings.tests;
-      if (here != null) unawaited(_detect(again: true));
-    }
-  }
-
-  void _reset() {
-    _epoch++;
-    available = null;
-    systemFiles = null;
+  @override
+  void serverChanged() {
     _lists.clear();
     _problems.clear();
     _reading.clear();
@@ -86,22 +54,13 @@ class AppsController extends ChangeNotifier {
     _pictures.clear();
     _wanted = false;
     _forgetData();
-    notifyListeners();
   }
 
-  /// Asks whether the apps server is there, and reads the open workspace's apps when it is and
-  /// the Apps tab wanted them.
-  Future<void> _detect({bool again = false}) async {
-    final epoch = _epoch;
-    final found = await _api.available(again: again);
-    if (epoch != _epoch) return;
-    final system = found && await _api.systemFiles();
-    if (epoch != _epoch) return;
-    if (found == available && system == systemFiles) return;
-    available = found;
-    systemFiles = system;
-    notifyListeners();
-    if (found && _wanted) unawaited(read());
+  /// Reads the open workspace's apps once the apps server is found, when the Apps tab wanted
+  /// them.
+  @override
+  void detected() {
+    if (available == true && _wanted) unawaited(read());
   }
 
   /// The System files folder at [path], `""` for the top, read afresh.
@@ -148,11 +107,11 @@ class AppsController extends ChangeNotifier {
     final workspace = slug ?? _chat.activeSlug;
     if (workspace == null || available != true) return;
     if (!_reading.add(workspace)) return;
-    final epoch = _epoch;
+    final asked = epoch;
     notifyListeners();
     try {
       final found = await _api.apps(workspace);
-      if (epoch != _epoch) return;
+      if (asked != epoch) return;
       final before = {for (final app in _lists[workspace] ?? []) app.ref: app};
       for (final app in found) {
         final was = before[app.ref];
@@ -161,10 +120,10 @@ class AppsController extends ChangeNotifier {
       _lists[workspace] = found;
       _problems.remove(workspace);
     } on ApiException catch (error) {
-      if (epoch != _epoch) return;
+      if (asked != epoch) return;
       _problems[workspace] = error.message;
     } finally {
-      if (epoch == _epoch) {
+      if (asked == epoch) {
         _reading.remove(workspace);
         notifyListeners();
       }
@@ -190,14 +149,14 @@ class AppsController extends ChangeNotifier {
     if (available != true) return;
     if (_reading.contains(ref.workspace)) return;
     if (!_lists.containsKey(ref.workspace)) return read(ref.workspace);
-    final epoch = _epoch;
+    final asked = epoch;
     ServerApp? found;
     try {
       found = await _api.app(ref);
     } on ApiException {
       found = null;
     }
-    if (epoch != _epoch) return;
+    if (asked != epoch) return;
     final list = _lists[ref.workspace];
     final at = list?.indexWhere((app) => app.ref == ref) ?? -1;
     if (found == null || list == null || at < 0) return read(ref.workspace);
@@ -376,12 +335,12 @@ class AppsController extends ChangeNotifier {
   Future<Uint8List> card(Uri card, {required bool light, bool fresh = false}) {
     final url = onceCard(card, light: light);
     if (fresh) _cards.remove(url);
-    final epoch = _epoch;
+    final asked = epoch;
     return _cards[url] ??= _api
         .card(url, last: _pictures[url])
         .then(
           (picture) {
-            if (epoch == _epoch) _pictures[url] = picture;
+            if (asked == epoch) _pictures[url] = picture;
             return picture.bytes;
           },
           onError: (Object error) {
@@ -398,7 +357,7 @@ class AppsController extends ChangeNotifier {
 
   @override
   void dispose() {
-    _settings.removeListener(_settingsChanged);
+    unwatch();
     _chat.removeListener(_chatChanged);
     super.dispose();
   }

@@ -6,6 +6,7 @@ import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/push.dart';
 import 'package:anywherellm/core/system_files.dart';
 
+import 'fake_companion.dart';
 import 'pixels.dart';
 
 /// An [AppsApi] for widget tests that keeps its apps in memory. It is absent, as beside a stock
@@ -20,10 +21,10 @@ import 'pixels.dart';
 ///
 /// System files are [system]: each file's text by its path, null for a file that is not text,
 /// its folders made from the paths.
-class FakeApps implements AppsApi {
+class FakeApps with FakeCompanion implements AppsApi {
   FakeApps({this.present = false, this.older = false});
 
-  /// Whether `/health` names the apps server.
+  @override
   bool present;
 
   /// Whether it is an apps server from before the paged log, versions and split diffs.
@@ -32,12 +33,10 @@ class FakeApps implements AppsApi {
   /// The most lines a page of the log holds, whatever the client asks: 500, as the server's.
   int pageMax = 500;
 
-  /// How many times [available] asked the server, rather than remembering.
-  int asked = 0;
-  bool? _remembered;
-
-  final List<String> calls = [];
-  final Map<String, Exception> errors = {};
+  /// An older apps server names no features.
+  @override
+  Set<String> get served =>
+      older ? const {} : const {AppsFeature.systemFiles, AppsFeature.push};
 
   /// Each workspace's apps, by slug.
   final Map<String, List<ServerApp>> spaces = {};
@@ -72,16 +71,6 @@ class FakeApps implements AppsApi {
 
   void _fail(String method) {
     if (errors[method] case final error?) throw error;
-  }
-
-  @override
-  Future<bool> available({bool again = false}) async {
-    calls.add('available${again ? ':again' : ''}');
-    if (again || _remembered == null) {
-      asked++;
-      _remembered = present;
-    }
-    return _remembered!;
   }
 
   @override
@@ -382,14 +371,8 @@ class FakeApps implements AppsApi {
     return version == null ? null : '"$version-$theme"';
   }
 
-  @override
-  Future<bool> systemFiles() async => await available() && !older;
-
   /// The devices [subscribePush] keeps, by endpoint.
   final pushDevices = <String, PushSubscription>{};
-
-  @override
-  Future<bool> canPush() async => await available() && !older;
 
   @override
   Future<String> pushKey() async {

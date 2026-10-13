@@ -59,7 +59,7 @@ void main() {
       expect(control('Chats'), findsOneWidget);
       expect(control('Apps'), findsNothing);
       expect(find.byType(AppsTab), findsNothing);
-      expect(h.appsServer.calls, ['available']);
+      expect(h.appsServer.calls, ['features']);
       expect(h.apps.available, isFalse);
     });
   });
