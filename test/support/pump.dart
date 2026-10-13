@@ -23,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_api.dart';
 import 'fake_apps.dart';
+import 'fake_toolkit.dart';
 import 'fake_background.dart';
 import 'fake_pusher.dart';
 import 'fake_settings.dart';
@@ -132,6 +133,7 @@ class Harness extends Rig {
     super.store,
     super.prefsStore,
     super.appsServer,
+    super.toolkitServer,
     super.connection,
     bool canViewApps = false,
     this.canScan = false,
@@ -167,7 +169,11 @@ class Harness extends Rig {
   final FakeSpeaker? speaker;
 
   /// The Memory page's memories as the fake server keeps them.
-  late final MemoryController memory = MemoryController(llm, settings, chat);
+  late final MemoryController memory = MemoryController(
+    toolkitServer,
+    settings,
+    chat,
+  );
 
   /// The device's push distributor, or null where it receives none.
   final FakePusher? pusher;
@@ -183,7 +189,6 @@ class Harness extends Rig {
   late final PushController? push = switch (pusher) {
     final pusher? => PushController(
       pusher,
-      llm,
       appsServer,
       settings,
       chat,
@@ -253,6 +258,7 @@ class Harness extends Rig {
       system: system,
       memory: memory,
       apps: apps,
+      toolkit: toolkit,
       appView: appView,
       launch: (url) async {
         opened.add(url);
@@ -293,7 +299,8 @@ const phoneSize = Size(390, 844);
 /// [connection], no server is set up. With [canScan], Settings offers a fake QR scanner, with
 /// [canDictate] the composer a microphone, with [canPickPhotos] the Attach sheet the device's
 /// photos and camera, and with [canSpeak] each answer Read aloud. [appsServer] is the apps
-/// server beside it, absent unless given present, and [canViewApps] draws an app's page with a
+/// server beside it, absent unless given present, [toolkitServer] the toolkit, present unless
+/// given absent, and [canViewApps] draws an app's page with a
 /// [FakeAppView]. The window is a phone's,
 /// [phoneSize], unless [size] says otherwise. The chat shows full screen, as after a chat is
 /// tapped on the Chats tab, unless [onChat] is false, which leaves the home showing.
@@ -302,6 +309,7 @@ Future<Harness> pumpApp(
   FakeAnythingLlm? llm,
   FakePrefsStore? prefsStore,
   FakeApps? appsServer,
+  FakeToolkit? toolkitServer,
   bool canViewApps = false,
   Connection? connection = sampleConnection,
   Size size = phoneSize,
@@ -323,6 +331,7 @@ Future<Harness> pumpApp(
     llm: llm,
     prefsStore: prefsStore,
     appsServer: appsServer,
+    toolkitServer: toolkitServer,
     canViewApps: canViewApps,
     connection: connection,
     canScan: canScan,
@@ -340,8 +349,6 @@ Future<Harness> pumpApp(
   if (onChat) harness.shell.openChat();
   await tester.pumpWidget(harness.app);
   await harness.chat.load();
-  // As the app's start does, once the connection is read.
-  await harness.settings.readAuth();
   await harness.push?.load();
   // Built now, as the app builds it at start, so it holds from the first answer.
   harness.keepAnswering;

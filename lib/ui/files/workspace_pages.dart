@@ -152,7 +152,11 @@ class _WorkspacePagesState extends State<WorkspacePages> {
     final shell = scope.shell;
     final chat = scope.chat;
     return ListenableBuilder(
-      listenable: Listenable.merge([scope.sources, scope.system]),
+      listenable: Listenable.merge([
+        scope.sources,
+        scope.system,
+        scope.toolkit,
+      ]),
       builder: (context, _) {
         final slug = chat.activeSlug ?? '';
         final docs = scope.sources.files;
@@ -205,15 +209,16 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                 about: (mode ?? ChatMode.automatic).title,
                 onTap: () => _open(shell, FilesSection.answers),
               ),
-              NavRow(
-                icon: 'memory',
-                title: 'Memory',
-                about: 'What chats are shown',
-                onTap: () {
-                  scope.memory.show(slug);
-                  shell.openSettings(SettingsPage.memory);
-                },
-              ),
+              if (scope.toolkit.memories)
+                NavRow(
+                  icon: 'memory',
+                  title: 'Memory',
+                  about: 'What chats are shown',
+                  onTap: () {
+                    scope.memory.show(slug);
+                    shell.openSettings(SettingsPage.memory);
+                  },
+                ),
             ]),
             const SizedBox(height: 20),
             FieldCard([

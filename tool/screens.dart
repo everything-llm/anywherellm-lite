@@ -32,6 +32,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../test/support/fake_api.dart';
+import '../test/support/fake_toolkit.dart';
 import '../test/support/fake_apps.dart';
 import '../test/support/fake_settings.dart';
 import '../test/support/pump.dart';
@@ -92,7 +93,8 @@ const _metrics = AnswerMetrics(
 
 /// The prototype's server: Household and Q3 planning, their documents and chats, the saved
 /// memories and the scheduled jobs.
-FakeAnythingLlm _sample() {
+(FakeAnythingLlm, FakeToolkit) _sample() {
+  final toolkit = FakeToolkit();
   final llm = FakeAnythingLlm()
     ..answer =
         'This is a sample answer. The prototype does not reach a server, so '
@@ -215,7 +217,7 @@ FakeAnythingLlm _sample() {
       ],
     ),
   ];
-  llm.globalMemories.addAll(const [
+  toolkit.globalMemories.addAll(const [
     SavedMemory(id: 1, text: 'Name is Anna.', global: true),
     SavedMemory(id: 2, text: 'Lives in Uppsala, Sweden.', global: true),
     SavedMemory(
@@ -224,7 +226,7 @@ FakeAnythingLlm _sample() {
       global: true,
     ),
   ]);
-  llm.workspaceMemories['household'] = [
+  toolkit.workspaceMemories['household'] = [
     const SavedMemory(
       id: 4,
       text: 'The boiler is a Vaillant ecoTEC from 2019.',
@@ -236,7 +238,7 @@ FakeAnythingLlm _sample() {
       global: false,
     ),
   ];
-  llm.workspaceMemories['q3'] = [
+  toolkit.workspaceMemories['q3'] = [
     const SavedMemory(
       id: 6,
       text: 'Reports go to Maja on Fridays.',
@@ -245,7 +247,7 @@ FakeAnythingLlm _sample() {
   ];
   final now = DateTime.now();
   final tomorrow = DateTime(now.year, now.month, now.day + 1, 6, 30);
-  llm.jobs = [
+  toolkit.jobs = [
     ScheduledJob(
       name: 'Morning brief',
       cron: '30 6 * * *',
@@ -276,7 +278,7 @@ FakeAnythingLlm _sample() {
     'TTSProvider': 'native',
   };
   llm.vectors = 1284;
-  return llm;
+  return (llm, toolkit);
 }
 
 const _host = 'anythingllm.example.ts.net';
@@ -687,9 +689,11 @@ void main() {
     for (final MapEntry(key: name, value: setup) in screens.entries) {
       testWidgets(name, (tester) async {
         for (final theme in [ThemePref.light, ThemePref.dark]) {
+          final (llm, toolkit) = _sample();
           final h = await pumpApp(
             tester,
-            llm: _sample(),
+            llm: llm,
+            toolkitServer: toolkit,
             appsServer: connected ? _sampleApps() : null,
             canViewApps: true,
             onChat: false,

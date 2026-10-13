@@ -53,46 +53,42 @@ void main() {
     expect(find.textContaining('Weighing the plan.'), findsNothing);
   });
 
-  testWidgets(
-    'More follows Copy and Retry, and lists what was measured and the thumbs',
-    (tester) async {
-      await pumpApp(tester, llm: measured());
-      await ask(tester, 'Second');
-      final more = control(_more);
-      expect(more, findsOneWidget);
-      // Nothing of how it ran shows until asked for.
-      expect(find.textContaining('tok/s'), findsNothing);
-      // Each control under the newest answer, the lowest of its kind.
-      Offset at(String label) => control(label)
-          .evaluate()
-          .map((e) => tester.getTopLeft(find.byElementPredicate((x) => x == e)))
-          .reduce((a, b) => a.dy >= b.dy ? a : b);
-      // The thumbs are in the menu, not the row.
-      expect(control('Good answer'), findsNothing);
-      final row = ['Copy answer', 'Retry', _more].map(at).toList();
-      expect(row.map((o) => o.dy).toSet(), hasLength(1));
-      final left = [for (final o in row) o.dx];
-      expect(left, orderedEquals([...left]..sort()));
-      await tester.tap(more);
-      await tester.pumpAndSettle();
-      expect(find.text('This answer'), findsOneWidget);
-      for (final (name, value) in [
-        ('Model', 'glm-5.3'),
-        ('Time', '4.3 s'),
-        ('Tokens', '1,642'),
-        ('Speed', '22 tok/s'),
-      ]) {
-        expect(find.text(name), findsOneWidget);
-        expect(find.text(value), findsOneWidget);
-      }
-      // No price, no Cost row.
-      expect(find.text('Cost'), findsNothing);
-      expect(find.text('Rate this answer'), findsOneWidget);
-      expect(control('Good answer'), findsOneWidget);
-      expect(control('Bad answer'), findsOneWidget);
-      expect(control(_always), findsOneWidget);
-    },
-  );
+  testWidgets('More follows Copy and Retry, and lists what was measured', (
+    tester,
+  ) async {
+    await pumpApp(tester, llm: measured());
+    await ask(tester, 'Second');
+    final more = control(_more);
+    expect(more, findsOneWidget);
+    // Nothing of how it ran shows until asked for.
+    expect(find.textContaining('tok/s'), findsNothing);
+    // Each control under the newest answer, the lowest of its kind.
+    Offset at(String label) => control(label)
+        .evaluate()
+        .map((e) => tester.getTopLeft(find.byElementPredicate((x) => x == e)))
+        .reduce((a, b) => a.dy >= b.dy ? a : b);
+    final row = ['Copy answer', 'Retry', _more].map(at).toList();
+    expect(row.map((o) => o.dy).toSet(), hasLength(1));
+    final left = [for (final o in row) o.dx];
+    expect(left, orderedEquals([...left]..sort()));
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    expect(find.text('This answer'), findsOneWidget);
+    for (final (name, value) in [
+      ('Model', 'glm-5.3'),
+      ('Time', '4.3 s'),
+      ('Tokens', '1,642'),
+      ('Speed', '22 tok/s'),
+    ]) {
+      expect(find.text(name), findsOneWidget);
+      expect(find.text(value), findsOneWidget);
+    }
+    // No price, no Cost row.
+    expect(find.text('Cost'), findsNothing);
+    expect(find.text('Rate this answer'), findsNothing);
+    expect(control('Good answer'), findsNothing);
+    expect(control(_always), findsOneWidget);
+  });
 
   testWidgets('More is a sheet, closed by Esc, Back and the scrim', (
     tester,
@@ -108,10 +104,6 @@ void main() {
     );
     expect(
       find.descendant(of: sheet, matching: find.text('glm-5.3')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: sheet, matching: control('Good answer')),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);

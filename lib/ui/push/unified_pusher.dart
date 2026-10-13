@@ -50,6 +50,20 @@ class UnifiedPusher implements Pusher {
       onMessage: (_, _) {},
     );
     _tapped(await _native.invokeMethod<Object?>('launchTap'));
+    unawaited(_retire());
+  }
+
+  /// The UnifiedPush instance an older version registered for AnythingLLM's own scheduled-job
+  /// pushes, which take its web login.
+  static const _retired = 'anythingllm';
+
+  /// Lets go of [_retired], so AnythingLLM's pushes stop reaching the device.
+  Future<void> _retire() async {
+    try {
+      await _up.unregister(_retired);
+    } on PlatformException {
+      // Nothing was registered under it, or no distributor is chosen.
+    }
   }
 
   void _endpoint(PushEndpoint endpoint, String instance) {

@@ -11,12 +11,9 @@ import 'push.dart';
 import 'schedule.dart';
 import 'server_models.dart';
 import 'system_files.dart';
+import 'toolkit.dart';
 
 export 'errors.dart';
-
-/// How a server signs in to its web UI: not at all, with one password, or with a user name and
-/// password, which the app does not do.
-enum ServerAuth { none, password, multiUser }
 
 /// The AnythingLLM server, as the UI sees it. Every method throws [ApiException] on failure.
 /// Every method but [verify] uses the connection in use, and throws [NotConfigured] when there
@@ -25,19 +22,6 @@ abstract interface class AnythingLlmApi {
   /// Asks the server whether [connection] opens it. Takes the connection as an argument so
   /// Settings can test one before it is saved.
   Future<void> verify(Connection connection);
-
-  /// How the server at [connection] signs in to its web UI, which its own routes outside the
-  /// developer API take instead of the key.
-  Future<ServerAuth> serverAuth(Connection connection);
-
-  /// Signs in to the server with [connection]'s password, so a wrong one fails here and not on
-  /// the first call that needs it. A refused password is an [ApiException] with status 403.
-  Future<void> signIn(Connection connection);
-
-  /// The developer key named `AnywhereLLM` on the server at [baseUrl], made when it has none,
-  /// signed in with [password] when the server has one. A server with several users refuses it
-  /// with 401, as does a server with a password when [password] is null.
-  Future<String> issueKey(String baseUrl, {String? password});
 
   /// Every workspace with its named threads, without its documents.
   Future<List<Workspace>> workspaces();
@@ -75,55 +59,6 @@ abstract interface class AnythingLlmApi {
     String message, {
     List<Attachment> attachments = const [],
   });
-
-  /// The server's VAPID public key, base64url, which a device registers its push endpoint
-  /// with. It takes the server's web login, as the presets do.
-  Future<String> pushKey();
-
-  /// Sends this device's push subscription to the server, which pushes to it when a scheduled
-  /// job ends. The server keeps one device for its one user: this replaces any other, such as
-  /// a browser's. It takes the server's web login.
-  Future<void> subscribePush(PushSubscription subscription);
-
-  /// The jobs AnythingLLM runs on a schedule. It takes the server's web login, as the presets
-  /// do: on a server with a password it needs one saved.
-  Future<List<ScheduledJob>> scheduledJobs();
-
-  /// Whether the server keeps saved memories, and saves them from chats itself. This and the
-  /// other saved-memory calls take the server's web login, as the presets do.
-  Future<MemorySwitches> memorySwitches();
-
-  /// Turns saved memories, or the server saving them from chats, on or off; null leaves one as
-  /// it is.
-  Future<void> setMemorySwitches({bool? enabled, bool? learn});
-
-  /// The saved memories workspace [slug]'s chats are shown. Fails with status 403 while the
-  /// server keeps none.
-  Future<SavedMemories> savedMemories(String slug);
-
-  /// Saves [text] for every workspace when [global], else for workspace [slug]. A full list is
-  /// an [ApiException] in the server's words.
-  Future<SavedMemory> addMemory(
-    String slug,
-    String text, {
-    required bool global,
-  });
-
-  Future<SavedMemory> editMemory(int id, String text);
-
-  Future<void> deleteMemory(int id);
-
-  /// Shows memory [id] in every workspace's chats, or, given [toWorkspace], in that workspace's
-  /// only.
-  Future<SavedMemory> moveMemory(int id, {String? toWorkspace});
-
-  /// Deletes the chat's exchanges from [chatId] on, that one included, so a question asked again
-  /// replaces them. Needs the server's password when it has one.
-  Future<void> dropFrom(String slug, String thread, int chatId);
-
-  /// Marks the answer [chatId] good or bad, or neither when [good] is null. Needs the server's
-  /// password when it has one.
-  Future<void> setFeedback(String slug, int chatId, bool? good);
 
   /// Embeds the documents at [adds] in the workspace and drops those at [deletes], by
   /// `folder/name.json` path.
@@ -180,8 +115,7 @@ abstract interface class AnythingLlmApi {
   /// The bytes of a file or image an agent made, by the [storageName] the server gave it.
   Future<List<int>> generatedFile(String storageName);
 
-  /// The bytes of the image at [url], from an answer. Sent without the key, the password or a
-  /// login token.
+  /// The bytes of the image at [url], from an answer. Sent without the key.
   Future<Uint8List> answerImage(Uri url);
 
   /// The server's settings, with every secret replaced by whether it is set.
@@ -281,6 +215,41 @@ abstract interface class AppsApi implements CompanionApi {
   /// card as read before, it sends [CardPicture.etag] as `If-None-Match`, and answers [last]
   /// itself when the server says the card has not changed.
   Future<CardPicture> card(Uri url, {CardPicture? last});
+}
+
+/// The toolkit, anythingllm-toolkit: AnythingLLM's saved memories and scheduled jobs, which
+/// its developer API lacks, as [ToolkitFeature]s. Every method but [features] uses the
+/// connection in use and throws [ApiException] on failure, [NotConfigured] when there is none.
+abstract interface class ToolkitApi implements CompanionApi {
+  /// The jobs AnythingLLM runs on a schedule. Times are UTC.
+  Future<List<ScheduledJob>> scheduledJobs();
+
+  /// Whether the server keeps saved memories, and saves them from chats itself.
+  Future<MemorySwitches> memorySwitches();
+
+  /// Turns saved memories, or the server saving them from chats, on or off; null leaves one as
+  /// it is.
+  Future<void> setMemorySwitches({bool? enabled, bool? learn});
+
+  /// The saved memories workspace [slug]'s chats are shown. Fails with status 403 while the
+  /// server keeps none.
+  Future<SavedMemories> savedMemories(String slug);
+
+  /// Saves [text] for every workspace when [global], else for workspace [slug]. A full list is
+  /// an [ApiException] in the server's words.
+  Future<SavedMemory> addMemory(
+    String slug,
+    String text, {
+    required bool global,
+  });
+
+  Future<SavedMemory> editMemory(int id, String text);
+
+  Future<void> deleteMemory(int id);
+
+  /// Shows memory [id] in every workspace's chats, or, given [toWorkspace], in that workspace's
+  /// only.
+  Future<SavedMemory> moveMemory(int id, {String? toWorkspace});
 }
 
 /// Where the connection is kept between runs.

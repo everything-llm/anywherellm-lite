@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../../core/connection.dart';
 import '../../core/ports.dart';
 import '../app_scope.dart';
-import '../layout.dart';
 import '../state/settings_controller.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';
@@ -13,16 +12,14 @@ import '../type.dart';
 import '../widgets/headline.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
-import '../widgets/tappable.dart';
 import '../widgets/controls.dart';
 import '../widgets/fields.dart';
-import 'password_card.dart';
 import 'rows.dart';
 import 'scan_view.dart';
 import '../widgets/sheet.dart';
 
-/// How this device reaches the server: the address and key, the server's password, and what
-/// the server says. The server reads Connected once Test connection passes here,
+/// How this device reaches the server: the address and developer key, and what the server
+/// says. The server reads Connected once Test connection passes here,
 /// until the page closes or the connection changes or fails a test.
 class ConnectionPage extends StatefulWidget {
   const ConnectionPage({super.key});
@@ -53,16 +50,12 @@ class _ConnectionPageState extends State<ConnectionPage> {
           child!,
         ],
       ),
-      child: _KeyCard(
-        tested: _tested,
-        onTest: _test,
-        password: const PasswordCard(),
-      ),
+      child: _KeyCard(tested: _tested, onTest: _test),
     );
   }
 }
 
-/// The first run, over the sign-in form: what to do to connect.
+/// The first run, over the key form: what to do to connect.
 class _Welcome extends StatelessWidget {
   const _Welcome();
 
@@ -82,7 +75,7 @@ class _Welcome extends StatelessWidget {
             child: Text(
               scan
                   ? 'Already set up on your computer? Scan its code and this phone is connected.'
-                  : 'Sign in with the address and password of your AnythingLLM server.',
+                  : 'Enter your AnythingLLM server\'s address and a developer key.',
               style: Type.note(t.muted),
             ),
           ),
@@ -94,23 +87,16 @@ class _Welcome extends StatelessWidget {
 
 /// The address and key: saved, replaced or forgotten, or read from a QR code. A key is saved
 /// only once the server takes it. Once one is saved, a card names the server and where its key
-/// is kept, with the form to edit it under it while open, then [password], then Test connection,
-/// Edit connection and Forget this server, one under another.
+/// is kept, with the form to edit it under it while open, then Test connection, Edit connection
+/// and Forget this server, one under another.
 class _KeyCard extends StatefulWidget {
-  const _KeyCard({
-    required this.tested,
-    required this.onTest,
-    required this.password,
-  });
+  const _KeyCard({required this.tested, required this.onTest});
 
   /// Whether Test connection was asked on this page, so a pass reads Connected.
   final bool tested;
 
   /// Tests the saved connection.
   final VoidCallback onTest;
-
-  /// The server's password, under the key.
-  final Widget password;
 
   @override
   State<_KeyCard> createState() => _KeyCardState();
@@ -121,11 +107,7 @@ class _KeyCardState extends State<_KeyCard> {
   late final CodeScanner? _scanner = AppScope.of(context).scanner;
   final _url = TextEditingController();
   final _key = TextEditingController();
-  final _password = TextEditingController();
   bool _replacing = false;
-
-  /// Whether the form takes a pasted developer key instead of the server's password.
-  bool _pasteKey = false;
   bool _confirmForget = false;
 
   /// The shell, which holds whether the camera reads a code, so Back can stop it.
@@ -142,10 +124,6 @@ class _KeyCardState extends State<_KeyCard> {
   void initState() {
     super.initState();
     _url.text = _settings.connection?.baseUrl ?? '';
-    // The server may have been out of reach when the app started.
-    if (_settings.connection != null && _settings.auth == null) {
-      unawaited(_settings.readAuth());
-    }
   }
 
   @override
@@ -153,7 +131,6 @@ class _KeyCardState extends State<_KeyCard> {
     _forgetTimer?.cancel();
     _url.dispose();
     _key.dispose();
-    _password.dispose();
     super.dispose();
   }
 
@@ -162,18 +139,6 @@ class _KeyCardState extends State<_KeyCard> {
     if (mounted && saved) {
       setState(() {
         _key.clear();
-        _replacing = false;
-      });
-    }
-  }
-
-  Future<void> _signIn() async {
-    final saved = await _settings.signIn(_url.text, _password.text);
-    // A server with several users gives no key this way, so the form takes one.
-    if (mounted && _settings.needsKey) setState(() => _pasteKey = true);
-    if (mounted && saved) {
-      setState(() {
-        _password.clear();
         _replacing = false;
       });
     }
@@ -195,7 +160,6 @@ class _KeyCardState extends State<_KeyCard> {
       _shell.setScanning(false);
       _scanProblem = null;
       // A key the server refuses then shows in its field, under why.
-      _pasteKey = true;
       _url.text = connection.baseUrl;
       _key.text = connection.apiKey;
     });
@@ -262,44 +226,21 @@ class _KeyCardState extends State<_KeyCard> {
                     keyboardType: TextInputType.url,
                     autofillHints: const [AutofillHints.url],
                   ),
-                  if (_pasteKey)
-                    AppField(
-                      controller: _key,
-                      label: 'AnythingLLM developer API key',
-                      hint: 'Paste the AnythingLLM API key',
-                      obscure: true,
-                      // Not a password: AppField leaves it out of autofill, so no saved
-                      // login is offered for it.
-                      keyboardType: TextInputType.visiblePassword,
-                    )
-                  else
-                    AppField(
-                      controller: _password,
-                      label: 'Server password',
-                      hint: 'Leave it empty if the server has none',
-                      obscure: true,
-                      keyboardType: TextInputType.visiblePassword,
-                      onSubmitted: (_) => saving ? null : _signIn(),
-                    ),
+                  AppField(
+                    controller: _key,
+                    label: 'AnythingLLM developer API key',
+                    hint: 'Paste the AnythingLLM API key',
+                    obscure: true,
+                    // Not a password: AppField leaves it out of autofill, so no saved
+                    // login is offered for it.
+                    keyboardType: TextInputType.visiblePassword,
+                    onSubmitted: (_) => saving ? null : _save(),
+                  ),
                   ActionRow([
                     AppButton(
-                      saving
-                          ? 'Checking…'
-                          : _pasteKey
-                          ? 'Save key'
-                          : 'Sign in',
+                      saving ? 'Checking…' : 'Save key',
                       primary: true,
-                      onPressed: saving
-                          ? null
-                          : _pasteKey
-                          ? _save
-                          : _signIn,
-                    ),
-                    AppButton(
-                      _pasteKey ? 'Use password' : 'Paste a key',
-                      onPressed: saving
-                          ? null
-                          : () => setState(() => _pasteKey = !_pasteKey),
+                      onPressed: saving ? null : _save,
                     ),
                     if (_scanner != null)
                       AppButton(
@@ -316,11 +257,6 @@ class _KeyCardState extends State<_KeyCard> {
               ),
             if (_settings.keyringProblem case final problem?)
               AlertBox(AlertKind.warn, problem.title, text: problem.text),
-            // The password's card, when it has something to show.
-            if (connection.password != null ||
-                _settings.auth == ServerAuth.password ||
-                _settings.auth == ServerAuth.multiUser)
-              widget.password,
             AppButton(
               saving && !editing ? 'Testing…' : 'Test connection',
               onPressed: saving ? null : widget.onTest,
@@ -354,9 +290,8 @@ class _KeyCardState extends State<_KeyCard> {
         child: child,
       );
 
-  /// The first run: Scan QR code first where there is a camera, then the address and
-  /// the password, each under its name, Sign in and Paste a key, or the key in the password's
-  /// place.
+  /// The first run: Scan QR code first where there is a camera, then the address and the
+  /// developer key, each under its name, where to make a key, and Connect.
   Widget _firstRun(BuildContext context, bool saving, VoidCallback startScan) {
     final t = Tokens.of(context);
     final scanner = _scanner;
@@ -376,10 +311,7 @@ class _KeyCardState extends State<_KeyCard> {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-            child: SectionLabel(
-              _pasteKey ? 'Or paste a key' : 'Or sign in',
-              header: false,
-            ),
+            child: SectionLabel('Or enter a key', header: false),
           ),
         ],
         NamedControl(
@@ -394,41 +326,26 @@ class _KeyCardState extends State<_KeyCard> {
             autofillHints: const [AutofillHints.url],
           ),
         ),
-        if (_pasteKey)
-          NamedControl(
-            'Developer API key',
-            quiet: true,
-            labelled: true,
-            AppField(
-              controller: _key,
-              label: 'AnythingLLM developer API key',
-              hint: 'Paste the AnythingLLM API key',
-              obscure: true,
-              keyboardType: TextInputType.visiblePassword,
-            ),
-          )
-        else ...[
-          NamedControl(
-            'Password',
-            quiet: true,
-            labelled: true,
-            AppField(
-              controller: _password,
-              label: 'Password',
-              hint: 'Leave it empty if the server has none',
-              obscure: true,
-              keyboardType: TextInputType.visiblePassword,
-              onSubmitted: (_) => saving ? null : _signIn(),
-            ),
+        NamedControl(
+          'Developer API key',
+          quiet: true,
+          labelled: true,
+          AppField(
+            controller: _key,
+            label: 'AnythingLLM developer API key',
+            hint: 'Paste the AnythingLLM API key',
+            obscure: true,
+            keyboardType: TextInputType.visiblePassword,
+            onSubmitted: (_) => saving ? null : _save(),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Text(
-              'The password AnythingLLM\'s web page asks for. The app makes its own developer key.',
-              style: Type.note(t.muted),
-            ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            'Make one in AnythingLLM\'s web page: Settings, Developer API, Generate New API Key.',
+            style: Type.note(t.muted),
           ),
-        ],
+        ),
         // Why the last try failed, in a line kept for it.
         ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 20),
@@ -444,32 +361,9 @@ class _KeyCardState extends State<_KeyCard> {
           ),
         ),
         AppButton(
-          saving
-              ? 'Checking…'
-              : _pasteKey
-              ? 'Save key'
-              : 'Sign in',
+          saving ? 'Checking…' : 'Connect',
           primary: scanner == null,
-          onPressed: saving
-              ? null
-              : _pasteKey
-              ? _save
-              : _signIn,
-        ),
-        Tappable(
-          label: _pasteKey ? 'Use password' : 'Paste a key',
-          onTap: () {
-            if (!saving) setState(() => _pasteKey = !_pasteKey);
-          },
-          radius: BorderRadius.circular(Sizes.control),
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 52),
-            alignment: Alignment.center,
-            child: Text(
-              _pasteKey ? 'Use password' : 'Paste a key',
-              style: Type.sans(16, weight: FontWeight.w500, color: t.accent),
-            ),
-          ),
+          onPressed: saving ? null : _save,
         ),
         if (_settings.keyringProblem case final problem?)
           AlertBox(AlertKind.warn, problem.title, text: problem.text),

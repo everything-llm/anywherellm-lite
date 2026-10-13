@@ -21,16 +21,14 @@ class PushState {
   final String? why;
 }
 
-/// Push notifications on this device, from AnythingLLM's scheduled jobs and from the apps
-/// server's apps. They are on while the [Pusher] has a distributor. Each source registers with
-/// its server's key whenever the server in use, its password or the apps server changes, and at
-/// every start, and sends the endpoint the distributor answers to its server. A tapped
-/// notification, these or the app's own that an answer is ready, opens Upcoming, its app or its
-/// chat.
+/// Push notifications on this device, from the apps server's apps. They are on while the
+/// [Pusher] has a distributor. Each source registers with its server's key whenever the server
+/// in use or the apps server changes, and at every start, and sends the endpoint the
+/// distributor answers to its server. A tapped notification, these or the app's own that an
+/// answer is ready, opens its app or its chat.
 class PushController extends ChangeNotifier {
   PushController(
     this._pusher,
-    this._llm,
     this._appsApi,
     this._settings,
     this._chat,
@@ -45,7 +43,6 @@ class PushController extends ChangeNotifier {
   }
 
   final Pusher _pusher;
-  final AnythingLlmApi _llm;
   final AppsApi _appsApi;
   final SettingsController _settings;
   final ChatController _chat;
@@ -67,8 +64,8 @@ class PushController extends ChangeNotifier {
   /// Each source's state while [on].
   final states = <PushSource, PushState>{};
 
-  /// What each source last registered for: its server, and for [PushSource.server] whether the
-  /// app is signed in, or for [PushSource.apps] whether the apps server is there.
+  /// What each source last registered for: its server, and for [PushSource.apps] whether the
+  /// apps server is there.
   final _seen = <PushSource, Object>{};
 
   /// The endpoint the distributor last gave [PushSource.apps], which turning off unsubscribes.
@@ -80,12 +77,11 @@ class PushController extends ChangeNotifier {
     _changed();
   }
 
-  /// What [source] registers for, compared by value; the password alone does not change it.
+  /// What [source] registers for, compared by value.
   Object? _keyOf(PushSource source) {
-    final server = _settings.connection?.withPassword(null);
+    final server = _settings.connection;
     if (server == null) return null;
     return switch (source) {
-      PushSource.server => (server, _chat.signedIn, _settings.auth),
       PushSource.apps => (server, _apps.available),
     };
   }
@@ -116,19 +112,6 @@ class PushController extends ChangeNotifier {
   /// Why [source] cannot push from the server in use, or null when it can.
   Future<PushState?> _blocked(PushSource source) async {
     switch (source) {
-      case PushSource.server:
-        if (_chat.signedIn) return null;
-        return switch (_settings.auth) {
-          null => const PushState(PushStatus.waiting),
-          ServerAuth.multiUser => const PushState(
-            PushStatus.unavailable,
-            'A server with several users does not send this app notifications.',
-          ),
-          _ => const PushState(
-            PushStatus.unavailable,
-            'Needs the server password. Add it on the Connection page.',
-          ),
-        };
       case PushSource.apps:
         return switch (_apps.available) {
           null => const PushState(PushStatus.waiting),
@@ -152,7 +135,6 @@ class PushController extends ChangeNotifier {
     _set(source, const PushState(PushStatus.waiting));
     try {
       final vapid = await switch (source) {
-        PushSource.server => _llm.pushKey(),
         PushSource.apps => _appsApi.pushKey(),
       };
       if (_seen[source] != key) return;
@@ -177,7 +159,6 @@ class PushController extends ChangeNotifier {
         }
         try {
           await switch (source) {
-            PushSource.server => _llm.subscribePush(subscription),
             PushSource.apps => _appsApi.subscribePush(subscription),
           };
           if (_seen[source] == key) {
@@ -242,8 +223,7 @@ class PushController extends ChangeNotifier {
     _changed();
   }
 
-  /// Stops every source's pushes. The apps server forgets the device; AnythingLLM has no way to,
-  /// and finds the endpoint gone.
+  /// Stops every source's pushes. The apps server forgets the device.
   Future<void> turnOff() async {
     final apps = _appsEndpoint;
     on = false;
@@ -267,9 +247,6 @@ class PushController extends ChangeNotifier {
 
   void _open(PushTarget target) {
     switch (target) {
-      case UpcomingTarget():
-        _shell.showTab(HomeTab.chats);
-        _shell.openUpcoming();
       case AppTarget(:final app):
         _shell.openApp(app);
       case ChatTarget(:final slug, :final thread):

@@ -241,7 +241,6 @@ class ChatMessage {
     this.files = const [],
     this.metrics,
     this.chatId,
-    this.feedback,
   });
 
   /// An entry of a chat's `history`.
@@ -260,10 +259,6 @@ class ChatMessage {
     metrics: metricsOf(json['metrics']),
     chatId: switch (json['chatId']) {
       final int id => id,
-      _ => null,
-    },
-    feedback: switch (json['feedbackScore']) {
-      final bool good => good,
       _ => null,
     },
   );
@@ -285,9 +280,6 @@ class ChatMessage {
 
   /// The server's id for the exchange; a question and its answer share it.
   final int? chatId;
-
-  /// Whether the answer was marked good or bad, or null when neither.
-  final bool? feedback;
 }
 
 /// A passage of a document an answer read: its [text], and how close it was to the question,

@@ -5,11 +5,8 @@ import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/chat_log.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/embeds.dart';
-import 'package:anywherellm/core/memory.dart';
 import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/ports.dart';
-import 'package:anywherellm/core/push.dart';
-import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/core/server_models.dart';
 
 /// A connection for tests that need a server set up.
@@ -62,12 +59,6 @@ class FakeAnythingLlm implements AnythingLlmApi {
   final List<Connection> verified = [];
   Object? verifyError;
 
-  /// How [serverAuth] says the server signs in.
-  ServerAuth auth = ServerAuth.none;
-
-  /// The password [signIn] takes; any other is refused.
-  String serverPassword = 'PASS-WORD';
-
   /// The id [streamChat]'s next answer is given, counting up.
   int nextChatId = 100;
 
@@ -119,10 +110,6 @@ class FakeAnythingLlm implements AnythingLlmApi {
   /// Each held answer's controller, by thread: the last one when a chat asked twice.
   final Map<String, StreamController<ChatEvent>> chats = {};
 
-  /// Whether [streamChat]'s closing event leaves out the answer's id, as AnythingLLM's agent path
-  /// does. The exchange is then saved to [histories] under that id, as the server saves it.
-  bool omitsChatId = false;
-
   /// The status lines [streamChat] sends before the answer, as an agent does.
   List<String> agentStatus = const [];
 
@@ -159,47 +146,6 @@ class FakeAnythingLlm implements AnythingLlmApi {
     verified.add(connection);
     if (verifyError != null) throw verifyError!;
   }
-
-  @override
-  Future<ServerAuth> serverAuth(Connection connection) =>
-      _run('serverAuth', () => auth);
-
-  @override
-  Future<void> signIn(Connection connection) => _run('signIn', () {
-    if (connection.password != serverPassword) {
-      throw const ApiException(
-        'The server did not accept the password.',
-        status: 403,
-      );
-    }
-  });
-
-  /// The developer keys the server holds, by name. [issueKey] adds `AnywhereLLM` when it is
-  /// missing.
-  final Map<String, String> apiKeys = {};
-
-  @override
-  Future<String> issueKey(String baseUrl, {String? password}) =>
-      _run('issueKey', () {
-        if (auth == ServerAuth.multiUser) {
-          throw const ApiException(
-            'This needs the server password. Add it in Settings.',
-            status: 401,
-          );
-        }
-        if (auth == ServerAuth.password && password != serverPassword) {
-          throw password == null
-              ? const ApiException(
-                  'This needs the server password. Add it in Settings.',
-                  status: 401,
-                )
-              : const ApiException(
-                  'The server did not accept the password.',
-                  status: 403,
-                );
-        }
-        return apiKeys.putIfAbsent('AnywhereLLM', () => 'MADE-KEY');
-      }, baseUrl);
 
   @override
   Future<List<Workspace>> workspaces() => _run(
@@ -289,13 +235,6 @@ class FakeAnythingLlm implements AnythingLlmApi {
       return chat!.stream;
     }
     final id = nextChatId++;
-    if (omitsChatId) {
-      histories[thread] = [
-        ...?histories[thread],
-        ChatMessage(role: Role.user, text: message, chatId: id),
-        ChatMessage(role: Role.assistant, text: answer, chatId: id),
-      ];
-    }
     return Stream.fromIterable([
       for (final line in agentStatus) StatusChunk(line),
       TextChunk(answer),
@@ -303,164 +242,10 @@ class FakeAnythingLlm implements AnythingLlmApi {
         [for (final title in cited) Citation(title)],
         files: made,
         metrics: measured,
-        chatId: omitsChatId ? null : id,
+        chatId: id,
       ),
     ]);
   }
-
-  /// What [memorySwitches] answers, and [setMemorySwitches] changes.
-  MemorySwitches switches = const MemorySwitches(enabled: true, learn: true);
-
-  /// The saved memories for every workspace.
-  final List<SavedMemory> globalMemories = [];
-
-  /// Each workspace's own saved memories, by slug.
-  final Map<String, List<SavedMemory>> workspaceMemories = {};
-
-  /// An id no saved memory has, as the server numbers them.
-  int get _nextMemory =>
-      [
-        0,
-        for (final list in [globalMemories, ...workspaceMemories.values])
-          for (final m in list) m.id,
-      ].reduce((a, b) => a > b ? a : b) +
-      1;
-
-  @override
-  Future<MemorySwitches> memorySwitches() =>
-      _run('memorySwitches', () => switches);
-
-  @override
-  Future<void> setMemorySwitches({bool? enabled, bool? learn}) => _run(
-    'setMemorySwitches',
-    () => switches = MemorySwitches(
-      enabled: enabled ?? switches.enabled,
-      learn: learn ?? switches.learn,
-    ),
-    [
-      ?enabled == null ? null : 'enabled=$enabled',
-      ?learn == null ? null : 'learn=$learn',
-    ].join(','),
-  );
-
-  /// Refuses a saved-memory call while they are off, as the server does.
-  void _memoriesOn() {
-    if (!switches.enabled) {
-      throw const ApiException('Personalization is disabled.', status: 403);
-    }
-  }
-
-  /// The list a saved memory for every workspace, or for [slug], goes in.
-  List<SavedMemory> _memories(String? slug) => slug == null
-      ? globalMemories
-      : workspaceMemories.putIfAbsent(slug, () => []);
-
-  /// Adds [memory] to the list for every workspace, or for [slug], unless it is full, as the
-  /// server refuses it.
-  SavedMemory _keepMemory(SavedMemory memory, String? slug) {
-    final list = _memories(slug);
-    final limit = slug == null ? globalMemoryLimit : workspaceMemoryLimit;
-    if (list.length >= limit) {
-      throw ApiException(
-        'Maximum ${slug == null ? 'global' : 'workspace'} memory limit ($limit) reached.',
-        status: 400,
-      );
-    }
-    list.add(memory);
-    return memory;
-  }
-
-  /// The list that holds saved memory [id], or a 404.
-  List<SavedMemory> _holding(int id) =>
-      [
-        globalMemories,
-        ...workspaceMemories.values,
-      ].where((list) => list.any((m) => m.id == id)).firstOrNull ??
-      (throw const ApiException('Memory not found.', status: 404));
-
-  @override
-  Future<SavedMemories> savedMemories(String slug) => _run('savedMemories', () {
-    _memoriesOn();
-    return SavedMemories(
-      global: [...globalMemories],
-      workspace: [...?workspaceMemories[slug]],
-    );
-  }, slug);
-
-  @override
-  Future<SavedMemory> addMemory(
-    String slug,
-    String text, {
-    required bool global,
-  }) => _run('addMemory', () {
-    _memoriesOn();
-    return _keepMemory(
-      SavedMemory(id: _nextMemory, text: text, global: global),
-      global ? null : slug,
-    );
-  }, text);
-
-  @override
-  Future<SavedMemory> editMemory(int id, String text) => _run('editMemory', () {
-    _memoriesOn();
-    final list = _holding(id);
-    final at = list.indexWhere((m) => m.id == id);
-    return list[at] = SavedMemory(id: id, text: text, global: list[at].global);
-  }, '$id');
-
-  @override
-  Future<void> deleteMemory(int id) => _run('deleteMemory', () {
-    _memoriesOn();
-    _holding(id).removeWhere((m) => m.id == id);
-  }, '$id');
-
-  @override
-  Future<SavedMemory> moveMemory(int id, {String? toWorkspace}) =>
-      _run('moveMemory', () {
-        _memoriesOn();
-        final list = _holding(id);
-        final memory = list.firstWhere((m) => m.id == id);
-        final moved = _keepMemory(
-          SavedMemory(id: id, text: memory.text, global: toWorkspace == null),
-          toWorkspace,
-        );
-        list.remove(memory);
-        return moved;
-      }, '$id:${toWorkspace ?? 'global'}');
-
-  /// What [scheduledJobs] answers.
-  List<ScheduledJob> jobs = const [];
-
-  /// The VAPID key [pushKey] answers.
-  String pushKeyText = 'BServerKey';
-
-  /// The one device [subscribePush] keeps, as AnythingLLM keeps one for its one user.
-  PushSubscription? pushDevice;
-
-  @override
-  Future<String> pushKey() => _run('pushKey', () => pushKeyText);
-
-  @override
-  Future<void> subscribePush(PushSubscription subscription) =>
-      _run('subscribePush', () => pushDevice = subscription);
-
-  @override
-  Future<List<ScheduledJob>> scheduledJobs() =>
-      _run('scheduledJobs', () => jobs);
-
-  /// Drops the history's entries from the one with [chatId] on.
-  @override
-  Future<void> dropFrom(String slug, String thread, int chatId) =>
-      _run('dropFrom', () {
-        final kept = histories[thread];
-        if (kept == null) return;
-        final at = kept.indexWhere((m) => m.chatId == chatId);
-        if (at >= 0) histories[thread] = kept.sublist(0, at);
-      }, '$thread:$chatId');
-
-  @override
-  Future<void> setFeedback(String slug, int chatId, bool? good) =>
-      _run('setFeedback', () {}, '$chatId:$good');
 
   @override
   Future<void> updateEmbeddings(
@@ -706,18 +491,16 @@ FakeAnythingLlm answering(String answer, {List<Citation> cited = const []}) {
   return llm;
 }
 
-/// [planningServer] with the budget chat's one exchange given id 5, its question sent with
-/// [attachments].
-FakeAnythingLlm withChatIds({List<String> attachments = const []}) {
+/// [planningServer] with the budget chat's one exchange asked with [attachments].
+FakeAnythingLlm askedWithFiles(List<String> attachments) {
   final llm = planningServer();
   llm.histories['budget'] = [
     ChatMessage(
       role: Role.user,
       text: 'What is the budget?',
-      chatId: 5,
       attachments: [for (final name in attachments) SentFile(name)],
     ),
-    const ChatMessage(role: Role.assistant, text: 'About 40k.', chatId: 5),
+    const ChatMessage(role: Role.assistant, text: 'About 40k.'),
   ];
   return llm;
 }

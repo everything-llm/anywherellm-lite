@@ -7,7 +7,6 @@ import '../../core/chat_log.dart';
 import '../../core/connection.dart';
 import '../../core/embeds.dart';
 import '../../core/ports.dart';
-import '../../core/schedule.dart';
 import '../../core/server_models.dart';
 import '../../core/system_settings.dart';
 import 'notice.dart';
@@ -16,8 +15,7 @@ import 'settings_controller.dart';
 /// The server itself, apart from its workspaces: its settings, how many vectors its database
 /// holds, its chat embeds and the chats it recorded. A new server starts it afresh.
 class SystemController extends ChangeNotifier {
-  SystemController(this._api, this._settings)
-    : _server = _settings.connection?.withPassword(null) {
+  SystemController(this._api, this._settings) : _server = _settings.connection {
     _settings.addListener(_serverChanged);
   }
 
@@ -29,28 +27,6 @@ class SystemController extends ChangeNotifier {
 
   /// How many vectors the server holds, or null until read.
   int? vectors;
-
-  /// The jobs the server runs on a schedule, or null until read.
-  List<ScheduledJob>? jobs;
-
-  /// Why the last read of the jobs failed.
-  Notice? jobsProblem;
-
-  /// Reads the jobs the server runs on a schedule.
-  Future<void> readJobs() async {
-    final server = _server;
-    if (server == null) return;
-    try {
-      final read = await _api.scheduledJobs();
-      if (_server != server) return;
-      jobs = read;
-      jobsProblem = null;
-    } on ApiException catch (error) {
-      if (_server != server) return;
-      jobsProblem = Notice('Could not read the scheduled jobs', error.message);
-    }
-    notifyListeners();
-  }
 
   /// The server's settings, with every secret replaced by whether it is set, or null until read.
   Map<String, Object?>? settings;
@@ -353,15 +329,12 @@ class SystemController extends ChangeNotifier {
   }
 
   void _serverChanged() {
-    // A password saved or forgotten is the same server.
-    final now = _settings.connection?.withPassword(null);
+    final now = _settings.connection;
     if (now == _server) return;
     _server = now;
     _reading = null;
     _wanted = false;
     vectors = null;
-    jobs = null;
-    jobsProblem = null;
     problem = null;
     settings = null;
     settingsProblem = null;

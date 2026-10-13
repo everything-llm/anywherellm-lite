@@ -4,13 +4,14 @@ import 'package:anywherellm/ui/upcoming.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
+import '../support/fake_toolkit.dart';
 import '../support/pump.dart';
 
 void main() {
   testWidgets('the phone\'s drawer counts the jobs and opens Upcoming', (
     tester,
   ) async {
-    final llm = planningServer()
+    final toolkit = FakeToolkit()
       ..jobs = [
         ScheduledJob(
           name: 'Morning brief',
@@ -25,7 +26,12 @@ void main() {
           enabled: false,
         ),
       ];
-    final h = await pumpApp(tester, llm: llm, onChat: false);
+    final h = await pumpApp(
+      tester,
+      llm: planningServer(),
+      toolkitServer: toolkit,
+      onChat: false,
+    );
     expect(find.textContaining('2 jobs · next today'), findsOneWidget);
     await tester.tap(find.text('Upcoming'));
     await tester.pumpAndSettle();
@@ -43,21 +49,38 @@ void main() {
     expect(h.shell.upcomingOpen, isFalse);
   });
 
-  testWidgets('without the password Upcoming says why and offers Connection', (
+  testWidgets('a read the toolkit refuses says why and offers Connection', (
     tester,
   ) async {
-    final llm = planningServer()
+    final toolkit = FakeToolkit()
       ..errors['scheduledJobs'] = const ApiException(
-        'This needs the server password. Add it in Settings.',
+        'The toolkit did not accept the key.',
         status: 401,
       );
-    final h = await pumpApp(tester, llm: llm);
+    final h = await pumpApp(tester, toolkitServer: toolkit);
     h.shell.openUpcoming();
     await tester.pumpAndSettle();
-    expect(find.textContaining('server password'), findsOneWidget);
+    expect(find.textContaining('did not accept the key'), findsOneWidget);
     await tester.tap(control('Open Connection'));
     await tester.pumpAndSettle();
     expect(h.shell.upcomingOpen, isFalse);
     expect(h.shell.settingsOpen, isTrue);
+  });
+
+  testWidgets('without the toolkit there is no Upcoming, and no Memory', (
+    tester,
+  ) async {
+    final h = await pumpApp(
+      tester,
+      toolkitServer: FakeToolkit(present: false),
+      onChat: false,
+    );
+    expect(find.text('Upcoming'), findsNothing);
+    h.shell.openSettings();
+    await tester.pumpAndSettle();
+    expect(find.text('Server'), findsOneWidget);
+    expect(find.text('Memory'), findsNothing);
+    await h.toolkitServer.features();
+    expect(h.toolkitServer.calls, isNot(contains('scheduledJobs')));
   });
 }

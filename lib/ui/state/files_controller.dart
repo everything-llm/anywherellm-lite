@@ -21,7 +21,7 @@ import 'sources_controller.dart';
 /// active.
 class FilesController extends ChangeNotifier {
   FilesController(this._api, this._settings, this._chat, this._sources)
-    : _server = _settings.connection?.withPassword(null) {
+    : _server = _settings.connection {
     _settings.addListener(_serverChanged);
     _chat.addListener(_chatChanged);
     _sources.addListener(_sourcesChanged);
@@ -84,8 +84,7 @@ class FilesController extends ChangeNotifier {
   }
 
   void _serverChanged() {
-    // A password saved or forgotten is the same server.
-    final now = _settings.connection?.withPassword(null);
+    final now = _settings.connection;
     if (now == _server) return;
     _server = now;
     _details.clear();

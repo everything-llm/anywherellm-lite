@@ -41,7 +41,8 @@ class SavedMemories {
   final List<SavedMemory> global;
   final List<SavedMemory> workspace;
 
-  /// The memories as `GET /api/workspaces/{slug}/memories` answers them, under `memories`.
+  /// The memories as the toolkit's `GET /workspaces/{slug}/memories` answers them, under
+  /// `memories`.
   static SavedMemories fromJson(Object? json) {
     final memories = json is Map ? json['memories'] : null;
     List<SavedMemory> listed(Object? list) => [
@@ -64,14 +65,13 @@ class MemorySwitches {
   final bool enabled;
   final bool learn;
 
-  /// The switches as the server's preferences give them, under `settings`: `memory_enabled` is
-  /// off unless `true`, and `memory_auto_extraction` on unless `false`, as AnythingLLM reads them.
+  /// The switches as the toolkit gives them, `{enabled, learn}`: memories are off unless
+  /// `enabled` is true, and learning on unless `learn` is false, as AnythingLLM reads them.
   static MemorySwitches fromJson(Object? json) {
-    final settings = json is Map ? json['settings'] : null;
-    final values = settings is Map ? settings : const {};
+    final values = json is Map ? json : const {};
     return MemorySwitches(
-      enabled: '${values['memory_enabled']}' == 'true',
-      learn: '${values['memory_auto_extraction']}' != 'false',
+      enabled: values['enabled'] == true,
+      learn: values['learn'] != false,
     );
   }
 }

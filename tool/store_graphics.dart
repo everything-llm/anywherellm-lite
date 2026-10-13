@@ -23,6 +23,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../test/support/fake_api.dart';
+import '../test/support/fake_toolkit.dart';
 import '../test/support/fake_settings.dart';
 import '../test/support/pump.dart';
 
@@ -74,7 +75,8 @@ Future<void> _capture(
 }
 
 /// A server with a few workspaces and a budget chat worth looking at.
-FakeAnythingLlm _server() {
+(FakeAnythingLlm, FakeToolkit) _server() {
+  final toolkit = FakeToolkit();
   final llm = FakeAnythingLlm();
   llm.spaces = [
     FakeWorkspace(
@@ -119,7 +121,7 @@ FakeAnythingLlm _server() {
   ];
   // The drawer counts the jobs the server runs.
   final now = DateTime.now().toUtc();
-  llm.jobs = [
+  toolkit.jobs = [
     ScheduledJob(
       name: 'Morning brief',
       cron: '30 6 * * *',
@@ -163,7 +165,7 @@ FakeAnythingLlm _server() {
       ],
     ),
   ];
-  return llm;
+  return (llm, toolkit);
 }
 
 /// The banner across the top of the store page: the robin and the name on the icon's ground.
@@ -226,9 +228,11 @@ void main() {
   });
 
   testWidgets('the phone screenshots', (tester) async {
+    final (llm, toolkit) = _server();
     final h = await pumpApp(
       tester,
-      llm: _server(),
+      llm: llm,
+      toolkitServer: toolkit,
       size: _phone,
       connection: const Connection(
         baseUrl: 'https://anythingllm.example.ts.net',

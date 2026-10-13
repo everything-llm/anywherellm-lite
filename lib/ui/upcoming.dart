@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../core/copy.dart';
 import '../core/schedule.dart';
 import 'app_scope.dart';
+import 'state/toolkit_controller.dart';
 import 'layout.dart';
 import 'links.dart';
 import 'settings/rows.dart';
@@ -16,9 +17,10 @@ import 'widgets/buttons.dart';
 import 'widgets/phone_page.dart';
 import 'widgets/fields.dart';
 
-/// Upcoming on the Chats tab, a card of one row: the jobs the server runs on a schedule, with
-/// how many and when the next runs once read. It reads them the first time it shows on a
-/// server. Tapped, it opens [UpcomingPage].
+/// Upcoming on the Chats tab, a card of one row under a 20 px gap, shown while the toolkit lists
+/// the scheduled jobs: the jobs the server runs on a schedule, with how many and when the next
+/// runs once read. It reads them the first time it shows on a server. Tapped, it opens
+/// [UpcomingPage].
 class UpcomingCard extends StatefulWidget {
   const UpcomingCard({super.key});
 
@@ -27,14 +29,13 @@ class UpcomingCard extends StatefulWidget {
 }
 
 class _UpcomingCardState extends State<UpcomingCard> {
-  @override
-  void initState() {
-    super.initState();
-    final system = AppScope.of(context).system;
-    // A read tells the controller's listeners at once, so it waits for the frame.
+  /// Reads the jobs once the toolkit lists them, unless read or refused already. A read tells
+  /// the controller's listeners at once, so it waits for the frame.
+  void _want(ToolkitController toolkit) {
+    if (toolkit.jobs != null || toolkit.jobsProblem != null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && system.jobs == null && system.jobsProblem == null) {
-        unawaited(system.readJobs());
+      if (mounted && toolkit.jobs == null && toolkit.jobsProblem == null) {
+        unawaited(toolkit.readJobs());
       }
     });
   }
@@ -43,9 +44,12 @@ class _UpcomingCardState extends State<UpcomingCard> {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     return ListenableBuilder(
-      listenable: scope.system,
+      listenable: scope.toolkit,
       builder: (context, _) {
-        final jobs = scope.system.jobs;
+        final toolkit = scope.toolkit;
+        if (!toolkit.jobsServed) return const SizedBox.shrink();
+        _want(toolkit);
+        final jobs = toolkit.jobs;
         final now = DateTime.now();
         final next = [
           for (final job in jobs ?? const <ScheduledJob>[])
@@ -57,14 +61,17 @@ class _UpcomingCardState extends State<UpcomingCard> {
                 plural(jobs.length, 'job', 'jobs'),
                 if (next.isNotEmpty) 'next ${whenText(next.first, now)}',
               ].join(' · ');
-        return FieldCard([
-          NavRow(
-            icon: 'clock',
-            title: 'Upcoming',
-            about: about,
-            onTap: () => scope.shell.openUpcoming(),
-          ),
-        ]);
+        return Padding(
+          padding: const EdgeInsets.only(top: 20),
+          child: FieldCard([
+            NavRow(
+              icon: 'clock',
+              title: 'Upcoming',
+              about: about,
+              onTap: () => scope.shell.openUpcoming(),
+            ),
+          ]),
+        );
       },
     );
   }
@@ -72,8 +79,8 @@ class _UpcomingCardState extends State<UpcomingCard> {
 
 /// A phone's Upcoming: each job the server runs on a schedule, read only, with its workspace,
 /// its schedule in local time, when it runs next and how its last run went, then a way to
-/// AnythingLLM's web page to change them. It reads the jobs afresh as it opens. A server with a
-/// password needs it saved for this.
+/// AnythingLLM's web page to change them. It reads the jobs afresh as it opens, from the
+/// toolkit.
 class UpcomingPage extends StatefulWidget {
   const UpcomingPage({super.key});
 
@@ -85,9 +92,9 @@ class _UpcomingPageState extends State<UpcomingPage> {
   @override
   void initState() {
     super.initState();
-    final system = AppScope.of(context).system;
+    final toolkit = AppScope.of(context).toolkit;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(system.readJobs());
+      if (mounted) unawaited(toolkit.readJobs());
     });
   }
 
@@ -108,15 +115,15 @@ class _UpcomingPageState extends State<UpcomingPage> {
           ),
           Expanded(
             child: ListenableBuilder(
-              listenable: scope.system,
+              listenable: scope.toolkit,
               builder: (context, _) {
-                final system = scope.system;
-                final jobs = system.jobs;
+                final toolkit = scope.toolkit;
+                final jobs = toolkit.jobs;
                 final now = DateTime.now();
                 return ListView(
                   padding: Sizes.pagePadding,
                   children: [
-                    if (system.jobsProblem case final problem?) ...[
+                    if (toolkit.jobsProblem case final problem?) ...[
                       AlertBox(
                         AlertKind.warn,
                         problem.title,

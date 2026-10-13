@@ -1,5 +1,4 @@
 import 'package:anywherellm/core/apps.dart';
-import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/push.dart';
 import 'package:anywherellm/ui/settings/rows.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
@@ -51,7 +50,7 @@ void main() {
   });
 
   testWidgets(
-    'turning on subscribes this device to both servers, with each one\'s key',
+    'turning on subscribes this device to the apps server, with its key',
     (tester) async {
       final pusher = FakePusher();
       final harness = await _onPage(tester, pusher: pusher);
@@ -61,38 +60,27 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(pusher.using, 'io.heckel.ntfy');
-      expect(pusher.calls, [
-        'register:anythingllm:BServerKey',
-        'register:apps:BAppsKey',
-      ]);
-      expect(harness.llm.pushDevice, FakePusher.endpointOf(PushSource.server));
+      expect(pusher.calls, ['register:apps:BAppsKey']);
       expect(harness.appsServer.pushDevices.values, [
         FakePusher.endpointOf(PushSource.apps),
       ]);
-      expect(find.widgetWithText(InfoRow, 'Scheduled jobs'), findsOneWidget);
+      expect(find.widgetWithText(InfoRow, 'Scheduled jobs'), findsNothing);
       expect(find.widgetWithText(InfoRow, 'Apps'), findsOneWidget);
-      expect(find.text('On'), findsNWidgets(2));
+      expect(find.text('On'), findsOneWidget);
     },
   );
 
   testWidgets('a source its server cannot send from says why', (tester) async {
-    final llm = FakeAnythingLlm()..auth = ServerAuth.password;
-    final harness = await _onPage(tester, llm: llm, appsServer: FakeApps());
+    final harness = await _onPage(tester, appsServer: FakeApps());
     await tester.tap(control('Notifications'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Not available'), findsNWidgets(2));
-    expect(
-      find.text(
-        'Scheduled jobs: Needs the server password. Add it on the Connection page.',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('Not available'), findsOneWidget);
     expect(
       find.text('Apps: No apps server runs beside this server.'),
       findsOneWidget,
     );
-    expect(harness.llm.pushDevice, isNull);
+    expect(harness.appsServer.pushDevices, isEmpty);
   });
 
   testWidgets('an older apps server is told apart from none', (tester) async {
@@ -103,20 +91,6 @@ void main() {
       find.text('Apps: This apps server cannot send notifications. Update it.'),
       findsOneWidget,
     );
-  });
-
-  testWidgets('saving the password later subscribes the scheduled jobs', (
-    tester,
-  ) async {
-    final llm = FakeAnythingLlm()..auth = ServerAuth.password;
-    final harness = await _onPage(tester, llm: llm);
-    await tester.tap(control('Notifications'));
-    await tester.pumpAndSettle();
-    expect(harness.llm.pushDevice, isNull);
-
-    await harness.settings.savePassword(llm.serverPassword);
-    await tester.pumpAndSettle();
-    expect(harness.llm.pushDevice, FakePusher.endpointOf(PushSource.server));
   });
 
   testWidgets('with no distributor installed it says to install one', (
@@ -161,7 +135,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(pusher.using, 'org.unifiedpush.distributor.sunup');
     expect(harness.push!.on, isTrue);
-    expect(find.text('On'), findsNWidgets(2));
+    expect(find.text('On'), findsOneWidget);
   });
 
   testWidgets('a distributor that refuses says why', (tester) async {
@@ -171,7 +145,7 @@ void main() {
     await _onPage(tester, pusher: pusher);
     await tester.tap(control('Notifications'));
     await tester.pumpAndSettle();
-    expect(find.text('Failed'), findsNWidgets(2));
+    expect(find.text('Failed'), findsOneWidget);
     expect(
       find.text(
         'Apps: Open the distributor app: it needs you to finish setting it up.',
@@ -192,7 +166,7 @@ void main() {
       await tester.tap(control('Notifications'));
       await tester.pumpAndSettle();
       expect(harness.push!.on, isFalse);
-      expect(pusher.calls, ['unregister:anythingllm', 'unregister:apps']);
+      expect(pusher.calls, ['unregister:apps']);
       expect(harness.appsServer.pushDevices, isEmpty);
       expect(find.text('Sent by'), findsNothing);
     },
@@ -204,11 +178,8 @@ void main() {
     final pusher = FakePusher()..using = 'io.heckel.ntfy';
     final harness = await _onPage(tester, pusher: pusher);
     expect(harness.push!.on, isTrue);
-    expect(pusher.calls, [
-      'register:anythingllm:BServerKey',
-      'register:apps:BAppsKey',
-    ]);
-    expect(harness.llm.pushDevice, isNotNull);
+    expect(pusher.calls, ['register:apps:BAppsKey']);
+    expect(harness.appsServer.pushDevices, isNotEmpty);
   });
 
   testWidgets('another server is subscribed afresh', (tester) async {
@@ -217,7 +188,7 @@ void main() {
     pusher.calls.clear();
     await harness.settings.connect('https://other.example:3001', 'K2');
     await tester.pumpAndSettle();
-    expect(pusher.calls, contains('register:anythingllm:BServerKey'));
+    expect(pusher.calls, contains('register:apps:BAppsKey'));
   });
 
   testWidgets('a dropped registration asks to turn them off and on', (
@@ -235,20 +206,13 @@ void main() {
     );
   });
 
-  testWidgets('a tapped notification opens Upcoming or its app', (
-    tester,
-  ) async {
+  testWidgets('a tapped notification opens its app', (tester) async {
     final pusher = FakePusher();
     final harness = await pumpApp(
       tester,
       pusher: pusher,
       appsServer: FakeApps(present: true),
     );
-    pusher.tap(const UpcomingTarget());
-    await tester.pumpAndSettle();
-    expect(harness.shell.chatOpen, isFalse);
-    expect(harness.shell.upcomingOpen, isTrue);
-
     pusher.tap(const AppTarget(AppRef('planning', 'groceries')));
     await tester.pump();
     expect(harness.shell.app, const AppRef('planning', 'groceries'));

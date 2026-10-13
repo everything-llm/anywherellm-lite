@@ -1,37 +1,22 @@
 import 'errors.dart';
 
-/// Where an AnythingLLM server is, the key that opens its developer API, and the password that
-/// signs in to its web UI's own routes when the server has one.
+/// Where an AnythingLLM server is, and the developer key that opens its developer API, the one
+/// way the app reaches it.
 class Connection {
-  const Connection({
-    required this.baseUrl,
-    required this.apiKey,
-    this.password,
-  });
+  const Connection({required this.baseUrl, required this.apiKey});
 
   /// The connection [url] and [key] describe, with the address cleaned by [normalizeBaseUrl].
-  /// An empty [password] is none. Throws [ApiException] saying what is wrong with them.
-  factory Connection.parse(String url, String key, {String? password}) {
+  /// Throws [ApiException] saying what is wrong with them.
+  factory Connection.parse(String url, String key) {
     final baseUrl = normalizeBaseUrl(url);
     final apiKey = key.trim();
     if (apiKey.isEmpty) throw const ApiException('Enter the API key.');
-    return Connection(baseUrl: baseUrl, apiKey: apiKey).withPassword(password);
+    return Connection(baseUrl: baseUrl, apiKey: apiKey);
   }
 
   /// `https://host:port`, with no trailing slash and no `/api`. See [normalizeBaseUrl].
   final String baseUrl;
   final String apiKey;
-
-  /// The server's password, or null when none is saved. Kept as typed: a password may begin or
-  /// end with a space.
-  final String? password;
-
-  /// This connection with [password] in place of its own; an empty one is none.
-  Connection withPassword(String? password) => Connection(
-    baseUrl: baseUrl,
-    apiKey: apiKey,
-    password: password == null || password.isEmpty ? null : password,
-  );
 
   /// [baseUrl] parsed.
   Uri get uri => Uri.parse(baseUrl);
@@ -41,15 +26,12 @@ class Connection {
 
   @override
   bool operator ==(Object other) =>
-      other is Connection &&
-      other.baseUrl == baseUrl &&
-      other.apiKey == apiKey &&
-      other.password == password;
+      other is Connection && other.baseUrl == baseUrl && other.apiKey == apiKey;
 
   @override
-  int get hashCode => Object.hash(baseUrl, apiKey, password);
+  int get hashCode => Object.hash(baseUrl, apiKey);
 
-  /// Never prints the key or the password, so a log line or a failed assertion cannot leak them.
+  /// Never prints the key, so a log line or a failed assertion cannot leak it.
   @override
   String toString() => 'Connection($baseUrl)';
 }
@@ -91,7 +73,7 @@ String normalizeBaseUrl(String raw) {
 
 /// The connection an AnywhereLLM pairing code carries, checked as [Connection.parse] checks a
 /// typed one. The code is `anywherellm://connect?url=...&key=...`, with both values
-/// percent-encoded, and no password: each device signs in for itself. Throws [ApiException]
+/// percent-encoded. Throws [ApiException]
 /// when [raw] is not a pairing code or what it carries cannot be used.
 Connection parsePairingCode(String raw) {
   const notOurs = ApiException(

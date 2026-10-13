@@ -511,12 +511,6 @@ class _Form extends StatelessWidget {
                     AlertBox(AlertKind.bad, 'Could not listen', text: problem),
                     const SizedBox(height: 8),
                   ],
-                  if (chat.editing != null)
-                    _FormNote(
-                      'Editing a sent message: sending replaces it and everything after it.',
-                      action: 'Send as new',
-                      onAction: chat.cancelEdit,
-                    ),
                   if (held)
                     _FormNote(
                       'Sends when this answer ends.',
@@ -804,7 +798,7 @@ class _NoKey extends StatelessWidget {
                     style: style.copyWith(fontWeight: FontWeight.w600),
                   ),
                   const TextSpan(
-                    text: 'Sign in to your AnythingLLM server in Settings to start asking.',
+                    text: 'Set up your AnythingLLM server in Settings to start asking.',
                   ),
                 ],
               ),

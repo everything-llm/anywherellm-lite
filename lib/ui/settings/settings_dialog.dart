@@ -123,7 +123,12 @@ class _Nav extends StatelessWidget {
     final shell = scope.shell;
     final settings = scope.settings;
     return ListenableBuilder(
-      listenable: Listenable.merge([scope.system, settings, scope.apps]),
+      listenable: Listenable.merge([
+        scope.system,
+        settings,
+        scope.apps,
+        scope.toolkit,
+      ]),
       builder: (context, _) {
         final connection = settings.connection;
         return ListView(
@@ -153,12 +158,13 @@ class _Nav extends StatelessWidget {
                   about: serverSummary(scope.system),
                   onTap: () => shell.showSettingsPage(SettingsPage.server),
                 ),
-                NavRow(
-                  icon: 'memory',
-                  title: SettingsPage.memory.label,
-                  about: 'Saved memories',
-                  onTap: () => shell.showSettingsPage(SettingsPage.memory),
-                ),
+                if (scope.toolkit.memories)
+                  NavRow(
+                    icon: 'memory',
+                    title: SettingsPage.memory.label,
+                    about: 'Saved memories',
+                    onTap: () => shell.showSettingsPage(SettingsPage.memory),
+                  ),
                 if (scope.apps.systemFiles == true)
                   NavRow(
                     icon: 'folder',
@@ -236,7 +242,7 @@ class _PageView extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
-    final server = scope.settings.connection?.withPassword(null);
+    final server = scope.settings.connection;
     final firstRun = page == SettingsPage.connection && server == null;
     return SingleChildScrollView(
       key: ValueKey(page),

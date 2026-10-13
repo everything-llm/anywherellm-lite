@@ -7,11 +7,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
+import '../support/fake_toolkit.dart';
 import '../support/pump.dart';
 
 /// The planning server with saved memories for every workspace and Q3 planning's own.
-FakeAnythingLlm _remembering() {
-  final llm = planningServer();
+FakeToolkit _remembering() {
+  final llm = FakeToolkit();
   llm.globalMemories.addAll(const [
     SavedMemory(id: 1, text: 'Name is Anna.', global: true),
     SavedMemory(id: 2, text: 'Lives in Uppsala.', global: true),
@@ -31,10 +32,15 @@ FakeAnythingLlm _remembering() {
 
 Future<Harness> _openMemory(
   WidgetTester tester,
-  FakeAnythingLlm llm, {
+  FakeToolkit llm, {
   Size size = const Size(390, 1000),
 }) async {
-  final h = await pumpApp(tester, llm: llm, size: size);
+  final h = await pumpApp(
+    tester,
+    llm: planningServer(),
+    toolkitServer: llm,
+    size: size,
+  );
   h.shell.openSettings(SettingsPage.memory);
   await tester.pumpAndSettle();
   return h;
@@ -184,7 +190,11 @@ void main() {
   testWidgets('on a phone, Settings and a workspace\'s page open Memory', (
     tester,
   ) async {
-    final h = await pumpApp(tester, llm: _remembering());
+    final h = await pumpApp(
+      tester,
+      llm: planningServer(),
+      toolkitServer: _remembering(),
+    );
     h.shell.openSettings();
     await tester.pumpAndSettle();
     await tapVisible(tester, control('Memory, Saved memories'));

@@ -196,10 +196,7 @@ class _MessageListState extends State<MessageList> {
                   ? _UserBubble(
                       turn.text,
                       attachments: turn.attachments,
-                      onEdit: () {
-                        chat.edit(turn);
-                        widget.onSuggest(turn.text);
-                      },
+                      onEdit: () => widget.onSuggest(turn.text),
                     )
                   : _Answer(
                       turn,
@@ -442,7 +439,7 @@ class _UserBubble extends StatelessWidget {
   /// The files sent with the question: a picture drawn small, any other by its name.
   final List<SentFile> attachments;
 
-  /// Puts [text] back in the composer, to replace the question when the app is signed in.
+  /// Puts [text] back in the composer, to ask again as a new message.
   final VoidCallback onEdit;
 
   /// The bubble stands alone, at most 300 wide, as the design canvas draws it, and a long press
@@ -576,7 +573,6 @@ class _AnswerState extends State<_Answer> {
     final answered = split.answer.isNotEmpty && failure == null;
     // The caret ends the text being written where it can, and stands alone where it cannot.
     final inline = turn.streaming && answered && takesCaret(split.answer);
-    final rate = answered ? _feedbackOf(context, turn) : null;
     // An answer cut short shows what came in the second ink, under why it stopped.
     final cut = !turn.streaming && turn.unfinished;
     const action = answerAction;
@@ -655,8 +651,7 @@ class _AnswerState extends State<_Answer> {
                     box: action,
                     size: IconSize.xs,
                   ),
-                if (turn.metrics != null || rate != null)
-                  AnswerMore(turn, turn.metrics, rate: rate),
+                if (turn.metrics != null) AnswerMore(turn, turn.metrics),
                 // In Agent mode the server may go on to finish the answer and save it, which
                 // shows when the chat is read again.
                 if (turn.stopped)
@@ -671,13 +666,6 @@ class _AnswerState extends State<_Answer> {
       ],
     );
   }
-}
-
-/// The chat that can mark [turn] good or bad, or null when it cannot: the app is not signed in
-/// to the server, or the server has not said the answer's id.
-ChatController? _feedbackOf(BuildContext context, Turn turn) {
-  final chat = AppScope.of(context).chat;
-  return chat.signedIn && turn.chatId != null ? chat : null;
 }
 
 /// Reads [turn] aloud, or stops it while it is being read.

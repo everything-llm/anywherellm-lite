@@ -6,7 +6,6 @@ import '../app_scope.dart';
 import '../icons.dart';
 import '../state/chat_controller.dart';
 import '../state/shell_controller.dart';
-import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';
@@ -18,19 +17,16 @@ import '../widgets/sheet.dart';
 /// sets the buttons side by side.
 const answerAction = 44.0;
 
-/// More, under a finished answer the server measured or that can be rated: its sheet, This
-/// answer, names the answer's model, time, tokens, speed and cost, as far as [metrics] has them,
-/// then Rate this answer when [rate] can, then Show details under every answer,
+/// More, under a finished answer the server measured: its sheet, This answer, names the
+/// answer's model, time, tokens, speed and cost, as far as [metrics] has them, then Show
+/// details under every answer,
 /// [ChatSwitch.answerDetails], when there are [metrics]. With that switch on, the whole line of
 /// them follows the button. The sheet opens over the chat, and closes on Esc, Back and a tap
 /// outside.
 class AnswerMore extends StatefulWidget {
-  const AnswerMore(this.turn, this.metrics, {super.key, this.rate});
+  const AnswerMore(this.turn, this.metrics, {super.key});
 
   final Turn turn;
-
-  /// The chat that marks the answer good or bad, or null when it cannot be marked.
-  final ChatController? rate;
 
   /// How the answer ran, or null when the server did not measure it.
   final AnswerMetrics? metrics;
@@ -93,8 +89,7 @@ class _AnswerMoreState extends State<AnswerMore> {
               open: open,
               onClose: close,
               title: 'This answer',
-              sheet: (context) =>
-                  _AnswerMenu(widget.turn, metrics, rate: widget.rate),
+              sheet: (context) => _AnswerMenu(widget.turn, metrics),
               child: button,
             ),
             if (details) ...[
@@ -110,21 +105,19 @@ class _AnswerMoreState extends State<AnswerMore> {
   }
 }
 
-/// The sheet More opens: the figures of how the answer ran in one card, Rate this answer in
-/// another, and the switch that shows how each answer ran under it in a third.
+/// The sheet More opens: the figures of how the answer ran in one card, and the switch that
+/// shows how each answer ran under it in another.
 class _AnswerMenu extends StatelessWidget {
-  const _AnswerMenu(this.turn, this.metrics, {required this.rate});
+  const _AnswerMenu(this.turn, this.metrics);
 
   final Turn turn;
   final AnswerMetrics? metrics;
-  final ChatController? rate;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final prefs = AppScope.of(context).prefs;
     final metrics = this.metrics;
-    final rate = this.rate;
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -154,38 +147,6 @@ class _AnswerMenu extends StatelessWidget {
                     ],
                   ),
                 ),
-            ]),
-          if (rate != null)
-            FieldCard([
-              ListenableBuilder(
-                listenable: turn,
-                builder: (context, _) => Container(
-                  constraints: const BoxConstraints(minHeight: Sizes.cardRow),
-                  padding: const EdgeInsets.only(
-                    left: FieldCard.inset,
-                    right: 8,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Rate this answer',
-                          style: Type.sans(17, color: t.ink),
-                        ),
-                      ),
-                      for (final good in const [true, false])
-                        IconBtn(
-                          good ? 'thumb-up' : 'thumb-down',
-                          tooltip: good ? 'Good answer' : 'Bad answer',
-                          active: turn.feedback == good,
-                          onPressed: () => rate.mark(turn, good),
-                          box: 44,
-                          size: IconSize.small,
-                        ),
-                    ],
-                  ),
-                ),
-              ),
             ]),
           if (metrics != null)
             FieldCard([

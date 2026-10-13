@@ -240,12 +240,7 @@ class _ChatsTabState extends State<ChatsTab> {
                               )
                             else ...[
                               if (scope.settings.configured)
-                                const SliverToBoxAdapter(
-                                  child: Padding(
-                                    padding: EdgeInsets.only(top: 20),
-                                    child: UpcomingCard(),
-                                  ),
-                                ),
+                                const SliverToBoxAdapter(child: UpcomingCard()),
                               if (chat.activeSlug case final slug?) ...[
                                 const SliverToBoxAdapter(
                                   child: CardHeading('Chats'),

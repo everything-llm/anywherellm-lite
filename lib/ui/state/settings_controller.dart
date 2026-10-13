@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 
 import '../../core/connection.dart';
@@ -8,10 +6,9 @@ import 'notice.dart';
 
 enum ConnectionCheck { idle, testing, ok, failed }
 
-/// The AnythingLLM address and key: the one in use, testing a candidate, signing in to get one,
-/// saving and removing; and the server's password, for the web UI's own routes, when the server
-/// has one. Listeners
-/// hear of a new connection as soon as the client uses it, before the keyring has written it.
+/// The AnythingLLM address and developer key: the one in use, testing a candidate, saving and
+/// removing. Listeners hear of a new connection as soon as the client uses it, before the
+/// keyring has written it.
 class SettingsController extends ChangeNotifier {
   /// Keeps the connection in use in [holder], where the client reads it.
   SettingsController(this._api, this._store, this._holder);
@@ -33,28 +30,13 @@ class SettingsController extends ChangeNotifier {
 
   bool get configured => connection != null;
 
-  /// How the server in use signs in to its web UI, or null until it has said or when asking
-  /// failed. Settings asks for the password when it is [ServerAuth.password].
-  ServerAuth? auth;
-
-  /// Whether a password is being checked.
-  bool checkingPassword = false;
-
-  /// What the last password save or removal said.
-  String? passwordMessage;
-
-  /// Whether the last [signIn] found a server that gives no key that way, so Settings asks for
-  /// one.
-  bool needsKey = false;
-
-  /// Reads the saved connection, then asks its server how it signs in. A keyring that cannot be
-  /// read is a notice, not a failure to start.
+  /// Reads the saved connection. A keyring that cannot be read is a notice, not a failure to
+  /// start.
   Future<void> load() async {
     await _keyring('Could not read the saved connection', () async {
       _holder.current = await _store.load();
     });
     notifyListeners();
-    unawaited(readAuth());
   }
 
   /// Asks the server whether [url] and [key] open it. Saves nothing.
@@ -67,14 +49,12 @@ class SettingsController extends ChangeNotifier {
   /// an answer per connection, such as whether the apps server is there, asks again.
   int tests = 0;
 
-  /// Asks the server whether the saved connection still opens it, then how it signs in.
+  /// Asks the server whether the saved connection still opens it.
   Future<void> testSaved() async {
     final server = connection;
     if (server == null) return;
     tests++;
     await _check(server);
-    if (connection != server) return;
-    await readAuth();
   }
 
   /// Asks the server whether [candidate] opens it, into [check] and [message].
@@ -101,81 +81,17 @@ class SettingsController extends ChangeNotifier {
     return true;
   }
 
-  /// Uses [url] and [key] from now on and keeps them in the keyring, with the saved password
-  /// when the address is the same. If the keyring refuses, they are still used for this run and
-  /// the refusal is shown.
+  /// Uses [url] and [key] from now on and keeps them in the keyring. If the keyring refuses,
+  /// they are still used for this run and the refusal is shown.
   Future<void> save(String url, String key) async {
     final parsed = _parse(url, key);
     if (parsed == null) return;
-    final kept = connection;
-    await _use(
-      kept != null && kept.baseUrl == parsed.baseUrl
-          ? parsed.withPassword(kept.password)
-          : parsed,
-      'The key was saved.',
-    );
-  }
-
-  /// Connects to the server at [url] with its [password], ignored when the server has none.
-  /// The server gives the app its developer key, which is saved with the password once it opens
-  /// the server. True when it was. A server with several users gives no key, and [needsKey] then
-  /// says to paste one.
-  Future<bool> signIn(String url, String password) async {
-    final String baseUrl;
-    try {
-      baseUrl = normalizeBaseUrl(url);
-    } on ApiException catch (error) {
-      check = ConnectionCheck.failed;
-      message = error.message;
-      notifyListeners();
-      return false;
-    }
-    check = ConnectionCheck.testing;
-    message = null;
-    needsKey = false;
-    notifyListeners();
-    final Connection candidate;
-    try {
-      final found = await _api.serverAuth(
-        Connection(baseUrl: baseUrl, apiKey: ''),
-      );
-      if (found == ServerAuth.multiUser) {
-        needsKey = true;
-        throw const ApiException(
-          'This server has several users, so it gives no key this way. Use a developer key '
-          'its admin made.',
-        );
-      }
-      final signsIn = found == ServerAuth.password;
-      if (signsIn && password.isEmpty) {
-        throw const ApiException('Enter the server password.');
-      }
-      final key = await _api.issueKey(
-        baseUrl,
-        password: signsIn ? password : null,
-      );
-      candidate = Connection.parse(
-        baseUrl,
-        key,
-        password: signsIn ? password : null,
-      );
-      await _api.verify(candidate);
-    } on ApiException catch (error) {
-      check = ConnectionCheck.failed;
-      message = error.message;
-      notifyListeners();
-      return false;
-    }
-    await _use(candidate, 'Signed in to ${candidate.host}.');
-    return true;
+    await _use(parsed, 'The key was saved.');
   }
 
   /// Uses [candidate] from now on and keeps it in the keyring, saying [saved] once it is there.
   /// If the keyring refuses, it is still used for this run and the refusal is shown.
   Future<void> _use(Connection candidate, String saved) async {
-    final kept = connection;
-    if (kept?.baseUrl != candidate.baseUrl) auth = null;
-    passwordMessage = null;
     _holder.current = candidate;
     check = ConnectionCheck.idle;
     notifyListeners();
@@ -185,83 +101,11 @@ class SettingsController extends ChangeNotifier {
     );
     message = keyringProblem == null ? saved : null;
     notifyListeners();
-    unawaited(readAuth());
-  }
-
-  /// Uses [password] for the server in use from now on, once the server takes it, and keeps it
-  /// in the keyring with the key. True when it was saved.
-  Future<bool> savePassword(String password) async {
-    final current = connection;
-    if (current == null) return false;
-    if (password.isEmpty) {
-      passwordMessage = 'Enter the password.';
-      notifyListeners();
-      return false;
-    }
-    final candidate = current.withPassword(password);
-    checkingPassword = true;
-    passwordMessage = null;
-    notifyListeners();
-    try {
-      await _api.signIn(candidate);
-    } on ApiException catch (error) {
-      checkingPassword = false;
-      passwordMessage = error.message;
-      notifyListeners();
-      return false;
-    }
-    checkingPassword = false;
-    if (connection != current) {
-      notifyListeners();
-      return false;
-    }
-    _holder.current = candidate;
-    notifyListeners();
-    await _keyring('Could not save the password', () => _store.save(candidate));
-    passwordMessage = keyringProblem == null ? 'The password was saved.' : null;
-    notifyListeners();
-    return true;
-  }
-
-  /// Stops using the saved password and removes it from the keyring; the key stays.
-  Future<void> forgetPassword() async {
-    final current = connection;
-    if (current == null || current.password == null) return;
-    final candidate = current.withPassword(null);
-    _holder.current = candidate;
-    notifyListeners();
-    await _keyring(
-      'Could not remove the saved password',
-      () => _store.save(candidate),
-    );
-    passwordMessage = keyringProblem == null
-        ? 'The saved password was deleted.'
-        : null;
-    notifyListeners();
-  }
-
-  /// Asks the server in use how it signs in, into [auth]. Best effort: a failure leaves it null,
-  /// and Settings then asks for nothing until it is asked again.
-  Future<void> readAuth() async {
-    final server = connection;
-    if (server == null) return;
-    ServerAuth? found;
-    try {
-      found = await _api.serverAuth(server);
-    } on ApiException {
-      found = null;
-    }
-    if (connection?.baseUrl != server.baseUrl || found == auth) return;
-    auth = found;
-    notifyListeners();
   }
 
   /// Forgets the connection and removes it from the keyring.
   Future<void> clear() async {
     _holder.current = null;
-    auth = null;
-    needsKey = false;
-    passwordMessage = null;
     check = ConnectionCheck.idle;
     notifyListeners();
     await _keyring(

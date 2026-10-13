@@ -43,10 +43,10 @@ void main() {
 
   testWidgets('with no server, only this device\'s pages show', (tester) async {
     final h = await pumpApp(tester, llm: planningServer(), connection: null);
-    // A server's page opens on signing in instead.
+    // A server's page opens on connecting instead.
     h.shell.openSettings(SettingsPage.chatModel);
     await tester.pumpAndSettle();
-    expect(control('Sign in'), findsOneWidget);
+    expect(control('Connect'), findsOneWidget);
     h.shell.openSettings();
     await tester.pumpAndSettle();
     expect(control('Appearance'), findsOneWidget);
@@ -103,12 +103,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Connect to your'), findsOneWidget);
     final scan = tester.getTopLeft(control('Scan QR code'));
-    expect(scan.dy, lessThan(tester.getTopLeft(find.text('OR SIGN IN')).dy));
     expect(
-      tester.getTopLeft(find.text('OR SIGN IN')).dy,
-      lessThan(tester.getTopLeft(control('Sign in')).dy),
+      scan.dy,
+      lessThan(tester.getTopLeft(find.text('OR ENTER A KEY')).dy),
     );
-    expect(control('Paste a key'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('OR ENTER A KEY')).dy,
+      lessThan(tester.getTopLeft(control('Connect')).dy),
+    );
+    expect(control('Paste a key'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -138,7 +141,7 @@ void main() {
   testWidgets('Test connection says whether the key still opens the server', (
     tester,
   ) async {
-    final llm = planningServer()..auth = ServerAuth.password;
+    final llm = planningServer();
     final h = await pumpApp(tester, llm: llm);
     h.shell.openSettings(SettingsPage.connection);
     await tester.pumpAndSettle();

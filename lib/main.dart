@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'adapters/anythingllm_client.dart';
 import 'adapters/apps_client.dart';
+import 'adapters/toolkit_client.dart';
 import 'adapters/json_prefs_store.dart';
 import 'adapters/keyring_settings_store.dart';
 import 'core/connection.dart';
@@ -42,6 +43,7 @@ import 'ui/state/settings_controller.dart';
 import 'ui/state/shell_controller.dart';
 import 'ui/state/sources_controller.dart';
 import 'ui/state/system_controller.dart';
+import 'ui/state/toolkit_controller.dart';
 
 /// The composition root: the one place that knows the adapters and the UI.
 ///
@@ -56,6 +58,7 @@ Future<void> main() async {
   final holder = ConnectionHolder();
   final llm = HttpAnythingLlmApi(holder: holder);
   final apps = HttpAppsApi(holder: holder);
+  final toolkit = HttpToolkitApi(holder: holder);
   final prefs = PrefsController(JsonPrefsStore(prefsFile));
   runApp(
     AnywhereLlmApp(
@@ -63,6 +66,7 @@ Future<void> main() async {
       home: SessionHost(
         llm: llm,
         apps: apps,
+        toolkit: toolkit,
         settings: SettingsController(llm, KeyringSettingsStore(), holder),
         prefs: prefs,
         shell: ShellController(),
@@ -85,6 +89,7 @@ class SessionHost extends StatefulWidget {
     super.key,
     required this.llm,
     required this.apps,
+    required this.toolkit,
     required this.settings,
     required this.prefs,
     required this.shell,
@@ -95,6 +100,9 @@ class SessionHost extends StatefulWidget {
 
   /// The apps server beside AnythingLLM, which may not be there.
   final AppsApi apps;
+
+  /// The toolkit beside AnythingLLM, which may not be there.
+  final ToolkitApi toolkit;
   final SettingsController settings;
   final PrefsController prefs;
   final ShellController shell;
@@ -112,6 +120,7 @@ class _SessionHostState extends State<SessionHost> {
   late final SystemController _system;
   late final MemoryController _memory;
   late final AppsController _apps;
+  late final ToolkitController _toolkit;
   late final PushController _push;
 
   /// The device's push notifications, through a UnifiedPush distributor.
@@ -142,11 +151,11 @@ class _SessionHostState extends State<SessionHost> {
     _sources = SourcesController(widget.llm, _chat, widget.prefs);
     _files = FilesController(widget.llm, widget.settings, _chat, _sources);
     _system = SystemController(widget.llm, widget.settings);
-    _memory = MemoryController(widget.llm, widget.settings, _chat);
+    _memory = MemoryController(widget.toolkit, widget.settings, _chat);
     _apps = AppsController(widget.apps, widget.settings, _chat);
+    _toolkit = ToolkitController(widget.toolkit, widget.settings);
     _push = PushController(
       _pusher,
-      widget.llm,
       widget.apps,
       widget.settings,
       _chat,
@@ -172,6 +181,7 @@ class _SessionHostState extends State<SessionHost> {
     _keepAnswering.dispose();
     _push.dispose();
     _apps.dispose();
+    _toolkit.dispose();
     _memory.dispose();
     _system.dispose();
     _files.dispose();
@@ -214,6 +224,7 @@ class _SessionHostState extends State<SessionHost> {
         system: _system,
         memory: _memory,
         apps: _apps,
+        toolkit: _toolkit,
         launch: widget.launch,
         save: saveWithPicker,
         scanner: cameraScanner,

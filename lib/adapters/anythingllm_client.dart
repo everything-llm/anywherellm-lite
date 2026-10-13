@@ -9,10 +9,7 @@ import '../core/chat.dart';
 import '../core/chat_log.dart';
 import '../core/connection.dart';
 import '../core/embeds.dart';
-import '../core/memory.dart';
 import '../core/ports.dart';
-import '../core/push.dart';
-import '../core/schedule.dart';
 import '../core/server_models.dart';
 import '../core/upload.dart';
 import 'anythingllm_stream.dart';
@@ -43,10 +40,6 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   /// sends no pings, and an agent's tool can run a while without a word.
   final Duration idle;
 
-  /// The web UI's login token for each connection signed in so far, kept only while the app
-  /// runs. The password is what is saved; a token lapses after 30 days or a new password.
-  final _tokens = <Connection, String>{};
-
   @override
   Future<void> verify(Connection connection) async {
     final body = await _get(_secure(connection), '/api/v1/auth');
@@ -54,74 +47,6 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       throw const ApiException('The server did not accept the key.');
     }
   }
-
-  /// `GET /api/setup-complete` answers without a key or a login, as the web UI asks it before
-  /// it shows its sign-in.
-  @override
-  Future<ServerAuth> serverAuth(Connection connection) async {
-    final secure = _secure(connection);
-    final results = _field(
-      await _call(
-        secure,
-        timeout,
-        () => _client.get(
-          Uri.parse('${secure.baseUrl}/api/setup-complete'),
-          headers: {'Accept': 'application/json'},
-        ),
-      ),
-      'results',
-    );
-    if (results is! Map) {
-      throw const ApiException(
-        'The address did not answer like an AnythingLLM server.',
-      );
-    }
-    if (results['MultiUserMode'] == true) return ServerAuth.multiUser;
-    return results['RequiresAuth'] == true
-        ? ServerAuth.password
-        : ServerAuth.none;
-  }
-
-  @override
-  Future<void> signIn(Connection connection) async {
-    final secure = _secure(connection);
-    _tokens.remove(secure);
-    await _token(secure);
-  }
-
-  /// The name of the developer key [issueKey] reuses or makes, as the web UI lists it.
-  static const keyName = 'AnywhereLLM';
-
-  /// Lists the keys with `GET /api/system/api-keys` and makes one with
-  /// `POST /api/system/generate-api-key` only when none is named [keyName], so every device and
-  /// every sign-in shares one key.
-  @override
-  Future<String> issueKey(String baseUrl, {String? password}) async {
-    final server = _secure(
-      Connection(baseUrl: baseUrl, apiKey: '').withPassword(password),
-    );
-    final listed = await _session('GET', '/api/system/api-keys', on: server);
-    for (final key in jsonObjects(_field(listed, 'apiKeys'))) {
-      if (_secret(key) case final secret? when key['name'] == keyName) {
-        return secret;
-      }
-    }
-    final made = await _session(
-      'POST',
-      '/api/system/generate-api-key',
-      body: {'name': keyName},
-      on: server,
-    );
-    final key = _field(made, 'apiKey');
-    return (key is Map ? _secret(key) : null) ??
-        (throw ApiException(_said(made) ?? 'The server did not make a key.'));
-  }
-
-  /// The secret of a developer key the server listed, or null when it has none.
-  static String? _secret(Map<dynamic, dynamic> key) => switch (key['secret']) {
-    final String secret when secret.isNotEmpty => secret,
-    _ => null,
-  };
 
   @override
   Future<List<Workspace>> workspaces() async => [
@@ -217,108 +142,6 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     final limit = attachments.isEmpty ? timeout : uploadTimeout;
     return _events('${_thread(slug, thread)}/stream-chat', body, limit);
   }
-
-  @override
-  Future<String> pushKey() async {
-    final body = await _session('GET', '/api/web-push/pubkey');
-    final key = body is Map ? body['publicKey'] : null;
-    if (key is! String || key.isEmpty) {
-      throw const ApiException('The server has no key for notifications.');
-    }
-    return key;
-  }
-
-  @override
-  Future<void> subscribePush(PushSubscription subscription) =>
-      _session('POST', '/api/web-push/subscribe', body: subscription.toJson());
-
-  @override
-  Future<List<ScheduledJob>> scheduledJobs() async =>
-      scheduledJobsOf(await _session('GET', '/api/scheduled-jobs'));
-
-  /// The switches are the server's preferences `memory_enabled` and `memory_auto_extraction`,
-  /// read and written as text through its admin routes, which a single-user server answers.
-  @override
-  Future<MemorySwitches> memorySwitches() async => MemorySwitches.fromJson(
-    await _session(
-      'GET',
-      '/api/admin/system-preferences-for'
-          '?labels=memory_enabled,memory_auto_extraction',
-    ),
-  );
-
-  @override
-  Future<void> setMemorySwitches({bool? enabled, bool? learn}) => _session(
-    'POST',
-    '/api/admin/system-preferences',
-    body: {
-      'memory_enabled': ?enabled?.toString(),
-      'memory_auto_extraction': ?learn?.toString(),
-    },
-  );
-
-  @override
-  Future<SavedMemories> savedMemories(String slug) async =>
-      SavedMemories.fromJson(
-        await _session(
-          'GET',
-          '/api/workspaces/${Uri.encodeComponent(slug)}/memories',
-        ),
-      );
-
-  @override
-  Future<SavedMemory> addMemory(
-    String slug,
-    String text, {
-    required bool global,
-  }) async => _memory(
-    await _session(
-      'POST',
-      '/api/workspaces/${Uri.encodeComponent(slug)}/memories',
-      body: {'content': text, 'scope': global ? 'global' : 'workspace'},
-    ),
-  );
-
-  @override
-  Future<SavedMemory> editMemory(int id, String text) async => _memory(
-    await _session('PUT', '/api/memories/$id', body: {'content': text}),
-  );
-
-  @override
-  Future<void> deleteMemory(int id) => _session('DELETE', '/api/memories/$id');
-
-  @override
-  Future<SavedMemory> moveMemory(int id, {String? toWorkspace}) async =>
-      _memory(
-        await _session(
-          'POST',
-          toWorkspace == null
-              ? '/api/memories/$id/promote'
-              : '/api/memories/$id/demote/${Uri.encodeComponent(toWorkspace)}',
-        ),
-      );
-
-  /// The memory an answer holds under `memory`.
-  SavedMemory _memory(Object? body) =>
-      SavedMemory.fromJson(_field(body, 'memory')) ??
-      (throw const ApiException('The server did not say what it saved.'));
-
-  /// The server answers a bare `OK`.
-  @override
-  Future<void> dropFrom(String slug, String thread, int chatId) => _session(
-    'DELETE',
-    '/api/workspace/${Uri.encodeComponent(slug)}/thread/'
-        '${Uri.encodeComponent(thread)}/delete-edited-chats',
-    body: {'startingId': chatId},
-    emptyOk: true,
-  );
-
-  @override
-  Future<void> setFeedback(String slug, int chatId, bool? good) => _session(
-    'POST',
-    '/api/workspace/${Uri.encodeComponent(slug)}/chat-feedback/$chatId',
-    body: {'feedback': good},
-  );
 
   @override
   Future<void> updateEmbeddings(
@@ -650,77 +473,6 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     'Accept': 'application/json',
   };
 
-  /// The decoded JSON of a [method] to [path], one of the web UI's own routes, with [body] as
-  /// JSON, on the connection in use or [on], signed in with the connection's password in place
-  /// of the key, or without credentials when no password is saved. A refused token is forgotten
-  /// and the call made once more with a new one. A server that requires credentials says so
-  /// with 401 or 403.
-  Future<Object?> _session(
-    String method,
-    String path, {
-    Map<String, Object?>? body,
-    bool emptyOk = false,
-    Connection? on,
-  }) async {
-    final connection = on ?? _current;
-    final signsIn = connection.password != null;
-    for (var again = false; ; again = true) {
-      final token = signsIn ? await _token(connection) : null;
-      try {
-        return await _call(
-          connection,
-          timeout,
-          () async {
-            final request = _request(connection, method, path, body);
-            if (token == null) {
-              request.headers.remove('Authorization');
-            } else {
-              request.headers['Authorization'] = 'Bearer $token';
-            }
-            return http.Response.fromStream(await _client.send(request));
-          },
-          emptyOk: emptyOk,
-          rejected: signsIn ? _passwordRefused : _needsPassword,
-        );
-      } on ApiException catch (error) {
-        final refused = error.status == 401 || error.status == 403;
-        if (!signsIn || again || !refused) rethrow;
-        _tokens.remove(connection);
-      }
-    }
-  }
-
-  /// The web UI's login token for [connection], signing in with its password when there is none
-  /// yet. Without a password this fails with status 401, and with a refused one with the
-  /// server's 401, or 403 when it answers that the password is not valid.
-  Future<String> _token(Connection connection) async {
-    if (_tokens[connection] case final token?) return token;
-    final password =
-        connection.password ??
-        (throw const ApiException(_needsPassword, status: 401));
-    final body = await _call(
-      connection,
-      timeout,
-      () => _client.post(
-        Uri.parse('${connection.baseUrl}/api/request-token'),
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({'password': password}),
-      ),
-      rejected: _passwordRefused,
-    );
-    if (body is! Map || body['valid'] != true) {
-      throw const ApiException(_passwordRefused, status: 403);
-    }
-    final token = body['token'];
-    if (token is! String || token.isEmpty) {
-      throw const ApiException(_passwordRefused, status: 403);
-    }
-    return _tokens[connection] = token;
-  }
-
   /// The decoded JSON of a GET to [path] on [connection].
   Future<Object?> _get(Connection connection, String path) => _call(
     connection,
@@ -863,20 +615,18 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     );
   }
 
-  /// The decoded JSON of the response [send] gets, with failures in plain words. [emptyOk],
-  /// [refused] and [rejected] are as for [_decode].
+  /// The decoded JSON of the response [send] gets, with failures in plain words. [emptyOk] and
+  /// [refused] are as for [_decode].
   Future<Object?> _call(
     Connection connection,
     Duration limit,
     Future<http.Response> Function() send, {
     bool emptyOk = false,
     String refused = _refused,
-    String rejected = _keyRejected,
   }) async => _decode(
     await _fetch(connection, limit, send),
     emptyOk: emptyOk,
     refused: refused,
-    rejected: rejected,
   );
 
   /// The response [send] gets within [limit], or an [ApiException] in plain words when the
@@ -915,24 +665,19 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   };
 
   static const _refused = 'The server refused the request.';
-  static const _keyRejected = 'The server rejected the key.';
-  static const _needsPassword =
-      'This needs the server password. Add it in Settings.';
-  static const _passwordRefused = 'The server did not accept the password.';
 
   /// The decoded JSON of [response], or null for a success that is empty or the bare status
   /// text `OK` when [emptyOk], as a delete answers. An answer with `success: false` fails, even with HTTP 200, with the server's reason
-  /// or else [refused]. A 401 or 403 fails with [rejected], whatever the server said.
+  /// or else [refused]. A 401 or 403 fails as a rejected key, whatever the server said.
   Object? _decode(
     http.Response response, {
     bool emptyOk = false,
     String refused = _refused,
-    String rejected = _keyRejected,
   }) {
     final status = response.statusCode;
     final body = _json(response);
     if (status == 401 || status == 403) {
-      throw ApiException(rejected, status: status);
+      throw ApiException('The server rejected the key.', status: status);
     }
     if (status < 200 || status >= 300) {
       throw ApiException(

@@ -13,8 +13,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * The app's notifications. A push, or the app's own word that an answer is ready, is drawn
- * from a payload `{title, body, data}`, the shape of AnythingLLM's pushes and the apps
- * server's; each kind has its own channel, so Android's settings can quiet one. Tapping it
+ * from a payload `{title, body, data}`, the shape of the apps server's pushes; each kind has
+ * its own channel, so Android's settings can quiet one. Tapping it
  * opens [MainActivity] with the channel and the payload, which the Dart side reads for what to
  * open. [ongoing] is [AnswerService]'s.
  */
@@ -28,10 +28,18 @@ object PushNotes {
      * `lib/core/push.dart`, since this runs with no Flutter engine.
      */
     private val channels = mapOf(
-        "anythingllm" to "Scheduled jobs",
         "apps" to "Apps",
         "answers" to "Answers ready",
     )
+
+    /** The channel an older version showed AnythingLLM's scheduled-job pushes on, which [retire] deletes. */
+    private const val RETIRED = "anythingllm"
+
+    /** Deletes the channels the app no longer posts to, so Android's settings stop listing them. */
+    fun retire(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        context.getSystemService(NotificationManager::class.java).deleteNotificationChannel(RETIRED)
+    }
 
     /** The channel of [AnswerService]'s ongoing notification, quiet. */
     private const val ANSWERING = "answering"

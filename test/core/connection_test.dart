@@ -84,15 +84,6 @@ void main() {
     expect('$connection', isNot(contains('SECRET')));
   });
 
-  test('a password is part of the connection but never printed or paired', () {
-    final plain = Connection.parse('https://h', 'K');
-    final signed = Connection.parse('https://h', 'K', password: 'PASS');
-    expect(signed, isNot(plain));
-    expect(signed.withPassword(null), plain);
-    expect(plain.withPassword(''), plain);
-    expect('$signed', isNot(contains('PASS')));
-  });
-
   group('pairing code', () {
     test('carries the address and key there and back', () {
       const connection = Connection(

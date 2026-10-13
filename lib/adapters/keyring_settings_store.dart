@@ -5,8 +5,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../core/connection.dart';
 import '../core/ports.dart';
 
-/// [SettingsStore] in the Android Keystore, as one entry holding the address, the key and the
-/// server's password when one is saved.
+/// [SettingsStore] in the Android Keystore, as one entry holding the address and the key. An
+/// entry an older version saved with the server's password is written again without it.
 class KeyringSettingsStore implements SettingsStore {
   KeyringSettingsStore({FlutterSecureStorage? storage})
     : _storage = storage ?? const FlutterSecureStorage();
@@ -19,17 +19,28 @@ class KeyringSettingsStore implements SettingsStore {
   Future<Connection?> load() async {
     final stored = await _guard('read', () => _storage.read(key: _entry));
     if (stored == null) return null;
+    final Connection connection;
+    final bool hadPassword;
     try {
       final json = jsonDecode(stored) as Map<String, dynamic>;
-      return Connection(
+      connection = Connection(
         baseUrl: json['baseUrl'] as String,
         apiKey: json['apiKey'] as String,
-      ).withPassword(json['password'] as String?);
+      );
+      hadPassword = json.containsKey('password');
     } on Object {
       throw const ApiException(
         'The saved connection in the keyring is unreadable. Enter it again and save.',
       );
     }
+    if (hadPassword) {
+      try {
+        await save(connection);
+      } on ApiException {
+        // The entry is written again on the next save; the connection works meanwhile.
+      }
+    }
+    return connection;
   }
 
   @override
@@ -40,7 +51,6 @@ class KeyringSettingsStore implements SettingsStore {
       value: jsonEncode({
         'baseUrl': connection.baseUrl,
         'apiKey': connection.apiKey,
-        'password': ?connection.password,
       }),
     ),
   );

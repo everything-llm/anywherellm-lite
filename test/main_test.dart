@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'support/fake_api.dart';
 import 'support/fake_apps.dart';
+import 'support/fake_toolkit.dart';
 import 'support/fake_settings.dart';
 
 Future<void> _boot(
@@ -29,6 +30,7 @@ Future<void> _boot(
       home: SessionHost(
         llm: llm,
         apps: FakeApps(),
+        toolkit: FakeToolkit(),
         settings: SettingsController(llm, store, ConnectionHolder()),
         prefs: PrefsController(prefsStore ?? FakePrefsStore()),
         shell: ShellController(),
@@ -45,7 +47,7 @@ void main() {
   ) async {
     await _boot(tester, FakeSettingsStore());
     expect(find.byType(SettingsDialog), findsOneWidget);
-    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Connect'), findsOneWidget);
   });
 
   testWidgets('with a saved connection, the app opens on the first workspace', (

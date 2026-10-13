@@ -11,7 +11,7 @@ import 'notice.dart';
 import 'settings_controller.dart';
 
 /// What the Memory page shows and changes for one workspace, [slug]: AnythingLLM's saved
-/// memories, which every chat is shown. Another server, or another password, starts it afresh.
+/// memories, which every chat is shown, through the toolkit. Another server starts it afresh.
 class MemoryController extends ChangeNotifier {
   MemoryController(this._api, this._settings, this._chat) {
     _settings.addListener(_changed);
@@ -20,11 +20,11 @@ class MemoryController extends ChangeNotifier {
     _shown = slug;
   }
 
-  final AnythingLlmApi _api;
+  final ToolkitApi _api;
   final SettingsController _settings;
   final ChatController _chat;
 
-  /// The server read, with its password, which the saved memories sign in with.
+  /// The server read.
   Connection? _server;
 
   /// The workspace picked on the page, or null for the open one.

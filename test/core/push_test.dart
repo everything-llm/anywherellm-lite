@@ -6,13 +6,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('tapTargetOf', () {
-    test('AnythingLLM\'s scheduled-job push opens Upcoming', () {
+    test('a push on a retired channel opens nothing', () {
       final payload = jsonEncode({
         'title': 'Morning brief completed',
-        'body': 'Three things today',
         'data': {'onClickUrl': '/settings/scheduled-jobs/4/runs/9'},
       });
-      expect(tapTargetOf('anythingllm', payload), const UpcomingTarget());
+      expect(tapTargetOf('anythingllm', payload), isNull);
     });
 
     test('an app\'s push opens that app', () {
@@ -76,7 +75,7 @@ void main() {
   );
 
   test('sources are found by their instance', () {
-    expect(PushSource.ofInstance('anythingllm'), PushSource.server);
+    expect(PushSource.ofInstance('anythingllm'), isNull);
     expect(PushSource.ofInstance('apps'), PushSource.apps);
     expect(PushSource.ofInstance('other'), isNull);
   });

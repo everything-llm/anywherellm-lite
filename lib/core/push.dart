@@ -5,9 +5,6 @@ import 'apps.dart';
 /// Where a notification comes from. Each is its own UnifiedPush instance, registered with that
 /// server's own VAPID key, since a distributor may tie an endpoint to one sender.
 enum PushSource {
-  /// AnythingLLM itself, which pushes when a scheduled job ends.
-  server('anythingllm', 'Scheduled jobs'),
-
   /// anythingllm-apps-v2, which pushes an app's `notify`.
   apps('apps', 'Apps');
 
@@ -37,7 +34,7 @@ class PushSubscription {
   final String p256dh;
   final String auth;
 
-  /// The browser's JSON, which AnythingLLM and the apps server both take.
+  /// The browser's JSON, which the apps server takes.
   Map<String, Object?> toJson() => {
     'endpoint': endpoint,
     'keys': {'p256dh': p256dh, 'auth': auth},
@@ -61,17 +58,6 @@ class PushSubscription {
 /// What tapping a notification opens.
 sealed class PushTarget {
   const PushTarget();
-}
-
-/// The Upcoming page, where the scheduled jobs are listed.
-class UpcomingTarget extends PushTarget {
-  const UpcomingTarget();
-
-  @override
-  bool operator ==(Object other) => other is UpcomingTarget;
-
-  @override
-  int get hashCode => (UpcomingTarget).hashCode;
 }
 
 /// An app, opened in its sheet.
@@ -107,8 +93,7 @@ class ChatTarget extends PushTarget {
 const answersChannel = 'answers';
 
 /// What tapping a notification opens: [payload] is what it was drawn from, `{title, body,
-/// data}`, the shape of AnythingLLM's scheduled-job pushes, on the channel [channel]. A
-/// scheduled job's opens Upcoming; an app's opens the app its `data` names by `workspace` and
+/// data}`, on the channel [channel]. An app's opens the app its `data` names by `workspace` and
 /// `app`; an answer's opens the chat its `data` names by `workspace` and `thread`; anything else
 /// opens nothing.
 PushTarget? tapTargetOf(String channel, String payload) {
@@ -120,8 +105,6 @@ PushTarget? tapTargetOf(String channel, String payload) {
   }
   final data = json is Map ? json['data'] : null;
   return switch ((channel, data)) {
-    (final server, _) when server == PushSource.server.instance =>
-      const UpcomingTarget(),
     (final apps, {'workspace': final String workspace, 'app': final String app})
         when apps == PushSource.apps.instance =>
       switch (appRefNamed(workspace, app)) {

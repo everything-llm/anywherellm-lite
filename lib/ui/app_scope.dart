@@ -16,6 +16,7 @@ import 'state/settings_controller.dart';
 import 'state/shell_controller.dart';
 import 'state/sources_controller.dart';
 import 'state/system_controller.dart';
+import 'state/toolkit_controller.dart';
 
 /// Opens [url] outside the app, in the browser or the mail app. Says whether something did.
 typedef LinkOpener = Future<bool> Function(Uri url);
@@ -49,6 +50,7 @@ class AppScope extends InheritedWidget {
     required this.system,
     required this.memory,
     required this.apps,
+    required this.toolkit,
     required this.launch,
     required this.save,
     this.scanner,
@@ -77,6 +79,10 @@ class AppScope extends InheritedWidget {
 
   /// The apps server beside the server in use, when it is there, and its apps.
   final AppsController apps;
+
+  /// The toolkit beside the server in use, when it is there: what it serves, and the scheduled
+  /// jobs.
+  final ToolkitController toolkit;
   final LinkOpener launch;
   final FileSaver save;
 

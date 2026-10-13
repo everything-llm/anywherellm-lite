@@ -28,7 +28,6 @@ class Turn extends ChangeNotifier {
       files = message.files,
       metrics = message.metrics,
       chatId = message.chatId,
-      feedback = message.feedback,
       streaming = false;
 
   final Role role;
@@ -44,11 +43,9 @@ class Turn extends ChangeNotifier {
   /// How the answer ran, when the server measured it.
   AnswerMetrics? metrics;
 
-  /// The server's id for the exchange, once it has said; a question and its answer share it.
+  /// The server's id for the exchange, once it has said, which tells a saved answer from the
+  /// ones before it.
   int? chatId;
-
-  /// Whether the answer was marked good or bad, or null when neither.
-  bool? feedback;
   bool streaming;
 
   /// Why the answer failed, or null.
@@ -81,11 +78,6 @@ class Turn extends ChangeNotifier {
 
   void _replace(String whole) {
     text = whole;
-    notifyListeners();
-  }
-
-  void _mark(bool? good) {
-    feedback = good;
     notifyListeners();
   }
 }
@@ -178,9 +170,7 @@ class _ImageRead {
 
 class ChatController extends ChangeNotifier {
   ChatController(this._api, this._settings, this._prefs)
-    : _server = _settings.connection?.withPassword(null),
-      _password = _settings.connection?.password,
-      _auth = _settings.auth {
+    : _server = _settings.connection {
     _settings.addListener(_serverChanged);
     unawaited(_prefs.useServer(_server?.baseUrl));
   }
@@ -189,27 +179,11 @@ class ChatController extends ChangeNotifier {
   final SettingsController _settings;
   final PrefsController _prefs;
 
-  /// The server the fields below describe: its address and key, without the password, so
-  /// saving or forgetting one does not start afresh.
+  /// The server the fields below describe.
   Connection? _server;
 
-  /// The server the workspaces and chats are about, without its optional web UI password.
+  /// The server the workspaces and chats are about.
   Connection? get server => _server;
-
-  /// The server's saved password, which signs in to the web UI's own routes.
-  String? _password;
-
-  /// How the server said it signs in, or null before it has said.
-  ServerAuth? _auth;
-
-  /// Whether the web UI's own routes open: a password for the server is saved, or the server has
-  /// none. Retry and Edit then replace the old exchange on the server, and an answer can be
-  /// marked good or bad.
-  bool get signedIn => _password != null || _auth == ServerAuth.none;
-
-  /// The question being edited: sending replaces it and everything after it. Only while
-  /// [signedIn].
-  Turn? editing;
 
   List<Workspace> workspaces = const [];
 
@@ -325,12 +299,9 @@ class ChatController extends ChangeNotifier {
   List<Turn> get turns =>
       activeThread == null ? _draft : (_turns[activeThread] ?? const []);
 
-  /// The chats whose exchanges are being deleted on the server, for Retry or an edit.
-  final _droppingIn = <String>{};
-
   /// Whether the chat on screen can take no message now: a chat of its workspace answers, this
-  /// one or another, or this chat's exchanges are being dropped.
-  bool get busy => _droppingIn.contains(activeThread) || workspaceAnswering;
+  /// one or another.
+  bool get busy => workspaceAnswering;
 
   /// Whether the chat on screen can take a message: a draft, or a chat whose history is read.
   bool get ready => activeThread == null || _turns.containsKey(activeThread);
@@ -367,11 +338,9 @@ class ChatController extends ChangeNotifier {
   /// Reads the workspaces and the chat on screen again, for when the connection dropped and
   /// what shows may be stale or stuck. An answer still running in this chat is let go of first,
   /// not stopped: the server may finish it, and it shows when the chat is read again. A chat
-  /// deleted on the server gives way to its workspace's newest chat. Does nothing while the
-  /// chat's exchanges are being dropped, which the reading would race.
+  /// deleted on the server gives way to its workspace's newest chat.
   Future<void> refresh() async {
-    final dropping = _droppingIn.contains(activeThread);
-    if (_server == null || _refreshing || dropping) return;
+    if (_server == null || _refreshing) return;
     _refreshing = true;
     if (_here case final running?) {
       unawaited(running.stream?.cancel());
@@ -427,21 +396,11 @@ class ChatController extends ChangeNotifier {
 
   void _serverChanged() {
     final now = _settings.connection;
-    if (now?.withPassword(null) == _server) {
-      if (now?.password == _password && _settings.auth == _auth) return;
-      _password = now?.password;
-      _auth = _settings.auth;
-      if (!signedIn) editing = null;
-      notifyListeners();
-      return;
-    }
+    if (now == _server) return;
     // A delete still waiting to be undone goes to the server it was made on.
     unawaited(flushDelete());
-    _server = now?.withPassword(null);
-    _password = now?.password;
-    _auth = _settings.auth;
+    _server = now;
     unawaited(_prefs.useServer(_server?.baseUrl));
-    editing = null;
     for (final running in _runs) {
       running.stream?.cancel();
     }
@@ -458,7 +417,6 @@ class ChatController extends ChangeNotifier {
     docCounts.clear();
     loading = false;
     unreachable.value = false;
-    _droppingIn.clear();
     activeSlug = null;
     activeThread = null;
     problem = null;
@@ -562,7 +520,6 @@ class ChatController extends ChangeNotifier {
   /// none.
   Future<void> select(String? slug, {String? thread}) async {
     activeSlug = slug;
-    editing = null;
     _draft = [];
     _draftGo++;
     await open(
@@ -578,7 +535,6 @@ class ChatController extends ChangeNotifier {
     if (threadSlug != null) _ready.remove(threadSlug);
     // What waits for the composer goes back only in its own chat.
     _forComposer.removeWhere((thread, _) => thread != threadSlug);
-    editing = null;
     _clearLinkNotice();
     _rememberChat();
     notifyListeners();
@@ -613,7 +569,6 @@ class ChatController extends ChangeNotifier {
     if (turns.isEmpty) return;
     _draft = [];
     _draftGo++;
-    editing = null;
     activeThread = null;
     _rememberChat();
     notifyListeners();
@@ -792,8 +747,7 @@ class ChatController extends ChangeNotifier {
   }
 
   /// Asks [message], with [attachments], in the chat on screen, making its thread first when it
-  /// is a draft. True when the message was taken; false when nothing was sent, as when the old exchange of an edit could not be
-  /// deleted, so the person still has it to send.
+  /// is a draft. True when the message was taken.
   Future<bool> send(
     String message, {
     List<Attachment> attachments = const [],
@@ -802,14 +756,6 @@ class ChatController extends ChangeNotifier {
     final text = message.trim();
     if (slug == null || text.isEmpty || busy || !ready) return false;
     _clearLinkNotice();
-    if (editing case final edited?) {
-      final at = this.turns.indexOf(edited);
-      if (at >= 0) {
-        if (!await _dropFrom(edited.chatId)) return false;
-        _setTurns(this.turns.sublist(0, at));
-      }
-      editing = null;
-    }
     final user = Turn.user(
       text,
       attachments: [
@@ -860,21 +806,12 @@ class ChatController extends ChangeNotifier {
       running,
       answer,
       _api.streamChat(slug, thread, text, attachments: attachments),
-      user: user,
     );
     return true;
   }
 
-  /// Reads [events] into [answer], the answer [running] is, until it ends or fails. [user] is
-  /// the question just sent, whose id the server's closing event also carries.
-  void _follow(
-    _Running running,
-    Turn answer,
-    Stream<ChatEvent> events, {
-    required Turn user,
-  }) {
-    final slug = running.slug;
-    final thread = running.thread!;
+  /// Reads [events] into [answer], the answer [running] is, until it ends or fails.
+  void _follow(_Running running, Turn answer, Stream<ChatEvent> events) {
     running.stream = events.listen(
       (event) {
         switch (event) {
@@ -895,7 +832,6 @@ class ChatController extends ChangeNotifier {
               ..files = files
               ..metrics = metrics
               ..chatId = chatId;
-            user.chatId = chatId;
         }
       },
       onError: (Object error) {
@@ -905,12 +841,7 @@ class ChatController extends ChangeNotifier {
           error: error is ApiException ? error.message : '$error',
         );
       },
-      onDone: () {
-        _finish(running);
-        if (answer.chatId == null && signedIn) {
-          unawaited(_learnIds(slug, thread, user, answer));
-        }
-      },
+      onDone: () => _finish(running),
       cancelOnError: true,
     );
   }
@@ -930,99 +861,14 @@ class ChatController extends ChangeNotifier {
         turns[turns.length - 2].attachments.isEmpty;
   }
 
-  /// Asks the chat's last question again, in place of its answer. While [signedIn] the old
-  /// exchange is deleted on the server first, its id read from the chat's history when the
-  /// answer did not say it; otherwise, or when the history does not show it, the server keeps it
-  /// too, and it shows again when the chat is next read.
+  /// Asks the chat's last question again, in place of its answer here. The server keeps the old
+  /// exchange too, which shows again when the chat is next read.
   Future<void> retry() async {
     if (!canRetry) return;
-    // Retry replaces the last exchange only; a question being edited stays as it was.
-    if (editing != null) {
-      editing = null;
-      notifyListeners();
-    }
     final turns = this.turns;
     final question = turns[turns.length - 2];
-    if ((activeSlug, activeThread) case (final slug?, final thread?)
-        when signedIn && question.chatId == null && turns.last.chatId == null) {
-      await _learnIds(slug, thread, question, turns.last);
-      if (!identical(this.turns, turns) || !canRetry) return;
-    }
-    if (!await _dropFrom(question.chatId ?? turns.last.chatId)) return;
-    if (!identical(this.turns, turns)) return;
     _setTurns(turns.sublist(0, turns.length - 2));
     await send(question.text);
-  }
-
-  /// Starts editing [question]: sending then replaces it and everything after it on the server.
-  /// Does nothing unless [signedIn] and the server has said the question's id; the composer
-  /// takes its text either way.
-  void edit(Turn question) {
-    if (!signedIn || question.chatId == null || !turns.contains(question)) {
-      return;
-    }
-    editing = question;
-    notifyListeners();
-  }
-
-  void cancelEdit() {
-    if (editing == null) return;
-    editing = null;
-    notifyListeners();
-  }
-
-  /// Marks [answer] good or bad on the server, or neither when it is marked so already. Shows at
-  /// once, and goes back with a [problem] when the server refuses.
-  Future<void> mark(Turn answer, bool good) async {
-    final slug = activeSlug;
-    final id = answer.chatId;
-    if (!signedIn || slug == null || id == null) return;
-    final was = answer.feedback;
-    final now = was == good ? null : good;
-    answer._mark(now);
-    final server = _server;
-    try {
-      await _api.setFeedback(slug, id, now);
-    } on ApiException catch (error) {
-      if (_server != server) return;
-      if (answer.feedback == now) answer._mark(was);
-      problem = Notice('Could not mark the answer', error.message);
-      notifyListeners();
-    }
-  }
-
-  /// Deletes the chat on screen's exchanges from [chatId] on, while [signedIn] and the id is
-  /// known. True when the question may then be asked: they were deleted, or there was nothing to
-  /// delete with. A failure shows as [problem].
-  Future<bool> _dropFrom(int? chatId) async {
-    final slug = activeSlug;
-    final thread = activeThread;
-    if (!signedIn || chatId == null || slug == null || thread == null) {
-      return true;
-    }
-    final server = _server;
-    _droppingIn.add(thread);
-    notifyListeners();
-    try {
-      await _api.dropFrom(slug, thread, chatId);
-      if (_server == server && activeSlug == slug && activeThread == thread) {
-        return true;
-      }
-      // The person moved on meanwhile: the chat is read afresh when it is next opened.
-      if (_server == server) _turns.remove(thread);
-      return false;
-    } on ApiException catch (error) {
-      if (_server == server) {
-        problem = Notice('Could not replace the old exchange', error.message);
-      }
-      return false;
-    } finally {
-      // A new server has started afresh, dropping included.
-      if (_server == server) {
-        _droppingIn.remove(thread);
-        notifyListeners();
-      }
-    }
   }
 
   /// Ends [running], whose connection dropped, without failing it: AnythingLLM may still finish
@@ -1171,49 +1017,6 @@ class ChatController extends ChangeNotifier {
       }
     } on ApiException {
       // The chat keeps its old name; nothing else depends on it.
-    }
-  }
-
-  /// Takes the ids of the exchange [user] and [answer] from the chat's history, for an answer
-  /// whose closing chunk did not say them, as an agent's does not. A wrong id would make Retry or
-  /// an edit delete other exchanges, so the ids are taken only while the exchange is still the
-  /// last in its chat and finished, and only from a last history entry that asks the same
-  /// question under an id newer than every id the chat already has.
-  Future<void> _learnIds(
-    String slug,
-    String thread,
-    Turn user,
-    Turn answer,
-  ) async {
-    final server = _server;
-    final List<ChatMessage> history;
-    try {
-      history = await _api.history(slug, thread);
-    } on ApiException {
-      return;
-    }
-    final turns = _turns[thread];
-    if (_server != server ||
-        turns == null ||
-        turns.length < 2 ||
-        !identical(turns.last, answer) ||
-        !identical(turns[turns.length - 2], user) ||
-        answer.unfinished ||
-        answer.chatId != null ||
-        isAnswering(thread)) {
-      return;
-    }
-    if (history case [..., final asked, final said]
-        when asked.role == Role.user &&
-            said.role == Role.assistant &&
-            said.chatId != null &&
-            asked.chatId == said.chatId &&
-            asked.text.trim() == user.text.trim()) {
-      final id = said.chatId!;
-      if (!_newerThanAll(turns, id)) return;
-      answer.chatId = user.chatId = id;
-      answer.notifyListeners();
-      notifyListeners();
     }
   }
 
