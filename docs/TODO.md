@@ -19,7 +19,7 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 
 ## Needs the private session API
 
-The web UI's own endpoints sign in with a session token, not the developer key, and promise no compatibility. The app signs in to them with the server's password when one is saved, for the presets, Retry and Edit that replace the old exchange, thumbs up or down, the saved memories, the Upcoming jobs and making its own key. The gaps below would use the same sign-in.
+The web UI's own endpoints sign in with a session token, not the developer key, and promise no compatibility. The app never signs in to them: it reaches saved memories and scheduled jobs through the toolkit, and leaves presets, ratings and deleting exchanges alone. Each gap below needs that sign-in, or a toolkit route that makes the call for it.
 
 | Gap | Why the developer API cannot do it |
 | --- | --- |
