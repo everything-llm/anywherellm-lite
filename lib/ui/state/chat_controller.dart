@@ -574,10 +574,15 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> createWorkspace(String name) {
+  /// Makes workspace [name] with [prompt] as its instructions and opens it. An empty prompt is
+  /// none, so the server's default applies.
+  Future<void> createWorkspace(String name, {String prompt = ''}) {
     final server = _server;
     return _try('Could not make the workspace', () async {
-      final made = await _api.createWorkspace(name.trim());
+      final made = await _api.createWorkspace(
+        name.trim(),
+        prompt: prompt.trim().isEmpty ? null : prompt,
+      );
       if (_server != server) return;
       workspaces = [...workspaces, made];
       _threads[made.slug] = [];

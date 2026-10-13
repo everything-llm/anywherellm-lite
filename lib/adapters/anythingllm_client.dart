@@ -69,8 +69,11 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   }
 
   @override
-  Future<Workspace> createWorkspace(String name) async {
-    final body = await _send('POST', '/api/v1/workspace/new', {'name': name});
+  Future<Workspace> createWorkspace(String name, {String? prompt}) async {
+    final body = await _send('POST', '/api/v1/workspace/new', {
+      'name': name,
+      'openAiPrompt': ?prompt,
+    });
     final json = _field(body, 'workspace');
     if (json is! Map<String, dynamic>) {
       throw ApiException(_said(body) ?? 'The server did not make $name.');

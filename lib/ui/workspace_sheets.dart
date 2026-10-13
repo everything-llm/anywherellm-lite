@@ -10,8 +10,9 @@ import 'widgets/buttons.dart';
 import 'widgets/fields.dart';
 import 'widgets/sheet.dart';
 
-/// A phone's sheet about the open workspace, over the window: a new workspace's name, the open
-/// one's new name, or whether to delete it, with Keep and Delete side by side.
+/// A phone's sheet about the open workspace, over the window: a new workspace's name and
+/// instructions, the open one's new name, or whether to delete it, with Keep and Delete side by
+/// side.
 class WorkspaceSheetView extends StatefulWidget {
   const WorkspaceSheetView(this.kind, {super.key});
 
@@ -29,9 +30,13 @@ class _WorkspaceSheetViewState extends State<WorkspaceSheetView> {
         : '',
   );
 
+  /// A new workspace's system prompt. Left empty, the server's default applies.
+  final _instructions = TextEditingController();
+
   @override
   void dispose() {
     _name.dispose();
+    _instructions.dispose();
     super.dispose();
   }
 
@@ -44,7 +49,7 @@ class _WorkspaceSheetViewState extends State<WorkspaceSheetView> {
     _close();
     if (typed.isEmpty) return;
     if (widget.kind == WorkspaceSheet.create) {
-      unawaited(chat.createWorkspace(typed));
+      unawaited(chat.createWorkspace(typed, prompt: _instructions.text));
       _scope.shell.openChat();
     } else if (active != null && typed != active.name) {
       unawaited(chat.renameWorkspace(active.slug, typed));
@@ -70,30 +75,46 @@ class _WorkspaceSheetViewState extends State<WorkspaceSheetView> {
   }
 
   Widget _naming(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 16,
-      children: [
-        NamedControl(
-          'Name',
-          quiet: true,
-          labelled: true,
-          AppField(
-            controller: _name,
-            label: 'Name',
-            autofocus: true,
-            onSubmitted: (_) => _named(),
+    final create = widget.kind == WorkspaceSheet.create;
+    // It scrolls when the keyboard leaves it too little room.
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 16,
+        children: [
+          NamedControl(
+            'Name',
+            quiet: true,
+            labelled: true,
+            AppField(
+              controller: _name,
+              label: 'Name',
+              autofocus: true,
+              onSubmitted: (_) => _named(),
+            ),
           ),
-        ),
-        ActionRow(even: true, [
-          AppButton(
-            widget.kind == WorkspaceSheet.create ? 'Create' : 'Save',
-            primary: true,
-            onPressed: _named,
-          ),
-        ]),
-      ],
+          if (create)
+            NamedControl(
+              'Instructions',
+              quiet: true,
+              labelled: true,
+              AppField(
+                controller: _instructions,
+                label: 'Instructions',
+                hint: 'Empty: the server\'s default system prompt applies.',
+                maxLines: 8,
+              ),
+            ),
+          ActionRow(even: true, [
+            AppButton(
+              create ? 'Create' : 'Save',
+              primary: true,
+              onPressed: _named,
+            ),
+          ]),
+        ],
+      ),
     );
   }
 

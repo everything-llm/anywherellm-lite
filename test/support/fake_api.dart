@@ -169,11 +169,16 @@ class FakeAnythingLlm implements AnythingLlmApi {
   }, slug);
 
   @override
-  Future<Workspace> createWorkspace(String name) => _run('createWorkspace', () {
-    final made = FakeWorkspace(name.toLowerCase().replaceAll(' ', '-'), name);
-    spaces.add(made);
-    return Workspace(slug: made.slug, name: made.name);
-  }, name);
+  Future<Workspace> createWorkspace(String name, {String? prompt}) =>
+      _run('createWorkspace', () {
+        final made = FakeWorkspace(
+          name.toLowerCase().replaceAll(' ', '-'),
+          name,
+          prompt: prompt,
+        );
+        spaces.add(made);
+        return Workspace(slug: made.slug, name: made.name);
+      }, name);
 
   @override
   Future<Workspace> renameWorkspace(String slug, String name) =>

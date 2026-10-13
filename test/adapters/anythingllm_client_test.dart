@@ -427,6 +427,17 @@ void main() {
       expect((made.slug, made.name), ('q3', 'Q3 planning'));
     });
 
+    test('a new workspace sends its instructions as its prompt', () async {
+      final seen = <http.Request>[];
+      await _answering({
+        'workspace': {'slug': 'r', 'name': 'Recipes'},
+      }, seen: seen).createWorkspace('Recipes', prompt: 'Answer as a chef.');
+      expect(jsonDecode(seen.single.body), {
+        'name': 'Recipes',
+        'openAiPrompt': 'Answer as a chef.',
+      });
+    });
+
     test(
       'a new workspace with no workspace in the answer is a failure',
       () async {

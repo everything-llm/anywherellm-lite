@@ -15,6 +15,7 @@ import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:file_picker_platform_interface/file_picker_platform_interface.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
+import 'package:anywherellm/ui/workspace_sheets.dart';
 import 'package:flutter/material.dart' show AxisDirection, Scrollable;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
@@ -257,8 +258,23 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('renaming and deleting a workspace fit at $at', (tester) async {
+    testWidgets('making, renaming and deleting a workspace fit at $at', (
+      tester,
+    ) async {
       final h = await pumpApp(tester, llm: awkward(), size: size);
+      // New workspace, with long instructions typed.
+      {
+        h.shell.togglePopup(WorkspaceSheet.create);
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          typingField(find.byType(WorkspaceSheetView)).last,
+          'instructions-$longWord\n' * 12,
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+      }
       // Rename and delete are in the workspace's settings, in sheets.
       {
         h.shell.showPane(Pane.files);

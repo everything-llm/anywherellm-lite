@@ -29,7 +29,9 @@ abstract interface class AnythingLlmApi {
   /// One workspace with its documents. A missing one is an [ApiException] with status 404.
   Future<Workspace> workspace(String slug);
 
-  Future<Workspace> createWorkspace(String name);
+  /// Makes a workspace called [name], with [prompt] as its system prompt, or the server's
+  /// default when it is null.
+  Future<Workspace> createWorkspace(String name, {String? prompt});
 
   /// Renames the workspace and returns it as the server now has it.
   Future<Workspace> renameWorkspace(String slug, String name);

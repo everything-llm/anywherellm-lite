@@ -5,6 +5,7 @@ import 'package:anywherellm/ui/settings/settings_dialog.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
+import 'package:anywherellm/ui/workspace_sheets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -109,6 +110,36 @@ void main() {
       raiseKeyboard(tester, sideKeyboard);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'New workspace on a phone on its side keeps its fields above the keyboard',
+    (tester) async {
+      final h = await pumpApp(tester, llm: planningServer(), size: side);
+      h.shell.togglePopup(WorkspaceSheet.create);
+      await tester.pumpAndSettle();
+      final sheet = find.byType(WorkspaceSheetView);
+      final name = typingField(sheet).first;
+      await tester.tap(name, warnIfMissed: false);
+      raiseKeyboard(tester, sideKeyboard);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(focused(tester, name), isTrue);
+      expectAboveKeyboard(tester, name, side, sideKeyboard);
+      final instructions = typingField(sheet).last;
+      await tester.ensureVisible(instructions);
+      // Only its top shows in the 160 pixels left, so it is tapped there.
+      await tester.tapAt(
+        tester.getRect(instructions).topCenter.translate(0, 12),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(focused(tester, instructions), isTrue);
+      expect(
+        tester.getRect(instructions).top,
+        lessThan(side.height - sideKeyboard),
+      );
     },
   );
 

@@ -8,7 +8,7 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 | --- | --- |
 | Generate or edit an image | `POST /v1/openai/images/generations`, multipart with `prompt`, optional `size` and optional `image_references` to edit. It answers a base64 PNG, and only when the server has an image provider set up. |
 | Chats that are in no chat thread | `GET /v1/workspace/{slug}/chats` answers `history`: the chats sent outside any thread, such as the web UI's default workspace chat. Every workspace on the server checked on 2026-10-06 answered an empty list, so this waits until someone uses the default chat. |
-| Settings when a workspace is made | `POST /v1/workspace/new` takes `similarityThreshold`, `openAiTemp`, `openAiHistory`, `openAiPrompt`, `queryRefusalResponse` and `topN`. Today they are set afterwards in `settings.json`. |
+| Settings when a workspace is made | `POST /v1/workspace/new` takes `similarityThreshold`, `openAiTemp`, `openAiHistory`, `queryRefusalResponse` and `topN` besides the `openAiPrompt` New workspace sends. Today they are set afterwards on the workspace's Answer from page. |
 | Edit a stored answer's text | The web UI edits one answer in place. The app's Edit replaces a question and everything after it; `update-chat`, which rewrites one exchange's text, is not used. |
 
 ## Local, no server needed
@@ -27,7 +27,7 @@ The web UI's own endpoints sign in with a session token, not the developer key, 
 | Fork a chat from a message | No fork call. |
 | Delete one message | `DELETE /system/workspace-chats/:id` deletes one stored chat, but the app deletes exchanges only as Edit and Retry do, from an id on. |
 | Reset Vector Database | Not in `/v1`. Detaching every document is the nearest equivalent. |
-| Default system prompt for new workspaces | Not in `/v1`. `workspace/new` takes `openAiPrompt`, so the app can set a prompt when it makes a workspace. |
+| Default system prompt for new workspaces | Not in `/v1`. New workspace sets a prompt for the one workspace it makes, through `workspace/new`'s `openAiPrompt`. |
 | Custom system prompt variables | Adding, editing and deleting them is not in `/v1`. The server fills the built-in ones on every answer. |
 | Clear Chats | Not in `/v1`. Listing and exporting every chat are on Settings' Workspace chats page. |
 | Suggested chat messages | Not in `/v1`. |

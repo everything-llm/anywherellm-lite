@@ -458,6 +458,16 @@ void main() {
     expect(llm.calls, contains('createWorkspace:Reading notes'));
     expect(rig.chat.active!.name, 'Reading notes');
     expect(rig.chat.activeThread, isNull);
+    expect(llm.spaces.last.prompt, isNull);
+  });
+
+  test('a new workspace takes its instructions as typed', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    await rig.chat.createWorkspace('Recipes', prompt: ' Answer as a chef.\n');
+    expect(llm.spaces.last.prompt, ' Answer as a chef.\n');
+    await rig.chat.createWorkspace('Blank', prompt: ' \n ');
+    expect(llm.spaces.last.prompt, isNull);
   });
 
   test('a failure becomes a notice', () async {
