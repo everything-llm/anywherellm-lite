@@ -578,7 +578,7 @@ class _AnswerState extends State<_Answer> {
     final inline = turn.streaming && answered && takesCaret(split.answer);
     final rate = answered ? _feedbackOf(context, turn) : null;
     // An answer cut short shows what came in the second ink, under why it stopped.
-    final cut = !turn.streaming && (turn.stopped || turn.error != null);
+    final cut = !turn.streaming && turn.unfinished;
     const action = answerAction;
     // The red box asks again itself, so Retry does not show twice.
     final askAgain = turn.error != null && retry?.onPressed != null;
@@ -594,6 +594,21 @@ class _AnswerState extends State<_Answer> {
           // The caret alone, as the design canvas draws it, from the send on, while a
           // model's reasoning is hidden too.
           const Padding(padding: EdgeInsets.only(top: 6), child: Caret()),
+        if (turn.waiting) ...[
+          const SizedBox(height: 10),
+          AlertBox(
+            AlertKind.info,
+            'Still answering on the server',
+            text:
+                'The connection dropped. AnythingLLM keeps going, and the answer shows '
+                'here once it is saved.',
+            action: AppButton(
+              'Check now',
+              onPressed: () =>
+                  unawaited(AppScope.of(context).chat.checkWaiting()),
+            ),
+          ),
+        ],
         if (turn.error case final error?) ...[
           const SizedBox(height: 10),
           AlertBox(

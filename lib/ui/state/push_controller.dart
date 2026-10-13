@@ -24,7 +24,8 @@ class PushState {
 /// server's apps. They are on while the [Pusher] has a distributor. Each source registers with
 /// its server's key whenever the server in use, its password or the apps server changes, and at
 /// every start, and sends the endpoint the distributor answers to its server. A tapped
-/// notification opens Upcoming or its app.
+/// notification, these or the app's own that an answer is ready, opens Upcoming, its app or its
+/// chat.
 class PushController extends ChangeNotifier {
   PushController(
     this._pusher,
@@ -270,6 +271,10 @@ class PushController extends ChangeNotifier {
         _shell.openUpcoming();
       case AppTarget(:final app):
         _shell.openApp(app);
+      case ChatTarget(:final slug, :final thread):
+        _shell.showTab(HomeTab.chats);
+        unawaited(_chat.select(slug, thread: thread));
+        _shell.openChat();
     }
   }
 

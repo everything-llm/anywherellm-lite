@@ -721,7 +721,7 @@ void main() {
       expect(error.message, contains('sent nothing for too long'));
     });
 
-    test('a connection cut off mid-answer says so', () async {
+    test('a connection dropped mid-answer is a CutOff, which the server may finish', () async {
       final api = HttpAnythingLlmApi(
         holder: ConnectionHolder(_connection),
         client: MockClient.streaming((request, body) async {
@@ -733,7 +733,8 @@ void main() {
         }),
       );
       final error = await _failure(api.streamChat('w', 't', 'Hi').drain());
-      expect(error.message, 'The answer was cut off: Connection reset');
+      expect(error, isA<CutOff>());
+      expect(error.message, 'The connection dropped: Connection reset');
     });
 
     test('sends no mode, so the workspace\'s own chat mode applies', () async {

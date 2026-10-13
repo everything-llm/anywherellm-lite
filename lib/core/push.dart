@@ -87,28 +87,69 @@ class AppTarget extends PushTarget {
   int get hashCode => app.hashCode;
 }
 
-/// What tapping the notification for [payload], a push from [source], opens. Both servers push
-/// `{title, body, data}`, the shape of AnythingLLM's scheduled-job pushes: a scheduled job's
-/// opens Upcoming, and an app's opens the app its `data` names by `workspace` and `app`, or
-/// nothing when it names none. Android draws the notification itself from the same payload.
-PushTarget? pushTargetOf(String payload, PushSource source) {
-  if (source == PushSource.server) return const UpcomingTarget();
-  final Object? json;
+/// A chat, opened full screen.
+class ChatTarget extends PushTarget {
+  const ChatTarget(this.slug, this.thread);
+
+  final String slug;
+  final String thread;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ChatTarget && other.slug == slug && other.thread == thread;
+
+  @override
+  int get hashCode => Object.hash(slug, thread);
+}
+
+/// The Android channel of the app's own notifications that an answer is ready, beside each
+/// [PushSource]'s.
+const answersChannel = 'answers';
+
+/// What tapping a notification opens: [payload] is what it was drawn from, `{title, body,
+/// data}`, the shape of AnythingLLM's scheduled-job pushes, on the channel [channel]. A
+/// scheduled job's opens Upcoming; an app's opens the app its `data` names by `workspace` and
+/// `app`; an answer's opens the chat its `data` names by `workspace` and `thread`; anything else
+/// opens nothing.
+PushTarget? tapTargetOf(String channel, String payload) {
+  Object? json;
   try {
     json = jsonDecode(payload);
   } on FormatException {
-    return null;
+    json = null;
   }
-  if (json case {
-    'data': {'workspace': final String workspace, 'app': final String app},
-  }) {
-    return switch (appRefNamed(workspace, app)) {
-      final ref? => AppTarget(ref),
-      null => null,
-    };
-  }
-  return null;
+  final data = json is Map ? json['data'] : null;
+  return switch ((channel, data)) {
+    (final server, _) when server == PushSource.server.instance =>
+      const UpcomingTarget(),
+    (final apps, {'workspace': final String workspace, 'app': final String app})
+        when apps == PushSource.apps.instance =>
+      switch (appRefNamed(workspace, app)) {
+        final ref? => AppTarget(ref),
+        null => null,
+      },
+    (
+      answersChannel,
+      {'workspace': final String slug, 'thread': final String thread},
+    )
+        when slug.isNotEmpty && thread.isNotEmpty =>
+      ChatTarget(slug, thread),
+    _ => null,
+  };
 }
+
+/// The payload of the notification that the answer in chat [thread] of workspace [slug] is
+/// ready, which [tapTargetOf] reads back.
+String answerReadyPayload({
+  required String title,
+  required String body,
+  required String slug,
+  required String thread,
+}) => jsonEncode({
+  'title': title,
+  'body': body,
+  'data': {'workspace': slug, 'thread': thread},
+});
 
 /// What a UnifiedPush distributor is called, from its Android package name.
 String distributorName(String package) => switch (package) {

@@ -17,3 +17,9 @@ class NotConfigured extends ApiException {
         'No AnythingLLM server is set up yet. Add its address and key in Settings.',
       );
 }
+
+/// A streamed answer whose connection dropped after the server took the question: the server
+/// may still finish it and save it to the chat.
+class CutOff extends ApiException {
+  const CutOff(super.message);
+}

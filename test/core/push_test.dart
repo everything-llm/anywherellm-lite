@@ -5,14 +5,14 @@ import 'package:anywherellm/core/push.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('pushTargetOf', () {
+  group('tapTargetOf', () {
     test('AnythingLLM\'s scheduled-job push opens Upcoming', () {
       final payload = jsonEncode({
         'title': 'Morning brief completed',
         'body': 'Three things today',
         'data': {'onClickUrl': '/settings/scheduled-jobs/4/runs/9'},
       });
-      expect(pushTargetOf(payload, PushSource.server), const UpcomingTarget());
+      expect(tapTargetOf('anythingllm', payload), const UpcomingTarget());
     });
 
     test('an app\'s push opens that app', () {
@@ -27,7 +27,7 @@ void main() {
         },
       });
       expect(
-        pushTargetOf(payload, PushSource.apps),
+        tapTargetOf('apps', payload),
         const AppTarget(AppRef('home', 'pomodoro')),
       );
     });
@@ -39,10 +39,24 @@ void main() {
         {'workspace': '', 'app': 'pomodoro'},
       ]) {
         final payload = jsonEncode({'title': 'x', 'data': data});
-        expect(pushTargetOf(payload, PushSource.apps), isNull);
+        expect(tapTargetOf('apps', payload), isNull);
       }
-      expect(pushTargetOf('not json', PushSource.apps), isNull);
+      expect(tapTargetOf('apps', 'not json'), isNull);
     });
+  });
+
+  test('a ready answer\'s notification opens its chat', () {
+    final payload = answerReadyPayload(
+      title: 'Podcasts',
+      body: 'Here is the game.',
+      slug: 'cloud',
+      thread: 't-1',
+    );
+    expect(
+      tapTargetOf(answersChannel, payload),
+      const ChatTarget('cloud', 't-1'),
+    );
+    expect(tapTargetOf('elsewhere', payload), isNull);
   });
 
   test(

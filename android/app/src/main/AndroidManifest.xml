@@ -5,6 +5,9 @@
     <!-- Shows each push from AnythingLLM or the apps server; asked for when notifications are
          turned on. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- AnswerService keeps the app, and an answer it reads, going while out of sight. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <uses-feature android:name="android.hardware.microphone" android:required="false"/>
     <application
         android:label="AnywhereLLM Lite"
@@ -50,6 +53,10 @@
         <service
             android:name="org.unifiedpush.flutter.connector.UnifiedPushService"
             tools:node="remove"/>
+        <service
+            android:name=".AnswerService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"/>
         <service android:name=".PushEvents" android:exported="false">
             <intent-filter>
                 <action android:name="org.unifiedpush.android.connector.PUSH_EVENT"/>

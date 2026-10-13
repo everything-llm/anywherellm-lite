@@ -15,6 +15,8 @@ import 'ui/app.dart';
 import 'ui/app_scope.dart';
 import 'ui/apps/app_web_view.dart';
 import 'ui/boot_screen.dart';
+import 'ui/chat/android_background.dart';
+import 'ui/chat/background_work.dart';
 import 'ui/chat/device_speaker.dart';
 import 'ui/chat/device_photos.dart';
 import 'ui/chat/dictation.dart';
@@ -115,6 +117,10 @@ class _SessionHostState extends State<SessionHost> {
   /// The device's push notifications, through a UnifiedPush distributor.
   final Pusher _pusher = UnifiedPusher();
 
+  /// Keeps an answer going while the app is out of sight.
+  final BackgroundWork _background = const AndroidBackground();
+  late final KeepAnswering _keepAnswering;
+
   /// Reads answers aloud with the device's engine.
   late final ReadAloud _readAloud;
 
@@ -148,6 +154,7 @@ class _SessionHostState extends State<SessionHost> {
       widget.shell,
     );
     _readAloud = ReadAloud(DeviceSpeaker(), _chat, widget.prefs);
+    _keepAnswering = KeepAnswering(_background, _chat);
     // A deleted chat waiting to be undone is deleted as the app hides: Android can end a hidden
     // app without a word.
     _lifecycle = AppLifecycleListener(
@@ -162,6 +169,7 @@ class _SessionHostState extends State<SessionHost> {
   void dispose() {
     _lifecycle.dispose();
     _readAloud.dispose();
+    _keepAnswering.dispose();
     _push.dispose();
     _apps.dispose();
     _memory.dispose();
@@ -216,6 +224,7 @@ class _SessionHostState extends State<SessionHost> {
         readAloud: _readAloud,
         appView: const AppWebViews(),
         push: _push,
+        background: _background,
         canSpellcheck: WidgetsBinding
             .instance
             .platformDispatcher

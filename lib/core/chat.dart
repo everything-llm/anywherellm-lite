@@ -121,14 +121,18 @@ String? modelFailure(String answer) {
   return text.startsWith('The agent model failed to respond') ? text : null;
 }
 
-/// The name a chat takes from its first [message]: its first line, cut to 42 characters as a
-/// person sees them, so an emoji is never split.
+/// The name a chat takes from its first [message]: its first line, cut to 42 characters.
 String defaultTitle(String message) {
   final line = message.trim().split('\n').first.trim();
-  if (line.isEmpty) return newChatName;
-  final shown = line.characters;
-  if (shown.length <= 42) return line;
-  return '${shown.take(41).toString().trimRight()}…';
+  return line.isEmpty ? newChatName : clip(line, 42);
+}
+
+/// [text] cut to [max] characters as a person sees them, so an emoji is never split, ending in
+/// an ellipsis when it was cut.
+String clip(String text, int max) {
+  final shown = text.characters;
+  if (shown.length <= max) return text;
+  return '${shown.take(max - 1).toString().trimRight()}…';
 }
 
 /// A file sent with one message, read in for that message only.

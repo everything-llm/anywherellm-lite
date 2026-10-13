@@ -2,6 +2,7 @@ import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/ui/app.dart';
 import 'package:anywherellm/ui/app_scope.dart';
 import 'package:anywherellm/ui/apps/app_screen.dart';
+import 'package:anywherellm/ui/chat/background_work.dart';
 import 'package:anywherellm/ui/chat/composer.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:anywherellm/ui/chat/dictation.dart';
@@ -22,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_api.dart';
 import 'fake_apps.dart';
+import 'fake_background.dart';
 import 'fake_pusher.dart';
 import 'fake_settings.dart';
 import 'rig.dart';
@@ -140,6 +142,7 @@ class Harness extends Rig {
     this.canShare = false,
     this.shares,
     this.pusher,
+    this.background,
   }) : dictation = canDictate ? FakeDictation() : null,
        photos = canPickPhotos ? FakePhotos() : null,
        speaker = canSpeak ? FakeSpeaker() : null,
@@ -169,6 +172,14 @@ class Harness extends Rig {
   /// The device's push distributor, or null where it receives none.
   final FakePusher? pusher;
 
+  /// What keeps answers going out of sight, or null where nothing does.
+  final FakeBackground? background;
+
+  late final KeepAnswering? keepAnswering = switch (background) {
+    final background? => KeepAnswering(background, chat),
+    null => null,
+  };
+
   late final PushController? push = switch (pusher) {
     final pusher? => PushController(
       pusher,
@@ -191,6 +202,7 @@ class Harness extends Rig {
   void dispose() {
     memory.dispose();
     push?.dispose();
+    keepAnswering?.dispose();
     readAloud?.dispose();
     super.dispose();
   }
@@ -261,6 +273,7 @@ class Harness extends Rig {
       photos: photos,
       readAloud: readAloud,
       push: push,
+      background: background,
       canSpellcheck: canSpellcheck,
       scanner: canScan
           ? (onCode) => TextButton(
@@ -300,6 +313,7 @@ Future<Harness> pumpApp(
   bool canShare = false,
   StreamController<SharedItem>? shares,
   FakePusher? pusher,
+  FakeBackground? background,
   bool onChat = true,
 }) async {
   tester.view.physicalSize = size;
@@ -315,6 +329,7 @@ Future<Harness> pumpApp(
     canShare: canShare,
     shares: shares,
     pusher: pusher,
+    background: background,
     canDictate: canDictate,
     canPickPhotos: canPickPhotos,
     canSpeak: canSpeak,
@@ -328,6 +343,8 @@ Future<Harness> pumpApp(
   // As the app's start does, once the connection is read.
   await harness.settings.readAuth();
   await harness.push?.load();
+  // Built now, as the app builds it at start, so it holds from the first answer.
+  harness.keepAnswering;
   await tester.pumpAndSettle();
   return harness;
 }

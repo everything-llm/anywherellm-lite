@@ -11,7 +11,9 @@ import io.flutter.plugin.common.MethodChannel
 /**
  * The app. Over the `anywherellm/push` channel it asks for the notification permission and
  * hands over each notification tapped: `launchTap` answers the one that started the activity,
- * once, and `tap` sends one tapped while it runs.
+ * once, and `tap` sends one tapped while it runs. Over `anywherellm/background` it holds the
+ * app while an answer runs ([AnswerService]), says an answer is ready, and leaves without
+ * finishing, so the Flutter engine and an answer it reads go on.
  */
 class MainActivity : FlutterActivity() {
     private var push: MethodChannel? = null
@@ -33,6 +35,20 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, BACKGROUND)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "hold" -> AnswerService.hold(applicationContext, call.arguments as String?)
+                    "ready" -> PushNotes.show(
+                        applicationContext,
+                        "answers",
+                        (call.arguments as String).toByteArray(Charsets.UTF_8),
+                    )
+                    "leave" -> moveTaskToBack(true)
+                    else -> return@setMethodCallHandler result.notImplemented()
+                }
+                result.success(null)
+            }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -75,6 +91,7 @@ class MainActivity : FlutterActivity() {
 
     private companion object {
         const val CHANNEL = "anywherellm/push"
+        const val BACKGROUND = "anywherellm/background"
         const val ASK_NOTIFICATIONS = 0x6e6f
     }
 }

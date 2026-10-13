@@ -755,7 +755,8 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   );
 
   /// The events of a POST of [body] to [path], whose answer streams server-sent events. A
-  /// failed status is an [ApiException] with the server's words, as is a stream cut off. A
+  /// failed status is an [ApiException] with the server's words; a stream that drops or falls
+  /// silent once it has begun is a [CutOff], since the server may still finish it. A
   /// cancel lets go of the response at once, even before the first event, as the `async*`
   /// readers of [chatEvents] would not until their next `yield`: the server stops answering
   /// when the connection closes.
@@ -770,14 +771,19 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     StreamSubscription<List<int>>? response;
     final bytes = StreamController<List<int>>();
     var cancelled = false;
+    // Whether the server took the question: its answer's headers came.
+    var began = false;
     Future<void> fail(Object error) async {
       if (cancelled) return;
       out.addError(switch (error) {
+        http.ClientException(:final message) when began => CutOff(
+          'The connection dropped: $message',
+        ),
+        TimeoutException() when began => const CutOff(
+          'The server sent nothing for too long, so the connection was let go.',
+        ),
         http.ClientException(:final message) => ApiException(
           'The answer was cut off: $message',
-        ),
-        TimeoutException() => const ApiException(
-          'The server sent nothing for too long, so the answer was given up.',
         ),
         _ => error,
       });
@@ -801,6 +807,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
         if (answer.statusCode < 200 || answer.statusCode >= 300) {
           _decode(await http.Response.fromStream(answer));
         }
+        began = true;
         response = answer.stream
             .timeout(idle)
             .listen(

@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import 'apps/app_screen.dart';
+import 'chat/background_work.dart';
 import 'chat/dictation.dart';
 import 'chat/photo_picker.dart';
 import 'chat/speaker.dart';
@@ -58,6 +59,7 @@ class AppScope extends InheritedWidget {
     this.readAloud,
     this.appView,
     this.push,
+    this.background,
     this.canSpellcheck = false,
     required super.child,
   });
@@ -105,6 +107,9 @@ class AppScope extends InheritedWidget {
 
   /// Push notifications, or null where the device cannot receive them.
   final PushController? push;
+
+  /// What keeps an answer going while the app is out of sight, or null where nothing does.
+  final BackgroundWork? background;
 
   /// Whether the platform has a spell checker the message box can use.
   final bool canSpellcheck;

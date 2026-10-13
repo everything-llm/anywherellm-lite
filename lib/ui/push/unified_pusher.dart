@@ -76,14 +76,13 @@ class UnifiedPusher implements Pusher {
       'The distributor could not register this app.',
   };
 
-  /// A tapped notification, as `MainActivity` hands it over: its source's instance and the
-  /// push's payload as text.
+  /// A tapped notification, as `MainActivity` hands it over: its channel, a [PushSource]'s
+  /// instance or [answersChannel], and the payload it was drawn from.
   void _tapped(Object? tap) {
     if (tap is! Map) return;
-    final source = PushSource.ofInstance('${tap['instance']}');
-    final payload = tap['payload'];
-    if (source == null || payload is! String) return;
-    if (pushTargetOf(payload, source) case final target?) _taps.add(target);
+    final (channel, payload) = (tap['instance'], tap['payload']);
+    if (channel is! String || payload is! String) return;
+    if (tapTargetOf(channel, payload) case final target?) _taps.add(target);
   }
 
   @override

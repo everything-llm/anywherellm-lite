@@ -103,6 +103,10 @@ class AppShell extends StatelessWidget {
           popup: shell.popup,
           open: topClose() != null,
           onBack: () => topClose()?.call(),
+          onLeave: switch (scope.background) {
+            final background? => () => unawaited(background.leave()),
+            null => null,
+          },
           child: CallbackShortcuts(
             bindings: {
               const SingleActivator(LogicalKeyboardKey.escape): () =>
@@ -294,7 +298,7 @@ class _PhoneUndo extends StatelessWidget {
 }
 
 /// Back closes the topmost thing open, a [popup] or what [open] counts, through [onBack], and
-/// leaves the app when nothing is. With the keyboard up it only puts the keyboard away, as
+/// leaves the app when nothing is, through [onLeave] where there is one. With the keyboard up it only puts the keyboard away, as
 /// Android does elsewhere. It reads the keyboard and the popup itself, so the keyboard's
 /// animation and a popup rebuild this and not [child].
 class _BackGuard extends StatelessWidget {
@@ -302,12 +306,17 @@ class _BackGuard extends StatelessWidget {
     required this.popup,
     required this.open,
     required this.onBack,
+    required this.onLeave,
     required this.child,
   });
 
   final ValueListenable<Object?> popup;
   final bool open;
   final VoidCallback onBack;
+
+  /// Puts the app out of sight when nothing is open, in place of closing it, so an answer it
+  /// holds goes on; null lets Back close the app.
+  final VoidCallback? onLeave;
   final Widget child;
 
   @override
@@ -316,13 +325,15 @@ class _BackGuard extends StatelessWidget {
     return ValueListenableBuilder(
       valueListenable: popup,
       builder: (context, popup, child) => PopScope(
-        canPop: !typing && !open && popup == null,
+        canPop: !typing && !open && popup == null && onLeave == null,
         onPopInvokedWithResult: (didPop, _) {
           if (didPop) return;
           if (typing) {
             FocusManager.instance.primaryFocus?.unfocus();
-          } else {
+          } else if (open || popup != null) {
             onBack();
+          } else {
+            onLeave?.call();
           }
         },
         child: child!,
