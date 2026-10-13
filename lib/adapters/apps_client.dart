@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import '../core/apps.dart';
 import '../core/connection.dart';
 import '../core/ports.dart';
+import '../core/push.dart';
 import '../core/system_files.dart';
 
 /// [AppsApi] over the apps server's client API, on the AnythingLLM server's host at
@@ -59,6 +60,35 @@ class HttpAppsApi implements AppsApi {
     if (connection == null || !await available()) return false;
     return hasAppsFeature(await _found[connection.baseUrl], 'system-files');
   }
+
+  @override
+  Future<bool> canPush() async {
+    final connection = _holder.current;
+    if (connection == null || !await available()) return false;
+    return hasAppsFeature(await _found[connection.baseUrl], 'push');
+  }
+
+  @override
+  Future<String> pushKey() async {
+    final body = await _json('GET', ['key'], root: 'push');
+    final key = body is Map ? body['key'] : null;
+    if (key is! String || key.isEmpty) {
+      throw const ApiException('The apps server has no key for notifications.');
+    }
+    return key;
+  }
+
+  @override
+  Future<void> subscribePush(PushSubscription subscription) =>
+      _json('POST', ['subscribe'], root: 'push', body: subscription.toJson());
+
+  @override
+  Future<void> unsubscribePush(String endpoint) => _json(
+    'POST',
+    ['unsubscribe'],
+    root: 'push',
+    body: {'endpoint': endpoint},
+  );
 
   Future<Object?> _health(Connection connection) async {
     try {

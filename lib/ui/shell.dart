@@ -26,11 +26,12 @@ import 'state/shell_controller.dart';
 import 'tokens.dart';
 import 'widgets/basics.dart';
 
-/// The window: the home, the Chats tab or Settings' list over the bar of tabs; the chat full
-/// screen over it; the workspace's pages or Upcoming over those; the sheet over the chat; and
-/// a page of Settings over everything when one is open. Esc and Back close the topmost thing
-/// open: the popup, Settings' page, the sheet, Upcoming, the workspace's pages a step at a
-/// time, then the chat.
+/// The window: the bar of tabs at its foot, always, but while the keyboard is up and on the
+/// first run's welcome, and above it the home, the Chats tab or the Apps tab; the chat over it;
+/// the workspace's pages or Upcoming over those; Settings, its list or a page, over them all;
+/// and the sheets and popups over the whole window, the bar too. Esc and Back close the
+/// topmost thing open: the popup, Settings' page, the sheet, Upcoming, the workspace's pages a
+/// step at a time, then the chat.
 class AppShell extends StatelessWidget {
   const AppShell({super.key});
 
@@ -82,6 +83,8 @@ class AppShell extends StatelessWidget {
         // An app's sheet shows over the chat or the tab; its data, full screen, covers them.
         final appData = app != null && shell.appDataOnly;
         final chatShown = shell.chatOpen && !files && !appData;
+        // The first run's welcome stands alone, since no tab has anything to show yet.
+        final tabs = !(shell.settingsOpen && !scope.settings.configured);
         final homeCovered =
             shell.chatOpen ||
             files ||
@@ -115,75 +118,95 @@ class AppShell extends StatelessWidget {
                   child: SafeArea(
                     child: Stack(
                       children: [
-                        // The Chats tab, kept while anything covers it.
                         Positioned.fill(
-                          child: Offstage(
-                            offstage: homeCovered,
-                            child: TickerMode(
-                              enabled: !homeCovered,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Expanded(
-                                    child: Stack(
-                                      fit: StackFit.expand,
-                                      children: [
-                                        // Kept while Apps shows, with its search.
-                                        Offstage(
-                                          offstage: appsTab,
-                                          child: const ChatsTab(),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(
+                                child: Stack(
+                                  children: [
+                                    // The Chats tab, kept while anything covers it.
+                                    Positioned.fill(
+                                      child: Offstage(
+                                        offstage: homeCovered,
+                                        child: TickerMode(
+                                          enabled: !homeCovered,
+                                          child: Stack(
+                                            fit: StackFit.expand,
+                                            children: [
+                                              // Kept while Apps shows, with its search.
+                                              Offstage(
+                                                offstage: appsTab,
+                                                child: const ChatsTab(),
+                                              ),
+                                              if (appsTab) const AppsTab(),
+                                            ],
+                                          ),
                                         ),
-                                        if (appsTab) const AppsTab(),
-                                      ],
+                                      ),
                                     ),
-                                  ),
-                                  const HomeTabBar(),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        // The chat stays built while it is off the screen, so a draft and a
-                        // running answer survive.
-                        Positioned.fill(
-                          child: Offstage(
-                            offstage: !chatShown,
-                            child: TickerMode(
-                              enabled: chatShown,
-                              child: ExcludeFocus(
-                                excluding: !chatShown,
-                                child: ColoredBox(
-                                  color: t.bg,
-                                  child: const ChatView(),
+                                    // The chat stays built while it is off the screen, so a draft and a
+                                    // running answer survive.
+                                    Positioned.fill(
+                                      child: Offstage(
+                                        offstage: !chatShown,
+                                        child: TickerMode(
+                                          enabled: chatShown,
+                                          child: ExcludeFocus(
+                                            excluding: !chatShown,
+                                            child: ColoredBox(
+                                              color: t.bg,
+                                              child: const ChatView(),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    // The Chats tab as a shelf from the left over the chat.
+                                    if (shell.shelfOpen && chatShown)
+                                      const Positioned.fill(
+                                        child: ChatsShelf(),
+                                      ),
+                                    if (files)
+                                      Positioned.fill(
+                                        child: ColoredBox(
+                                          color: t.bg,
+                                          child: const WorkspacePages(),
+                                        ),
+                                      ),
+                                    if (shell.upcomingOpen)
+                                      const Positioned.fill(
+                                        child: UpcomingPage(),
+                                      ),
+                                    // An app's data, full screen as a page is.
+                                    if (app != null && appData)
+                                      Positioned.fill(
+                                        child: AppScreen(
+                                          app,
+                                          key: ValueKey(app),
+                                        ),
+                                      ),
+                                    // A deleted chat is put back from over the chat or the Chats tab.
+                                    if (!shell.settingsOpen)
+                                      _PhoneUndo(overTabs: shell.atHome),
+                                    if (shell.settingsOpen)
+                                      const Positioned.fill(
+                                        child: SettingsDialog(),
+                                      ),
+                                  ],
                                 ),
                               ),
-                            ),
+                              if (tabs) const _TabsUnlessTyping(),
+                            ],
                           ),
                         ),
-                        // The Chats tab as a shelf from the left over the chat.
-                        if (shell.shelfOpen && chatShown)
-                          const Positioned.fill(child: ChatsShelf()),
-                        if (files)
-                          Positioned.fill(
-                            child: ColoredBox(
-                              color: t.bg,
-                              child: const WorkspacePages(),
-                            ),
-                          ),
-                        if (shell.upcomingOpen)
-                          const Positioned.fill(child: UpcomingPage()),
                         // The sheet's own scrim closes it.
                         if (shell.rightOpen) Positioned.fill(child: right),
                         // An app in a sheet, over the chat or the tab it was opened from.
-                        if (app != null)
+                        if (app != null && !appData)
                           Positioned.fill(
                             child: AppScreen(app, key: ValueKey(app)),
                           ),
-                        // A deleted chat is put back from over the chat or the Chats tab.
-                        if (!shell.settingsOpen)
-                          _PhoneUndo(overTabs: shell.atHome),
-                        if (shell.settingsOpen)
-                          const Positioned.fill(child: SettingsDialog()),
                         // What another app shared, over everything but a popup.
                         if (shell.shared case final item?)
                           Positioned.fill(
@@ -242,8 +265,8 @@ class AppShell extends StatelessWidget {
   }
 }
 
-/// Undo for a chat just deleted, over the chat or, with [overTabs], over the bar of tabs, while
-/// it can be put back.
+/// Undo for a chat just deleted, over the chat's composer or, with [overTabs], just over the bar
+/// of tabs, while it can be put back.
 class _PhoneUndo extends StatelessWidget {
   const _PhoneUndo({required this.overTabs});
 
@@ -259,7 +282,7 @@ class _PhoneUndo extends StatelessWidget {
           : Positioned(
               left: 20,
               right: 20,
-              bottom: overTabs ? 104 : 96,
+              bottom: overTabs ? 30 : 96,
               child: UndoBar(
                 'Chat deleted',
                 onUndo: chat.undoDelete,
@@ -312,21 +335,47 @@ class _BackGuard extends StatelessWidget {
 /// [child] above the on-screen keyboard. Android keeps the window full height under the
 /// keyboard and reports it as a bottom view inset, which a Scaffold would stand clear of; the
 /// shell has none. The inset is taken out below, so nothing applies it twice, and the
-/// keyboard's animation rebuilds this and not [child].
+/// keyboard's animation rebuilds this and not [child]; [_Typing] says whether it is up.
 class _AboveKeyboard extends StatelessWidget {
   const _AboveKeyboard({required this.child});
 
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-    child: MediaQuery.removeViewInsets(
-      context: context,
-      removeBottom: true,
-      child: child,
-    ),
-  );
+  Widget build(BuildContext context) {
+    final inset = MediaQuery.viewInsetsOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: inset),
+      child: MediaQuery.removeViewInsets(
+        context: context,
+        removeBottom: true,
+        child: _Typing(typing: inset > 0, child: child),
+      ),
+    );
+  }
+}
+
+/// Whether the keyboard is up, for what [_AboveKeyboard] holds, which no longer sees its inset.
+/// Only a change of it rebuilds those that read it, not each frame of the keyboard's rise.
+class _Typing extends InheritedWidget {
+  const _Typing({required this.typing, required super.child});
+
+  final bool typing;
+
+  @override
+  bool updateShouldNotify(_Typing old) => typing != old.typing;
+}
+
+/// The bar of tabs, put away while the keyboard is up, so the field typed in keeps the room.
+class _TabsUnlessTyping extends StatelessWidget {
+  const _TabsUnlessTyping();
+
+  @override
+  Widget build(BuildContext context) {
+    final typing =
+        context.dependOnInheritedWidgetOfExactType<_Typing>()?.typing ?? false;
+    return Offstage(offstage: typing, child: const HomeTabBar());
+  }
 }
 
 /// Hands each item another app shares to the shell, which offers it in a sheet.

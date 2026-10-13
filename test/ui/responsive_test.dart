@@ -23,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
 import '../support/fake_apps.dart';
+import '../support/fake_pusher.dart';
 import '../support/fake_settings.dart';
 import '../support/picker.dart';
 import '../support/pump.dart';
@@ -125,6 +126,8 @@ void main() {
         canDictate: true,
         canSpeak: true,
         appsServer: groceriesServer(),
+        // Notifications on, so its page lists where each source stands.
+        pusher: FakePusher()..using = 'io.heckel.ntfy',
       );
       h.shell.openSettings();
       await tester.pumpAndSettle();

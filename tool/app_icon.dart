@@ -4,7 +4,9 @@
 //   flutter test tool/app_icon.dart
 //
 // writes `assets/icon/icon.png`, `icon-foreground.png` and `splash.png`. Then run
-// `dart run flutter_launcher_icons` and `dart run flutter_native_splash:create`.
+// `dart run flutter_launcher_icons` and `dart run flutter_native_splash:create`. It also writes
+// the notification icon, the bird alone in white, straight to each density's
+// `android/app/src/main/res/drawable-<density>/ic_notification.png`.
 // It sits outside `test/`, so the suite does not run it.
 
 import 'dart:io';
@@ -64,13 +66,33 @@ final _splash = Stack(
   ],
 );
 
-/// Writes [picture], drawn on a transparent square, to `assets/icon/[name]`.
-Future<void> _draw(WidgetTester tester, Widget picture, String name) async {
+/// The notification icon's side at each density: 24 dp.
+const _notificationSides = {
+  'mdpi': 24.0,
+  'hdpi': 36.0,
+  'xhdpi': 48.0,
+  'xxhdpi': 72.0,
+  'xxxhdpi': 96.0,
+};
+
+/// Writes [picture], drawn on a transparent square of [side], to [path].
+Future<void> _draw(
+  WidgetTester tester,
+  Widget picture,
+  String path, {
+  double side = _side,
+}) async {
+  tester.view.physicalSize = Size.square(side);
   await tester.pumpWidget(
     Directionality(
       textDirection: TextDirection.ltr,
       child: RepaintBoundary(
-        child: SizedBox.square(dimension: _side, child: picture),
+        child: SizedBox.square(
+          dimension: side,
+          child: FittedBox(
+            child: SizedBox.square(dimension: _side, child: picture),
+          ),
+        ),
       ),
     ),
   );
@@ -81,7 +103,7 @@ Future<void> _draw(WidgetTester tester, Widget picture, String name) async {
     final image = await boundary.toImage();
     final png = await image.toByteData(format: ui.ImageByteFormat.png);
     image.dispose();
-    File('assets/icon/$name').writeAsBytesSync(png!.buffer.asUint8List());
+    File(path).writeAsBytesSync(png!.buffer.asUint8List());
   });
 }
 
@@ -92,8 +114,16 @@ void main() {
       ..devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
-    await _draw(tester, _icon, 'icon.png');
-    await _draw(tester, _foreground, 'icon-foreground.png');
-    await _draw(tester, _splash, 'splash.png');
+    await _draw(tester, _icon, 'assets/icon/icon.png');
+    await _draw(tester, _foreground, 'assets/icon/icon-foreground.png');
+    await _draw(tester, _splash, 'assets/icon/splash.png');
+    for (final MapEntry(key: density, value: side) in _notificationSides.entries) {
+      await _draw(
+        tester,
+        const _Bird(0.9),
+        'android/app/src/main/res/drawable-$density/ic_notification.png',
+        side: side,
+      );
+    }
   });
 }

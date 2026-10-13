@@ -10,6 +10,7 @@ import 'state/chat_controller.dart';
 import 'state/files_controller.dart';
 import 'state/memory_controller.dart';
 import 'state/prefs_controller.dart';
+import 'state/push_controller.dart';
 import 'state/settings_controller.dart';
 import 'state/shell_controller.dart';
 import 'state/sources_controller.dart';
@@ -56,6 +57,7 @@ class AppScope extends InheritedWidget {
     this.photos,
     this.readAloud,
     this.appView,
+    this.push,
     this.canSpellcheck = false,
     required super.child,
   });
@@ -100,6 +102,9 @@ class AppScope extends InheritedWidget {
   /// Shows an app's working page in a web view, or null where the device has none, and an app
   /// shows its card with a way to its page in the browser.
   final AppView? appView;
+
+  /// Push notifications, or null where the device cannot receive them.
+  final PushController? push;
 
   /// Whether the platform has a spell checker the message box can use.
   final bool canSpellcheck;

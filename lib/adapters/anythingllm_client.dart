@@ -12,6 +12,7 @@ import '../core/connection.dart';
 import '../core/embeds.dart';
 import '../core/memory.dart';
 import '../core/ports.dart';
+import '../core/push.dart';
 import '../core/schedule.dart';
 import '../core/server_models.dart';
 import '../core/upload.dart';
@@ -239,6 +240,20 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     ))
       ?SlashCommand.fromJson(json),
   ];
+
+  @override
+  Future<String> pushKey() async {
+    final body = await _session('GET', '/api/web-push/pubkey');
+    final key = body is Map ? body['publicKey'] : null;
+    if (key is! String || key.isEmpty) {
+      throw const ApiException('The server has no key for notifications.');
+    }
+    return key;
+  }
+
+  @override
+  Future<void> subscribePush(PushSubscription subscription) =>
+      _session('POST', '/api/web-push/subscribe', body: subscription.toJson());
 
   @override
   Future<List<ScheduledJob>> scheduledJobs() async =>

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:anywherellm/core/apps.dart';
 import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/push.dart';
 import 'package:anywherellm/core/system_files.dart';
 
 import 'pixels.dart';
@@ -383,6 +384,33 @@ class FakeApps implements AppsApi {
 
   @override
   Future<bool> systemFiles() async => await available() && !older;
+
+  /// The devices [subscribePush] keeps, by endpoint.
+  final pushDevices = <String, PushSubscription>{};
+
+  @override
+  Future<bool> canPush() async => await available() && !older;
+
+  @override
+  Future<String> pushKey() async {
+    calls.add('pushKey');
+    _fail('pushKey');
+    return 'BAppsKey';
+  }
+
+  @override
+  Future<void> subscribePush(PushSubscription subscription) async {
+    calls.add('subscribePush');
+    _fail('subscribePush');
+    pushDevices[subscription.endpoint] = subscription;
+  }
+
+  @override
+  Future<void> unsubscribePush(String endpoint) async {
+    calls.add('unsubscribePush');
+    _fail('unsubscribePush');
+    pushDevices.remove(endpoint);
+  }
 
   @override
   Future<List<SystemEntry>> systemFolder(String path) async {

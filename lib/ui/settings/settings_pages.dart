@@ -1,11 +1,12 @@
 import '../../core/providers.dart';
 
-/// The pages of Settings. Connection, Appearance and Chat are about this device; Server lists
+/// The pages of Settings. Connection, Appearance, Chat and Notifications are about this device; Server lists
 /// the pages about AnythingLLM, which open from it, and Memory and System files sit beside it.
 enum SettingsPage {
   connection('Connection', null, needsServer: false),
   appearance('Appearance', null, needsServer: false),
   chat('Chat', null, needsServer: false),
+  notifications('Notifications', null, needsServer: false),
   memory('Memory', null),
   systemFiles('System files', null, ownsPage: true),
   server('Server', null),

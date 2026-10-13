@@ -7,7 +7,6 @@ import '../layout.dart';
 import '../state/settings_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
-import '../home.dart';
 import '../widgets/phone_page.dart';
 import 'chats_page.dart';
 import 'connection_page.dart';
@@ -15,6 +14,7 @@ import 'device_pages.dart';
 import 'embeds_page.dart';
 import 'json_page.dart';
 import 'memory_page.dart';
+import 'notifications_page.dart';
 import 'privacy_page.dart';
 import 'provider_page.dart';
 import 'rows.dart';
@@ -22,9 +22,10 @@ import 'server_page.dart';
 import 'settings_pages.dart';
 import 'system_files_page.dart';
 
-/// Settings: its list as the Settings tab, under its title and over the bar of tabs, in two
-/// groups, This app and AnythingLLM, whose Server row opens the Server page, which lists the
-/// server's pages; a page shows over the window under a back arrow and its name.
+/// Settings: its list as the Settings tab, under its title, in two groups, This app and
+/// AnythingLLM, whose Server row opens the Server page, which lists the server's pages; a page
+/// shows over what showed under a back arrow and its name. The shell draws the bar of tabs
+/// under both.
 class SettingsDialog extends StatefulWidget {
   const SettingsDialog({super.key});
 
@@ -93,7 +94,6 @@ class _Frame extends StatelessWidget {
         children: [
           TabTitle('Settings'),
           Expanded(child: _Nav()),
-          HomeTabBar(),
         ],
       );
     }
@@ -132,10 +132,11 @@ class _Nav extends StatelessWidget {
             if (connection != null) const _ServerCard(),
             CardHeading('This app', top: connection != null ? 20 : 0),
             FieldCard([
-              for (final (page, icon) in const [
+              for (final (page, icon) in [
                 (SettingsPage.connection, 'link'),
                 (SettingsPage.appearance, 'brush'),
                 (SettingsPage.chat, 'chat'),
+                if (scope.push != null) (SettingsPage.notifications, 'bell'),
               ])
                 NavRow(
                   icon: icon,
@@ -267,6 +268,7 @@ class _PageView extends StatelessWidget {
     SettingsPage.memory => const MemoryPage(),
     SettingsPage.appearance => const AppearancePage(),
     SettingsPage.chat => const ChatPage(),
+    SettingsPage.notifications => const NotificationsPage(),
     SettingsPage.chatModel => ProviderPage(
       providerPages[page]!,
       fieldsNote: 'These fields change with the provider.',

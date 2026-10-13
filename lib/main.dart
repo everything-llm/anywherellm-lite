@@ -23,6 +23,8 @@ import 'ui/chat/speaker.dart';
 import 'ui/chat/speech_dictation.dart';
 import 'ui/files/save_android.dart';
 import 'ui/files/share_file.dart';
+import 'ui/push/pusher.dart';
+import 'ui/push/unified_pusher.dart';
 import 'ui/settings/scan_code.dart';
 import 'ui/share/android_shares.dart';
 import 'ui/share/shared_item.dart';
@@ -33,6 +35,7 @@ import 'ui/state/memory_controller.dart';
 import 'ui/state/chat_controller.dart';
 import 'ui/state/files_controller.dart';
 import 'ui/state/prefs_controller.dart';
+import 'ui/state/push_controller.dart';
 import 'ui/state/settings_controller.dart';
 import 'ui/state/shell_controller.dart';
 import 'ui/state/sources_controller.dart';
@@ -107,6 +110,10 @@ class _SessionHostState extends State<SessionHost> {
   late final SystemController _system;
   late final MemoryController _memory;
   late final AppsController _apps;
+  late final PushController _push;
+
+  /// The device's push notifications, through a UnifiedPush distributor.
+  final Pusher _pusher = UnifiedPusher();
 
   /// Reads answers aloud with the device's engine.
   late final ReadAloud _readAloud;
@@ -131,6 +138,15 @@ class _SessionHostState extends State<SessionHost> {
     _system = SystemController(widget.llm, widget.settings);
     _memory = MemoryController(widget.llm, widget.settings, _chat);
     _apps = AppsController(widget.apps, widget.settings, _chat);
+    _push = PushController(
+      _pusher,
+      widget.llm,
+      widget.apps,
+      widget.settings,
+      _chat,
+      _apps,
+      widget.shell,
+    );
     _readAloud = ReadAloud(DeviceSpeaker(), _chat, widget.prefs);
     // A deleted chat waiting to be undone is deleted as the app hides: Android can end a hidden
     // app without a word.
@@ -146,6 +162,7 @@ class _SessionHostState extends State<SessionHost> {
   void dispose() {
     _lifecycle.dispose();
     _readAloud.dispose();
+    _push.dispose();
     _apps.dispose();
     _memory.dispose();
     _system.dispose();
@@ -160,6 +177,7 @@ class _SessionHostState extends State<SessionHost> {
   Future<void> _load() async {
     await widget.prefs.load();
     await widget.settings.load();
+    unawaited(_push.load());
     if (!widget.settings.configured) {
       widget.shell.openSettings(SettingsPage.connection);
     }
@@ -197,6 +215,7 @@ class _SessionHostState extends State<SessionHost> {
         photos: _photos,
         readAloud: _readAloud,
         appView: const AppWebViews(),
+        push: _push,
         canSpellcheck: WidgetsBinding
             .instance
             .platformDispatcher

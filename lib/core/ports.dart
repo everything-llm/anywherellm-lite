@@ -8,6 +8,7 @@ import 'connection.dart';
 import 'embeds.dart';
 import 'memory.dart';
 import 'prefs.dart';
+import 'push.dart';
 import 'schedule.dart';
 import 'server_models.dart';
 import 'system_files.dart';
@@ -75,6 +76,15 @@ abstract interface class AnythingLlmApi {
     String message, {
     List<Attachment> attachments = const [],
   });
+
+  /// The server's VAPID public key, base64url, which a device registers its push endpoint
+  /// with. It takes the server's web login, as the presets do.
+  Future<String> pushKey();
+
+  /// Sends this device's push subscription to the server, which pushes to it when a scheduled
+  /// job ends. The server keeps one device for its one user: this replaces any other, such as
+  /// a browser's. It takes the server's web login.
+  Future<void> subscribePush(PushSubscription subscription);
 
   /// The jobs AnythingLLM runs on a schedule. It takes the server's web login, as the presets
   /// do: on a server with a password it needs one saved.
@@ -259,6 +269,20 @@ abstract interface class AppsApi {
   /// Whether the apps server serves System files, as its `/health` says; remembered with
   /// [available]'s answer. Never throws.
   Future<bool> systemFiles();
+
+  /// Whether the apps server pushes notifications, as its `/health` says; remembered with
+  /// [available]'s answer. Never throws.
+  Future<bool> canPush();
+
+  /// The apps server's VAPID public key, base64url.
+  Future<String> pushKey();
+
+  /// Sends this device's push subscription to the apps server, which pushes each app's
+  /// `notify` to every device subscribed. Subscribing the same endpoint again replaces it.
+  Future<void> subscribePush(PushSubscription subscription);
+
+  /// Stops pushing to the device at [endpoint].
+  Future<void> unsubscribePush(String endpoint);
 
   /// The System files folder at [path], `""` for the top: everything that decides what the
   /// agent and the apps do, read only.

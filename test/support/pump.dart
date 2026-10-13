@@ -10,6 +10,7 @@ import 'package:anywherellm/ui/chat/speaker.dart';
 import 'package:anywherellm/ui/share/shared_item.dart';
 import 'package:anywherellm/ui/shell.dart';
 import 'package:anywherellm/ui/state/memory_controller.dart';
+import 'package:anywherellm/ui/state/push_controller.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 
@@ -21,6 +22,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_api.dart';
 import 'fake_apps.dart';
+import 'fake_pusher.dart';
 import 'fake_settings.dart';
 import 'rig.dart';
 
@@ -137,6 +139,7 @@ class Harness extends Rig {
     this.canSpellcheck = false,
     this.canShare = false,
     this.shares,
+    this.pusher,
   }) : dictation = canDictate ? FakeDictation() : null,
        photos = canPickPhotos ? FakePhotos() : null,
        speaker = canSpeak ? FakeSpeaker() : null,
@@ -163,6 +166,22 @@ class Harness extends Rig {
   /// The Memory page's memories as the fake server keeps them.
   late final MemoryController memory = MemoryController(llm, settings, chat);
 
+  /// The device's push distributor, or null where it receives none.
+  final FakePusher? pusher;
+
+  late final PushController? push = switch (pusher) {
+    final pusher? => PushController(
+      pusher,
+      llm,
+      appsServer,
+      settings,
+      chat,
+      apps,
+      shell,
+    ),
+    null => null,
+  };
+
   late final ReadAloud? readAloud = switch (speaker) {
     final speaker? => ReadAloud(speaker, chat, prefs),
     null => null,
@@ -171,6 +190,7 @@ class Harness extends Rig {
   @override
   void dispose() {
     memory.dispose();
+    push?.dispose();
     readAloud?.dispose();
     super.dispose();
   }
@@ -240,6 +260,7 @@ class Harness extends Rig {
       dictation: dictation,
       photos: photos,
       readAloud: readAloud,
+      push: push,
       canSpellcheck: canSpellcheck,
       scanner: canScan
           ? (onCode) => TextButton(
@@ -278,6 +299,7 @@ Future<Harness> pumpApp(
   bool canSpellcheck = false,
   bool canShare = false,
   StreamController<SharedItem>? shares,
+  FakePusher? pusher,
   bool onChat = true,
 }) async {
   tester.view.physicalSize = size;
@@ -292,6 +314,7 @@ Future<Harness> pumpApp(
     canScan: canScan,
     canShare: canShare,
     shares: shares,
+    pusher: pusher,
     canDictate: canDictate,
     canPickPhotos: canPickPhotos,
     canSpeak: canSpeak,
@@ -304,6 +327,7 @@ Future<Harness> pumpApp(
   await harness.chat.load();
   // As the app's start does, once the connection is read.
   await harness.settings.readAuth();
+  await harness.push?.load();
   await tester.pumpAndSettle();
   return harness;
 }

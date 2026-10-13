@@ -59,7 +59,7 @@ AppRef? appCardRef(Uri url, Uri? server) {
   if (parts.length != 3 || parts[0] != 'cards' || !parts[2].endsWith('.png')) {
     return null;
   }
-  return _ref(parts[1], parts[2].substring(0, parts[2].length - 4));
+  return appRefNamed(parts[1], parts[2].substring(0, parts[2].length - 4));
 }
 
 /// The app whose working page is at [url], on the apps server beside [server]
@@ -70,7 +70,7 @@ AppRef? appPageRef(Uri url, Uri? server) {
     for (final part in url.pathSegments)
       if (part.isNotEmpty) part,
   ];
-  return parts.length == 2 ? _ref(parts[0], parts[1]) : null;
+  return parts.length == 2 ? appRefNamed(parts[0], parts[1]) : null;
 }
 
 /// The app [url] names, as its card or its page, or null.
@@ -83,7 +83,9 @@ bool _onAppsHost(Uri url, Uri? server, int port) =>
     url.host == server.host &&
     url.port == port;
 
-AppRef? _ref(String workspace, String name) =>
+/// The app [name] of workspace [workspace], or null when [name] is not a folder name an app can
+/// have.
+AppRef? appRefNamed(String workspace, String name) =>
     workspace.isNotEmpty && _appName.hasMatch(name)
     ? AppRef(workspace, name)
     : null;

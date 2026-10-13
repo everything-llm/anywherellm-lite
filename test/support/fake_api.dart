@@ -9,6 +9,7 @@ import 'package:anywherellm/core/embeds.dart';
 import 'package:anywherellm/core/memory.dart';
 import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/push.dart';
 import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/core/server_models.dart';
 
@@ -433,6 +434,19 @@ class FakeAnythingLlm implements AnythingLlmApi {
 
   /// What [scheduledJobs] answers.
   List<ScheduledJob> jobs = const [];
+
+  /// The VAPID key [pushKey] answers.
+  String pushKeyText = 'BServerKey';
+
+  /// The one device [subscribePush] keeps, as AnythingLLM keeps one for its one user.
+  PushSubscription? pushDevice;
+
+  @override
+  Future<String> pushKey() => _run('pushKey', () => pushKeyText);
+
+  @override
+  Future<void> subscribePush(PushSubscription subscription) =>
+      _run('subscribePush', () => pushDevice = subscription);
 
   @override
   Future<List<ScheduledJob>> scheduledJobs() =>

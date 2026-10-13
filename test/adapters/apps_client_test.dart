@@ -5,6 +5,7 @@ import 'package:anywherellm/adapters/apps_client.dart';
 import 'package:anywherellm/core/apps.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/push.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -179,6 +180,60 @@ void main() {
       'GET /apps/home/groceries/history?',
       'GET /apps/home/groceries/diff?commit=abcd',
     ]);
+  });
+
+  test(
+    'push reads the key, subscribes and unsubscribes with the key',
+    () async {
+      final seen = <http.Request>[];
+      final api = _api((request) async {
+        seen.add(request);
+        return switch (request.url.path) {
+          '/push/key' => http.Response('{"key":"BApps"}', 200),
+          '/push/subscribe' => http.Response('{"subscribed":true}', 200),
+          _ => http.Response('{"unsubscribed":true}', 200),
+        };
+      });
+      expect(await api.pushKey(), 'BApps');
+      await api.subscribePush(
+        const PushSubscription(
+          'https://ntfy.sh/up1?up=1',
+          p256dh: 'BK',
+          auth: 'A',
+        ),
+      );
+      await api.unsubscribePush('https://ntfy.sh/up1?up=1');
+      expect(seen.map((r) => '${r.method} ${r.url}'), [
+        'GET https://host.example.ts.net:8466/push/key',
+        'POST https://host.example.ts.net:8466/push/subscribe',
+        'POST https://host.example.ts.net:8466/push/unsubscribe',
+      ]);
+      expect(
+        seen.every((r) => r.headers['Authorization'] == 'Bearer SECRET-KEY'),
+        isTrue,
+      );
+      expect(jsonDecode(seen[1].body), {
+        'endpoint': 'https://ntfy.sh/up1?up=1',
+        'keys': {'p256dh': 'BK', 'auth': 'A'},
+      });
+      expect(jsonDecode(seen[2].body), {
+        'endpoint': 'https://ntfy.sh/up1?up=1',
+      });
+    },
+  );
+
+  test('push is offered only by a server whose health names it', () async {
+    for (final (features, pushes) in [
+      (['system-files', 'push'], true),
+      (['system-files'], false),
+    ]) {
+      final api = _answering({
+        'service': 'anythingllm-apps-v2',
+        'ok': true,
+        'features': features,
+      });
+      expect(await api.canPush(), pushes);
+    }
   });
 
   test('each change posts its body to its route', () async {

@@ -12,6 +12,7 @@ import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/controls.dart';
 import 'package:anywherellm/ui/widgets/sheet.dart';
 import 'package:anywherellm/core/server_models.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -429,6 +430,76 @@ void main() {
         findsOneWidget,
       );
       expect(inSources(find.text('The server is down.')), findsOneWidget);
+    });
+  });
+
+  group('the bar of tabs', () {
+    Finder tab(String label) =>
+        find.descendant(of: find.byType(HomeTabBar), matching: control(label));
+
+    testWidgets(
+      'stays under the chat, and its Chats tab goes back to the list',
+      (tester) async {
+        final h = await pumpApp(tester);
+        expect(h.shell.chatOpen, isTrue);
+        expect(find.byType(HomeTabBar), findsOneWidget);
+        // The composer sits above the bar, not under it.
+        expect(
+          tester.getBottomLeft(find.byType(ChatView)).dy,
+          lessThanOrEqualTo(tester.getTopLeft(find.byType(HomeTabBar)).dy),
+        );
+
+        await tester.tap(tab('Chats'));
+        await tester.pumpAndSettle();
+        expect(h.shell.chatOpen, isFalse);
+        expect(find.byType(HomeTabBar), findsOneWidget);
+      },
+    );
+
+    testWidgets('stays under Settings\' pages and Upcoming', (tester) async {
+      final h = await pumpApp(tester, onChat: false);
+      h.shell.openSettings(SettingsPage.appearance);
+      await tester.pumpAndSettle();
+      expect(find.byType(HomeTabBar), findsOneWidget);
+      expect(h.shell.tab, HomeTab.settings);
+
+      await tester.tap(tab('Chats'));
+      await tester.pumpAndSettle();
+      h.shell.openUpcoming();
+      await tester.pumpAndSettle();
+      expect(find.byType(HomeTabBar), findsOneWidget);
+    });
+
+    testWidgets('gives way to the keyboard', (tester) async {
+      await pumpApp(tester);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      expect(find.byType(HomeTabBar), findsNothing);
+
+      tester.view.resetViewInsets();
+      await tester.pumpAndSettle();
+      expect(find.byType(HomeTabBar), findsOneWidget);
+    });
+
+    testWidgets('is not on the first run\'s welcome', (tester) async {
+      final h = await pumpApp(tester, connection: null, onChat: false);
+      h.shell.openSettings(SettingsPage.connection);
+      await tester.pumpAndSettle();
+      expect(find.byType(HomeTabBar), findsNothing);
+    });
+
+    testWidgets('a sheet covers it', (tester) async {
+      final h = await pumpApp(tester);
+      h.shell.openSources();
+      await tester.pumpAndSettle();
+      // The sheet lies over the bar, so its Chats tab cannot be reached.
+      await tester.tapAt(
+        tester.getCenter(tab('Chats')),
+        kind: PointerDeviceKind.touch,
+      );
+      await tester.pumpAndSettle();
+      expect(h.shell.chatOpen, isTrue);
     });
   });
 

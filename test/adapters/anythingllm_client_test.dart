@@ -8,6 +8,7 @@ import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/embeds.dart';
 import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/push.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -1117,6 +1118,41 @@ void main() {
         ]).resetChat('w', 't'),
       );
       expect(error.message, 'Thread t not found.');
+    });
+  });
+
+  group('push', () {
+    const device = PushSubscription(
+      'https://ntfy.sh/upAbc?up=1',
+      p256dh: 'BKey',
+      auth: 'Auth',
+    );
+
+    test(
+      'reads the key and subscribes through the web routes, signed in',
+      () async {
+        final server = _SignInServer()
+          ..routes['/api/web-push/pubkey'] = {'publicKey': 'BServer'}
+          ..routes['/api/web-push/subscribe'] = {};
+        final api = server.api();
+        expect(await api.pushKey(), 'BServer');
+        await api.subscribePush(device);
+        final sent = server.seen.last;
+        expect(sent.method, 'POST');
+        expect(sent.url.path, '/api/web-push/subscribe');
+        expect(sent.headers['Authorization'], 'Bearer TOKEN-1');
+        expect(jsonDecode(sent.body), {
+          'endpoint': 'https://ntfy.sh/upAbc?up=1',
+          'keys': {'p256dh': 'BKey', 'auth': 'Auth'},
+        });
+      },
+    );
+
+    test('a server with no key says so', () async {
+      final server = _SignInServer()
+        ..routes['/api/web-push/pubkey'] = {'publicKey': null};
+      final error = await _failure(server.api().pushKey());
+      expect(error.message, 'The server has no key for notifications.');
     });
   });
 
