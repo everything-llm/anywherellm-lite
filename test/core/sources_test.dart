@@ -95,6 +95,28 @@ void main() {
     expect(tile('README.json', 'README.md'), 'FILE');
   });
 
+  test('the type follows the server on whether a file is a web page', () {
+    const id = '6c3f0a1e-2b4d-4c5e-8f90-a1b2c3d4e5f6';
+    String tile(String name, bool? web) => SourceFile(
+      path: 'custom-documents/$name',
+      title: name,
+      on: true,
+      web: web,
+    ).tile;
+    expect(tile('url-list.md-$id.json', false), 'MD');
+    expect(tile('url-list.md-$id.json', null), 'WEB');
+    expect(tile('example.com-guide.html-$id.json', true), 'WEB');
+  });
+
+  test('whether a file is a web page survives switching it off', () {
+    final [on, off] = mergeSources(
+      [const WorkspaceDoc(path: 'f/a.json', title: 'a', web: true)],
+      [const OffDoc(path: 'f/b.json', title: 'b', web: false)],
+    );
+    expect((on.web, off.web), (true, false));
+    expect(on.asOff.web, isTrue);
+  });
+
   test('a pinned document stays pinned among the merged ones', () {
     final files = mergeSources(
       [const WorkspaceDoc(path: 'a', title: 'A', pinned: true)],

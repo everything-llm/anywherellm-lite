@@ -21,6 +21,20 @@ void main() {
     );
   });
 
+  test('whether a switched-off file is a web page round-trips when known', () {
+    const prefs = Prefs(
+      switchedOff: {
+        '$_s q3': [
+          OffDoc(path: 'f/a.json', title: 'a', web: true),
+          OffDoc(path: 'f/b.json', title: 'b'),
+        ],
+      },
+    );
+    expect(prefs.encode(), isNot(contains('"web":null')));
+    final [web, unknown] = Prefs.decode(prefs.encode()).offIn(_s, 'q3');
+    expect((web.web, unknown.web), (true, null));
+  });
+
   test('text that is not its JSON reads as the defaults', () {
     for (final text in ['', 'nope', '[]', '{"switchedOff": 3}']) {
       final prefs = Prefs.decode(text);

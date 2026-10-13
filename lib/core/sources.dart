@@ -12,6 +12,7 @@ class SourceFile {
     required this.on,
     this.words,
     this.pinned = false,
+    this.web,
   });
 
   /// `folder/name.json`, how the workspace names it.
@@ -25,8 +26,17 @@ class SourceFile {
   /// Whether its whole text is always in the workspace's context. Only a switched-on file can be.
   final bool pinned;
 
-  /// The type on the file's tile: `PDF`, `MD`, `WEB` or `FILE`.
-  String get tile => _docType(path);
+  /// Whether it is a web page, or null when the server did not say.
+  final bool? web;
+
+  /// The type on the file's tile: `PDF`, `MD`, `WEB` or `FILE`. A web page is `WEB`, and any
+  /// other document takes the extension of the name it is stored under, so an upload called
+  /// `URL-list.md` is `MD`. Only when the server did not say is a stored name starting `url-`
+  /// taken for a web page.
+  String get tile {
+    final name = _storedName(path);
+    return (web ?? name.startsWith('url-')) ? 'WEB' : sourceExt(name);
+  }
 
   /// `1,204 words`, or empty when the server did not count them.
   String get size => words == null ? '' : plural(words!, 'word', 'words');
@@ -35,7 +45,7 @@ class SourceFile {
   /// switched off.
   String get meta => on ? size : _joined([_notUsed, size]);
 
-  OffDoc get asOff => OffDoc(path: path, title: title, words: words);
+  OffDoc get asOff => OffDoc(path: path, title: title, words: words, web: web);
 }
 
 /// What a switched-off document is marked.
@@ -107,13 +117,12 @@ final _storedId = RegExp(
   caseSensitive: false,
 );
 
-/// The type of the document at [path], read from the name the server stored it under rather than
-/// its title: `report.pdf-<id>.json` is `PDF`, and a web page's `url-<page>-<id>.json` is `WEB`.
-String _docType(String path) {
+/// The name the server stored the document at [path] under, less its `.json` and id:
+/// `report.pdf` for `report.pdf-<id>.json`.
+String _storedName(String path) {
   var name = docName(path);
   if (name.endsWith('.json')) name = name.substring(0, name.length - 5);
-  name = name.replaceFirst(_storedId, '');
-  return name.startsWith('url-') ? 'WEB' : sourceExt(name);
+  return name.replaceFirst(_storedId, '');
 }
 
 /// The documents [embedded] in a workspace, switched on, followed by those switched [off] there.
@@ -128,6 +137,7 @@ List<SourceFile> mergeSources(List<WorkspaceDoc> embedded, List<OffDoc> off) {
         on: true,
         words: doc.words,
         pinned: doc.pinned,
+        web: doc.web,
       ),
     for (final doc in off)
       if (!onPaths.contains(doc.path))
@@ -136,6 +146,7 @@ List<SourceFile> mergeSources(List<WorkspaceDoc> embedded, List<OffDoc> off) {
           title: doc.title,
           on: false,
           words: doc.words,
+          web: doc.web,
         ),
   ];
 }

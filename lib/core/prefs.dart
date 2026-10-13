@@ -5,16 +5,21 @@ import 'dart:convert';
 /// A document switched off in a workspace: no longer embedded there, but still listed in its
 /// Sources so it can be switched back on.
 class OffDoc {
-  const OffDoc({required this.path, required this.title, this.words});
+  const OffDoc({required this.path, required this.title, this.words, this.web});
 
   final String path;
   final String title;
   final int? words;
 
+  /// Whether it is a web page, or null when the server did not say, as for one saved before the
+  /// app kept it.
+  final bool? web;
+
   Map<String, Object?> toJson() => {
     'path': path,
     'title': title,
     if (words != null) 'words': words,
+    if (web != null) 'web': web,
   };
 
   static OffDoc? fromJson(Object? json) {
@@ -26,6 +31,7 @@ class OffDoc {
       path: path,
       title: title is String && title.isNotEmpty ? title : path,
       words: json['words'] is int ? json['words'] as int : null,
+      web: json['web'] is bool ? json['web'] as bool : null,
     );
   }
 }

@@ -124,6 +124,17 @@ void main() {
       final doc = WorkspaceDoc.fromJson({'docpath': 'c/a.json', 'pinned': 1});
       expect(doc.pinned, isTrue);
     });
+
+    test('a web page is one whose chunk source is a link', () {
+      bool? web(Map<String, Object?> metadata) => WorkspaceDoc.fromJson({
+        'docpath': 'c/a.json',
+        'metadata': jsonEncode(metadata),
+      }).web;
+      expect(web({'chunkSource': 'link://https://news.test/a'}), isTrue);
+      expect(web({'chunkSource': ''}), isFalse);
+      expect(web({'title': 'a.md'}), isNull);
+      expect(WorkspaceDoc.fromJson({'docpath': 'c/a.json'}).web, isNull);
+    });
   });
 
   test('a document keeps each passage read from it, closest first', () {

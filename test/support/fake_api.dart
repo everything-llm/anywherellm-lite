@@ -272,7 +272,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
     DocMeta meta = const DocMeta(),
   }) => _run('upload', () {
     final doc = DocEntry(folder: 'custom-documents', name: '$name.json');
-    _keep(doc, name, meta, words: bytes.length);
+    _keep(doc, name, meta, words: bytes.length, web: false);
     return [doc];
   }, name);
 
@@ -284,7 +284,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
   }) => _run('uploadLink', () {
     final host = Uri.parse(url).host;
     final doc = DocEntry(folder: 'custom-documents', name: 'url-$host.json');
-    _keep(doc, host, meta, words: 1);
+    _keep(doc, host, meta, words: 1, web: true);
     return [doc];
   }, url);
 
@@ -306,17 +306,26 @@ class FakeAnythingLlm implements AnythingLlmApi {
         source: meta.source,
       ),
       words: text.split(' ').length,
+      web: false,
     );
     return [doc];
   }, title);
 
-  /// Puts [doc] in the library, titled by [meta] or else [title], and records [meta].
-  void _keep(DocEntry doc, String title, DocMeta meta, {required int words}) {
+  /// Puts [doc] in the library, titled by [meta] or else [title], and records [meta]. A [web]
+  /// page is one the server read from a link.
+  void _keep(
+    DocEntry doc,
+    String title,
+    DocMeta meta, {
+    required int words,
+    required bool web,
+  }) {
     metaOf[doc.path] = meta;
     library[doc.path] = WorkspaceDoc(
       path: doc.path,
       title: meta.title.trim().isEmpty ? title : meta.title.trim(),
       words: words,
+      web: web,
     );
   }
 

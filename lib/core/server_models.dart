@@ -317,10 +317,8 @@ List<Citation> citationsOf(Object? sources) {
   for (final source in jsonObjects(sources)) {
     final title = _known(source, 'title');
     if (title == null) continue;
-    final chunk = source['chunkSource'];
-    final page = chunk is String && chunk.startsWith('link://')
-        ? Uri.tryParse(chunk.substring('link://'.length))
-        : null;
+    final link = _linkOf(source['chunkSource']);
+    final page = link == null ? null : Uri.tryParse(link);
     if (page != null &&
         page.host.isNotEmpty &&
         (page.scheme == 'http' || page.scheme == 'https')) {
@@ -375,6 +373,13 @@ List<Passage> _closestFirst(List<Passage> passages) {
   ]);
 }
 
+/// The address a document was read from, after the `link://` of its [chunkSource], or null for
+/// one that was not read from a link.
+String? _linkOf(Object? chunkSource) =>
+    chunkSource is String && chunkSource.startsWith('link://')
+    ? chunkSource.substring('link://'.length)
+    : null;
+
 /// A document a workspace holds.
 class WorkspaceDoc {
   const WorkspaceDoc({
@@ -382,9 +387,11 @@ class WorkspaceDoc {
     required this.title,
     this.words,
     this.pinned = false,
+    this.web,
   });
 
-  /// The `metadata` field is the document's own JSON as a string.
+  /// The `metadata` field is the document's own JSON as a string. Its `chunkSource` is
+  /// `link://<url>` for a web page and empty for any other document.
   factory WorkspaceDoc.fromJson(Map<String, dynamic> json) {
     final path = _text(json, 'docpath');
     final metadata = switch (json['metadata']) {
@@ -399,6 +406,10 @@ class WorkspaceDoc {
           docName(path),
       words: metadata == null ? null : _int(metadata, 'wordCount'),
       pinned: _bool(json, 'pinned'),
+      web: switch (metadata?['chunkSource']) {
+        final String source => _linkOf(source) != null,
+        _ => null,
+      },
     );
   }
 
@@ -409,6 +420,9 @@ class WorkspaceDoc {
 
   /// Whether its whole text is always in the workspace's context.
   final bool pinned;
+
+  /// Whether it is a web page, or null when its metadata does not say.
+  final bool? web;
 
   static Map<String, dynamic>? _decode(String text) {
     try {

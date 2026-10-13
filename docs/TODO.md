@@ -16,7 +16,6 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 | Gap | Note |
 | --- | --- |
 | Render HTML in answers | The web UI's Customization > Chat preference. A local setting; spellcheck, following a streaming answer, sending dictation when talking stops and reading answers aloud are built. |
-| Telling a web page from an upload named `url-...` | `docType` reads the stored name alone, so an upload such as `URL-list.md`, stored as `url-list.md-<uuid>.json`, shows `WEB`. A web page's name can end in `.md` or `.html` too, so the name cannot settle it. The document's metadata `chunkSource` (`link://...`) can, but a switched-off file keeps only its path, title and word count in `prefs.json`. |
 
 ## Needs the private session API
 
