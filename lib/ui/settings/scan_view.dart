@@ -4,16 +4,23 @@ import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/phone_page.dart';
+import 'connect_guide.dart';
 
 /// A phone's camera view for a pairing code, over the whole window: a page under Back, heard as
-/// Cancel, with the camera in a square as wide as the screen, where to find the code, and what
-/// it holds.
+/// Cancel, with the camera in a square as wide as the screen, where to find the code, what it
+/// holds, and How connecting works, which [onHelp] opens.
 class ScanView extends StatelessWidget {
-  const ScanView({super.key, required this.camera, required this.onCancel});
+  const ScanView({
+    super.key,
+    required this.camera,
+    required this.onCancel,
+    required this.onHelp,
+  });
 
   /// The camera, reading codes.
   final Widget camera;
   final VoidCallback onCancel;
+  final VoidCallback onHelp;
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +65,8 @@ class ScanView extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  GuideLink('How connecting works', onTap: onHelp),
                 ],
               ),
             ),

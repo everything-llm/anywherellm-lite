@@ -184,6 +184,7 @@ class ShellController extends ChangeNotifier {
   bool _rightOpen = false;
   FilesSection? _workspacePage;
   bool _scanning = false;
+  bool _guiding = false;
   bool _upcomingOpen = false;
 
   /// Whether the page of the server's scheduled jobs shows over the Chats tab, from its
@@ -230,6 +231,16 @@ class ShellController extends ChangeNotifier {
   void setScanning(bool on) {
     if (on == _scanning) return;
     _scanning = on;
+    notifyListeners();
+  }
+
+  /// Whether the guide to connecting shows over the Connection page and the camera, which Esc
+  /// and Back close before the camera.
+  bool get guiding => _guiding;
+
+  void setGuiding(bool on) {
+    if (on == _guiding) return;
+    _guiding = on;
     notifyListeners();
   }
 
@@ -325,6 +336,7 @@ class ShellController extends ChangeNotifier {
     _chatOpen = true;
     _settingsOpen = false;
     _scanning = false;
+    _guiding = false;
     _app = null;
     _appPages.clear();
     _sourcesUnder = null;
@@ -355,6 +367,7 @@ class ShellController extends ChangeNotifier {
     _workspacePage = null;
     _upcomingOpen = false;
     _scanning = false;
+    _guiding = false;
     _settingsOpen = tab == HomeTab.settings;
     if (tab != HomeTab.settings) _homeTab = tab;
     _app = null;
@@ -439,6 +452,7 @@ class ShellController extends ChangeNotifier {
 
   void closeSettings() {
     _scanning = false;
+    _guiding = false;
     if (!_settingsOpen) return;
     _settingsOpen = false;
     _settingsDirect = false;

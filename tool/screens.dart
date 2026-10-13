@@ -22,6 +22,7 @@ import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/ui/apps/app_sheets.dart';
+import 'package:anywherellm/ui/settings/connect_guide.dart';
 import 'package:anywherellm/ui/settings/memory_page.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/share/shared_item.dart';
@@ -680,6 +681,17 @@ final _signedOut = <String, _Setup>{
       ..setScanning(true);
     await _settle(tester);
   },
+  for (var n = 0; n < connectSteps.length; n++)
+    'howto${n + 1}': (tester, h) async {
+      h.shell
+        ..openSettings(SettingsPage.connection)
+        ..setGuiding(true);
+      await _settle(tester);
+      for (var i = 0; i < n; i++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await _settle(tester);
+      }
+    },
 };
 
 void main() {

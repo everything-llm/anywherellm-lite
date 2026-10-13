@@ -8,6 +8,7 @@ import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/server_models.dart';
+import 'package:anywherellm/ui/settings/connect_guide.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/files/workspace_pages.dart';
 import 'package:anywherellm/ui/home.dart';
@@ -367,6 +368,27 @@ void main() {
       await h.settings.clear();
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('each screen of How connecting works fits at $at', (
+      tester,
+    ) async {
+      final h = await pumpApp(
+        tester,
+        connection: null,
+        size: size,
+        canScan: true,
+      );
+      h.shell
+        ..openSettings(SettingsPage.connection)
+        ..setGuiding(true);
+      await tester.pumpAndSettle();
+      for (var n = 0; n < connectSteps.length; n++) {
+        expect(find.text('${n + 1} of ${connectSteps.length}'), findsOneWidget);
+        expect(tester.takeException(), isNull, reason: 'screen ${n + 1}');
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await tester.pumpAndSettle();
+      }
     });
   }
 

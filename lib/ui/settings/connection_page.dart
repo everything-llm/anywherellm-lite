@@ -14,6 +14,7 @@ import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
 import '../widgets/fields.dart';
+import 'connect_guide.dart';
 import 'rows.dart';
 import 'scan_view.dart';
 import '../widgets/sheet.dart';
@@ -190,105 +191,119 @@ class _KeyCardState extends State<_KeyCard> {
       builder: (context, _) {
         final connection = _settings.connection;
         final set = connection != null;
-        final editing = !set || _replacing;
         final saving = _settings.check == ConnectionCheck.testing;
         void startScan() => setState(() {
           _shell.setScanning(true);
           _scanProblem = null;
         });
-        if (!set) return _firstRun(context, saving, startScan);
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 20,
-          children: [
-            FieldCard([
-              InfoRow(
-                'AnythingLLM server',
-                about: _replacing ? null : connection.baseUrl,
-                mono: true,
-                tag: AppBadge(
-                  widget.tested && _settings.check == ConnectionCheck.ok
-                      ? 'Connected'
-                      : 'Saved',
-                  kind: BadgeKind.ok,
-                ),
-              ),
-              const InfoRow(
-                'Developer key',
-                about: 'Stored in this phone\'s keyring and never shown',
-              ),
-            ]),
-            // Plain http to a private address: the key crosses that network unencrypted.
-            if (connection.plainHttp)
-              const AlertBox(
-                AlertKind.warn,
-                'Plain http',
-                text:
-                    'This address is not encrypted, so the key travels as plain text on this '
-                    'network. Use it only on a network you trust.',
-              ),
-            if (_scanner case final scan? when editing && _shell.scanning)
-              _scan(scan),
-            if (editing && !_shell.scanning)
-              PanelCard(
-                children: [
-                  AppField(
-                    controller: _url,
-                    label: 'AnythingLLM server address',
-                    hint: _example,
-                    keyboardType: TextInputType.url,
-                    autofillHints: const [AutofillHints.url],
-                  ),
-                  AppField(
-                    controller: _key,
-                    label: 'AnythingLLM developer API key',
-                    hint: 'Paste the AnythingLLM API key',
-                    obscure: true,
-                    // Not a password: AppField leaves it out of autofill, so no saved
-                    // login is offered for it.
-                    keyboardType: TextInputType.visiblePassword,
-                    onSubmitted: (_) => saving ? null : _save(),
-                  ),
-                  ActionRow([
-                    AppButton(
-                      saving ? 'Checking…' : 'Save key',
-                      primary: true,
-                      onPressed: saving ? null : _save,
-                    ),
-                    if (_scanner != null)
-                      AppButton(
-                        'Scan QR code',
-                        onPressed: saving ? null : startScan,
-                      ),
-                  ]),
-                ],
-              ),
-            for (final note in [?_scanProblem, ?_settings.message])
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: HelpText(note, status: true),
-              ),
-            if (_settings.keyringProblem case final problem?)
-              AlertBox(AlertKind.warn, problem.title, text: problem.text),
-            AppButton(
-              saving && !editing ? 'Testing…' : 'Test connection',
-              onPressed: saving ? null : widget.onTest,
-            ),
-            AppButton(
-              _replacing ? 'Cancel' : 'Edit connection',
-              onPressed: () => setState(() {
-                _replacing = !_replacing;
-                _shell.setScanning(false);
-              }),
-            ),
-            AppButton(
-              _confirmForget ? 'Really forget it?' : 'Forget this server',
-              danger: true,
-              onPressed: _forget,
-            ),
-          ],
+        return _guide(
+          startScan,
+          set
+              ? _connected(context, connection, saving, startScan)
+              : _firstRun(context, saving, startScan),
         );
       },
+    );
+  }
+
+  /// The saved connection's card, then, while Edit connection has it open, the fields; then
+  /// Test connection, Edit connection and Forget this server.
+  Widget _connected(
+    BuildContext context,
+    Connection connection,
+    bool saving,
+    VoidCallback startScan,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 20,
+      children: [
+        FieldCard([
+          InfoRow(
+            'AnythingLLM server',
+            about: _replacing ? null : connection.baseUrl,
+            mono: true,
+            tag: AppBadge(
+              widget.tested && _settings.check == ConnectionCheck.ok
+                  ? 'Connected'
+                  : 'Saved',
+              kind: BadgeKind.ok,
+            ),
+          ),
+          const InfoRow(
+            'Developer key',
+            about: 'Stored in this phone\'s keyring and never shown',
+          ),
+        ]),
+        // Plain http to a private address: the key crosses that network unencrypted.
+        if (connection.plainHttp)
+          const AlertBox(
+            AlertKind.warn,
+            'Plain http',
+            text:
+                'This address is not encrypted, so the key travels as plain text on this '
+                'network. Use it only on a network you trust.',
+          ),
+        if (_scanner case final scan? when _replacing && _shell.scanning)
+          _scan(scan),
+        if (_replacing && !_shell.scanning)
+          PanelCard(
+            children: [
+              AppField(
+                controller: _url,
+                label: 'AnythingLLM server address',
+                hint: _example,
+                keyboardType: TextInputType.url,
+                autofillHints: const [AutofillHints.url],
+              ),
+              AppField(
+                controller: _key,
+                label: 'AnythingLLM developer API key',
+                hint: 'Paste the AnythingLLM API key',
+                obscure: true,
+                // Not a password: AppField leaves it out of autofill, so no saved
+                // login is offered for it.
+                keyboardType: TextInputType.visiblePassword,
+                onSubmitted: (_) => saving ? null : _save(),
+              ),
+              ActionRow([
+                AppButton(
+                  saving ? 'Checking…' : 'Save key',
+                  primary: true,
+                  onPressed: saving ? null : _save,
+                ),
+                if (_scanner != null)
+                  AppButton(
+                    'Scan QR code',
+                    onPressed: saving ? null : startScan,
+                  ),
+              ]),
+            ],
+          ),
+        for (final note in [?_scanProblem, ?_settings.message])
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: HelpText(note, status: true),
+          ),
+        if (_settings.keyringProblem case final problem?)
+          AlertBox(AlertKind.warn, problem.title, text: problem.text),
+        AppButton(
+          saving && !_replacing ? 'Testing…' : 'Test connection',
+          onPressed: saving ? null : widget.onTest,
+        ),
+        AppButton(
+          _replacing ? 'Cancel' : 'Edit connection',
+          onPressed: () => setState(() {
+            _replacing = !_replacing;
+            _shell.setScanning(false);
+          }),
+        ),
+        AppButton(
+          _confirmForget ? 'Really forget it?' : 'Forget this server',
+          danger: true,
+          onPressed: _forget,
+        ),
+      ],
     );
   }
 
@@ -299,12 +314,35 @@ class _KeyCardState extends State<_KeyCard> {
         overlay: (context) => ScanView(
           camera: scan(_scanned),
           onCancel: () => _shell.setScanning(false),
+          onHelp: () => _shell.setGuiding(true),
         ),
         child: child,
       );
 
+  /// [child], with How connecting works over the whole window while the shell says so. Its
+  /// end scans a code where there is a camera, through [startScan].
+  Widget _guide(VoidCallback startScan, Widget child) {
+    final canScan = _scanner != null;
+    return OverlayWhile(
+      open: _shell.guiding,
+      overlay: (context) => ConnectGuide(
+        onClose: () => _shell.setGuiding(false),
+        end: canScan ? 'Scan QR code' : 'Close',
+        endAbout: canScan
+            ? 'or close and type them'
+            : 'then type the address and key',
+        onEnd: () {
+          _shell.setGuiding(false);
+          if (canScan && !_shell.scanning) startScan();
+        },
+      ),
+      child: child,
+    );
+  }
+
   /// The first run: Scan QR code first where there is a camera, then the address and the
-  /// developer key, each under its name, where to make a key, and Connect.
+  /// developer key, each under its name, where to make a key, Connect, and How connecting
+  /// works.
   Widget _firstRun(BuildContext context, bool saving, VoidCallback startScan) {
     final t = Tokens.of(context);
     final scanner = _scanner;
@@ -337,6 +375,13 @@ class _KeyCardState extends State<_KeyCard> {
             hint: _example,
             keyboardType: TextInputType.url,
             autofillHints: const [AutofillHints.url],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            'https, or http on your home network or Tailscale.',
+            style: Type.note(t.muted),
           ),
         ),
         NamedControl(
@@ -380,6 +425,7 @@ class _KeyCardState extends State<_KeyCard> {
         ),
         if (_settings.keyringProblem case final problem?)
           AlertBox(AlertKind.warn, problem.title, text: problem.text),
+        GuideLink('How connecting works', onTap: () => _shell.setGuiding(true)),
       ],
     );
   }

@@ -47,9 +47,11 @@ class AppShell extends StatelessWidget {
     /// What closes the thing on top, or null when nothing is open that Esc or Back closes: in
     /// Settings, a page goes back to its parent first.
     VoidCallback? topClose() {
+      // The guide and the camera lie over the whole window, a share and the popups too.
+      if (shell.guiding) return () => shell.setGuiding(false);
+      if (shell.scanning) return () => shell.setScanning(false);
       if (shell.shared != null) return shell.closeShared;
       if (shell.popup.value != null) return shell.closePopup;
-      if (shell.scanning) return () => shell.setScanning(false);
       if (shell.settingsOpen) {
         return shell.settingsPage != null
             ? shell.settingsBack
