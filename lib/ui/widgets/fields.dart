@@ -9,7 +9,7 @@ import '../type.dart';
 import 'tappable.dart';
 
 /// A text field's outline.
-Color fieldEdge(BuildContext context) => Tokens.of(context).line;
+Color fieldEdge(BuildContext context) => Tokens.of(context).edge;
 
 /// A text field's fill.
 Color fieldFill(BuildContext context) => Tokens.of(context).bg;

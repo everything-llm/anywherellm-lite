@@ -115,6 +115,7 @@ class Walkthrough extends StatefulWidget {
     required this.end,
     required this.endAbout,
     required this.onEnd,
+    this.initial = 0,
   });
 
   final String title;
@@ -124,13 +125,16 @@ class Walkthrough extends StatefulWidget {
   final String endAbout;
   final VoidCallback onEnd;
 
+  /// The screen it opens on, counted from 0.
+  final int initial;
+
   @override
   State<Walkthrough> createState() => _WalkthroughState();
 }
 
 class _WalkthroughState extends State<Walkthrough> {
-  final _pages = PageController();
-  int _at = 0;
+  late final _pages = PageController(initialPage: widget.initial);
+  late int _at = widget.initial;
 
   @override
   void dispose() {

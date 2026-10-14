@@ -228,6 +228,7 @@ class ShellController extends ChangeNotifier {
   FilesSection? _workspacePage;
   bool _scanning = false;
   Guide? _guide;
+  int _guideStep = 0;
   bool _upcomingOpen = false;
 
   /// Whether the page of the server's scheduled jobs shows over the Chats tab, from its
@@ -283,10 +284,14 @@ class ShellController extends ChangeNotifier {
   /// Whether a walk-through shows over the window.
   bool get guiding => _guide != null;
 
-  /// Shows [guide] over the window, or none.
-  void showGuide(Guide? guide) {
+  /// The screen the walk-through opened on, counted from 0.
+  int get guideStep => _guideStep;
+
+  /// Shows [guide] over the window, opening on screen [step], or none.
+  void showGuide(Guide? guide, {int step = 0}) {
     if (guide == _guide) return;
     _guide = guide;
+    _guideStep = step;
     notifyListeners();
   }
 

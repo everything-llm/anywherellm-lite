@@ -2,6 +2,8 @@ import 'package:anywherellm/core/chat_log.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
+import 'package:anywherellm/ui/state/shell_controller.dart';
+import 'package:anywherellm/ui/widgets/buttons.dart';
 import 'package:anywherellm/ui/widgets/fields.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/services.dart';
@@ -115,6 +117,59 @@ void main() {
     );
     expect(control('Paste a key'), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the filled button on the first run is the next step', (
+    tester,
+  ) async {
+    final h = await pumpApp(
+      tester,
+      size: phone,
+      connection: null,
+      canScan: true,
+    );
+    h.shell.openSettings(SettingsPage.connection);
+    await tester.pumpAndSettle();
+    bool filled(String label) => tester
+        .widget<AppButton>(
+          find.byWidgetPredicate((w) => w is AppButton && w.label == label),
+        )
+        .primary;
+    expect(filled('Scan QR code'), isTrue);
+    expect(filled('Connect'), isFalse);
+    expect(
+      tester
+          .widget<AppButton>(
+            find.byWidgetPredicate(
+              (w) => w is AppButton && w.label == 'Scan QR code',
+            ),
+          )
+          .leading,
+      'qr',
+    );
+    final fields = find.descendant(
+      of: find.byType(SettingsDialog),
+      matching: find.byType(EditableText),
+    );
+    await tester.enterText(fields.at(0), 'https://host.example');
+    await tester.pump();
+    expect(filled('Scan QR code'), isTrue, reason: 'the key is still empty');
+    await tester.enterText(fields.at(1), 'k-secret');
+    await tester.pump();
+    expect(filled('Scan QR code'), isFalse);
+    expect(filled('Connect'), isTrue);
+  });
+
+  testWidgets('Where do I find a key? opens the guide on its key screen', (
+    tester,
+  ) async {
+    final h = await pumpApp(tester, size: phone, connection: null);
+    h.shell.openSettings(SettingsPage.connection);
+    await tester.pumpAndSettle();
+    await tapShown(tester, control('Where do I find a key?'));
+    expect(h.shell.guide, Guide.connect);
+    expect(find.text('2 of 3'), findsOneWidget);
+    expect(find.text('THE KEY'), findsOneWidget);
   });
 
   testWidgets('the first run\'s help link is at the foot while there is room', (

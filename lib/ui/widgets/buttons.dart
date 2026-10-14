@@ -19,6 +19,7 @@ class AppButton extends StatelessWidget {
     this.primary = false,
     this.danger = false,
     this.icon,
+    this.leading,
   });
 
   final String label;
@@ -30,6 +31,9 @@ class AppButton extends StatelessWidget {
 
   /// An icon after the label, such as `external` for a button that leaves the app.
   final String? icon;
+
+  /// An icon before the label, such as `qr` for the button that scans a code.
+  final String? leading;
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +49,7 @@ class AppButton extends StatelessWidget {
       onTap: onPressed,
       radius: BorderRadius.circular(Sizes.control),
       color: primary ? t.accent : t.panel,
-      side: BorderSide(color: primary ? t.accent : t.line),
+      side: BorderSide(color: primary ? t.accent : t.edge),
       hoverColor: primary ? t.onaccent.withValues(alpha: 0.1) : null,
       dimWhenDisabled: 0.5,
       child: ConstrainedBox(
@@ -58,6 +62,10 @@ class AppButton extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              if (leading case final leading?) ...[
+                AppIcon(leading, size: IconSize.small, color: fg),
+                const SizedBox(width: 10),
+              ],
               // A label wider than the space wraps rather than overflows.
               Flexible(
                 child: Text(

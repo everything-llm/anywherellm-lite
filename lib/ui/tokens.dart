@@ -12,6 +12,7 @@ class Tokens extends ThemeExtension<Tokens> {
     required this.panel2,
     required this.line,
     required this.line2,
+    required this.edge,
     required this.ink,
     required this.ink2,
     required this.muted,
@@ -39,6 +40,10 @@ class Tokens extends ThemeExtension<Tokens> {
   final Color panel2;
   final Color line;
   final Color line2;
+
+  /// A control's own outline, a text field's or an outlined button's: 3 to 1 against the page
+  /// and the card behind it, where [line] is a rule, 1.3 to 1.
+  final Color edge;
   final Color ink;
   final Color ink2;
   final Color muted;
@@ -70,6 +75,7 @@ class Tokens extends ThemeExtension<Tokens> {
     panel2: oklch(0.989, 0.006, 75),
     line: oklch(0.895, 0.014, 75),
     line2: oklch(0.928, 0.012, 75),
+    edge: oklch(0.62, 0.014, 75),
     ink: oklch(0.27, 0.025, 280),
     ink2: oklch(0.4, 0.025, 280),
     muted: oklch(0.5, 0.02, 280),
@@ -98,9 +104,10 @@ class Tokens extends ThemeExtension<Tokens> {
     panel2: oklch(0.235, 0.019, 280),
     line: oklch(0.36, 0.022, 280),
     line2: oklch(0.31, 0.02, 280),
+    edge: oklch(0.55, 0.022, 280),
     ink: oklch(0.93, 0.01, 75),
     ink2: oklch(0.81, 0.014, 75),
-    muted: oklch(0.72, 0.018, 280),
+    muted: oklch(0.78, 0.018, 280),
     accent: oklch(0.78, 0.1, 272),
     accentbg: oklch(0.33, 0.06, 272),
     onaccent: oklch(0.2, 0.03, 280),
