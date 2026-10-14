@@ -53,8 +53,6 @@ Since the app was simplified to AnywhereLLM Lite, a phone chat client rather tha
 
 ## Lite prototype: not built yet
 
-- Welcome page polish, in the prototype. The app's first run already follows the layout rules: top-aligned and scrolling, Connect under the fields, the help link after it, and one filled button (Scan QR code). The prototype's welcome overflows by 45 px at 360 by 640 with the help link pinned to the bottom, and its Scan QR code and Connect are both prominent. Move the prototype to the app's order.
-- A Show control on the developer key field. The key is masked with no way to see it. Password guidance (GOV.UK, NIST) asks for one, and Mobile layout and style evidence.md rates it as holding narrowly, by analogy.
 - Confirm the other prototype session's welcome wording removals: the "https, or http on your home network or Tailscale." hint under the address and the "Make one in AnythingLLM's web page" line. The app still shows both, and `test/ui/walkthrough_test.dart` expects the hint.
 - A tappable apps-lean card. The app opens a linked page already (`isAppsLeanPage`), but the card is a blockquote with a linked title only once the apps-lean skill writes that shape.
 - Add the toolkit, Step 1: `uv run anythingllm-toolkit gui` is a stand-in until the installer's distribution is settled.

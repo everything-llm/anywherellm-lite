@@ -198,16 +198,21 @@ class _ProviderFormState extends State<_ProviderForm> with SettingsSaving {
     return FieldRow(
       label: field.label,
       help: secret ? 'Never shown once saved.' : field.help,
-      control: AppField(
-        controller: _controller(field),
-        label: field.label,
-        hint: secret ? 'Not set' : null,
-        obscure: secret,
-        keyboardType: field.kind == FieldKind.number
-            ? TextInputType.number
-            : null,
-        onChanged: (_) => setState(() {}),
-      ),
+      control: secret
+          ? SecretField(
+              controller: _controller(field),
+              label: field.label,
+              hint: 'Not set',
+              onChanged: (_) => setState(() {}),
+            )
+          : AppField(
+              controller: _controller(field),
+              label: field.label,
+              keyboardType: field.kind == FieldKind.number
+                  ? TextInputType.number
+                  : null,
+              onChanged: (_) => setState(() {}),
+            ),
     );
   }
 

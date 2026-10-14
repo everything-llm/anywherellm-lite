@@ -2,8 +2,10 @@ import 'package:anywherellm/core/chat_log.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
+import 'package:anywherellm/ui/widgets/fields.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' show EditableText;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
@@ -113,6 +115,55 @@ void main() {
     );
     expect(control('Paste a key'), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the first run\'s help link is at the foot while there is room', (
+    tester,
+  ) async {
+    final h = await pumpApp(tester, connection: null);
+    h.shell.openSettings(SettingsPage.connection);
+    await tester.pumpAndSettle();
+    final link = tester.getBottomLeft(control('How connecting works')).dy;
+    expect(link, greaterThan(tester.view.physicalSize.height / 3 * 2));
+    // Connect stays under the fields, well above it.
+    expect(tester.getBottomLeft(control('Connect')).dy, lessThan(link - 100));
+  });
+
+  testWidgets('on a short screen the help link follows Connect and scrolls', (
+    tester,
+  ) async {
+    final h = await pumpApp(
+      tester,
+      connection: null,
+      size: const Size(360, 480),
+    );
+    h.shell.openSettings(SettingsPage.connection);
+    await tester.pumpAndSettle();
+    final link = control('How connecting works');
+    final connect = tester.getBottomLeft(control('Connect')).dy;
+    expect(tester.getTopLeft(link).dy - connect, lessThan(40));
+    await tapShown(tester, link);
+    expect(h.shell.guiding, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the developer key is hidden until Show, which Hide undoes', (
+    tester,
+  ) async {
+    final h = await pumpApp(tester, connection: null, size: phone);
+    h.shell.openSettings(SettingsPage.connection);
+    await tester.pumpAndSettle();
+    final key = find.descendant(
+      of: find.byType(SecretField),
+      matching: find.byType(EditableText),
+    );
+    await tester.enterText(key, 'k-secret');
+    await tester.pumpAndSettle();
+    expect(tester.widget<EditableText>(key).obscureText, isTrue);
+    await tapShown(tester, control('Show AnythingLLM developer API key'));
+    expect(tester.widget<EditableText>(key).obscureText, isFalse);
+    await tapShown(tester, control('Hide AnythingLLM developer API key'));
+    expect(tester.widget<EditableText>(key).obscureText, isTrue);
   });
 
   testWidgets('on a phone the camera fills the window, and Back stops it', (

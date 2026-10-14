@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -301,24 +302,55 @@ class _PageView extends StatelessWidget {
     final t = Tokens.of(context);
     final server = scope.settings.connection;
     final firstRun = page == SettingsPage.connection && server == null;
-    return SingleChildScrollView(
-      key: ValueKey(page),
-      padding: firstRun
-          ? const EdgeInsets.fromLTRB(16, 56, 16, 16)
-          : Sizes.pagePadding,
-      child: Align(
-        alignment: Alignment.topLeft,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 680),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (page.about case final about?) ...[
-                Text(about, style: Type.sans(14.5, color: t.ink2, height: 1.5)),
-                const SizedBox(height: 14),
-              ],
-              KeyedSubtree(key: ValueKey((page, server)), child: _body(page)),
+    final column = Align(
+      alignment: Alignment.topLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (page.about case final about?) ...[
+              Text(about, style: Type.sans(14.5, color: t.ink2, height: 1.5)),
+              const SizedBox(height: 14),
             ],
+            KeyedSubtree(key: ValueKey((page, server)), child: _body(page)),
+          ],
+        ),
+      ),
+    );
+    if (!firstRun) {
+      return SingleChildScrollView(
+        key: ValueKey(page),
+        padding: Sizes.pagePadding,
+        child: column,
+      );
+    }
+    // The first run is top-aligned and scrolls, so a short screen loses nothing. How connecting
+    // works sits at the foot while there is room, and follows Connect where there is not.
+    const top = 56.0, bottom = 8.0;
+    return LayoutBuilder(
+      key: ValueKey(page),
+      builder: (context, box) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, top, 16, bottom),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: math.max(0, box.maxHeight - top - bottom),
+          ),
+          child: IntrinsicHeight(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                column,
+                const Spacer(),
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: GuideLink(
+                    'How connecting works',
+                    onTap: () => scope.shell.showGuide(Guide.connect),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

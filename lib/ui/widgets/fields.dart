@@ -6,6 +6,7 @@ import '../icons.dart';
 import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
+import 'tappable.dart';
 
 /// A text field's outline.
 Color fieldEdge(BuildContext context) => Tokens.of(context).line;
@@ -47,6 +48,7 @@ class AppField extends StatelessWidget {
     this.icon,
     this.suffix,
     this.obscure = false,
+    this.private = false,
     this.keyboardType,
     this.autofillHints,
     this.maxLines = 1,
@@ -80,6 +82,9 @@ class AppField extends StatelessWidget {
 
   /// Hides the text, as for a key. It also keeps the keyboard from learning it.
   final bool obscure;
+
+  /// Keeps the keyboard from learning the text, whether or not it is hidden, as for a key.
+  final bool private;
 
   final TextInputType? keyboardType;
 
@@ -124,7 +129,7 @@ class AppField extends StatelessWidget {
         minLines: maxLines > 1 ? math.min(4, maxLines) : null,
         maxLines: maxLines,
         autofillHints: autofillHints,
-        enableIMEPersonalizedLearning: !obscure,
+        enableIMEPersonalizedLearning: !(obscure || private),
         onChanged: onChanged,
         onSubmitted: onSubmitted,
         style: text.copyWith(color: t.ink),
@@ -159,6 +164,64 @@ class AppField extends StatelessWidget {
           constraints: BoxConstraints(minHeight: height),
           enabledBorder: border(fieldEdge(context)),
           focusedBorder: border(t.accent, 2),
+        ),
+      ),
+    );
+  }
+}
+
+/// An [AppField] for a secret such as a key: hidden until Show is pressed, and Hide hides it
+/// again. Both are heard with the field's [label], and the keyboard never learns the text.
+class SecretField extends StatefulWidget {
+  const SecretField({
+    super.key,
+    required this.controller,
+    required this.label,
+    this.hint,
+    this.onChanged,
+    this.onSubmitted,
+    this.keyboardType,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final String? hint;
+  final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
+  final TextInputType? keyboardType;
+
+  @override
+  State<SecretField> createState() => _SecretFieldState();
+}
+
+class _SecretFieldState extends State<SecretField> {
+  bool _shown = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final verb = _shown ? 'Hide' : 'Show';
+    return AppField(
+      controller: widget.controller,
+      label: widget.label,
+      hint: widget.hint,
+      obscure: !_shown,
+      private: true,
+      keyboardType: widget.keyboardType,
+      onChanged: widget.onChanged,
+      onSubmitted: widget.onSubmitted,
+      suffix: Tappable(
+        label: '$verb ${widget.label}',
+        toggled: _shown,
+        touchTarget: true,
+        onTap: () => setState(() => _shown = !_shown),
+        radius: BorderRadius.circular(Sizes.small),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Text(
+            verb,
+            style: Type.sans(14, weight: FontWeight.w600, color: t.accent),
+          ),
         ),
       ),
     );

@@ -255,11 +255,10 @@ class _KeyCardState extends State<_KeyCard> {
                 keyboardType: TextInputType.url,
                 autofillHints: const [AutofillHints.url],
               ),
-              AppField(
+              SecretField(
                 controller: _key,
                 label: 'AnythingLLM developer API key',
                 hint: 'Paste the AnythingLLM API key',
-                obscure: true,
                 // Not a password: AppField leaves it out of autofill, so no saved
                 // login is offered for it.
                 keyboardType: TextInputType.visiblePassword,
@@ -342,8 +341,8 @@ class _KeyCardState extends State<_KeyCard> {
   }
 
   /// The first run: Scan QR code first where there is a camera, then the address and the
-  /// developer key, each under its name, where to make a key, Connect, and How connecting
-  /// works.
+  /// developer key, each under its name, where to make a key, and Connect. How connecting works
+  /// is under the page, in the settings dialog.
   Widget _firstRun(BuildContext context, bool saving, VoidCallback startScan) {
     final t = Tokens.of(context);
     final scanner = _scanner;
@@ -389,11 +388,10 @@ class _KeyCardState extends State<_KeyCard> {
           'Developer API key',
           quiet: true,
           labelled: true,
-          AppField(
+          SecretField(
             controller: _key,
             label: 'AnythingLLM developer API key',
             hint: 'Paste the AnythingLLM API key',
-            obscure: true,
             keyboardType: TextInputType.visiblePassword,
             onSubmitted: (_) => saving ? null : _save(),
           ),
@@ -426,10 +424,6 @@ class _KeyCardState extends State<_KeyCard> {
         ),
         if (_settings.keyringProblem case final problem?)
           AlertBox(AlertKind.warn, problem.title, text: problem.text),
-        GuideLink(
-          'How connecting works',
-          onTap: () => _shell.showGuide(Guide.connect),
-        ),
       ],
     );
   }
