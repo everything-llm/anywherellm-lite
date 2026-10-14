@@ -8,7 +8,7 @@ abstract final class Sizes {
   static const panelMin = 360.0;
 
   /// A card's corners.
-  static const card = 24.0;
+  static const card = 28.0;
 
   /// An alert's or a notice's corners, less round than a [card].
   static const notice = 20.0;
