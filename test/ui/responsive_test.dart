@@ -79,216 +79,393 @@ FakeAnythingLlm awkward() {
   return llm;
 }
 
+/// Each size at normal text, and the small phones at the system's largest, 200%, since a fixed
+/// height is the first thing large text breaks.
+final cases = [
+  for (final size in sizes) (size, 1.0),
+  (sizes[1], 2.0),
+  (sizes[3], 2.0),
+];
+
+/// Scales the text for the tests of a group, then puts it back.
+void textScaledTo(double scale) {
+  if (scale == 1.0) return;
+  setUp(() {
+    final dispatcher =
+        TestWidgetsFlutterBinding.ensureInitialized().platformDispatcher;
+    dispatcher.textScaleFactorTestValue = scale;
+    addTearDown(dispatcher.clearTextScaleFactorTestValue);
+  });
+}
+
 void main() {
-  for (final size in sizes) {
-    final at = '${size.width.toInt()}x${size.height.toInt()}';
+  for (final (size, scale) in cases) {
+    final at =
+        '${size.width.toInt()}x${size.height.toInt()}'
+        '${scale == 1.0 ? '' : ' at ${(scale * 100).toInt()}% text'}';
+    group(at, () {
+      textScaledTo(scale);
 
-    testWidgets('a long chat fits at $at', (tester) async {
-      await pumpApp(tester, llm: awkward(), size: size);
-      expect(tester.takeException(), isNull);
-    });
+      testWidgets('a long chat fits', (tester) async {
+        await pumpApp(tester, llm: awkward(), size: size);
+        expect(tester.takeException(), isNull);
+      });
 
-    testWidgets('the Chats tab, the sheet and Settings fit at $at', (
-      tester,
-    ) async {
-      final h = await pumpApp(tester, llm: awkward(), size: size);
-      h.shell.closeChat();
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      h.shell.openSources();
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      h.shell.openSettings();
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('every Settings page fits at $at', (tester) async {
-      final llm = awkward()
-        ..chatLog = [
-          LoggedChat(
-            workspace: longWord,
-            question: longWord,
-            at: DateTime(2026, 10, 7),
-          ),
-        ]
-        ..embedList = [
-          Embed(
-            uuid: 'e-$longWord',
-            workspace: 'name-$longWord',
-            mode: EmbedMode.query,
-            enabled: true,
-            chats: 123456,
-          ),
-        ];
-      final h = await pumpApp(
-        tester,
-        llm: llm,
-        size: size,
-        canDictate: true,
-        canSpeak: true,
-        appsServer: groceriesServer(),
-        // Notifications on, so its page lists where each source stands.
-        pusher: FakePusher()..using = 'io.heckel.ntfy',
-      );
-      h.shell.openSettings();
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      for (final page in SettingsPage.values) {
-        h.shell.showSettingsPage(page);
+      testWidgets('the Chats tab, the sheet and Settings fit', (tester) async {
+        final h = await pumpApp(tester, llm: awkward(), size: size);
+        h.shell.closeChat();
         await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull, reason: page.name);
-        await tester.drag(
-          find
-              .byWidgetPredicate(
-                (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
-              )
-              .last,
-          const Offset(0, -2000),
+        expect(tester.takeException(), isNull);
+        h.shell.openSources();
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        h.shell.openSettings();
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('every Settings page fits', (tester) async {
+        final llm = awkward()
+          ..chatLog = [
+            LoggedChat(
+              workspace: longWord,
+              question: longWord,
+              at: DateTime(2026, 10, 7),
+            ),
+          ]
+          ..embedList = [
+            Embed(
+              uuid: 'e-$longWord',
+              workspace: 'name-$longWord',
+              mode: EmbedMode.query,
+              enabled: true,
+              chats: 123456,
+            ),
+          ];
+        final h = await pumpApp(
+          tester,
+          llm: llm,
+          size: size,
+          canDictate: true,
+          canSpeak: true,
+          appsServer: groceriesServer(),
+          toolkitServer: FakeToolkit(),
+          // Notifications on, so its page lists where each source stands.
+          pusher: FakePusher()..using = 'io.heckel.ntfy',
         );
+        h.shell.openSettings();
         await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull, reason: page.name);
-      }
-    });
-
-    testWidgets('the scanner fits at $at', (tester) async {
-      final h = await pumpApp(
-        tester,
-        llm: awkward(),
-        size: size,
-        connection: const Connection(
-          baseUrl: 'https://localhost:3001/$longWord',
-          apiKey: 'K1',
-        ),
-        canScan: true,
-      );
-      h.shell.openSettings(SettingsPage.connection);
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Edit connection'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Edit connection'));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Scan QR code'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Scan QR code'));
-      await tester.pumpAndSettle();
-      expect(find.text('Fake scan'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('the microphone and a dictation problem fit at $at', (
-      tester,
-    ) async {
-      final h = await pumpApp(
-        tester,
-        llm: awkward(),
-        size: size,
-        canDictate: true,
-      );
-      h.dictation!.available = false;
-      await tester.tap(
-        find.byWidgetPredicate((w) => w is Tappable && w.label == 'Dictate'),
-      );
-      await tester.pump();
-      expect(find.text('Could not listen'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('a search with long names fits at $at', (tester) async {
-      await pumpApp(tester, llm: awkward(), size: size, onChat: false);
-      await tester.enterText(
-        find.bySemanticsLabel('Search workspaces and chats').last,
-        longWord.substring(0, 5),
-      );
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('adding a link or text in Sources fits at $at', (tester) async {
-      final h = await pumpApp(tester, llm: awkward(), size: size);
-      h.shell.openSources();
-      await tester.pumpAndSettle();
-      await tapVisible(tester, find.bySemanticsLabel('Paste text').last);
-      await tester.pumpAndSettle();
-      await tapVisible(tester, find.bySemanticsLabel('Details').last);
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      final cancel = find.descendant(
-        of: find.byType(SourcesPanel),
-        matching: find.text('Cancel'),
-      );
-      await tester.ensureVisible(cancel);
-      await tester.pumpAndSettle();
-      await tester.tap(cancel);
-      await tester.pumpAndSettle();
-      await tapVisible(tester, find.bySemanticsLabel('Add a link').last);
-      await tester.pumpAndSettle();
-      await tapVisible(tester, find.bySemanticsLabel('Details').last);
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('a tested question fits at $at', (tester) async {
-      final h = await pumpApp(tester, llm: awkward(), size: size);
-      h.shell.openSources();
-      await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsLabel('Test a question').last);
-      await tester.pumpAndSettle();
-      await h.sources.search('file-$longWord');
-      await tester.pumpAndSettle();
-      expect(h.sources.hits, isNotEmpty);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('files waiting to be added fit at $at', (tester) async {
-      final h = await pumpApp(tester, llm: awkward(), size: size);
-      h.shell.openSources();
-      await tester.pumpAndSettle();
-      FilePickerPlatform.instance = FakePicker([
-        Picked('a-$longWord.pdf'),
-        Picked('b-$longWord.md'),
-      ]);
-      await tapVisible(
-        tester,
-        find.descendant(
-          of: find.byType(SourcesPanel),
-          matching: control('Add a file'),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsLabel('Details of a-$longWord.pdf'));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('making, renaming and deleting a workspace fit at $at', (
-      tester,
-    ) async {
-      final h = await pumpApp(tester, llm: awkward(), size: size);
-      // New workspace, with long instructions typed.
-      {
-        h.shell.togglePopup(WorkspaceSheet.create);
+        expect(tester.takeException(), isNull);
+        for (final page in SettingsPage.values) {
+          h.shell.showSettingsPage(page);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull, reason: page.name);
+          await tester.drag(
+            find
+                .byWidgetPredicate(
+                  (w) =>
+                      w is Scrollable && w.axisDirection == AxisDirection.down,
+                )
+                .last,
+            const Offset(0, -2000),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull, reason: page.name);
+        }
+        h.shell
+          ..showSettingsPage(SettingsPage.memory)
+          ..togglePopup(const MemorySheet('g:new'));
         await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'a new memory');
+      });
+
+      testWidgets('the scanner fits', (tester) async {
+        final h = await pumpApp(
+          tester,
+          llm: awkward(),
+          size: size,
+          connection: const Connection(
+            baseUrl: 'https://localhost:3001/$longWord',
+            apiKey: 'K1',
+          ),
+          canScan: true,
+        );
+        h.shell.openSettings(SettingsPage.connection);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Edit connection'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Edit connection'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Scan QR code'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Scan QR code'));
+        await tester.pumpAndSettle();
+        expect(find.text('Fake scan'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('the microphone and a dictation problem fit', (tester) async {
+        final h = await pumpApp(
+          tester,
+          llm: awkward(),
+          size: size,
+          canDictate: true,
+        );
+        h.dictation!.available = false;
+        await tester.tap(
+          find.byWidgetPredicate((w) => w is Tappable && w.label == 'Dictate'),
+        );
+        await tester.pump();
+        expect(find.text('Could not listen'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('a search with long names fits', (tester) async {
+        await pumpApp(tester, llm: awkward(), size: size, onChat: false);
         await tester.enterText(
-          typingField(find.byType(WorkspaceSheetView)).last,
-          'instructions-$longWord\n' * 12,
+          find.bySemanticsLabel('Search workspaces and chats').last,
+          longWord.substring(0, 5),
         );
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
-        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      });
+
+      testWidgets('adding a link or text in Sources fits', (tester) async {
+        final h = await pumpApp(tester, llm: awkward(), size: size);
+        h.shell.openSources();
         await tester.pumpAndSettle();
-      }
-      // Rename and delete are in the workspace's settings, in sheets.
-      {
+        await tapVisible(tester, find.bySemanticsLabel('Paste text').last);
+        await tester.pumpAndSettle();
+        await tapVisible(tester, find.bySemanticsLabel('Details').last);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        final cancel = find.descendant(
+          of: find.byType(SourcesPanel),
+          matching: find.text('Cancel'),
+        );
+        await tester.ensureVisible(cancel);
+        await tester.pumpAndSettle();
+        await tester.tap(cancel);
+        await tester.pumpAndSettle();
+        await tapVisible(tester, find.bySemanticsLabel('Add a link').last);
+        await tester.pumpAndSettle();
+        await tapVisible(tester, find.bySemanticsLabel('Details').last);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('a tested question fits', (tester) async {
+        final h = await pumpApp(tester, llm: awkward(), size: size);
+        h.shell.openSources();
+        await tester.pumpAndSettle();
+        await tester.tap(find.bySemanticsLabel('Test a question').last);
+        await tester.pumpAndSettle();
+        await h.sources.search('file-$longWord');
+        await tester.pumpAndSettle();
+        expect(h.sources.hits, isNotEmpty);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('files waiting to be added fit', (tester) async {
+        final h = await pumpApp(tester, llm: awkward(), size: size);
+        h.shell.openSources();
+        await tester.pumpAndSettle();
+        FilePickerPlatform.instance = FakePicker([
+          Picked('a-$longWord.pdf'),
+          Picked('b-$longWord.md'),
+        ]);
+        await tapVisible(
+          tester,
+          find.descendant(
+            of: find.byType(SourcesPanel),
+            matching: control('Add a file'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.bySemanticsLabel('Details of a-$longWord.pdf'));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('making, renaming and deleting a workspace fit', (
+        tester,
+      ) async {
+        final h = await pumpApp(tester, llm: awkward(), size: size);
+        // New workspace, with long instructions typed.
+        {
+          h.shell.togglePopup(WorkspaceSheet.create);
+          await tester.pumpAndSettle();
+          await tester.enterText(
+            typingField(find.byType(WorkspaceSheetView)).last,
+            'instructions-$longWord\n' * 12,
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+          await tester.pumpAndSettle();
+        }
+        // Rename and delete are in the workspace's settings, in sheets.
+        {
+          h.shell.showPane(Pane.files);
+          await tester.pumpAndSettle();
+          await tapVisible(tester, control('Rename'));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+          await tester.pumpAndSettle();
+          await tester.scrollUntilVisible(
+            control('Delete workspace'),
+            200,
+            scrollable: find
+                .descendant(
+                  of: find.byType(WorkspacePages),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tapVisible(tester, control('Delete workspace'));
+          await tester.pumpAndSettle();
+          expect(control('Keep'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        }
+      });
+
+      testWidgets('an agent answer fits', (tester) async {
+        final llm = awkward()..hold = true;
+        final h = await pumpApp(tester, llm: llm, size: size);
+        h.chat.newChat();
+        await tester.pumpAndSettle();
+        await h.chat.send('news');
+        llm.chat!.add(StatusChunk('Using SearXNG to search for $longWord'));
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(tester.takeException(), isNull);
+        llm.chat!
+          ..add(const WholeAnswer('Headline'))
+          ..add(
+            ChatDone([
+              for (var i = 0; i < 9; i++)
+                Citation(
+                  'story-$i-$longWord',
+                  url: Uri.parse('https://example.com/$longWord'),
+                ),
+            ]),
+          );
+        await llm.chat!.close();
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('an answer\'s More menu and its details fit', (tester) async {
+        final llm = awkward()
+          ..measured = AnswerMetrics(
+            model: 'model-$longWord',
+            tokens: 1642,
+            seconds: 73.852,
+            speed: 22.2,
+            cost: 0.0049,
+          );
+        final h = await pumpApp(
+          tester,
+          llm: llm,
+          size: size,
+          prefsStore: FakePrefsStore(
+            const Prefs().withSwitch(ChatSwitch.answerDetails, true),
+          ),
+        );
+        await h.chat.send('measured');
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await tapVisible(
+          tester,
+          find.bySemanticsLabel(
+            'More for this answer: model, time, tokens, speed and cost',
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('This answer'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('a draft and the no-key banner fit', (tester) async {
+        final h = await pumpApp(tester, llm: awkward(), size: size);
+        h.chat.newChat();
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await h.settings.clear();
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        h.shell.openSettings(SettingsPage.connection);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'the first run');
+      });
+
+      testWidgets('each screen of How connecting works fits', (tester) async {
+        final h = await pumpApp(
+          tester,
+          connection: null,
+          size: size,
+          canScan: true,
+        );
+        h.shell
+          ..openSettings(SettingsPage.connection)
+          ..showGuide(Guide.connect);
+        await tester.pumpAndSettle();
+        for (var n = 0; n < connectSteps.length; n++) {
+          expect(
+            find.text('${n + 1} of ${connectSteps.length}'),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull, reason: 'screen ${n + 1}');
+          await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+          await tester.pumpAndSettle();
+        }
+      });
+
+      testWidgets('each screen of Add the toolkit fits', (tester) async {
+        final h = await pumpApp(tester, size: size, canScan: true);
+        h.shell
+          ..openSettings()
+          ..showGuide(Guide.toolkit);
+        await tester.pumpAndSettle();
+        for (var n = 0; n < toolkitSteps.length; n++) {
+          expect(
+            find.text('${n + 1} of ${toolkitSteps.length}'),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull, reason: 'screen ${n + 1}');
+          await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+          await tester.pumpAndSettle();
+        }
+      });
+    });
+  }
+
+  for (final (size, scale) in cases) {
+    final at =
+        '${size.width.toInt()}x${size.height.toInt()}'
+        '${scale == 1.0 ? '' : ' at ${(scale * 100).toInt()}% text'}';
+    group(at, () {
+      textScaledTo(scale);
+
+      testWidgets('the workspace\'s pages fit', (tester) async {
+        final llm = awkward();
+        llm.spaces.first.prompt = 'prompt-$longWord';
+        final h = await pumpApp(tester, llm: llm, size: size);
         h.shell.showPane(Pane.files);
         await tester.pumpAndSettle();
-        await tester.tap(control('Rename'));
+        expect(tester.takeException(), isNull);
+        h.shell.openSources();
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
-        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-        await tester.pumpAndSettle();
+        h.shell.closeSources();
+        for (final page in [FilesSection.instructions, FilesSection.answers]) {
+          h.shell.showWorkspacePage(page);
+          await h.files.openSection(page);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull, reason: '$page');
+        }
         await tester.scrollUntilVisible(
-          control('Delete workspace'),
+          find.text('Chat model'),
           200,
           scrollable: find
               .descendant(
@@ -297,197 +474,27 @@ void main() {
               )
               .first,
         );
-        await tapVisible(tester, control('Delete workspace'));
+        await tapVisible(tester, find.text('Chat model').last);
         await tester.pumpAndSettle();
-        expect(control('Keep'), findsOneWidget);
         expect(tester.takeException(), isNull);
-      }
-    });
+      });
 
-    testWidgets('an agent answer fits at $at', (tester) async {
-      final llm = awkward()..hold = true;
-      final h = await pumpApp(tester, llm: llm, size: size);
-      h.chat.newChat();
-      await tester.pumpAndSettle();
-      await h.chat.send('news');
-      llm.chat!.add(StatusChunk('Using SearXNG to search for $longWord'));
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(tester.takeException(), isNull);
-      llm.chat!
-        ..add(const WholeAnswer('Headline'))
-        ..add(
-          ChatDone([
-            for (var i = 0; i < 9; i++)
-              Citation(
-                'story-$i-$longWord',
-                url: Uri.parse('https://example.com/$longWord'),
-              ),
-          ]),
-        );
-      await llm.chat!.close();
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('an answer\'s More menu and its details fit at $at', (
-      tester,
-    ) async {
-      final llm = awkward()
-        ..measured = AnswerMetrics(
-          model: 'model-$longWord',
-          tokens: 1642,
-          seconds: 73.852,
-          speed: 22.2,
-          cost: 0.0049,
-        );
-      final h = await pumpApp(
-        tester,
-        llm: llm,
-        size: size,
-        prefsStore: FakePrefsStore(
-          const Prefs().withSwitch(ChatSwitch.answerDetails, true),
-        ),
-      );
-      await h.chat.send('measured');
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      await tapVisible(
-        tester,
-        find.bySemanticsLabel(
-          'More for this answer: model, time, tokens, speed and cost',
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('This answer'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('a draft and the no-key banner fit at $at', (tester) async {
-      final h = await pumpApp(tester, llm: awkward(), size: size);
-      h.chat.newChat();
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      await h.settings.clear();
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('each screen of How connecting works fits at $at', (
-      tester,
-    ) async {
-      final h = await pumpApp(
-        tester,
-        connection: null,
-        size: size,
-        canScan: true,
-      );
-      h.shell
-        ..openSettings(SettingsPage.connection)
-        ..showGuide(Guide.connect);
-      await tester.pumpAndSettle();
-      for (var n = 0; n < connectSteps.length; n++) {
-        expect(find.text('${n + 1} of ${connectSteps.length}'), findsOneWidget);
-        expect(tester.takeException(), isNull, reason: 'screen ${n + 1}');
-        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      testWidgets('each page of the workspace fits', (tester) async {
+        final llm = awkward();
+        final path = 'custom-documents/file-$longWord.pdf.json';
+        final h = await pumpApp(tester, llm: llm, size: size);
+        h.shell
+          ..showPane(Pane.files)
+          ..openSources();
         await tester.pumpAndSettle();
-      }
+        await h.sources.toggle(h.sources.files.first);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await h.files.viewText(path, 'file-$longWord.pdf');
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      });
     });
-
-    testWidgets('each screen of Add the toolkit fits at $at', (tester) async {
-      final h = await pumpApp(tester, size: size, canScan: true);
-      h.shell
-        ..openSettings()
-        ..showGuide(Guide.toolkit);
-      await tester.pumpAndSettle();
-      for (var n = 0; n < toolkitSteps.length; n++) {
-        expect(find.text('${n + 1} of ${toolkitSteps.length}'), findsOneWidget);
-        expect(tester.takeException(), isNull, reason: 'screen ${n + 1}');
-        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-        await tester.pumpAndSettle();
-      }
-    });
-  }
-
-  for (final size in sizes) {
-    final at = '${size.width.toInt()}x${size.height.toInt()}';
-
-    testWidgets('the workspace\'s pages fit at $at', (tester) async {
-      final llm = awkward();
-      llm.spaces.first.prompt = 'prompt-$longWord';
-      final h = await pumpApp(tester, llm: llm, size: size);
-      h.shell.showPane(Pane.files);
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      h.shell.openSources();
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      h.shell.closeSources();
-      for (final page in [FilesSection.instructions, FilesSection.answers]) {
-        h.shell.showWorkspacePage(page);
-        await h.files.openSection(page);
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull, reason: '$page');
-      }
-      await tester.scrollUntilVisible(
-        find.text('Chat model'),
-        200,
-        scrollable: find
-            .descendant(
-              of: find.byType(WorkspacePages),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
-      await tapVisible(tester, find.text('Chat model').last);
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('each page of the workspace fits at $at', (tester) async {
-      final llm = awkward();
-      final path = 'custom-documents/file-$longWord.pdf.json';
-      final h = await pumpApp(tester, llm: llm, size: size);
-      h.shell
-        ..showPane(Pane.files)
-        ..openSources();
-      await tester.pumpAndSettle();
-      await h.sources.toggle(h.sources.files.first);
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      await h.files.viewText(path, 'file-$longWord.pdf');
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-    });
-  }
-
-  // The system's largest text: nothing may overflow, since a fixed height is the first thing
-  // large text breaks.
-  for (final size in [sizes[1], sizes[3]]) {
-    final at = '${size.width.toInt()}x${size.height.toInt()}';
-
-    testWidgets(
-      'at 200% text the chat, tabs, Settings and a memory fit at $at',
-      (tester) async {
-        tester.platformDispatcher.textScaleFactorTestValue = 2.0;
-        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-        final h = await pumpApp(
-          tester,
-          llm: awkward(),
-          size: size,
-          toolkitServer: FakeToolkit(),
-        );
-        expect(tester.takeException(), isNull, reason: 'the chat');
-        h.shell.closeChat();
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull, reason: 'the Chats tab');
-        h.shell.openSettings(SettingsPage.memory);
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull, reason: 'Memory');
-        h.shell.togglePopup(const MemorySheet('g:new'));
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull, reason: 'a new memory');
-      },
-    );
   }
 
   testWidgets('clear of the phone\'s bars', (tester) async {

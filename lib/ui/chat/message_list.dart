@@ -390,7 +390,7 @@ class _Suggestion extends StatelessWidget {
       // A pill on one line; a label that wraps keeps its corners rather than bulging.
       radius: BorderRadius.circular(24),
       color: t.panel,
-      side: BorderSide(color: t.line2),
+      side: BorderSide(color: t.edge),
       hoverColor: Colors.transparent,
       child: Container(
         constraints: BoxConstraints(
@@ -788,7 +788,7 @@ class _MoreSources extends StatelessWidget {
       onTap: onTap,
       radius: BorderRadius.circular(99),
       color: open ? t.sel : t.panel,
-      side: BorderSide(color: t.line),
+      side: BorderSide(color: t.edge),
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 36),
         child: Padding(
@@ -881,7 +881,7 @@ class _CitationState extends State<_Citation> {
       radius: BorderRadius.circular(99),
       // A chip is the panel's colour, outlined, as the design canvas draws it.
       color: t.panel,
-      side: BorderSide(color: t.line),
+      side: BorderSide(color: t.edge),
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 36),
         child: Padding(

@@ -139,7 +139,7 @@ Imports run `ui -> core <- adapters`. `lib/main.dart` is the only file that know
 - A selectable answer is a read-only `EditableText`; to find a field a person types in, match `EditableText` with `!readOnly`.
 - A streaming answer's caret blinks forever, so `pumpAndSettle` times out while one runs; pump a fixed duration instead.
 - `test/ui/keyboard_test.dart` raises the keyboard as Android does (`tester.view.viewInsets`) on a phone upright and on its side, and checks that the composer, a Settings field, a Sources field and the prompt editor stay above it, keep their focus, and overflow nothing.
-- `test/ui/responsive_test.dart` pumps the chat, the Chats tab and the sheet, Settings, a draft and the no-key banner at 412x915, 360x640, 740x360 and 360x480, with long unbroken strings, and fails on any overflow. At each size it also shows every `SettingsPage`, with all settings listed, and scrolls each to its end.
+- `test/ui/responsive_test.dart` pumps the chat, the Chats tab and the sheet, Settings, a draft and the no-key banner at 412x915, 360x640, 740x360 and 360x480, with long unbroken strings, and fails on any overflow. The 360x640 and 360x480 windows run again at 200% text (`cases`, `textScaledTo`), since a fixed height is the first thing large text breaks; headers and tabs are minimum heights (`Sizes.header` 72, `Sizes.tab` 56) that grow with the text. At each size it also shows every `SettingsPage`, with all settings listed, and scrolls each to its end.
 
 ## Conventions
 

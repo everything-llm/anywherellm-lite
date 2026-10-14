@@ -91,7 +91,7 @@ class _Tab extends StatelessWidget {
       radius: BorderRadius.circular(Sizes.small),
       onTap: onTap,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 56),
+        constraints: const BoxConstraints(minHeight: Sizes.tab),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
@@ -172,8 +172,8 @@ class _ChatsTabState extends State<ChatsTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SizedBox(
-              height: 72,
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: Sizes.header),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 16, 0),
                 child: Row(

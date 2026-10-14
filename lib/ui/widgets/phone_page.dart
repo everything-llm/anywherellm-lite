@@ -41,7 +41,7 @@ class PhonePageHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 72),
+      constraints: const BoxConstraints(minHeight: Sizes.header),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(
@@ -96,8 +96,8 @@ class TabTitle extends StatelessWidget {
       Type.sans(26, weight: FontWeight.w600, letterSpacing: -0.3, color: color);
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 72,
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: const BoxConstraints(minHeight: Sizes.header),
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Align(

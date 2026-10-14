@@ -40,6 +40,12 @@ abstract final class Sizes {
   /// The least height of a row that only says something, or holds a switch.
   static const infoRow = 88.0;
 
+  /// The least height of a page's or a tab's header bar, which grows with the text.
+  static const header = 72.0;
+
+  /// The least height of a tab in the bar under the home.
+  static const tab = 56.0;
+
   /// A one-line field's height.
   static const field = 52.0;
 }

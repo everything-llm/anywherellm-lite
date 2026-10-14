@@ -440,11 +440,14 @@ class SheetQuestion extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     spacing: 16,
     children: [
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Text(
-          question,
-          style: Type.sans(15.5, color: Tokens.of(context).ink, height: 1.5),
+      // A long question scrolls, so the buttons stay in reach.
+      Flexible(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Text(
+            question,
+            style: Type.sans(15.5, color: Tokens.of(context).ink, height: 1.5),
+          ),
         ),
       ),
       ActionRow(even: true, [

@@ -443,7 +443,7 @@ class _SmallButton extends StatelessWidget {
       touchTarget: true,
       radius: BorderRadius.circular(8),
       color: open == true ? t.sel : t.panel,
-      side: BorderSide(color: t.line),
+      side: BorderSide(color: t.edge),
       dimWhenDisabled: 0.5,
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 32),

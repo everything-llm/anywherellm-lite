@@ -37,7 +37,7 @@ class RadioCard extends StatelessWidget {
       onTap: onTap,
       radius: BorderRadius.circular(20),
       color: card ? (selected ? t.sel : t.panel) : null,
-      side: card ? BorderSide(color: selected ? t.sel : t.line) : null,
+      side: card ? BorderSide(color: selected ? t.sel : t.edge) : null,
       child: Container(
         constraints: BoxConstraints(minHeight: card ? Sizes.cardRow : 48),
         padding: EdgeInsets.symmetric(

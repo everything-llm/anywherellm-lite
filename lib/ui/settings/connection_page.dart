@@ -7,13 +7,11 @@ import '../../core/ports.dart';
 import '../app_scope.dart';
 import '../state/settings_controller.dart';
 import '../state/shell_controller.dart';
-import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/headline.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
-import '../widgets/tappable.dart';
 import '../widgets/controls.dart';
 import '../widgets/fields.dart';
 import 'walkthrough.dart';
@@ -47,6 +45,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
       listenable: settings,
       builder: (context, child) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 28,
         children: [
           // With nothing saved, it opens on the first run's welcome.
           if (settings.connection == null) const _Welcome(),
@@ -66,24 +65,21 @@ class _Welcome extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final scan = AppScope.of(context).scanner != null;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Headline('Connect to your ', name: 'AnythingLLM', after: '.'),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Text(
-              scan
-                  ? 'Already set up on your computer? Scan its code and this phone is connected.'
-                  : 'Enter your AnythingLLM server\'s address and a developer key.',
-              style: Type.note(t.muted),
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Headline('Connect to your ', name: 'AnythingLLM', after: '.'),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            scan
+                ? 'Already set up on your computer? Scan its code and this phone is connected.'
+                : 'Enter your AnythingLLM server\'s address and a developer key.',
+            style: Type.note(t.muted),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -110,42 +106,15 @@ class _OrDivider extends StatelessWidget {
             spacing: 12,
             children: [
               line,
-              Text(label, style: Type.sans(13, color: t.muted)),
+              Flexible(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: Type.sans(13, color: t.muted),
+                ),
+              ),
               line,
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A link under the key field to the walk-through's screen on where to find one.
-class _KeyLink extends StatelessWidget {
-  const _KeyLink({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Tappable(
-        label: 'Where do I find a key?',
-        onTap: onTap,
-        radius: BorderRadius.circular(Sizes.small),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 44),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Center(
-              widthFactor: 1,
-              child: Text(
-                'Where do I find a key?',
-                style: Type.sans(14, weight: FontWeight.w600, color: t.accent),
-              ),
-            ),
           ),
         ),
       ),
@@ -463,7 +432,14 @@ class _KeyCardState extends State<_KeyCard> {
                 onSubmitted: (_) => saving ? null : _save(),
               ),
             ),
-            _KeyLink(onTap: () => _shell.showGuide(Guide.connect, step: 1)),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextAction.plain(
+                'Where do I find a key?',
+                () => _shell.showGuide(Guide.connect, step: connectKeyStep),
+                weight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
         Column(

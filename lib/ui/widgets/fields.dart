@@ -80,7 +80,7 @@ class AppField extends StatelessWidget {
   /// A widget drawn inside the field, after the text.
   final Widget? suffix;
 
-  /// Hides the text, as for a key. It also keeps the keyboard from learning it.
+  /// Hides the text, as for a key.
   final bool obscure;
 
   /// Keeps the keyboard from learning the text, whether or not it is hidden, as for a key.
@@ -129,7 +129,7 @@ class AppField extends StatelessWidget {
         minLines: maxLines > 1 ? math.min(4, maxLines) : null,
         maxLines: maxLines,
         autofillHints: autofillHints,
-        enableIMEPersonalizedLearning: !(obscure || private),
+        enableIMEPersonalizedLearning: !private,
         onChanged: onChanged,
         onSubmitted: onSubmitted,
         style: text.copyWith(color: t.ink),

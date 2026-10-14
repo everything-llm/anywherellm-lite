@@ -42,6 +42,9 @@ class GuideStep {
   final List<(String, String)> lines;
 }
 
+/// The screen of [connectSteps] on where the key comes from.
+const connectKeyStep = 1;
+
 /// How connecting works: the two things to bring, where the key comes from, and the address.
 const connectSteps = [
   GuideStep(
@@ -243,14 +246,16 @@ class _WalkthroughState extends State<Walkthrough> {
                               : 'next · ${steps[_at + 1].kicker.toLowerCase()}',
                           onTap: last ? widget.onEnd : () => _go(_at + 1),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 10),
-                          child: Text(
-                            'Swipe, or use the arrow keys',
-                            textAlign: TextAlign.center,
-                            style: Type.sans(12, color: t.muted),
+                        // The hint gives way on a short window, where the screen needs the room.
+                        if (MediaQuery.sizeOf(context).height >= 560)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 10),
+                            child: Text(
+                              'Swipe, or use the arrow keys',
+                              textAlign: TextAlign.center,
+                              style: Type.sans(12, color: t.muted),
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),

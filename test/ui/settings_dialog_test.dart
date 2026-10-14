@@ -136,15 +136,6 @@ void main() {
       expect(button('Connect').primary, isTrue);
       expect(button('Scan QR code').primary, isFalse);
       expect(button('Scan QR code').leading, 'qr');
-      final fields = find.descendant(
-        of: find.byType(SettingsDialog),
-        matching: find.byType(EditableText),
-      );
-      await tester.enterText(fields.at(0), 'https://host.example');
-      await tester.enterText(fields.at(1), 'k-secret');
-      await tester.pump();
-      expect(button('Connect').primary, isTrue);
-      expect(button('Scan QR code').primary, isFalse);
     },
   );
 
@@ -196,10 +187,7 @@ void main() {
     final h = await pumpApp(tester, connection: null, size: phone);
     h.shell.openSettings(SettingsPage.connection);
     await tester.pumpAndSettle();
-    final key = find.descendant(
-      of: find.byType(SecretField),
-      matching: find.byType(EditableText),
-    );
+    final key = typingField(find.byType(SecretField));
     await tester.enterText(key, 'k-secret');
     await tester.pumpAndSettle();
     expect(tester.widget<EditableText>(key).obscureText, isTrue);

@@ -214,6 +214,7 @@ class TextAction extends StatelessWidget {
     super.key,
     this.semanticLabel,
     this.height,
+    this.weight = FontWeight.w400,
   });
 
   const TextAction.plain(
@@ -222,6 +223,7 @@ class TextAction extends StatelessWidget {
     super.key,
     this.semanticLabel,
     this.height,
+    this.weight = FontWeight.w400,
   }) : icon = null;
 
   final String? icon;
@@ -234,6 +236,9 @@ class TextAction extends StatelessWidget {
   /// The least height, with the words in its middle, as beside buttons whose row it shares.
   /// It is at least 44.
   final double? height;
+
+  /// The weight of the words.
+  final FontWeight weight;
 
   @override
   Widget build(BuildContext context) {
@@ -248,7 +253,10 @@ class TextAction extends StatelessWidget {
         ],
         // Wraps where the line is too narrow for it.
         Flexible(
-          child: Text(label, style: Type.sans(14, color: t.accent)),
+          child: Text(
+            label,
+            style: Type.sans(14, weight: weight, color: t.accent),
+          ),
         ),
       ],
     );

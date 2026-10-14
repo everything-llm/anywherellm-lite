@@ -474,8 +474,8 @@ class Fold extends StatelessWidget {
         expanded: open,
         onTap: onToggle,
         radius: BorderRadius.circular(8),
-        child: SizedBox(
-          height: 36,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 36),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             spacing: 6,
@@ -484,9 +484,12 @@ class Fold extends StatelessWidget {
                 quarterTurns: open ? 1 : 0,
                 child: AppIcon('chevron', size: IconSize.xs, color: t.ink2),
               ),
-              Text(
-                label,
-                style: Type.sans(14, weight: FontWeight.w500, color: t.ink2),
+              // Wraps where the line is too narrow for it.
+              Flexible(
+                child: Text(
+                  label,
+                  style: Type.sans(14, weight: FontWeight.w500, color: t.ink2),
+                ),
               ),
             ],
           ),
