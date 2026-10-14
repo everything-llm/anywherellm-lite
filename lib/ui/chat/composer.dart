@@ -618,21 +618,14 @@ class _Form extends StatelessWidget {
                   ),
                 if (holdable) const SizedBox(width: 8),
                 if (here)
-                  _RoundButton(
+                  RoundButton(
                     label: 'Stop the answer',
                     color: t.ink,
                     onTap: chat.stop,
-                    child: Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: t.bg,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
+                    child: const StopMark(),
                   )
                 else
-                  _RoundButton(
+                  RoundButton(
                     label: 'Send',
                     // Send keeps the accent, as the design canvas draws it.
                     color: t.accent,
@@ -681,18 +674,37 @@ class _FilesPill extends StatelessWidget {
   }
 }
 
-class _RoundButton extends StatelessWidget {
-  const _RoundButton({
+/// Stop's square, drawn in a [RoundButton] on [Tokens.ink].
+class StopMark extends StatelessWidget {
+  const StopMark({super.key});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 10,
+    height: 10,
+    decoration: BoxDecoration(
+      color: Tokens.of(context).bg,
+      borderRadius: BorderRadius.circular(2),
+    ),
+  );
+}
+
+/// A round button [size] across, or a pill as wide as a [child] wider than that, such as Send.
+class RoundButton extends StatelessWidget {
+  const RoundButton({
+    super.key,
     required this.label,
     required this.color,
     required this.onTap,
     required this.child,
+    this.size = 40,
   });
 
   final String label;
   final Color color;
   final VoidCallback? onTap;
   final Widget child;
+  final double size;
 
   @override
   Widget build(BuildContext context) => Tappable(
@@ -700,9 +712,12 @@ class _RoundButton extends StatelessWidget {
     label: label,
     tooltip: label,
     onTap: onTap,
-    shape: const CircleBorder(),
+    radius: BorderRadius.circular(99),
     color: color,
-    child: SizedBox.square(dimension: 40, child: Center(child: child)),
+    child: ConstrainedBox(
+      constraints: BoxConstraints(minWidth: size, minHeight: size),
+      child: Center(widthFactor: 1, heightFactor: 1, child: child),
+    ),
   );
 }
 

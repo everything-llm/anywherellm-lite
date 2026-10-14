@@ -1,4 +1,5 @@
 import 'package:anywherellm/core/server_models.dart';
+import 'package:anywherellm/ui/chat/browser_sheet.dart';
 import 'package:anywherellm/ui/state/notice.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -193,6 +194,52 @@ void main() {
       await tester.pumpAndSettle();
       expect(h.shell.browserTab, isNull);
       expect(h.shell.chatOpen, isTrue);
+    },
+  );
+
+  testWidgets(
+    'the bar under the agent\'s browser hands the tab back and messages the agent',
+    (tester) async {
+      final llm = answering('Done: [the tab](/browser-lean/3kQ.html)');
+      final h = await pumpApp(tester, llm: llm, canViewApps: true);
+      await tapLink(tester, 'the tab');
+      await tester.pumpAndSettle();
+      final page = h.appView!.channel!;
+      expect(page.name, 'AnywhereLLMBrowser');
+      expect(find.text('Hand back'), findsNothing);
+
+      // The page says the person took the tab over: Send reads Hand back.
+      page.onMessage('{"who":"user"}');
+      await tester.pumpAndSettle();
+      await tester.tap(control('Hand back to the agent'));
+      await tester.pump();
+      expect(h.appView!.ran, ['window.browserLean&&browserLean.give()']);
+      page.onMessage('{"gave":true}');
+      await tester.pumpAndSettle();
+      expect(find.text('Hand back'), findsNothing);
+
+      // Taken over again, a message hands the tab back before it goes in the chat.
+      page.onMessage('{"who":"user"}');
+      await tester.pumpAndSettle();
+      llm.answer = 'Booked for Tuesday.';
+      final bar = find.descendant(
+        of: find.byType(AgentBar),
+        matching: find.byType(EditableText),
+      );
+      await tester.enterText(bar, 'Book Tuesday');
+      await tester.pump();
+      await tester.tap(control('Send to the agent'));
+      await tester.pump();
+      expect(h.appView!.ran, hasLength(2));
+      expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
+      page.onMessage('{"gave":true}');
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('You: Book Tuesday'), findsOneWidget);
+      expect(find.text('Booked for Tuesday.'), findsWidgets);
+      await tester.tap(control('Dismiss the reply'));
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('You: Book Tuesday'), findsNothing);
     },
   );
 }

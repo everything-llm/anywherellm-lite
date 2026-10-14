@@ -122,14 +122,20 @@ class FakeAppView implements AppView {
   /// How the page shown last closes itself, as its `window.close()` does.
   VoidCallback? close;
 
+  /// The channel the page shown last was given, whose scripts run are kept in [ran].
+  PageChannel? channel;
+  final List<String> ran = [];
+
   @override
   Widget show(
     Uri page, {
     required void Function(Uri url) onLeave,
     VoidCallback? onClose,
+    PageChannel? channel,
   }) {
     shown.add(page);
     close = onClose;
+    this.channel = channel?..runner = (script) async => ran.add(script);
     return Center(child: Text('Web view of $page'));
   }
 }

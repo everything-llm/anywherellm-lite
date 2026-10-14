@@ -18,11 +18,13 @@ class AppWebViews implements AppView {
     Uri page, {
     required void Function(Uri url) onLeave,
     VoidCallback? onClose,
+    PageChannel? channel,
   }) => _AppWebView(
     key: ValueKey(page),
     page: page,
     onLeave: onLeave,
     onClose: onClose,
+    channel: channel,
   );
 }
 
@@ -35,11 +37,13 @@ class _AppWebView extends StatefulWidget {
     required this.page,
     required this.onLeave,
     this.onClose,
+    this.channel,
   });
 
   final Uri page;
   final void Function(Uri url) onLeave;
   final VoidCallback? onClose;
+  final PageChannel? channel;
 
   @override
   State<_AppWebView> createState() => _AppWebViewState();
@@ -89,7 +93,26 @@ class _AppWebViewState extends State<_AppWebView> {
         ),
       );
     }
+    if (widget.channel case final channel?) {
+      unawaited(
+        _web.addJavaScriptChannel(
+          channel.name,
+          onMessageReceived: (message) => channel.onMessage(message.message),
+        ),
+      );
+      channel.runner = _web.runJavaScript;
+    }
     unawaited(_web.loadRequest(widget.page));
+  }
+
+  @override
+  void dispose() {
+    // A web view that took its place may have set its own runner already.
+    if (widget.channel case final channel?
+        when channel.runner == _web.runJavaScript) {
+      channel.runner = null;
+    }
+    super.dispose();
   }
 
   @override
