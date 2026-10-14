@@ -8,6 +8,7 @@ import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/server_models.dart';
+import 'package:anywherellm/ui/settings/memory_page.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/settings/walkthrough.dart';
 import 'package:anywherellm/ui/files/workspace_pages.dart';
@@ -25,6 +26,7 @@ import '../support/fake_api.dart';
 import '../support/fake_apps.dart';
 import '../support/fake_pusher.dart';
 import '../support/fake_settings.dart';
+import '../support/fake_toolkit.dart';
 import '../support/picker.dart';
 import '../support/pump.dart';
 
@@ -456,6 +458,36 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });
+  }
+
+  // The system's largest text: nothing may overflow, since a fixed height is the first thing
+  // large text breaks.
+  for (final size in [sizes[1], sizes[3]]) {
+    final at = '${size.width.toInt()}x${size.height.toInt()}';
+
+    testWidgets(
+      'at 200% text the chat, tabs, Settings and a memory fit at $at',
+      (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final h = await pumpApp(
+          tester,
+          llm: awkward(),
+          size: size,
+          toolkitServer: FakeToolkit(),
+        );
+        expect(tester.takeException(), isNull, reason: 'the chat');
+        h.shell.closeChat();
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'the Chats tab');
+        h.shell.openSettings(SettingsPage.memory);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'Memory');
+        h.shell.togglePopup(const MemorySheet('g:new'));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'a new memory');
+      },
+    );
   }
 
   testWidgets('clear of the phone\'s bars', (tester) async {

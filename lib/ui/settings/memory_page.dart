@@ -382,71 +382,74 @@ class _SavedEditorState extends State<_SavedEditor> {
       selected: _global == global,
       onTap: () => setState(() => _global = global),
     );
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 16,
-      children: [
-        AppField(
-          controller: _text,
-          label: 'Memory',
-          hint: 'One short fact, such as: Prefers metric units.',
-          maxLines: 4,
-          autofocus: existing == null,
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: SectionLabel('Shown in', header: false),
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 8,
-          children: [
-            choice(true, 'Every workspace', globalMemoryLimit),
-            choice(false, 'Only ${widget.name}', workspaceMemoryLimit),
-          ],
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Text(
-            'Every chat there is shown it, word for word.',
-            style: Type.note(t.muted),
+    // It scrolls where large text leaves the sheet too short for the form.
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 16,
+        children: [
+          AppField(
+            controller: _text,
+            label: 'Memory',
+            hint: 'One short fact, such as: Prefers metric units.',
+            maxLines: 4,
+            autofocus: existing == null,
           ),
-        ),
-        if (_problem case final problem?)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(problem, style: Type.sans(13.5, color: t.badfg)),
+            child: SectionLabel('Shown in', header: false),
           ),
-        if (_asking && existing != null)
-          SheetQuestion(
-            'Delete this memory? Chats are no longer shown it.',
-            onKeep: () => setState(() => _asking = false),
-            onDelete: memory.busy
-                ? null
-                : () async {
-                    if (await memory.delete(existing) && mounted) {
-                      widget.onDone();
-                    }
-                  },
-          )
-        else
-          ActionRow(even: true, [
-            if (existing != null)
-              AppButton(
-                'Delete',
-                danger: true,
-                onPressed: memory.busy
-                    ? null
-                    : () => setState(() => _asking = true),
-              ),
-            AppButton(
-              existing == null ? 'Add' : 'Save',
-              primary: true,
-              onPressed: memory.busy ? null : _save,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: 8,
+            children: [
+              choice(true, 'Every workspace', globalMemoryLimit),
+              choice(false, 'Only ${widget.name}', workspaceMemoryLimit),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              'Every chat there is shown it, word for word.',
+              style: Type.note(t.muted),
             ),
-          ]),
-      ],
+          ),
+          if (_problem case final problem?)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(problem, style: Type.sans(13.5, color: t.badfg)),
+            ),
+          if (_asking && existing != null)
+            SheetQuestion(
+              'Delete this memory? Chats are no longer shown it.',
+              onKeep: () => setState(() => _asking = false),
+              onDelete: memory.busy
+                  ? null
+                  : () async {
+                      if (await memory.delete(existing) && mounted) {
+                        widget.onDone();
+                      }
+                    },
+            )
+          else
+            ActionRow(even: true, [
+              if (existing != null)
+                AppButton(
+                  'Delete',
+                  danger: true,
+                  onPressed: memory.busy
+                      ? null
+                      : () => setState(() => _asking = true),
+                ),
+              AppButton(
+                existing == null ? 'Add' : 'Save',
+                primary: true,
+                onPressed: memory.busy ? null : _save,
+              ),
+            ]),
+        ],
+      ),
     );
   }
 }

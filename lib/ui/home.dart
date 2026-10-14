@@ -90,9 +90,10 @@ class _Tab extends StatelessWidget {
       selected: on,
       radius: BorderRadius.circular(Sizes.small),
       onTap: onTap,
-      child: SizedBox(
-        height: 56,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           spacing: 4,
           children: [

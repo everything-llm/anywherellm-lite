@@ -40,8 +40,8 @@ class PhonePageHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    return SizedBox(
-      height: 72,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 72),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(
