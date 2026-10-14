@@ -14,7 +14,6 @@ import '../type.dart';
 import '../widgets/controls.dart';
 import '../widgets/sheet.dart';
 import '../widgets/buttons.dart';
-import '../widgets/fields.dart';
 import 'composer.dart';
 
 /// The channel browser-lean's page posts to: who has the tab, and when a hand back has gone.
@@ -197,8 +196,8 @@ class _AgentBarState extends State<AgentBar> {
                           horizontal: 18,
                           vertical: 14,
                         ),
-                        enabledBorder: edge(fieldEdge(context)),
-                        disabledBorder: edge(fieldEdge(context)),
+                        enabledBorder: edge(t.edge),
+                        disabledBorder: edge(t.edge),
                         focusedBorder: edge(t.ink),
                       ),
                     ),

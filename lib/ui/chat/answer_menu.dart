@@ -19,17 +19,16 @@ const answerAction = 44.0;
 
 /// More, under a finished answer the server measured: its sheet, This answer, names the
 /// answer's model, time, tokens, speed and cost, as far as [metrics] has them, then Show
-/// details under every answer,
-/// [ChatSwitch.answerDetails], when there are [metrics]. With that switch on, the whole line of
-/// them follows the button. The sheet opens over the chat, and closes on Esc, Back and a tap
+/// details under every answer, [ChatSwitch.answerDetails]. With that switch on, the whole line
+/// of them follows the button. The sheet opens over the chat, and closes on Esc, Back and a tap
 /// outside.
 class AnswerMore extends StatefulWidget {
   const AnswerMore(this.turn, this.metrics, {super.key});
 
   final Turn turn;
 
-  /// How the answer ran, or null when the server did not measure it.
-  final AnswerMetrics? metrics;
+  /// How the answer ran.
+  final AnswerMetrics metrics;
 
   @override
   State<AnswerMore> createState() => _AnswerMoreState();
@@ -67,15 +66,12 @@ class _AnswerMoreState extends State<AnswerMore> {
       builder: (context, _) {
         final open = identical(shell.popup.value, widget.turn);
         final metrics = widget.metrics;
-        final details =
-            metrics != null && scope.prefs.prefs.isOn(ChatSwitch.answerDetails);
+        final details = scope.prefs.prefs.isOn(ChatSwitch.answerDetails);
         void close() => shell.closePopup(widget.turn);
         final button = IconBtn(
           'more',
           tooltip: 'More',
-          heard: metrics != null
-              ? 'More for this answer: model, time, tokens, speed and cost'
-              : 'More for this answer',
+          heard: 'More for this answer: model, time, tokens, speed and cost',
           expanded: open,
           filled: open,
           onPressed: () => shell.togglePopup(widget.turn),
@@ -111,19 +107,18 @@ class _AnswerMenu extends StatelessWidget {
   const _AnswerMenu(this.turn, this.metrics);
 
   final Turn turn;
-  final AnswerMetrics? metrics;
+  final AnswerMetrics metrics;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final prefs = AppScope.of(context).prefs;
-    final metrics = this.metrics;
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         spacing: 16,
         children: [
-          if (metrics != null && metrics.named.isNotEmpty)
+          if (metrics.named.isNotEmpty)
             FieldCard([
               for (final (name, value) in metrics.named)
                 Container(
@@ -148,25 +143,24 @@ class _AnswerMenu extends StatelessWidget {
                   ),
                 ),
             ]),
-          if (metrics != null)
-            FieldCard([
-              ListenableBuilder(
-                listenable: prefs,
-                builder: (context, _) {
-                  final on = prefs.prefs.isOn(ChatSwitch.answerDetails);
-                  return FieldRow(
+          FieldCard([
+            ListenableBuilder(
+              listenable: prefs,
+              builder: (context, _) {
+                final on = prefs.prefs.isOn(ChatSwitch.answerDetails);
+                return FieldRow(
+                  label: 'Show details under every answer',
+                  small: true,
+                  control: AppSwitch(
+                    value: on,
                     label: 'Show details under every answer',
-                    small: true,
-                    control: AppSwitch(
-                      value: on,
-                      label: 'Show details under every answer',
-                      onChanged: (on) =>
-                          prefs.setSwitch(ChatSwitch.answerDetails, on),
-                    ),
-                  );
-                },
-              ),
-            ]),
+                    onChanged: (on) =>
+                        prefs.setSwitch(ChatSwitch.answerDetails, on),
+                  ),
+                );
+              },
+            ),
+          ]),
         ],
       ),
     );

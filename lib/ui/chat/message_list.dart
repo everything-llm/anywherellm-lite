@@ -198,11 +198,7 @@ class _MessageListState extends State<MessageList> {
                       attachments: turn.attachments,
                       onEdit: () => widget.onSuggest(turn.text),
                     )
-                  : _Answer(
-                      turn,
-                      last: i == 0,
-                      retry: i == 0 ? _retryOf(chat) : null,
-                    ),
+                  : _Answer(turn, retry: i == 0 ? _retryOf(chat) : null),
             ),
           ),
         ),
@@ -546,28 +542,19 @@ class _Picture extends StatelessWidget {
   );
 }
 
-class _Answer extends StatefulWidget {
-  const _Answer(this.turn, {this.last = false, this.retry});
+class _Answer extends StatelessWidget {
+  const _Answer(this.turn, {this.retry});
 
   final Turn turn;
-
-  /// Whether [turn] is the chat's last answer.
-  final bool last;
 
   /// Retry, on the chat's last answer only.
   final _Retry? retry;
 
   @override
-  State<_Answer> createState() => _AnswerState();
-}
-
-class _AnswerState extends State<_Answer> {
-  @override
   Widget build(BuildContext context) =>
-      ListenableBuilder(listenable: widget.turn, builder: _build);
+      ListenableBuilder(listenable: turn, builder: _build);
 
   Widget _build(BuildContext context, Widget? _) {
-    final (turn, retry) = (widget.turn, widget.retry);
     final split = splitReasoning(turn.text, streaming: turn.streaming);
     final failure = turn.streaming ? null : modelFailure(split.answer);
     final answered = split.answer.isNotEmpty && failure == null;
@@ -634,12 +621,7 @@ class _AnswerState extends State<_Answer> {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 if (answered)
-                  CopyButton(
-                    split.answer,
-                    tooltip: 'Copy answer',
-                    box: action,
-                    size: IconSize.xs,
-                  ),
+                  CopyButton(split.answer, tooltip: 'Copy answer', box: action),
                 if (AppScope.of(context).readAloud case final aloud?
                     when answered)
                   _ReadAloudButton(aloud, turn),
@@ -651,7 +633,7 @@ class _AnswerState extends State<_Answer> {
                     box: action,
                     size: IconSize.xs,
                   ),
-                if (turn.metrics != null) AnswerMore(turn, turn.metrics),
+                if (turn.metrics case final metrics?) AnswerMore(turn, metrics),
                 // In Agent mode the server may go on to finish the answer and save it, which
                 // shows when the chat is read again.
                 if (turn.stopped)

@@ -77,13 +77,12 @@ class PassagesView extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (passage.score case final score?) ...[
+                  if (passage.score case final score?)
                     Text(
                       '${(score * 100).round()}% match',
                       textAlign: TextAlign.end,
                       style: Type.sans(13.5, color: t.muted, height: 1.5),
                     ),
-                  ],
                   SelectableText(
                     passage.text,
                     style: Type.sans(14, color: t.ink2, height: 1.5),

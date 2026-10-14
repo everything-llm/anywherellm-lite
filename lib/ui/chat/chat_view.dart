@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../core/copy.dart';
 import '../app_scope.dart';
 import '../icons.dart';
 import '../tokens.dart';
@@ -181,12 +182,7 @@ class _Header extends StatelessWidget {
       builder: (context, _) {
         final chat = scope.chat;
         final workspace = chat.active;
-        final thread = chat.activeThread == null
-            ? null
-            : chat
-                  .threadsOf(workspace?.slug ?? '')
-                  .where((c) => c.slug == chat.activeThread)
-                  .firstOrNull;
+        final thread = chat.thread;
         final docs = scope.sources.onCount;
         final title = Text(
           workspace == null ? 'AnywhereLLM' : chat.title,
@@ -225,7 +221,7 @@ class _Header extends StatelessWidget {
                             Flexible(
                               child: Text(
                                 '${workspace.name} · '
-                                '${docs == 1 ? '1 doc' : '$docs docs'} in use',
+                                '${plural(docs, 'doc', 'docs')} in use',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: Type.sans(

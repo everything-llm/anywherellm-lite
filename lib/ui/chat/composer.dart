@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/chat.dart';
+import '../../core/copy.dart';
 import '../../core/prefs.dart';
 import '../app_scope.dart';
 import '../icons.dart';
@@ -134,7 +135,6 @@ class _ComposerState extends State<Composer> {
         setState(() => _listening = false);
         final send = _scope.prefs.prefs.isOn(ChatSwitch.sendDictation);
         if (how == DictationEnd.paused &&
-            go == _go &&
             send &&
             canSend(_scope.chat, widget.draft.text)) {
           _send(widget.draft.text);
@@ -656,7 +656,7 @@ class _FilesPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final words = count == 1 ? '1 file' : '$count files';
+    final words = plural(count, 'file', 'files');
     return Tappable(
       touchTarget: true,
       label: '$words attached. Review',

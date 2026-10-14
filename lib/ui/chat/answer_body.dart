@@ -244,13 +244,11 @@ class CopyButton extends StatefulWidget {
     super.key,
     this.tooltip = 'Copy',
     this.box = 30,
-    this.size = IconSize.xs,
   });
 
   final String text;
   final String tooltip;
   final double box;
-  final IconSize size;
 
   @override
   State<CopyButton> createState() => _CopyButtonState();
@@ -292,7 +290,7 @@ class _CopyButtonState extends State<CopyButton> {
           tooltip: widget.tooltip,
           onPressed: _copy,
           box: widget.box,
-          size: widget.size,
+          size: IconSize.xs,
         ),
       ],
     );

@@ -49,23 +49,22 @@ Future<bool> _download(BuildContext context, GeneratedFile file) async {
   return where != null;
 }
 
-/// A made file's Save: it asks where to save [file] and saves it, named Save until then and
-/// Saved after. [builder] draws the button from whether it is saved.
-class _Saving extends StatefulWidget {
-  const _Saving(this.file, {required this.builder});
+/// Save, which asks where to save [file] and saves it, reading Saved once the file is saved.
+class _SaveButton extends StatefulWidget {
+  const _SaveButton(this.file);
 
   final GeneratedFile file;
-  final Widget Function(bool saved) builder;
 
   @override
-  State<_Saving> createState() => _SavingState();
+  State<_SaveButton> createState() => _SaveButtonState();
 }
 
-class _SavingState extends State<_Saving> {
+class _SaveButtonState extends State<_SaveButton> {
   bool _saved = false;
 
   @override
   Widget build(BuildContext context) {
+    final t = Tokens.of(context);
     final name = widget.file.name;
     return Tappable(
       touchTarget: true,
@@ -76,23 +75,7 @@ class _SavingState extends State<_Saving> {
         if (mounted && saved) setState(() => _saved = true);
       },
       radius: BorderRadius.circular(8),
-      child: widget.builder(_saved),
-    );
-  }
-}
-
-/// Save, which reads Saved once the file is saved.
-class _SaveButton extends StatelessWidget {
-  const _SaveButton(this.file);
-
-  final GeneratedFile file;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return _Saving(
-      file,
-      builder: (saved) => SizedBox(
+      child: SizedBox(
         height: 32,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -100,13 +83,13 @@ class _SaveButton extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               AppIcon(
-                saved ? 'check' : 'download',
+                _saved ? 'check' : 'download',
                 size: IconSize.xs,
                 color: t.accent,
               ),
               const SizedBox(width: 6),
               Text(
-                saved ? 'Saved' : 'Save',
+                _saved ? 'Saved' : 'Save',
                 style: Type.sans(
                   13.5,
                   weight: FontWeight.w500,
