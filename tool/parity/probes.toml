@@ -1,0 +1,169 @@
+# The Muse parity probe set. `parity.py probe <id>` prints a prompt word for word.
+# `attach` names a fixture file made by `parity.py fixtures`. `after` names the probe
+# whose chat this one continues. `sides` limits a probe to one side. `do` is what the
+# agent does besides, or instead of, sending. `group = "browser"` marks the probes that
+# measure watching, steering and handing over the agent's browser; the rest are core.
+
+[[probe]]
+id = "tools"
+name = "Tools"
+measures = "Tool inventory; whether AnythingLLM's reranker hides installed tools"
+prompt = "[Scratch test] Without taking any actions: list every tool, connector and capability you have, grouped by category (research, browsing, code, files, media generation, scheduling, memory, messaging, purchases, artifacts). For each, say in one line what it does and any limits."
+
+[[probe]]
+id = "news"
+name = "News"
+measures = "Search, citations, wall-clock time"
+prompt = "[Scratch test] What were the three biggest tech news stories of the past 48 hours? Cite each with a source link and its publication date."
+
+[[probe]]
+id = "code"
+name = "Code"
+measures = "Sandbox, inline charts, unprompted publishing"
+check = "dice"
+prompt = "[Scratch test] Run code to simulate 10,000 rolls of two six-sided dice with seed 42, plot the distribution of the sums as a bar chart, and show me the chart plus a table of exact counts."
+
+[[probe]]
+id = "artifact"
+name = "Artifact"
+measures = "Interactive artifacts, private hosting"
+prompt = "[Scratch test] Build me a small interactive web page artifact: a Pomodoro timer with start, pause and reset, 25/5 minute cycles. Keep it private, don't share or publish it anywhere."
+
+[[probe]]
+id = "reminder"
+name = "Reminder"
+measures = "One-off scheduling, time zones"
+prompt = "[Scratch test] Schedule a one-off reminder for tomorrow at 09:00 Stockholm time with the text 'scratch test reminder - delete me'. It's only a test; I'll ask you to delete it right after."
+
+[[probe]]
+id = "reminder-ok"
+name = "Reminder approval"
+measures = "Whether the side asks before it creates"
+after = "reminder"
+sides = ["allm"]
+prompt = "You have my OK to create it."
+
+[[probe]]
+id = "reminder-delete"
+name = "Reminder delete"
+measures = "Whether the side can delete what it made"
+after = "reminder"
+prompt = "[Scratch test] Delete that reminder."
+
+[[probe]]
+id = "image"
+name = "Image"
+measures = "Image generation"
+prompt = "[Scratch test] Generate an image: a red fox reading a newspaper in a Stockholm cafe, watercolor style. Then describe in one line what you made."
+
+[[probe]]
+id = "browser"
+name = "Browser"
+measures = "Live browser, cards; time until the browser can first be seen; what shows while it works"
+prompt = "[Scratch test] Use your live browser (not search) to open https://news.ycombinator.com, then open the comments page of the current #1 story, and tell me its title, points, and the gist of the top comment. Read only: don't log in, vote or post."
+
+[[probe]]
+id = "memory"
+name = "Memory"
+measures = "Memory model and management"
+prompt = "[Scratch test] Without saving anything new: how is your memory organised (files, categories, how you decide what to save, how I can view, edit or delete it)? Give the category names and how many facts are in each, not the facts themselves."
+
+[[probe]]
+id = "research"
+name = "Deep research"
+measures = "Long jobs, post-back to the chat"
+prompt = "[Scratch test] Please run a quick deep research: compare self-hosted SearXNG, Brave Search API and Tavily as the web-search backend for a personal AI agent in 2026, on cost, result quality, rate limits and privacy. A short cited report is enough."
+
+[[probe]]
+id = "file"
+name = "File"
+measures = "Upload handling, arithmetic"
+check = "expenses"
+attach = "scratch-expenses.csv"
+prompt = "[Scratch test] This is fake test data. Summarise September spending by category, flag the biggest single expense, and suggest one budget cut."
+
+[[probe]]
+id = "plan"
+name = "Multi-step"
+measures = "Connectors (calendar), planning, memory of the home city"
+prompt = "[Scratch test] Plan this coming Saturday in Stockholm for me: check the forecast, check my calendar for conflicts, find two things to do that fit the weather, and give me a timed itinerary. Don't book, send or create anything."
+
+[[probe]]
+id = "navigate"
+name = "Browser navigate"
+group = "browser"
+measures = "Whether each step can be followed; whether a second chat gets a card of its own"
+prompt = "[Scratch test] Use your live browser (not search) to go to https://en.wikipedia.org, search there for \"Stockholm Metro\", open the article, and tell me the year the first line opened. Then list the pages you went through, in order. Read only."
+
+[[probe]]
+id = "fill"
+name = "Browser fill"
+group = "browser"
+measures = "Whether actions show as they happen; what the status line says"
+prompt = "[Scratch test] Use your live browser to open https://httpbin.org/forms/post and fill in the form with made-up values: customer name \"Scratch Test\", telephone \"000\", email \"scratch@example.com\", size Medium, topping Cheese, comments \"scratch test\". Then submit it and tell me what the result page shows."
+
+[[probe]]
+id = "handoff"
+name = "Browser handoff"
+group = "browser"
+measures = "Clicks to take over and hand back; how clear it is who has the browser"
+after = "fill"
+do = "Take the browser over, scroll, hand it back, then send handoff-back."
+prompt = "[Scratch test] Hand me the browser so I can check the form myself. I'll tell you when I'm done."
+
+[[probe]]
+id = "handoff-back"
+name = "Browser take-back"
+group = "browser"
+measures = "Whether the agent works from the page as the person left it"
+after = "handoff"
+prompt = "[Scratch test] I'm done. Take the browser back and read me what's in the delivery instructions field."
+
+[[probe]]
+id = "login-wall"
+name = "Browser login wall"
+group = "browser"
+measures = "The login request card and its form; Muse's equivalent"
+do = "Decline any login request with Not now. A site behind a bot check makes this a handoff for the check: keep to a site without one."
+prompt = "[Scratch test] Use your live browser to open https://news.ycombinator.com/login. Don't sign in yourself. If a login would be needed, ask me for one the safe way your tools provide, never in the chat."
+
+[[probe]]
+id = "second-task"
+name = "Browser second task"
+group = "browser"
+measures = "Whether a second task updates the widget or adds one; whether the agent really browses"
+after = "navigate"
+prompt = "[Scratch test] Now use your live browser to open https://en.wikipedia.org/wiki/Gothenburg_tram and tell me how many lines it has. Read only."
+
+[[probe]]
+id = "leave-return"
+name = "Browser leave and return"
+group = "browser"
+measures = "What the running chat's row shows; whether the chip and steps resume"
+after = "fill"
+do = "During fill, open another chat after its first step and come back 20 s later. Sends nothing."
+
+[[probe]]
+id = "stop"
+name = "Browser stop"
+group = "browser"
+measures = "What each widget says after Stop; whether the agent stops"
+do = "Press Stop after the second step. Muse finishes in about 30 s, so press Stop within 10 s."
+prompt = "[Scratch test] Use your live browser to open https://en.wikipedia.org/wiki/Special:Random five times, one page after another, and tell me each article's title. Read only."
+
+[[probe]]
+id = "saved-login"
+name = "Browser saved login"
+group = "browser"
+measures = "The whole saved-login path, and whether the password ever shows"
+do = "The user saves the practice login in the form, then asks the agent to go on. The agent never types the password."
+prompt = "[Scratch test] Use your live browser to sign in at https://the-internet.herokuapp.com/login with the saved login for that site, and tell me what the page says after. If there is no saved login, ask me for one the safe way your tools provide. Don't change anything there."
+
+[[probe]]
+id = "return"
+name = "Browser return"
+group = "browser"
+measures = "What a stopped browser looks like, and whether the card or its link goes stale"
+after = "navigate"
+do = "Run last. Close every take-over view and page showing a live card, wait 20 minutes with the browser unused and unwatched, then reload the navigate chat."
+prompt = "[Scratch test] What page is your browser on right now?"

@@ -1,83 +1,90 @@
-# Muse parity testing: how it was run
+# Muse parity test
 
-How the Muse versus AnythingLLM comparison of 2026-10-07 was run, so it can be repeated. The findings are in `docs/.notes/muse-parity.md` in the everythingllm repository on owen (`diot@192.168.0.29:/home/diot/dev/everythingllm`). The run used Claude Code with the Claude in Chrome extension driving the user's own Chrome, with both sites already signed in, plus read-only SSH to owen.
+Sends the same prompts to a fresh scratch chat in Meta's Muse and in AnythingLLM and records what each does. The core set (13 probes) measures answers; the browser group (10 probes) measures watching, steering and handing over the agent's live browser. It ends in `docs/notes/muse-parity-<date>.md`. Any agent that can run shell commands and drive a browser over CDP can run it.
+
+## Harness
+
+`uv run tool/parity/parity.py <command>`. The probe prompts are in `tool/parity/probes.toml`.
+
+| Command | Does |
+| --- | --- |
+| `probes` | Lists the probes with what each measures. |
+| `probe <id>` | Prints the prompt to send word for word. A `DO:` line on stderr is what to do besides sending. |
+| `fixtures <dir>` | Writes `scratch-expenses.csv` and prints the right totals. |
+| `check <id> <file>` | Checks an answer saved as text: `file` against the totals, `code` against the dice counts. Exit 0 passes. |
+| `chrome` | Starts Chrome with a debugging port on its own profile and prints the endpoint. |
+| `mark <run> <probe> <side> sent\|ended\|note [text]` | Logs a timestamp or a note. `side` is `muse` or `allm`. |
+| `table <run>` | Prints the probe table: every core probe, and a browser probe once logged. |
+
+`<run>` is `build/parity/<date>`, which git ignores.
+
+## Driver
+
+The browser tool must navigate, click by accessible name, type, press keys, evaluate script, read page text, screenshot and set files on a file input. Attach it to the Chrome that `chrome` starts (Playwright MCP `--cdp-endpoint`, Chrome DevTools MCP `--browser-url`, or another CDP client), or use a tool that drives the user's own Chrome and skip `chrome`. Chrome refuses a debugging port on its default profile, so `chrome` uses `~/.cache/parity-chrome`; the user signs in to both sites there once.
+
+Keep the window visible: a minimised one reports `document.visibilityState` `hidden` and may drop input.
 
 ## Ground rules
 
 Agree on these with the user before the first probe.
 
-- **Where chats go:** new threads in AnythingLLM's "AnythingLLM" workspace (slug `algorithms`) and new Muse side chats. Never post in existing threads or Muse's main chat.
-- **Prefix:** every prompt starts with `[Scratch test]`, which makes the threads easy to find and delete, and tells both agents it is a test.
-- **Allowed effects:** one scheduled reminder and one artifact per tool, each deleted afterwards.
+- **Chats:** new threads in the AnythingLLM workspace the user names, and new Muse side chats. Never an existing thread or Muse's main chat. Read only scratch chats and keep the user's personal data out of the findings.
+- **Prefix:** `probe` prints `[Scratch test]` on every prompt. Do not remove it.
+- **Effects:** one reminder and one artifact per side. The agent deletes only what `reminder-delete` asks of the side.
 - **Never:** sending, posting, buying, connecting accounts, OAuth grants, or entering credentials. Stop and ask if an agent asks for one.
-- **Owen:** read-only. No `hostctl deploy`, `units` or restarts; leave `research-runner` and `agents-runner` alone while a run is going.
-- **Quota:** Muse's free plan has a weekly limit (Settings > General > Usage). Note the figure before starting; one full run of 11 probes cost a visible share of it.
+- **Server:** read-only, and only if the user gives access.
+- **Quota:** note Muse's weekly figure (Settings > General > Usage) before and after.
+- **Browser group:** run it only if the `tools` answer lists a browser, in a workspace made for the run so its browser holds none of the user's logins. Also allowed: httpbin's test form, a login request card declined with Not now, and the practice sign-in at `https://the-internet.herokuapp.com/login`, typed by the user. Never solve a CAPTCHA or bot check; hand the browser back untouched. Keep every probe off the sites in Muse's Secure store.
 
-## Probe set
+## Run
 
-Send each prompt, word for word, to a fresh Muse side chat and a fresh AnythingLLM thread. Run the two tools in parallel tabs.
+1. Run `chrome`, attach the driver, have the user sign in, and run `fixtures <run>/files`.
+1. Map Muse's surface without changing anything: the left rail (Chat, Search, Feed, Ideas, Goals, Library), the side panel (Activity, Approvals, Upcoming, Identity) and Settings (Connectors, Wallet, Secure store, Permissions, Messaging channels, Devices). Close Activity before the probes: it may list an earlier run. In AnythingLLM, read Settings > Agent Skills and Scheduled Jobs.
+1. For each probe in `probes` order, in a fresh chat on each side (an `after` probe continues its parent's chat):
+   1. `mark ... sent`, then send `probe <id>`. The `file` probe attaches `<run>/files/scratch-expenses.csv`.
+   1. When the answer ends, `mark ... ended`. AnythingLLM's footer time counts only the last generation, so the marks are the wall-clock time.
+   1. Save the answer to `<run>/<id>-<side>.txt`, `check` the `code` and `file` ones, and `mark ... note` what showed.
+1. `reminder-ok` goes to AnythingLLM only, and only if it asks. A stock AnythingLLM ends most agent probes in "I have no such tool"; record that as the result.
+1. Run the browser group one side after the other, `return` last: browsing, and any page showing a live card, keeps the browser from stopping. If Muse answers "Something went wrong", "Message failed to send" or "Conversation controls unavailable", it is degraded: do AnythingLLM's side and return to Muse later, without a retry loop.
 
-| Probe | Prompt | What it measures |
-| --- | --- | --- |
-| Tools | `[Scratch test] Without taking any actions: list every tool, connector and capability you have, grouped by category (research, browsing, code, files, media generation, scheduling, memory, messaging, purchases, artifacts). For each, say in one line what it does and any limits.` | Tool inventory; in AnythingLLM, whether the reranker hides installed tools |
-| News | `[Scratch test] What were the three biggest tech news stories of the past 48 hours? Cite each with a source link and its publication date.` | Search, citations, wall-clock time |
-| Code | `[Scratch test] Run code to simulate 10,000 rolls of two six-sided dice with seed 42, plot the distribution of the sums as a bar chart, and show me the chart plus a table of exact counts.` | Sandbox, inline charts, unprompted publishing |
-| Artifact | `[Scratch test] Build me a small interactive web page artifact: a Pomodoro timer with start, pause and reset, 25/5 minute cycles. Keep it private, don't share or publish it anywhere.` | Interactive artifacts, private hosting |
-| Reminder | `[Scratch test] Schedule a one-off reminder for tomorrow at 09:00 Stockholm time with the text 'scratch test reminder - delete me'. It's only a test; I'll ask you to delete it right after.` (AnythingLLM also needs `You have my OK to create it.`) Follow with a request to delete it. | One-off scheduling, time zones, delete support |
-| Image | `[Scratch test] Generate an image: a red fox reading a newspaper in a Stockholm cafe, watercolor style. Then describe in one line what you made.` | Image generation |
-| Browser | `[Scratch test] Use your live browser (not search) to open https://news.ycombinator.com, then open the comments page of the current #1 story, and tell me its title, points, and the gist of the top comment. Read only: don't log in, vote or post.` | Live browser, cards |
-| Memory | `[Scratch test] Without saving anything new: how is your memory organised (files, categories, how you decide what to save, how I can view, edit or delete it)? Give the category names and how many facts are in each, not the facts themselves.` | Memory model and management |
-| Deep research | `[Scratch test] Please run a quick deep research: compare self-hosted SearXNG, Brave Search API and Tavily as the web-search backend for a personal AI agent in 2026, on cost, result quality, rate limits and privacy. A short cited report is enough.` | Long jobs, post-back to the chat |
-| File | Attach `scratch-expenses.csv` (below), then `[Scratch test] This is fake test data. Summarise September spending by category, flag the biggest single expense, and suggest one budget cut.` | Upload handling, arithmetic |
-| Multi-step | `[Scratch test] Plan this coming Saturday in Stockholm for me: check the forecast, check my calendar for conflicts, find two things to do that fit the weather, and give me a timed itinerary. Don't book, send or create anything.` | Connectors (calendar), planning, memory of the home city |
+Tag each finding **app** (AnywhereLLM's code; give file and function), **server** (AnythingLLM or the model) or **harness** (hidden tabs, synthetic keys, the clipboard; confirm by hand before reporting).
 
-The CSV is fake: 45 rows of `date,category,amount_sek` for September 2026, made with `random.seed(7)` over five categories plus one 9800 SEK rent row. The right totals are rent 9800.00, groceries 5768.09, restaurants 5600.45, utilities 4649.33, transport 3022.41, total 28840.28. Regenerate it and check the totals before comparing answers.
-
-Before the probes, map Muse's surface without changing anything: the left rail (Chat, Search, Feed, Ideas, Goals, Library), the side panel tabs (Activity, Approvals, Upcoming, Identity), and Settings (Connectors, Wallet, Secure store, Permissions, Messaging channels, Devices). In AnythingLLM, read Settings > Agent Skills and Settings > Scheduled Jobs.
+For each browser probe also note: when the browser first showed in the chat; what showed while it worked; who the chat, card and take-over view say has the browser, before and after the answer ends; the clicks to watch, take over and hand back; the wording of each state on every surface and whether they agree; failures and stale states. Screenshots of a tab not in front come back stale, so load each surface in turn in one tab.
 
 ## Driving the two sites
 
-### Muse
+| Site | Task | How |
+| --- | --- | --- |
+| Muse | New side chat | The "New side chat" button, located by name. The message box is near the bottom centre; click, type, press Enter. |
+| Muse | Slow loads | Skeletons show for 10-15 s after a navigation. Wait. |
+| Muse | Reading replies | Page text or `document.querySelector('main').innerText`. The Activity list gives each task's outcome and time. |
+| Muse | Permission denied | Artifact and browser previews are opaque-origin iframes, which blocks screenshots and page text. Navigating to the thread URL again clears it. |
+| Muse | Browser | "Open preview" on a Browser card opens a pane. "Take control of the browser" gives it to you ("You're in control", with Stop and Done, named "Hand browser control back to the assistant"). The agent's step shows under its avatar; Stop is in the composer, and a bar under the avatar has Stop task while the card is out of view. |
+| Muse | Deleting an artifact | The library menu ignores automation; ask Muse in the artifact's own side chat. |
+| AnythingLLM | New thread | The sidebar's "New Thread". The sidebar scrolls as threads are added, so locate the button again each time and check the URL became `/workspace/<slug>/t/<id>`. |
+| AnythingLLM | Reading replies | Page text hides the prompt and card images while the agent runs. The footer (`model · 43.2s ...`) appears when the answer ends. |
+| AnythingLLM | Browser cards | A card link opens the browser page in a new tab. Close every one before `return`: a watched browser never stops as idle. |
+| AnythingLLM | Confirm dialogs | Deleting a scheduled job calls `window.confirm`, which freezes the driver. Evaluate `window.confirm = () => true` first. |
+| AnythingLLM | Attachments | Set files on the hidden file input. |
 
-- **New side chat:** the "New side chat" button, found with `find`. The message box sits near the bottom center; click it, type, press Enter.
-- **Slow loads:** a page shows skeletons for 10-15 s after a navigation. Wait before reading it.
-- **Permission denied:** once an artifact or live-browser preview is on the page, screenshots and `get_page_text` fail with "Permission denied", because those render in opaque-origin iframes. Navigating the tab to the same thread URL clears it until the next preview.
-- **Reading replies:** `get_page_text` or `document.querySelector('main').innerText` both work. The side panel's Activity list gives each task's outcome and time, which helps with timing.
-- **Library:** artifacts open in an iframe the extension cannot read. The library's "More options" menu did not respond to automation; asking Muse in the artifact's own side chat to delete it worked.
+## Server evidence
 
-### AnythingLLM
-
-- **New thread:** the sidebar's "New Thread" button. The sidebar scrolls as threads are added, so a click by coordinates can land on the workspace's default chat (`*New Thread`) instead. Re-run `find` before each click, and check that the URL changed to `/workspace/algorithms/t/<id>`.
-- **Reading replies:** `get_page_text` hides the user's prompt and card images while the agent runs; the footer (`glm-5.3-flash · 43.2s ...`) appears when it ends. That footer time counts only the last generation, so note wall-clock time yourself.
-- **Confirm dialogs:** deleting a scheduled job calls `window.confirm`, which freezes the extension. Override it first with `window.confirm = () => true` in `javascript_tool`, then click.
-- **Attachments:** use `file_upload` on the hidden file input found with `find`; it accepts files from the session's scratchpad.
-
-## Evidence on owen
-
-All read-only.
+Optional and read-only, on the AnythingLLM host.
 
 | What | How |
 | --- | --- |
 | Agent tool calls and the tool list the reranker kept | `journalctl --user -u anythingllm --since -5min` |
-| Research runs | `journalctl --user -u research-runner`, run ids `dr-...` |
-| Scheduled jobs and their runs, memories, skill config | SQLite opened read-only from Python: `sqlite3.connect("file:/srv/anythingllm/storage/anythingllm.db?mode=ro", uri=True)`; tables `scheduled_jobs`, `scheduled_job_runs`, `memories`, `system_settings`. owen has no `sqlite3` binary |
-| Pages and files the agent wrote | `~/.local/share/everythingllm/sandbox/public/<workspace>/` and `.../workspaces/<workspace>/project/` |
-| Health | `uv run hostctl health` in the repo |
-| Container time zone | `podman exec systemd-anythingllm date` (the container is `systemd-anythingllm`; it runs in UTC) |
+| Scheduled jobs and runs, memories, skill config | `sqlite3.connect("file:/srv/anythingllm/storage/anythingllm.db?mode=ro", uri=True)` from Python (the host may have no `sqlite3` binary); tables `scheduled_jobs`, `scheduled_job_runs`, `memories`, `system_settings` |
+| Container time zone | `podman exec systemd-anythingllm date` (UTC) |
 
-`system_settings` holds connector API keys. Read them only inside a script that uses them, never print them.
-
-To test a Google Apps Script bridge without AnythingLLM, POST `{"key": ..., "action": "version"}` to `https://script.google.com/macros/s/<deploymentId>/exec` from a script that reads the key from `system_settings`. Google's HTML "Access Denied" page means the deployment's access is not "Anyone" or the project is gone; a JSON `Unauthorized` means the key is wrong.
+`system_settings` holds connector API keys. Read them only inside a script that uses them; never print them.
 
 ## Cleanup
 
-1. Delete each tool's test reminder: Muse in its chat; AnythingLLM in Settings > Scheduled Jobs, since its agent has no delete tool.
-1. Delete Muse's artifact through its side chat.
-1. Remove what AnythingLLM wrote under `sandbox/public/algorithms/` and `workspaces/algorithms/project/`. Look at the files before removing them.
-1. Decide with the user about the deep-research entry on the research site (`delete-entry`).
-1. Leave the scratch threads and side chats for the user, and list them in the report.
-1. Close the browser tabs the session opened.
+1. Hand the browser back in every view that says you have it, and decline any waiting login request.
+1. List for the user, without deleting: the scratch threads and side chats, each side's artifact, any reminder still there (AnythingLLM's agent cannot delete one; it goes in Settings > Scheduled Jobs), and a practice login saved for `saved-login`.
+1. Close the tabs the session opened and stop the Chrome that `chrome` started.
 
-## Writing up
+## Write-up
 
-The report has four parts: a probe table (both tools side by side, with timings), what Muse does well, a gap table (Muse feature, AnythingLLM status, closest repo piece, build, size S/M/L), and a numbered bug table with evidence and where to look. It goes in the everythingllm repo's `docs/.notes/`, which git ignores, because the report names personal accounts. Lint it with the `mdlint` skill. Leave personal data seen in Muse's main chat and memory out of it.
+In order: the run (date, AnythingLLM commit, server, model, Muse plan and quota); a verdict in a few sentences; the `table` output with observations; what Muse does well, widget by widget for the browser group; a gap table (Muse feature, AnythingLLM now, closest repo piece, build, size S/M/L, the app's own items first); a numbered bug table (what happens, evidence, owner tag, where to look); the process (what went wrong, and the change it makes to this runbook, made here too); what was left for the user. Lint it with the `mdlint` skill.
