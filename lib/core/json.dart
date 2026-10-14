@@ -14,6 +14,11 @@ Object? jsonOrNull(String text) {
   }
 }
 
+/// [value] decoded when it is text holding JSON, else [value] itself, as a field that some
+/// servers send as JSON text and others as JSON.
+Object? jsonOrSelf(Object? value) =>
+    value is String ? jsonOrNull(value) ?? value : value;
+
 /// [value] when it is text that is not empty, else null.
 String? textOrNull(Object? value) =>
     value is String && value.isNotEmpty ? value : null;

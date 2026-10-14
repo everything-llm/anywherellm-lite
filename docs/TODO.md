@@ -19,11 +19,11 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 
 ## Needs the private session API
 
-The web UI's own endpoints sign in with a session token, not the developer key, and promise no compatibility. The app never signs in to them: it reaches saved memories and scheduled jobs through the toolkit, and leaves presets, ratings and deleting exchanges alone. Each gap below needs that sign-in, or a toolkit route that makes the call for it.
+The web UI's own endpoints sign in with a session token, not the developer key, and promise no compatibility. The app never signs in to them: it reaches saved memories and scheduled jobs through the toolkit's bridge, and leaves presets, ratings and deleting exchanges alone. Each gap below needs that sign-in, or a bridge rule that passes the route.
 
 | Gap | Why the developer API cannot do it |
 | --- | --- |
-| A model picker | `GET /v1/openai/models` lists the workspaces, not a provider's models (settled against v1.16.2's source on 2026-10-07). The web UI lists a provider's models with `POST /api/system/custom-models` (`provider`, `apiKey`, `basePath`), which takes the web login. Until then the model is a free-text field: in the workspace's Chat model picker, on Settings' AI provider pages and in Server settings as JSON and `settings.json`. |
+| A model picker | `GET /v1/openai/models` lists the workspaces, not a provider's models (settled against v1.16.2's source on 2026-10-07). The web UI lists a provider's models with `POST /api/system/custom-models` (`provider`, `apiKey`, `basePath`), which takes the web login; a bridge rule `POST /system/custom-models` would pass it. Until then the model is a free-text field: in the workspace's Chat model picker, on Settings' AI provider pages and in Server settings as JSON and `settings.json`. |
 | Fork a chat from a message | No fork call. |
 | Delete one message | `DELETE /system/workspace-chats/:id` deletes one stored chat, but the app deletes exchanges only as Edit and Retry do, from an id on. |
 | Reset Vector Database | Not in `/v1`. Detaching every document is the nearest equivalent. |
@@ -41,7 +41,7 @@ The web UI's own endpoints sign in with a session token, not the developer key, 
 
 ## Out of scope
 
-Instance administration beyond what Settings writes to the server's `.env` stays in the web UI: switching the vector database (it deletes every vector), the server's password and signing secret, making and editing Scheduled Jobs without the toolkit (Upcoming changes them only where the toolkit serves `jobs-write`, and lists them read-only otherwise), Event Logs, Model Router, Telegram, Branding, the Community Hub, Developer API keys, multi-user mode and password protection, the Browser Extension and AnythingLLM Mobile pairing, and the web UI's display language (the app has no translations).
+Instance administration beyond what Settings writes to the server's `.env` stays in the web UI: switching the vector database (it deletes every vector), the server's password and signing secret, making and editing Scheduled Jobs without the toolkit (Upcoming changes them only where the toolkit's bridge passes their routes, and lists them read-only where it passes only the reads), a job's tools, Event Logs, Model Router, Telegram, Branding, the Community Hub, Developer API keys, multi-user mode and password protection, the Browser Extension and AnythingLLM Mobile pairing, and the web UI's display language (the app has no translations).
 
 Since the app was simplified to AnywhereLLM Lite, a phone chat client rather than an admin console, these stay in the web UI as well: the agent's skills, flows, app integrations and MCP servers; users and invites; signing in to a multi-user server (such a server takes a pasted key); and the server's own text-to-speech, since answers are read aloud on the device.
 
@@ -58,6 +58,19 @@ Since the app was simplified to AnywhereLLM Lite, a phone chat client rather tha
 - Custom apps are slow: 2 to 7 minutes from request to page.
 - Kanban: the agent adds example cards nobody asked for.
 - Timeline figure: labels are cut at 10 characters.
+
+## Needs a server route
+
+| Gap | Note |
+| --- | --- |
+| Library and Activity | Built and tested against `FakeToolkit`, hidden until `/health` offers `library` and `activity`, which `bridgeFeatures` never derives. AnythingLLM has no route that lists the agent's apps or files or what it did, and apps-lean keeps its apps as files with no listing route. |
+| A task that runs once | The prototype's New task offers Once. AnythingLLM's scheduled jobs have no one-shot job, and a dated cron runs again every year, so the form leaves Once out. |
+| A task's workspace | The prototype's New task picks a workspace. AnythingLLM's scheduled jobs belong to none. |
+
+## For the toolkit's owner
+
+- anythingllm-mcp's `toolkit` server still calls the toolkit's `/jobs`, which the bridge removed.
+- The installer page (the toolkit's `gui` branch) predates the bridge, so it does not write `BRIDGE_ALLOW`; only `install` does.
 
 ## Lite prototype: not built yet
 

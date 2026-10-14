@@ -23,7 +23,7 @@ void main() {
     expect(describeSchedule('', now), 'No schedule');
   });
 
-  test('a job reads from the server\'s list, a workspace in any form', () {
+  test('a job reads from the server\'s list', () {
     final jobs = scheduledJobsOf({
       'jobs': [
         {
@@ -36,22 +36,14 @@ void main() {
             'status': 'completed',
             'startedAt': '2026-10-08T07:00:00Z',
           },
-          'workspace': {'name': 'Household', 'slug': 'household'},
         },
-        {
-          'name': 'Off one',
-          'schedule': '0 9 * * 1',
-          'enabled': false,
-          'workspaceSlug': 'q3',
-        },
+        {'name': 'Off one', 'schedule': '0 9 * * 1', 'enabled': false},
         {'schedule': '* * * * *'},
       ],
     });
     expect(jobs.map((j) => j.name), ['Morning brief', 'Off one']);
-    expect(jobs.first.workspace, 'Household');
     expect(jobs.first.lastStatus, 'completed');
     expect(jobs.first.nextRun, DateTime.utc(2026, 10, 9, 7));
-    expect(jobs.last.workspace, 'q3');
     expect(jobs.last.enabled, isFalse);
   });
 

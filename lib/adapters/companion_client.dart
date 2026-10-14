@@ -49,18 +49,6 @@ class CompanionClient {
     return _found[key] ??= _health(at);
   }
 
-  /// The features [health] names, or null when the companion is not there. Never throws.
-  Future<Set<String>?> features({bool again = false}) async {
-    final found = await health(again: again);
-    if (found == null) return null;
-    final named = found is Map ? found['features'] : null;
-    return {
-      if (named is List)
-        for (final feature in named)
-          if (feature is String) feature,
-    };
-  }
-
   Future<Object?> _health(Uri at) async {
     try {
       final response = await client

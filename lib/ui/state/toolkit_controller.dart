@@ -11,8 +11,9 @@ import 'companion_watch.dart';
 import 'notice.dart';
 import 'settings_controller.dart';
 
-/// What the app knows of the toolkit beside the server in use: whether it is there, what it
-/// serves, the scheduled jobs it lists and, where it allows, makes, changes, runs and deletes.
+/// What the app knows of the toolkit beside the server in use: whether it is there, what its
+/// bridge lets through, and the scheduled jobs, which, where it allows, the app makes, changes,
+/// runs and deletes.
 /// Another server starts it afresh, and Test connection asks again whether the toolkit is
 /// there.
 class ToolkitController extends ChangeNotifier with CompanionWatch {
@@ -74,7 +75,7 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   /// The latest runs of each job read by [readRuns], by job id.
   final Map<String, List<JobRun>> runs = {};
 
-  int _keys = 0;
+  int _follows = 0;
   Timer? _watching;
 
   @override
@@ -200,9 +201,7 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
     final id = existing?.id;
     return _change(
       id == null ? 'Could not add the task' : 'Could not save the task',
-      () => id == null
-          ? _api.createJob(draft, key: _key())
-          : _api.updateJob(id, draft),
+      () => id == null ? _api.createJob(draft) : _api.updateJob(id, draft),
     );
   }
 
@@ -221,7 +220,7 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   Future<bool> runNow(String id) async {
     final started = await _change(
       'Could not start the task',
-      () => _api.runJob(id, key: _key()),
+      () => _api.runJob(id),
     );
     if (started) await _follow(id, tries: 40);
     return started;
@@ -232,8 +231,10 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   Future<void> _follow(String id, {required int tries}) async {
     final asked = epoch;
     stopFollowing();
+    final follow = _follows;
     await readRuns(id);
-    if (asked != epoch || tries <= 1) return;
+    // A stop while the runs were being read ends the following too.
+    if (asked != epoch || follow != _follows || tries <= 1) return;
     if (runs[id]?.firstOrNull?.running ?? false) {
       _watching = Timer(const Duration(seconds: 3), () {
         unawaited(_follow(id, tries: tries - 1));
@@ -245,9 +246,10 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   }
 
   /// Stops reading a run's progress, as when its sheet closes.
-  void stopFollowing() => _watching?.cancel();
-
-  String _key() => '${DateTime.now().microsecondsSinceEpoch}-${_keys++}';
+  void stopFollowing() {
+    _follows++;
+    _watching?.cancel();
+  }
 
   /// Sends [call], then reads the jobs again, whether it went or not, and shows why it failed
   /// over them. Whether it went.

@@ -76,12 +76,11 @@ const connectSteps = [
 const toolkitSteps = [
   GuideStep(
     'The toolkit',
-    'Add *Memory*, *Library* and *Upcoming*.',
+    'Add *Memory* and *Upcoming*.',
     hero: true,
     sub:
         'A free add-on for the computer AnythingLLM runs on. Memory is what every chat '
-        'knows about you; Library and Activity show what the agent made and did; '
-        'Upcoming is its scheduled tasks.',
+        'knows about you; Upcoming is its scheduled tasks.',
     art: GuideArt.kit,
   ),
   GuideStep(

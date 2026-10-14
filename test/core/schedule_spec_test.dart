@@ -6,7 +6,7 @@ void main() {
   // A Thursday.
   final now = DateTime(2026, 10, 8, 10);
 
-  group('a time of day in local time and the UTC cron the toolkit stores', () {
+  group('a time of day in local time and the UTC cron AnythingLLM stores', () {
     test('a daily task is the local time turned into UTC', () {
       final spec = ScheduleSpec(hour: 7, minute: 30);
       final utc = DateTime(2026, 10, 8, 7, 30).toUtc();
@@ -32,41 +32,13 @@ void main() {
         expect((back.hour, back.minute), (hour, minute), reason: cron);
       }
     });
-
-    test('a task that runs once is a cron with its date', () {
-      final spec = ScheduleSpec(
-        repeat: Repeat.once,
-        hour: 9,
-        minute: 0,
-        date: DateTime(2026, 10, 17),
-      );
-      final cron = spec.toCron(now)!;
-      final utc = DateTime(2026, 10, 17, 9).toUtc();
-      expect(cron, '${utc.minute} ${utc.hour} ${utc.day} ${utc.month} *');
-      final back = ScheduleSpec.fromCron(cron, now);
-      expect(back.repeat, Repeat.once);
-      expect(back.date, DateTime(2026, 10, 17));
-      expect((back.hour, back.minute), (9, 0));
-    });
   });
 
   group('what is wrong with a schedule', () {
-    test('a weekly task needs a day, a one-off a date still to come', () {
+    test('a weekly task needs a day', () {
       expect(
         const ScheduleSpec(repeat: Repeat.weekly).problem(now),
         'Pick at least one day.',
-      );
-      expect(
-        const ScheduleSpec(repeat: Repeat.once).problem(now),
-        'Pick a date.',
-      );
-      expect(
-        ScheduleSpec(
-          repeat: Repeat.once,
-          hour: 9,
-          date: DateTime(2026, 10, 8),
-        ).problem(now),
-        'That time has passed.',
       );
       expect(const ScheduleSpec().problem(now), isNull);
     });
@@ -77,6 +49,9 @@ void main() {
       expect(cronProblem('30 17 * * 5'), isNull);
       expect(cronProblem('* * * * *'), contains('more often than every 5'));
       expect(cronProblem('*/4 * * * *'), contains('more often than every 5'));
+      expect(cronProblem('0,1,2 * * * *'), contains('more often than every 5'));
+      expect(cronProblem('0-30 * * * *'), contains('more often than every 5'));
+      expect(cronProblem('0,15,30,45 * * * *'), isNull);
       expect(cronProblem('nonsense'), contains('five fields'));
       expect(cronProblem('0 6 * * mon'), contains('five fields'));
       expect(
@@ -92,6 +67,8 @@ void main() {
       final spec = ScheduleSpec.fromCron('0 7 1 * *', now);
       expect(spec.repeat, Repeat.custom);
       expect(spec.cron, '0 7 1 * *');
+      // A date, which a task that ran once used to be, is custom too.
+      expect(ScheduleSpec.fromCron('0 9 17 10 *', now).repeat, Repeat.custom);
       expect(spec.caption(now), contains('Custom schedules run in UTC.'));
     });
   });
@@ -110,83 +87,81 @@ void main() {
       startsWith('Runs on Mondays and Thursdays at 08:00 your time.'),
     );
     expect(
-      ScheduleSpec(
-        repeat: Repeat.once,
-        hour: 9,
-        date: DateTime(2026, 10, 17),
-      ).caption(now),
-      'Runs once, Sat 17 Oct at 09:00 your time.',
-    );
-    expect(
       const ScheduleSpec(repeat: Repeat.weekly).caption(now),
       'Pick at least one day.',
     );
   });
 
-  group('a job and its runs as the toolkit lists them', () {
-    test('a job carries its id, prompt, action and workspace slug', () {
+  group('a job and its runs as AnythingLLM lists them', () {
+    test('a job carries its id, prompt and how many tools it may use', () {
       final job = ScheduledJob.fromJson({
         'id': 7,
         'name': 'Price watch',
         'schedule': '0 */6 * * *',
-        'prompt': '',
-        'runAction': 'Check the boiler service price',
-        'workspace': {'name': 'Household', 'slug': 'household'},
+        'prompt': 'Check the boiler service price.',
+        'tools': '["web-scraping","web-browsing"]',
+        'enabled': false,
+        'latestRun': {'status': 'timed_out'},
       })!;
       expect(job.id, '7');
-      expect(job.action, 'Check the boiler service price');
-      expect(job.workspace, 'Household');
-      expect(job.workspaceSlug, 'household');
+      expect(job.prompt, 'Check the boiler service price.');
+      expect(job.tools, 2);
+      expect(job.enabled, isFalse);
+      expect(job.lastWentWell, isFalse);
       final plain = ScheduledJob.fromJson({
         'id': 'abc',
         'name': 'Brief',
         'schedule': '0 7 * * *',
         'prompt': 'Summarise today.',
-        'workspaceSlug': 'home',
+        'tools': null,
       })!;
       expect(plain.id, 'abc');
-      expect(plain.prompt, 'Summarise today.');
-      expect(plain.action, isNull);
-      expect(plain.workspaceSlug, 'home');
+      expect(plain.tools, 0);
       expect(
         ScheduledJob.fromJson({'name': 'Old', 'schedule': ''})!.id,
         isNull,
       );
     });
 
-    test('runs read newest first, with how each ended', () {
+    test('runs read newest first, with how each ended and what it said', () {
       final runs = jobRunsOf({
         'runs': [
-          {'status': 'running', 'startedAt': '2026-10-08T07:00:00Z'},
-          {'status': 'failed', 'result': 'The site answered 503'},
-          {'status': 'completed', 'result': 'Done.'},
+          {'status': 'queued', 'startedAt': '2026-10-08T07:00:00Z'},
+          {
+            'status': 'failed',
+            'result': null,
+            'error': 'The site answered 503',
+          },
+          {
+            'status': 'completed',
+            'result': '{"text":"Done. ","sources":[],"outputs":[]}',
+          },
+          {'status': 'timed_out', 'result': null, 'error': null},
           'nonsense',
         ],
       });
-      expect(runs, hasLength(3));
+      expect(runs, hasLength(4));
       expect(runs[0].running, isTrue);
       expect(runs[0].wentWell, isNull);
       expect(runs[1].wentWell, isFalse);
       expect(runs[1].result, 'The site answered 503');
       expect(runs[2].wentWell, isTrue);
+      expect(runs[2].result, 'Done.');
+      expect(runs[3].wentWell, isFalse);
+      expect(runs[3].result, isNull);
     });
 
-    test('a draft is what the toolkit takes', () {
+    test('a draft is what AnythingLLM takes, without tools or a switch', () {
       expect(
         const JobDraft(
           name: 'Brief',
           prompt: 'Summarise today.',
-          workspaceSlug: 'home',
           cron: '0 7 * * *',
-          once: true,
         ).toJson(),
         {
           'name': 'Brief',
           'prompt': 'Summarise today.',
-          'workspace': 'home',
           'schedule': '0 7 * * *',
-          'once': true,
-          'enabled': true,
         },
       );
     });

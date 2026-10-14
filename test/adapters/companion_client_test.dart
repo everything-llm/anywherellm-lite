@@ -46,7 +46,7 @@ Future<ApiException> _failure(Future<void> call) async {
 }
 
 void main() {
-  group('features', () {
+  group('health', () {
     test('asks /health on 8467 without the key, and believes only the toolkit '
         'server', () async {
       final seen = <http.Request>[];
@@ -55,7 +55,7 @@ void main() {
         'server': 'toolkit',
         'ok': true,
       }, seen: seen);
-      expect(await api.features(), isEmpty);
+      expect(await api.health(), isA<Map<String, dynamic>>());
       expect(
         seen.single.url.toString(),
         'https://host.example.ts.net:8467/health',
@@ -63,48 +63,48 @@ void main() {
       expect(seen.single.headers.containsKey('Authorization'), isFalse);
     });
 
-    test('are null for anything else that answers, or nothing', () async {
-      expect(await _answering({'service': 'other'}).features(), isNull);
+    test('is null for anything else that answers, or nothing', () async {
+      expect(await _answering({'service': 'other'}).health(), isNull);
       expect(
         await _api((_) async => http.Response('<html>AnythingLLM</html>', 200))
-            .features(),
+            .health(),
         isNull,
       );
       expect(
         await _answering({
           'service': 'anythingllm-toolkit',
-        }, status: 502).features(),
+        }, status: 502).health(),
         isNull,
       );
       expect(
         await _api((_) async => throw const SocketException('refused'))
-            .features(),
+            .health(),
         isNull,
       );
     });
 
-    test('are remembered per connection, until asked again', () async {
+    test('is remembered per connection, until asked again', () async {
       var asked = 0;
       final holder = ConnectionHolder(_connection);
       final api = _api((request) async {
         asked++;
         return http.Response('{"service":"anythingllm-toolkit"}', 200);
       }, holder: holder);
-      await api.features();
-      await api.features();
+      await api.health();
+      await api.health();
       expect(asked, 1);
-      await api.features(again: true);
+      await api.health(again: true);
       expect(asked, 2);
       holder.current = const Connection(
         baseUrl: 'https://other.example:3001',
         apiKey: 'K',
       );
-      await api.features();
+      await api.health();
       expect(asked, 3);
     });
 
     test(
-      'are null with no server, or at a public http address, without asking',
+      'is null with no server, or at a public http address, without asking',
       () async {
         var asked = 0;
         Future<http.Response> count(http.Request _) async {
@@ -112,10 +112,7 @@ void main() {
           return http.Response('{"service":"anythingllm-toolkit"}', 200);
         }
 
-        expect(
-          await _api(count, holder: ConnectionHolder()).features(),
-          isNull,
-        );
+        expect(await _api(count, holder: ConnectionHolder()).health(), isNull);
         expect(
           await _api(
             count,
@@ -125,7 +122,7 @@ void main() {
                   'http://toolkit.example.com',
                 ),
               },
-          ).features(),
+          ).health(),
           isNull,
         );
         expect(asked, 0);
@@ -133,7 +130,7 @@ void main() {
     );
   });
 
-  test('are asked at the address said, under its path', () async {
+  test('is asked at the address said, under its path', () async {
     final seen = <Uri>[];
     final api = _api(
       (request) async {
@@ -145,7 +142,7 @@ void main() {
           toolkitCompanion.service: Uri.parse('http://toolkit.lan/v2'),
         },
     );
-    expect(await api.features(), isEmpty);
+    expect(await api.health(), isA<Map<String, dynamic>>());
     expect(seen.single.toString(), 'http://toolkit.lan/v2/health');
   });
 

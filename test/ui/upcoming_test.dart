@@ -19,7 +19,6 @@ void main() {
         ScheduledJob(
           name: 'Morning brief',
           cron: '*/30 * * * *',
-          workspace: 'Household',
           nextRun: DateTime.now().toUtc().add(const Duration(hours: 1)),
           lastStatus: 'completed',
         ),
@@ -41,10 +40,7 @@ void main() {
     final page = find.byType(UpcomingPage);
     expect(page, findsOneWidget);
     expect(find.text('Morning brief'), findsOneWidget);
-    expect(
-      find.textContaining('Household · Every 30 minutes\nNext: '),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Every 30 minutes\nNext: '), findsOneWidget);
     expect(find.textContaining('\nOff'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.binding.handlePopRoute();

@@ -2,39 +2,69 @@ import 'copy.dart';
 import 'schedule.dart';
 
 /// How often a scheduled task runs, as the New task sheet offers it.
-enum Repeat { once, daily, weekly, custom }
+enum Repeat { daily, weekly, custom }
 
-/// The least a cron may leave between runs, in minutes. The toolkit refuses a faster one, since a
-/// job spends the model's time with no one watching.
+/// The least a cron may leave between runs, in minutes. The app refuses a faster one, since a job
+/// spends the model's time with no one watching.
 const minJobGap = 5;
 
-/// What is wrong with the cron [text], in plain words, or null when it is a schedule the toolkit
-/// takes: five fields, and a minute field that does not fire more often than every
+/// What is wrong with the cron [text], in plain words, or null when it is a schedule the app
+/// sends: five fields, and a minute field that does not fire more often than every
 /// [minJobGap] minutes.
 String? cronProblem(String text) {
   final parts = text.trim().split(RegExp(r'\s+'));
   if (parts.length != 5 || !parts.every(_field.hasMatch)) {
     return 'A schedule is five fields, such as 0 */6 * * *.';
   }
-  final minute = parts.first;
-  if (minute == '*' || (cronStep(minute) ?? minJobGap) < minJobGap) {
-    return 'That runs more often than every $minJobGap minutes. The toolkit does not allow it.';
+  final gap = _minuteGap(parts.first);
+  if (gap != null && gap < minJobGap) {
+    return 'That runs more often than every $minJobGap minutes. Leave more time between runs.';
   }
   return null;
+}
+
+final _minuteItem = RegExp(r'^(?:\*|(\d+)(?:-(\d+))?)(?:/(\d+))?$');
+
+/// The least gap, in minutes, between two runs within an hour that the cron minute [field] allows:
+/// `*`, `*/N`, `A-B`, `A-B/N`, `A/N` and numbers, joined by commas. Null for a field with one
+/// run an hour or one this does not read; 0 for a step of 0.
+int? _minuteGap(String field) {
+  final minutes = <int>{};
+  for (final item in field.split(',')) {
+    final match = _minuteItem.firstMatch(item);
+    if (match == null) return null;
+    final star = item.startsWith('*');
+    final step = int.parse(match[3] ?? '1');
+    final from = star ? 0 : int.parse(match[1]!);
+    final to = star || (match[2] == null && match[3] != null)
+        ? 59
+        : int.parse(match[2] ?? match[1]!);
+    if (step < 1) return 0;
+    if (from > to || to > 59) return null;
+    for (var at = from; at <= to; at += step) {
+      minutes.add(at);
+    }
+  }
+  final sorted = minutes.toList()..sort();
+  int? least;
+  for (var i = 1; i < sorted.length; i++) {
+    final gap = sorted[i] - sorted[i - 1];
+    if (least == null || gap < least) least = gap;
+  }
+  return least;
 }
 
 final _field = RegExp(r'^[\d*/,\-]+$');
 
 /// When a task runs, as a person writes it in the sheet: daily or weekly at a time of day in
-/// their own time, once on a date, or a cron of their own. [toCron] turns it into the UTC cron
-/// the toolkit stores and [fromCron] reads one back for Edit.
+/// their own time, or a cron of their own. [toCron] turns it into the UTC cron AnythingLLM stores
+/// and [fromCron] reads one back for Edit.
 class ScheduleSpec {
   const ScheduleSpec({
     this.repeat = Repeat.daily,
     this.hour = 7,
     this.minute = 0,
     this.days = const {},
-    this.date,
     this.cron = '',
   });
 
@@ -47,9 +77,6 @@ class ScheduleSpec {
   /// The weekdays of a weekly task, `DateTime.monday` to `DateTime.sunday`.
   final Set<int> days;
 
-  /// The local date of a task that runs once.
-  final DateTime? date;
-
   /// A custom task's cron, in UTC.
   final String cron;
 
@@ -58,19 +85,17 @@ class ScheduleSpec {
     int? hour,
     int? minute,
     Set<int>? days,
-    DateTime? date,
     String? cron,
   }) => ScheduleSpec(
     repeat: repeat ?? this.repeat,
     hour: hour ?? this.hour,
     minute: minute ?? this.minute,
     days: days ?? this.days,
-    date: date ?? this.date,
     cron: cron ?? this.cron,
   );
 
   /// Reads [cron], which runs in UTC, back as a spec in local time, as [now] gives it. A cron
-  /// that is not a time of day, one day a week or one date is a custom one.
+  /// that is not a time of day or days of the week is a custom one.
   static ScheduleSpec fromCron(String cron, DateTime now) {
     final custom = ScheduleSpec(repeat: Repeat.custom, cron: cron.trim());
     final parts = cron.trim().split(RegExp(r'\s+'));
@@ -80,7 +105,7 @@ class ScheduleSpec {
     final h = int.tryParse(hour);
     if (m == null || h == null || m > 59 || h > 23) return custom;
     final at = DateTime.utc(now.year, now.month, now.day, h, m).toLocal();
-    final shift = _dayShift(at, DateTime.utc(now.year, now.month, now.day));
+    final shift = calendarDays(at, now);
     if (day == '*' && month == '*' && weekday == '*') {
       return ScheduleSpec(hour: at.hour, minute: at.minute);
     }
@@ -96,27 +121,8 @@ class ScheduleSpec {
         },
       );
     }
-    final dom = int.tryParse(day);
-    final mon = int.tryParse(month);
-    if (dom != null && mon != null && weekday == '*') {
-      final local = DateTime.utc(now.year, mon, dom, h, m).toLocal();
-      return ScheduleSpec(
-        repeat: Repeat.once,
-        hour: local.hour,
-        minute: local.minute,
-        date: DateTime(local.year, local.month, local.day),
-      );
-    }
     return custom;
   }
-
-  /// The days between [local]'s date and [from]'s, as UTC dates, so a clock change between the
-  /// two cannot make a day 23 hours.
-  static int _dayShift(DateTime local, DateTime from) => DateTime.utc(
-    local.year,
-    local.month,
-    local.day,
-  ).difference(DateTime.utc(from.year, from.month, from.day)).inDays;
 
   /// What is wrong with the spec, in plain words, or null when [toCron] has a cron for it.
   String? problem(DateTime now) {
@@ -125,33 +131,21 @@ class ScheduleSpec {
         return null;
       case Repeat.weekly:
         return days.isEmpty ? 'Pick at least one day.' : null;
-      case Repeat.once:
-        final at = _once();
-        if (at == null) return 'Pick a date.';
-        return at.isAfter(now) ? null : 'That time has passed.';
       case Repeat.custom:
         return cronProblem(cron);
     }
   }
 
-  DateTime? _once() => date == null
-      ? null
-      : DateTime(date!.year, date!.month, date!.day, hour, minute);
-
-  /// The UTC cron the toolkit stores for the spec, as [now]'s clock offset gives it, or null
+  /// The UTC cron AnythingLLM stores for the spec, as [now]'s clock offset gives it, or null
   /// while [problem] says something is wrong.
   String? toCron(DateTime now) {
     if (problem(now) != null) return null;
     if (repeat == Repeat.custom) return cron.trim();
-    if (repeat == Repeat.once) {
-      final utc = _once()!.toUtc();
-      return '${utc.minute} ${utc.hour} ${utc.day} ${utc.month} *';
-    }
     // The time of day in UTC as today's offset gives it, and how many days that moves the day.
     final utc = DateTime(now.year, now.month, now.day, hour, minute).toUtc();
     final at = '${utc.minute} ${utc.hour}';
     if (repeat == Repeat.daily) return '$at * * *';
-    final shift = _dayShift(
+    final shift = calendarDays(
       DateTime(now.year, now.month, now.day, hour, minute),
       DateTime.utc(utc.year, utc.month, utc.day),
     );
@@ -172,7 +166,6 @@ class ScheduleSpec {
       Repeat.daily => 'Runs every day at $time your time.',
       Repeat.weekly =>
         'Runs on ${_andList([for (final d in (days.toList()..sort())) '${weekdayNames[d - 1]}s'])} at $time your time.',
-      Repeat.once => 'Runs once, ${dateText(date!)} at $time your time.',
       Repeat.custom =>
         '${describeSchedule(cron.trim(), now)}. Custom schedules run in UTC.',
     };

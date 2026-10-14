@@ -29,6 +29,9 @@ mixin CompanionWatch on ChangeNotifier {
   /// Whether the companion's `/health` names [feature].
   bool serves(String feature) => _features.contains(feature);
 
+  /// Whether the companion is known to serve nothing: it is not there, or names no feature.
+  bool get servesNothing => available != null && _features.isEmpty;
+
   /// Starts following [companion] beside the server [settings] has in use.
   void watch(CompanionApi companion, SettingsController settings) {
     _companion = companion;

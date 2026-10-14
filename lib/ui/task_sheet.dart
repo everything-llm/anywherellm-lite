@@ -36,7 +36,7 @@ class TaskSheet {
   int get hashCode => Object.hash(id, editing);
 }
 
-/// A task as the toolkit lists it, found by [id], or null when it is gone.
+/// A task as AnythingLLM lists it, found by [id], or null when it is gone.
 ScheduledJob? jobById(List<ScheduledJob>? jobs, String? id) =>
     id == null ? null : jobs?.where((j) => j.id == id).firstOrNull;
 
@@ -108,12 +108,7 @@ class _TaskDetailState extends State<TaskDetail> {
               FieldCard([
                 InfoRow(
                   describeSchedule(job.cron, now),
-                  aboutSpan: TextSpan(
-                    text: [
-                      ?job.workspace,
-                      if (when.isNotEmpty) when,
-                    ].join(' · '),
-                  ),
+                  aboutSpan: TextSpan(text: when),
                 ),
               ]),
               FieldCard([
@@ -146,12 +141,12 @@ class _TaskDetailState extends State<TaskDetail> {
               ]),
               const SheetLabel('What it does'),
               FieldCard([
-                CardWords(switch (job.action) {
-                  final action? => 'Runs the action $action.',
-                  null when job.prompt.isEmpty => 'Nothing saved.',
-                  null => job.prompt,
-                }),
+                CardWords(job.prompt.isEmpty ? 'Nothing saved.' : job.prompt),
               ]),
+              if (job.tools > 0)
+                CardCaption(
+                  'May use ${plural(job.tools, 'tool', 'tools')}, which only AnythingLLM\'s web page sets.',
+                ),
               const SheetLabel('Recent runs'),
               if (runs == null)
                 const HelpText('Reading…', status: true)
@@ -233,8 +228,8 @@ class _RunRow extends StatelessWidget {
   }
 }
 
-/// A new task, or [existing] changed: its name, what it asks, the workspace it runs in and when,
-/// as the person writes it, which becomes a UTC cron for the toolkit.
+/// A new task, or [existing] changed: its name, what it asks and when, as the person writes it,
+/// which becomes a UTC cron for AnythingLLM.
 class TaskForm extends StatefulWidget {
   const TaskForm({super.key, this.existing});
 
@@ -251,18 +246,10 @@ class _TaskFormState extends State<TaskForm> {
   );
   late ScheduleSpec _spec = switch (widget.existing) {
     final job? => ScheduleSpec.fromCron(job.cron, DateTime.now()),
-    null => ScheduleSpec(date: DateTime.now().add(const Duration(days: 1))),
+    null => const ScheduleSpec(),
   };
   late final _cron = TextEditingController(text: _spec.cron);
-  String? _slug;
   String? _problem;
-
-  @override
-  void initState() {
-    super.initState();
-    final chat = AppScope.of(context).chat;
-    _slug = widget.existing?.workspaceSlug ?? chat.activeSlug;
-  }
 
   @override
   void dispose() {
@@ -278,27 +265,17 @@ class _TaskFormState extends State<TaskForm> {
     final existing = widget.existing;
     final name = _name.text.trim();
     final prompt = _prompt.text.trim();
-    final slug = _slug;
     final cron = _spec.toCron(now);
     final problem = name.isEmpty
         ? 'Give it a name.'
-        : existing?.action == null && prompt.isEmpty
+        : prompt.isEmpty
         ? 'Say what it should do.'
-        : slug == null
-        ? 'Pick a workspace.'
         : _spec.problem(now);
     setState(() => _problem = problem);
-    if (problem != null || slug == null || cron == null) return;
+    if (problem != null || cron == null) return;
     final done = await scope.toolkit.saveJob(
       existing,
-      JobDraft(
-        name: name,
-        prompt: existing?.action == null ? prompt : '',
-        workspaceSlug: slug,
-        cron: cron,
-        once: _spec.repeat == Repeat.once,
-        enabled: existing?.enabled ?? true,
-      ),
+      JobDraft(name: name, prompt: prompt, cron: cron),
     );
     if (done && mounted) scope.shell.closePopup();
   }
@@ -325,26 +302,12 @@ class _TaskFormState extends State<TaskForm> {
     }
   }
 
-  Future<void> _pickDate() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _spec.date ?? now,
-      firstDate: DateTime(now.year, now.month, now.day),
-      lastDate: DateTime(now.year + 2),
-    );
-    if (picked != null && mounted) {
-      setState(() => _spec = _spec.copyWith(date: picked));
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
     final toolkit = scope.toolkit;
     final now = DateTime.now();
-    final names = {for (final w in scope.chat.workspaces) w.slug: w.name};
     final existing = widget.existing;
     final problem = _problem ?? _spec.problem(now);
     // It scrolls where the keyboard or large text leaves the sheet too short for the form.
@@ -365,27 +328,16 @@ class _TaskFormState extends State<TaskForm> {
               autofocus: existing == null,
               onChanged: (_) => setState(() => _problem = null),
             ),
-            if (existing?.action case final action?)
-              FieldCard([CardWords('Runs the action $action.')])
-            else
-              AppField(
-                controller: _prompt,
-                label: 'What should it do?',
-                hint: 'Summarise today: the weather, the bins, anything due.',
-                maxLines: 4,
-                onChanged: (_) => setState(() => _problem = null),
-              ),
-            const SheetLabel('Workspace'),
-            AppSelect(
-              value: _slug,
-              choices: names.keys.toList(),
-              labelOf: (slug) => names[slug] ?? slug,
-              onChanged: (slug) => setState(() => _slug = slug),
+            AppField(
+              controller: _prompt,
+              label: 'What should it do?',
+              hint: 'Summarise today: the weather, the bins, anything due.',
+              maxLines: 4,
+              onChanged: (_) => setState(() => _problem = null),
             ),
             const SheetLabel('When'),
             Segmented<Repeat>(
               options: const [
-                (Repeat.once, 'Once'),
                 (Repeat.daily, 'Daily'),
                 (Repeat.weekly, 'Weekly'),
                 (Repeat.custom, 'Custom'),
@@ -414,22 +366,13 @@ class _TaskFormState extends State<TaskForm> {
                   _problem = null;
                 }),
               )
-            else ...[
-              if (_spec.repeat == Repeat.once)
-                _Picker(
-                  label: 'Date',
-                  value: _spec.date == null
-                      ? 'Pick a date'
-                      : '${_spec.date!.day} ${monthNames[_spec.date!.month - 1]} ${_spec.date!.year}',
-                  onTap: _pickDate,
-                ),
+            else
               _Picker(
                 label: 'Time',
                 value: clockText(DateTime(0, 1, 1, _spec.hour, _spec.minute)),
                 icon: 'clock',
                 onTap: _pickTime,
               ),
-            ],
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Text(

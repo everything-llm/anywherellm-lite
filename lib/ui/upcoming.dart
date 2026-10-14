@@ -17,11 +17,11 @@ import 'widgets/fields.dart';
 import 'widgets/sheet.dart';
 import 'widgets/tappable.dart';
 
-/// A phone's Upcoming: each job the server runs on a schedule, with its workspace, its schedule
-/// in local time, when it runs next and how its last run went. Where the toolkit lets jobs be
-/// changed ([ToolkitController.jobsWritable]) a plus makes one and a row opens its [TaskSheet];
+/// A phone's Upcoming: each job the server runs on a schedule, with its schedule in local time,
+/// when it runs next and how its last run went. Where the toolkit lets jobs be changed
+/// ([ToolkitController.jobsWritable]) a plus makes one and a row opens its [TaskSheet];
 /// otherwise it is read only, with a way to AnythingLLM's web page. It reads the jobs afresh as
-/// it opens, from the toolkit.
+/// it opens, through the toolkit.
 class UpcomingPage extends StatelessWidget {
   const UpcomingPage({super.key});
 
@@ -130,8 +130,8 @@ class UpcomingPage extends StatelessWidget {
   }
 }
 
-/// One job: its name, then one line of its workspace, its schedule and when it runs next, or
-/// when its last run failed, in red, cut short where it is too long.
+/// One job: its name, then its schedule and when it runs next, or when its last run failed, in
+/// red, cut short where it is too long.
 class _JobRow extends StatelessWidget {
   const _JobRow(this.job, {required this.now, this.onTap});
 
@@ -154,15 +154,13 @@ class _JobRow extends StatelessWidget {
         : next != null
         ? 'Next: ${whenText(next, now)}'
         : null;
-    final about = [?job.workspace, describeSchedule(job.cron, now)].join(' · ');
-    final action = job.action == null ? null : 'Runs the action ${job.action}';
+    final about = describeSchedule(job.cron, now);
     final row = InfoRow(
       job.name,
       aboutLines: 4,
       aboutSpan: TextSpan(
         text: about,
         children: [
-          if (action != null) TextSpan(text: '\n$action'),
           if (when != null) ...[
             const TextSpan(text: '\n'),
             TextSpan(
@@ -175,7 +173,7 @@ class _JobRow extends StatelessWidget {
     );
     if (onTap == null) return row;
     return Tappable(
-      label: '${[job.name, about, ?action, ?when].join(', ')}. Open',
+      label: '${[job.name, about, ?when].join(', ')}. Open',
       onTap: onTap,
       child: Row(
         children: [

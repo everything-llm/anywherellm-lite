@@ -65,13 +65,27 @@ class MemorySwitches {
   final bool enabled;
   final bool learn;
 
-  /// The switches as the toolkit gives them, `{enabled, learn}`: memories are off unless
-  /// `enabled` is true, and learning on unless `learn` is false, as AnythingLLM reads them.
+  /// The labels of the system preferences that hold the switches.
+  static const enabledLabel = 'memory_enabled';
+  static const learnLabel = 'memory_auto_extraction';
+
+  /// The switches in AnythingLLM's `settings`, which hold each as text: memories are off unless
+  /// [enabledLabel] is `true`, and learning on unless [learnLabel] is `false`, as AnythingLLM
+  /// reads them.
   static MemorySwitches fromJson(Object? json) {
-    final values = json is Map ? json : const {};
+    final values = json is Map && json['settings'] is Map
+        ? json['settings'] as Map
+        : const {};
     return MemorySwitches(
-      enabled: values['enabled'] == true,
-      learn: values['learn'] != false,
+      enabled: '${values[enabledLabel]}' == 'true',
+      learn: '${values[learnLabel]}' != 'false',
     );
   }
+
+  /// The system preferences that set [enabled] and [learn], each as text; null leaves one as it
+  /// is.
+  static Map<String, String> preferences({bool? enabled, bool? learn}) => {
+    if (enabled != null) enabledLabel: '$enabled',
+    if (learn != null) learnLabel: '$learn',
+  };
 }

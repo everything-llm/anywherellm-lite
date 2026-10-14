@@ -28,13 +28,12 @@ Future<void> _openGuide(WidgetTester tester) async {
 Future<Harness> _settings(
   WidgetTester tester, {
   bool present = false,
+  Set<String>? served,
   bool canScan = false,
 }) async {
-  final h = await pumpApp(
-    tester,
-    toolkitServer: FakeToolkit(present: present),
-    canScan: canScan,
-  );
+  final toolkit = FakeToolkit(present: present);
+  if (served != null) toolkit.served = served;
+  final h = await pumpApp(tester, toolkitServer: toolkit, canScan: canScan);
   h.shell.openSettings();
   await tester.pumpAndSettle();
   return h;
@@ -155,6 +154,13 @@ void main() {
       await _settings(tester, present: true);
       expect(find.text('Get more from your server'), findsNothing);
       expect(find.text('Memory'), findsOneWidget);
+    });
+
+    testWidgets('a toolkit whose bridge passes nothing the app uses is offered '
+        'like none', (tester) async {
+      await _settings(tester, present: true, served: const {});
+      expect(find.text('Get more from your server'), findsOneWidget);
+      expect(find.text('Memory'), findsNothing);
     });
 
     testWidgets('the installer\'s page says which AnythingLLM is picked', (

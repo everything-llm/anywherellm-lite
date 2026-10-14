@@ -4,10 +4,15 @@ import 'package:anywherellm/core/library.dart';
 import 'package:anywherellm/core/memory.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/schedule.dart';
-import 'package:anywherellm/core/schedule_spec.dart';
 import 'package:anywherellm/core/toolkit.dart';
 
 import 'fake_companion.dart';
+
+/// The toolkit's `CLIENT_ALLOW`, which its `install` writes as `BRIDGE_ALLOW`: what the app
+/// calls.
+const liteBridgeAllow =
+    '/workspaces, /memories, GET /admin/system-preferences-for, '
+    'POST /admin/system-preferences, /scheduled-jobs';
 
 /// A [ToolkitApi] for widget tests that keeps the saved memories and the scheduled jobs in
 /// memory. It is [present] unless a test makes it absent, as beside a stock AnythingLLM, and
@@ -184,10 +189,6 @@ class FakeToolkit with FakeCompanion implements ToolkitApi {
   /// `running` or `failed`.
   String runStatus = 'completed';
 
-  /// Every idempotency key a create or a run came with. One seen before changes nothing, as the
-  /// toolkit does.
-  final List<String> keys = [];
-
   int _nextJob = 1;
 
   ScheduledJob _job(String id) =>
@@ -199,10 +200,10 @@ class FakeToolkit with FakeCompanion implements ToolkitApi {
     jobs = [for (final j in jobs) j.id == id ? change(j) : j];
   }
 
-  /// Refuses a schedule the toolkit would, in its words.
+  /// Refuses a schedule AnythingLLM would, in its words: one that is not five cron fields.
   void _checkCron(String cron) {
-    if (cronProblem(cron) case final problem?) {
-      throw ApiException(problem, status: 400);
+    if (cron.trim().split(RegExp(r'\s+')).length != 5) {
+      throw const ApiException('Invalid cron expression.', status: 400);
     }
   }
 
@@ -211,69 +212,53 @@ class FakeToolkit with FakeCompanion implements ToolkitApi {
       run('jobRuns', () => [...?runRecords[id]].take(limit).toList(), id);
 
   @override
-  Future<void> createJob(JobDraft draft, {required String key}) => run(
-    'createJob',
-    () {
-      _checkCron(draft.cron);
-      if (keys.contains(key)) return;
-      keys.add(key);
-      jobs = [
-        ...jobs,
-        ScheduledJob(
-          id: '${_nextJob++}',
-          name: draft.name,
-          prompt: draft.prompt,
-          cron: draft.cron,
-          workspace: draft.workspaceSlug,
-          workspaceSlug: draft.workspaceSlug,
-          enabled: draft.enabled,
-        ),
-      ];
-    },
-    '${draft.name}|${draft.workspaceSlug}|${draft.cron}|once=${draft.once}',
-  );
+  Future<void> createJob(JobDraft draft) => run('createJob', () {
+    _checkCron(draft.cron);
+    jobs = [
+      ...jobs,
+      ScheduledJob(
+        id: '${_nextJob++}',
+        name: draft.name,
+        prompt: draft.prompt,
+        cron: draft.cron,
+      ),
+    ];
+  }, '${draft.name}|${draft.cron}');
 
   @override
   Future<void> updateJob(String id, JobDraft draft) => run('updateJob', () {
     _checkCron(draft.cron);
     _replace(
       id,
-      (j) => ScheduledJob(
-        id: id,
-        name: draft.name,
-        prompt: draft.prompt,
-        action: j.action,
-        cron: draft.cron,
-        workspace: draft.workspaceSlug,
-        workspaceSlug: draft.workspaceSlug,
-        enabled: j.enabled,
-        nextRun: j.nextRun,
-        lastRun: j.lastRun,
-        lastStatus: j.lastStatus,
-      ),
+      (j) => _with(j, name: draft.name, prompt: draft.prompt, cron: draft.cron),
     );
   }, '$id|${draft.name}|${draft.cron}');
 
   @override
-  Future<void> setJobEnabled(String id, bool enabled) =>
-      run('setJobEnabled', () {
-        _replace(
-          id,
-          (j) => ScheduledJob(
-            id: id,
-            name: j.name,
-            prompt: j.prompt,
-            action: j.action,
-            cron: j.cron,
-            workspace: j.workspace,
-            workspaceSlug: j.workspaceSlug,
-            enabled: enabled,
-            nextRun: j.nextRun,
-            lastRun: j.lastRun,
-            lastStatus: j.lastStatus,
-          ),
-        );
-      }, '$id=$enabled');
+  Future<void> setJobEnabled(String id, bool enabled) => run(
+    'setJobEnabled',
+    () => _replace(id, (j) => _with(j, enabled: enabled)),
+    '$id=$enabled',
+  );
+
+  /// [job] with what is given changed.
+  static ScheduledJob _with(
+    ScheduledJob job, {
+    String? name,
+    String? prompt,
+    String? cron,
+    bool? enabled,
+  }) => ScheduledJob(
+    id: job.id,
+    name: name ?? job.name,
+    prompt: prompt ?? job.prompt,
+    tools: job.tools,
+    cron: cron ?? job.cron,
+    enabled: enabled ?? job.enabled,
+    nextRun: job.nextRun,
+    lastRun: job.lastRun,
+    lastStatus: job.lastStatus,
+  );
 
   @override
   Future<void> deleteJob(String id) => run('deleteJob', () {
@@ -285,11 +270,13 @@ class FakeToolkit with FakeCompanion implements ToolkitApi {
     runRecords.remove(id);
   }, id);
 
+  /// Starts a run with [runStatus], or, as AnythingLLM skips one while another runs, fails.
   @override
-  Future<void> runJob(String id, {required String key}) => run('runJob', () {
+  Future<void> runJob(String id) => run('runJob', () {
     _job(id);
-    if (keys.contains(key)) return;
-    keys.add(key);
+    if (runRecords[id]?.firstOrNull?.running ?? false) {
+      throw const ApiException('It is already running.');
+    }
     runRecords[id] = [
       JobRun(startedAt: DateTime.now().toUtc(), status: runStatus),
       ...?runRecords[id],

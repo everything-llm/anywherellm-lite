@@ -151,14 +151,15 @@ abstract interface class CompanionApi {
   /// Which companion this is.
   Companion get companion;
 
-  /// The features the companion's `/health` names beside the server in use, asked without the
+  /// The features the companion's `/health` offers beside the server in use, asked without the
   /// key, or null when it is not there. Remembered for the connection; [again] asks afresh.
   /// Never throws.
   Future<Set<String>?> features({bool again = false});
 }
 
 /// The toolkit, anythingllm-toolkit: AnythingLLM's saved memories and scheduled jobs, which
-/// its developer API lacks, as [ToolkitFeature]s. Every method but [features] uses the
+/// its developer API lacks, through the toolkit's bridge to its internal API, as the
+/// [ToolkitFeature]s the bridge allows. Every method but [features] uses the
 /// connection in use and throws [ApiException] on failure, [NotConfigured] when there is none.
 abstract interface class ToolkitApi implements CompanionApi {
   /// The jobs AnythingLLM runs on a schedule. Times are UTC.
@@ -174,11 +175,10 @@ abstract interface class ToolkitApi implements CompanionApi {
   /// The latest runs of job [id], newest first.
   Future<List<JobRun>> jobRuns(String id, {int limit = 5});
 
-  /// Makes a job. [key] names this attempt, so a retry the toolkit already took does not make a
-  /// second one.
-  Future<void> createJob(JobDraft draft, {required String key});
+  /// Makes a job, switched on.
+  Future<void> createJob(JobDraft draft);
 
-  /// Replaces job [id]'s name, prompt, workspace and schedule with [draft]'s.
+  /// Replaces job [id]'s name, prompt and schedule with [draft]'s.
   Future<void> updateJob(String id, JobDraft draft);
 
   /// Switches job [id] on or off.
@@ -186,9 +186,9 @@ abstract interface class ToolkitApi implements CompanionApi {
 
   Future<void> deleteJob(String id);
 
-  /// Starts one run of job [id] at once, and answers without waiting for it. [key] names this
-  /// attempt, as for [createJob].
-  Future<void> runJob(String id, {required String key});
+  /// Starts one run of job [id] at once, and answers without waiting for it. Fails when one is
+  /// already running or waiting.
+  Future<void> runJob(String id);
 
   /// Whether the server keeps saved memories, and saves them from chats itself.
   Future<MemorySwitches> memorySwitches();

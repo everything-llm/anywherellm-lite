@@ -23,17 +23,14 @@ FakeToolkit _writable() => FakeToolkit()
       name: 'Morning brief',
       prompt: 'Give me today in four lines.',
       cron: '0 7 * * *',
-      workspace: 'Household',
-      workspaceSlug: 'household',
       lastStatus: 'completed',
     ),
     ScheduledJob(
       id: '2',
       name: 'Price watch',
+      prompt: 'Check the boiler service price.',
+      tools: 2,
       cron: '0 */6 * * *',
-      workspace: 'Household',
-      workspaceSlug: 'household',
-      action: 'Check the boiler service price',
     ),
   ];
 
@@ -81,12 +78,12 @@ void main() {
     expect(find.text('Run now'), findsNothing);
   });
 
-  testWidgets('a task is added from the plus, in the open workspace', (
-    tester,
-  ) async {
+  testWidgets('a task is added from the plus', (tester) async {
     final toolkit = _writable();
     final h = await _open(tester, toolkit);
     expect(find.text('Times are in your time zone.'), findsOneWidget);
+    // AnythingLLM has no task that runs once, nor one tied to a workspace.
+    expect(find.text('Once'), findsNothing);
     await tester.tap(control('New task'));
     await tester.pumpAndSettle();
     expect(find.text('New task'), findsOneWidget);
@@ -94,13 +91,7 @@ void main() {
     await tester.enterText(_field(_promptHint), 'Make the groceries list.');
     await tester.tap(control('Save'));
     await tester.pumpAndSettle();
-    expect(
-      toolkit.calls,
-      contains(
-        'createJob:Weekly shop|${h.chat.activeSlug}|${_daily(7, 0)}|once=false',
-      ),
-    );
-    expect(toolkit.keys, hasLength(1));
+    expect(toolkit.calls, contains('createJob:Weekly shop|${_daily(7, 0)}'));
     // The sheet closes and the list has the new task.
     expect(find.text('New task'), findsNothing);
     expect(find.text('Weekly shop'), findsOneWidget);
@@ -170,10 +161,7 @@ void main() {
     await tester.pumpAndSettle();
     final sent = toolkit.calls.singleWhere((c) => c.startsWith('createJob'));
     // Minute, hour, then the days, which a zone far from UTC may move by one.
-    expect(
-      sent,
-      matches(RegExp(r'\|\d+ \d+ \* \* [0-6](,[0-6])?\|once=false$')),
-    );
+    expect(sent, matches(RegExp(r'\|\d+ \d+ \* \* [0-6](,[0-6])?$')));
   });
 
   testWidgets(
@@ -195,7 +183,6 @@ void main() {
       await tester.tap(find.text('Run now'));
       await tester.pumpAndSettle();
       expect(toolkit.calls, contains('runJob:1'));
-      expect(toolkit.keys, hasLength(1));
       expect(toolkit.runRecords['1'], hasLength(2));
     },
   );
@@ -293,22 +280,31 @@ void main() {
     expect(find.text('Evening brief'), findsOneWidget);
   });
 
-  testWidgets('a task that runs an action shows it where the prompt goes', (
+  testWidgets('a task with tools says only the web page sets them', (
     tester,
   ) async {
     await _open(tester, _writable());
     await tester.tap(find.text('Price watch'));
     await tester.pumpAndSettle();
+    expect(find.text('Check the boiler service price.'), findsOneWidget);
     expect(
-      find.text('Runs the action Check the boiler service price.'),
+      find.text('May use 2 tools, which only AnythingLLM\'s web page sets.'),
       findsOneWidget,
     );
-    await tester.tap(control('Edit'));
+  });
+
+  testWidgets('Run now on a task AnythingLLM is already running says so', (
+    tester,
+  ) async {
+    final toolkit = _writable()
+      ..runRecords['1'] = [
+        JobRun(startedAt: DateTime.now().toUtc(), status: 'queued'),
+      ];
+    await _open(tester, toolkit);
+    await tester.tap(find.text('Morning brief'));
     await tester.pumpAndSettle();
-    expect(
-      find.text('Runs the action Check the boiler service price.'),
-      findsOneWidget,
-    );
-    expect(_field(_promptHint), findsNothing);
+    // A run waiting its turn counts as running, so Run now waits too.
+    expect(find.text('Running…'), findsWidgets);
+    expect(toolkit.calls.where((c) => c.startsWith('runJob')), isEmpty);
   });
 }

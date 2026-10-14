@@ -23,7 +23,12 @@ void main() {
   test('the switches read as AnythingLLM reads them', () {
     expect(MemorySwitches.fromJson({}).enabled, isFalse);
     expect(MemorySwitches.fromJson({}).learn, isTrue);
-    expect(MemorySwitches.fromJson({'enabled': true}).enabled, isTrue);
-    expect(MemorySwitches.fromJson({'learn': false}).learn, isFalse);
+    MemorySwitches read(Map<String, Object?> settings) =>
+        MemorySwitches.fromJson({'settings': settings});
+    expect(read({'memory_enabled': 'true'}).enabled, isTrue);
+    expect(read({'memory_enabled': 'false'}).enabled, isFalse);
+    expect(read({'memory_enabled': null}).learn, isTrue);
+    expect(read({'memory_auto_extraction': 'false'}).learn, isFalse);
+    expect(read({'memory_auto_extraction': 'true'}).learn, isTrue);
   });
 }

@@ -125,13 +125,11 @@ Future<void> _capture(
     ScheduledJob(
       name: 'Morning brief',
       cron: '30 6 * * *',
-      workspace: 'Household',
       nextRun: now.add(const Duration(hours: 9)),
     ),
     ScheduledJob(
       name: 'Roadmap check',
       cron: '0 8 * * 1',
-      workspace: 'Q3 planning',
       nextRun: now.add(const Duration(days: 2)),
     ),
   ];

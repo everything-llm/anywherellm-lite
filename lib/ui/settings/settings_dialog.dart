@@ -160,14 +160,18 @@ class _Nav extends StatelessWidget {
                     onTap: () => shell.showSettingsPage(SettingsPage.memory),
                   ),
               ]),
-              if (scope.toolkit.available == false) ...[
+              if (scope.toolkit.servesNothing) ...[
                 const SizedBox(height: 20),
                 SummaryCard(
                   title: 'Get more from your server',
                   lines: [
                     Text(
-                      'Install the free toolkit beside AnythingLLM to add Memory here, '
-                      'and Library, Activity and Upcoming on the Chats tab.',
+                      scope.toolkit.available ?? false
+                          ? 'The toolkit answers, but lets none of this app\'s calls through. '
+                                'Run its install again to add Memory here, and Upcoming on '
+                                'the Chats tab.'
+                          : 'Install the free toolkit beside AnythingLLM to add Memory here, '
+                                'and Upcoming on the Chats tab.',
                       style: Type.sans(13, color: Tokens.of(context).muted),
                     ),
                   ],
