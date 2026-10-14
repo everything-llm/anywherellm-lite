@@ -5,6 +5,8 @@ import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/settings_text.dart';
+
 const _settings = WorkspaceSettings({
   'openAiTemp': 0.7,
   'openAiHistory': 20,
@@ -118,11 +120,6 @@ void main() {
       });
       expect(doc.text, isNull);
       expect(doc.title, 'notes.md');
-    });
-
-    test('pinned reads from a number or a boolean', () {
-      final doc = WorkspaceDoc.fromJson({'docpath': 'c/a.json', 'pinned': 1});
-      expect(doc.pinned, isTrue);
     });
 
     test('a web page is one whose chunk source is a link', () {

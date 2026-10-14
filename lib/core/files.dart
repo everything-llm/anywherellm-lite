@@ -1,9 +1,8 @@
 // The open workspace's pages, the name a document's text is saved under, and the answer
 // settings as JSON.
 
-import 'dart:convert';
-
 import 'errors.dart';
+import 'json.dart';
 import 'server_models.dart';
 
 /// The pages of the open workspace.
@@ -29,27 +28,12 @@ String textFileName(String title) {
   return _plainText.hasMatch(name) ? name : '$name.txt';
 }
 
-const _indented = JsonEncoder.withIndent('  ');
-
-/// [settings] as the JSON the answer settings are saved through.
-String settingsText(WorkspaceSettings settings) =>
-    '${_indented.convert(settings.values)}\n';
-
 /// The settings in [text] that differ from [was], ready to write. Throws [ApiException] when the
 /// text is not a JSON object, names a setting the app does not know, or gives one a value of the
 /// wrong type or range.
 Map<String, Object?> parseSettings(String text, WorkspaceSettings was) {
-  final Object? json;
-  try {
-    json = jsonDecode(text);
-  } on FormatException catch (error) {
-    throw ApiException('The settings are not valid JSON: ${error.message}');
-  }
-  if (json is! Map<String, dynamic>) {
-    throw const ApiException('The settings must be one JSON object.');
-  }
   final changed = <String, Object?>{};
-  for (final MapEntry(:key, :value) in json.entries) {
+  for (final MapEntry(:key, :value) in settingsObject(text).entries) {
     final spec = workspaceSettingSpecs[key];
     if (spec == null) throw ApiException('$key is not a workspace setting.');
     if (value == was.values[key]) continue;

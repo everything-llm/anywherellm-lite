@@ -9,6 +9,7 @@ import '../core/chat.dart';
 import '../core/chat_log.dart';
 import '../core/connection.dart';
 import '../core/embeds.dart';
+import '../core/json.dart';
 import '../core/ports.dart';
 import '../core/server_models.dart';
 import '../core/upload.dart';
@@ -42,25 +43,21 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
 
   @override
   Future<void> verify(Connection connection) async {
-    final body = await _get(_secure(connection), '/api/v1/auth');
+    final body = await _get('/api/v1/auth', on: connection);
     if (body is! Map || body['authenticated'] != true) {
       throw const ApiException('The server did not accept the key.');
     }
   }
 
   @override
-  Future<List<Workspace>> workspaces() async => [
-    for (final json in jsonObjects(
-      _field(await _get(_current, '/api/v1/workspaces'), 'workspaces'),
-    ))
-      Workspace.fromJson(json),
-  ];
+  Future<List<Workspace>> workspaces() async =>
+      _list(await _get('/api/v1/workspaces'), 'workspaces', Workspace.fromJson);
 
   /// The server answers with a list of the workspaces that have the slug: one, or none.
   @override
   Future<Workspace> workspace(String slug) async {
     final found = jsonObjects(
-      _field(await _get(_current, _workspace(slug)), 'workspace'),
+      _field(await _get(_workspace(slug)), 'workspace'),
     );
     if (found.isEmpty) {
       throw ApiException('There is no workspace $slug.', status: 404);
@@ -74,11 +71,9 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       'name': name,
       'openAiPrompt': ?prompt,
     });
-    final json = _field(body, 'workspace');
-    if (json is! Map<String, dynamic>) {
-      throw ApiException(_said(body) ?? 'The server did not make $name.');
-    }
-    return Workspace.fromJson(json);
+    return Workspace.fromJson(
+      _written(body, 'workspace', 'The server did not make $name.'),
+    );
   }
 
   /// The server answers with the workspace it wrote, or a `message` saying why it did not.
@@ -87,11 +82,9 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     final body = await _send('POST', '${_workspace(slug)}/update', {
       'name': name,
     });
-    final json = _field(body, 'workspace');
-    if (json is! Map<String, dynamic>) {
-      throw ApiException(_said(body) ?? 'The server did not rename $slug.');
-    }
-    return Workspace.fromJson(json);
+    return Workspace.fromJson(
+      _written(body, 'workspace', 'The server did not rename $slug.'),
+    );
   }
 
   /// The server answers a delete with no JSON. Deleting a workspace leaves its documents in the
@@ -105,11 +98,9 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     final body = await _send('POST', '${_workspace(slug)}/thread/new', {
       'name': newChatName,
     });
-    final json = _field(body, 'thread');
-    if (json is! Map<String, dynamic>) {
-      throw ApiException(_said(body) ?? 'The server did not start a chat.');
-    }
-    return Thread.fromJson(json);
+    return Thread.fromJson(
+      _written(body, 'thread', 'The server did not start a chat.'),
+    );
   }
 
   @override
@@ -122,12 +113,11 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       _send('DELETE', _thread(slug, thread), null, emptyOk: true, on: on);
 
   @override
-  Future<List<ChatMessage>> history(String slug, String thread) async => [
-    for (final json in jsonObjects(
-      _field(await _get(_current, '${_thread(slug, thread)}/chats'), 'history'),
-    ))
-      ChatMessage.fromJson(json),
-  ];
+  Future<List<ChatMessage>> history(String slug, String thread) async => _list(
+    await _get('${_thread(slug, thread)}/chats'),
+    'history',
+    ChatMessage.fromJson,
+  );
 
   @override
   Stream<ChatEvent> streamChat(
@@ -160,7 +150,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   @override
   Future<Set<String>> acceptedExtensions() async {
     final types = _field(
-      await _get(_current, '/api/v1/document/accepted-file-types'),
+      await _get('/api/v1/document/accepted-file-types'),
       'types',
     );
     return {
@@ -227,10 +217,8 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   );
 
   /// The documents an upload, a link or pasted text made, from the server's answer [body].
-  List<DocEntry> _documents(Object? body) => [
-    for (final json in jsonObjects(_field(body, 'documents')))
-      DocEntry.fromJson(json),
-  ];
+  List<DocEntry> _documents(Object? body) =>
+      _list(body, 'documents', DocEntry.fromJson);
 
   /// The server answers with the workspace it wrote, or a `message` saying why it did not.
   @override
@@ -242,17 +230,11 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   }
 
   @override
-  Future<List<SearchHit>> searchDocs(String slug, String query) async => [
-    for (final json in jsonObjects(
-      _field(
-        await _send('POST', '${_workspace(slug)}/vector-search', {
-          'query': query,
-        }),
-        'results',
-      ),
-    ))
-      SearchHit.fromJson(json),
-  ];
+  Future<List<SearchHit>> searchDocs(String slug, String query) async => _list(
+    await _send('POST', '${_workspace(slug)}/vector-search', {'query': query}),
+    'results',
+    SearchHit.fromJson,
+  );
 
   @override
   Future<List<int>> exportChats(ChatExport format) =>
@@ -325,7 +307,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   Future<DocBody> document(String path) async {
     final name = docName(path);
     final json = _field(
-      await _get(_current, '/api/v1/document/${Uri.encodeComponent(name)}'),
+      await _get('/api/v1/document/${Uri.encodeComponent(name)}'),
       'document',
     );
     if (json is! Map<String, dynamic>) {
@@ -336,7 +318,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
 
   @override
   Future<Map<String, Object?>> systemSettings() async {
-    final settings = _field(await _get(_current, '/api/v1/system'), 'settings');
+    final settings = _field(await _get('/api/v1/system'), 'settings');
     return settings is Map<String, dynamic> ? settings : const {};
   }
 
@@ -350,10 +332,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       changes,
       refused: 'The server did not change its settings.',
     );
-    if (_field(answer, 'error') case final String error
-        when error.trim().isNotEmpty) {
-      throw ApiException(error.trim());
-    }
+    _failOnError(answer);
     final written = _field(answer, 'newValues');
     final missing = [
       for (final key in changes.keys)
@@ -365,12 +344,8 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   }
 
   @override
-  Future<List<Embed>> embeds() async => [
-    for (final json in jsonObjects(
-      _field(await _get(_current, '/api/v1/embed'), 'embeds'),
-    ))
-      Embed.fromJson(json),
-  ];
+  Future<List<Embed>> embeds() async =>
+      _list(await _get('/api/v1/embed'), 'embeds', Embed.fromJson);
 
   /// The server answers the new embed, or null with an `error` when it made none.
   @override
@@ -381,10 +356,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       embed.toJson(),
       refused: 'The server did not make the embed.',
     );
-    if (_field(answer, 'error') case final String error
-        when error.trim().isNotEmpty) {
-      throw ApiException(error.trim());
-    }
+    _failOnError(answer);
     return switch (_field(answer, 'embed')) {
       {'uuid': final String uuid} => uuid,
       _ => throw const ApiException('The server did not make the embed.'),
@@ -403,10 +375,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       {'enabled': ?enabled, 'chat_mode': ?mode?.name},
       refused: 'The server did not change the embed.',
     );
-    if (_field(answer, 'error') case final String error
-        when error.trim().isNotEmpty) {
-      throw ApiException(error.trim());
-    }
+    _failOnError(answer);
   }
 
   @override
@@ -418,18 +387,11 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   );
 
   @override
-  Future<List<EmbedChat>> embedChats(String uuid) async => [
-    for (final json in jsonObjects(
-      _field(
-        await _get(
-          _current,
-          '/api/v1/embed/${Uri.encodeComponent(uuid)}/chats',
-        ),
-        'chats',
-      ),
-    ))
-      EmbedChat.fromJson(json),
-  ];
+  Future<List<EmbedChat>> embedChats(String uuid) async => _list(
+    await _get('/api/v1/embed/${Uri.encodeComponent(uuid)}/chats'),
+    'chats',
+    EmbedChat.fromJson,
+  );
 
   /// `/v1/admin/workspace-chats` answers every workspace's chats on any server, though its
   /// other `/v1/admin` routes refuse one with a single user.
@@ -440,7 +402,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
 
   @override
   Future<int> vectorCount() async => switch (_field(
-    await _get(_current, '/api/v1/system/vector-count'),
+    await _get('/api/v1/system/vector-count'),
     'vectorCount',
   )) {
     final num count => count.toInt(),
@@ -468,15 +430,9 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     'Accept': 'application/json',
   };
 
-  /// The decoded JSON of a GET to [path] on [connection].
-  Future<Object?> _get(Connection connection, String path) => _call(
-    connection,
-    timeout,
-    () => _client.get(
-      Uri.parse('${connection.baseUrl}$path'),
-      headers: _headers(connection),
-    ),
-  );
+  /// The decoded JSON of a GET to [path] on the connection in use, or on [on].
+  Future<Object?> _get(String path, {Connection? on}) =>
+      _send('GET', path, null, on: on);
 
   /// The events of a POST of [body] to [path], whose answer streams server-sent events. A
   /// failed status is an [ApiException] with the server's words; a stream that drops or falls
@@ -641,11 +597,11 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   /// [error], from sending a request, in plain words.
   ApiException _unreachable(
     Connection connection,
-    Exception error, [
-    Duration? limit,
-  ]) => switch (error) {
+    Exception error,
+    Duration limit,
+  ) => switch (error) {
     TimeoutException() => ApiException(
-      'The server did not answer within ${_duration(limit ?? timeout)}.',
+      'The server did not answer within ${_duration(limit)}.',
     ),
     HandshakeException() => const ApiException(
       'The server\'s certificate could not be verified.',
@@ -711,6 +667,29 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     if (body is! Map) return null;
     final said = body['error'] ?? body['message'];
     return said is String && said.trim().isNotEmpty ? said.trim() : null;
+  }
+
+  /// The objects under [key] in the JSON [body], each read by [from].
+  List<T> _list<T>(
+    Object? body,
+    String key,
+    T Function(Map<String, dynamic>) from,
+  ) => [for (final json in jsonObjects(_field(body, key))) from(json)];
+
+  /// The object under [key] in the JSON [body] that wrote it, or an [ApiException] with the
+  /// server's reason, or else [failed].
+  Map<String, dynamic> _written(Object? body, String key, String failed) =>
+      switch (_field(body, key)) {
+        final Map<String, dynamic> json => json,
+        _ => throw ApiException(_said(body) ?? failed),
+      };
+
+  /// Fails with the `error` the server put in an answer that succeeded, when it did.
+  void _failOnError(Object? body) {
+    if (_field(body, 'error') case final String error
+        when error.trim().isNotEmpty) {
+      throw ApiException(error.trim());
+    }
   }
 
   static String _duration(Duration limit) => limit.inSeconds < 120

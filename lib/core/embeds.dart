@@ -1,6 +1,6 @@
 // Chat embeds: a chat box for one workspace that a web page carries, and the chats it held.
 
-import 'dart:convert';
+import 'json.dart';
 
 /// The modes an embed answers in. The server takes only these two; an agent never runs in one.
 enum EmbedMode {
@@ -99,7 +99,7 @@ class EmbedChat {
   /// The server keeps an answer as JSON holding its `text`, or as the text itself.
   factory EmbedChat.fromJson(Map<String, dynamic> json) {
     final response = json['response'];
-    final decoded = response is String ? _jsonOrNull(response) : response;
+    final decoded = response is String ? jsonOrNull(response) : response;
     return EmbedChat(
       session: switch (json['session_id']) {
         final String id => id,
@@ -127,18 +127,9 @@ class EmbedChat {
   final DateTime? at;
 }
 
-Object? _jsonOrNull(String text) {
-  try {
-    return jsonDecode(text);
-  } on FormatException {
-    return null;
-  }
-}
-
 /// The HTML a web page carries to show [uuid]'s chat box, served by the server at [server].
 String embedSnippet(Uri server, String uuid) {
-  final base = server.replace(query: null, fragment: null);
-  final origin = base.toString().replaceFirst(RegExp(r'[/?#]+$'), '');
+  final origin = server.toString().replaceFirst(RegExp(r'[/?#]+$'), '');
   return '<script\n'
       '  data-embed-id="$uuid"\n'
       '  data-base-api-url="$origin/api/embed"\n'

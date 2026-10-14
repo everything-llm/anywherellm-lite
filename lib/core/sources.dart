@@ -11,7 +11,6 @@ class SourceFile {
     required this.title,
     required this.on,
     this.words,
-    this.pinned = false,
     this.web,
   });
 
@@ -22,9 +21,6 @@ class SourceFile {
   /// Whether the workspace answers from it.
   final bool on;
   final int? words;
-
-  /// Whether its whole text is always in the workspace's context. Only a switched-on file can be.
-  final bool pinned;
 
   /// Whether it is a web page, or null when the server did not say.
   final bool? web;
@@ -136,7 +132,6 @@ List<SourceFile> mergeSources(List<WorkspaceDoc> embedded, List<OffDoc> off) {
         title: doc.title,
         on: true,
         words: doc.words,
-        pinned: doc.pinned,
         web: doc.web,
       ),
     for (final doc in off)

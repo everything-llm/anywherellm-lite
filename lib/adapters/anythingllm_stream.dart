@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../core/chat.dart';
+import '../core/json.dart';
 import '../core/outputs.dart';
 import '../core/ports.dart';
 import '../core/server_models.dart';
@@ -97,14 +98,5 @@ Stream<Map<String, dynamic>> _dataChunks(Stream<List<int>> bytes) async* {
         case final Map<String, dynamic> c) {
       yield c;
     }
-  }
-}
-
-/// The decoded JSON of [text], or null when it is not JSON.
-Object? jsonOrNull(String text) {
-  try {
-    return jsonDecode(text);
-  } on FormatException {
-    return null;
   }
 }

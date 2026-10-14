@@ -116,12 +116,4 @@ void main() {
     expect((on.web, off.web), (true, false));
     expect(on.asOff.web, isTrue);
   });
-
-  test('a pinned document stays pinned among the merged ones', () {
-    final files = mergeSources(
-      [const WorkspaceDoc(path: 'a', title: 'A', pinned: true)],
-      const [OffDoc(path: 'b', title: 'B')],
-    );
-    expect([for (final f in files) f.pinned], [true, false]);
-  });
 }

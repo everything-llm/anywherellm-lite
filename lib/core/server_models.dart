@@ -1,9 +1,9 @@
 // What the AnythingLLM API answers. Field names follow its responses; every field is read
 // defensively, since the server's answers do not always match its own schema.
 
-import 'dart:convert';
 import 'dart:typed_data';
 
+import 'json.dart';
 import 'outputs.dart';
 
 /// A string or number field as text, trimmed, or empty when it is missing.
@@ -19,18 +19,11 @@ String? _known(Map<String, dynamic> json, String key) {
   return value.isEmpty || value == 'Unknown' ? null : value;
 }
 
-int? _int(Map<String, dynamic> json, String key) => switch (json[key]) {
-  final num value => value.toInt(),
-  final String value => int.tryParse(value.trim()),
+/// [value] as a whole number when it is one or a number as text, or else null.
+int? _asInt(Object? value) => switch (value) {
+  final num n => n.toInt(),
+  final String s => int.tryParse(s.trim()),
   _ => null,
-};
-
-/// A boolean field, which the server sometimes sends as `0`/`1` or `"true"`.
-bool _bool(Map<String, dynamic> json, String key) => switch (json[key]) {
-  final bool value => value,
-  final num value => value != 0,
-  final String value => value.trim() == 'true',
-  _ => false,
 };
 
 /// The objects in a list field; anything else is skipped.
@@ -154,11 +147,7 @@ class WorkspaceSettings {
   final Map<String, Object?> values;
 
   static Object? _setting(Object? value, SettingType type) => switch (type) {
-    SettingType.integer => switch (value) {
-      final num n => n.toInt(),
-      final String s => int.tryParse(s.trim()),
-      _ => null,
-    },
+    SettingType.integer => _asInt(value),
     SettingType.number => switch (value) {
       final num n => n,
       final String s => num.tryParse(s.trim()),
@@ -309,6 +298,7 @@ class Citation {
 /// none. A passage's `text` starts with a `<document_metadata>` block, which is dropped, and
 /// its `score` is kept only from 0 to 1.
 List<Citation> citationsOf(Object? sources) {
+  if (sources is! List || sources.isEmpty) return const [];
   // Each title's passages, filled as the list is read; a page's stays empty.
   final cited = <(String, Uri?, List<Passage>)>[];
   final byTitle = <String, List<Passage>>{};
@@ -386,7 +376,6 @@ class WorkspaceDoc {
     required this.path,
     required this.title,
     this.words,
-    this.pinned = false,
     this.web,
   });
 
@@ -395,7 +384,10 @@ class WorkspaceDoc {
   factory WorkspaceDoc.fromJson(Map<String, dynamic> json) {
     final path = _text(json, 'docpath');
     final metadata = switch (json['metadata']) {
-      final String text => _decode(text),
+      final String text => switch (jsonOrNull(text)) {
+        final Map<String, dynamic> map => map,
+        _ => null,
+      },
       _ => null,
     };
     return WorkspaceDoc(
@@ -404,8 +396,7 @@ class WorkspaceDoc {
           (metadata == null ? null : _known(metadata, 'title')) ??
           _known(json, 'filename') ??
           docName(path),
-      words: metadata == null ? null : _int(metadata, 'wordCount'),
-      pinned: _bool(json, 'pinned'),
+      words: _asInt(metadata?['wordCount']),
       web: switch (metadata?['chunkSource']) {
         final String source => _linkOf(source) != null,
         _ => null,
@@ -418,20 +409,8 @@ class WorkspaceDoc {
   final String title;
   final int? words;
 
-  /// Whether its whole text is always in the workspace's context.
-  final bool pinned;
-
   /// Whether it is a web page, or null when its metadata does not say.
   final bool? web;
-
-  static Map<String, dynamic>? _decode(String text) {
-    try {
-      final value = jsonDecode(text);
-      return value is Map<String, dynamic> ? value : null;
-    } on FormatException {
-      return null;
-    }
-  }
 }
 
 /// The details the server keeps with a document, given when it is added. An empty field is left

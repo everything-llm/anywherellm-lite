@@ -4,6 +4,7 @@
 import 'dart:convert';
 
 import 'errors.dart';
+import 'json.dart';
 
 /// The settings `update-env` takes, from AnythingLLM 1.16.2's `KEY_MAPPING`, less the server's
 /// password and signing secret, which it changes only in its own force mode. A key it does not
@@ -435,17 +436,8 @@ String systemText(Map<String, Object?> settings) =>
 /// the text is not a JSON object, names a setting the app does not write, empties one, or gives
 /// a provider a value the server does not take.
 Map<String, String> parseSystemSettings(String text, Map<String, Object?> was) {
-  final Object? json;
-  try {
-    json = jsonDecode(text);
-  } on FormatException catch (error) {
-    throw ApiException('The settings are not valid JSON: ${error.message}');
-  }
-  if (json is! Map<String, dynamic>) {
-    throw const ApiException('The settings must be one JSON object.');
-  }
   final changed = <String, String>{};
-  for (final MapEntry(:key, :value) in json.entries) {
+  for (final MapEntry(:key, :value) in settingsObject(text).entries) {
     if (!systemKeys.contains(key) || readOnlySettings.contains(key)) {
       if (readOnlySettings.contains(key) && value == was[key]) continue;
       throw ApiException(

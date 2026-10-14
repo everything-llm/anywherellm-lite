@@ -60,17 +60,6 @@ class ScheduledJob {
     'failed' || 'failure' || 'error' || 'errored' => false,
     _ => null,
   };
-
-  /// [lastStatus] as a word to show: Done, Failed, or the server's own word with a capital.
-  String? get lastStatusText => switch (lastWentWell) {
-    true => 'Done',
-    false => 'Failed',
-    null => switch (lastStatus) {
-      final word? when word.isNotEmpty =>
-        word[0].toUpperCase() + word.substring(1),
-      _ => null,
-    },
-  };
 }
 
 DateTime? _time(Object? value) =>

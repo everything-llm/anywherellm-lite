@@ -1117,7 +1117,7 @@ void main() {
         }).workspace('w');
         expect(w.prompt, 'Be brief.');
         expect(w.settings!.values['topN'], 4);
-        expect(w.documents.single.pinned, isTrue);
+        expect(w.documents.single.path, 'c/a.json');
       },
     );
 

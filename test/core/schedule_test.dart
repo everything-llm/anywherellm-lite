@@ -60,15 +60,12 @@ void main() {
     expect(whenText(DateTime(2026, 10, 13, 7), now), 'Tue 13 Oct, 07:00');
   });
 
-  test('the last run reads Done, Failed, or the server\'s word', () {
+  test('the last run went well, badly or neither', () {
     ScheduledJob ran(String? status) =>
         ScheduledJob(name: 'Job', cron: '* * * * *', lastStatus: status);
-    expect(ran('completed').lastStatusText, 'Done');
     expect(ran('completed').lastWentWell, isTrue);
-    expect(ran('failed').lastStatusText, 'Failed');
     expect(ran('failed').lastWentWell, isFalse);
-    expect(ran('running').lastStatusText, 'Running');
     expect(ran('running').lastWentWell, isNull);
-    expect(ran(null).lastStatusText, isNull);
+    expect(ran(null).lastWentWell, isNull);
   });
 }

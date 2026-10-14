@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
 import '../support/fake_settings.dart';
+import '../support/settings_text.dart';
 import '../support/rig.dart';
 
 Future<Rig> started(FakeAnythingLlm llm, {Prefs prefs = const Prefs()}) async {

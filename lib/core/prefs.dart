@@ -2,6 +2,8 @@
 
 import 'dart:convert';
 
+import 'json.dart';
+
 /// A document switched off in a workspace: no longer embedded there, but still listed in its
 /// Sources so it can be switched back on.
 class OffDoc {
@@ -383,12 +385,7 @@ class Prefs {
   /// Reads what [encode] wrote. Anything it cannot read falls back to the default, and keys it
   /// no longer uses, such as the old `groundedOnly`, are ignored.
   static Prefs decode(String text) {
-    final Object? json;
-    try {
-      json = jsonDecode(text);
-    } on FormatException {
-      return const Prefs();
-    }
+    final json = jsonOrNull(text);
     if (json is! Map) return const Prefs();
     final off = json['switchedOff'];
     final order = json['workspaceOrder'];
