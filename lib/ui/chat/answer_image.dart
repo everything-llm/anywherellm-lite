@@ -79,7 +79,7 @@ class _AnswerImageState extends State<AnswerImage> {
   void didUpdateWidget(AnswerImage old) {
     super.didUpdateWidget(old);
     // An answer's images rebuild with each chunk of it, mostly unchanged.
-    if (old.uri != widget.uri || old.loadable != widget.loadable) _read();
+    if (old.written != widget.written || old.server != widget.server) _read();
   }
 
   void _read() {

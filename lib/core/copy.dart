@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 // Wording, kept in one place so every part of the app says the same things.
 
 /// What a document whose text the server left out says in place of it.
@@ -25,10 +27,11 @@ String clockText(DateTime at) =>
 /// blank or only a markup tag, such as `<instructions version="3">`, or [text] whole when every
 /// line is one.
 String promptPreview(String text) {
-  final lines = text.split('\n').map((line) => line.trim());
-  final tag = RegExp(r'^</?[\w:.-]+(\s[^>]*)?>$');
-  return lines.firstWhere(
-    (line) => line.isNotEmpty && !tag.hasMatch(line),
-    orElse: () => text.trim(),
-  );
+  for (final line in const LineSplitter().convert(text)) {
+    final trimmed = line.trim();
+    if (trimmed.isNotEmpty && !_markupTag.hasMatch(trimmed)) return trimmed;
+  }
+  return text.trim();
 }
+
+final _markupTag = RegExp(r'^</?[\w:.-]+(\s[^>]*)?>$');
