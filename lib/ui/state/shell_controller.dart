@@ -143,7 +143,6 @@ class ShellController extends ChangeNotifier {
     if (key == null || identical(_popup.value, key)) _popup.value = null;
   }
 
-  HomeTab _homeTab = HomeTab.chats;
   bool _rightOpen = false;
   FilesSection? _workspacePage;
   bool _scanning = false;
@@ -249,7 +248,7 @@ class ShellController extends ChangeNotifier {
   bool get chatOpen => _chatOpen;
 
   /// The tab the home shows: Settings while Settings is open, else Chats.
-  HomeTab get tab => _settingsOpen ? HomeTab.settings : _homeTab;
+  HomeTab get tab => _settingsOpen ? HomeTab.settings : HomeTab.chats;
 
   /// Whether the home shows, with the bar of its tabs: the Chats tab with nothing over it, or
   /// Settings' list.
@@ -337,7 +336,6 @@ class ShellController extends ChangeNotifier {
     _scanning = false;
     _guide = null;
     _settingsOpen = tab == HomeTab.settings;
-    if (tab != HomeTab.settings) _homeTab = tab;
     _settingsPage = null;
     _settingsDirect = false;
     _popup.value = null;

@@ -7,8 +7,8 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import 'app_view.dart';
 
-/// An app's working page in the device's web view. The page runs its scripts, as its ticks and
-/// adds need, and stays on its own host and port; a link anywhere else goes to `onLeave`, and
+/// A page an answer links to in the device's web view. The page runs its scripts and stays on
+/// its own host and port; a link anywhere else goes to `onLeave`, and
 /// `window.close()`, which a web view ignores, to `onClose`.
 class AppWebViews implements AppView {
   const AppWebViews();

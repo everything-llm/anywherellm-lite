@@ -115,9 +115,8 @@ Pairing parsePairingCode(String raw) {
   final key = uri.queryParameters['key'];
   if (url == null || key == null) throw notOurs;
   return Pairing(Connection.parse(url, key), {
-    for (final companion in const [toolkitCompanion])
-      if (uri.queryParameters[companion.code] case final address?)
-        companion.service: _companionAddress(address),
+    if (uri.queryParameters[toolkitCompanion.code] case final address?)
+      toolkitCompanion.service: _companionAddress(address),
   });
 }
 

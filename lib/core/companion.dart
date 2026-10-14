@@ -34,7 +34,7 @@ List<String> segmentsOf(Uri uri) => [
 ];
 
 /// [path] under [base]'s own path, with [query]: how a companion behind a path prefix, as
-/// `https://host/apps`, is reached.
+/// `https://host/toolkit`, is reached.
 Uri under(Uri base, List<String> path, [Map<String, String>? query]) =>
     base.replace(
       pathSegments: [...segmentsOf(base), ...path],
