@@ -68,11 +68,11 @@ class _ChatSheetState extends State<ChatSheet> {
     return ModalSheet(
       title: of.deleting ? 'Delete chat' : 'Chat',
       onClose: _close,
-      child: of.deleting ? _Delete(of.thread.name, of) : _sheet(context),
+      child: of.deleting ? _Delete(of) : _sheet(),
     );
   }
 
-  Widget _sheet(BuildContext context) {
+  Widget _sheet() {
     final scope = _scope;
     final thread = widget.of.thread;
     final workspace = scope.chat.activeSlug ?? '';
@@ -130,16 +130,15 @@ class _ChatSheetState extends State<ChatSheet> {
 
 /// The question before a chat is deleted.
 class _Delete extends StatelessWidget {
-  const _Delete(this.name, this.of);
+  const _Delete(this.of);
 
-  final String name;
   final ChatSheetFor of;
 
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     return SheetQuestion(
-      'Delete $name? Its messages go with it.',
+      'Delete ${of.thread.name}? Its messages go with it.',
       onKeep: scope.shell.closePopup,
       onDelete: () {
         scope.shell.closePopup();

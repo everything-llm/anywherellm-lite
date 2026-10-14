@@ -68,13 +68,11 @@ class _WorkspaceSheetViewState extends State<WorkspaceSheetView> {
       title: title,
       onClose: _close,
       autofocus: widget.kind == WorkspaceSheet.delete,
-      child: widget.kind == WorkspaceSheet.delete
-          ? _delete(context)
-          : _naming(context),
+      child: widget.kind == WorkspaceSheet.delete ? _delete() : _naming(),
     );
   }
 
-  Widget _naming(BuildContext context) {
+  Widget _naming() {
     final create = widget.kind == WorkspaceSheet.create;
     // It scrolls when the keyboard leaves it too little room.
     return SingleChildScrollView(
@@ -118,7 +116,7 @@ class _WorkspaceSheetViewState extends State<WorkspaceSheetView> {
     );
   }
 
-  Widget _delete(BuildContext context) {
+  Widget _delete() {
     final chat = _scope.chat;
     final active = chat.active;
     final chats = plural(

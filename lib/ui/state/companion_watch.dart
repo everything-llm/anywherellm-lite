@@ -46,10 +46,6 @@ mixin CompanionWatch on ChangeNotifier {
   @protected
   void serverChanged() {}
 
-  /// What the companion answered changed: it was found, lost, or serves something else.
-  @protected
-  void detected() {}
-
   void _settingsChanged() {
     final here = _watched.connection;
     final address = _watched.addressOf(_companion.companion);
@@ -82,7 +78,6 @@ mixin CompanionWatch on ChangeNotifier {
     available = found != null;
     _features = features;
     notifyListeners();
-    detected();
   }
 
   /// Stops following the server in use.

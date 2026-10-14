@@ -142,14 +142,6 @@ class _Waiting {
   void cancel() => next?.cancel();
 }
 
-/// The workspaces and their chats, the chat on screen, and the answers running.
-///
-/// One answer runs at a time in each workspace, since AnythingLLM gives an agent run no thread
-/// of its own.
-///
-/// A chat not yet asked anything is a draft: it lives only here until its first message, which
-/// makes the thread on the server. Everything it knows is about the server in [_settings]; a new
-/// server starts it afresh.
 /// One read of an answer image: its bytes as they are read, and [done] once they are.
 class _ImageRead {
   _ImageRead(Uri url, ChatController chat) {
@@ -168,6 +160,14 @@ class _ImageRead {
   Uint8List? done;
 }
 
+/// The workspaces and their chats, the chat on screen, and the answers running.
+///
+/// One answer runs at a time in each workspace, since AnythingLLM gives an agent run no thread
+/// of its own.
+///
+/// A chat not yet asked anything is a draft: it lives only here until its first message, which
+/// makes the thread on the server. Everything it knows is about the server in [_settings]; a new
+/// server starts it afresh.
 class ChatController extends ChangeNotifier {
   ChatController(this._api, this._settings, this._prefs)
     : _server = _settings.connection {
@@ -942,8 +942,7 @@ class ChatController extends ChangeNotifier {
             _newerThanAll(turns, said.chatId!)) {
       final saved = [for (final m in history) Turn.saved(m)];
       _turns[thread] = saved;
-      _finished = (turn: saved.last, slug: slug, thread: thread);
-      if (thread != activeThread || slug != activeSlug) _ready[thread] = slug;
+      _markFinished(saved.last, slug, thread);
       return _endWaiting(waiting);
     }
     if (waiting.reads >= waitReads) {
@@ -985,6 +984,13 @@ class ChatController extends ChangeNotifier {
     _finish(running);
   }
 
+  /// Records [turn] as the last answer that ran to its end, and marks its chat ready unless it
+  /// is the one on screen.
+  void _markFinished(Turn turn, String slug, String thread) {
+    _finished = (turn: turn, slug: slug, thread: thread);
+    if (thread != activeThread || slug != activeSlug) _ready[thread] = slug;
+  }
+
   /// Ends [running], with [error] when it failed, unless it was already stopped or dropped.
   void _finish(_Running running, {String? error}) {
     if (!_runs.remove(running)) return;
@@ -994,10 +1000,7 @@ class ChatController extends ChangeNotifier {
     }
     if ((error, running.thread) case (null, final thread?)
         when !running.answer.unfinished) {
-      _finished = (turn: running.answer, slug: running.slug, thread: thread);
-      if (thread != activeThread || running.slug != activeSlug) {
-        _ready[thread] = running.slug;
-      }
+      _markFinished(running.answer, running.slug, thread);
     }
     // An answer in a chat, however it ended, is a use of it, for Recent.
     if (running.thread case final thread?) {

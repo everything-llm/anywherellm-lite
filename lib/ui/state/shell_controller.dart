@@ -301,16 +301,23 @@ class ShellController extends ChangeNotifier {
         !_upcomingOpen) {
       return;
     }
-    _shelfOpen = false;
+    _clearOverlays();
     _chatOpen = true;
     _settingsOpen = false;
-    _scanning = false;
-    _guide = null;
+    notifyListeners();
+  }
+
+  /// Closes what lies over the Chats tab but the chat and Settings: the shelf, the workspace's
+  /// pages, Upcoming, the scanner and the walk-through. A document's text forgets what it was
+  /// opened over.
+  void _clearOverlays() {
+    _shelfOpen = false;
     _sourcesUnder = null;
     _pane = Pane.chats;
     _workspacePage = null;
     _upcomingOpen = false;
-    notifyListeners();
+    _scanning = false;
+    _guide = null;
   }
 
   /// Takes the chat off the screen, back to the Chats tab. It stays built, so a draft and a
@@ -326,15 +333,9 @@ class ShellController extends ChangeNotifier {
 
   /// Shows [tab] with nothing over it.
   void showTab(HomeTab tab) {
-    _shelfOpen = false;
+    _clearOverlays();
     _chatOpen = false;
     _rightOpen = false;
-    _sourcesUnder = null;
-    _pane = Pane.chats;
-    _workspacePage = null;
-    _upcomingOpen = false;
-    _scanning = false;
-    _guide = null;
     _settingsOpen = tab == HomeTab.settings;
     _settingsPage = null;
     _settingsDirect = false;
