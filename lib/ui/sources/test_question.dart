@@ -12,12 +12,11 @@ import '../widgets/tappable.dart';
 /// Tests what a question finds in the switched-on files: the passages an answer would get, each
 /// with how close it is. Tapping one shows all of it and lights up its file.
 class TestQuestion extends StatefulWidget {
-  const TestQuestion({super.key, this.trigger});
+  const TestQuestion({super.key, required this.trigger});
 
   /// What stands over the question, given the way to open it, or null while it is open, such
-  /// as a Test a question among other buttons; the question opens under it. Null is a Test a
-  /// question of its own, which the question replaces.
-  final Widget Function(VoidCallback? open)? trigger;
+  /// as a Test a question among other buttons; the question opens under it.
+  final Widget Function(VoidCallback? open) trigger;
 
   @override
   State<TestQuestion> createState() => _TestQuestionState();
@@ -42,24 +41,13 @@ class _TestQuestionState extends State<TestQuestion> {
   void _show() => setState(() => _open = true);
 
   @override
-  Widget build(BuildContext context) {
-    final trigger = widget.trigger;
-    if (trigger == null) {
-      return _open
-          ? _form()
-          : Align(
-              alignment: Alignment.centerLeft,
-              child: TextAction('search', 'Test a question', _show),
-            );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        trigger(_open ? null : _show),
-        if (_open) ...[const SizedBox(height: 12), _form()],
-      ],
-    );
-  }
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      widget.trigger(_open ? null : _show),
+      if (_open) ...[const SizedBox(height: 12), _form()],
+    ],
+  );
 
   /// The question, its buttons, and what it found.
   Widget _form() {

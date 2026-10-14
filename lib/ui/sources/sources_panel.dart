@@ -73,7 +73,6 @@ class _Body extends StatelessWidget {
     final scope = AppScope.of(context);
     final sources = scope.sources;
     final slug = scope.chat.activeSlug;
-    final t = Tokens.of(context);
     final card = files.isNotEmpty || sources.loading;
     return CustomScrollView(
       shrinkWrap: true,
@@ -82,14 +81,10 @@ class _Body extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  files.isEmpty && !sources.loading
-                      ? 'No documents in this workspace yet.'
-                      : 'Answers draw on the ones switched on.',
-                  style: Type.note(t.muted),
-                ),
+              CardCaption(
+                files.isEmpty && !sources.loading
+                    ? 'No documents in this workspace yet.'
+                    : 'Answers draw on the ones switched on.',
               ),
               ..._notices(context),
               const SizedBox(height: 16),
@@ -122,7 +117,6 @@ class _Body extends StatelessWidget {
                 onProblem: sources.report,
                 trigger: (browse) => AddSource(
                   key: ValueKey(('add', slug)),
-                  buttons: true,
                   leading: AppButton('Add a file', onPressed: browse),
                 ),
               ),

@@ -17,11 +17,13 @@ BoxDecoration cardDecoration(Tokens t, {bool inSheet = false}) => BoxDecoration(
   border: Border.all(color: t.line2),
 );
 
-/// A rounded panel holding [children] one above another, as Settings draws a card.
+/// A rounded panel holding [children] one above another, [spacing] apart, as Settings draws a
+/// card.
 class PanelCard extends StatelessWidget {
-  const PanelCard({super.key, required this.children});
+  const PanelCard({super.key, required this.children, this.spacing = 10});
 
   final List<Widget> children;
+  final double spacing;
 
   @override
   Widget build(BuildContext context) {
@@ -31,11 +33,24 @@ class PanelCard extends StatelessWidget {
       decoration: cardDecoration(t),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: 10,
+        spacing: spacing,
         children: children,
       ),
     );
   }
+}
+
+/// A muted line of words in line with the cards' edges, 8 px in from the page's sides.
+class CardCaption extends StatelessWidget {
+  const CardCaption(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 8),
+    child: Text(text, style: Type.note(Tokens.of(context).muted)),
+  );
 }
 
 /// A rounded panel of [rows], a hairline between each, as a grouped card: its edge is
@@ -291,9 +306,8 @@ class NamedControl extends StatelessWidget {
 }
 
 /// A row of a [FieldCard] that only says something: [title] at 17, with [tag] beside it, over
-/// the line [about], in the mono face when [mono], or the line [aboutSpan] drawn as it says, and
-/// [trailing] at its end. It is taller
-/// than a row that opens something, as the design canvas draws it.
+/// the line [about], in the mono face when [mono], or the line [aboutSpan] drawn as it says. It
+/// is taller than a row that opens something, as the design canvas draws it.
 class InfoRow extends StatelessWidget {
   const InfoRow(
     this.title, {
@@ -302,7 +316,6 @@ class InfoRow extends StatelessWidget {
     this.aboutSpan,
     this.mono = false,
     this.tag,
-    this.trailing,
   });
 
   final String title;
@@ -312,7 +325,6 @@ class InfoRow extends StatelessWidget {
 
   /// A badge beside [title], such as Saved.
   final Widget? tag;
-  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -359,7 +371,6 @@ class InfoRow extends StatelessWidget {
               ],
             ),
           ),
-          ?trailing,
         ],
       ),
     );
@@ -515,7 +526,6 @@ class CardRow extends StatelessWidget {
     this.trailing,
     this.tone = RowTone.plain,
     this.strong = false,
-    this.height = Sizes.cardRow,
     this.large = false,
     this.checked,
     this.heard,
@@ -534,7 +544,6 @@ class CardRow extends StatelessWidget {
 
   /// Semibold words, as New workspace is.
   final bool strong;
-  final double height;
   final bool large;
 
   /// For a row that is one of a choice: whether it is the one chosen, which a check before it
@@ -555,7 +564,9 @@ class CardRow extends StatelessWidget {
       onTap: onTap,
       dimWhenDisabled: 0.5,
       child: Container(
-        constraints: BoxConstraints(minHeight: large ? Sizes.navRow : height),
+        constraints: BoxConstraints(
+          minHeight: large ? Sizes.navRow : Sizes.cardRow,
+        ),
         padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
         child: Row(
           spacing: large ? 16 : 14,
@@ -619,57 +630,52 @@ class SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    return Container(
-      padding: const EdgeInsets.all(FieldCard.inset),
-      decoration: cardDecoration(t),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: 8,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            spacing: 12,
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Type.sans(19, weight: FontWeight.w500, color: t.ink),
-                ),
+    return PanelCard(
+      spacing: 8,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          spacing: 12,
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Type.sans(19, weight: FontWeight.w500, color: t.ink),
               ),
-              ?trailing,
-            ],
-          ),
-          ...lines,
-          if (link case final link?)
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Tappable(
-                label: link,
-                onTap: onLink,
-                dimWhenDisabled: 0.5,
-                child: Container(
-                  constraints: const BoxConstraints(minHeight: 44),
-                  padding: const EdgeInsets.only(top: 6),
-                  alignment: Alignment.centerLeft,
-                  decoration: BoxDecoration(
-                    border: Border(top: BorderSide(color: t.line2)),
-                  ),
-                  child: Text(
-                    link,
-                    style: Type.sans(
-                      17,
-                      weight: FontWeight.w500,
-                      color: t.accent,
-                    ),
+            ),
+            ?trailing,
+          ],
+        ),
+        ...lines,
+        if (link case final link?)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Tappable(
+              label: link,
+              onTap: onLink,
+              dimWhenDisabled: 0.5,
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 44),
+                padding: const EdgeInsets.only(top: 6),
+                alignment: Alignment.centerLeft,
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: t.line2)),
+                ),
+                child: Text(
+                  link,
+                  style: Type.sans(
+                    17,
+                    weight: FontWeight.w500,
+                    color: t.accent,
                   ),
                 ),
               ),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 }

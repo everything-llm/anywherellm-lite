@@ -10,20 +10,11 @@ enum _Adding { none, link, text }
 /// Adds a source that is not a file: a web page the server reads in, or text pasted here, each
 /// with optional details. Its form takes the place of its row of ways to add one.
 class AddSource extends StatefulWidget {
-  const AddSource({
-    super.key,
-    this.buttons = false,
-    this.leading,
-    this.trailing,
-  });
+  const AddSource({super.key, required this.leading});
 
-  /// Draws Add a link and Paste text as buttons rather than small text actions.
-  final bool buttons;
-
-  /// What the row holds before Add a link, such as an Add a file button, and at its end. Both
-  /// give way to an open form.
-  final Widget? leading;
-  final Widget? trailing;
+  /// What the row holds before Add a link, such as an Add a file button. It gives way to an
+  /// open form.
+  final Widget leading;
 
   @override
   State<AddSource> createState() => _AddSourceState();
@@ -71,32 +62,15 @@ class _AddSourceState extends State<AddSource> {
     AppScope.of(context).sources.addText(title, text, meta: meta);
   }
 
-  Widget _row() {
-    final ways = Wrap(
-      spacing: widget.buttons ? 8 : 4,
-      runSpacing: widget.buttons ? 8 : 4,
-      children: [
-        ?widget.leading,
-        if (widget.buttons) ...[
-          AppButton('Add a link', onPressed: () => _open(_Adding.link)),
-          AppButton('Paste text', onPressed: () => _open(_Adding.text)),
-        ] else ...[
-          TextAction('link', 'Add a link', () => _open(_Adding.link)),
-          TextAction('doc', 'Paste text', () => _open(_Adding.text)),
-        ],
-      ],
-    );
-    final trailing = widget.trailing;
-    if (trailing == null) return ways;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: ways),
-        const SizedBox(width: 8),
-        trailing,
-      ],
-    );
-  }
+  Widget _row() => Wrap(
+    spacing: 8,
+    runSpacing: 8,
+    children: [
+      widget.leading,
+      AppButton('Add a link', onPressed: () => _open(_Adding.link)),
+      AppButton('Paste text', onPressed: () => _open(_Adding.text)),
+    ],
+  );
 
   @override
   Widget build(BuildContext context) => switch (_adding) {

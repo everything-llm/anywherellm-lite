@@ -65,13 +65,7 @@ class TextViewer extends StatelessWidget {
             ),
           ),
         const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Text(
-            'The text the server read from this document.',
-            style: Type.note(t.muted),
-          ),
-        ),
+        const CardCaption('The text the server read from this document.'),
         if (file != null) ...[
           const SizedBox(height: 20),
           ActionRow(even: true, [

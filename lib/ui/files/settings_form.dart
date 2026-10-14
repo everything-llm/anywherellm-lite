@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../../core/chat.dart';
-import '../../core/server_models.dart';
 import '../app_scope.dart';
 import '../layout.dart';
 import '../widgets/buttons.dart';
@@ -28,22 +27,11 @@ class SettingsForm extends StatefulWidget {
 }
 
 class _SettingsFormState extends State<SettingsForm> {
-  static const _textKeys = [
-    'chatProvider',
-    'chatModel',
-    'agentProvider',
-    'agentModel',
-    'queryRefusalResponse',
-    'openAiHistory',
-    'openAiTemp',
-    'topN',
-  ];
+  static const _refusalKey = 'queryRefusalResponse';
 
   late final Map<String, Object?> _saved;
-  late final Map<String, TextEditingController> _text;
+  late final TextEditingController _refusal;
   late String? _mode;
-  late String? _search;
-  late Object? _similarity;
   bool _saving = false;
 
   /// Whether the model picker shows.
@@ -54,82 +42,44 @@ class _SettingsFormState extends State<SettingsForm> {
     super.initState();
     final detail = AppScope.of(context).files.detail(widget.slug);
     _saved = {...?detail?.settings?.values};
-    _text = {
-      for (final key in _textKeys)
-        key: TextEditingController(text: _show(_saved[key])),
-    };
+    _refusal = TextEditingController(text: _show(_saved[_refusalKey]));
     _mode = _saved['chatMode'] as String?;
-    _search = _saved['vectorSearchMode'] as String?;
-    _similarity = _saved['similarityThreshold'];
   }
 
   @override
   void dispose() {
-    for (final controller in _text.values) {
-      controller.dispose();
-    }
+    _refusal.dispose();
     super.dispose();
   }
 
   static String _show(Object? value) => value == null ? '' : '$value';
 
-  /// The form's values by column, or the problem with each one that cannot be read.
-  (Map<String, Object?>, Map<String, String>) _read() {
-    final values = <String, Object?>{};
-    final problems = <String, String>{};
-    for (final key in _textKeys) {
-      final text = _text[key]!.text.trim();
-      final spec = workspaceSettingSpecs[key]!;
-      // A field left as the server had it keeps the server's value, even `""` or one with
-      // spaces around it, so it is not sent.
-      if (text == _show(_saved[key]).trim()) {
-        values[key] = _saved[key];
-        continue;
-      }
-      if (text.isEmpty) {
-        values[key] = null;
-        continue;
-      }
-      switch (spec.type) {
-        case SettingType.text:
-          values[key] = text;
-        case SettingType.integer:
-          final whole = int.tryParse(text);
-          whole == null
-              ? problems[key] = 'A whole number.'
-              : values[key] = whole;
-        case SettingType.number:
-          final number = num.tryParse(text);
-          number == null ? problems[key] = 'A number.' : values[key] = number;
-      }
-    }
-    values['chatMode'] = _mode;
-    values['vectorSearchMode'] = _search;
-    values['similarityThreshold'] = _similarity;
-    return (values, problems);
+  /// The two settings the form edits, by column. A field left as the server had it keeps the
+  /// server's value, even `""` or one with spaces around it, so it is not sent.
+  Map<String, Object?> get _values {
+    final text = _refusal.text.trim();
+    return {
+      'chatMode': _mode,
+      _refusalKey: text == _show(_saved[_refusalKey]).trim()
+          ? _saved[_refusalKey]
+          : text.isEmpty
+          ? null
+          : text,
+    };
   }
 
-  bool get _dirty {
-    final (values, problems) = _read();
-    return problems.isNotEmpty ||
-        values.entries.any((entry) => entry.value != _saved[entry.key]);
-  }
+  bool get _dirty =>
+      _values.entries.any((entry) => entry.value != _saved[entry.key]);
 
   Future<void> _save() async {
-    final (values, problems) = _read();
-    if (problems.isNotEmpty) return;
     setState(() => _saving = true);
-    await AppScope.of(context).files.save(jsonEncode(values));
+    await AppScope.of(context).files.save(jsonEncode(_values));
     if (mounted) setState(() => _saving = false);
   }
 
   void _revert() => setState(() {
-    for (final key in _textKeys) {
-      _text[key]!.text = _show(_saved[key]);
-    }
+    _refusal.text = _show(_saved[_refusalKey]);
     _mode = _saved['chatMode'] as String?;
-    _search = _saved['vectorSearchMode'] as String?;
-    _similarity = _saved['similarityThreshold'];
   });
 
   @override
@@ -205,7 +155,7 @@ class _SettingsFormState extends State<SettingsForm> {
         ],
         const CardHeading('When the files do not cover it'),
         AppField(
-          controller: _text['queryRefusalResponse']!,
+          controller: _refusal,
           label: 'When the files do not cover it',
           hint: 'System default',
           maxLines: 3,

@@ -379,20 +379,22 @@ class _Screen extends StatelessWidget {
   }
 
   /// [text] with the words between asterisks bold in the accent.
-  static List<TextSpan> _accented(String text, Tokens t) => [
-    for (final (n, part) in text.split('*').indexed)
-      n.isOdd
-          ? TextSpan(
-              text: part,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontVariations: const [FontVariation('wght', 700)],
-                color: t.accent,
-              ),
-            )
-          : TextSpan(text: part),
-  ];
+  static List<TextSpan> _accented(String text, Tokens t) => _marked(
+    text,
+    '*',
+    TextStyle(
+      fontWeight: FontWeight.w700,
+      fontVariations: const [FontVariation('wght', 700)],
+      color: t.accent,
+    ),
+  );
 }
+
+/// [text] split at each [marker], the parts between a pair of them drawn in [style].
+List<TextSpan> _marked(String text, Pattern marker, TextStyle style) => [
+  for (final (n, part) in text.split(marker).indexed)
+    TextSpan(text: part, style: n.isOdd ? style : null),
+];
 
 /// Words set 8 px in from the cards' edges.
 class _Padded extends StatelessWidget {
@@ -447,15 +449,11 @@ class _Code extends StatelessWidget {
         ),
       ];
     }
-    return [
-      for (final (n, part) in line.split(_brackets).indexed)
-        n.isOdd
-            ? TextSpan(
-                text: part,
-                style: TextStyle(color: t.ink, backgroundColor: t.accentbg),
-              )
-            : TextSpan(text: part),
-    ];
+    return _marked(
+      line,
+      _brackets,
+      TextStyle(color: t.ink, backgroundColor: t.accentbg),
+    );
   }
 }
 
@@ -468,7 +466,6 @@ class _Lines extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final detail = Type.sans(13, color: t.muted, height: 1.45);
     final code = Type.mono(
       12.5,
       color: t.ink2,
@@ -498,11 +495,8 @@ class _Lines extends StatelessWidget {
               ),
               Text.rich(
                 TextSpan(
-                  style: detail,
-                  children: [
-                    for (final (n, part) in about.split('`').indexed)
-                      TextSpan(text: part, style: n.isOdd ? code : null),
-                  ],
+                  style: Type.note(t.muted),
+                  children: _marked(about, '`', code),
                 ),
               ),
             ],

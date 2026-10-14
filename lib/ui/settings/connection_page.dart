@@ -22,21 +22,8 @@ import '../widgets/sheet.dart';
 /// How this device reaches the server: the address and developer key, and what the server
 /// says. The server reads Connected once Test connection passes here,
 /// until the page closes or the connection changes or fails a test.
-class ConnectionPage extends StatefulWidget {
+class ConnectionPage extends StatelessWidget {
   const ConnectionPage({super.key});
-
-  @override
-  State<ConnectionPage> createState() => _ConnectionPageState();
-}
-
-class _ConnectionPageState extends State<ConnectionPage> {
-  /// Whether Test connection was asked on this page.
-  bool _tested = false;
-
-  void _test() {
-    setState(() => _tested = true);
-    AppScope.of(context).settings.testSaved();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +39,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
           child!,
         ],
       ),
-      child: _KeyCard(tested: _tested, onTest: _test),
+      child: const _KeyCard(),
     );
   }
 }
@@ -127,13 +114,7 @@ class _OrDivider extends StatelessWidget {
 /// is kept, with the form to edit it under it while open, then Test connection, Edit connection
 /// and Forget this server, one under another.
 class _KeyCard extends StatefulWidget {
-  const _KeyCard({required this.tested, required this.onTest});
-
-  /// Whether Test connection was asked on this page, so a pass reads Connected.
-  final bool tested;
-
-  /// Tests the saved connection.
-  final VoidCallback onTest;
+  const _KeyCard();
 
   @override
   State<_KeyCard> createState() => _KeyCardState();
@@ -146,6 +127,9 @@ class _KeyCardState extends State<_KeyCard> {
   final _key = TextEditingController();
   bool _replacing = false;
   bool _confirmForget = false;
+
+  /// Whether Test connection was asked on this page, so a pass reads Connected.
+  bool _tested = false;
 
   /// The shell, which holds whether the camera reads a code, so Back can stop it.
   late final ShellController _shell = AppScope.of(context).shell;
@@ -173,6 +157,34 @@ class _KeyCardState extends State<_KeyCard> {
 
   Future<void> _save() async =>
       _saved(await _settings.connect(_url.text, _key.text));
+
+  /// Tests the saved connection.
+  void _test() {
+    setState(() => _tested = true);
+    unawaited(_settings.testSaved());
+  }
+
+  /// The address field, named [label] to a screen reader.
+  Widget _urlField(String label) => AppField(
+    controller: _url,
+    label: label,
+    hint: _example,
+    keyboardType: TextInputType.url,
+    autofillHints: const [AutofillHints.url],
+  );
+
+  /// The developer key field, which sends the form on Enter unless it is [saving].
+  Widget _keyField(bool saving) => SecretField(
+    controller: _key,
+    label: 'AnythingLLM developer API key',
+    hint: 'Paste the AnythingLLM API key',
+    // Not a password: AppField leaves it out of autofill, so no saved login is offered for it.
+    keyboardType: TextInputType.visiblePassword,
+    onSubmitted: (_) => saving ? null : _save(),
+  );
+
+  /// Why the last scan or try failed, when it did.
+  List<String> get _notes => [?_scanProblem, ?_settings.message];
 
   /// Closes the form once a connection was saved.
   void _saved(bool saved) {
@@ -260,7 +272,7 @@ class _KeyCardState extends State<_KeyCard> {
             about: _replacing ? null : connection.baseUrl,
             mono: true,
             tag: AppBadge(
-              widget.tested && _settings.check == ConnectionCheck.ok
+              _tested && _settings.check == ConnectionCheck.ok
                   ? 'Connected'
                   : 'Saved',
               kind: BadgeKind.ok,
@@ -284,22 +296,8 @@ class _KeyCardState extends State<_KeyCard> {
         if (_replacing && !_shell.scanning)
           PanelCard(
             children: [
-              AppField(
-                controller: _url,
-                label: 'AnythingLLM server address',
-                hint: _example,
-                keyboardType: TextInputType.url,
-                autofillHints: const [AutofillHints.url],
-              ),
-              SecretField(
-                controller: _key,
-                label: 'AnythingLLM developer API key',
-                hint: 'Paste the AnythingLLM API key',
-                // Not a password: AppField leaves it out of autofill, so no saved
-                // login is offered for it.
-                keyboardType: TextInputType.visiblePassword,
-                onSubmitted: (_) => saving ? null : _save(),
-              ),
+              _urlField('AnythingLLM server address'),
+              _keyField(saving),
               ActionRow([
                 AppButton(
                   saving ? 'Checking…' : 'Save key',
@@ -314,7 +312,7 @@ class _KeyCardState extends State<_KeyCard> {
               ]),
             ],
           ),
-        for (final note in [?_scanProblem, ?_settings.message])
+        for (final note in _notes)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: HelpText(note, status: true),
@@ -323,7 +321,7 @@ class _KeyCardState extends State<_KeyCard> {
           AlertBox(AlertKind.warn, problem.title, text: problem.text),
         AppButton(
           saving && !_replacing ? 'Testing…' : 'Test connection',
-          onPressed: saving ? null : widget.onTest,
+          onPressed: saving ? null : _test,
         ),
         AppButton(
           _replacing ? 'Cancel' : 'Edit connection',
@@ -383,7 +381,6 @@ class _KeyCardState extends State<_KeyCard> {
   /// QR icon before its label. How connecting works is under the page, in the settings dialog.
   Widget _firstRun(BuildContext context, bool saving, VoidCallback startScan) {
     final scanner = _scanner;
-    final notes = [?_scanProblem, ?_settings.message];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       spacing: 28,
@@ -412,25 +409,13 @@ class _KeyCardState extends State<_KeyCard> {
               'Server address',
               quiet: true,
               labelled: true,
-              AppField(
-                controller: _url,
-                label: 'Server address',
-                hint: _example,
-                keyboardType: TextInputType.url,
-                autofillHints: const [AutofillHints.url],
-              ),
+              _urlField('Server address'),
             ),
             NamedControl(
               'Developer API key',
               quiet: true,
               labelled: true,
-              SecretField(
-                controller: _key,
-                label: 'AnythingLLM developer API key',
-                hint: 'Paste the AnythingLLM API key',
-                keyboardType: TextInputType.visiblePassword,
-                onSubmitted: (_) => saving ? null : _save(),
-              ),
+              _keyField(saving),
             ),
             Align(
               alignment: Alignment.centerLeft,
@@ -455,7 +440,7 @@ class _KeyCardState extends State<_KeyCard> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   spacing: 8,
                   children: [
-                    for (final note in notes) HelpText(note, status: true),
+                    for (final note in _notes) HelpText(note, status: true),
                   ],
                 ),
               ),

@@ -169,7 +169,7 @@ void main() {
         }
         h.shell
           ..showSettingsPage(SettingsPage.memory)
-          ..togglePopup(const MemorySheet('g:new'));
+          ..togglePopup(const MemorySheet(global: true));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull, reason: 'a new memory');
       });

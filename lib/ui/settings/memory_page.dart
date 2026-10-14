@@ -19,18 +19,22 @@ import '../widgets/tappable.dart';
 import 'rows.dart';
 
 /// The Memory page's sheet for one saved memory, or a new one, in the shell's popup, so Back
-/// closes it: [key] is `g:<id>` or `w:<id>` for a saved memory, `g:new` or `w:new` for a new
-/// one.
+/// closes it.
 class MemorySheet {
-  const MemorySheet(this.key);
+  const MemorySheet({required this.global, this.id});
 
-  final String key;
+  /// Whether the memory shows in every workspace, as it starts.
+  final bool global;
+
+  /// The saved memory's id, or null for a new one.
+  final int? id;
 
   @override
-  bool operator ==(Object other) => other is MemorySheet && other.key == key;
+  bool operator ==(Object other) =>
+      other is MemorySheet && other.global == global && other.id == id;
 
   @override
-  int get hashCode => key.hashCode;
+  int get hashCode => Object.hash(global, id);
 }
 
 /// What chats are shown about the person, for one workspace, picked at the top in a sheet:
@@ -58,13 +62,13 @@ class MemoryPage extends StatelessWidget {
         return PopupSheet(
           open: open != null,
           onClose: shell.closePopup,
-          title: open?.key.endsWith(':new') ?? false
+          title: open != null && open.id == null
               ? 'New memory'
               : 'Saved memory',
           sheet: (context) => _SavedEditor(
-            key: ValueKey(open?.key),
-            memory: _memoryOf(memory, open?.key),
-            global: open?.key.startsWith('g:') ?? true,
+            key: ValueKey(open),
+            memory: _memoryOf(memory, open),
+            global: open?.global ?? true,
             name: name,
             onDone: shell.closePopup,
           ),
@@ -97,11 +101,11 @@ class MemoryPage extends StatelessWidget {
     );
   }
 
-  /// The saved memory [key] names, or null for a new one.
-  static SavedMemory? _memoryOf(MemoryController memory, String? key) {
-    if (key == null || key.endsWith(':new')) return null;
+  /// The saved memory [open] names, or null for a new one.
+  static SavedMemory? _memoryOf(MemoryController memory, MemorySheet? open) {
+    final id = open?.id;
+    if (id == null) return null;
     final saved = memory.saved;
-    final id = int.tryParse(key.substring(2));
     return [
       ...?saved?.global,
       ...?saved?.workspace,
@@ -120,13 +124,12 @@ class MemoryPage extends StatelessWidget {
         const SizedBox(height: 20),
         AlertBox(AlertKind.bad, problem.title, text: problem.text),
       ],
-      if (switches == null)
+      if (switches == null) ...[
         if (memory.loading) ...[
           const SizedBox(height: 20),
           const HelpText('Loading…', status: true),
-        ] else
-          ...[]
-      else ...[
+        ],
+      ] else ...[
         CardHeading('Saved memories'),
         FieldCard([
           FieldRow(
@@ -183,24 +186,24 @@ class MemoryPage extends StatelessWidget {
     required bool global,
   }) {
     final shell = AppScope.of(context).shell;
-    final scope = global ? 'g' : 'w';
     final limit = global ? globalMemoryLimit : workspaceMemoryLimit;
+    final add = MemorySheet(global: global);
     return FieldCard([
       for (final m in list)
         _Item(
-          key: ValueKey('$scope:${m.id}'),
+          key: ValueKey(MemorySheet(global: global, id: m.id)),
           text: m.text,
           heard: '${m.text} Change or delete',
-          onTap: () => shell.togglePopup(MemorySheet('$scope:${m.id}')),
+          onTap: () => shell.togglePopup(MemorySheet(global: global, id: m.id)),
         ),
       if (list.length >= limit)
         CardNote('All $limit in use. Delete one to add another.')
       else
         _Item(
-          key: ValueKey('$scope:new'),
+          key: ValueKey(add),
           add: true,
           text: 'Add a memory',
-          onTap: () => shell.togglePopup(MemorySheet('$scope:new')),
+          onTap: () => shell.togglePopup(add),
         ),
     ]);
   }
@@ -216,7 +219,6 @@ class _WorkspaceChoice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
-    final t = Tokens.of(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -233,12 +235,8 @@ class _WorkspaceChoice extends StatelessWidget {
               },
             ),
         ]),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Text(
-            'Memories for every workspace show whichever you pick.',
-            style: Type.note(t.muted),
-          ),
+        const CardCaption(
+          'Memories for every workspace show whichever you pick.',
         ),
       ],
     );
@@ -335,7 +333,7 @@ class _SavedEditorState extends State<_SavedEditor> {
   Future<void> _save() async {
     final memory = AppScope.of(context).memory;
     final text = _text.text.trim();
-    final problem = _problemWith(text, memory);
+    final problem = _problemWith(text);
     setState(() => _problem = problem);
     if (problem != null) return;
     final done = switch (widget.memory) {
@@ -345,22 +343,27 @@ class _SavedEditorState extends State<_SavedEditor> {
     if (done && mounted) widget.onDone();
   }
 
-  String? _problemWith(String text, MemoryController memory) {
+  /// Whether the list for [global] is full, so this memory cannot move into it. A list that is
+  /// full takes no memory from the other, as the design canvas draws it.
+  bool _full(bool global) {
+    final saved = AppScope.of(context).memory.saved;
+    final existing = widget.memory;
+    return saved != null &&
+        (existing == null || existing.global != global) &&
+        (global
+            ? saved.global.length >= globalMemoryLimit
+            : saved.workspace.length >= workspaceMemoryLimit);
+  }
+
+  String? _problemWith(String text) {
     if (text.isEmpty) return 'Write the memory first.';
     if (text.length > memoryTextMax) {
       return 'Keep it to $memoryTextMax characters.';
     }
-    final saved = memory.saved;
-    final moving = widget.memory == null || _global != widget.memory!.global;
-    if (saved != null && moving) {
-      if (_global && saved.global.length >= globalMemoryLimit) {
-        return 'Every workspace has $globalMemoryLimit already. Delete one first.';
-      }
-      if (!_global && saved.workspace.length >= workspaceMemoryLimit) {
-        return '${widget.name} has $workspaceMemoryLimit already. Delete one first.';
-      }
-    }
-    return null;
+    if (!_full(_global)) return null;
+    return _global
+        ? 'Every workspace has $globalMemoryLimit already. Delete one first.'
+        : '${widget.name} has $workspaceMemoryLimit already. Delete one first.';
   }
 
   @override
@@ -368,17 +371,9 @@ class _SavedEditorState extends State<_SavedEditor> {
     final memory = AppScope.of(context).memory;
     final t = Tokens.of(context);
     final existing = widget.memory;
-    final saved = memory.saved;
-    // A list that is full takes no memory from the other, as the design canvas draws it.
-    bool full(bool global) =>
-        saved != null &&
-        (existing == null || existing.global != global) &&
-        (global
-            ? saved.global.length >= globalMemoryLimit
-            : saved.workspace.length >= workspaceMemoryLimit);
     RadioCard choice(bool global, String title, int limit) => RadioCard(
       title: title,
-      about: full(global) ? 'Full' : '$limit at most',
+      about: _full(global) ? 'Full' : '$limit at most',
       selected: _global == global,
       onTap: () => setState(() => _global = global),
     );
@@ -408,13 +403,7 @@ class _SavedEditorState extends State<_SavedEditor> {
               choice(false, 'Only ${widget.name}', workspaceMemoryLimit),
             ],
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              'Every chat there is shown it, word for word.',
-              style: Type.note(t.muted),
-            ),
-          ),
+          const CardCaption('Every chat there is shown it, word for word.'),
           if (_problem case final problem?)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),

@@ -364,7 +364,7 @@ final _screens = <String, _Setup>{
   'memory': (tester, h) => _settings(tester, h, SettingsPage.memory),
   'memedit': (tester, h) async {
     await _settings(tester, h, SettingsPage.memory);
-    h.shell.togglePopup(const MemorySheet('g:1'));
+    h.shell.togglePopup(const MemorySheet(global: true, id: 1));
     await _settle(tester);
   },
   'memws': (tester, h) async {

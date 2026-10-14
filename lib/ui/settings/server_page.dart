@@ -37,33 +37,6 @@ String serverSummary(SystemController system) {
   ].join(' · ');
 }
 
-/// What each provider page of the server says it is set to, by page; null for one that is not
-/// set up.
-Map<SettingsPage, String?> _summaries(
-  SystemController system,
-  Map<String, Object?> values,
-) {
-  final vectors = system.vectors;
-  final speech = _chosen(speechToTextProviders, values);
-  final speaking = _chosen(textToSpeechProviders, values);
-  return {
-    SettingsPage.chatModel: _chatModel(values),
-    SettingsPage.searchModel: _chosen(embedderProviders, values),
-    SettingsPage.storage: [
-      _chosen(vectorProviders, values),
-      if (vectors != null) plural(vectors, 'passage', 'passages'),
-    ].join(' \u00b7 '),
-    SettingsPage.transcription: _chosen(transcriptionProviders, values),
-    SettingsPage.voice: speech == speaking
-        ? speech
-        : '$speech \u00b7 $speaking',
-    // An image provider that is not chosen is not set up.
-    SettingsPage.images: settingText(values, imageProviders.chooser).isEmpty
-        ? null
-        : _chosen(imageProviders, values),
-  };
-}
-
 /// The Server page: what AnythingLLM runs with, the pages in four groups, each row showing its
 /// value and opening the page that changes it, then a way to AnythingLLM's own web page.
 class ServerPage extends StatefulWidget {
@@ -86,17 +59,17 @@ class _ServerPageState extends State<ServerPage> {
 
   @override
   Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    return ServerSettings(
-      builder: (values, _) {
-        return _page(context, _summaries(scope.system, values));
-      },
-    );
+    return ServerSettings(builder: (values, _) => _page(context, values));
   }
 
-  /// Four groups of rows, then a way to AnythingLLM's web page.
-  Widget _page(BuildContext context, Map<SettingsPage, String?> summaries) {
-    final shell = AppScope.of(context).shell;
+  /// Four groups of rows, each with what the server is set to, then a way to AnythingLLM's web
+  /// page.
+  Widget _page(BuildContext context, Map<String, Object?> values) {
+    final scope = AppScope.of(context);
+    final shell = scope.shell;
+    final vectors = scope.system.vectors;
+    final speech = _chosen(speechToTextProviders, values);
+    final speaking = _chosen(textToSpeechProviders, values);
     Widget row(SettingsPage page, [String? value]) => NavRow(
       title: page.label,
       about: value,
@@ -112,17 +85,32 @@ class _ServerPageState extends State<ServerPage> {
       spacing: 18,
       children: [
         group('Answers', [
-          row(SettingsPage.chatModel, summaries[SettingsPage.chatModel]),
-          row(SettingsPage.searchModel, summaries[SettingsPage.searchModel]),
-          row(SettingsPage.storage, summaries[SettingsPage.storage]),
-          row(SettingsPage.images, summaries[SettingsPage.images] ?? 'None'),
+          row(SettingsPage.chatModel, _chatModel(values)),
+          row(SettingsPage.searchModel, _chosen(embedderProviders, values)),
+          row(
+            SettingsPage.storage,
+            [
+              _chosen(vectorProviders, values),
+              if (vectors != null) plural(vectors, 'passage', 'passages'),
+            ].join(' \u00b7 '),
+          ),
+          // An image provider that is not chosen is not set up.
+          row(
+            SettingsPage.images,
+            settingText(values, imageProviders.chooser).isEmpty
+                ? 'None'
+                : _chosen(imageProviders, values),
+          ),
         ]),
         group('Files and voice', [
           row(
             SettingsPage.transcription,
-            summaries[SettingsPage.transcription],
+            _chosen(transcriptionProviders, values),
           ),
-          row(SettingsPage.voice, summaries[SettingsPage.voice]),
+          row(
+            SettingsPage.voice,
+            speech == speaking ? speech : '$speech \u00b7 $speaking',
+          ),
         ]),
         group('Data', [
           row(SettingsPage.chats),
