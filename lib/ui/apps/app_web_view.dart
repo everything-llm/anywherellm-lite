@@ -54,12 +54,13 @@ class _AppWebViewState extends State<_AppWebView> {
   @override
   void initState() {
     super.initState();
+    final close = widget.onClose;
     _web = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (_) {
-            if (widget.onClose != null) {
+            if (close != null) {
               unawaited(
                 _web.runJavaScript(
                   "window.close=()=>$_closeChannel.postMessage('close')",
@@ -80,7 +81,7 @@ class _AppWebViewState extends State<_AppWebView> {
           },
         ),
       );
-    if (widget.onClose case final close?) {
+    if (close != null) {
       unawaited(
         _web.addJavaScriptChannel(
           _closeChannel,

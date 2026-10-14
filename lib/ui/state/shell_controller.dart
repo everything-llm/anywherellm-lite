@@ -57,6 +57,13 @@ class GalleryOpen {
   final String chat;
 }
 
+/// browser-lean's page for an agent's [tab], in its tall sheet over the chat.
+class BrowserOpen {
+  const BrowserOpen(this.tab);
+
+  final Uri tab;
+}
+
 /// A phone's sheet for one chat of the workspace on screen: its name, its pin and Delete, or
 /// with [deleting] the question whether to delete it.
 class ChatSheetFor {
@@ -116,6 +123,21 @@ class ShellController extends ChangeNotifier {
   /// Opens the page of [pictures] at [index], over the window.
   void openGallery(List<Picture> pictures, int index, {required String chat}) =>
       _popup.value = GalleryOpen(pictures, index, chat: chat);
+
+  /// browser-lean's page for the agent's tab, shown in a tall sheet over the chat, or null.
+  Uri? get browserTab => switch (_popup.value) {
+    BrowserOpen(:final tab) => tab,
+    _ => null,
+  };
+
+  /// Shows [tab], browser-lean's page for an agent's tab, in its sheet over the chat, closing
+  /// any other popup.
+  void openBrowser(Uri tab) => _popup.value = BrowserOpen(tab);
+
+  /// Closes the agent's browser, when it is open.
+  void closeBrowser() {
+    if (_popup.value is BrowserOpen) _popup.value = null;
+  }
 
   /// Opens [thread]'s sheet, closing any other popup.
   void openChatSheet(Thread thread, {bool deleting = false}) =>
@@ -178,25 +200,6 @@ class ShellController extends ChangeNotifier {
     _app = null;
     _appPages.clear();
     _popup.value = null;
-    notifyListeners();
-  }
-
-  Uri? _browserTab;
-
-  /// browser-lean's page for the agent's tab, shown in a tall sheet over the chat, or null.
-  Uri? get browserTab => _browserTab;
-
-  /// Shows [tab], browser-lean's page for an agent's tab, in its sheet over the chat.
-  void openBrowser(Uri tab) {
-    _shelfOpen = false;
-    _browserTab = tab;
-    _popup.value = null;
-    notifyListeners();
-  }
-
-  void closeBrowser() {
-    if (_browserTab == null) return;
-    _browserTab = null;
     notifyListeners();
   }
 
@@ -348,8 +351,7 @@ class ShellController extends ChangeNotifier {
         !_settingsOpen &&
         _pane == Pane.chats &&
         !_upcomingOpen &&
-        _app == null &&
-        _browserTab == null) {
+        _app == null) {
       return;
     }
     _shelfOpen = false;
@@ -359,7 +361,6 @@ class ShellController extends ChangeNotifier {
     _guiding = false;
     _app = null;
     _appPages.clear();
-    _browserTab = null;
     _sourcesUnder = null;
     _pane = Pane.chats;
     _workspacePage = null;
@@ -374,7 +375,6 @@ class ShellController extends ChangeNotifier {
     _shelfOpen = false;
     _chatOpen = false;
     _rightOpen = false;
-    _browserTab = null;
     closePopup();
     notifyListeners();
   }
@@ -393,7 +393,6 @@ class ShellController extends ChangeNotifier {
     _settingsOpen = tab == HomeTab.settings;
     if (tab != HomeTab.settings) _homeTab = tab;
     _app = null;
-    _browserTab = null;
     _appPages.clear();
     _settingsPage = null;
     _settingsDirect = false;

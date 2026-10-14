@@ -36,22 +36,19 @@ Future<void> openLink(BuildContext context, String href) async {
 
 /// Opens [href], a link in an answer: an app's page or card opens the app full screen where
 /// the apps server is there, browser-lean's page for an agent's tab opens in its sheet where
-/// the device has a web view ([browserTabOf]), and anything else as [openLink] does.
+/// the device has a web view ([isBrowserTab]), and anything else as [openLink] does.
 Future<void> openAnswerLink(BuildContext context, String href) async {
   final scope = AppScope.of(context);
   final server = scope.settings.connection?.uri;
-  final parsed = Uri.tryParse(href.trim());
-  final url = parsed == null ? null : onServer(parsed, server);
+  final url = openableLink(href, server: server);
   final app = url == null || scope.apps.available != true
       ? null
       : appRefOf(url, cards: scope.apps.cards, pages: scope.apps.pages);
   if (app != null) return scope.shell.openApp(app);
-  if (url != null && scope.appView != null) {
-    if (browserTabOf(url, server) case final tab?) {
-      return scope.shell.openBrowser(tab);
-    }
+  if (url != null && scope.appView != null && isBrowserTab(url, server)) {
+    return scope.shell.openBrowser(url);
   }
-  await openLink(context, href);
+  await openLink(context, url?.toString() ?? href);
 }
 
 /// Opens AnythingLLM's own web page, at the connected server's address.
