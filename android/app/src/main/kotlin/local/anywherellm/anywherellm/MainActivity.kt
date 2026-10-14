@@ -11,13 +11,15 @@ import io.flutter.plugin.common.MethodChannel
 /**
  * The app. Over the `anywherellm/background` channel it holds the app while an answer runs
  * ([AnswerService]), says an answer is ready, leaves without finishing, so the Flutter engine
- * and an answer it reads go on, and hands over each notification tapped: `launchTap` answers the
- * one that started the activity, once, and `tap` sends one tapped while it runs. Notifications
- * need a permission on Android 13 and later, which it asks for when an answer first runs.
+ * and an answer it reads go on, and hands over each notification tapped as `{slug, thread}`:
+ * `launchTap` answers the one that started the activity, once, and `tap` sends one tapped while
+ * it runs. Notifications need a permission on Android 13 and later, which it asks for when an
+ * answer first runs.
  */
 class MainActivity : FlutterActivity() {
     private var channel: MethodChannel? = null
-    private var launchTap: String? = null
+    private var launchTap: Map<String, String>? = null
+    private var asked = false
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -26,20 +28,29 @@ class MainActivity : FlutterActivity() {
         channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, BACKGROUND).apply {
             setMethodCallHandler { call, result ->
                 when (call.method) {
-                    "launchTap" -> {
-                        result.success(launchTap)
-                        launchTap = null
-                        return@setMethodCallHandler
-                    }
+                    "launchTap" -> result.success(launchTap.also { launchTap = null })
                     "hold" -> {
                         askPermission()
                         AnswerService.hold(applicationContext, call.arguments as String?)
+                        result.success(null)
                     }
-                    "ready" -> Notes.ready(applicationContext, call.arguments as String)
-                    "leave" -> moveTaskToBack(true)
-                    else -> return@setMethodCallHandler result.notImplemented()
+                    "ready" -> {
+                        val note = call.arguments as Map<*, *>
+                        Notes.ready(
+                            applicationContext,
+                            note["title"] as String,
+                            note["body"] as String,
+                            note["slug"] as String,
+                            note["thread"] as String,
+                        )
+                        result.success(null)
+                    }
+                    "leave" -> {
+                        moveTaskToBack(true)
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
                 }
-                result.success(null)
             }
         }
     }
@@ -49,12 +60,14 @@ class MainActivity : FlutterActivity() {
         takeTap(intent)?.let { channel?.invokeMethod("tap", it) }
     }
 
-    /** The tapped notification's payload that [intent] carries, taken out so it is handed over once. */
-    private fun takeTap(intent: Intent?): String? {
+    /** The tapped notification's chat that [intent] carries, taken out so it is handed over once. */
+    private fun takeTap(intent: Intent?): Map<String, String>? {
         if (intent?.action != Notes.ACTION_TAP) return null
-        val payload = intent.getStringExtra(Notes.EXTRA_PAYLOAD) ?: return null
-        intent.removeExtra(Notes.EXTRA_PAYLOAD)
-        return payload
+        val slug = intent.getStringExtra(Notes.EXTRA_SLUG) ?: return null
+        val thread = intent.getStringExtra(Notes.EXTRA_THREAD) ?: return null
+        intent.removeExtra(Notes.EXTRA_SLUG)
+        intent.removeExtra(Notes.EXTRA_THREAD)
+        return mapOf("slug" to slug, "thread" to thread)
     }
 
     /** Asks for the notification permission when it is missing, once per run of the activity. */
@@ -66,13 +79,10 @@ class MainActivity : FlutterActivity() {
             return
         }
         asked = true
-        requestPermissions(arrayOf(permission), ASK_NOTIFICATIONS)
+        requestPermissions(arrayOf(permission), 0)
     }
-
-    private var asked = false
 
     private companion object {
         const val BACKGROUND = "anywherellm/background"
-        const val ASK_NOTIFICATIONS = 0x6e6f
     }
 }

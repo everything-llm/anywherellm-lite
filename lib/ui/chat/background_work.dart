@@ -4,9 +4,11 @@ import 'package:flutter/widgets.dart';
 
 import '../../core/chat.dart';
 import '../../core/markdown.dart';
-import '../../core/notes.dart';
 import '../state/chat_controller.dart';
 import '../state/shell_controller.dart';
+
+/// The chat a tapped notification opens.
+typedef ChatTarget = ({String slug, String thread});
 
 /// What lets an answer go on while the app is out of sight: Android keeps an app that holds a
 /// foreground service, with its ongoing notification, running and connected.

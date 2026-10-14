@@ -1,6 +1,5 @@
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/errors.dart';
-import 'package:anywherellm/core/notes.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/state/chat_controller.dart';
 import 'package:flutter/widgets.dart';
@@ -176,7 +175,7 @@ void main() {
       );
       final slug = h.chat.workspaces.first.slug;
       final thread = h.chat.threadsOf(slug).first.slug;
-      background.tap(ChatTarget(slug, thread));
+      background.tap((slug: slug, thread: thread));
       await tester.pumpAndSettle();
       expect(h.shell.chatOpen, isTrue);
       expect((h.chat.activeSlug, h.chat.activeThread), (slug, thread));

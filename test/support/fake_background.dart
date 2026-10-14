@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:anywherellm/core/notes.dart';
 import 'package:anywherellm/ui/chat/background_work.dart';
 
 /// What keeps answers going, kept in memory: [held] is what each hold said, null for a release,

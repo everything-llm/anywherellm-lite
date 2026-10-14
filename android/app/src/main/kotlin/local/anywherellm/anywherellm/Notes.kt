@@ -11,12 +11,13 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * The app's notifications: [ongoing], which is [AnswerService]'s, and [ready], the app's own
- * word that an answer is ready, drawn from a payload `{title, body, data}`. Tapping the second
- * opens [MainActivity] with the payload, which the Dart side reads for the chat to open.
+ * word that an answer is ready. Tapping the second opens [MainActivity] with the chat's slug and
+ * thread, which the Dart side opens.
  */
 object Notes {
     const val ACTION_TAP = "local.anywherellm.NOTE_TAP"
-    const val EXTRA_PAYLOAD = "local.anywherellm.note.payload"
+    const val EXTRA_SLUG = "local.anywherellm.note.slug"
+    const val EXTRA_THREAD = "local.anywherellm.note.thread"
 
     /** The channels earlier versions showed notifications on, which [retire] deletes. */
     private val RETIRED = listOf("anythingllm", "apps")
@@ -53,19 +54,13 @@ object Notes {
             .build()
     }
 
-    /** Shows that an answer is ready, from [payload], `{title, body, data}`. */
-    fun ready(context: Context, payload: String) {
-        val json = try {
-            org.json.JSONObject(payload)
-        } catch (_: org.json.JSONException) {
-            null
-        }
-        val title = json?.optString("title").orEmpty().ifEmpty { "Answer ready" }
-        val body = json?.optString("body").orEmpty()
+    /** Shows that the answer in chat [thread] of workspace [slug] is ready: [title] over [body]. */
+    fun ready(context: Context, title: String, body: String, slug: String, thread: String) {
         val id = ids.incrementAndGet()
         val tap = Intent(context, MainActivity::class.java)
             .setAction(ACTION_TAP)
-            .putExtra(EXTRA_PAYLOAD, payload)
+            .putExtra(EXTRA_SLUG, slug)
+            .putExtra(EXTRA_THREAD, thread)
         val note = builder(context, ANSWERS, "Answers ready", high = true, opens = tap, request = id)
             .setContentTitle(title)
             .setContentText(body)
