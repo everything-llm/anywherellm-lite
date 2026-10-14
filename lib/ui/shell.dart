@@ -5,9 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app_scope.dart';
-import 'apps/app_screen.dart';
-import 'apps/app_sheets.dart';
-import 'apps/apps_tab.dart';
 import 'chat/browser_sheet.dart';
 import 'chat/chat_view.dart';
 import 'chat/cited_sources.dart';
@@ -29,7 +26,7 @@ import 'tokens.dart';
 import 'widgets/basics.dart';
 
 /// The window: the bar of tabs at its foot, always, but while the keyboard is up and on the
-/// first run's welcome, and above it the home, the Chats tab or the Apps tab; the chat over it;
+/// first run's welcome, and above it the home, the Chats tab; the chat over it;
 /// the workspace's pages or Upcoming over those; Settings, its list or a page, over them all;
 /// and the sheets and popups over the whole window, the bar too. Esc and Back close the
 /// topmost thing open: the popup, Settings' page, the sheet, Upcoming, the workspace's pages a
@@ -60,7 +57,6 @@ class AppShell extends StatelessWidget {
             : shell.closeSettings;
       }
       if (shell.shelfOpen) return shell.closeShelf;
-      if (shell.app != null) return shell.appBack;
       if (shell.passagesOpen) return shell.closePassages;
       if (shell.citedOpen) return shell.closeCited;
       if (shell.rightOpen) return shell.closeSources;
@@ -74,30 +70,18 @@ class AppShell extends StatelessWidget {
         return () => shell.showPane(Pane.chats);
       }
       if (shell.chatOpen) return shell.closeChat;
-      // Back from the Apps tab goes to the Chats tab, as from any tab but the first.
-      if (shell.tab == HomeTab.apps) return () => shell.showTab(HomeTab.chats);
       return null;
     }
 
     return ListenableBuilder(
-      listenable: Listenable.merge([shell, scope.apps]),
+      listenable: shell,
       builder: (context, _) {
         final files = shell.pane == Pane.files;
-        final app = shell.app;
-        // An app's sheet shows over the chat or the tab; its data, full screen, covers them.
-        final appData = app != null && shell.appDataOnly;
-        final chatShown = shell.chatOpen && !files && !appData;
+        final chatShown = shell.chatOpen && !files;
         // The first run's welcome stands alone, since no tab has anything to show yet.
         final tabs = !(shell.settingsOpen && !scope.settings.configured);
         final homeCovered =
-            shell.chatOpen ||
-            files ||
-            shell.upcomingOpen ||
-            shell.settingsOpen ||
-            appData;
-        // The Apps tab shows only while the apps server is there.
-        final appsTab =
-            shell.tab == HomeTab.apps && scope.apps.available == true;
+            shell.chatOpen || files || shell.upcomingOpen || shell.settingsOpen;
         final right = switch (shell.beside) {
           Beside.sources => const SourcesPanel(),
           Beside.passages => const PassagesPanel(),
@@ -139,17 +123,7 @@ class AppShell extends StatelessWidget {
                                         offstage: homeCovered,
                                         child: TickerMode(
                                           enabled: !homeCovered,
-                                          child: Stack(
-                                            fit: StackFit.expand,
-                                            children: [
-                                              // Kept while Apps shows, with its search.
-                                              Offstage(
-                                                offstage: appsTab,
-                                                child: const ChatsTab(),
-                                              ),
-                                              if (appsTab) const AppsTab(),
-                                            ],
-                                          ),
+                                          child: const ChatsTab(),
                                         ),
                                       ),
                                     ),
@@ -186,14 +160,6 @@ class AppShell extends StatelessWidget {
                                       const Positioned.fill(
                                         child: UpcomingPage(),
                                       ),
-                                    // An app's data, full screen as a page is.
-                                    if (app != null && appData)
-                                      Positioned.fill(
-                                        child: AppScreen(
-                                          app,
-                                          key: ValueKey(app),
-                                        ),
-                                      ),
                                     // A deleted chat is put back from over the chat or the Chats tab.
                                     if (!shell.settingsOpen)
                                       _PhoneUndo(overTabs: shell.atHome),
@@ -210,11 +176,6 @@ class AppShell extends StatelessWidget {
                         ),
                         // The sheet's own scrim closes it.
                         if (shell.rightOpen) Positioned.fill(child: right),
-                        // An app in a sheet, over the chat or the tab it was opened from.
-                        if (app != null && !appData)
-                          Positioned.fill(
-                            child: AppScreen(app, key: ValueKey(app)),
-                          ),
                         // What another app shared, over everything but a popup.
                         if (shell.shared case final item?)
                           Positioned.fill(
@@ -249,13 +210,6 @@ class AppShell extends StatelessWidget {
                                 if (popup case PageOpen(:final page))
                                   Positioned.fill(
                                     child: PageSheet(page, key: ValueKey(page)),
-                                  ),
-                                if (popup case final AppSheet sheet)
-                                  Positioned.fill(
-                                    child: AppSheetView(
-                                      sheet,
-                                      key: ObjectKey(sheet),
-                                    ),
                                   ),
                                 if (popup case final ChatSheetFor of)
                                   Positioned.fill(

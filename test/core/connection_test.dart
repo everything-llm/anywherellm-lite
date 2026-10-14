@@ -136,12 +136,11 @@ void main() {
     test('carries companions\' addresses when it names them', () {
       final pairing = parsePairingCode(
         'anywherellm://connect?url=https%3A%2F%2Fai.example.com&key=K'
-        '&toolkit=https%3A%2F%2Ftoolkit.example.com%2F&apps=http%3A%2F%2Fapps.lan',
+        '&toolkit=https%3A%2F%2Ftoolkit.example.com%2F',
       );
       expect(pairing.connection.baseUrl, 'https://ai.example.com');
       expect(pairing.companions, {
         'anythingllm-toolkit': Uri.parse('https://toolkit.example.com'),
-        'anythingllm-apps-v2': Uri.parse('http://apps.lan'),
       });
       expect(
         () => parsePairingCode(
@@ -150,6 +149,15 @@ void main() {
         ),
         throwsA(isA<ApiException>()),
       );
+    });
+
+    test('an apps server\'s address, from an older code, is left out', () {
+      final pairing = parsePairingCode(
+        'anywherellm://connect?url=https%3A%2F%2Fai.example.com&key=K'
+        '&apps=http%3A%2F%2Fapps.lan',
+      );
+      expect(pairing.connection.baseUrl, 'https://ai.example.com');
+      expect(pairing.companions, isEmpty);
     });
 
     test('anything else is refused', () {

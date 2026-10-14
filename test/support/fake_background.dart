@@ -1,12 +1,18 @@
+import 'dart:async';
+
+import 'package:anywherellm/core/notes.dart';
 import 'package:anywherellm/ui/chat/background_work.dart';
 
 /// What keeps answers going, kept in memory: [held] is what each hold said, null for a release,
 /// [readied] each ready answer as `<title>: <body> @ <slug>/<thread>`, and [left] how many times
-/// the app was put out of sight.
+/// the app was put out of sight; [tap] acts as a tapped notification.
 class FakeBackground implements BackgroundWork {
   final held = <String?>[];
   final readied = <String>[];
   var left = 0;
+  final _taps = StreamController<ChatTarget>();
+
+  void tap(ChatTarget target) => _taps.add(target);
 
   @override
   Future<void> hold(String? what) async => held.add(what);
@@ -21,4 +27,7 @@ class FakeBackground implements BackgroundWork {
 
   @override
   Future<void> leave() async => left++;
+
+  @override
+  Stream<ChatTarget> get taps => _taps.stream;
 }

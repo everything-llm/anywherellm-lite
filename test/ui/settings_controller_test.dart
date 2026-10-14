@@ -1,5 +1,4 @@
 import 'package:anywherellm/core/toolkit.dart';
-import 'package:anywherellm/core/apps.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/ui/state/settings_controller.dart';
@@ -143,11 +142,6 @@ void main() {
         expect(saved, isTrue);
         expect(settings.addressOf(toolkitCompanion), toolkit);
         expect(store.savedCompanions, {toolkitCompanion.service: toolkit});
-        expect(
-          settings.addressOf(appsCompanion),
-          Uri.parse('https://h:8466'),
-          reason: 'one the code does not name is guessed',
-        );
       },
     );
 

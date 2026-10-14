@@ -23,8 +23,6 @@ import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
-import '../support/fake_apps.dart';
-import '../support/fake_pusher.dart';
 import '../support/fake_settings.dart';
 import '../support/fake_toolkit.dart';
 import '../support/picker.dart';
@@ -148,10 +146,7 @@ void main() {
           size: size,
           canDictate: true,
           canSpeak: true,
-          appsServer: groceriesServer(),
           toolkitServer: FakeToolkit(),
-          // Notifications on, so its page lists where each source stands.
-          pusher: FakePusher()..using = 'io.heckel.ntfy',
         );
         h.shell.openSettings();
         await tester.pumpAndSettle();

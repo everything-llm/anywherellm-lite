@@ -49,7 +49,8 @@ Since the app was simplified to AnywhereLLM Lite, a phone chat client rather tha
 
 | Idea | Note |
 | --- | --- |
-| Native tabs for companions | A companion whose `/health` declares a tab (`title`, `icon` and a declarative screen: lists, rows and actions as JSON) gets a native tab in the bar, with no Dart in the companion. It needs a small UI spec the app renders and keeps compatible, so wait for a second companion that wants a tab. The Apps tab would be its first user. The bar fits about five tabs and Chats, Apps and Settings take three, so extra tabs need a cap or a place under More. A web-view tab (`tab: {title, icon, page}` shown in `AppView`) is the cheaper first step. |
+| Push notifications from a server | UnifiedPush and the apps-v2 server were removed. Nothing sends a push to the app now: its two notifications, a running answer and a ready answer, are its own. A sender needs a way to hand it the phone's endpoint, a key to encrypt for, and a trigger such as an AnythingLLM scheduled job. apps-lean, a skill with no process, has none of these. The deleted `PushController`, `UnifiedPusher` and `PushEvents.kt` are in git history (the commit before the purge). |
+| Native tabs for companions | A companion whose `/health` declares a tab (`title`, `icon` and a declarative screen: lists, rows and actions as JSON) gets a native tab in the bar, with no Dart in the companion. It needs a small UI spec the app renders and keeps compatible, so wait for a companion that wants a tab. The apps-v2 Apps tab was removed with the apps-v2 server and is in git history. The bar fits about five tabs and Chats and Settings take two, so extra tabs need a cap or a place under More. A web-view tab (`tab: {title, icon, page}` shown in `AppView`) is the cheaper first step. |
 
 ## apps-lean: open from the stress test
 

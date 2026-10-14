@@ -4,7 +4,9 @@ import 'package:flutter/widgets.dart';
 
 import '../../core/chat.dart';
 import '../../core/markdown.dart';
+import '../../core/notes.dart';
 import '../state/chat_controller.dart';
+import '../state/shell_controller.dart';
 
 /// What lets an answer go on while the app is out of sight: Android keeps an app that holds a
 /// foreground service, with its ongoing notification, running and connected.
@@ -25,14 +27,19 @@ abstract interface class BackgroundWork {
   /// Puts the app out of sight without ending it, as Back does on its first screen, so an
   /// answer it holds goes on.
   Future<void> leave();
+
+  /// The chat each notification tapped opens, the one that started the app first; buffered until
+  /// listened to.
+  Stream<ChatTarget> get taps;
 }
 
 /// Holds the app in the background while an answer runs or is waited for, and says so when one
 /// becomes ready while the app is out of sight. Each time the app comes back to the front, the
-/// answers waited for are read for again.
+/// answers waited for are read for again. A tapped notification opens its chat.
 class KeepAnswering {
-  KeepAnswering(this._work, this._chat) : _seen = _chat.finished {
+  KeepAnswering(this._work, this._chat, this._shell) : _seen = _chat.finished {
     _chat.addListener(_follow);
+    _tapsSeen = _work.taps.listen(_open);
     _life = AppLifecycleListener(
       onStateChange: (state) => _front = state == AppLifecycleState.resumed,
       onResume: () => unawaited(_chat.checkWaiting()),
@@ -42,7 +49,9 @@ class KeepAnswering {
 
   final BackgroundWork _work;
   final ChatController _chat;
+  final ShellController _shell;
   late final AppLifecycleListener _life;
+  late final StreamSubscription<ChatTarget> _tapsSeen;
 
   /// The finished answer last seen, so each is announced once.
   Turn? _seen;
@@ -84,7 +93,14 @@ class KeepAnswering {
   String? _workspaceName(String? slug) =>
       _chat.workspaces.where((w) => w.slug == slug).firstOrNull?.name;
 
+  void _open(ChatTarget target) {
+    _shell.showTab(HomeTab.chats);
+    unawaited(_chat.select(target.slug, thread: target.thread));
+    _shell.openChat();
+  }
+
   void dispose() {
+    unawaited(_tapsSeen.cancel());
     _chat.removeListener(_follow);
     _life.dispose();
     unawaited(_work.hold(null));

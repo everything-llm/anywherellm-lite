@@ -5,7 +5,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import 'app_screen.dart';
+import 'app_view.dart';
 
 /// An app's working page in the device's web view. The page runs its scripts, as its ticks and
 /// adds need, and stays on its own host and port; a link anywhere else goes to `onLeave`, and

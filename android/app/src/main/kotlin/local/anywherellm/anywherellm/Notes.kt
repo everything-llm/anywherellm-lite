@@ -7,42 +7,32 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import org.json.JSONException
-import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * The app's notifications. A push, or the app's own word that an answer is ready, is drawn
- * from a payload `{title, body, data}`, the shape of the apps server's pushes; each kind has
- * its own channel, so Android's settings can quiet one. Tapping it
- * opens [MainActivity] with the channel and the payload, which the Dart side reads for what to
- * open. [ongoing] is [AnswerService]'s.
+ * The app's notifications: [ongoing], which is [AnswerService]'s, and [ready], the app's own
+ * word that an answer is ready, drawn from a payload `{title, body, data}`. Tapping the second
+ * opens [MainActivity] with the payload, which the Dart side reads for the chat to open.
  */
-object PushNotes {
-    const val ACTION_TAP = "local.anywherellm.PUSH_TAP"
-    const val EXTRA_INSTANCE = "local.anywherellm.push.instance"
-    const val EXTRA_PAYLOAD = "local.anywherellm.push.payload"
+object Notes {
+    const val ACTION_TAP = "local.anywherellm.NOTE_TAP"
+    const val EXTRA_PAYLOAD = "local.anywherellm.note.payload"
 
-    /**
-     * Each source's channel name, by its UnifiedPush instance: a copy of `PushSource` in
-     * `lib/core/push.dart`, since this runs with no Flutter engine.
-     */
-    private val channels = mapOf(
-        "apps" to "Apps",
-        "answers" to "Answers ready",
-    )
-
-    /** The channel an older version showed AnythingLLM's scheduled-job pushes on, which [retire] deletes. */
-    private const val RETIRED = "anythingllm"
+    /** The channels earlier versions showed notifications on, which [retire] deletes. */
+    private val RETIRED = listOf("anythingllm", "apps")
 
     /** Deletes the channels the app no longer posts to, so Android's settings stop listing them. */
     fun retire(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        context.getSystemService(NotificationManager::class.java).deleteNotificationChannel(RETIRED)
+        val manager = context.getSystemService(NotificationManager::class.java)
+        RETIRED.forEach(manager::deleteNotificationChannel)
     }
 
     /** The channel of [AnswerService]'s ongoing notification, quiet. */
     private const val ANSWERING = "answering"
+
+    /** The channel of an answer that is ready. */
+    private const val ANSWERS = "answers"
 
     const val ONGOING_ID = 1
 
@@ -63,22 +53,20 @@ object PushNotes {
             .build()
     }
 
-    fun show(context: Context, instance: String, content: ByteArray) {
-        val payload = String(content, Charsets.UTF_8)
+    /** Shows that an answer is ready, from [payload], `{title, body, data}`. */
+    fun ready(context: Context, payload: String) {
         val json = try {
-            JSONObject(payload)
-        } catch (_: JSONException) {
+            org.json.JSONObject(payload)
+        } catch (_: org.json.JSONException) {
             null
         }
-        val channel = channels[instance] ?: "Notifications"
-        val title = json?.optString("title").orEmpty().ifEmpty { channel }
+        val title = json?.optString("title").orEmpty().ifEmpty { "Answer ready" }
         val body = json?.optString("body").orEmpty()
         val id = ids.incrementAndGet()
         val tap = Intent(context, MainActivity::class.java)
             .setAction(ACTION_TAP)
-            .putExtra(EXTRA_INSTANCE, instance)
             .putExtra(EXTRA_PAYLOAD, payload)
-        val note = builder(context, instance, channel, high = true, opens = tap, request = id)
+        val note = builder(context, ANSWERS, "Answers ready", high = true, opens = tap, request = id)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(Notification.BigTextStyle().bigText(body))

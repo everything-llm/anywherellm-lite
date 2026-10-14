@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/chat.dart';
 import '../app_scope.dart';
-import '../apps/app_screen.dart';
+import '../apps/app_view.dart';
 import '../icons.dart';
 import '../links.dart';
 import '../state/chat_controller.dart';

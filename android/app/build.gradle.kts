@@ -6,18 +6,6 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// The UnifiedPush connector brings Tink for the JVM, and flutter_secure_storage brings Tink for
-// Android, which holds the same classes; the app keeps the Android one alone.
-configurations.all {
-    val tink = "com.google.crypto.tink:tink-android:1.23.0"
-    resolutionStrategy {
-        force(tink)
-        dependencySubstitution {
-            substitute(module("com.google.crypto.tink:tink")).using(module(tink))
-        }
-    }
-}
-
 // Release signing is read from android/key.properties, which is gitignored; `appstore sync`
 // writes it the first time it builds this app. Android keys an installed app to its signing
 // certificate, so the first key to publish local.anywherellm.lite must sign every later
@@ -98,10 +86,4 @@ kotlin {
 
 flutter {
     source = "../.."
-}
-
-dependencies {
-    // PushEvents hands the distributor's events to the UnifiedPush plugin's flow, whose
-    // coroutines the plugin keeps to itself.
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 }

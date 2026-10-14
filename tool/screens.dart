@@ -11,9 +11,6 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'dart:convert';
-
-import 'package:anywherellm/core/apps.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/memory.dart';
 import 'package:anywherellm/core/outputs.dart';
@@ -21,7 +18,6 @@ import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/files.dart';
-import 'package:anywherellm/ui/apps/app_sheets.dart';
 import 'package:anywherellm/ui/settings/memory_page.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/settings/walkthrough.dart';
@@ -34,7 +30,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../test/support/fake_api.dart';
 import '../test/support/fake_toolkit.dart';
-import '../test/support/fake_apps.dart';
 import '../test/support/fake_settings.dart';
 import '../test/support/pump.dart';
 
@@ -282,172 +277,6 @@ const _metrics = AnswerMetrics(
   return (llm, toolkit);
 }
 
-const _host = 'anythingllm.example.ts.net';
-const _flash = AppRef('household', 'flashcards');
-
-/// The prototype's apps in Household, Flashcards with its folder, log and history.
-FakeApps _sampleApps() {
-  final apps = FakeApps(present: true);
-  final now = DateTime.now();
-  DateTime at(int daysAgo, int hour, int minute) =>
-      DateTime(now.year, now.month, now.day - daysAgo, hour, minute);
-  ServerApp app(
-    String name,
-    String title,
-    String kind,
-    String summary,
-    DateTime when,
-  ) => ServerApp(
-    ref: AppRef('household', name),
-    title: title,
-    kind: kind,
-    summary: summary,
-    modified: when.toUtc(),
-    line: 3,
-    page: Uri.parse('https://$_host:8465/household/$name/'),
-    card: Uri.parse('https://$_host:8466/cards/household/$name.png'),
-  );
-  apps.spaces['household'] = [
-    app('groceries', 'Groceries', 'list', '4 of 6 left', at(0, 8, 30)),
-    app('flashcards', 'Flashcards', 'flashcards', '9 due', at(0, 7, 54)),
-    app('boiler-fund', 'Boiler fund', 'tracker', '62%', at(0, 7, 10)),
-    app('habits', 'Habits', 'tracker', '0 of 3 met today', at(1, 21, 5)),
-    app('focus', 'Pomodoro', 'pomodoro', 'Focus · paused', at(1, 16, 40)),
-    app('calendar', 'Calendar', 'calendar', 'Sat 10 Oct', at(3, 9, 0)),
-  ];
-  String time(DateTime t) => '${t.toUtc().toIso8601String().substring(0, 19)}Z';
-  final cards = ['hej', 'tack', 'vatten', 'bröd', 'hus'];
-  final state = <String, Object?>{
-    'deck': 'Swedish basics',
-    'goalPerDay': 12,
-    'xp': 260,
-    'streak': 6,
-    'reviewedToday': 0,
-    'cards': [
-      for (final card in cards) {'sv': card, 'due': true},
-    ],
-  };
-  final lines = [
-    jsonEncode({
-      'n': 1,
-      't': time(at(1, 20, 0)),
-      'by': 'agent',
-      'ev': 'made',
-      'chat': 'Swedish practice',
-      'patch': [
-        {'op': 'add', 'path': '', 'value': state},
-      ],
-    }),
-    for (final (i, card) in cards.indexed)
-      jsonEncode({
-        'n': i + 2,
-        't': time(at(0, 7, 50 + i)),
-        'by': 'you',
-        'ev': 'review',
-        'card': card,
-        'xp': i < 2 ? 10 : 20,
-        'patch': [
-          {'op': 'replace', 'path': '/reviewedToday', 'value': i + 1},
-          {'op': 'replace', 'path': '/cards/$i/due', 'value': false},
-        ],
-      }),
-  ];
-  apps.folders[_flash] = {
-    'app.json': const JsonEncoder.withIndent('  ').convert({
-      'title': 'Flashcards',
-      'kind': 'flashcards',
-      'about':
-          'A spaced-repetition deck of 14 basic Swedish words. Each answer is one '
-          'line in the log; XP, level and streak follow from the log.',
-      'rules': [
-        'Add cards with patch. Ask before removing a card that has reviews in the log.',
-        'Append one line per answer. Never edit or delete past lines.',
-        'A missed card comes back 3 cards later. The daily goal is 12 cards.',
-      ],
-      'schema': {
-        'type': 'object',
-        'required': ['cards'],
-        'properties': {
-          'deck': {'type': 'string'},
-          'goalPerDay': {'type': 'number'},
-          'cards': {'type': 'array'},
-        },
-      },
-      'card': {
-        'summary': '{/cards/length} cards',
-        'lines': ['Streak: {/streak} days'],
-      },
-    }),
-    'log.jsonl': '${lines.join('\n')}\n',
-    'page.html':
-        '<!doctype html>\n<title>Flashcards</title>\n<script src="app.js"></script>\n'
-        '<main id="card"></main>\n<script>\nApp.start(/*APP*/null);\n'
-        'App.onchange(draw);\ndraw();\n</script>\n',
-  };
-  apps.commits[_flash] = [
-    AppCommit(
-      commit: '9f46c25e0b1a2c3d4e5f60718293a4b5c6d7e8f9',
-      t: at(0, 7, 40).toUtc(),
-      by: 'agent',
-      chat: 'Swedish practice',
-      message:
-          'Marks a card missed this session with Again\n\n'
-          'A missed card shows Again until it is answered right.',
-      subject: 'Marks a card missed this session with Again',
-      body: 'A missed card shows Again until it is answered right.',
-      files: const ['app.json', 'page.html'],
-      revertable: true,
-    ),
-    AppCommit(
-      commit: 'c9ddf09a1b2c3d4e5f60718293a4b5c6d7e8f901',
-      t: at(1, 20, 30).toUtc(),
-      by: 'agent',
-      chat: 'Swedish practice',
-      message:
-          'Raised the daily goal from 10 to 12 cards\n\n'
-          'You asked for a little more practice each day.',
-      subject: 'Raised the daily goal from 10 to 12 cards',
-      body: 'You asked for a little more practice each day.',
-      files: const ['app.json'],
-      revertable: true,
-    ),
-    AppCommit(
-      commit: 'bc3a7790a1b2c3d4e5f60718293a4b5c6d7e8f90',
-      t: at(1, 20, 0).toUtc(),
-      by: 'agent',
-      chat: 'Swedish practice',
-      message: 'Make Flashcards',
-      subject: 'Make Flashcards',
-      body: '',
-      files: const ['app.json', 'page.html'],
-      revertable: false,
-    ),
-  ];
-  apps.diffs['c9ddf09a1b2c3d4e5f60718293a4b5c6d7e8f901'] =
-      'commit c9ddf09a1b2c3d4e5f60718293a4b5c6d7e8f901\n'
-      'Author: agent <agent@apps>\n\n'
-      '    Raised the daily goal from 10 to 12 cards\n\n'
-      'diff --git a/app.json b/app.json\n'
-      '--- a/app.json\n'
-      '+++ b/app.json\n'
-      '@@ -7,3 +7,3 @@\n'
-      '     "Append one line per answer. Never edit or delete past lines.",\n'
-      '-    "A missed card comes back 3 cards later. The daily goal is 10 cards."\n'
-      '+    "A missed card comes back 3 cards later. The daily goal is 12 cards."\n'
-      '   ],\n';
-  return apps;
-}
-
-/// Opens Flashcards' data, then [page] of it when given.
-Future<void> _appData(WidgetTester tester, Harness h, [AppPage? page]) async {
-  h.shell.openApp(_flash, data: true);
-  await _settle(tester);
-  if (page != null) {
-    h.shell.showAppPage(page);
-    await _settle(tester);
-  }
-}
-
 /// A step that brings a screen up once the app shows its Chats tab.
 typedef _Setup = Future<void> Function(WidgetTester tester, Harness h);
 
@@ -620,55 +449,6 @@ final _screens = <String, _Setup>{
     h.shell.openShelf();
     await _settle(tester);
   },
-  'apps': (tester, h) async {
-    h.shell.showTab(HomeTab.apps);
-    await _settle(tester);
-  },
-  'appmenu': (tester, h) async {
-    h.shell.showTab(HomeTab.apps);
-    await _settle(tester);
-    h.shell.togglePopup(const AppMenuSheet(_flash));
-    await _settle(tester);
-  },
-  'apprename': (tester, h) async {
-    h.shell.showTab(HomeTab.apps);
-    await _settle(tester);
-    h.shell.togglePopup(const AppRenameSheet(_flash));
-    await _settle(tester);
-  },
-  'appdel': (tester, h) async {
-    h.shell.showTab(HomeTab.apps);
-    await _settle(tester);
-    h.shell.togglePopup(const AppDeleteSheet(_flash));
-    await _settle(tester);
-  },
-  'appopen': (tester, h) async {
-    h.shell.openApp(_flash);
-    await _settle(tester);
-  },
-  'appdata': (tester, h) => _appData(tester, h),
-  'appjson': (tester, h) => _appData(tester, h, const AppFileOf('app.json')),
-  'appjsonraw': (tester, h) async {
-    await _appData(tester, h, const AppFileOf('app.json'));
-    await tester.tap(control('Show the raw file'));
-    await _settle(tester);
-  },
-  'apppage': (tester, h) => _appData(tester, h, const AppFileOf('page.html')),
-  'applog': (tester, h) => _appData(tester, h, const AppLog()),
-  'appstate': (tester, h) async {
-    await _appData(tester, h, const AppLog());
-    final lines = logLinesOf(h.appsServer.folders[_flash]!['log.jsonl']!);
-    h.shell.togglePopup(LineSheet(_flash, lines[2], latest: false));
-    await _settle(tester);
-  },
-  'appgit': (tester, h) => _appData(tester, h, const AppGit()),
-  'appcommit': (tester, h) async {
-    await _appData(tester, h, const AppGit());
-    h.shell.togglePopup(
-      CommitSheet(_flash, h.appsServer.commits[_flash]![1], first: false),
-    );
-    await _settle(tester);
-  },
   'share': (tester, h) async {
     h.shell.showShared(
       SharedLink(
@@ -717,7 +497,6 @@ void main() {
             tester,
             llm: llm,
             toolkitServer: toolkit,
-            appsServer: connected ? _sampleApps() : null,
             canViewApps: true,
             onChat: false,
             canScan: !connected,

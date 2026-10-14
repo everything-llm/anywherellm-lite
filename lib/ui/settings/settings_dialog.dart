@@ -17,13 +17,11 @@ import 'device_pages.dart';
 import 'embeds_page.dart';
 import 'json_page.dart';
 import 'memory_page.dart';
-import 'notifications_page.dart';
 import 'privacy_page.dart';
 import 'provider_page.dart';
 import 'rows.dart';
 import 'server_page.dart';
 import 'settings_pages.dart';
-import 'system_files_page.dart';
 import 'walkthrough.dart';
 
 /// Settings: its list as the Settings tab, under its title, in two groups, This app and
@@ -91,7 +89,6 @@ class _Frame extends StatelessWidget {
     if (page == SettingsPage.connection && !configured) {
       return const _PageView(SettingsPage.connection);
     }
-    if (page != null && page.ownsPage) return _PageView._body(page);
     if (page == null) {
       return const Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -116,9 +113,8 @@ class _Frame extends StatelessWidget {
 }
 
 /// The list of Settings: once a server is saved, a card with it, whether it answers and Test
-/// connection; This app's pages; then AnythingLLM's Server and Memory rows, and System files
-/// where the apps server serves them; and, while no toolkit answers beside the server, a card
-/// that opens Add the toolkit over the list.
+/// connection; This app's pages; then AnythingLLM's Server and Memory rows; and, while no
+/// toolkit answers beside the server, a card that opens Add the toolkit over the list.
 class _Nav extends StatelessWidget {
   const _Nav();
 
@@ -128,12 +124,7 @@ class _Nav extends StatelessWidget {
     final shell = scope.shell;
     final settings = scope.settings;
     return ListenableBuilder(
-      listenable: Listenable.merge([
-        scope.system,
-        settings,
-        scope.apps,
-        scope.toolkit,
-      ]),
+      listenable: Listenable.merge([scope.system, settings, scope.toolkit]),
       builder: (context, _) {
         final connection = settings.connection;
         final list = ListView(
@@ -146,7 +137,6 @@ class _Nav extends StatelessWidget {
                 (SettingsPage.connection, 'link'),
                 (SettingsPage.appearance, 'brush'),
                 (SettingsPage.chat, 'chat'),
-                if (scope.push != null) (SettingsPage.notifications, 'bell'),
               ])
                 NavRow(
                   icon: icon,
@@ -168,14 +158,6 @@ class _Nav extends StatelessWidget {
                     icon: 'memory',
                     title: SettingsPage.memory.label,
                     onTap: () => shell.showSettingsPage(SettingsPage.memory),
-                  ),
-                if (scope.apps.systemFiles == true)
-                  NavRow(
-                    icon: 'folder',
-                    title: SettingsPage.systemFiles.label,
-                    about: 'Apps, skill and runner, read only',
-                    onTap: () =>
-                        shell.showSettingsPage(SettingsPage.systemFiles),
                   ),
               ]),
               if (scope.toolkit.available == false) ...[
@@ -362,7 +344,6 @@ class _PageView extends StatelessWidget {
     SettingsPage.memory => const MemoryPage(),
     SettingsPage.appearance => const AppearancePage(),
     SettingsPage.chat => const ChatPage(),
-    SettingsPage.notifications => const NotificationsPage(),
     SettingsPage.chatModel => ProviderPage(
       providerPages[page]!,
       fieldsNote: 'These fields change with the provider.',
@@ -390,6 +371,5 @@ class _PageView extends StatelessWidget {
     SettingsPage.embeds => const EmbedsPage(),
     SettingsPage.privacy => const PrivacyPage(),
     SettingsPage.json => const JsonPage(),
-    SettingsPage.systemFiles => const SystemFilesPage(),
   };
 }

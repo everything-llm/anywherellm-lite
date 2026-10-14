@@ -1,4 +1,4 @@
-import 'apps.dart';
+import 'companion.dart';
 import 'errors.dart';
 import 'toolkit.dart';
 
@@ -101,7 +101,7 @@ class Pairing {
 /// What an AnywhereLLM pairing code carries, checked as [Connection.parse] checks a typed
 /// connection. The code is `anywherellm://connect?url=...&key=...`, both values
 /// percent-encoded, and may name companions' addresses by service after them, as
-/// `toolkit=...&apps=...` by each one's [Companion.code]. Throws [ApiException] when [raw] is not a
+/// `toolkit=...` by each one's [Companion.code]. Throws [ApiException] when [raw] is not a
 /// pairing code or what it carries cannot be used.
 Pairing parsePairingCode(String raw) {
   const notOurs = ApiException(
@@ -115,7 +115,7 @@ Pairing parsePairingCode(String raw) {
   final key = uri.queryParameters['key'];
   if (url == null || key == null) throw notOurs;
   return Pairing(Connection.parse(url, key), {
-    for (final companion in const [appsCompanion, toolkitCompanion])
+    for (final companion in const [toolkitCompanion])
       if (uri.queryParameters[companion.code] case final address?)
         companion.service: _companionAddress(address),
   });

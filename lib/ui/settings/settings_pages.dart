@@ -1,14 +1,12 @@
 import '../../core/providers.dart';
 
-/// The pages of Settings. Connection, Appearance, Chat and Notifications are about this device; Server lists
-/// the pages about AnythingLLM, which open from it, and Memory and System files sit beside it.
+/// The pages of Settings. Connection, Appearance and Chat are about this device; Server lists the
+/// pages about AnythingLLM, which open from it, and Memory sits beside it.
 enum SettingsPage {
   connection('Connection', null, needsServer: false),
   appearance('Appearance', null, needsServer: false),
   chat('Chat', null, needsServer: false),
-  notifications('Notifications', null, needsServer: false),
   memory('Memory', null),
-  systemFiles('System files', null, ownsPage: true),
   server('Server', null),
   chatModel(
     'Chat model',
@@ -44,12 +42,7 @@ enum SettingsPage {
     'Every setting the server takes from the app, written to its .env.',
   );
 
-  const SettingsPage(
-    this.label,
-    this.about, {
-    this.needsServer = true,
-    this.ownsPage = false,
-  });
+  const SettingsPage(this.label, this.about, {this.needsServer = true});
 
   final String label;
 
@@ -59,15 +52,10 @@ enum SettingsPage {
   /// Whether the page is about the server, and so shows only once one is saved.
   final bool needsServer;
 
-  /// Whether the page draws its own header and scrolling, as one whose title changes does.
-  final bool ownsPage;
-
   /// The page this one is reached from and goes back to: [server] for a page about the server
-  /// other than [server] itself, [memory] and [systemFiles], or null, the list, for the others.
+  /// other than [server] itself and [memory], or null, the list, for the others.
   SettingsPage? get parent =>
-      needsServer && !const [server, memory, systemFiles].contains(this)
-      ? server
-      : null;
+      needsServer && !const [server, memory].contains(this) ? server : null;
 }
 
 /// The providers each provider page chooses among, which the page draws.

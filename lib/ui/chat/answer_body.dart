@@ -91,7 +91,6 @@ class AnswerBody extends StatelessWidget {
         uri,
         alt: alt,
         server: server,
-        cards: AppScope.of(context).apps.cards,
         linked: linked.contains(uri),
       ),
       bulletBuilder: (bullet) => listBullet(bullet, body),

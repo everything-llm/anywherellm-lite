@@ -60,7 +60,7 @@ class SettingsController extends ChangeNotifier {
   }
 
   /// How many times Test connection has asked about the saved connection, so what remembers
-  /// an answer per connection, such as whether the apps server is there, asks again.
+  /// an answer per connection, such as whether the toolkit is there, asks again.
   int tests = 0;
 
   /// Asks the server whether the saved connection still opens it.

@@ -10,14 +10,14 @@ class Companion {
     required this.code,
   });
 
-  /// What its `/health` names itself, as `anythingllm-apps-v2`.
+  /// What its `/health` names itself, as `anythingllm-toolkit`.
   final String service;
   final int port;
 
-  /// What a pairing code names its address by, as `apps` in `&apps=...`.
+  /// What a pairing code names its address by, as `toolkit` in `&toolkit=...`.
   final String code;
 
-  /// How a message names it, as `The apps server`.
+  /// How a message names it, as `The toolkit`.
   final String name;
 
   /// Its address beside the AnythingLLM server at [server]: the same host on [port].

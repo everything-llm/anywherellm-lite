@@ -1,6 +1,6 @@
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/errors.dart';
-import 'package:anywherellm/core/push.dart';
+import 'package:anywherellm/core/notes.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/state/chat_controller.dart';
 import 'package:flutter/widgets.dart';
@@ -8,7 +8,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
 import '../support/fake_background.dart';
-import '../support/fake_pusher.dart';
 import '../support/pump.dart';
 
 const _dropped = CutOff(
@@ -168,16 +167,16 @@ void main() {
     });
 
     testWidgets('a ready answer tapped opens its chat', (tester) async {
-      final pusher = FakePusher();
+      final background = FakeBackground();
       final h = await pumpApp(
         tester,
         llm: planningServer(),
-        pusher: pusher,
+        background: background,
         onChat: false,
       );
       final slug = h.chat.workspaces.first.slug;
       final thread = h.chat.threadsOf(slug).first.slug;
-      pusher.tap(ChatTarget(slug, thread));
+      background.tap(ChatTarget(slug, thread));
       await tester.pumpAndSettle();
       expect(h.shell.chatOpen, isTrue);
       expect((h.chat.activeSlug, h.chat.activeThread), (slug, thread));

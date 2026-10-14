@@ -1,17 +1,15 @@
 import 'package:flutter/widgets.dart';
 
-import 'apps/app_screen.dart';
+import 'apps/app_view.dart';
 import 'chat/background_work.dart';
 import 'chat/dictation.dart';
 import 'chat/photo_picker.dart';
 import 'chat/speaker.dart';
 import 'share/shared_item.dart';
-import 'state/apps_controller.dart';
 import 'state/chat_controller.dart';
 import 'state/files_controller.dart';
 import 'state/memory_controller.dart';
 import 'state/prefs_controller.dart';
-import 'state/push_controller.dart';
 import 'state/settings_controller.dart';
 import 'state/shell_controller.dart';
 import 'state/sources_controller.dart';
@@ -49,7 +47,6 @@ class AppScope extends InheritedWidget {
     required this.files,
     required this.system,
     required this.memory,
-    required this.apps,
     required this.toolkit,
     required this.launch,
     required this.save,
@@ -60,7 +57,6 @@ class AppScope extends InheritedWidget {
     this.photos,
     this.readAloud,
     this.appView,
-    this.push,
     this.background,
     this.canSpellcheck = false,
     required super.child,
@@ -76,9 +72,6 @@ class AppScope extends InheritedWidget {
 
   /// The Memory page's saved memories.
   final MemoryController memory;
-
-  /// The apps server beside the server in use, when it is there, and its apps.
-  final AppsController apps;
 
   /// The toolkit beside the server in use, when it is there: what it serves, and the scheduled
   /// jobs.
@@ -107,12 +100,9 @@ class AppScope extends InheritedWidget {
   /// Reads an answer aloud, or null where the device has no speech to read with.
   final ReadAloud? readAloud;
 
-  /// Shows an app's working page in a web view, or null where the device has none, and an app
-  /// shows its card with a way to its page in the browser.
+  /// Shows a page an answer links to in a web view, or null where the device has none, and the
+  /// link opens in the browser.
   final AppView? appView;
-
-  /// Push notifications, or null where the device cannot receive them.
-  final PushController? push;
 
   /// What keeps an answer going while the app is out of sight, or null where nothing does.
   final BackgroundWork? background;

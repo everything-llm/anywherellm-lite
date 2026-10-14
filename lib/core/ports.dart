@@ -1,16 +1,14 @@
 import 'dart:typed_data';
 
-import 'apps.dart';
 import 'chat.dart';
 import 'chat_log.dart';
+import 'companion.dart';
 import 'connection.dart';
 import 'embeds.dart';
 import 'memory.dart';
 import 'prefs.dart';
-import 'push.dart';
 import 'schedule.dart';
 import 'server_models.dart';
-import 'system_files.dart';
 import 'toolkit.dart';
 
 export 'errors.dart';
@@ -155,76 +153,6 @@ abstract interface class CompanionApi {
   /// key, or null when it is not there. Remembered for the connection; [again] asks afresh.
   /// Never throws.
   Future<Set<String>?> features({bool again = false});
-}
-
-/// The apps server, anythingllm-apps-v2. Every method but [features], [pages] and [card] uses
-/// the connection in use and throws [ApiException] on failure, [NotConfigured] when there is
-/// none.
-abstract interface class AppsApi implements CompanionApi {
-  /// Where the apps server's working pages are: where its `/health` says (`pages`), or else
-  /// beside the AnythingLLM server on [appsPagesPort]. Null with no server. Never throws.
-  Future<Uri?> pages();
-
-  /// Workspace [workspace]'s apps, newest change first.
-  Future<List<ServerApp>> apps(String workspace);
-
-  /// [app] as the list would show it now, read alone. Null from an apps server without the
-  /// route; throws [ApiException] with status 404 when there is no such app.
-  Future<ServerApp?> app(AppRef app);
-
-  /// The files of [app]'s folder, less its caches and git.
-  Future<List<AppFile>> files(AppRef app);
-
-  /// The text of [app]'s file at [path], as stored.
-  Future<String> file(AppRef app, String path);
-
-  /// [app]'s data after log line [line], or now when [line] is null.
-  Future<AppState> state(AppRef app, {int? line});
-
-  /// A page of [app]'s log, newest first: the newest [limit] lines numbered below [before], or
-  /// the newest of all when [before] is null. Null from an apps server without the route,
-  /// which is then read whole as the file `log.jsonl`.
-  Future<LogPage?> log(AppRef app, {int? before, int limit = 100});
-
-  /// The commits of [app]'s folder, newest first.
-  Future<List<AppCommit>> history(AppRef app);
-
-  /// [app]'s commit [commit]: `git show` whole, and file by file where the server splits it.
-  Future<AppDiff> diff(AppRef app, String commit);
-
-  /// Puts [app]'s data back as it was after line [line], as a new line, and returns its number.
-  Future<int> restore(AppRef app, int line);
-
-  /// Reverts [app]'s commit [commit] as a new commit, and returns its hash.
-  Future<String> revert(AppRef app, String commit);
-
-  /// Gives [app] the title [title]. Its folder keeps its name.
-  Future<void> rename(AppRef app, String title);
-
-  /// Deletes [app] with its data.
-  Future<void> delete(AppRef app);
-
-  /// The apps server's VAPID public key, base64url.
-  Future<String> pushKey();
-
-  /// Sends this device's push subscription to the apps server, which pushes each app's
-  /// `notify` to every device subscribed. Subscribing the same endpoint again replaces it.
-  Future<void> subscribePush(PushSubscription subscription);
-
-  /// Stops pushing to the device at [endpoint].
-  Future<void> unsubscribePush(String endpoint);
-
-  /// The System files folder at [path], `""` for the top: everything that decides what the
-  /// agent and the apps do, read only.
-  Future<List<SystemEntry>> systemFolder(String path);
-
-  /// The System files file at [path] as text, or null when it is not text.
-  Future<String?> systemFile(String path);
-
-  /// The picture at [url], an app's card read once. Sent without the key. With [last], the
-  /// card as read before, it sends [CardPicture.etag] as `If-None-Match`, and answers [last]
-  /// itself when the server says the card has not changed.
-  Future<CardPicture> card(Uri url, {CardPicture? last});
 }
 
 /// The toolkit, anythingllm-toolkit: AnythingLLM's saved memories and scheduled jobs, which

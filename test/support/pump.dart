@@ -1,7 +1,7 @@
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/ui/app.dart';
 import 'package:anywherellm/ui/app_scope.dart';
-import 'package:anywherellm/ui/apps/app_screen.dart';
+import 'package:anywherellm/ui/apps/app_view.dart';
 import 'package:anywherellm/ui/chat/background_work.dart';
 import 'package:anywherellm/ui/chat/composer.dart';
 import 'package:cross_file/cross_file.dart';
@@ -11,7 +11,6 @@ import 'package:anywherellm/ui/chat/speaker.dart';
 import 'package:anywherellm/ui/share/shared_item.dart';
 import 'package:anywherellm/ui/shell.dart';
 import 'package:anywherellm/ui/state/memory_controller.dart';
-import 'package:anywherellm/ui/state/push_controller.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 
@@ -22,10 +21,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_api.dart';
-import 'fake_apps.dart';
 import 'fake_toolkit.dart';
 import 'fake_background.dart';
-import 'fake_pusher.dart';
 import 'fake_settings.dart';
 import 'rig.dart';
 
@@ -146,7 +143,6 @@ class Harness extends Rig {
     super.llm,
     super.store,
     super.prefsStore,
-    super.appsServer,
     super.toolkitServer,
     super.connection,
     bool canViewApps = false,
@@ -157,7 +153,6 @@ class Harness extends Rig {
     this.canSpellcheck = false,
     this.canShare = false,
     this.shares,
-    this.pusher,
     this.background,
   }) : dictation = canDictate ? FakeDictation() : null,
        photos = canPickPhotos ? FakePhotos() : null,
@@ -189,26 +184,11 @@ class Harness extends Rig {
     chat,
   );
 
-  /// The device's push distributor, or null where it receives none.
-  final FakePusher? pusher;
-
   /// What keeps answers going out of sight, or null where nothing does.
   final FakeBackground? background;
 
   late final KeepAnswering? keepAnswering = switch (background) {
-    final background? => KeepAnswering(background, chat),
-    null => null,
-  };
-
-  late final PushController? push = switch (pusher) {
-    final pusher? => PushController(
-      pusher,
-      appsServer,
-      settings,
-      chat,
-      apps,
-      shell,
-    ),
+    final background? => KeepAnswering(background, chat, shell),
     null => null,
   };
 
@@ -220,7 +200,6 @@ class Harness extends Rig {
   @override
   void dispose() {
     memory.dispose();
-    push?.dispose();
     keepAnswering?.dispose();
     readAloud?.dispose();
     super.dispose();
@@ -271,7 +250,6 @@ class Harness extends Rig {
       files: files,
       system: system,
       memory: memory,
-      apps: apps,
       toolkit: toolkit,
       appView: appView,
       launch: (url) async {
@@ -292,7 +270,6 @@ class Harness extends Rig {
       dictation: dictation,
       photos: photos,
       readAloud: readAloud,
-      push: push,
       background: background,
       canSpellcheck: canSpellcheck,
       scanner: canScan
@@ -312,9 +289,8 @@ const phoneSize = Size(390, 844);
 /// Sizes the test window, builds the app on [llm] and lets the first loads finish. With no
 /// [connection], no server is set up. With [canScan], Settings offers a fake QR scanner, with
 /// [canDictate] the composer a microphone, with [canPickPhotos] the Attach sheet the device's
-/// photos and camera, and with [canSpeak] each answer Read aloud. [appsServer] is the apps
-/// server beside it, absent unless given present, [toolkitServer] the toolkit, present unless
-/// given absent, and [canViewApps] draws an app's page with a
+/// photos and camera, and with [canSpeak] each answer Read aloud. [toolkitServer] is the toolkit,
+/// present unless given absent, and [canViewApps] draws a page an answer links to with a
 /// [FakeAppView]. The window is a phone's,
 /// [phoneSize], unless [size] says otherwise. The chat shows full screen, as after a chat is
 /// tapped on the Chats tab, unless [onChat] is false, which leaves the home showing.
@@ -322,7 +298,6 @@ Future<Harness> pumpApp(
   WidgetTester tester, {
   FakeAnythingLlm? llm,
   FakePrefsStore? prefsStore,
-  FakeApps? appsServer,
   FakeToolkit? toolkitServer,
   bool canViewApps = false,
   Connection? connection = sampleConnection,
@@ -334,7 +309,6 @@ Future<Harness> pumpApp(
   bool canSpellcheck = false,
   bool canShare = false,
   StreamController<SharedItem>? shares,
-  FakePusher? pusher,
   FakeBackground? background,
   bool onChat = true,
 }) async {
@@ -344,14 +318,12 @@ Future<Harness> pumpApp(
   final harness = Harness(
     llm: llm,
     prefsStore: prefsStore,
-    appsServer: appsServer,
     toolkitServer: toolkitServer,
     canViewApps: canViewApps,
     connection: connection,
     canScan: canScan,
     canShare: canShare,
     shares: shares,
-    pusher: pusher,
     background: background,
     canDictate: canDictate,
     canPickPhotos: canPickPhotos,
@@ -363,7 +335,6 @@ Future<Harness> pumpApp(
   if (onChat) harness.shell.openChat();
   await tester.pumpWidget(harness.app);
   await harness.chat.load();
-  await harness.push?.load();
   // Built now, as the app builds it at start, so it holds from the first answer.
   harness.keepAnswering;
   await tester.pumpAndSettle();

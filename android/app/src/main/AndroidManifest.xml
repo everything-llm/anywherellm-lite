@@ -1,9 +1,8 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
-    <!-- Shows each push from AnythingLLM or the apps server; asked for when notifications are
-         turned on. -->
+    <!-- Shows that an answer is ready and that one is running; asked for when an answer first
+         runs. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- AnswerService keeps the app, and an answer it reads, going while out of sight. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
@@ -49,20 +48,10 @@
                 <data android:mimeType="*/*"/>
             </intent-filter>
         </activity>
-        <!-- The distributor's events: PushEvents shows each push itself, in place of the
-             UnifiedPush plugin's service, which needs a Flutter engine to. -->
-        <service
-            android:name="org.unifiedpush.flutter.connector.UnifiedPushService"
-            tools:node="remove"/>
         <service
             android:name=".AnswerService"
             android:exported="false"
             android:foregroundServiceType="dataSync"/>
-        <service android:name=".PushEvents" android:exported="false">
-            <intent-filter>
-                <action android:name="org.unifiedpush.android.connector.PUSH_EVENT"/>
-            </intent-filter>
-        </service>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

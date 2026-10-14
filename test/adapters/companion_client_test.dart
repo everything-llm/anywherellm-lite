@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:anywherellm/adapters/companion_client.dart';
-import 'package:anywherellm/core/apps.dart';
+import 'package:anywherellm/core/toolkit.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,12 +14,12 @@ const _connection = Connection(
   apiKey: 'SECRET-KEY',
 );
 
-/// The apps server as a companion, answering through [handler].
+/// The toolkit as a companion, answering through [handler].
 CompanionClient _api(
   Future<http.Response> Function(http.Request) handler, {
   ConnectionHolder? holder,
 }) => CompanionClient(
-  appsCompanion,
+  toolkitCompanion,
   holder: holder ?? ConnectionHolder(_connection),
   client: MockClient(handler),
   timeout: const Duration(seconds: 5),
@@ -47,18 +47,18 @@ Future<ApiException> _failure(Future<void> call) async {
 
 void main() {
   group('features', () {
-    test('asks /health on 8466 without the key, and believes only the apps '
+    test('asks /health on 8467 without the key, and believes only the toolkit '
         'server', () async {
       final seen = <http.Request>[];
       final api = _answering({
-        'service': 'anythingllm-apps-v2',
-        'server': 'cards',
+        'service': 'anythingllm-toolkit',
+        'server': 'toolkit',
         'ok': true,
       }, seen: seen);
       expect(await api.features(), isEmpty);
       expect(
         seen.single.url.toString(),
-        'https://host.example.ts.net:8466/health',
+        'https://host.example.ts.net:8467/health',
       );
       expect(seen.single.headers.containsKey('Authorization'), isFalse);
     });
@@ -72,7 +72,7 @@ void main() {
       );
       expect(
         await _answering({
-          'service': 'anythingllm-apps-v2',
+          'service': 'anythingllm-toolkit',
         }, status: 502).features(),
         isNull,
       );
@@ -88,7 +88,7 @@ void main() {
       final holder = ConnectionHolder(_connection);
       final api = _api((request) async {
         asked++;
-        return http.Response('{"service":"anythingllm-apps-v2"}', 200);
+        return http.Response('{"service":"anythingllm-toolkit"}', 200);
       }, holder: holder);
       await api.features();
       await api.features();
@@ -109,7 +109,7 @@ void main() {
         var asked = 0;
         Future<http.Response> count(http.Request _) async {
           asked++;
-          return http.Response('{"service":"anythingllm-apps-v2"}', 200);
+          return http.Response('{"service":"anythingllm-toolkit"}', 200);
         }
 
         expect(
@@ -121,7 +121,9 @@ void main() {
             count,
             holder: ConnectionHolder(_connection)
               ..companions = {
-                appsCompanion.service: Uri.parse('http://apps.example.com'),
+                toolkitCompanion.service: Uri.parse(
+                  'http://toolkit.example.com',
+                ),
               },
           ).features(),
           isNull,
@@ -136,13 +138,15 @@ void main() {
     final api = _api(
       (request) async {
         seen.add(request.url);
-        return http.Response('{"service":"anythingllm-apps-v2"}', 200);
+        return http.Response('{"service":"anythingllm-toolkit"}', 200);
       },
       holder: ConnectionHolder(_connection)
-        ..companions = {appsCompanion.service: Uri.parse('http://apps.lan/v2')},
+        ..companions = {
+          toolkitCompanion.service: Uri.parse('http://toolkit.lan/v2'),
+        },
     );
     expect(await api.features(), isEmpty);
-    expect(seen.single.toString(), 'http://apps.lan/v2/health');
+    expect(seen.single.toString(), 'http://toolkit.lan/v2/health');
   });
 
   group('calls', () {
@@ -154,9 +158,9 @@ void main() {
           seen.add(request);
           return http.Response(jsonEncode({'error': 'bad key'}), 401);
         });
-        final error = await _failure(api.json('GET', ['apps', 'home']));
+        final error = await _failure(api.json('GET', ['memory-switches']));
         expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
-        expect(error.message, 'The apps server did not accept the key.');
+        expect(error.message, 'The toolkit did not accept the key.');
         expect(error.message, isNot(contains('SECRET-KEY')));
       },
     );
@@ -164,15 +168,15 @@ void main() {
     test('a bare 404 is a route the companion lacks', () async {
       final api = _api((_) async => http.Response('Not Found', 404));
       expect(
-        await _failure(api.json('GET', ['apps', 'home', 'log'])),
+        await _failure(api.json('GET', ['workspaces', 'home', 'memories'])),
         isA<NoRoute>(),
       );
     });
 
     test('a server out of reach is named, without the key', () async {
       final api = _api((_) async => throw const SocketException('refused'));
-      final error = await _failure(api.json('GET', ['apps', 'home']));
-      expect(error.message, contains('the apps server on host.example.ts.net'));
+      final error = await _failure(api.json('GET', ['memory-switches']));
+      expect(error.message, contains('the toolkit on host.example.ts.net'));
       expect(error.message, isNot(contains('SECRET-KEY')));
     });
   });

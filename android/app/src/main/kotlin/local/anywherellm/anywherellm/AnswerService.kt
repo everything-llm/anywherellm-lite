@@ -18,11 +18,11 @@ class AnswerService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val note = PushNotes.ongoing(this, intent?.getStringExtra(EXTRA_TEXT) ?: "Answering")
+        val note = Notes.ongoing(this, intent?.getStringExtra(EXTRA_TEXT) ?: "Answering")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(PushNotes.ONGOING_ID, note, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            startForeground(Notes.ONGOING_ID, note, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } else {
-            startForeground(PushNotes.ONGOING_ID, note)
+            startForeground(Notes.ONGOING_ID, note)
         }
         return START_NOT_STICKY
     }
@@ -52,7 +52,7 @@ class AnswerService : Service() {
             }
             if (held) {
                 context.getSystemService(NotificationManager::class.java)
-                    .notify(PushNotes.ONGOING_ID, PushNotes.ongoing(context, text))
+                    .notify(Notes.ONGOING_ID, Notes.ongoing(context, text))
                 return
             }
             try {

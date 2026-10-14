@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-import '../../core/apps.dart';
 import '../../core/files.dart';
 import '../../core/gallery.dart';
 import '../../core/server_models.dart';
@@ -11,37 +10,8 @@ import 'chat_controller.dart';
 /// What the main pane shows: the chat, or the open workspace's pages.
 enum Pane { chats, files }
 
-/// A tab of the bar at the foot of the home: the open workspace's chats, its apps where the
-/// apps server is there, or Settings' list.
-enum HomeTab { chats, apps, settings }
-
-/// A page of an app's data, over the app shown full screen: its folder, one of its files,
-/// its log, or its git history.
-sealed class AppPage {
-  const AppPage();
-}
-
-/// The app's folder: its files and its git history.
-class AppFolder extends AppPage {
-  const AppFolder();
-}
-
-/// One file of the app's folder, at [path], such as `app.json`.
-class AppFileOf extends AppPage {
-  const AppFileOf(this.path);
-
-  final String path;
-}
-
-/// The app's `log.jsonl`, read as its history.
-class AppLog extends AppPage {
-  const AppLog();
-}
-
-/// The commits of the app's folder.
-class AppGit extends AppPage {
-  const AppGit();
-}
+/// A tab of the bar at the foot of the home: the open workspace's chats, or Settings' list.
+enum HomeTab { chats, settings }
 
 /// What the sheet over the chat shows: Sources, the passages an answer read from one
 /// file, or all of an answer's sources ([cited]).
@@ -174,56 +144,6 @@ class ShellController extends ChangeNotifier {
   }
 
   HomeTab _homeTab = HomeTab.chats;
-  AppRef? _app;
-  final List<AppPage> _appPages = [];
-
-  /// The app shown in its sheet, or whose data shows, over the home and the chat, or null.
-  AppRef? get app => _app;
-
-  /// Whether the app's data shows, full screen, rather than its sheet: it opens only from
-  /// outside the app, with no sheet under it.
-  bool get appDataOnly => _appPages.isNotEmpty;
-
-  /// The pages of the app's data open over it, the top one last.
-  List<AppPage> get appPages => List.unmodifiable(_appPages);
-
-  /// Shows [ref]'s working page in its sheet, or with [data] its folder alone, which Back
-  /// closes.
-  void openApp(AppRef ref, {bool data = false}) {
-    _shelfOpen = false;
-    _app = ref;
-    _appPages
-      ..clear()
-      ..addAll([if (data) const AppFolder()]);
-    _settingsOpen = false;
-    _rightOpen = false;
-    _popup.value = null;
-    notifyListeners();
-  }
-
-  /// Opens [page] of the shown app's data over what shows.
-  void showAppPage(AppPage page) {
-    if (_app == null) return;
-    _appPages.add(page);
-    _popup.value = null;
-    notifyListeners();
-  }
-
-  /// Steps back from the top page of the app's data, or closes the app when none is open.
-  void appBack() {
-    if (_appPages.length <= 1) return closeApp();
-    _appPages.removeLast();
-    notifyListeners();
-  }
-
-  void closeApp() {
-    if (_app == null) return;
-    _app = null;
-    _appPages.clear();
-    _popup.value = null;
-    notifyListeners();
-  }
-
   bool _rightOpen = false;
   FilesSection? _workspacePage;
   bool _scanning = false;
@@ -328,14 +248,14 @@ class ShellController extends ChangeNotifier {
   /// Whether the chat shows, full screen over the home.
   bool get chatOpen => _chatOpen;
 
-  /// The tab the home shows: Settings while Settings is open, else Chats or Apps.
+  /// The tab the home shows: Settings while Settings is open, else Chats.
   HomeTab get tab => _settingsOpen ? HomeTab.settings : _homeTab;
 
   /// Whether the home shows, with the bar of its tabs: the Chats tab with nothing over it, or
   /// Settings' list.
   bool get atHome => _settingsOpen
       ? _settingsPage == null
-      : !_chatOpen && _pane == Pane.chats && !_upcomingOpen && _app == null;
+      : !_chatOpen && _pane == Pane.chats && !_upcomingOpen;
 
   /// Whether the sheet over the chat, or over the workspace's pages, is open.
   bool get rightOpen => _rightOpen;
@@ -379,8 +299,7 @@ class ShellController extends ChangeNotifier {
         !_shelfOpen &&
         !_settingsOpen &&
         _pane == Pane.chats &&
-        !_upcomingOpen &&
-        _app == null) {
+        !_upcomingOpen) {
       return;
     }
     _shelfOpen = false;
@@ -388,8 +307,6 @@ class ShellController extends ChangeNotifier {
     _settingsOpen = false;
     _scanning = false;
     _guide = null;
-    _app = null;
-    _appPages.clear();
     _sourcesUnder = null;
     _pane = Pane.chats;
     _workspacePage = null;
@@ -421,8 +338,6 @@ class ShellController extends ChangeNotifier {
     _guide = null;
     _settingsOpen = tab == HomeTab.settings;
     if (tab != HomeTab.settings) _homeTab = tab;
-    _app = null;
-    _appPages.clear();
     _settingsPage = null;
     _settingsDirect = false;
     _popup.value = null;
@@ -495,7 +410,6 @@ class ShellController extends ChangeNotifier {
     _settingsDirect = !_settingsOpen || _settingsDirect;
     _shelfOpen = false;
     _settingsPage = page;
-    _systemShown = _systemTop;
     _settingsOpen = true;
     _popup.value = null;
     notifyListeners();
@@ -515,34 +429,15 @@ class ShellController extends ChangeNotifier {
     if (page == _settingsPage) return;
     if (_settingsPage == null) _settingsDirect = false;
     _settingsPage = page;
-    _systemShown = _systemTop;
     notifyListeners();
   }
 
-  static const _systemTop = (path: '', folder: true);
-  ({String path, bool folder}) _systemShown = _systemTop;
-
-  /// What the System files page shows: a folder or a file by its path, `""` the top.
-  ({String path, bool folder}) get systemShown => _systemShown;
-
-  /// Shows the System files folder or file at [path]; Back goes to the folder that holds it.
-  void showSystemPath(String path, {required bool folder}) {
-    _systemShown = (path: path, folder: folder);
-    notifyListeners();
-  }
-
-  /// Goes back from the Settings page shown to the page it is reached from: the folder above in
-  /// System files, the Server page, the list, or what showed under Settings when it opened on the page. From the list,
-  /// Settings closes, back to the Chats tab.
+  /// Goes back from the Settings page shown to the page it is reached from: the Server page, the
+  /// list, or what showed under Settings when it opened on the page. From the list, Settings
+  /// closes, back to the Chats tab.
   void settingsBack() {
     final page = _settingsPage;
-    if (page == SettingsPage.systemFiles && _systemShown.path.isNotEmpty) {
-      final path = _systemShown.path;
-      showSystemPath(
-        path.substring(0, path.lastIndexOf('/').clamp(0, path.length)),
-        folder: true,
-      );
-    } else if (page == null) {
+    if (page == null) {
       closeSettings();
     } else if (page.parent == null && _settingsDirect) {
       closeSettings();
