@@ -479,7 +479,7 @@ class _UserBubble extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(text, style: Type.sans(15.5, color: t.ink, height: 1.5)),
+          Text(text, style: Type.sans(Type.chat, color: t.ink, height: 1.5)),
           for (final file in attachments)
             Padding(
               padding: const EdgeInsets.only(top: 6),

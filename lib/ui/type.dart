@@ -40,6 +40,10 @@ abstract final class Type {
   static TextStyle textArea(double size, Color color) =>
       sans(size, color: color, height: textAreaLine);
 
+  /// The size of what is said in a chat, before the person's Chat text size and the system's:
+  /// Material's body large, with its line 1.6, which keeps the pitch the chat had at 15.5.
+  static const chat = 16.0;
+
   /// A muted note at 13, as under a card or a sheet's title, in [color].
   static TextStyle note(Color color) => sans(13, color: color, height: 1.45);
 

@@ -552,7 +552,7 @@ class _Form extends StatelessWidget {
                             textInputAction: TextInputAction.newline,
                             // The keyboard starts each sentence with a capital.
                             textCapitalization: TextCapitalization.sentences,
-                            style: Type.textArea(15.5, t.ink),
+                            style: Type.textArea(Type.chat, t.ink),
                             cursorColor: t.accent,
                             // A picture from the keyboard's clipboard; the rest goes in as text.
                             contentInsertionConfiguration:
@@ -568,7 +568,7 @@ class _Form extends StatelessWidget {
                               ),
                               border: InputBorder.none,
                               hintText: hint,
-                              hintStyle: Type.textArea(15.5, t.muted),
+                              hintStyle: Type.textArea(Type.chat, t.muted),
                             ),
                           ),
                         ),

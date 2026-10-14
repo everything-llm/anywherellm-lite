@@ -71,9 +71,9 @@ class AnswerBody extends StatelessWidget {
   Widget _markdown(BuildContext context, String text, {required bool caret}) {
     final t = Tokens.of(context);
     final ink = muted ? t.ink2 : t.ink;
-    const lineHeight = 1.65;
-    final body = Type.sans(15.5, color: ink, height: lineHeight);
-    final code = Type.mono(13.5, color: ink, height: 1.5);
+    const lineHeight = 1.6;
+    final body = Type.sans(Type.chat, color: ink, height: lineHeight);
+    final code = Type.mono(14, color: ink, height: 1.5);
     TextStyle heading(double size) =>
         Type.sans(size, weight: FontWeight.w600, color: ink, height: 1.35);
     final border = BorderSide(color: t.line);
@@ -109,17 +109,17 @@ class AnswerBody extends StatelessWidget {
         ),
         code: code.copyWith(backgroundColor: t.panel2),
         h1: heading(22),
-        h2: heading(19),
-        h3: heading(17),
-        h4: heading(15.5),
-        h5: heading(15.5),
-        h6: heading(15.5),
+        h2: heading(20),
+        h3: heading(18),
+        h4: heading(Type.chat),
+        h5: heading(Type.chat),
+        h6: heading(Type.chat),
         h1Padding: const EdgeInsets.only(top: 6),
         h2Padding: const EdgeInsets.only(top: 6),
         h3Padding: const EdgeInsets.only(top: 4),
         em: body.copyWith(fontStyle: FontStyle.italic),
         strong: Type.sans(
-          15.5,
+          Type.chat,
           weight: FontWeight.w600,
           color: ink,
           height: lineHeight,
@@ -134,12 +134,12 @@ class AnswerBody extends StatelessWidget {
         listIndent: 20,
         listBullet: body,
         tableHead: Type.sans(
-          14,
+          14.5,
           weight: FontWeight.w600,
           color: ink,
           height: 1.4,
         ),
-        tableBody: Type.sans(14, color: ink, height: 1.4),
+        tableBody: Type.sans(14.5, color: ink, height: 1.4),
         tableBorder: TableBorder.all(color: t.line),
         tableColumnWidth: const IntrinsicColumnWidth(),
         tableCellsPadding: const EdgeInsets.symmetric(

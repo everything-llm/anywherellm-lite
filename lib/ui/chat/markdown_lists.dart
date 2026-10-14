@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
+import '../type.dart';
 import '../widgets/controls.dart';
 
 /// A [MarkdownBody] whose tight lists have no space between their items, as a browser draws
@@ -99,7 +100,7 @@ Widget listBullet(MarkdownBulletParameters bullet, TextStyle style) {
       style: style,
     );
   }
-  final size = (style.fontSize ?? 15.5) / 3;
+  final size = (style.fontSize ?? Type.chat) / 3;
   final hollow = bullet.nestLevel.isOdd;
   return Text.rich(
     TextSpan(
