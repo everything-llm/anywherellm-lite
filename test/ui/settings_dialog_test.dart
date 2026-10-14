@@ -119,46 +119,34 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the filled button on the first run is the next step', (
-    tester,
-  ) async {
-    final h = await pumpApp(
-      tester,
-      size: phone,
-      connection: null,
-      canScan: true,
-    );
-    h.shell.openSettings(SettingsPage.connection);
-    await tester.pumpAndSettle();
-    bool filled(String label) => tester
-        .widget<AppButton>(
-          find.byWidgetPredicate((w) => w is AppButton && w.label == label),
-        )
-        .primary;
-    expect(filled('Scan QR code'), isTrue);
-    expect(filled('Connect'), isFalse);
-    expect(
-      tester
-          .widget<AppButton>(
-            find.byWidgetPredicate(
-              (w) => w is AppButton && w.label == 'Scan QR code',
-            ),
-          )
-          .leading,
-      'qr',
-    );
-    final fields = find.descendant(
-      of: find.byType(SettingsDialog),
-      matching: find.byType(EditableText),
-    );
-    await tester.enterText(fields.at(0), 'https://host.example');
-    await tester.pump();
-    expect(filled('Scan QR code'), isTrue, reason: 'the key is still empty');
-    await tester.enterText(fields.at(1), 'k-secret');
-    await tester.pump();
-    expect(filled('Scan QR code'), isFalse);
-    expect(filled('Connect'), isTrue);
-  });
+  testWidgets(
+    'Connect is the filled button on the first run, Scan QR code has an icon',
+    (tester) async {
+      final h = await pumpApp(
+        tester,
+        size: phone,
+        connection: null,
+        canScan: true,
+      );
+      h.shell.openSettings(SettingsPage.connection);
+      await tester.pumpAndSettle();
+      AppButton button(String label) => tester.widget<AppButton>(
+        find.byWidgetPredicate((w) => w is AppButton && w.label == label),
+      );
+      expect(button('Connect').primary, isTrue);
+      expect(button('Scan QR code').primary, isFalse);
+      expect(button('Scan QR code').leading, 'qr');
+      final fields = find.descendant(
+        of: find.byType(SettingsDialog),
+        matching: find.byType(EditableText),
+      );
+      await tester.enterText(fields.at(0), 'https://host.example');
+      await tester.enterText(fields.at(1), 'k-secret');
+      await tester.pump();
+      expect(button('Connect').primary, isTrue);
+      expect(button('Scan QR code').primary, isFalse);
+    },
+  );
 
   testWidgets('Where do I find a key? opens the guide on its key screen', (
     tester,

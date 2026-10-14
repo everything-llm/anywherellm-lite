@@ -410,99 +410,90 @@ class _KeyCardState extends State<_KeyCard> {
 
   /// The first run: Scan QR code first where there is a camera, then the address and the
   /// developer key, each under its name, where to find a key, and Connect, in groups 28 apart
-  /// with 12 or less inside one. The filled button is the next step: Scan QR code while the
-  /// address or key is empty, Connect once both hold text. How connecting works is under the
-  /// page, in the settings dialog.
+  /// with 12 or less inside one. Connect is the filled button; Scan QR code is outlined, with a
+  /// QR icon before its label. How connecting works is under the page, in the settings dialog.
   Widget _firstRun(BuildContext context, bool saving, VoidCallback startScan) {
     final scanner = _scanner;
     final notes = [?_scanProblem, ?_settings.message];
-    return ListenableBuilder(
-      listenable: Listenable.merge([_url, _key]),
-      builder: (context, _) {
-        final ready =
-            _url.text.trim().isNotEmpty && _key.text.trim().isNotEmpty;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 28,
-          children: [
-            if (scanner != null)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                spacing: 20,
-                children: [
-                  _scan(
-                    scanner,
-                    child: AppButton(
-                      'Scan QR code',
-                      leading: 'qr',
-                      primary: !ready,
-                      onPressed: saving ? null : startScan,
-                    ),
-                  ),
-                  const _OrDivider('or enter a key'),
-                ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 28,
+      children: [
+        if (scanner != null)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: 20,
+            children: [
+              _scan(
+                scanner,
+                child: AppButton(
+                  'Scan QR code',
+                  leading: 'qr',
+                  onPressed: saving ? null : startScan,
+                ),
               ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              spacing: 12,
-              children: [
-                NamedControl(
-                  'Server address',
-                  quiet: true,
-                  labelled: true,
-                  AppField(
-                    controller: _url,
-                    label: 'Server address',
-                    hint: _example,
-                    keyboardType: TextInputType.url,
-                    autofillHints: const [AutofillHints.url],
-                  ),
-                ),
-                NamedControl(
-                  'Developer API key',
-                  quiet: true,
-                  labelled: true,
-                  SecretField(
-                    controller: _key,
-                    label: 'AnythingLLM developer API key',
-                    hint: 'Paste the AnythingLLM API key',
-                    keyboardType: TextInputType.visiblePassword,
-                    onSubmitted: (_) => saving ? null : _save(),
-                  ),
-                ),
-                _KeyLink(onTap: () => _shell.showGuide(Guide.connect, step: 1)),
-              ],
+              const _OrDivider('or enter a key'),
+            ],
+          ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 12,
+          children: [
+            NamedControl(
+              'Server address',
+              quiet: true,
+              labelled: true,
+              AppField(
+                controller: _url,
+                label: 'Server address',
+                hint: _example,
+                keyboardType: TextInputType.url,
+                autofillHints: const [AutofillHints.url],
+              ),
             ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              spacing: 12,
-              children: [
-                // Why the last try failed, in a line kept for it.
-                ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 20),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      spacing: 8,
-                      children: [
-                        for (final note in notes) HelpText(note, status: true),
-                      ],
-                    ),
-                  ),
-                ),
-                AppButton(
-                  saving ? 'Checking…' : 'Connect',
-                  primary: scanner == null || ready,
-                  onPressed: saving ? null : _save,
-                ),
-                if (_settings.keyringProblem case final problem?)
-                  AlertBox(AlertKind.warn, problem.title, text: problem.text),
-              ],
+            NamedControl(
+              'Developer API key',
+              quiet: true,
+              labelled: true,
+              SecretField(
+                controller: _key,
+                label: 'AnythingLLM developer API key',
+                hint: 'Paste the AnythingLLM API key',
+                keyboardType: TextInputType.visiblePassword,
+                onSubmitted: (_) => saving ? null : _save(),
+              ),
             ),
+            _KeyLink(onTap: () => _shell.showGuide(Guide.connect, step: 1)),
           ],
-        );
-      },
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 12,
+          children: [
+            // Why the last try failed, in a line kept for it.
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 20),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  spacing: 8,
+                  children: [
+                    for (final note in notes) HelpText(note, status: true),
+                  ],
+                ),
+              ),
+            ),
+            AppButton(
+              saving ? 'Checking…' : 'Connect',
+              primary: true,
+              onPressed: saving ? null : _save,
+            ),
+            if (_settings.keyringProblem case final problem?)
+              AlertBox(AlertKind.warn, problem.title, text: problem.text),
+          ],
+        ),
+      ],
     );
   }
 }
