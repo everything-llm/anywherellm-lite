@@ -45,14 +45,12 @@ class AppField extends StatelessWidget {
     this.hint,
     this.onChanged,
     this.onSubmitted,
-    this.icon,
     this.suffix,
     this.obscure = false,
     this.private = false,
     this.keyboardType,
     this.autofillHints,
     this.maxLines = 1,
-    this.focusNode,
     this.autofocus = false,
   });
 
@@ -60,9 +58,6 @@ class AppField extends StatelessWidget {
 
   /// Whether the field takes the focus when it first shows.
   final bool autofocus;
-
-  /// The field's focus, for something else to move to it, or null for its own.
-  final FocusNode? focusNode;
 
   /// The accessible name. The field has no visible label of its own.
   final String label;
@@ -73,9 +68,6 @@ class AppField extends StatelessWidget {
 
   /// Called when the person presses Enter.
   final ValueChanged<String>? onSubmitted;
-
-  /// The name of an icon drawn inside the field, before the text.
-  final String? icon;
 
   /// A widget drawn inside the field, after the text.
   final Widget? suffix;
@@ -115,7 +107,6 @@ class AppField extends StatelessWidget {
       label: label,
       textField: true,
       child: TextField(
-        focusNode: focusNode,
         autofocus: autofocus,
         controller: controller,
         autocorrect: false,
@@ -140,23 +131,12 @@ class AppField extends StatelessWidget {
           fillColor: fieldFill(context),
           hintText: hint,
           hintStyle: text.copyWith(color: t.muted),
-          prefixIcon: icon == null
-              ? null
-              : Center(
-                  widthFactor: 1,
-                  heightFactor: 1,
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 15, right: 4),
-                    child: AppIcon(icon!, size: IconSize.sm, color: t.muted),
-                  ),
-                ),
           suffixIcon: suffix == null
               ? null
               : Padding(
                   padding: const EdgeInsets.only(right: 4),
                   child: suffix,
                 ),
-          prefixIconConstraints: BoxConstraints(minHeight: height),
           contentPadding: EdgeInsets.symmetric(
             horizontal: 13,
             vertical: (height - 18) / 2,
@@ -229,21 +209,19 @@ class _SecretFieldState extends State<SecretField> {
 }
 
 /// A choice among [choices], drawn as a field: as tall as an [AppField] and rounded, with
-/// [hint] while [value] is none of them. A null [onChanged] turns it off.
+/// Not set while [value] is none of them. A null [onChanged] turns it off.
 class AppSelect extends StatelessWidget {
   const AppSelect({
     super.key,
     required this.value,
     required this.choices,
     required this.onChanged,
-    this.hint = 'Not set',
     this.labelOf,
   });
 
   final String? value;
   final List<String> choices;
   final ValueChanged<String?>? onChanged;
-  final String hint;
 
   /// What a choice is called, when that is not the choice itself.
   final String Function(String choice)? labelOf;
@@ -264,7 +242,7 @@ class AppSelect extends StatelessWidget {
         child: DropdownButton<String>(
           isExpanded: true,
           value: choices.contains(value) ? value : null,
-          hint: Text(hint, style: Type.sans(15, color: t.muted)),
+          hint: Text('Not set', style: Type.sans(15, color: t.muted)),
           style: Type.sans(15, color: t.ink),
           dropdownColor: t.panel,
           borderRadius: radius,

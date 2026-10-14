@@ -36,8 +36,6 @@ const _paths = {
   'clock': 'M8 14A6 6 0 1 0 8 2a6 6 0 0 0 0 12z M8 5v3l2 1.5',
   'grid': 'M3 3h4v4H3z M9 3h4v4H9z M3 9h4v4H3z M9 9h4v4H9z',
   'link': 'M7 9a3 3 0 0 0 4 0l2-2a3 3 0 0 0-4-4l-1 1 M9 7a3 3 0 0 0-4 0l-2 2a3 3 0 0 0 4 4l1-1',
-  'thumb-up': 'M5 7v6.5H2.5V7z M5 7l2.5-4.5a1.3 1.3 0 0 1 2.4.8L9.5 6h3.2a1.2 1.2 0 0 1 1.2 1.4l-.9 5a1.2 1.2 0 0 1-1.2 1H5',
-  'thumb-down': 'M5 9V2.5H2.5V9z M5 9l2.5 4.5a1.3 1.3 0 0 0 2.4-.8L9.5 10h3.2a1.2 1.2 0 0 0 1.2-1.4l-.9-5a1.2 1.2 0 0 0-1.2-1H5',
 };
 
 final _parsed = <String, Path>{};
@@ -50,7 +48,6 @@ enum IconSize {
   tiny(12),
   xs(14),
   small(16),
-  sm(15),
   normal(18),
 
   /// A tab's icon in the bar at the home's foot.

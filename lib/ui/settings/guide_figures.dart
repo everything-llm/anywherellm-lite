@@ -311,7 +311,6 @@ class _Pen {
     Color? fill,
     bool edge = false,
     Color? edgeColor,
-    bool dashed = false,
   }) {
     final shape = RRect.fromRectAndRadius(
       Rect.fromLTWH(x, y, w, h),
@@ -319,7 +318,7 @@ class _Pen {
     );
     if (fill != null) canvas.drawRRect(shape, Paint()..color = fill);
     if (edge) {
-      _draw(Path()..addRRect(shape), _stroke(color: edgeColor), dashed);
+      _draw(Path()..addRRect(shape), _stroke(color: edgeColor), false);
     }
   }
 

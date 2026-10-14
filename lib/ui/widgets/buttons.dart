@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../icons.dart';
@@ -213,7 +211,6 @@ class TextAction extends StatelessWidget {
     this.onTap, {
     super.key,
     this.semanticLabel,
-    this.height,
     this.weight = FontWeight.w400,
   });
 
@@ -222,7 +219,6 @@ class TextAction extends StatelessWidget {
     this.onTap, {
     super.key,
     this.semanticLabel,
-    this.height,
     this.weight = FontWeight.w400,
   }) : icon = null;
 
@@ -233,17 +229,12 @@ class TextAction extends StatelessWidget {
   /// What a screen reader hears, when [label] alone is not enough, as in a list.
   final String? semanticLabel;
 
-  /// The least height, with the words in its middle, as beside buttons whose row it shares.
-  /// It is at least 44.
-  final double? height;
-
   /// The weight of the words.
   final FontWeight weight;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final height = math.max(44.0, this.height ?? 0);
     final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -265,7 +256,7 @@ class TextAction extends StatelessWidget {
       onTap: onTap,
       radius: BorderRadius.circular(6),
       child: ConstrainedBox(
-        constraints: BoxConstraints(minHeight: height),
+        constraints: const BoxConstraints(minHeight: 44),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Align(widthFactor: 1, heightFactor: 1, child: content),

@@ -10,13 +10,13 @@ import 'buttons.dart';
 import 'rise.dart';
 
 /// How tall a [SheetFrame] stands: [tall] fills the screen but for [SheetFrame.gap] above it,
-/// and [fit] takes the height of what it holds, at most [SheetFrame.maxFraction] of the screen.
+/// and [fit] takes the height of what it holds, at most [SheetFrame.fitFraction] of the screen.
 enum SheetHeight { tall, fit }
 
 /// A sheet over the chat on a phone, filling what it is given: the scrim, which closes it when
-/// tapped, and the sheet itself at the bottom, under a drag handle, with [title], the line
-/// [about] under it, [actions] and Close, then [child]. Dragging the handle or the header down
-/// past 120 px, or flinging it, closes it; a shorter drag puts it back.
+/// tapped, and the sheet itself at the bottom, under a drag handle, with [title] and Close, then
+/// [child]. Dragging the handle or the header down past 120 px, or flinging it, closes it; a
+/// shorter drag puts it back.
 ///
 /// A [bare] sheet has only the drag handle over [child], which draws its own controls; [title]
 /// then names it to a screen reader alone.
@@ -29,29 +29,15 @@ class SheetFrame extends StatefulWidget {
     required this.title,
     required this.onClose,
     required this.child,
-    this.about,
-    this.actions = const [],
     this.height = SheetHeight.fit,
-    this.maxFraction = 0.9,
-    this.live = false,
     this.padding = const EdgeInsets.fromLTRB(16, 4, 16, 24),
     this.bare = false,
   });
 
   final String title;
-  final String? about;
   final VoidCallback onClose;
   final Widget child;
-
-  /// Buttons before Close, such as one that opens the sheet's page elsewhere.
-  final List<Widget> actions;
   final SheetHeight height;
-
-  /// The most of the screen a [SheetHeight.fit] sheet takes.
-  final double maxFraction;
-
-  /// Whether [about] is read out when it changes.
-  final bool live;
 
   /// Around [child].
   final EdgeInsets padding;
@@ -61,6 +47,9 @@ class SheetFrame extends StatefulWidget {
 
   /// The room left above a [SheetHeight.tall] sheet, where the chat shows through the scrim.
   static const gap = 72.0;
+
+  /// The most of the screen a [SheetHeight.fit] sheet takes.
+  static const fitFraction = 0.9;
 
   /// Whether [context] is inside a sheet, whose cards are filled with [Tokens.bg].
   static bool holds(BuildContext context) =>
@@ -139,9 +128,6 @@ class _SheetFrameState extends State<SheetFrame>
           if (!widget.bare)
             SheetHeader(
               title: widget.title,
-              about: widget.about,
-              live: widget.live,
-              actions: widget.actions,
               onClose: widget.onClose,
               divided: tall,
             ),
@@ -152,7 +138,7 @@ class _SheetFrameState extends State<SheetFrame>
       builder: (context, box) {
         final most = tall
             ? math.max(0.0, box.maxHeight - SheetFrame.gap)
-            : box.maxHeight * widget.maxFraction;
+            : box.maxHeight * SheetFrame.fitFraction;
         final sheet = Semantics(
           container: true,
           explicitChildNodes: true,
@@ -227,23 +213,16 @@ class _InSheet extends InheritedWidget {
   bool updateShouldNotify(_InSheet old) => false;
 }
 
-/// A sheet's header: [title] at 19, the line [about] under it, [actions] and a 44 px Close, with
-/// a rule under it when [divided].
+/// A sheet's header: [title] at 19 and a 44 px Close, with a rule under it when [divided].
 class SheetHeader extends StatelessWidget {
   const SheetHeader({
     super.key,
     required this.title,
     required this.onClose,
-    this.about,
-    this.live = false,
-    this.actions = const [],
     this.divided = false,
   });
 
   final String title;
-  final String? about;
-  final bool live;
-  final List<Widget> actions;
   final VoidCallback onClose;
   final bool divided;
 
@@ -260,38 +239,22 @@ class SheetHeader extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Semantics(
-                  header: true,
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Type.sans(
-                      19,
-                      weight: FontWeight.w600,
-                      color: t.ink,
-                      height: 1.3,
-                    ),
-                  ),
+            child: Semantics(
+              header: true,
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Type.sans(
+                  19,
+                  weight: FontWeight.w600,
+                  color: t.ink,
+                  height: 1.3,
                 ),
-                if (about case final about?)
-                  Semantics(
-                    liveRegion: live,
-                    child: Text(
-                      about,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Type.sans(13.5, color: t.muted, height: 1.45),
-                    ),
-                  ),
-              ],
+              ),
             ),
           ),
           const SizedBox(width: 4),
-          ...actions,
           IconBtn(
             'close',
             tooltip: 'Close',
@@ -361,7 +324,6 @@ class PopupSheet extends StatelessWidget {
     required this.title,
     required this.sheet,
     required this.child,
-    this.maxFraction = 0.9,
   });
 
   final bool open;
@@ -369,7 +331,6 @@ class PopupSheet extends StatelessWidget {
   final String title;
   final WidgetBuilder sheet;
   final Widget child;
-  final double maxFraction;
 
   @override
   Widget build(BuildContext context) => OverlayWhile(
@@ -377,7 +338,6 @@ class PopupSheet extends StatelessWidget {
     overlay: (context) => ModalSheet(
       title: title,
       onClose: onClose,
-      maxFraction: maxFraction,
       child: Builder(builder: sheet),
     ),
     child: child,
@@ -393,14 +353,12 @@ class ModalSheet extends StatelessWidget {
     required this.title,
     required this.onClose,
     required this.child,
-    this.maxFraction = 0.9,
     this.autofocus = true,
   });
 
   final String title;
   final VoidCallback onClose;
   final Widget child;
-  final double maxFraction;
   final bool autofocus;
 
   @override
@@ -409,12 +367,7 @@ class ModalSheet extends StatelessWidget {
     child: Focus(
       autofocus: autofocus,
       child: SafeArea(
-        child: SheetFrame(
-          title: title,
-          onClose: onClose,
-          maxFraction: maxFraction,
-          child: child,
-        ),
+        child: SheetFrame(title: title, onClose: onClose, child: child),
       ),
     ),
   );

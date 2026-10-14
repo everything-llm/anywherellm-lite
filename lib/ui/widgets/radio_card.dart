@@ -5,9 +5,8 @@ import '../tokens.dart';
 import '../type.dart';
 import 'tappable.dart';
 
-/// One choice of several: a radio ring, [title], the line [about] under it and [hint] after
-/// it. As a [card], it sits in a box filled while chosen; otherwise it is a plain row. A title
-/// not chosen is medium, and a chosen one semibold.
+/// One choice of several: a radio ring, [title] and the line [about] under it, in a box filled
+/// while chosen. A title not chosen is medium, and a chosen one semibold.
 class RadioCard extends StatelessWidget {
   const RadioCard({
     super.key,
@@ -15,35 +14,28 @@ class RadioCard extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.about,
-    this.hint,
-    this.card = true,
   });
 
   final String title;
   final String? about;
-  final String? hint;
   final bool selected;
-  final bool card;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    // A card rings itself in the selection colour when chosen, and marks the choice with a
+    // The card rings itself in the selection colour when chosen, and marks the choice with a
     // thick ring rather than a dot, as the design canvas draws it.
     return Tappable(
-      label: [title, ?hint, ?about].join('. '),
+      label: [title, ?about].join('. '),
       selected: selected,
       onTap: onTap,
       radius: BorderRadius.circular(20),
-      color: card ? (selected ? t.sel : t.panel) : null,
-      side: card ? BorderSide(color: selected ? t.sel : t.edge) : null,
+      color: selected ? t.sel : t.panel,
+      side: BorderSide(color: selected ? t.sel : t.edge),
       child: Container(
-        constraints: BoxConstraints(minHeight: card ? Sizes.cardRow : 48),
-        padding: EdgeInsets.symmetric(
-          horizontal: card ? 18 : 0,
-          vertical: card ? 8 : 6,
-        ),
+        constraints: const BoxConstraints(minHeight: Sizes.cardRow),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
         child: Row(
           children: [
             Container(
@@ -80,8 +72,6 @@ class RadioCard extends StatelessWidget {
                 ],
               ),
             ),
-            if (hint case final hint?)
-              Text(hint, style: Type.sans(12.5, color: t.muted)),
           ],
         ),
       ),

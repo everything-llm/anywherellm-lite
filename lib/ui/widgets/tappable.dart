@@ -16,7 +16,6 @@ class Tappable extends StatelessWidget {
     required this.label,
     required this.onTap,
     required this.child,
-    this.onDoubleTap,
     this.selected,
     this.toggled,
     this.expanded,
@@ -34,8 +33,6 @@ class Tappable extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
 
-  /// Leave null where a double tap means nothing: while set, a single tap waits to be told apart.
-  final VoidCallback? onDoubleTap;
   final Widget child;
   final bool? selected;
   final bool? toggled;
@@ -73,7 +70,6 @@ class Tappable extends StatelessWidget {
             : null);
     final ink = InkWell(
       onTap: onTap,
-      onDoubleTap: onDoubleTap,
       borderRadius: radius,
       customBorder: shape,
       hoverColor: hoverColor,

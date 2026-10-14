@@ -75,7 +75,7 @@ class AppSwitch extends StatelessWidget {
   }
 }
 
-/// The look of an [AppSwitch] alone, for a row that is itself the switch, as a menu's is.
+/// The look of an [AppSwitch] alone, for a row that is itself the switch.
 class SwitchTrack extends StatelessWidget {
   const SwitchTrack({super.key, required this.value});
 
