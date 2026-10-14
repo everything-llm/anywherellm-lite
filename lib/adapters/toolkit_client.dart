@@ -1,7 +1,9 @@
 import 'package:http/http.dart' as http;
 
+import '../core/activity.dart';
 import '../core/companion.dart';
 import '../core/connection.dart';
+import '../core/library.dart';
 import '../core/memory.dart';
 import '../core/ports.dart';
 import '../core/schedule.dart';
@@ -36,6 +38,65 @@ class HttpToolkitApi implements ToolkitApi {
   @override
   Future<List<ScheduledJob>> scheduledJobs() async =>
       scheduledJobsOf(await _companion.json('GET', ['jobs']));
+
+  @override
+  Future<LibraryContents> library() async =>
+      libraryOf(await _companion.json('GET', ['library']));
+
+  @override
+  Future<ActivityEvents> activity({String? before, int limit = 50}) async =>
+      activityOf(
+        await _companion.json(
+          'GET',
+          ['activity'],
+          query: {'limit': '$limit', 'before': ?before},
+        ),
+      );
+
+  @override
+  Future<List<JobRun>> jobRuns(String id, {int limit = 5}) async => jobRunsOf(
+    await _companion.json(
+      'GET',
+      ['jobs', id, 'runs'],
+      query: {'limit': '$limit'},
+    ),
+  );
+
+  // The calls below answer with what they did, which the app reads again as a list of jobs, so
+  // none decodes the answer.
+  @override
+  Future<void> createJob(JobDraft draft, {required String key}) async {
+    await _companion.call(
+      'POST',
+      ['jobs'],
+      body: draft.toJson(),
+      headers: {'Idempotency-Key': key},
+    );
+  }
+
+  @override
+  Future<void> updateJob(String id, JobDraft draft) async {
+    await _companion.call('PUT', ['jobs', id], body: draft.toJson());
+  }
+
+  @override
+  Future<void> setJobEnabled(String id, bool enabled) async {
+    await _companion.call('PUT', ['jobs', id], body: {'enabled': enabled});
+  }
+
+  @override
+  Future<void> deleteJob(String id) async {
+    await _companion.call('DELETE', ['jobs', id]);
+  }
+
+  @override
+  Future<void> runJob(String id, {required String key}) async {
+    await _companion.call(
+      'POST',
+      ['jobs', id, 'run'],
+      headers: {'Idempotency-Key': key},
+    );
+  }
 
   @override
   Future<MemorySwitches> memorySwitches() async => MemorySwitches.fromJson(

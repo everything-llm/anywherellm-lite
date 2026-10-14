@@ -37,7 +37,7 @@ class GeneratedFiles extends StatelessWidget {
 }
 
 /// Asks where to save [file], then reads and writes it there. Says whether it was saved.
-Future<bool> _download(BuildContext context, GeneratedFile file) async {
+Future<bool> saveMadeFile(BuildContext context, GeneratedFile file) async {
   final chat = AppScope.of(context).chat;
   final where = await saveFile(
     context,
@@ -71,7 +71,7 @@ class _SaveButtonState extends State<_SaveButton> {
       label: _saved ? 'Saved $name' : 'Save $name',
       tooltip: _saved ? null : 'Save',
       onTap: () async {
-        final saved = await _download(context, widget.file);
+        final saved = await saveMadeFile(context, widget.file);
         if (mounted && saved) setState(() => _saved = true);
       },
       radius: BorderRadius.circular(8),
@@ -244,23 +244,43 @@ class _MadeImageState extends State<_MadeImage> {
             ),
           ],
         );
-        // Open, it is the popup, keyed by the file, so Esc and Back close it.
-        return ValueListenableBuilder(
-          valueListenable: scope.shell.popup,
-          child: image,
-          builder: (context, popup, image) => OverlayWhile(
-            open: identical(popup, file),
-            overlay: (context) => SafeArea(
-              child: ImageViewer(
-                file,
-                bytes,
-                onClose: () => scope.shell.closePopup(file),
-              ),
-            ),
-            child: image!,
-          ),
-        );
+        return ViewerWhileOpen(file, bytes, child: image);
       },
+    );
+  }
+}
+
+/// [child], with [ImageViewer] showing [file] over the window while it is the popup open, keyed
+/// by the file, so Esc and Back close it.
+class ViewerWhileOpen extends StatelessWidget {
+  const ViewerWhileOpen(
+    this.file,
+    this.bytes, {
+    super.key,
+    required this.child,
+  });
+
+  final GeneratedFile file;
+  final Uint8List bytes;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final shell = AppScope.of(context).shell;
+    return ValueListenableBuilder(
+      valueListenable: shell.popup,
+      child: child,
+      builder: (context, popup, child) => OverlayWhile(
+        open: identical(popup, file),
+        overlay: (context) => SafeArea(
+          child: ImageViewer(
+            file,
+            bytes,
+            onClose: () => shell.closePopup(file),
+          ),
+        ),
+        child: child!,
+      ),
     );
   }
 }
@@ -391,7 +411,7 @@ class ImageViewer extends StatelessWidget {
                       button(
                         'Save',
                         'download',
-                        () => _download(context, file),
+                        () => saveMadeFile(context, file),
                         filled: true,
                       ),
                       if (scope.share != null)

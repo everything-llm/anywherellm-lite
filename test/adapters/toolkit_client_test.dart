@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:anywherellm/adapters/toolkit_client.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/core/toolkit.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -55,6 +56,120 @@ void main() {
       ToolkitFeature.jobs,
     });
     expect(toolkit.seen.single.url.port, 8467);
+  });
+
+  group('scheduled jobs', () {
+    const draft = JobDraft(
+      name: 'Brief',
+      prompt: 'Summarise today.',
+      workspaceSlug: 'home',
+      cron: '0 7 * * *',
+    );
+
+    test('a job\'s runs are listed, newest first', () async {
+      final toolkit = _Toolkit()
+        ..routes['/jobs/7/runs'] = {
+          'runs': [
+            {'status': 'running'},
+            {'status': 'failed', 'result': 'The site answered 503'},
+          ],
+        };
+      final runs = await toolkit.api().jobRuns('7', limit: 3);
+      expect(runs.map((r) => r.status), ['running', 'failed']);
+      expect(toolkit.seen.last.url.queryParameters, {'limit': '3'});
+    });
+
+    test('a job is made, changed, switched, run and deleted', () async {
+      final toolkit = _Toolkit()
+        ..routes['/jobs'] = {
+          'job': {'id': 7},
+        }
+        ..routes['/jobs/7'] = {}
+        ..routes['/jobs/7/run'] = {
+          'run': {'status': 'running'},
+        };
+      final api = toolkit.api();
+
+      await api.createJob(draft, key: 'k-1');
+      expect(toolkit.seen.last.method, 'POST');
+      expect(toolkit.seen.last.url.path, '/jobs');
+      expect(toolkit.seen.last.headers['Idempotency-Key'], 'k-1');
+      expect(jsonDecode(toolkit.seen.last.body), draft.toJson());
+
+      await api.updateJob('7', draft);
+      expect(toolkit.seen.last.method, 'PUT');
+      expect(toolkit.seen.last.url.path, '/jobs/7');
+
+      await api.setJobEnabled('7', false);
+      expect(jsonDecode(toolkit.seen.last.body), {'enabled': false});
+
+      await api.runJob('7', key: 'k-2');
+      expect(toolkit.seen.last.method, 'POST');
+      expect(toolkit.seen.last.url.path, '/jobs/7/run');
+      expect(toolkit.seen.last.headers['Idempotency-Key'], 'k-2');
+
+      // An answer with no body is a success, as for a delete.
+      toolkit.routes['/jobs/7'] = http.Response('', 204);
+      await api.deleteJob('7');
+      expect(toolkit.seen.last.method, 'DELETE');
+      for (final request in toolkit.seen.skip(1)) {
+        expect(request.headers['Authorization'], 'Bearer SECRET-KEY');
+      }
+    });
+
+    test('a refusal fails in the toolkit\'s words, without the key', () async {
+      final toolkit = _Toolkit()
+        ..routes['/jobs'] = http.Response(
+          jsonEncode({'error': 'That runs more often than every 5 minutes'}),
+          400,
+        );
+      final failure = await _failure(toolkit.api().createJob(draft, key: 'k'));
+      expect(failure.message, 'That runs more often than every 5 minutes.');
+      expect(failure.status, 400);
+      expect(failure.message, isNot(contains('SECRET-KEY')));
+    });
+  });
+
+  group('the Library and the Activity', () {
+    test('the Library is read whole, and an activity by pages', () async {
+      final toolkit = _Toolkit()
+        ..routes['/library'] = {
+          'apps': [
+            {'title': 'Groceries', 'page': '/apps-lean/g1.html'},
+          ],
+          'files': [
+            {'storageFilename': 'pdf-1.pdf', 'name': 'Quote.pdf'},
+          ],
+        }
+        ..routes['/activity'] = {
+          'events': [
+            {
+              'id': 'e2',
+              'at': '2026-10-14T16:00:00Z',
+              'title': 'Price watch',
+              'kind': 'action',
+              'outcome': 'failed',
+            },
+          ],
+          'more': true,
+        };
+      final api = toolkit.api();
+      final library = await api.library();
+      expect(library.apps.single.title, 'Groceries');
+      expect(library.files.single.file.name, 'Quote.pdf');
+      expect(toolkit.seen.last.url.path, '/library');
+      expect(toolkit.seen.last.headers['Authorization'], 'Bearer SECRET-KEY');
+
+      final first = await api.activity();
+      expect(first.events.single.title, 'Price watch');
+      expect(first.more, isTrue);
+      expect(toolkit.seen.last.url.queryParameters, {'limit': '50'});
+      await api.activity(before: 'e2', limit: 10);
+      expect(toolkit.seen.last.url.queryParameters, {
+        'limit': '10',
+        'before': 'e2',
+      });
+    });
   });
 
   group('saved memories', () {

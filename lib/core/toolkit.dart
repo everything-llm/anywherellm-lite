@@ -14,4 +14,13 @@ const toolkitCompanion = Companion(
 abstract final class ToolkitFeature {
   static const memories = 'memories';
   static const jobs = 'jobs';
+
+  /// Whether the scheduled jobs can be made, changed, run and deleted, not only listed.
+  static const jobsWrite = 'jobs-write';
+
+  /// Whether the toolkit lists the apps and files the agent made.
+  static const library = 'library';
+
+  /// Whether the toolkit lists what the agent did.
+  static const activity = 'activity';
 }

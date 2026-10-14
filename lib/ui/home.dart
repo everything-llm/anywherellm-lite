@@ -11,7 +11,7 @@ import 'settings/rows.dart';
 import 'state/shell_controller.dart';
 import 'tokens.dart';
 import 'type.dart';
-import 'upcoming.dart';
+import 'toolkit_card.dart';
 import 'widgets/basics.dart';
 import 'widgets/buttons.dart';
 import 'widgets/min_height.dart';
@@ -122,7 +122,7 @@ class _Tab extends StatelessWidget {
 }
 
 /// The Chats tab: the open workspace's name as its title, which opens the Workspaces sheet,
-/// with Workspace settings and New chat beside it; the search; the Upcoming card; then the
+/// with Workspace settings and New chat beside it; the search; the toolkit's card; then the
 /// workspace's chats under Chats, each with a More button that opens its sheet. A chat opens
 /// full screen over the home.
 class ChatsTab extends StatefulWidget {
@@ -235,7 +235,7 @@ class _ChatsTabState extends State<ChatsTab> {
                               )
                             else ...[
                               if (scope.settings.configured)
-                                const SliverToBoxAdapter(child: UpcomingCard()),
+                                const SliverToBoxAdapter(child: ToolkitCard()),
                               if (chat.activeSlug case final slug?) ...[
                                 const SliverToBoxAdapter(
                                   child: CardHeading('Chats'),

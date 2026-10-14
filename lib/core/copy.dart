@@ -19,6 +19,12 @@ const monthNames = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
 
+/// The days of the week, Monday first, as `DateTime.weekday - 1` indexes them.
+const weekdayNames = [
+  'Monday', 'Tuesday', 'Wednesday', 'Thursday', //
+  'Friday', 'Saturday', 'Sunday',
+];
+
 /// [at]'s time of day on a 24-hour clock: `07:05`.
 String clockText(DateTime at) =>
     '${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}';

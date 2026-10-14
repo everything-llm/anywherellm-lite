@@ -445,7 +445,7 @@ void main() {
 
       await tester.tap(tab('Chats'));
       await tester.pumpAndSettle();
-      h.shell.openUpcoming();
+      h.shell.openToolkitPage(ToolkitPage.upcoming);
       await tester.pumpAndSettle();
       expect(find.byType(HomeTabBar), findsOneWidget);
     });

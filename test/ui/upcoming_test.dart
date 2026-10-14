@@ -2,6 +2,7 @@ import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/toolkit.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/schedule.dart';
+import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/upcoming.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -41,14 +42,14 @@ void main() {
     expect(page, findsOneWidget);
     expect(find.text('Morning brief'), findsOneWidget);
     expect(
-      find.textContaining('Household · Every 30 minutes · Next: '),
+      find.textContaining('Household · Every 30 minutes\nNext: '),
       findsOneWidget,
     );
-    expect(find.textContaining(' · Off'), findsOneWidget);
+    expect(find.textContaining('\nOff'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(h.shell.upcomingOpen, isFalse);
+    expect(h.shell.toolkitPage, isNull);
   });
 
   testWidgets('a read the toolkit refuses says why and offers Connection', (
@@ -60,12 +61,12 @@ void main() {
         status: 401,
       );
     final h = await pumpApp(tester, toolkitServer: toolkit);
-    h.shell.openUpcoming();
+    h.shell.openToolkitPage(ToolkitPage.upcoming);
     await tester.pumpAndSettle();
     expect(find.textContaining('did not accept the key'), findsOneWidget);
     await tester.tap(control('Open Connection'));
     await tester.pumpAndSettle();
-    expect(h.shell.upcomingOpen, isFalse);
+    expect(h.shell.toolkitPage, isNull);
     expect(h.shell.settingsOpen, isTrue);
   });
 

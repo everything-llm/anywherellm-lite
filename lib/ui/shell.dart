@@ -20,6 +20,8 @@ import 'share/shared_item.dart';
 import 'home.dart';
 import 'workspace_sheets.dart';
 import 'sources/sources_panel.dart';
+import 'activity.dart';
+import 'library.dart';
 import 'upcoming.dart';
 import 'state/shell_controller.dart';
 import 'tokens.dart';
@@ -60,7 +62,7 @@ class AppShell extends StatelessWidget {
       if (shell.passagesOpen) return shell.closePassages;
       if (shell.citedOpen) return shell.closeCited;
       if (shell.rightOpen) return shell.closeSources;
-      if (shell.upcomingOpen) return shell.closeUpcoming;
+      if (shell.toolkitPage != null) return shell.closeToolkitPage;
       // The workspace's pages step back: a document's text, a page, then what they opened over.
       if (shell.pane == Pane.files) {
         if (scope.files.reading != null) return () => closeDocText(scope);
@@ -81,7 +83,10 @@ class AppShell extends StatelessWidget {
         // The first run's welcome stands alone, since no tab has anything to show yet.
         final tabs = !(shell.settingsOpen && !scope.settings.configured);
         final homeCovered =
-            shell.chatOpen || files || shell.upcomingOpen || shell.settingsOpen;
+            shell.chatOpen ||
+            files ||
+            shell.toolkitPage != null ||
+            shell.settingsOpen;
         final right = switch (shell.beside) {
           Beside.sources => const SourcesPanel(),
           Beside.passages => const PassagesPanel(),
@@ -156,9 +161,16 @@ class AppShell extends StatelessWidget {
                                           child: const WorkspacePages(),
                                         ),
                                       ),
-                                    if (shell.upcomingOpen)
-                                      const Positioned.fill(
-                                        child: UpcomingPage(),
+                                    if (shell.toolkitPage case final page?)
+                                      Positioned.fill(
+                                        child: switch (page) {
+                                          ToolkitPage.upcoming =>
+                                            const UpcomingPage(),
+                                          ToolkitPage.library =>
+                                            const LibraryPage(),
+                                          ToolkitPage.activity =>
+                                            const ActivityPage(),
+                                        },
                                       ),
                                     // A deleted chat is put back from over the chat or the Chats tab.
                                     if (!shell.settingsOpen)

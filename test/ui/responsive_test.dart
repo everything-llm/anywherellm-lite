@@ -6,7 +6,11 @@ import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/embeds.dart';
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/core/outputs.dart';
+import 'package:anywherellm/core/activity.dart';
+import 'package:anywherellm/core/library.dart';
 import 'package:anywherellm/core/prefs.dart';
+import 'package:anywherellm/core/schedule.dart';
+import 'package:anywherellm/core/toolkit.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/settings/memory_page.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
@@ -14,7 +18,9 @@ import 'package:anywherellm/ui/settings/walkthrough.dart';
 import 'package:anywherellm/ui/files/workspace_pages.dart';
 import 'package:anywherellm/ui/home.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
+import 'package:anywherellm/ui/activity.dart' show ActivityOpen;
 import 'package:anywherellm/ui/state/shell_controller.dart';
+import 'package:anywherellm/ui/task_sheet.dart';
 import 'package:file_picker_platform_interface/file_picker_platform_interface.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:anywherellm/ui/workspace_sheets.dart';
@@ -414,6 +420,119 @@ void main() {
           await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
           await tester.pumpAndSettle();
         }
+      });
+
+      testWidgets('Upcoming, a task and the New task form fit', (tester) async {
+        final toolkit = FakeToolkit()
+          ..served = {
+            ToolkitFeature.memories,
+            ToolkitFeature.jobs,
+            ToolkitFeature.jobsWrite,
+          }
+          ..jobs = [
+            ScheduledJob(
+              id: '1',
+              name: 'job-$longWord',
+              prompt: 'prompt-$longWord ' * 8,
+              cron: '0 7 * * 1',
+              workspace: 'name-$longWord',
+              workspaceSlug: 'w',
+              lastStatus: 'failed',
+              lastRun: DateTime.now().toUtc(),
+            ),
+          ]
+          ..runRecords['1'] = [
+            for (var n = 0; n < 5; n++)
+              JobRun(
+                startedAt: DateTime.now().toUtc(),
+                status: n == 0 ? 'failed' : 'completed',
+                result: 'result-$longWord',
+              ),
+          ];
+        final h = await pumpApp(
+          tester,
+          llm: awkward(),
+          toolkitServer: toolkit,
+          size: size,
+          onChat: false,
+        );
+        h.shell.openToolkitPage(ToolkitPage.upcoming);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'the page');
+        h.shell.togglePopup(const TaskSheet(id: '1'));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'the task');
+        h.shell.togglePopup(const TaskSheet(id: '1', editing: true));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'the form');
+        h.shell.togglePopup(const TaskSheet());
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'the new task');
+      });
+
+      testWidgets('Library and Activity fit, with long names', (tester) async {
+        final toolkit = FakeToolkit()
+          ..served = {
+            ToolkitFeature.memories,
+            ToolkitFeature.jobs,
+            ToolkitFeature.library,
+            ToolkitFeature.activity,
+          }
+          ..libraryContents = LibraryContents(
+            apps: [
+              LibraryApp(
+                title: 'app-$longWord',
+                page: '/apps-lean/x.html',
+                workspace: 'name-$longWord',
+                workspaceSlug: 'w',
+                change: 'change-$longWord',
+                changed: DateTime.now().toUtc(),
+              ),
+            ],
+            files: [
+              LibraryFile(
+                file: GeneratedFile(
+                  type: 'PdfFileDownload',
+                  name: 'file-$longWord.pdf',
+                  storageName: 'pdf-1.pdf',
+                  size: 123456,
+                ),
+                workspace: 'name-$longWord',
+                workspaceSlug: 'w',
+                created: DateTime.now().toUtc(),
+              ),
+            ],
+          )
+          ..activityEvents = [
+            ActivityEvent(
+              at: DateTime.now().toUtc(),
+              title: 'event-$longWord',
+              kind: ActivityKind.task,
+              outcome: ActivityOutcome.failed,
+              workspace: 'name-$longWord',
+              detail: 'detail-$longWord ' * 6,
+            ),
+          ];
+        final h = await pumpApp(
+          tester,
+          llm: awkward(),
+          toolkitServer: toolkit,
+          size: size,
+          onChat: false,
+        );
+        expect(tester.takeException(), isNull, reason: 'the card');
+        h.shell.openToolkitPage(ToolkitPage.library);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'the apps');
+        await tapVisible(tester, find.textContaining('Files ·'));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'the files');
+        h.shell.openToolkitPage(ToolkitPage.activity);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'the activity');
+        h.shell.togglePopup(ActivityOpen(toolkit.activityEvents.first.key));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'the event');
       });
 
       testWidgets('each screen of Add the toolkit fits', (tester) async {

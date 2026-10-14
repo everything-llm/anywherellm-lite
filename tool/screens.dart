@@ -11,17 +11,22 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:anywherellm/core/activity.dart';
 import 'package:anywherellm/core/connection.dart';
+import 'package:anywherellm/core/library.dart';
 import 'package:anywherellm/core/memory.dart';
 import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/schedule.dart';
+import 'package:anywherellm/core/toolkit.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/files.dart';
+import 'package:anywherellm/ui/activity.dart' show ActivityOpen;
 import 'package:anywherellm/ui/settings/memory_page.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/settings/walkthrough.dart';
 import 'package:anywherellm/ui/share/shared_item.dart';
+import 'package:anywherellm/ui/task_sheet.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -243,26 +248,187 @@ const _metrics = AnswerMetrics(
   ];
   final now = DateTime.now();
   final tomorrow = DateTime(now.year, now.month, now.day + 1, 6, 30);
+  toolkit.served = {
+    ToolkitFeature.memories,
+    ToolkitFeature.jobs,
+    ToolkitFeature.jobsWrite,
+    ToolkitFeature.library,
+    ToolkitFeature.activity,
+  };
+  final at16 = DateTime(now.year, now.month, now.day, 16).toUtc();
   toolkit.jobs = [
     ScheduledJob(
+      id: '1',
       name: 'Morning brief',
+      prompt: 'Give me today in four lines: the weather, the bins, and anything due.',
       cron: '30 6 * * *',
       workspace: 'Household',
+      workspaceSlug: 'household',
       nextRun: tomorrow.toUtc(),
+      lastRun: tomorrow.subtract(const Duration(days: 1)).toUtc(),
+      lastStatus: 'completed',
     ),
     ScheduledJob(
+      id: '2',
       name: 'Roadmap check',
+      prompt: 'Compare the roadmap with last week and list what slipped.',
       cron: '0 8 * * 1',
       workspace: 'Q3 planning',
+      workspaceSlug: 'q3',
       nextRun: tomorrow.add(const Duration(days: 3)).toUtc(),
     ),
     ScheduledJob(
+      id: '3',
       name: 'Price watch: boiler service',
+      action: 'Check the boiler service price',
       cron: '0 */6 * * *',
       workspace: 'Household',
+      workspaceSlug: 'household',
       nextRun: tomorrow.add(const Duration(hours: 2)).toUtc(),
-      lastRun: DateTime(now.year, now.month, now.day, 16).toUtc(),
+      lastRun: at16,
       lastStatus: 'failed',
+    ),
+  ];
+  toolkit.runRecords['1'] = [
+    for (var d = 0; d < 3; d++)
+      JobRun(
+        startedAt: tomorrow.subtract(Duration(days: d + 1)).toUtc(),
+        status: 'completed',
+        result: 'Done. The answer is in the chat.',
+      ),
+  ];
+  toolkit.libraryContents = LibraryContents(
+    apps: [
+      LibraryApp(
+        title: 'Groceries',
+        page: '/apps-lean/g1.html',
+        workspace: 'Household',
+        workspaceSlug: 'household',
+        change: 'Added Eggs, Oat milk and Coffee',
+        changed: at16.subtract(const Duration(days: 1)),
+      ),
+      LibraryApp(
+        title: 'Habits',
+        page: '/apps-lean/h1.html',
+        workspace: 'Household',
+        workspaceSlug: 'household',
+        change: 'Marked Evening walk on Monday and Tuesday',
+        changed: at16.subtract(const Duration(hours: 10)),
+      ),
+      LibraryApp(
+        title: 'Swedish words',
+        page: '/apps-lean/s1.html',
+        workspace: 'Household',
+        workspaceSlug: 'household',
+        change: 'Added 5 cards',
+        changed: at16.subtract(const Duration(days: 1)),
+      ),
+    ],
+    files: [
+      LibraryFile(
+        file: const GeneratedFile(
+          type: 'PdfFileDownload',
+          name: 'Boiler service quote.pdf',
+          storageName: 'quote.pdf',
+          size: 86016,
+        ),
+        workspace: 'Household',
+        workspaceSlug: 'household',
+        created: at16.subtract(const Duration(days: 1)),
+      ),
+      LibraryFile(
+        file: const GeneratedFile(
+          type: 'PdfFileDownload',
+          name: 'Household budget.csv',
+          storageName: 'budget.csv',
+          size: 12288,
+        ),
+        workspace: 'Household',
+        workspaceSlug: 'household',
+        created: at16.subtract(const Duration(days: 2)),
+      ),
+      LibraryFile(
+        file: const GeneratedFile(
+          type: 'imageGenerationCard',
+          name: 'Waste calendar.png',
+          storageName: 'waste.png',
+          size: 215040,
+        ),
+        workspace: 'Household',
+        workspaceSlug: 'household',
+        created: at16.subtract(const Duration(days: 3)),
+      ),
+      LibraryFile(
+        file: const GeneratedFile(
+          type: 'PdfFileDownload',
+          name: 'Q3 roadmap summary.pdf',
+          storageName: 'q3.pdf',
+          size: 146432,
+        ),
+        workspace: 'Q3 planning',
+        workspaceSlug: 'q3',
+        created: at16,
+      ),
+    ],
+  );
+  ActivityEvent event(
+    int hoursAgo,
+    String title,
+    ActivityKind kind, {
+    ActivityOutcome outcome = ActivityOutcome.ok,
+    String detail = '',
+    String workspace = 'Household',
+    ActivityLink? link,
+  }) => ActivityEvent(
+    id: 'e$hoursAgo',
+    at: now.toUtc().subtract(Duration(hours: hoursAgo)),
+    title: title,
+    kind: kind,
+    outcome: outcome,
+    workspace: workspace,
+    detail: detail,
+    link: link,
+  );
+  toolkit.activityEvents = [
+    event(
+      0,
+      'Check the boiler service price',
+      ActivityKind.action,
+      outcome: ActivityOutcome.failed,
+      detail: 'Failed: the site answered 503.',
+    ),
+    event(
+      1,
+      'Book a boiler service',
+      ActivityKind.action,
+      detail: 'Booked Tue 14 Oct · 08:00–10:00, while the agent wrote it.',
+    ),
+    event(
+      2,
+      'Morning brief',
+      ActivityKind.task,
+      detail: 'Done. The answer is in the chat.',
+      link: const ChatLink('household', 'errands'),
+    ),
+    event(
+      3,
+      'Habits',
+      ActivityKind.app,
+      detail: 'Marked Evening walk on Monday and Tuesday.',
+      link: const PageLink('/apps-lean/h1.html'),
+    ),
+    event(
+      30,
+      'Boiler service quote.pdf',
+      ActivityKind.file,
+      detail: 'The agent made an 84 KB PDF.',
+    ),
+    event(
+      32,
+      'Groceries',
+      ActivityKind.app,
+      detail: 'Added Eggs, Oat milk and Coffee.',
+      link: const PageLink('/apps-lean/g1.html'),
     ),
   ];
   llm.system = const {
@@ -375,7 +541,39 @@ final _screens = <String, _Setup>{
   'chatmodel': (tester, h) => _settings(tester, h, SettingsPage.chatModel),
   'privacy': (tester, h) => _settings(tester, h, SettingsPage.privacy),
   'upcoming': (tester, h) async {
-    h.shell.openUpcoming();
+    h.shell.openToolkitPage(ToolkitPage.upcoming);
+    await _settle(tester);
+  },
+  'task': (tester, h) async {
+    h.shell.openToolkitPage(ToolkitPage.upcoming);
+    await _settle(tester);
+    h.shell.togglePopup(const TaskSheet(id: '1'));
+    await _settle(tester);
+  },
+  'newtask': (tester, h) async {
+    h.shell.openToolkitPage(ToolkitPage.upcoming);
+    await _settle(tester);
+    h.shell.togglePopup(const TaskSheet());
+    await _settle(tester);
+  },
+  'library': (tester, h) async {
+    h.shell.openToolkitPage(ToolkitPage.library);
+    await _settle(tester);
+  },
+  'libraryfiles': (tester, h) async {
+    h.shell.openToolkitPage(ToolkitPage.library);
+    await _settle(tester);
+    await tester.tap(find.textContaining('Files ·'));
+    await _settle(tester);
+  },
+  'activity': (tester, h) async {
+    h.shell.openToolkitPage(ToolkitPage.activity);
+    await _settle(tester);
+  },
+  'run': (tester, h) async {
+    h.shell.openToolkitPage(ToolkitPage.activity);
+    await _settle(tester);
+    h.shell.togglePopup(const ActivityOpen('e0'));
     await _settle(tester);
   },
   'workspace': _workspace,

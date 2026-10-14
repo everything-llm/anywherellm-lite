@@ -10,6 +10,9 @@ import 'chat_controller.dart';
 /// What the main pane shows: the chat, or the open workspace's pages.
 enum Pane { chats, files }
 
+/// A page of what the toolkit adds that lies over the Chats tab, opened from its card there.
+enum ToolkitPage { upcoming, library, activity }
+
 /// A tab of the bar at the foot of the home: the open workspace's chats, or Settings' list.
 enum HomeTab { chats, settings }
 
@@ -148,24 +151,25 @@ class ShellController extends ChangeNotifier {
   bool _scanning = false;
   Guide? _guide;
   int _guideStep = 0;
-  bool _upcomingOpen = false;
+  ToolkitPage? _toolkitPage;
 
-  /// Whether the page of the server's scheduled jobs shows over the Chats tab, from its
-  /// Upcoming card.
-  bool get upcomingOpen => _upcomingOpen;
+  /// The page of what the toolkit shows that lies over the Chats tab, from its card there, or
+  /// null.
+  ToolkitPage? get toolkitPage => _toolkitPage;
 
-  /// Shows the Upcoming page over the Chats tab, closing the popup open.
-  void openUpcoming() {
-    if (_upcomingOpen) return;
+  /// Shows [page] over the Chats tab, closing the popup open.
+  void openToolkitPage(ToolkitPage page) {
+    if (_toolkitPage == page) return;
     _shelfOpen = false;
-    _upcomingOpen = true;
+    _toolkitPage = page;
     _popup.value = null;
     notifyListeners();
   }
 
-  void closeUpcoming() {
-    if (!_upcomingOpen) return;
-    _upcomingOpen = false;
+  /// Closes the toolkit's page over the Chats tab, whichever it is.
+  void closeToolkitPage() {
+    if (_toolkitPage == null) return;
+    _toolkitPage = null;
     notifyListeners();
   }
 
@@ -254,7 +258,7 @@ class ShellController extends ChangeNotifier {
   /// Settings' list.
   bool get atHome => _settingsOpen
       ? _settingsPage == null
-      : !_chatOpen && _pane == Pane.chats && !_upcomingOpen;
+      : !_chatOpen && _pane == Pane.chats && _toolkitPage == null;
 
   /// Whether the sheet over the chat, or over the workspace's pages, is open.
   bool get rightOpen => _rightOpen;
@@ -298,7 +302,7 @@ class ShellController extends ChangeNotifier {
         !_shelfOpen &&
         !_settingsOpen &&
         _pane == Pane.chats &&
-        !_upcomingOpen) {
+        _toolkitPage == null) {
       return;
     }
     _clearOverlays();
@@ -315,7 +319,7 @@ class ShellController extends ChangeNotifier {
     _sourcesUnder = null;
     _pane = Pane.chats;
     _workspacePage = null;
-    _upcomingOpen = false;
+    _toolkitPage = null;
     _scanning = false;
     _guide = null;
   }

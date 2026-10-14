@@ -1,10 +1,12 @@
 import 'dart:typed_data';
 
+import 'activity.dart';
 import 'chat.dart';
 import 'chat_log.dart';
 import 'companion.dart';
 import 'connection.dart';
 import 'embeds.dart';
+import 'library.dart';
 import 'memory.dart';
 import 'prefs.dart';
 import 'schedule.dart';
@@ -161,6 +163,32 @@ abstract interface class CompanionApi {
 abstract interface class ToolkitApi implements CompanionApi {
   /// The jobs AnythingLLM runs on a schedule. Times are UTC.
   Future<List<ScheduledJob>> scheduledJobs();
+
+  /// The apps and files the agent made, in every workspace.
+  Future<LibraryContents> library();
+
+  /// What the agent did, newest first: the events before the one named [before] when it is
+  /// given, up to [limit].
+  Future<ActivityEvents> activity({String? before, int limit = 50});
+
+  /// The latest runs of job [id], newest first.
+  Future<List<JobRun>> jobRuns(String id, {int limit = 5});
+
+  /// Makes a job. [key] names this attempt, so a retry the toolkit already took does not make a
+  /// second one.
+  Future<void> createJob(JobDraft draft, {required String key});
+
+  /// Replaces job [id]'s name, prompt, workspace and schedule with [draft]'s.
+  Future<void> updateJob(String id, JobDraft draft);
+
+  /// Switches job [id] on or off.
+  Future<void> setJobEnabled(String id, bool enabled);
+
+  Future<void> deleteJob(String id);
+
+  /// Starts one run of job [id] at once, and answers without waiting for it. [key] names this
+  /// attempt, as for [createJob].
+  Future<void> runJob(String id, {required String key});
 
   /// Whether the server keeps saved memories, and saves them from chats itself.
   Future<MemorySwitches> memorySwitches();

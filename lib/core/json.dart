@@ -14,6 +14,21 @@ Object? jsonOrNull(String text) {
   }
 }
 
+/// [value] when it is text that is not empty, else null.
+String? textOrNull(Object? value) =>
+    value is String && value.isNotEmpty ? value : null;
+
+/// [value], ISO 8601 text, as a time in UTC, or null when it is not one.
+DateTime? timeOrNull(Object? value) =>
+    value is String ? DateTime.tryParse(value)?.toUtc() : null;
+
+/// An id given as a number or as text, as text, or null when there is none.
+String? idOrNull(Object? value) => switch (value) {
+  final int id => '$id',
+  final String id when id.isNotEmpty => id,
+  _ => null,
+};
+
 /// The one JSON object in the settings [text] a person edited. Throws [ApiException] when the
 /// text is not JSON, or is not an object.
 Map<String, dynamic> settingsObject(String text) {

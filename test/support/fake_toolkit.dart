@@ -1,14 +1,18 @@
+import 'package:anywherellm/core/activity.dart';
 import 'package:anywherellm/core/companion.dart';
+import 'package:anywherellm/core/library.dart';
 import 'package:anywherellm/core/memory.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/schedule.dart';
+import 'package:anywherellm/core/schedule_spec.dart';
 import 'package:anywherellm/core/toolkit.dart';
 
 import 'fake_companion.dart';
 
 /// A [ToolkitApi] for widget tests that keeps the saved memories and the scheduled jobs in
 /// memory. It is [present] unless a test makes it absent, as beside a stock AnythingLLM, and
-/// serves every feature in [served].
+/// serves every feature in [served]: by default the memories and the jobs, to read only; add
+/// [ToolkitFeature.jobsWrite] to let them be changed.
 class FakeToolkit with FakeCompanion implements ToolkitApi {
   FakeToolkit({this.present = true});
 
@@ -147,4 +151,148 @@ class FakeToolkit with FakeCompanion implements ToolkitApi {
 
   /// What [scheduledJobs] answers.
   List<ScheduledJob> jobs = const [];
+
+  /// What [library] answers.
+  LibraryContents libraryContents = const LibraryContents();
+
+  /// What [activity] answers, newest first, paged [activityPageSize] at a time from the event
+  /// whose id is `before`.
+  List<ActivityEvent> activityEvents = const [];
+  int activityPageSize = 50;
+
+  @override
+  Future<LibraryContents> library() => run('library', () => libraryContents);
+
+  @override
+  Future<ActivityEvents> activity({String? before, int limit = 50}) =>
+      run('activity', () {
+        final from = before == null
+            ? 0
+            : activityEvents.indexWhere((e) => e.id == before) + 1;
+        final size = activityPageSize < limit ? activityPageSize : limit;
+        final page = activityEvents.skip(from).take(size).toList();
+        return ActivityEvents(
+          page,
+          more: from + page.length < activityEvents.length,
+        );
+      }, before ?? '');
+
+  /// Each job's runs by id, newest first, which [jobRuns] answers.
+  final Map<String, List<JobRun>> runRecords = {};
+
+  /// The status a run started by [runJob] has when read: `completed` unless a test says
+  /// `running` or `failed`.
+  String runStatus = 'completed';
+
+  /// Every idempotency key a create or a run came with. One seen before changes nothing, as the
+  /// toolkit does.
+  final List<String> keys = [];
+
+  int _nextJob = 1;
+
+  ScheduledJob _job(String id) =>
+      jobs.where((j) => j.id == id).firstOrNull ??
+      (throw const ApiException('Job not found.', status: 404));
+
+  void _replace(String id, ScheduledJob Function(ScheduledJob) change) {
+    _job(id);
+    jobs = [for (final j in jobs) j.id == id ? change(j) : j];
+  }
+
+  /// Refuses a schedule the toolkit would, in its words.
+  void _checkCron(String cron) {
+    if (cronProblem(cron) case final problem?) {
+      throw ApiException(problem, status: 400);
+    }
+  }
+
+  @override
+  Future<List<JobRun>> jobRuns(String id, {int limit = 5}) =>
+      run('jobRuns', () => [...?runRecords[id]].take(limit).toList(), id);
+
+  @override
+  Future<void> createJob(JobDraft draft, {required String key}) => run(
+    'createJob',
+    () {
+      _checkCron(draft.cron);
+      if (keys.contains(key)) return;
+      keys.add(key);
+      jobs = [
+        ...jobs,
+        ScheduledJob(
+          id: '${_nextJob++}',
+          name: draft.name,
+          prompt: draft.prompt,
+          cron: draft.cron,
+          workspace: draft.workspaceSlug,
+          workspaceSlug: draft.workspaceSlug,
+          enabled: draft.enabled,
+        ),
+      ];
+    },
+    '${draft.name}|${draft.workspaceSlug}|${draft.cron}|once=${draft.once}',
+  );
+
+  @override
+  Future<void> updateJob(String id, JobDraft draft) => run('updateJob', () {
+    _checkCron(draft.cron);
+    _replace(
+      id,
+      (j) => ScheduledJob(
+        id: id,
+        name: draft.name,
+        prompt: draft.prompt,
+        action: j.action,
+        cron: draft.cron,
+        workspace: draft.workspaceSlug,
+        workspaceSlug: draft.workspaceSlug,
+        enabled: j.enabled,
+        nextRun: j.nextRun,
+        lastRun: j.lastRun,
+        lastStatus: j.lastStatus,
+      ),
+    );
+  }, '$id|${draft.name}|${draft.cron}');
+
+  @override
+  Future<void> setJobEnabled(String id, bool enabled) =>
+      run('setJobEnabled', () {
+        _replace(
+          id,
+          (j) => ScheduledJob(
+            id: id,
+            name: j.name,
+            prompt: j.prompt,
+            action: j.action,
+            cron: j.cron,
+            workspace: j.workspace,
+            workspaceSlug: j.workspaceSlug,
+            enabled: enabled,
+            nextRun: j.nextRun,
+            lastRun: j.lastRun,
+            lastStatus: j.lastStatus,
+          ),
+        );
+      }, '$id=$enabled');
+
+  @override
+  Future<void> deleteJob(String id) => run('deleteJob', () {
+    _job(id);
+    jobs = [
+      for (final j in jobs)
+        if (j.id != id) j,
+    ];
+    runRecords.remove(id);
+  }, id);
+
+  @override
+  Future<void> runJob(String id, {required String key}) => run('runJob', () {
+    _job(id);
+    if (keys.contains(key)) return;
+    keys.add(key);
+    runRecords[id] = [
+      JobRun(startedAt: DateTime.now().toUtc(), status: runStatus),
+      ...?runRecords[id],
+    ];
+  }, id);
 }

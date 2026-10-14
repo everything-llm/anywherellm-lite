@@ -90,8 +90,15 @@ class CompanionClient {
     List<String> path, {
     Map<String, String> query = const {},
     Map<String, Object?>? body,
+    Map<String, String> headers = const {},
   }) async {
-    final response = await call(method, path, query: query, body: body);
+    final response = await call(
+      method,
+      path,
+      query: query,
+      body: body,
+      headers: headers,
+    );
     try {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } on FormatException {
@@ -106,10 +113,12 @@ class CompanionClient {
     List<String> path, {
     Map<String, String> query = const {},
     Map<String, Object?>? body,
+    Map<String, String> headers = const {},
   }) async {
     final connection = current;
     final url = under(address!, path, query);
     final request = http.Request(method, url)
+      ..headers.addAll(headers)
       ..headers['Authorization'] = 'Bearer ${connection.apiKey}'
       ..headers['Accept'] = 'application/json';
     if (body != null) {

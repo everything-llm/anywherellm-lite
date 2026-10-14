@@ -166,8 +166,8 @@ class _Nav extends StatelessWidget {
                   title: 'Get more from your server',
                   lines: [
                     Text(
-                      'Install the free toolkit beside AnythingLLM to add Memory here '
-                      'and Upcoming on the Chats tab.',
+                      'Install the free toolkit beside AnythingLLM to add Memory here, '
+                      'and Library, Activity and Upcoming on the Chats tab.',
                       style: Type.sans(13, color: Tokens.of(context).muted),
                     ),
                   ],

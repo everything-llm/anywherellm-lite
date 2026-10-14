@@ -12,6 +12,8 @@ void main() {
   test('a schedule reads in plain words, in local time', () {
     expect(describeSchedule('*/15 * * * *', now), 'Every 15 minutes');
     expect(describeSchedule('5 * * * *', now), 'Every hour at :05');
+    expect(describeSchedule('0 */6 * * *', now), 'Every 6 hours');
+    expect(describeSchedule('0 */1 * * *', now), 'Every hour');
     expect(describeSchedule('0 7 * * *', now), 'Every day at ${local(7, 0)}');
   });
 

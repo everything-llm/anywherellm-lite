@@ -314,6 +314,7 @@ class InfoRow extends StatelessWidget {
     super.key,
     this.about,
     this.aboutSpan,
+    this.aboutLines = 1,
     this.mono = false,
     this.tag,
   });
@@ -321,6 +322,9 @@ class InfoRow extends StatelessWidget {
   final String title;
   final String? about;
   final InlineSpan? aboutSpan;
+
+  /// How many lines the line under the title may take before it is cut short.
+  final int aboutLines;
   final bool mono;
 
   /// A badge beside [title], such as Saved.
@@ -362,7 +366,7 @@ class InfoRow extends StatelessWidget {
                 if (about != null || aboutSpan != null)
                   Text.rich(
                     aboutSpan ?? TextSpan(text: about),
-                    maxLines: 1,
+                    maxLines: aboutLines,
                     overflow: TextOverflow.ellipsis,
                     style: mono
                         ? Type.mono(13, color: t.muted)
@@ -710,5 +714,42 @@ class CardNote extends StatelessWidget {
     ),
     alignment: Alignment.centerLeft,
     child: Text(text, style: Type.sans(15.5, color: Tokens.of(context).muted)),
+  );
+}
+
+/// Words in a [FieldCard], wrapped, in [color] or else [Tokens.ink2], such as what a task asks.
+class CardWords extends StatelessWidget {
+  const CardWords(this.text, {super.key, this.color});
+
+  final String text;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(
+      horizontal: FieldCard.inset,
+      vertical: 16,
+    ),
+    child: Text(
+      text,
+      style: Type.sans(
+        15.5,
+        color: color ?? Tokens.of(context).ink2,
+        height: 1.5,
+      ),
+    ),
+  );
+}
+
+/// A label over a card in a sheet, such as Recent runs, in from the card's edge.
+class SheetLabel extends StatelessWidget {
+  const SheetLabel(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 8),
+    child: SectionLabel(text, header: false),
   );
 }
