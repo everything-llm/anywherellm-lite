@@ -48,7 +48,7 @@ void main() {
       final h = await _firstRun(tester);
       expect(
         find.text('https, or http on your home network or Tailscale.'),
-        findsOneWidget,
+        findsNothing,
       );
       await _openGuide(tester);
       expect(h.shell.guide, Guide.connect);

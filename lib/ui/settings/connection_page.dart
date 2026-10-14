@@ -86,6 +86,38 @@ class _Welcome extends StatelessWidget {
   }
 }
 
+/// A line across the page with [label] centred in it, where one way in gives way to another.
+class _OrDivider extends StatelessWidget {
+  const _OrDivider(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final line = Expanded(
+      child: Divider(height: 1, thickness: 1, color: t.line),
+    );
+    return Semantics(
+      container: true,
+      label: label,
+      child: ExcludeSemantics(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            spacing: 12,
+            children: [
+              line,
+              Text(label, style: Type.sans(13, color: t.muted)),
+              line,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// The address and key: saved, replaced or forgotten, or read from a QR code. A key is saved
 /// only once the server takes it. Once one is saved, a card names the server and where its key
 /// is kept, with the form to edit it under it while open, then Test connection, Edit connection
@@ -360,10 +392,7 @@ class _KeyCardState extends State<_KeyCard> {
               onPressed: saving ? null : startScan,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-            child: SectionLabel('Or enter a key', header: false),
-          ),
+          const _OrDivider('or enter a key'),
         ],
         NamedControl(
           'Server address',
@@ -375,13 +404,6 @@ class _KeyCardState extends State<_KeyCard> {
             hint: _example,
             keyboardType: TextInputType.url,
             autofillHints: const [AutofillHints.url],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text(
-            'https, or http on your home network or Tailscale.',
-            style: Type.note(t.muted),
           ),
         ),
         NamedControl(

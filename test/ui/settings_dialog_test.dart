@@ -107,10 +107,10 @@ void main() {
     final scan = tester.getTopLeft(control('Scan QR code'));
     expect(
       scan.dy,
-      lessThan(tester.getTopLeft(find.text('OR ENTER A KEY')).dy),
+      lessThan(tester.getTopLeft(find.text('or enter a key')).dy),
     );
     expect(
-      tester.getTopLeft(find.text('OR ENTER A KEY')).dy,
+      tester.getTopLeft(find.text('or enter a key')).dy,
       lessThan(tester.getTopLeft(control('Connect')).dy),
     );
     expect(control('Paste a key'), findsNothing);

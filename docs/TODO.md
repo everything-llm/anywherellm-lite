@@ -53,7 +53,7 @@ Since the app was simplified to AnywhereLLM Lite, a phone chat client rather tha
 
 ## Lite prototype: not built yet
 
-- Confirm the other prototype session's welcome wording removals: the "https, or http on your home network or Tailscale." hint under the address and the "Make one in AnythingLLM's web page" line. The app still shows both, and `test/ui/walkthrough_test.dart` expects the hint.
+- Confirm the prototype's welcome wording removal of "Make one in AnythingLLM's web page: Settings, Developer API, Generate New API Key." under the key. The app still shows it.
 - A tappable apps-lean card. The app opens a linked page already (`isAppsLeanPage`), but the card is a blockquote with a linked title only once the apps-lean skill writes that shape.
 - Add the toolkit, Step 1: `uv run anythingllm-toolkit gui` is a stand-in until the installer's distribution is settled.
 - Guide figures draw whole as they grow in. The prototype animates each element in turn.
