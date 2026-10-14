@@ -45,6 +45,12 @@ Instance administration beyond what Settings writes to the server's `.env` stays
 
 Since the app was simplified to AnywhereLLM Lite, a phone chat client rather than an admin console, these stay in the web UI as well: the agent's skills, flows, app integrations and MCP servers; users and invites; signing in to a multi-user server (such a server takes a pasted key); and the server's own text-to-speech, since answers are read aloud on the device.
 
+## Considered, not decided
+
+| Idea | Note |
+| --- | --- |
+| Native tabs for companions | A companion whose `/health` declares a tab (`title`, `icon` and a declarative screen: lists, rows and actions as JSON) gets a native tab in the bar, with no Dart in the companion. It needs a small UI spec the app renders and keeps compatible, so wait for a second companion that wants a tab. The Apps tab would be its first user. The bar fits about five tabs and Chats, Apps and Settings take three, so extra tabs need a cap or a place under More. A web-view tab (`tab: {title, icon, page}` shown in `AppView`) is the cheaper first step. |
+
 ## apps-lean: open from the stress test
 
 - Custom apps are slow: 2 to 7 minutes from request to page.

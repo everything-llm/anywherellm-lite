@@ -219,7 +219,7 @@ class _NewEmbedState extends State<_NewEmbed> {
           ),
           FieldRow(
             label: 'Answers',
-            help: 'Query answers only from documents.',
+            help: 'Chat also draws on the model\'s own knowledge. Query answers only from documents.',
             control: Segmented<EmbedMode>(
               options: [for (final m in EmbedMode.values) (m, m.label)],
               value: _mode,

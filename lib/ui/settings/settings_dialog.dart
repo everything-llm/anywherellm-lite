@@ -167,7 +167,6 @@ class _Nav extends StatelessWidget {
                   NavRow(
                     icon: 'memory',
                     title: SettingsPage.memory.label,
-                    about: 'Saved memories',
                     onTap: () => shell.showSettingsPage(SettingsPage.memory),
                   ),
                 if (scope.apps.systemFiles == true)

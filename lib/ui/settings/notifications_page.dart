@@ -71,9 +71,7 @@ class NotificationsPage extends StatelessWidget {
             ],
             const PageNote(
               'Notifications come through a UnifiedPush distributor, such as ntfy, installed on '
-              'this phone. AnythingLLM sends when a scheduled job ends, to one device or browser '
-              'only: the last to turn them on. The apps server sends what each app asks to, to '
-              'every device.',
+              'this phone. The apps server sends what each app asks to, to every device.',
             ),
           ],
         );

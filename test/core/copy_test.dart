@@ -17,4 +17,14 @@ void main() {
     expect(grouped(796), '796');
     expect(grouped(1284), '1,284');
   });
+
+  test('promptPreview skips blank lines and lines that are only a tag', () {
+    expect(
+      promptPreview('<assistant version="2">\n\nYou are brief.\nSecond.'),
+      'You are brief.',
+    );
+    expect(promptPreview('  Plain first line\nmore'), 'Plain first line');
+    expect(promptPreview('<a>\n</a>'), '<a>\n</a>');
+    expect(promptPreview('<b>text</b>'), '<b>text</b>');
+  });
 }

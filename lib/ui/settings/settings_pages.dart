@@ -23,10 +23,7 @@ enum SettingsPage {
     'Where the searchable copy of your documents is kept. AnythingLLM calls this the vector '
         'database.',
   ),
-  images(
-    'Image generation',
-    'Used by the /img command and the Generate images skill.',
-  ),
+  images('Image generation', 'Used by the Generate images skill.'),
   voice(
     'Voice and speech',
     'The server\'s own listening and speaking, used by the web UI.',
@@ -44,8 +41,7 @@ enum SettingsPage {
   privacy('Privacy and data', 'Where your questions and files go.'),
   json(
     'Server settings as JSON',
-    'Every setting the server takes from the app, written to its .env. Keys and passwords are '
-        'left out.',
+    'Every setting the server takes from the app, written to its .env.',
   );
 
   const SettingsPage(

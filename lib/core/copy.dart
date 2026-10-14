@@ -20,3 +20,15 @@ const monthNames = [
 /// [at]'s time of day on a 24-hour clock: `07:05`.
 String clockText(DateTime at) =>
     '${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}';
+
+/// The line of a workspace's instructions that says what they are: the first one that is not
+/// blank or only a markup tag, such as `<instructions version="3">`, or [text] whole when every
+/// line is one.
+String promptPreview(String text) {
+  final lines = text.split('\n').map((line) => line.trim());
+  final tag = RegExp(r'^</?[\w:.-]+(\s[^>]*)?>$');
+  return lines.firstWhere(
+    (line) => line.isNotEmpty && !tag.hasMatch(line),
+    orElse: () => text.trim(),
+  );
+}

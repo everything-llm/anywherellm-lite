@@ -162,7 +162,7 @@ class _WorkspacePagesState extends State<WorkspacePages> {
         final docs = scope.sources.files;
         final on = docs.where((f) => f.on).length;
         final chats = chat.threadsOf(slug).length;
-        final prompt = _files.detail(slug)?.prompt?.trim().split('\n').first;
+        final prompt = _files.detail(slug)?.prompt?.trim();
         final mode = scope.sources.chatMode.value;
         return ListView(
           padding: Sizes.pagePadding,
@@ -200,7 +200,7 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                 title: 'Instructions',
                 about: prompt == null || prompt.isEmpty
                     ? 'The server\'s default'
-                    : prompt,
+                    : promptPreview(prompt),
                 onTap: () => _open(shell, FilesSection.instructions),
               ),
               NavRow(

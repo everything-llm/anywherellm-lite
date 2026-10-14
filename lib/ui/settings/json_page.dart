@@ -18,8 +18,7 @@ class JsonPage extends StatelessWidget {
   Widget build(BuildContext context) => ServerSettings(
     before: const [
       PageNote(
-        'Keys and passwords are left out; add one by its name to replace it. Only the '
-        'settings the server takes from the app are written.',
+        'Keys and passwords are left out; add one by its name to replace it.',
       ),
     ],
     builder: (values, revision) =>
@@ -77,16 +76,16 @@ class _JsonFormState extends State<_JsonForm> with SettingsSaving {
               final dirty = _draft.text != _saved;
               return ActionRow([
                 AppButton(
-                  'Revert',
-                  onPressed: dirty && !system.saving
-                      ? () => _draft.text = _saved
-                      : null,
-                ),
-                AppButton(
                   system.saving ? 'Saving…' : 'Save',
                   primary: true,
                   onPressed: dirty && !system.saving
                       ? () => save(_draft.text)
+                      : null,
+                ),
+                AppButton(
+                  'Revert',
+                  onPressed: dirty && !system.saving
+                      ? () => _draft.text = _saved
                       : null,
                 ),
               ]);

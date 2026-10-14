@@ -197,7 +197,7 @@ void main() {
     );
     h.shell.openSettings();
     await tester.pumpAndSettle();
-    await tapVisible(tester, control('Memory, Saved memories'));
+    await tapVisible(tester, control('Memory'));
     await tester.pumpAndSettle();
     expect(find.byType(MemoryPage), findsOneWidget);
     expect(_inPage(find.text('Name is Anna.')), findsOneWidget);
