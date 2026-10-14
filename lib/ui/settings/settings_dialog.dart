@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import '../app_scope.dart';
 import '../layout.dart';
 import '../state/settings_controller.dart';
+import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/phone_page.dart';
+import '../widgets/sheet.dart';
 import 'chats_page.dart';
 import 'connection_page.dart';
 import 'device_pages.dart';
@@ -21,6 +23,7 @@ import 'rows.dart';
 import 'server_page.dart';
 import 'settings_pages.dart';
 import 'system_files_page.dart';
+import 'walkthrough.dart';
 
 /// Settings: its list as the Settings tab, under its title, in two groups, This app and
 /// AnythingLLM, whose Server row opens the Server page, which lists the server's pages; a page
@@ -113,7 +116,8 @@ class _Frame extends StatelessWidget {
 
 /// The list of Settings: once a server is saved, a card with it, whether it answers and Test
 /// connection; This app's pages; then AnythingLLM's Server and Memory rows, and System files
-/// where the apps server serves them.
+/// where the apps server serves them; and, while no toolkit answers beside the server, a card
+/// that opens Add the toolkit over the list.
 class _Nav extends StatelessWidget {
   const _Nav();
 
@@ -131,7 +135,7 @@ class _Nav extends StatelessWidget {
       ]),
       builder: (context, _) {
         final connection = settings.connection;
-        return ListView(
+        final list = ListView(
           padding: Sizes.pagePadding,
           children: [
             if (connection != null) const _ServerCard(),
@@ -174,9 +178,62 @@ class _Nav extends StatelessWidget {
                         shell.showSettingsPage(SettingsPage.systemFiles),
                   ),
               ]),
+              if (scope.toolkit.available == false) ...[
+                const SizedBox(height: 20),
+                SummaryCard(
+                  title: 'Get more from your server',
+                  lines: [
+                    Text(
+                      'Install the free toolkit beside AnythingLLM to add Memory here '
+                      'and Upcoming on the Chats tab.',
+                      style: Type.sans(13, color: Tokens.of(context).muted),
+                    ),
+                  ],
+                  link: 'See how to add it',
+                  onLink: () => shell.showGuide(Guide.toolkit),
+                ),
+              ],
             ],
           ],
         );
+        return ListenableBuilder(
+          listenable: shell,
+          child: list,
+          builder: (context, list) => OverlayWhile(
+            open: shell.guide == Guide.toolkit,
+            overlay: (context) => const _ToolkitGuide(),
+            child: list!,
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Add the toolkit, over the list of Settings. Its end opens the Connection page with the
+/// camera reading, for the code the toolkit's installer shows, where there is a camera.
+class _ToolkitGuide extends StatelessWidget {
+  const _ToolkitGuide();
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final shell = scope.shell;
+    final canScan = scope.scanner != null;
+    return Walkthrough(
+      title: 'Add the toolkit',
+      steps: toolkitSteps,
+      onClose: () => shell.showGuide(null),
+      end: canScan ? 'Scan the installer\'s code' : 'Close',
+      endAbout: canScan
+          ? 'or close and scan it later'
+          : 'scan it on a phone with a camera',
+      onEnd: () {
+        shell.showGuide(null);
+        if (!canScan) return;
+        shell
+          ..showSettingsPage(SettingsPage.connection)
+          ..setScanning(true);
       },
     );
   }

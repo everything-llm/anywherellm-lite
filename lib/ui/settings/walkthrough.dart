@@ -14,9 +14,9 @@ import '../widgets/tappable.dart';
 import 'guide_figures.dart';
 import 'rows.dart';
 
-/// One screen of the guide: a [kicker] over a picture, a block of code or a numbered list, and
-/// what it [says], whose words between asterisks are in the accent; a [hero] screen says it
-/// large, over [sub].
+/// One screen of a walk-through: a [kicker], what it [says], whose words between asterisks are
+/// in the accent, then [sub], then a picture, a block of code or a list. A [hero] screen says it
+/// largest, any other in the smaller size a longer sentence takes.
 class GuideStep {
   const GuideStep(
     this.kicker,
@@ -38,94 +38,97 @@ class GuideStep {
   /// shown without its `~`, and words between `[` and `]` are marked.
   final List<String>? code;
 
-  /// A numbered list, each a name over a detail in the mono face.
+  /// A list, each a name over a detail, whose words between backticks are code.
   final List<(String, String)> lines;
 }
 
-/// How connecting works: one idea a screen, from the key and the address to the pairing code
-/// and the add-ons.
+/// How connecting works: the two things to bring, where the key comes from, and the address.
 const connectSteps = [
   GuideStep(
     'Getting connected',
     'Your phone, *your* AnythingLLM.',
     hero: true,
-    sub: 'Bring two things: where the server is, and a key it trusts.',
+    sub: 'You need two things: the server\'s address and a key.',
     art: GuideArt.hero,
   ),
   GuideStep(
-    'Step 1 · A key',
-    'In AnythingLLM\'s web page, open Settings, Developer API, and Generate New API Key. '
-        'It is all the app signs in with.',
+    'The key',
+    'In AnythingLLM\'s web page: Settings, Developer API, Generate New API Key.',
     art: GuideArt.key,
   ),
   GuideStep(
-    'Step 2 · An address',
-    'Where the phone finds the server. Use the tool you already know.',
+    'The address',
+    'The one you open AnythingLLM at in a browser. Away from your home network or '
+        'Tailscale, it starts https.',
     lines: [
-      ('Same Wi-Fi', 'http://192.168.1.20:3001'),
-      ('Tailscale', 'https://box.tail1234.ts.net'),
-      ('Cloudflare Tunnel', 'https://ai.example.com'),
-      ('Your own proxy', 'Caddy or nginx, with https'),
+      ('At home', '`http://192.168.1.20:3001`'),
+      ('Tailscale', '`https://box.tail1234.ts.net`'),
+      ('Your own domain', '`https://ai.example.com`'),
     ],
-  ),
-  GuideStep(
-    'Why https away from home',
-    'The key goes with every request. On your own network plain http is fine. Across the '
-        'internet it would travel in the clear, so the app asks for https.',
-    art: GuideArt.safe,
-  ),
-  GuideStep(
-    'Step 3 · Scan',
-    'If the toolkit runs on the server, its pair command prints a code holding the address '
-        'and a key. Scan it and you are in.',
-    code: [
-      '# on the server',
-      '\$ anythingllm-toolkit pair',
-      '~  Scan this with the phone:',
-      '  ▇▇▇ ▇ ▇▇ ▇▇▇',
-      '  ▇ ▇ ▇▇ ▇ ▇ ▇',
-      '  ▇▇▇ ▇ ▇▇ ▇▇▇',
-      '',
-      'anywherellm://connect',
-      '  ?url=[https://ai.example.com]',
-      '  &key=…&toolkit=…',
-    ],
-  ),
-  GuideStep(
-    'Optional · Add-ons',
-    'The apps server and the toolkit add Apps, Memory and Upcoming. Each can have an address '
-        'of its own. Without them, the rest works.',
-    art: GuideArt.addOns,
-  ),
-  GuideStep(
-    'Ready',
-    'Scan the code, or type the address and key.\n\n*That is all.*',
   ),
 ];
 
-/// The guide to connecting, over the whole window: Previous, its title and which screen of
-/// how many, and Close; a mark for each screen, which goes to it; the screens, swiped or
-/// stepped with the arrow keys; and a button for the next screen, on the last [end], which
-/// [onEnd] does, with [endAbout] under it.
-class ConnectGuide extends StatefulWidget {
-  const ConnectGuide({
+/// Add the toolkit: what it adds, then installing it, adding it to an AnythingLLM and scanning
+/// the code its installer shows.
+const toolkitSteps = [
+  GuideStep(
+    'The toolkit',
+    'Add *Memory* and *Upcoming*.',
+    hero: true,
+    sub:
+        'A free add-on for the computer AnythingLLM runs on. Memory is what every chat '
+        'knows about you; Upcoming is the agent\'s scheduled jobs.',
+    art: GuideArt.kit,
+  ),
+  GuideStep(
+    'Step 1 · Install',
+    'On that computer, run this and open the address it prints.',
+    code: [
+      '\$ uv run anythingllm-toolkit gui',
+      '~  Open this address in the browser:',
+      '  [http://127.0.0.1:8470/?token=…]',
+    ],
+  ),
+  GuideStep(
+    'Step 2 · Add it',
+    'Pick your AnythingLLM and choose Add the toolkit.',
+    art: GuideArt.pick,
+  ),
+  GuideStep(
+    'Step 3 · Scan',
+    'Scan the code the page shows. Memory then appears here.',
+    sub: 'If the page says your phone can\'t reach it yet, copy the fix it shows.',
+    art: GuideArt.pair,
+  ),
+];
+
+/// A walk-through over the whole window, as the Mobile Design pager draws one: Previous, its
+/// [title] and which of the [steps] of how many, and Close; a mark for each screen, which goes
+/// to it; the screens, swiped or stepped with the arrow keys; and a button for the next screen,
+/// on the last [end], which [onEnd] does, with [endAbout] under it.
+class Walkthrough extends StatefulWidget {
+  const Walkthrough({
     super.key,
+    required this.title,
+    required this.steps,
     required this.onClose,
     required this.end,
     required this.endAbout,
     required this.onEnd,
   });
 
+  final String title;
+  final List<GuideStep> steps;
   final VoidCallback onClose;
   final String end;
   final String endAbout;
   final VoidCallback onEnd;
 
   @override
-  State<ConnectGuide> createState() => _ConnectGuideState();
+  State<Walkthrough> createState() => _WalkthroughState();
 }
 
-class _ConnectGuideState extends State<ConnectGuide> {
+class _WalkthroughState extends State<Walkthrough> {
   final _pages = PageController();
   int _at = 0;
 
@@ -136,7 +139,7 @@ class _ConnectGuideState extends State<ConnectGuide> {
   }
 
   void _go(int to) {
-    final next = to.clamp(0, connectSteps.length - 1);
+    final next = to.clamp(0, widget.steps.length - 1);
     if (next == _at) return;
     _pages.animateToPage(
       next,
@@ -148,7 +151,7 @@ class _ConnectGuideState extends State<ConnectGuide> {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    const steps = connectSteps;
+    final steps = widget.steps;
     final last = _at == steps.length - 1;
     return CallbackShortcuts(
       bindings: {
@@ -162,7 +165,7 @@ class _ConnectGuideState extends State<ConnectGuide> {
         child: Semantics(
           scopesRoute: true,
           explicitChildNodes: true,
-          label: 'How connecting works',
+          label: widget.title,
           child: ColoredBox(
             color: t.bg,
             child: SafeArea(
@@ -178,7 +181,7 @@ class _ConnectGuideState extends State<ConnectGuide> {
                         Semantics(
                           header: true,
                           child: Text(
-                            'How connecting works',
+                            widget.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: Type.sans(
@@ -236,15 +239,14 @@ class _ConnectGuideState extends State<ConnectGuide> {
                               : 'next · ${steps[_at + 1].kicker.toLowerCase()}',
                           onTap: last ? widget.onEnd : () => _go(_at + 1),
                         ),
-                        if (_at < 2)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 10),
-                            child: Text(
-                              'Swipe, or use the arrow keys',
-                              textAlign: TextAlign.center,
-                              style: Type.sans(12, color: t.muted),
-                            ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Text(
+                            'Swipe, or use the arrow keys',
+                            textAlign: TextAlign.center,
+                            style: Type.sans(12, color: t.muted),
                           ),
+                        ),
                       ],
                     ),
                   ),
@@ -270,10 +272,10 @@ class _Marks extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
-        spacing: 4,
+        spacing: 2,
         children: [
           for (final (n, step) in steps.indexed)
             Flexible(
@@ -284,9 +286,13 @@ class _Marks extends StatelessWidget {
                   selected: n == at,
                   onTap: () => onTap(n),
                   child: SizedBox(
-                    height: 24,
+                    height: 32,
                     child: Center(
-                      child: Container(
+                      child: AnimatedContainer(
+                        duration: motion(
+                          context,
+                          const Duration(milliseconds: 250),
+                        ),
                         height: 4,
                         decoration: BoxDecoration(
                           color: n > at
@@ -306,7 +312,8 @@ class _Marks extends StatelessWidget {
   }
 }
 
-/// One screen, centred in its room, scrolling when it is taller.
+/// One screen, centred in its room, scrolling when it is taller: its kicker, what it says and
+/// the line under it, then its picture, code or list.
 class _Screen extends StatelessWidget {
   const _Screen(this.step, {super.key});
 
@@ -318,7 +325,7 @@ class _Screen extends StatelessWidget {
     final height = MediaQuery.sizeOf(context).height;
     final short = height < 680;
     final says = Type.sans(
-      step.hero ? (short ? 30 : 36) : 20,
+      step.hero ? (short ? 32 : 38) : 20,
       weight: FontWeight.w500,
       color: t.ink2,
       height: step.hero ? 1.1 : 1.3,
@@ -328,9 +335,9 @@ class _Screen extends StatelessWidget {
     final code = step.code;
     return LayoutBuilder(
       builder: (context, room) => SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
         child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: room.maxHeight - 24),
+          constraints: BoxConstraints(minHeight: room.maxHeight - 40),
           child: Rise(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -338,14 +345,6 @@ class _Screen extends StatelessWidget {
               spacing: 16,
               children: [
                 _Padded(SectionLabel(step.kicker, header: false)),
-                if (art != null)
-                  GuideFigure(
-                    art,
-                    maxHeight:
-                        MediaQuery.sizeOf(context).height *
-                        (short ? 0.24 : 0.3),
-                  ),
-                if (code != null) _Code(code),
                 _Padded(
                   Text.rich(
                     TextSpan(children: _accented(step.says, t), style: says),
@@ -358,6 +357,9 @@ class _Screen extends StatelessWidget {
                       style: Type.sans(16, color: t.muted, height: 1.5),
                     ),
                   ),
+                if (art != null)
+                  GuideFigure(art, maxHeight: height * (short ? 0.22 : 0.26)),
+                if (code != null) _Code(code),
                 if (step.lines.isNotEmpty) _Lines(step.lines),
               ],
             ),
@@ -448,7 +450,7 @@ class _Code extends StatelessWidget {
   }
 }
 
-/// A numbered list in a card, each a name over a detail in the mono face.
+/// A list in a card, each a name over a detail, whose words between backticks are code.
 class _Lines extends StatelessWidget {
   const _Lines(this.lines);
 
@@ -457,52 +459,40 @@ class _Lines extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    final detail = Type.sans(13, color: t.muted, height: 1.45);
+    final code = Type.mono(
+      12.5,
+      color: t.ink2,
+    ).copyWith(backgroundColor: t.hover);
     return FieldCard([
-      for (final (n, (name, detail)) in lines.indexed)
+      for (final (name, about) in lines)
         Container(
           constraints: const BoxConstraints(minHeight: 56),
           padding: const EdgeInsets.symmetric(
             horizontal: FieldCard.inset,
-            vertical: 8,
+            vertical: 10,
           ),
-          child: Row(
-            spacing: 10,
+          alignment: Alignment.centerLeft,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            spacing: 2,
             children: [
-              Container(
-                width: 24,
-                height: 24,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: t.accentbg,
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  '${n + 1}',
-                  style: Type.sans(
-                    11.5,
-                    weight: FontWeight.w700,
-                    color: t.accent,
-                  ),
+              Text(
+                name,
+                style: Type.sans(
+                  16,
+                  weight: FontWeight.w500,
+                  color: t.ink,
+                  height: 1.3,
                 ),
               ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  spacing: 2,
+              Text.rich(
+                TextSpan(
+                  style: detail,
                   children: [
-                    Text(
-                      name,
-                      style: Type.sans(
-                        16,
-                        weight: FontWeight.w500,
-                        color: t.ink,
-                        height: 1.3,
-                      ),
-                    ),
-                    Text(
-                      detail,
-                      style: Type.mono(11.5, color: t.muted, height: 1.4),
-                    ),
+                    for (final (n, part) in about.split('`').indexed)
+                      TextSpan(text: part, style: n.isOdd ? code : null),
                   ],
                 ),
               ),
@@ -513,7 +503,8 @@ class _Lines extends StatelessWidget {
   }
 }
 
-/// The guide's main button, on the accent: what it does over where it goes, and an arrow.
+/// The walk-through's main button, on the accent: what it does over where it goes, and an
+/// arrow.
 class _Go extends StatelessWidget {
   const _Go({required this.label, required this.about, required this.onTap});
 
@@ -554,13 +545,13 @@ class _Go extends StatelessWidget {
                       about,
                       style: Type.sans(
                         12.5,
-                        color: t.onaccent.withValues(alpha: 0.8),
+                        color: t.onaccent.withValues(alpha: 0.9),
                       ),
                     ),
                   ],
                 ),
               ),
-              AppIcon('chevron', color: t.onaccent),
+              AppIcon('arrow', color: t.onaccent, size: IconSize.medium),
             ],
           ),
         ),
@@ -569,7 +560,7 @@ class _Go extends StatelessWidget {
   }
 }
 
-/// A quiet underlined link to a guide, centred, such as How connecting works.
+/// A quiet underlined link to a walk-through, centred, such as How connecting works.
 class GuideLink extends StatelessWidget {
   const GuideLink(this.label, {super.key, required this.onTap});
 

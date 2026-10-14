@@ -44,3 +44,18 @@ The web UI's own endpoints sign in with a session token, not the developer key, 
 Instance administration beyond what Settings writes to the server's `.env` stays in the web UI: switching the vector database (it deletes every vector), the server's password and signing secret, making and editing Scheduled Jobs (the app lists them read-only in Upcoming), Event Logs, Model Router, Telegram, Branding, the Community Hub, Developer API keys, multi-user mode and password protection, the Browser Extension and AnythingLLM Mobile pairing, and the web UI's display language (the app has no translations).
 
 Since the app was simplified to AnywhereLLM Lite, a phone chat client rather than an admin console, these stay in the web UI as well: the agent's skills, flows, app integrations and MCP servers; users and invites; signing in to a multi-user server (such a server takes a pasted key); and the server's own text-to-speech, since answers are read aloud on the device.
+
+## apps-lean: open from the stress test
+
+- Custom apps are slow: 2 to 7 minutes from request to page.
+- Kanban: the agent adds example cards nobody asked for.
+- Timeline figure: labels are cut at 10 characters.
+
+## Lite prototype: not built yet
+
+- Welcome page polish. At 360 by 640 the page overflows by 45 px with the help link pinned to the bottom. Top-align the content, put Connect directly under the fields and the help link after Connect. Scan QR code and Connect are two prominent buttons, which conflicts with the one-filled-button rule: make Scan the quiet one.
+- Confirm the other prototype session's welcome wording removals: the "https, or http on your home network or Tailscale." hint under the address and the "Make one in AnythingLLM's web page" line. The app still shows both, and `test/ui/walkthrough_test.dart` expects the hint.
+- A tappable apps-lean card. The app opens a linked page already (`isAppsLeanPage`), but the card is a blockquote with a linked title only once the apps-lean skill writes that shape.
+- Add the toolkit, Step 1: `uv run anythingllm-toolkit gui` is a stand-in until the installer's distribution is settled.
+- Guide figures draw whole as they grow in. The prototype animates each element in turn.
+- Demos and Vault in the prototype are prototype-only and need no app work.

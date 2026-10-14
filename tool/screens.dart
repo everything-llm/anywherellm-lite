@@ -22,9 +22,9 @@ import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/ui/apps/app_sheets.dart';
-import 'package:anywherellm/ui/settings/connect_guide.dart';
 import 'package:anywherellm/ui/settings/memory_page.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
+import 'package:anywherellm/ui/settings/walkthrough.dart';
 import 'package:anywherellm/ui/share/shared_item.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter/rendering.dart';
@@ -498,6 +498,17 @@ Thread _thread(Harness h, String slug) =>
 
 final _screens = <String, _Setup>{
   'chats': (tester, h) async {},
+  for (var n = 0; n < toolkitSteps.length; n++)
+    'toolkit${n + 1}': (tester, h) async {
+      h.shell
+        ..openSettings()
+        ..showGuide(Guide.toolkit);
+      await _settle(tester);
+      for (var i = 0; i < n; i++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await _settle(tester);
+      }
+    },
   'chat': (tester, h) => _openChat(tester, h, 'errands'),
   'hero': (tester, h) async {
     h.chat.newChat();
@@ -685,7 +696,7 @@ final _signedOut = <String, _Setup>{
     'howto${n + 1}': (tester, h) async {
       h.shell
         ..openSettings(SettingsPage.connection)
-        ..setGuiding(true);
+        ..showGuide(Guide.connect);
       await _settle(tester);
       for (var i = 0; i < n; i++) {
         await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);

@@ -117,7 +117,8 @@ void main() {
     await _draw(tester, _icon, 'assets/icon/icon.png');
     await _draw(tester, _foreground, 'assets/icon/icon-foreground.png');
     await _draw(tester, _splash, 'assets/icon/splash.png');
-    for (final MapEntry(key: density, value: side) in _notificationSides.entries) {
+    for (final MapEntry(key: density, value: side)
+        in _notificationSides.entries) {
       await _draw(
         tester,
         const _Bird(0.9),

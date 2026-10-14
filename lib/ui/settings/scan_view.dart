@@ -4,7 +4,7 @@ import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/phone_page.dart';
-import 'connect_guide.dart';
+import 'walkthrough.dart';
 
 /// A phone's camera view for a pairing code, over the whole window: a page under Back, heard as
 /// Cancel, with the camera in a square as wide as the screen, where to find the code, what it

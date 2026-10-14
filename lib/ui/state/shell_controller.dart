@@ -64,6 +64,18 @@ class BrowserOpen {
   final Uri tab;
 }
 
+/// A [page] on the connected server that an answer links to, such as an apps-lean app's page,
+/// in a tall sheet over the chat.
+class PageOpen {
+  const PageOpen(this.page);
+
+  final Uri page;
+}
+
+/// A walk-through over the whole window: How connecting works, over the Connection page and the
+/// camera, or Add the toolkit, over Settings' list.
+enum Guide { connect, toolkit }
+
 /// A phone's sheet for one chat of the workspace on screen: its name, its pin and Delete, or
 /// with [deleting] the question whether to delete it.
 class ChatSheetFor {
@@ -139,6 +151,15 @@ class ShellController extends ChangeNotifier {
     if (_popup.value is BrowserOpen) _popup.value = null;
   }
 
+  /// Shows [page], a page on the connected server, in its sheet over the chat, closing any
+  /// other popup.
+  void openPage(Uri page) => _popup.value = PageOpen(page);
+
+  /// Closes the page's sheet, when it is open.
+  void closePage() {
+    if (_popup.value is PageOpen) _popup.value = null;
+  }
+
   /// Opens [thread]'s sheet, closing any other popup.
   void openChatSheet(Thread thread, {bool deleting = false}) =>
       _popup.value = ChatSheetFor(thread, deleting: deleting);
@@ -206,7 +227,7 @@ class ShellController extends ChangeNotifier {
   bool _rightOpen = false;
   FilesSection? _workspacePage;
   bool _scanning = false;
-  bool _guiding = false;
+  Guide? _guide;
   bool _upcomingOpen = false;
 
   /// Whether the page of the server's scheduled jobs shows over the Chats tab, from its
@@ -256,13 +277,16 @@ class ShellController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Whether the guide to connecting shows over the Connection page and the camera, which Esc
-  /// and Back close before the camera.
-  bool get guiding => _guiding;
+  /// The walk-through shown over the window, or null. Esc and Back close it before the camera.
+  Guide? get guide => _guide;
 
-  void setGuiding(bool on) {
-    if (on == _guiding) return;
-    _guiding = on;
+  /// Whether a walk-through shows over the window.
+  bool get guiding => _guide != null;
+
+  /// Shows [guide] over the window, or none.
+  void showGuide(Guide? guide) {
+    if (guide == _guide) return;
+    _guide = guide;
     notifyListeners();
   }
 
@@ -358,7 +382,7 @@ class ShellController extends ChangeNotifier {
     _chatOpen = true;
     _settingsOpen = false;
     _scanning = false;
-    _guiding = false;
+    _guide = null;
     _app = null;
     _appPages.clear();
     _sourcesUnder = null;
@@ -389,7 +413,7 @@ class ShellController extends ChangeNotifier {
     _workspacePage = null;
     _upcomingOpen = false;
     _scanning = false;
-    _guiding = false;
+    _guide = null;
     _settingsOpen = tab == HomeTab.settings;
     if (tab != HomeTab.settings) _homeTab = tab;
     _app = null;
@@ -474,7 +498,7 @@ class ShellController extends ChangeNotifier {
 
   void closeSettings() {
     _scanning = false;
-    _guiding = false;
+    _guide = null;
     if (!_settingsOpen) return;
     _settingsOpen = false;
     _settingsDirect = false;

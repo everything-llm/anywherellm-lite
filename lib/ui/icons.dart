@@ -21,6 +21,7 @@ const _paths = {
   'folder': 'M2 4.5h4l1.5 1.5H14v6.5H2z',
   'send': 'M8 13V3M3.5 7.5 8 3l4.5 4.5',
   'chevron': 'M6 4l4 4-4 4',
+  'arrow': 'M2.5 8h10.5 M9 4l4 4-4 4',
   'down': 'M4 6l4 4 4-4',
   'back': 'M10 3.5 5.5 8l4.5 4.5',
   'refresh': 'M13 8a5 5 0 1 1-1.5-3.5 M13 2.5v3h-3',

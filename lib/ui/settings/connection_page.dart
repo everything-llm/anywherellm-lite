@@ -14,7 +14,7 @@ import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
 import '../widgets/fields.dart';
-import 'connect_guide.dart';
+import 'walkthrough.dart';
 import 'rows.dart';
 import 'scan_view.dart';
 import '../widgets/sheet.dart';
@@ -244,8 +244,7 @@ class _KeyCardState extends State<_KeyCard> {
                 'This address is not encrypted, so the key travels as plain text on this '
                 'network. Use it only on a network you trust.',
           ),
-        if (_scanner case final scan? when _replacing && _shell.scanning)
-          _scan(scan),
+        if (_scanner case final scan? when _shell.scanning) _scan(scan),
         if (_replacing && !_shell.scanning)
           PanelCard(
             children: [
@@ -314,7 +313,7 @@ class _KeyCardState extends State<_KeyCard> {
         overlay: (context) => ScanView(
           camera: scan(_scanned),
           onCancel: () => _shell.setScanning(false),
-          onHelp: () => _shell.setGuiding(true),
+          onHelp: () => _shell.showGuide(Guide.connect),
         ),
         child: child,
       );
@@ -324,15 +323,17 @@ class _KeyCardState extends State<_KeyCard> {
   Widget _guide(VoidCallback startScan, Widget child) {
     final canScan = _scanner != null;
     return OverlayWhile(
-      open: _shell.guiding,
-      overlay: (context) => ConnectGuide(
-        onClose: () => _shell.setGuiding(false),
+      open: _shell.guide == Guide.connect,
+      overlay: (context) => Walkthrough(
+        title: 'How connecting works',
+        steps: connectSteps,
+        onClose: () => _shell.showGuide(null),
         end: canScan ? 'Scan QR code' : 'Close',
         endAbout: canScan
-            ? 'or close and type them'
+            ? 'or close and type the address and key'
             : 'then type the address and key',
         onEnd: () {
-          _shell.setGuiding(false);
+          _shell.showGuide(null);
           if (canScan && !_shell.scanning) startScan();
         },
       ),
@@ -425,7 +426,10 @@ class _KeyCardState extends State<_KeyCard> {
         ),
         if (_settings.keyringProblem case final problem?)
           AlertBox(AlertKind.warn, problem.title, text: problem.text),
-        GuideLink('How connecting works', onTap: () => _shell.setGuiding(true)),
+        GuideLink(
+          'How connecting works',
+          onTap: () => _shell.showGuide(Guide.connect),
+        ),
       ],
     );
   }

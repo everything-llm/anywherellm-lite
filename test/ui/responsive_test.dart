@@ -8,8 +8,8 @@ import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/server_models.dart';
-import 'package:anywherellm/ui/settings/connect_guide.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
+import 'package:anywherellm/ui/settings/walkthrough.dart';
 import 'package:anywherellm/ui/files/workspace_pages.dart';
 import 'package:anywherellm/ui/home.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
@@ -381,10 +381,24 @@ void main() {
       );
       h.shell
         ..openSettings(SettingsPage.connection)
-        ..setGuiding(true);
+        ..showGuide(Guide.connect);
       await tester.pumpAndSettle();
       for (var n = 0; n < connectSteps.length; n++) {
         expect(find.text('${n + 1} of ${connectSteps.length}'), findsOneWidget);
+        expect(tester.takeException(), isNull, reason: 'screen ${n + 1}');
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await tester.pumpAndSettle();
+      }
+    });
+
+    testWidgets('each screen of Add the toolkit fits at $at', (tester) async {
+      final h = await pumpApp(tester, size: size, canScan: true);
+      h.shell
+        ..openSettings()
+        ..showGuide(Guide.toolkit);
+      await tester.pumpAndSettle();
+      for (var n = 0; n < toolkitSteps.length; n++) {
+        expect(find.text('${n + 1} of ${toolkitSteps.length}'), findsOneWidget);
         expect(tester.takeException(), isNull, reason: 'screen ${n + 1}');
         await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
         await tester.pumpAndSettle();

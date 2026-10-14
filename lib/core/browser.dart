@@ -1,10 +1,13 @@
 import 'chat.dart';
 
-/// The path of browser-lean's page for an agent's tab: `/browser-lean/<token>.html`, which the
-/// skill links its tab's card to and AnythingLLM serves without a sign-in.
-final _tabPage = RegExp(r'^/browser-lean/[A-Za-z0-9_-]+\.html$');
+/// Whether [link] is the page `/<folder>/<token>.html` of an agent skill that publishes into
+/// AnythingLLM's web folder, which AnythingLLM serves without a sign-in, on [server]'s host as an
+/// answer's image may be ([loadableImage]).
+bool isSkillPage(Uri link, Uri? server, String folder) =>
+    loadableImage(link, server) &&
+    RegExp('^/$folder/[A-Za-z0-9_-]+\\.html\$').hasMatch(link.path);
 
-/// Whether [link] is browser-lean's page for an agent's tab, on [server]'s host as an answer's
-/// image may be ([loadableImage]).
+/// Whether [link] is browser-lean's page for an agent's tab: `/browser-lean/<token>.html`, which
+/// the skill links its tab's card to.
 bool isBrowserTab(Uri link, Uri? server) =>
-    loadableImage(link, server) && _tabPage.hasMatch(link.path);
+    isSkillPage(link, server, 'browser-lean');

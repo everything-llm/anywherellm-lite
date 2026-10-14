@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../core/apps.dart';
+import '../core/apps_lean.dart';
 import '../core/browser.dart';
 import '../core/chat.dart';
 import 'app_scope.dart';
@@ -35,8 +36,9 @@ Future<void> openLink(BuildContext context, String href) async {
 }
 
 /// Opens [href], a link in an answer: an app's page or card opens the app full screen where
-/// the apps server is there, browser-lean's page for an agent's tab opens in its sheet where
-/// the device has a web view ([isBrowserTab]), and anything else as [openLink] does.
+/// the apps server is there; where the device has a web view, browser-lean's page for an
+/// agent's tab opens in its sheet ([isBrowserTab]) and an apps-lean app's page in the page's
+/// sheet ([isAppsLeanPage]); anything else opens as [openLink] does.
 Future<void> openAnswerLink(BuildContext context, String href) async {
   final scope = AppScope.of(context);
   final server = scope.settings.connection?.uri;
@@ -45,8 +47,9 @@ Future<void> openAnswerLink(BuildContext context, String href) async {
       ? null
       : appRefOf(url, cards: scope.apps.cards, pages: scope.apps.pages);
   if (app != null) return scope.shell.openApp(app);
-  if (url != null && scope.appView != null && isBrowserTab(url, server)) {
-    return scope.shell.openBrowser(url);
+  if (url != null && scope.appView != null) {
+    if (isBrowserTab(url, server)) return scope.shell.openBrowser(url);
+    if (isAppsLeanPage(url, server)) return scope.shell.openPage(url);
   }
   await openLink(context, url?.toString() ?? href);
 }

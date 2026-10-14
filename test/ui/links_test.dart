@@ -1,5 +1,7 @@
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/chat/browser_sheet.dart';
+import 'package:anywherellm/ui/chat/page_sheet.dart';
+import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/state/notice.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -196,6 +198,45 @@ void main() {
       expect(h.shell.chatOpen, isTrue);
     },
   );
+
+  testWidgets('an apps-lean app\'s page opens in a sheet over the chat', (
+    tester,
+  ) async {
+    final h = await pumpApp(
+      tester,
+      llm: answering('Made it: [Groceries](/apps-lean/q9Zx_-1aB2.html)'),
+      canViewApps: true,
+    );
+    await tapLink(tester, 'Groceries');
+    await tester.pumpAndSettle();
+    final page = Uri.parse('https://h:3001/apps-lean/q9Zx_-1aB2.html');
+    expect(h.shell.popup.value, isA<PageOpen>());
+    expect(find.byType(PageSheet), findsOneWidget);
+    expect(find.text('Web view of $page'), findsOneWidget);
+    expect(h.opened, isEmpty);
+    // The page's own close shuts the sheet, and so does Back.
+    h.appView!.close!();
+    await tester.pumpAndSettle();
+    expect(find.byType(PageSheet), findsNothing);
+    expect(h.shell.chatOpen, isTrue);
+    await tapLink(tester, 'Groceries');
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(PageSheet), findsNothing);
+    expect(h.shell.chatOpen, isTrue);
+  });
+
+  testWidgets('without a web view an apps-lean page opens in the browser', (
+    tester,
+  ) async {
+    final h = await pumpApp(
+      tester,
+      llm: answering('Made it: [Groceries](/apps-lean/q9Zx_-1aB2.html)'),
+    );
+    await tapLink(tester, 'Groceries');
+    expect(h.opened, [Uri.parse('https://h:3001/apps-lean/q9Zx_-1aB2.html')]);
+  });
 
   testWidgets(
     'the bar under the agent\'s browser hands the tab back and messages the agent',

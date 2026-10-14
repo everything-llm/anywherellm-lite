@@ -13,6 +13,7 @@ import 'chat/chat_view.dart';
 import 'chat/cited_sources.dart';
 import 'chat/gallery.dart';
 import 'chat_sheet.dart';
+import 'chat/page_sheet.dart';
 import 'chat/passages_sheet.dart';
 import 'files/workspace_pages.dart';
 import 'settings/settings_dialog.dart';
@@ -49,7 +50,7 @@ class AppShell extends StatelessWidget {
     /// Settings, a page goes back to its parent first.
     VoidCallback? topClose() {
       // The guide and the camera lie over the whole window, a share and the popups too.
-      if (shell.guiding) return () => shell.setGuiding(false);
+      if (shell.guiding) return () => shell.showGuide(null);
       if (shell.scanning) return () => shell.setScanning(false);
       if (shell.shared != null) return shell.closeShared;
       if (shell.popup.value != null) return shell.closePopup;
@@ -244,6 +245,10 @@ class AppShell extends StatelessWidget {
                                       tab,
                                       key: ValueKey(tab),
                                     ),
+                                  ),
+                                if (popup case PageOpen(:final page))
+                                  Positioned.fill(
+                                    child: PageSheet(page, key: ValueKey(page)),
                                   ),
                                 if (popup case final AppSheet sheet)
                                   Positioned.fill(
