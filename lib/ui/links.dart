@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../core/apps.dart';
+import '../core/browser.dart';
 import '../core/chat.dart';
 import 'app_scope.dart';
 
@@ -8,7 +9,7 @@ import 'app_scope.dart';
 /// else, or a link nothing on the device opens, becomes a short notice in the chat.
 Future<void> openLink(BuildContext context, String href) async {
   final scope = AppScope.of(context);
-  final url = openableLink(href);
+  final url = openableLink(href, server: scope.settings.connection?.uri);
   if (url == null) {
     final scheme = Uri.tryParse(href.trim())?.scheme ?? '';
     scope.chat.reportLink(
@@ -34,14 +35,22 @@ Future<void> openLink(BuildContext context, String href) async {
 }
 
 /// Opens [href], a link in an answer: an app's page or card opens the app full screen where
-/// the apps server is there, and anything else as [openLink] does.
+/// the apps server is there, browser-lean's page for an agent's tab opens in its sheet where
+/// the device has a web view ([browserTabOf]), and anything else as [openLink] does.
 Future<void> openAnswerLink(BuildContext context, String href) async {
   final scope = AppScope.of(context);
-  final url = Uri.tryParse(href.trim());
+  final server = scope.settings.connection?.uri;
+  final parsed = Uri.tryParse(href.trim());
+  final url = parsed == null ? null : onServer(parsed, server);
   final app = url == null || scope.apps.available != true
       ? null
       : appRefOf(url, cards: scope.apps.cards, pages: scope.apps.pages);
   if (app != null) return scope.shell.openApp(app);
+  if (url != null && scope.appView != null) {
+    if (browserTabOf(url, server) case final tab?) {
+      return scope.shell.openBrowser(tab);
+    }
+  }
   await openLink(context, href);
 }
 

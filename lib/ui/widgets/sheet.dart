@@ -18,6 +18,9 @@ enum SheetHeight { tall, fit }
 /// [about] under it, [actions] and Close, then [child]. Dragging the handle or the header down
 /// past 120 px, or flinging it, closes it; a shorter drag puts it back.
 ///
+/// A [bare] sheet has only the drag handle over [child], which draws its own controls; [title]
+/// then names it to a screen reader alone.
+///
 /// [child] is laid out under the header in what is left: a [SheetHeight.tall] sheet gives it a
 /// fixed height, so a scroll view fills it; a [SheetHeight.fit] sheet gives it a loose one.
 class SheetFrame extends StatefulWidget {
@@ -32,6 +35,7 @@ class SheetFrame extends StatefulWidget {
     this.maxFraction = 0.9,
     this.live = false,
     this.padding = const EdgeInsets.fromLTRB(16, 4, 16, 24),
+    this.bare = false,
   });
 
   final String title;
@@ -51,6 +55,9 @@ class SheetFrame extends StatefulWidget {
 
   /// Around [child].
   final EdgeInsets padding;
+
+  /// Whether the header is the drag handle alone.
+  final bool bare;
 
   /// The room left above a [SheetHeight.tall] sheet, where the chat shows through the scrim.
   static const gap = 72.0;
@@ -117,7 +124,7 @@ class _SheetFrameState extends State<SheetFrame>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.only(top: 10),
+            padding: EdgeInsets.only(top: 10, bottom: widget.bare ? 8 : 0),
             child: Center(
               child: Container(
                 width: 40,
@@ -129,14 +136,15 @@ class _SheetFrameState extends State<SheetFrame>
               ),
             ),
           ),
-          SheetHeader(
-            title: widget.title,
-            about: widget.about,
-            live: widget.live,
-            actions: widget.actions,
-            onClose: widget.onClose,
-            divided: tall,
-          ),
+          if (!widget.bare)
+            SheetHeader(
+              title: widget.title,
+              about: widget.about,
+              live: widget.live,
+              actions: widget.actions,
+              onClose: widget.onClose,
+              divided: tall,
+            ),
         ],
       ),
     );

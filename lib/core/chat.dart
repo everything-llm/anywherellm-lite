@@ -97,11 +97,24 @@ class ChatDone extends ChatEvent {
   final int? chatId;
 }
 
+/// [address] as an answer means it: a path from the root, such as `/browser-lean/3kQ.html`,
+/// which an agent skill writes for AnythingLLM's own chat, is on [server]'s origin, as that chat
+/// reads it; any other address is as written.
+Uri onServer(Uri address, Uri? server) =>
+    server != null &&
+        !address.hasScheme &&
+        !address.hasAuthority &&
+        address.path.startsWith('/')
+    ? server.resolveUri(address)
+    : address;
+
 /// The address a link in an answer opens, or null for one the app will not open. Only web
-/// pages and mail open; `javascript:`, `file:`, app schemes and relative paths do not.
-Uri? openableLink(String href) {
-  final uri = Uri.tryParse(href.trim());
-  if (uri == null) return null;
+/// pages and mail open; `javascript:`, `file:` and app schemes do not, and a relative path only
+/// as a path from the root of [server] ([onServer]).
+Uri? openableLink(String href, {Uri? server}) {
+  final parsed = Uri.tryParse(href.trim());
+  if (parsed == null) return null;
+  final uri = onServer(parsed, server);
   return switch (uri.scheme) {
     'http' || 'https' when uri.host.isNotEmpty => uri,
     'mailto' when uri.path.contains('@') => uri,

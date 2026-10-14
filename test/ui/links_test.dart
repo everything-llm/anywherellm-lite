@@ -140,4 +140,59 @@ void main() {
       'answerImage:https://h:8080/card.png',
     ]);
   });
+
+  testWidgets('a skill\'s card on the server loads and opens there', (
+    tester,
+  ) async {
+    final llm =
+        answering(
+            'Done.\n\n[![Example](/browser-lean/3kQ-card.jpg?v=1)](/browser-lean/3kQ.html)',
+          )
+          ..images[Uri.parse('https://h:3001/browser-lean/3kQ-card.jpg?v=1')] =
+              pixel;
+    final h = await pumpApp(tester, llm: llm);
+    await tester.pumpAndSettle();
+    expect(find.byType(Image), findsOneWidget);
+    // The test's one-pixel picture is drawn at no size, so the link around it is tapped as
+    // its gesture would.
+    tester
+        .widget<GestureDetector>(
+          find.ancestor(
+            of: find.byType(Image),
+            matching: find.byType(GestureDetector),
+          ),
+        )
+        .onTap!();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(h.opened, [Uri.parse('https://h:3001/browser-lean/3kQ.html')]);
+    expect(h.chat.linkNotice, isNull);
+  });
+
+  testWidgets(
+    'a skill\'s tab opens the agent\'s browser in a sheet over the chat',
+    (tester) async {
+      final h = await pumpApp(
+        tester,
+        llm: answering('Done: [the tab](/browser-lean/3kQ.html)'),
+        canViewApps: true,
+      );
+      await tapLink(tester, 'the tab');
+      await tester.pumpAndSettle();
+      final page = Uri.parse('https://h:3001/browser-lean/3kQ.html');
+      expect(h.shell.browserTab, page);
+      expect(find.text('Web view of $page'), findsOneWidget);
+      expect(h.opened, isEmpty);
+      // The page's own Back closes it, as its window.close() does.
+      h.appView!.close!();
+      await tester.pumpAndSettle();
+      expect(h.shell.browserTab, isNull);
+      expect(h.shell.chatOpen, isTrue);
+      await tapLink(tester, 'the tab');
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(h.shell.browserTab, isNull);
+      expect(h.shell.chatOpen, isTrue);
+    },
+  );
 }

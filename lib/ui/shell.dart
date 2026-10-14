@@ -8,6 +8,7 @@ import 'app_scope.dart';
 import 'apps/app_screen.dart';
 import 'apps/app_sheets.dart';
 import 'apps/apps_tab.dart';
+import 'chat/browser_sheet.dart';
 import 'chat/chat_view.dart';
 import 'chat/cited_sources.dart';
 import 'chat/gallery.dart';
@@ -58,6 +59,7 @@ class AppShell extends StatelessWidget {
             : shell.closeSettings;
       }
       if (shell.shelfOpen) return shell.closeShelf;
+      if (shell.browserTab != null) return shell.closeBrowser;
       if (shell.app != null) return shell.appBack;
       if (shell.passagesOpen) return shell.closePassages;
       if (shell.citedOpen) return shell.closeCited;
@@ -212,6 +214,11 @@ class AppShell extends StatelessWidget {
                         if (app != null && !appData)
                           Positioned.fill(
                             child: AppScreen(app, key: ValueKey(app)),
+                          ),
+                        // The agent's browser, in a sheet over the chat.
+                        if (shell.browserTab case final tab?)
+                          Positioned.fill(
+                            child: BrowserSheet(tab, key: ValueKey(tab)),
                           ),
                         // What another app shared, over everything but a popup.
                         if (shell.shared case final item?)

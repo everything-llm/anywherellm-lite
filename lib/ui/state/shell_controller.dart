@@ -181,6 +181,25 @@ class ShellController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Uri? _browserTab;
+
+  /// browser-lean's page for the agent's tab, shown in a tall sheet over the chat, or null.
+  Uri? get browserTab => _browserTab;
+
+  /// Shows [tab], browser-lean's page for an agent's tab, in its sheet over the chat.
+  void openBrowser(Uri tab) {
+    _shelfOpen = false;
+    _browserTab = tab;
+    _popup.value = null;
+    notifyListeners();
+  }
+
+  void closeBrowser() {
+    if (_browserTab == null) return;
+    _browserTab = null;
+    notifyListeners();
+  }
+
   bool _rightOpen = false;
   FilesSection? _workspacePage;
   bool _scanning = false;
@@ -329,7 +348,8 @@ class ShellController extends ChangeNotifier {
         !_settingsOpen &&
         _pane == Pane.chats &&
         !_upcomingOpen &&
-        _app == null) {
+        _app == null &&
+        _browserTab == null) {
       return;
     }
     _shelfOpen = false;
@@ -339,6 +359,7 @@ class ShellController extends ChangeNotifier {
     _guiding = false;
     _app = null;
     _appPages.clear();
+    _browserTab = null;
     _sourcesUnder = null;
     _pane = Pane.chats;
     _workspacePage = null;
@@ -353,6 +374,7 @@ class ShellController extends ChangeNotifier {
     _shelfOpen = false;
     _chatOpen = false;
     _rightOpen = false;
+    _browserTab = null;
     closePopup();
     notifyListeners();
   }
@@ -371,6 +393,7 @@ class ShellController extends ChangeNotifier {
     _settingsOpen = tab == HomeTab.settings;
     if (tab != HomeTab.settings) _homeTab = tab;
     _app = null;
+    _browserTab = null;
     _appPages.clear();
     _settingsPage = null;
     _settingsDirect = false;

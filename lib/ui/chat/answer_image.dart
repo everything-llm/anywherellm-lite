@@ -12,8 +12,8 @@ import '../tokens.dart';
 import '../type.dart';
 import '../widgets/tappable.dart';
 
-/// An image in an answer: loaded when it is on the [server]'s host over https; otherwise its
-/// description. The
+/// An image in an answer: loaded when it is on the [server]'s host over https, a path from the
+/// root ([onServer]) included; otherwise its description. The
 /// description says whether the image was not loaded or failed to load, and why it failed. It
 /// opens the image's address when tapped, unless the image is [linked], where the link around
 /// it takes the tap.
@@ -23,7 +23,7 @@ import '../widgets/tappable.dart';
 /// app where the apps server is there.
 class AnswerImage extends StatefulWidget {
   const AnswerImage(
-    this.uri, {
+    this.written, {
     super.key,
     required this.alt,
     required this.server,
@@ -35,7 +35,11 @@ class AnswerImage extends StatefulWidget {
     this.decodeWidth,
   });
 
-  final Uri uri;
+  /// The image's address as the answer wrote it.
+  final Uri written;
+
+  /// The image's address, a path from the root on the [server] ([onServer]).
+  Uri get uri => onServer(written, server);
   final String? alt;
   final Uri? server;
 

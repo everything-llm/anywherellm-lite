@@ -8,20 +8,38 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'app_screen.dart';
 
 /// An app's working page in the device's web view. The page runs its scripts, as its ticks and
-/// adds need, and stays on its own host and port; a link anywhere else goes to `onLeave`.
+/// adds need, and stays on its own host and port; a link anywhere else goes to `onLeave`, and
+/// `window.close()`, which a web view ignores, to `onClose`.
 class AppWebViews implements AppView {
   const AppWebViews();
 
   @override
-  Widget show(Uri page, {required void Function(Uri url) onLeave}) =>
-      _AppWebView(key: ValueKey(page), page: page, onLeave: onLeave);
+  Widget show(
+    Uri page, {
+    required void Function(Uri url) onLeave,
+    VoidCallback? onClose,
+  }) => _AppWebView(
+    key: ValueKey(page),
+    page: page,
+    onLeave: onLeave,
+    onClose: onClose,
+  );
 }
 
+/// The channel a page's `window.close()` calls to close what shows it.
+const _closeChannel = 'AnywhereLLMClose';
+
 class _AppWebView extends StatefulWidget {
-  const _AppWebView({super.key, required this.page, required this.onLeave});
+  const _AppWebView({
+    super.key,
+    required this.page,
+    required this.onLeave,
+    this.onClose,
+  });
 
   final Uri page;
   final void Function(Uri url) onLeave;
+  final VoidCallback? onClose;
 
   @override
   State<_AppWebView> createState() => _AppWebViewState();
@@ -41,6 +59,13 @@ class _AppWebViewState extends State<_AppWebView> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (_) {
+            if (widget.onClose != null) {
+              unawaited(
+                _web.runJavaScript(
+                  "window.close=()=>$_closeChannel.postMessage('close')",
+                ),
+              );
+            }
             if (mounted && !_loaded) setState(() => _loaded = true);
           },
           onNavigationRequest: (request) {
@@ -55,6 +80,14 @@ class _AppWebViewState extends State<_AppWebView> {
           },
         ),
       );
+    if (widget.onClose case final close?) {
+      unawaited(
+        _web.addJavaScriptChannel(
+          _closeChannel,
+          onMessageReceived: (_) => close(),
+        ),
+      );
+    }
     unawaited(_web.loadRequest(widget.page));
   }
 

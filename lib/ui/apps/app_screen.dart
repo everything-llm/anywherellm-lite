@@ -16,8 +16,12 @@ import 'app_data.dart';
 /// Shows an app's working page in the device's web view.
 abstract interface class AppView {
   /// [page] in a web view that runs its scripts; a link off its host and port goes to
-  /// [onLeave].
-  Widget show(Uri page, {required void Function(Uri url) onLeave});
+  /// [onLeave], and the page closing itself (`window.close()`) to [onClose].
+  Widget show(
+    Uri page, {
+    required void Function(Uri url) onLeave,
+    VoidCallback? onClose,
+  });
 }
 
 /// An app in a tall sheet over the home or the chat: its title over its kind and workspace, and

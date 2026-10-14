@@ -119,9 +119,17 @@ class FakeSpeaker implements Speaker {
 class FakeAppView implements AppView {
   final List<Uri> shown = [];
 
+  /// How the page shown last closes itself, as its `window.close()` does.
+  VoidCallback? close;
+
   @override
-  Widget show(Uri page, {required void Function(Uri url) onLeave}) {
+  Widget show(
+    Uri page, {
+    required void Function(Uri url) onLeave,
+    VoidCallback? onClose,
+  }) {
     shown.add(page);
+    close = onClose;
     return Center(child: Text('Web view of $page'));
   }
 }

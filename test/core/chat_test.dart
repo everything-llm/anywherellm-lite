@@ -227,6 +227,30 @@ void main() {
     );
   });
 
+  test(
+    'a path from the root is on the server, as AnythingLLM\'s chat reads it',
+    () {
+      final server = Uri.parse('https://owen.example.ts.net:3001/');
+      expect(
+        openableLink('/browser-lean/3kQ.html', server: server).toString(),
+        'https://owen.example.ts.net:3001/browser-lean/3kQ.html',
+      );
+      expect(
+        onServer(
+          Uri.parse('/browser-lean/3kQ-card.jpg?v=lq2m1'),
+          server,
+        ).toString(),
+        'https://owen.example.ts.net:3001/browser-lean/3kQ-card.jpg?v=lq2m1',
+      );
+      expect(openableLink('relative/path', server: server), isNull);
+      expect(openableLink('/relative/path'), isNull);
+      expect(
+        onServer(Uri.parse('https://example.com/a.png'), server).host,
+        'example.com',
+      );
+    },
+  );
+
   group('loadableImage', () {
     final server = Uri.parse('https://owen.example.ts.net:3001');
     bool loads(String image, {Uri? from}) =>
