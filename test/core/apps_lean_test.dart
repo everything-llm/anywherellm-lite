@@ -1,5 +1,7 @@
 import 'package:anywherellm/core/apps_lean.dart';
+import 'package:anywherellm/core/markdown.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:markdown/markdown.dart' as md;
 
 void main() {
   final server = Uri.parse('https://owen.example.ts.net:3001');
@@ -38,4 +40,39 @@ void main() {
       );
     },
   );
+
+  group('an app\'s card', () {
+    AppCard? card(String text) =>
+        parseAnswer(text)
+            .whereType<md.Element>()
+            .map((e) => appCardOf(e, server))
+            .firstWhere((c) => c != null, orElse: () => null);
+
+    test('is a quote that opens with a link to the app\'s page', () {
+      final c = card(
+        '> [**Groceries**](/apps-lean/q9Z.html)\n> Added Oat milk and Coffee',
+      )!;
+      expect(c.title, 'Groceries');
+      expect(c.href, '/apps-lean/q9Z.html');
+      expect(c.lines, ['Added Oat milk and Coffee']);
+    });
+
+    test(
+      'may hold the link in bold, a title alone, or lines in more blocks',
+      () {
+        expect(card('> **[Groceries](/apps-lean/q9Z.html)**')!.lines, isEmpty);
+        final c = card(
+          '> [Groceries](/apps-lean/q9Z.html)\n>\n> - Ticked off Eggs\n> - Added Tea',
+        )!;
+        expect(c.lines, ['Ticked off Eggs', 'Added Tea']);
+      },
+    );
+
+    test('is not any other quote, nor a link in a paragraph', () {
+      expect(card('> Groceries: [open](/apps-lean/q9Z.html)'), isNull);
+      expect(card('> [Docs](https://evil.test/apps-lean/q9Z.html)'), isNull);
+      expect(card('> [Docs](/browser-lean/q9Z.html)'), isNull);
+      expect(card('[Groceries](/apps-lean/q9Z.html) - Added Tea'), isNull);
+    });
+  });
 }

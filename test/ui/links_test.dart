@@ -227,6 +227,37 @@ void main() {
     expect(h.shell.chatOpen, isTrue);
   });
 
+  testWidgets('an app\'s card in an answer is one tap that opens its page', (
+    tester,
+  ) async {
+    final h = await pumpApp(
+      tester,
+      llm: answering(
+        'Done.\n\n> [**Groceries**](/apps-lean/q9Zx_-1aB2.html)\n> Added Oat milk and Coffee',
+      ),
+      canViewApps: true,
+    );
+    expect(find.text('Groceries'), findsOneWidget);
+    expect(find.text('Added Oat milk and Coffee'), findsOneWidget);
+    await tester.tap(
+      control('Groceries, Added Oat milk and Coffee, Open the app'),
+    );
+    await tester.pumpAndSettle();
+    expect(h.shell.popup.value, isA<PageOpen>());
+    expect(find.byType(PageSheet), findsOneWidget);
+  });
+
+  testWidgets('a quote that is not an app\'s card stays a quote', (
+    tester,
+  ) async {
+    await pumpApp(
+      tester,
+      llm: answering('> [Groceries](https://evil.test/apps-lean/q9Z.html)'),
+      canViewApps: true,
+    );
+    expect(control('Groceries, Open the app'), findsNothing);
+  });
+
   testWidgets('without a web view an apps-lean page opens in the browser', (
     tester,
   ) async {

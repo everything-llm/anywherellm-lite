@@ -14,6 +14,7 @@ import '../type.dart';
 import '../widgets/buttons.dart';
 import '../widgets/side_scroll.dart';
 import 'answer_image.dart';
+import 'app_card.dart';
 import 'gallery.dart';
 import 'highlight.dart';
 import 'markdown_lists.dart';
@@ -96,6 +97,7 @@ class AnswerBody extends StatelessWidget {
       bulletBuilder: (bullet) => listBullet(bullet, body),
       builders: {
         'pre': _CodeBlockBuilder(),
+        'blockquote': AppCardBuilder(server),
         'math': MathBuilder(style: body, fallback: code),
         'caret': CaretBuilder(),
       },
