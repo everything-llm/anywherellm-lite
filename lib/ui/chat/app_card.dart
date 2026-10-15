@@ -12,8 +12,8 @@ import '../tokens.dart';
 import '../type.dart';
 import '../widgets/tappable.dart';
 
-/// Draws a quote that [appCardOf] reads as an app's card as an [AppCardView]; any other quote is
-/// left to the package.
+/// Draws a quote or paragraph that [appCardOf] reads as an app's card as an [AppCardView]; any
+/// other is left to the package.
 class AppCardBuilder extends MarkdownElementBuilder {
   AppCardBuilder(this.server);
 

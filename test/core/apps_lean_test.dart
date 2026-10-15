@@ -68,11 +68,18 @@ void main() {
       },
     );
 
+    test('is also a paragraph that opens with the link', () {
+      final c = card('[Groceries](/apps-lean/q9Z.html) - Added Tea')!;
+      expect(c.title, 'Groceries');
+      expect(c.lines, ['Added Tea']);
+      expect(card('**[Groceries](/apps-lean/q9Z.html)**')!.lines, isEmpty);
+    });
+
     test('is not any other quote, nor a link in a paragraph', () {
       expect(card('> Groceries: [open](/apps-lean/q9Z.html)'), isNull);
       expect(card('> [Docs](https://evil.test/apps-lean/q9Z.html)'), isNull);
       expect(card('> [Docs](/browser-lean/q9Z.html)'), isNull);
-      expect(card('[Groceries](/apps-lean/q9Z.html) - Added Tea'), isNull);
+      expect(card('Made it: [Groceries](/apps-lean/q9Z.html)'), isNull);
     });
   });
 }

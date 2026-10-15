@@ -80,7 +80,7 @@ Since the app was simplified to AnywhereLLM Lite, a phone chat client rather tha
 
 ## Lite prototype: not built yet
 
-- apps-lean card: the app draws a quote whose first line links to an app's page as a tappable card (`appCardOf`), but the skill still writes a plain paragraph with a link. The skill's `card.js` and README rule need the `> [**Title**](<page>)` shape.
+- apps-lean card: the app draws a quote whose first line links to an app's page as a tappable card (`appCardOf`), and a paragraph that opens with the link is drawn as one too, but the skill still writes a sentence with a link in it. The skill's `card.js` and README rule need the `> [**Title**](<page>)` shape.
 - Add the toolkit, Step 1: `uv run anythingllm-toolkit gui` is a stand-in until the installer ships the bundled toolkit.
 - Guide figures draw whole as they grow in. The prototype animates each element in turn.
 - Demos and Vault in the prototype are prototype-only and need no app work.

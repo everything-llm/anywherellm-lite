@@ -243,6 +243,19 @@ void main() {
     expect(find.byType(PageSheet), findsOneWidget);
   });
 
+  testWidgets('a paragraph that opens with an app\'s link is its card too', (
+    tester,
+  ) async {
+    final h = await pumpApp(
+      tester,
+      llm: answering('[Groceries](/apps-lean/q9Zx_-1aB2.html) - Added Tea'),
+      canViewApps: true,
+    );
+    await tester.tap(control('Groceries, Added Tea, Open the app'));
+    await tester.pumpAndSettle();
+    expect(h.shell.popup.value, isA<PageOpen>());
+  });
+
   testWidgets('a quote that is not an app\'s card stays a quote', (
     tester,
   ) async {

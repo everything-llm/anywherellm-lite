@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
+import '../../core/apps_lean.dart';
 import '../../core/gallery.dart';
 import '../../core/markdown.dart';
 import '../app_scope.dart';
@@ -81,6 +82,7 @@ class AnswerBody extends StatelessWidget {
     final settings = AppScope.of(context).settings;
     final server = settings.connection?.uri;
     final linked = linkedImages(text);
+    final card = AppCardBuilder(server);
     return TightListMarkdown(
       data: caret ? '$text$caretMark' : text,
       selectable: !caret,
@@ -97,7 +99,8 @@ class AnswerBody extends StatelessWidget {
       bulletBuilder: (bullet) => listBullet(bullet, body),
       builders: {
         'pre': _CodeBlockBuilder(),
-        'blockquote': AppCardBuilder(server),
+        'blockquote': card,
+        appCardTag: card,
         'math': MathBuilder(style: body, fallback: code),
         'caret': CaretBuilder(),
       },

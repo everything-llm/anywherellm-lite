@@ -6,7 +6,44 @@ import 'chat.dart';
 /// Whether [link] is an apps-lean app's page: `/apps-lean/<token>.html`, which the skill
 /// publishes into AnythingLLM's web folder.
 bool isAppsLeanPage(Uri link, Uri? server) =>
-    isSkillPage(link, server, 'apps-lean');
+    isSkillPage(link, server, _folder);
+
+const _folder = 'apps-lean';
+
+/// The element [AppLinkSyntax] wraps a paragraph in.
+const appCardTag = 'appcard';
+
+/// A paragraph that opens with a link to an apps-lean page, `[**Groceries**](/apps-lean/q9Z.html)
+/// - Added Tea`, as an [appCardTag] around the paragraph, so it can be drawn as an app's card like
+/// the quote an answer ends with. Whether the link is the connected server's own is for the
+/// builder to say: any other is drawn as the paragraph it is. It reads top-level paragraphs
+/// only: the opening paragraph of a quote is read by [appCardOf] as it stands.
+class AppLinkSyntax extends md.BlockSyntax {
+  static final _link = RegExp(
+    '^ {0,3}(?:\\*\\*|\\*|__|_)?\\[[^\\]]+\\]\\([^)\\s]*/$_folder/[^)\\s]*\\)',
+  );
+
+  @override
+  RegExp get pattern => _link;
+
+  @override
+  bool canParse(md.BlockParser parser) =>
+      parser.parentSyntax is! md.BlockquoteSyntax &&
+      parser.current.content.contains(_folder) &&
+      super.canParse(parser);
+
+  /// Never ends the paragraph before it.
+  @override
+  bool canEndBlock(md.BlockParser parser) => false;
+
+  @override
+  md.Node? parse(md.BlockParser parser) {
+    final paragraph = const md.ParagraphSyntax().parse(parser);
+    return paragraph is md.Element && paragraph.tag == 'p'
+        ? md.Element(appCardTag, [paragraph])
+        : paragraph;
+  }
+}
 
 /// An app's card in an answer: the quote an apps-lean answer ends with, `> [**Groceries**](<page>)`
 /// over the lines that say what changed. It is drawn as one tappable card.
@@ -30,17 +67,22 @@ class AppCard {
   String get about => lines.join('\n');
 }
 
-/// The [AppCard] a Markdown quote makes, or null when it is not one: its first line must open
-/// with a link, alone or inside bold or italics, to an apps-lean page on [server]. Any other
-/// quote, and a link in a paragraph that is not in one, stays as written.
-AppCard? appCardOf(md.Element quote, Uri? server) {
-  if (quote.tag != 'blockquote') return null;
-  final blocks = quote.children ?? const <md.Node>[];
-  if (blocks.firstOrNull case md.Element(tag: 'p', :final children?)) {
-    return _cardOf(children, blocks.skip(1), server);
+/// The [AppCard] a Markdown quote or an [appCardTag] paragraph makes, or null when it is not
+/// one: its first line must open with a link, alone or inside bold or italics, to an apps-lean
+/// page on [server]. Any other quote or paragraph, and a link in the middle of a sentence, stays
+/// as written.
+AppCard? appCardOf(md.Element block, Uri? server) {
+  final children = block.children;
+  if (children == null) return null;
+  if (block.tag != 'blockquote' && block.tag != appCardTag) return null;
+  if (children.firstOrNull case md.Element(tag: 'p', children: final inline?)) {
+    return _cardOf(inline, children.skip(1), server);
   }
   return null;
 }
+
+/// A dash, colon or dot that joins a paragraph's link to the words after it.
+final _joiner = RegExp(r'^[\s\-:\u00b7\u2013\u2014]+');
 
 /// The card of a quote whose first paragraph holds [inline] and which goes on with [more].
 AppCard? _cardOf(List<md.Node> inline, Iterable<md.Node> more, Uri? server) {
@@ -54,7 +96,11 @@ AppCard? _cardOf(List<md.Node> inline, Iterable<md.Node> more, Uri? server) {
   final title = link.textContent.trim();
   if (title.isEmpty) return null;
   final rest = [
-    inline.skip(at + 1).map((n) => n.textContent).join(),
+    inline
+        .skip(at + 1)
+        .map((n) => n.textContent)
+        .join()
+        .replaceFirst(_joiner, ''),
     for (final block in more) ..._textsOf(block),
   ];
   return AppCard(
