@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '../core/activity.dart';
 import '../core/companion.dart';
 import '../core/connection.dart';
+import '../core/json.dart';
 import '../core/library.dart';
 import '../core/memory.dart';
 import '../core/ports.dart';
@@ -172,10 +173,7 @@ class HttpToolkitApi implements ToolkitApi {
       body: body,
     );
     if (answer is Map && answer['success'] == false) {
-      final said = answer['error'] ?? answer['message'];
-      throw ApiException(
-        said is String && said.trim().isNotEmpty ? said.trim() : refused,
-      );
+      throw ApiException(saidIn(answer) ?? refused);
     }
     return answer;
   }

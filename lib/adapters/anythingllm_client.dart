@@ -225,7 +225,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   Future<void> updateWorkspace(String slug, Map<String, Object?> fields) async {
     final body = await _send('POST', '${_workspace(slug)}/update', fields);
     if (_field(body, 'workspace') is! Map) {
-      throw ApiException(_said(body) ?? 'The server did not save $slug.');
+      throw ApiException(saidIn(body) ?? 'The server did not save $slug.');
     }
   }
 
@@ -632,7 +632,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     }
     if (status < 200 || status >= 300) {
       throw ApiException(
-        _said(body) ?? 'The server answered HTTP $status.',
+        saidIn(body) ?? 'The server answered HTTP $status.',
         status: status,
       );
     }
@@ -645,7 +645,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       );
     }
     if (body is Map && body['success'] == false) {
-      throw ApiException(_said(body) ?? refused, status: status);
+      throw ApiException(saidIn(body) ?? refused, status: status);
     }
     return body;
   }
@@ -662,13 +662,6 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   /// [key] of a JSON object, or null when [body] is not one.
   Object? _field(Object? body, String key) => body is Map ? body[key] : null;
 
-  /// The `error` or `message` the server put in a failed response, when it did.
-  String? _said(Object? body) {
-    if (body is! Map) return null;
-    final said = body['error'] ?? body['message'];
-    return said is String && said.trim().isNotEmpty ? said.trim() : null;
-  }
-
   /// The objects under [key] in the JSON [body], each read by [from].
   List<T> _list<T>(
     Object? body,
@@ -681,7 +674,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   Map<String, dynamic> _written(Object? body, String key, String failed) =>
       switch (_field(body, key)) {
         final Map<String, dynamic> json => json,
-        _ => throw ApiException(_said(body) ?? failed),
+        _ => throw ApiException(saidIn(body) ?? failed),
       };
 
   /// Fails with the `error` the server put in an answer that succeeded, when it did.

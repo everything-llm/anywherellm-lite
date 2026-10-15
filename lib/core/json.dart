@@ -19,6 +19,14 @@ Object? jsonOrNull(String text) {
 Object? jsonOrSelf(Object? value) =>
     value is String ? jsonOrNull(value) ?? value : value;
 
+/// The `error` or `message` a server put in the JSON object [body], trimmed, or null when it
+/// gave none.
+String? saidIn(Object? body) {
+  if (body is! Map) return null;
+  final said = body['error'] ?? body['message'];
+  return said is String && said.trim().isNotEmpty ? said.trim() : null;
+}
+
 /// [value] when it is text that is not empty, else null.
 String? textOrNull(Object? value) =>
     value is String && value.isNotEmpty ? value : null;
