@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
 import '../../core/chat.dart';
+import '../../core/json.dart';
 import '../app_scope.dart';
 import '../apps/app_view.dart';
 import '../icons.dart';
@@ -43,13 +43,7 @@ class _BrowserSheetState extends State<BrowserSheet> {
   Completer<void>? _giving;
 
   void _heard(String message) {
-    final Object? said;
-    try {
-      said = jsonDecode(message);
-    } on FormatException {
-      return;
-    }
-    switch (said) {
+    switch (jsonOrNull(message)) {
       case {'gave': true}:
         _giving?.complete();
       case {'who': final String who} when (who == 'user') != _mine:

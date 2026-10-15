@@ -84,7 +84,7 @@ class _ToolkitCardState extends State<ToolkitCard> {
     final now = DateTime.now();
     final today = [
       for (final e in events)
-        if (dayText(e.at, now) == 'Today') e,
+        if (calendarDays(e.at.toLocal(), now) == 0) e,
     ];
     final failed = today
         .where((e) => e.outcome == ActivityOutcome.failed)
