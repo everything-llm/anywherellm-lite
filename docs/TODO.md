@@ -75,10 +75,12 @@ Since the app was simplified to AnywhereLLM Lite, a phone chat client rather tha
 
 - anythingllm-mcp's `toolkit` server still calls the toolkit's `/jobs`, which the bridge removed.
 - The installer page (the toolkit's `gui` branch) predates the bridge, so it does not write `BRIDGE_ALLOW`; only `install` does.
+- The installer bundles the toolkit (decided 2026-10-15): it ships a `uv` binary pinned by series and the toolkit's wheel, built in CI, and runs `uv tool install` itself, so the user never sees uv. Settled: the installer owns `UV_TOOL_DIR`, `UV_TOOL_BIN_DIR` and `UV_PYTHON_INSTALL_DIR`, so it never touches a uv the user has and uninstall deletes one folder; Python is always the installer's own copy at a pinned version (`UV_PYTHON_PREFERENCE=only-managed`), never one found on the machine; the toolkit is called by absolute path, and the service unit carries that path. Open: a restricted network can block the Python download; the toolkit's dependencies still come from PyPI; publishing the toolkit to PyPI is unchecked; updating the toolkit becomes part of the installer's release.
+- The installer ships uv's `LICENSE-MIT` beside the bundled `uv` binary. uv is licensed under MIT or Apache-2.0, and its release archives carry no licence file, so the installer must add it. Whether the binary's third-party crate notices must ship too is unchecked.
 
 ## Lite prototype: not built yet
 
 - apps-lean card: the app draws a quote whose first line links to an app's page as a tappable card (`appCardOf`), but the skill still writes a plain paragraph with a link. The skill's `card.js` and README rule need the `> [**Title**](<page>)` shape.
-- Add the toolkit, Step 1: `uv run anythingllm-toolkit gui` is a stand-in until the installer's distribution is settled.
+- Add the toolkit, Step 1: `uv run anythingllm-toolkit gui` is a stand-in until the installer ships the bundled toolkit.
 - Guide figures draw whole as they grow in. The prototype animates each element in turn.
 - Demos and Vault in the prototype are prototype-only and need no app work.

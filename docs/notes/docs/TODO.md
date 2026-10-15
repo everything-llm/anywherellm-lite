@@ -91,3 +91,17 @@ Requested on 2026-10-15 without saying which kind. Read from AnythingLLM 1.16.2'
 ## Several chats answering at once in one workspace
 
 Requested on 2026-10-15. The app's guard is `_runs`, one `_Running` per workspace. Its recorded reason is that AnythingLLM gives an agent run no thread of its own. Source of 1.16.2 says otherwise for both paths: `WorkspaceAgentInvocation.new` stores `thread_id`, and `apiChatHandler.js` builds an `EphemeralAgentHandler` with `threadId: thread?.id`. Whether two agent runs in one workspace share state (a browser profile in browser-lean is kept per workspace, and the sandbox holds a workspace's folder) was not checked, and it decides whether the limit belongs to the server, the skills or only the app.
+
+## Installer bundle: uv inside the installer
+
+Decided on 2026-10-15 while designing the installer. The user-facing "uv found" step is an implementation detail, so it leaves the Toolkit screens. Something must still provide Python and the toolkit's dependencies, and two ways were weighed.
+
+Chosen: ship the `uv` binary and the toolkit wheel inside the installer (option A). It matches the stack (the toolkit is already installed with `uv tool`, and `uv tool upgrade` handles updates), needs only a uv binary per platform, and leaves nothing frozen to sign. The install flow already needs the network for the container image, so a first-run Python download costs little.
+
+Rejected for now: freeze the toolkit into a self-contained executable per operating system (option B). It removes the Python download but means building and signing three binaries, and the toolkit's launchd and Windows paths are only tested with fakes. It becomes the better choice if restricted networks block the Python download in practice; a bundled Python build plus a vendored wheelhouse is the middle step.
+
+Why the three folders: pointing `UV_TOOL_DIR`, `UV_TOOL_BIN_DIR` and `UV_PYTHON_INSTALL_DIR` at an installer-owned folder keeps the bundled uv away from any uv the user already runs and makes uninstall one deletion. The absolute path matters because `uv tool install` puts its shim in a folder that may not be on `PATH`, and a service unit must not depend on `PATH`.
+
+Why the installer's own Python, decided later on 2026-10-15: by default uv uses a Python already on the machine when one fits ("By default, uv will attempt to use Python versions found on the system and only download managed Python versions when necessary", uv docs, Python versions), taking the first compatible one on `PATH`, which may be a distro, pyenv or conda Python. The toolkit's environment would then depend on an interpreter that an OS upgrade can replace or remove, and every machine would run a different Python. `only-managed` makes the download happen every time, so it stops being a choice: the Toolkit step lists Python with its size instead of asking in a popup, and the popup is archived on the design canvas. Rejected: reuse a fitting system Python, which saves about 35 MB and the download on most machines but brings back both risks.
+
+The licence fact: uv's README says it "is licensed under either of" Apache-2.0 or MIT, and the 0.13.1 archives hold only the binaries (`uv`, `uvx`, and on Windows `uvw.exe`), so MIT's condition that the notice be "included in all copies or substantial portions of the Software" falls on the installer.
