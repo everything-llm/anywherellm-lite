@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/providers.dart';
 import '../app_scope.dart';
-import '../widgets/controls.dart';
 import 'rows.dart';
 import 'server_settings.dart';
 
@@ -29,19 +28,15 @@ class PrivacyPage extends StatelessWidget {
             value: searchModelPrivacy(values),
           ),
           ReadOnlyRow(label: 'Document storage', value: storagePrivacy(values)),
-          FieldRow(
+          FieldRow.toggle(
             label: 'Anonymous telemetry',
             help: 'The server sends anonymous usage data to AnythingLLM\'s makers.',
-            small: true,
-            control: AppSwitch(
-              value: telemetry,
-              label: 'Anonymous telemetry',
-              onChanged: system.saving
-                  ? null
-                  : (on) => system.saveSettings(
-                      jsonEncode({'DisableTelemetry': on ? 'false' : 'true'}),
-                    ),
-            ),
+            value: telemetry,
+            onChanged: system.saving
+                ? null
+                : (on) => system.saveSettings(
+                    jsonEncode({'DisableTelemetry': on ? 'false' : 'true'}),
+                  ),
           ),
         ]);
       },

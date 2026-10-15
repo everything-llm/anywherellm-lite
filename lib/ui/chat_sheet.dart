@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'app_scope.dart';
 import 'settings/rows.dart';
 import 'state/shell_controller.dart';
-import 'widgets/controls.dart';
 import 'widgets/fields.dart';
 import 'widgets/sheet.dart';
 
@@ -98,15 +97,11 @@ class _ChatSheetState extends State<ChatSheet> {
                 ),
               ),
               FieldCard([
-                FieldRow(
+                FieldRow.toggle(
                   label: 'Pin to the top',
-                  small: true,
-                  control: AppSwitch(
-                    value: pinned,
-                    label: 'Pin to the top',
-                    onChanged: (on) => unawaited(
-                      scope.prefs.setPinned(workspace, thread.slug, on: on),
-                    ),
+                  value: pinned,
+                  onChanged: (on) => unawaited(
+                    scope.prefs.setPinned(workspace, thread.slug, on: on),
                   ),
                 ),
               ]),

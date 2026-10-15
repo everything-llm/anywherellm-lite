@@ -5,6 +5,7 @@ import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
+import '../widgets/controls.dart';
 import '../widgets/fields.dart';
 import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
@@ -181,6 +182,28 @@ class FieldRow extends StatelessWidget {
     this.tag,
   });
 
+  /// A small row of [label] over the line [help] with a switch, which a screen reader hears as
+  /// [switchLabel], or as [label] when there is none. The switch is off the page's reach while
+  /// [onChanged] is null.
+  factory FieldRow.toggle({
+    Key? key,
+    required String label,
+    required bool value,
+    required ValueChanged<bool>? onChanged,
+    String help = '',
+    String? switchLabel,
+  }) => FieldRow(
+    key: key,
+    label: label,
+    help: help,
+    small: true,
+    control: AppSwitch(
+      value: value,
+      label: switchLabel ?? label,
+      onChanged: onChanged,
+    ),
+  );
+
   final String label;
   final String help;
   final Widget control;
@@ -263,7 +286,7 @@ class NamedControl extends StatelessWidget {
     this.name,
     this.control, {
     super.key,
-    this.size = 15,
+    this.size = 17,
     this.labelled = false,
     this.quiet = false,
   });

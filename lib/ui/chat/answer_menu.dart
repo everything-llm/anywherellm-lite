@@ -9,7 +9,6 @@ import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';
-import '../widgets/controls.dart';
 import '../settings/rows.dart';
 import '../widgets/sheet.dart';
 
@@ -148,15 +147,11 @@ class _AnswerMenu extends StatelessWidget {
               listenable: prefs,
               builder: (context, _) {
                 final on = prefs.prefs.isOn(ChatSwitch.answerDetails);
-                return FieldRow(
+                return FieldRow.toggle(
                   label: 'Show details under every answer',
-                  small: true,
-                  control: AppSwitch(
-                    value: on,
-                    label: 'Show details under every answer',
-                    onChanged: (on) =>
-                        prefs.setSwitch(ChatSwitch.answerDetails, on),
-                  ),
+                  value: on,
+                  onChanged: (on) =>
+                      prefs.setSwitch(ChatSwitch.answerDetails, on),
                 );
               },
             ),

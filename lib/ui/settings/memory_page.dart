@@ -13,7 +13,6 @@ import '../state/shell_controller.dart';
 import '../widgets/phone_page.dart';
 import '../widgets/radio_card.dart';
 import '../widgets/sheet.dart';
-import '../widgets/controls.dart';
 import '../widgets/fields.dart';
 import '../widgets/tappable.dart';
 import 'rows.dart';
@@ -132,30 +131,22 @@ class MemoryPage extends StatelessWidget {
       ] else ...[
         CardHeading('Saved memories'),
         FieldCard([
-          FieldRow(
+          FieldRow.toggle(
             label: 'Saved memories',
             help: 'Every chat is shown them',
-            small: true,
-            control: AppSwitch(
-              value: switches.enabled,
-              label: 'Saved memories',
-              onChanged: memory.busy
-                  ? null
-                  : (on) => memory.setSwitches(enabled: on),
-            ),
+            value: switches.enabled,
+            onChanged: memory.busy
+                ? null
+                : (on) => memory.setSwitches(enabled: on),
           ),
           if (switches.enabled)
-            FieldRow(
+            FieldRow.toggle(
               label: 'Learn from chats',
               help: 'AnythingLLM saves what it notices',
-              small: true,
-              control: AppSwitch(
-                value: switches.learn,
-                label: 'Learn from chats',
-                onChanged: memory.busy
-                    ? null
-                    : (on) => memory.setSwitches(learn: on),
-              ),
+              value: switches.learn,
+              onChanged: memory.busy
+                  ? null
+                  : (on) => memory.setSwitches(learn: on),
             ),
         ]),
         if (!switches.enabled) ...[

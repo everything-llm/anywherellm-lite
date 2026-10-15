@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/prefs.dart';
 import '../app_scope.dart';
-import '../widgets/controls.dart';
 import '../widgets/fields.dart';
 import '../widgets/segmented.dart';
 import 'rows.dart';
@@ -41,10 +40,8 @@ class AppearancePage extends StatelessWidget {
           children: [
             // Each name sits over its choices in a card of its own, as the design canvas
             // draws it.
-            PanelCard(children: [NamedControl('Theme', theme, size: 17)]),
-            PanelCard(
-              children: [NamedControl('Chat text size', size, size: 17)],
-            ),
+            PanelCard(children: [NamedControl('Theme', theme)]),
+            PanelCard(children: [NamedControl('Chat text size', size)]),
             if (prefs.problem case final problem?)
               HelpText('${problem.title}. ${problem.text}', status: true),
           ],
@@ -81,14 +78,10 @@ class ChatPage extends StatelessWidget {
           FieldCard([
             // Each switch is named alone, as the design canvas draws them.
             for (final (which, label) in rows)
-              FieldRow(
+              FieldRow.toggle(
                 label: label,
-                small: true,
-                control: AppSwitch(
-                  value: prefs.prefs.isOn(which),
-                  label: label,
-                  onChanged: (on) => prefs.setSwitch(which, on),
-                ),
+                value: prefs.prefs.isOn(which),
+                onChanged: (on) => prefs.setSwitch(which, on),
               ),
           ]),
           if (prefs.problem case final problem?)

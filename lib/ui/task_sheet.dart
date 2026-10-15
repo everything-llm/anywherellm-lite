@@ -13,7 +13,6 @@ import 'tokens.dart';
 import 'type.dart';
 import 'widgets/basics.dart';
 import 'widgets/buttons.dart';
-import 'widgets/controls.dart';
 import 'widgets/fields.dart';
 import 'widgets/segmented.dart';
 import 'widgets/sheet.dart';
@@ -112,17 +111,14 @@ class _TaskDetailState extends State<TaskDetail> {
                 ),
               ]),
               FieldCard([
-                FieldRow(
+                FieldRow.toggle(
                   label: 'On',
                   help: job.enabled ? 'Runs on its schedule' : 'Paused',
-                  small: true,
-                  control: AppSwitch(
-                    value: job.enabled,
-                    label: 'Task on',
-                    onChanged: toolkit.busy
-                        ? null
-                        : (on) => toolkit.setEnabled(widget.id, on),
-                  ),
+                  switchLabel: 'Task on',
+                  value: job.enabled,
+                  onChanged: toolkit.busy
+                      ? null
+                      : (on) => toolkit.setEnabled(widget.id, on),
                 ),
               ]),
               ActionRow(even: true, [
