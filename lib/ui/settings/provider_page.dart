@@ -248,14 +248,16 @@ class _ProviderFormState extends State<_ProviderForm> with SettingsSaving {
         if (confirmBox(() => _draft(fields)) case final box?)
           box
         else if (widget.settings.any((s) => s.writable) || fields.isNotEmpty)
-          ActionRow(alignment: WrapAlignment.start, [
-            AppButton(
-              saving ? 'Saving…' : 'Save',
-              primary: true,
-              onPressed: dirty && !saving ? () => save(_draft(fields)) : null,
+          ActionRow(
+            alignment: WrapAlignment.start,
+            saveRevertButtons(
+              dirty: dirty,
+              saving: saving,
+              onSave: () => save(_draft(fields)),
+              onRevert: _revert,
+              saveFirst: true,
             ),
-            AppButton('Revert', onPressed: dirty && !saving ? _revert : null),
-          ]),
+          ),
       ],
     );
   }

@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'app_scope.dart';
-import 'icons.dart';
 import 'settings/settings_pages.dart';
 import 'state/notice.dart';
 import 'tokens.dart';
@@ -34,12 +33,9 @@ class ToolkitPageFrame extends StatefulWidget {
   final Widget body;
 
   /// A round Read again, which runs [read].
-  static Widget readAgain(Future<void> Function() read) => IconBtn(
+  static Widget readAgain(Future<void> Function() read) => IconBtn.header(
     'refresh',
     tooltip: 'Read again',
-    box: 48,
-    filled: true,
-    size: IconSize.small,
     onPressed: () => unawaited(read()),
   );
 

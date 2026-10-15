@@ -74,21 +74,15 @@ class _JsonFormState extends State<_JsonForm> with SettingsSaving {
             listenable: _draft,
             builder: (context, _) {
               final dirty = _draft.text != _saved;
-              return ActionRow([
-                AppButton(
-                  system.saving ? 'Saving…' : 'Save',
-                  primary: true,
-                  onPressed: dirty && !system.saving
-                      ? () => save(_draft.text)
-                      : null,
+              return ActionRow(
+                saveRevertButtons(
+                  dirty: dirty,
+                  saving: system.saving,
+                  onSave: () => save(_draft.text),
+                  onRevert: () => _draft.text = _saved,
+                  saveFirst: true,
                 ),
-                AppButton(
-                  'Revert',
-                  onPressed: dirty && !system.saving
-                      ? () => _draft.text = _saved
-                      : null,
-                ),
-              ]);
+              );
             },
           ),
       ],

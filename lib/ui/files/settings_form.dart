@@ -90,17 +90,15 @@ class _SettingsFormState extends State<SettingsForm> {
     return _form(
       context,
       dirty || _saving
-          ? ActionRow(even: true, [
-              AppButton(
-                'Revert',
-                onPressed: dirty && !_saving ? _revert : null,
+          ? ActionRow(
+              even: true,
+              saveRevertButtons(
+                dirty: dirty,
+                saving: _saving,
+                onSave: _save,
+                onRevert: _revert,
               ),
-              AppButton(
-                _saving ? 'Saving…' : 'Save',
-                primary: true,
-                onPressed: dirty && !_saving ? _save : null,
-              ),
-            ])
+            )
           : null,
     );
   }

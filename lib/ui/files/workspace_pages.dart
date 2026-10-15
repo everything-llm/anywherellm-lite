@@ -9,7 +9,6 @@ import '../state/files_controller.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
-import '../icons.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/min_height.dart';
@@ -106,12 +105,9 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                 // A document's text saves from the bar over it.
                 action: reading == null
                     ? null
-                    : IconBtn(
+                    : IconBtn.header(
                         'download',
                         tooltip: 'Download the extracted text',
-                        box: 48,
-                        filled: true,
-                        size: IconSize.small,
                         onPressed: () => saveText(
                           context,
                           reading.title,

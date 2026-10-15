@@ -107,19 +107,15 @@ class _EditorState extends State<_Editor> {
               constraints: const BoxConstraints(minHeight: 52),
               child: !_dirty && !_saving
                   ? null
-                  : ActionRow(even: true, [
-                      AppButton(
-                        'Revert',
-                        onPressed: _dirty && !_saving
-                            ? () => _draft.text = _saved
-                            : null,
+                  : ActionRow(
+                      even: true,
+                      saveRevertButtons(
+                        dirty: _dirty,
+                        saving: _saving,
+                        onSave: _save,
+                        onRevert: () => _draft.text = _saved,
                       ),
-                      AppButton(
-                        _saving ? 'Saving…' : 'Save',
-                        primary: true,
-                        onPressed: _dirty && !_saving ? _save : null,
-                      ),
-                    ]),
+                    ),
             ),
           ),
         ],

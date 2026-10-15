@@ -245,12 +245,9 @@ class _Header extends StatelessWidget {
                 ),
           action: workspace == null
               ? null
-              : IconBtn(
+              : IconBtn.header(
                   'plus',
                   tooltip: 'New chat',
-                  box: 48,
-                  filled: true,
-                  size: IconSize.small,
                   onPressed: chat.newChat,
                 ),
         );

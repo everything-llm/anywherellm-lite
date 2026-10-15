@@ -47,14 +47,7 @@ class PhonePageHeader extends StatelessWidget {
         child: Row(
           children: [
             if (onBack case final onBack?)
-              IconBtn(
-                backIcon,
-                tooltip: back,
-                box: 48,
-                filled: true,
-                size: IconSize.small,
-                onPressed: onBack,
-              )
+              IconBtn.header(backIcon, tooltip: back, onPressed: onBack)
             else
               const SizedBox(width: 48),
             const SizedBox(width: 4),

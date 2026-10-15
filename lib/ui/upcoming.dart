@@ -39,12 +39,9 @@ class UpcomingPage extends StatelessWidget {
           title: 'Upcoming',
           read: toolkit.readJobs,
           action: toolkit.jobsWritable
-              ? IconBtn(
+              ? IconBtn.header(
                   'plus',
                   tooltip: 'New task',
-                  box: 48,
-                  filled: true,
-                  size: IconSize.small,
                   onPressed: () => shell.togglePopup(const TaskSheet()),
                 )
               : null,

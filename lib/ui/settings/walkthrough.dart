@@ -211,12 +211,9 @@ class _WalkthroughState extends State<Walkthrough> {
                         ),
                       ],
                     ),
-                    action: IconBtn(
+                    action: IconBtn.header(
                       'close',
                       tooltip: 'Close',
-                      box: 48,
-                      filled: true,
-                      size: IconSize.small,
                       onPressed: widget.onClose,
                     ),
                   ),

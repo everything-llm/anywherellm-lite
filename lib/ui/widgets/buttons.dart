@@ -100,6 +100,19 @@ class IconBtn extends StatelessWidget {
     this.expanded,
   });
 
+  /// A header's round button: 48 across, on [Tokens.hover], its icon at [IconSize.small].
+  const IconBtn.header(
+    this.icon, {
+    super.key,
+    required this.tooltip,
+    required this.onPressed,
+    this.active,
+    this.heard,
+    this.expanded,
+  }) : box = 48,
+       filled = true,
+       size = IconSize.small;
+
   final String icon;
   final String tooltip;
   final VoidCallback? onPressed;
@@ -154,6 +167,26 @@ class IconBtn extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The Save and Revert buttons of a form, for an [ActionRow]: Save reads Saving… while [saving],
+/// and both wait for a change ([dirty]) and for any save to end. Revert comes first, or after
+/// Save when [saveFirst].
+List<Widget> saveRevertButtons({
+  required bool dirty,
+  required bool saving,
+  required VoidCallback onSave,
+  required VoidCallback onRevert,
+  bool saveFirst = false,
+}) {
+  final ready = dirty && !saving;
+  final save = AppButton(
+    saving ? 'Saving…' : 'Save',
+    primary: true,
+    onPressed: ready ? onSave : null,
+  );
+  final revert = AppButton('Revert', onPressed: ready ? onRevert : null);
+  return saveFirst ? [save, revert] : [revert, save];
 }
 
 /// A form's buttons, such as Cancel and Add, in a row at its end that wraps when narrow. A
