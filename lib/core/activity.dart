@@ -64,7 +64,7 @@ class ActivityEvent {
         _ => ActivityOutcome.unknown,
       },
       workspace: textOrNull(json['workspace']),
-      detail: json['detail'] is String ? json['detail'] as String : '',
+      detail: textOrNull(json['detail']) ?? '',
       link: switch (json['link']) {
         final String path when path.startsWith('/') => PageLink(path),
         {'slug': final String slug, 'thread': final String thread} => ChatLink(

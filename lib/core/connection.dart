@@ -134,18 +134,22 @@ const plainHttpRefused =
 bool keySafe(Uri uri) =>
     uri.scheme == 'https' || (uri.scheme == 'http' && isPrivateHost(uri.host));
 
+final _trailingDot = RegExp(r'\.$');
+final _v6Brackets = RegExp(r'^\[|\]$');
+final _v6UniqueLocal = RegExp(r'^f[cd][0-9a-f]{0,2}:');
+final _v6LinkLocal = RegExp(r'^fe[89ab][0-9a-f]?:');
+
 /// Whether [host] is on a private network: this device, a home network or Tailscale. That is
 /// `localhost`, a name with no dot (a home network's, such as `nas`), a name under `.local`,
 /// `.lan`, `.home.arpa` or `.ts.net`, an IPv4 address in `127/8`, `10/8`, `172.16/12`,
 /// `192.168/16`, `169.254/16` or `100.64/10` (Tailscale's), or an IPv6 address that is `::1`,
 /// unique-local (`fc00::/7`) or link-local (`fe80::/10`).
 bool isPrivateHost(String host) {
-  final name = host.toLowerCase().replaceFirst(RegExp(r'\.$'), '');
+  final name = host.toLowerCase().replaceFirst(_trailingDot, '');
   if (isLoopback(name)) return true;
   if (name.contains(':')) {
-    final v6 = name.replaceAll(RegExp(r'^\[|\]$'), '');
-    return RegExp(r'^f[cd][0-9a-f]{0,2}:').hasMatch(v6) ||
-        RegExp(r'^fe[89ab][0-9a-f]?:').hasMatch(v6);
+    final v6 = name.replaceAll(_v6Brackets, '');
+    return _v6UniqueLocal.hasMatch(v6) || _v6LinkLocal.hasMatch(v6);
   }
   final parts = name.split('.');
   final octets = [for (final part in parts) int.tryParse(part)];

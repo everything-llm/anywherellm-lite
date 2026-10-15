@@ -9,9 +9,10 @@ const noDocText = 'The server did not send this document\'s text.';
 String plural(int count, String one, String many) =>
     '${grouped(count)} ${count == 1 ? one : many}';
 
+final _thousands = RegExp(r'\B(?=(\d{3})+$)');
+
 /// [n] with commas between thousands: `1,284`.
-String grouped(int n) =>
-    n.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+$)'), (_) => ',');
+String grouped(int n) => n.toString().replaceAllMapped(_thousands, (_) => ',');
 
 /// The months, shortened: `Jan` to `Dec`.
 const monthNames = [

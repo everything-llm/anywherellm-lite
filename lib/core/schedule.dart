@@ -36,8 +36,8 @@ class ScheduledJob {
     return ScheduledJob(
       id: idOrNull(json['id']),
       name: name,
-      cron: json['schedule'] is String ? json['schedule'] as String : '',
-      prompt: json['prompt'] is String ? json['prompt'] as String : '',
+      cron: textOrNull(json['schedule']) ?? '',
+      prompt: textOrNull(json['prompt']) ?? '',
       tools: switch (jsonOrSelf(json['tools'])) {
         final List<dynamic> tools => tools.length,
         _ => 0,
@@ -151,12 +151,17 @@ List<ScheduledJob> scheduledJobsOf(Object? json) => [
     ?ScheduledJob.fromJson(job),
 ];
 
+final _cronEvery = RegExp(r'^\*/(\d+)$');
+final _whitespace = RegExp(r'\s+');
+
+/// The fields of [cron], split at its white space: five for a schedule.
+List<String> cronFields(String cron) => cron.trim().split(_whitespace);
+
 /// The N of a `*/N` cron field, which runs every N minutes or hours, or null for another field.
-int? _cronStep(String field) =>
-    switch (RegExp(r'^\*/(\d+)$').firstMatch(field)) {
-      final every? => int.parse(every.group(1)!),
-      null => null,
-    };
+int? _cronStep(String field) => switch (_cronEvery.firstMatch(field)) {
+  final every? => int.parse(every.group(1)!),
+  null => null,
+};
 
 /// [at]'s date as a short day, the day of the month and the month: `Mon 6 Oct`.
 String _dateText(DateTime at) =>
@@ -169,7 +174,7 @@ String _shortDay(int index) => weekdayNames[index].substring(0, 3);
 /// minutes, every hour, every day, every weekday or one day a week. Any other schedule is the
 /// cron itself, marked UTC.
 String describeSchedule(String cron, DateTime now) {
-  final parts = cron.trim().split(RegExp(r'\s+'));
+  final parts = cronFields(cron);
   if (parts.length != 5) return cron.isEmpty ? 'No schedule' : '$cron (UTC)';
   final [minute, hour, day, month, weekday] = parts;
   if (day != '*' || month != '*') return '$cron (UTC)';
