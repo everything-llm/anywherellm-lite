@@ -10,7 +10,6 @@ import '../app_scope.dart';
 import '../icons.dart';
 import '../settings/rows.dart';
 import '../settings/settings_pages.dart';
-import '../state/shell_controller.dart';
 import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
@@ -89,9 +88,7 @@ class _ShareSheetState extends State<ShareSheet> {
     final shell = scope.shell;
     if (chat.activeSlug != slug) await chat.select(slug);
     if (!mounted) return;
-    shell
-      ..closeSettings()
-      ..showPane(Pane.chats);
+    shell.openChat();
     try {
       switch (use) {
         case _Use.add:
@@ -126,9 +123,7 @@ class _ShareSheetState extends State<ShareSheet> {
             ),
           };
           chat.newChat();
-          shell
-            ..closeShared()
-            ..openChat();
+          shell.closeShared();
           chat.putInComposer(message, attachments);
       }
     } on UnreadableFile catch (error) {

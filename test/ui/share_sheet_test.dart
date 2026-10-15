@@ -62,6 +62,26 @@ void main() {
     await shares.close();
   });
 
+  testWidgets('a share puts the chats shelf away before it is used', (
+    tester,
+  ) async {
+    final shares = StreamController<SharedItem>();
+    final h = await pumpApp(tester, llm: planningServer(), shares: shares);
+    h.shell.openShelf();
+    await tester.pumpAndSettle();
+    expect(h.shell.shelfOpen, isTrue);
+    await share(
+      tester,
+      shares,
+      SharedLink(Uri.parse('https://example.test/prices'), title: 'Prices'),
+    );
+    await tester.tap(inSheet(control('Add to documents')));
+    await tester.pumpAndSettle();
+    expect(h.shell.shelfOpen, isFalse);
+    expect(h.shell.sourcesOpen, isTrue);
+    await shares.close();
+  });
+
   testWidgets('asking about shared text puts it, quoted, in a new chat', (
     tester,
   ) async {

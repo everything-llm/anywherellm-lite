@@ -436,7 +436,7 @@ class ShellController extends ChangeNotifier {
     _beside = Beside.sources;
     _pane = Pane.files;
     _workspacePage = null;
-    closePopup();
+    _popup.value = null;
     notifyListeners();
   }
 
