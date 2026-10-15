@@ -241,7 +241,6 @@ class _EventSheet extends StatelessWidget {
         'Open the chat',
         primary: true,
         onPressed: () {
-          shell.closePopup();
           unawaited(scope.chat.select(link.slug, thread: link.thread));
           shell.openChat();
         },
@@ -259,11 +258,7 @@ class _EventSheet extends StatelessWidget {
       lead = AppButton(
         'Show in Library',
         primary: true,
-        onPressed: () {
-          shell
-            ..closePopup()
-            ..openToolkitPage(ToolkitPage.library);
-        },
+        onPressed: () => shell.openToolkitPage(ToolkitPage.library),
       );
     }
     // It scrolls where large text leaves the sheet too short for what it holds.

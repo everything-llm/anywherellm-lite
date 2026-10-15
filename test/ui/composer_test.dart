@@ -36,7 +36,7 @@ Future<void> attachFiles(WidgetTester tester) async {
 void main() {
   testWidgets("on a phone Enter doesn't send; Send does", (tester) async {
     final llm = planningServer();
-    await pumpApp(tester, llm: llm);
+    await pumpApp(tester, enterSends: false, llm: llm);
     await tester.enterText(composerField, 'one');
     await tester.pump();
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
@@ -64,7 +64,7 @@ void main() {
       contract(),
     ]);
     final llm = planningServer()..hold = true;
-    await pumpApp(tester, enterSends: true, llm: llm);
+    await pumpApp(tester, llm: llm);
     await attachFiles(tester);
     expect(control('2 files attached. Review'), findsOneWidget);
     await tester.enterText(composerField, 'What is this?');
@@ -83,7 +83,7 @@ void main() {
     (tester) async {
       FilePickerPlatform.instance = FakePicker([contract()]);
       final llm = planningServer();
-      final h = await pumpApp(tester, enterSends: true, llm: llm);
+      final h = await pumpApp(tester, llm: llm);
       await attachFiles(tester);
       expect(control('1 file attached. Review'), findsOneWidget);
       await h.chat.select('household');
@@ -141,7 +141,7 @@ void main() {
 
     Future<(Harness, FakeAnythingLlm)> answering(WidgetTester tester) async {
       final llm = planningServer()..hold = true;
-      final h = await pumpApp(tester, enterSends: true, llm: llm);
+      final h = await pumpApp(tester, llm: llm);
       await tester.enterText(composerField, 'First');
       await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
@@ -242,7 +242,7 @@ void main() {
 
     testWidgets('a chat of another workspace takes a message', (tester) async {
       final llm = planningServer()..hold = true;
-      final h = await pumpApp(tester, enterSends: true, llm: llm);
+      final h = await pumpApp(tester, llm: llm);
       await tester.enterText(composerField, 'First');
       await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);

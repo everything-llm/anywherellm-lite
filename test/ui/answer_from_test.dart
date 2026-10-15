@@ -128,7 +128,7 @@ void main() {
     tester,
   ) async {
     final llm = onChat()..hold = true;
-    final h = await pumpApp(tester, enterSends: true, llm: llm);
+    final h = await pumpApp(tester, llm: llm);
     await tester.tap(chip);
     await tester.pumpAndSettle();
     await typeAndEnter(tester, 'Go');

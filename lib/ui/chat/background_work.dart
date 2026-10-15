@@ -96,7 +96,6 @@ class KeepAnswering {
       _chat.workspaces.where((w) => w.slug == slug).firstOrNull?.name;
 
   void _open(ChatTarget target) {
-    _shell.showTab(HomeTab.chats);
     unawaited(_chat.select(target.slug, thread: target.thread));
     _shell.openChat();
   }

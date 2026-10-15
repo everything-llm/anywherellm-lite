@@ -80,7 +80,7 @@ void main() {
         final llm = planningServer()
           ..hold = true
           ..cited = ['Q3 roadmap.pdf'];
-        final h = await pumpApp(tester, enterSends: true, llm: llm);
+        final h = await pumpApp(tester, llm: llm);
         await typeAndEnter(tester, 'What is due?');
         expect(find.text('What is due?'), findsOneWidget);
         expect(find.byType(Caret), findsOneWidget);
@@ -109,7 +109,7 @@ void main() {
       tester,
     ) async {
       final llm = planningServer()..hold = true;
-      final h = await pumpApp(tester, enterSends: true, llm: llm);
+      final h = await pumpApp(tester, llm: llm);
       await typeAndEnter(tester, 'What is the budget?');
       llm.chat!.add(const TextChunk('About 40k.'));
       llm.chat!.add(
@@ -156,7 +156,7 @@ void main() {
       tester,
     ) async {
       final llm = planningServer();
-      await pumpApp(tester, enterSends: true, llm: llm);
+      await pumpApp(tester, llm: llm);
       await tester.enterText(find.byType(TextField).last, 'one');
       await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
@@ -168,7 +168,7 @@ void main() {
     testWidgets('a new chat keeps its question on screen while the first '
         'answer runs, whatever redraws the list', (tester) async {
       final llm = planningServer()..hold = true;
-      final h = await pumpApp(tester, enterSends: true, llm: llm);
+      final h = await pumpApp(tester, llm: llm);
       await h.chat.select('household');
       await tester.pump();
       final made = llm.gates['createThread'] = Completer<void>();
@@ -184,7 +184,7 @@ void main() {
 
     testWidgets('Stop ends the answer', (tester) async {
       final llm = planningServer()..hold = true;
-      final h = await pumpApp(tester, enterSends: true, llm: llm);
+      final h = await pumpApp(tester, llm: llm);
       await typeAndEnter(tester, 'Go');
       await tester.tap(control('Stop the answer'));
       await tester.pumpAndSettle();
@@ -301,7 +301,7 @@ void main() {
       'an agent answer shows its status, then folds its many sources',
       (tester) async {
         final llm = planningServer()..hold = true;
-        final h = await pumpApp(tester, enterSends: true, llm: llm);
+        final h = await pumpApp(tester, llm: llm);
         await typeAndEnter(tester, 'News?');
         llm.chat!.add(const StatusChunk('Running web-browsing'));
         await tester.pump(const Duration(milliseconds: 300));
@@ -515,7 +515,7 @@ void main() {
       expect(find.text('The key was saved.'), findsOneWidget);
       expect(find.text('Saved'), findsOneWidget);
       h.shell
-        ..showTab(HomeTab.chats)
+        ..openChat()
         ..openShelf();
       await tester.pumpAndSettle();
       expect(inHome('Q3 planning'), findsOneWidget);
@@ -620,7 +620,7 @@ void main() {
       expect(h.store.saved?.apiKey, 'K9');
       expect(find.text('The key was saved.'), findsOneWidget);
       h.shell
-        ..showTab(HomeTab.chats)
+        ..openChat()
         ..openShelf();
       await tester.pumpAndSettle();
       expect(inHome('Q3 planning'), findsOneWidget);

@@ -151,7 +151,7 @@ class Harness extends Rig {
     bool canPickPhotos = false,
     bool canSpeak = false,
     this.canSpellcheck = false,
-    this.enterSends = false,
+    this.enterSends = true,
     this.canShare = false,
     this.shares,
     this.background,
@@ -169,7 +169,8 @@ class Harness extends Rig {
   /// Whether the message box may spellcheck, as on Android.
   final bool canSpellcheck;
 
-  /// Whether Enter sends the message, as on a desktop; a phone's Enter starts a new line.
+  /// Whether Enter sends the message, as on a desktop, which the harness is unless told
+  /// otherwise; a phone's Enter starts a new line.
   final bool enterSends;
 
   /// The device's photos and camera, or null where there are none.
@@ -312,7 +313,7 @@ Future<Harness> pumpApp(
   bool canPickPhotos = false,
   bool canSpeak = false,
   bool canSpellcheck = false,
-  bool enterSends = false,
+  bool enterSends = true,
   bool canShare = false,
   StreamController<SharedItem>? shares,
   FakeBackground? background,
@@ -369,8 +370,8 @@ Finder get typingInto {
   return focused.evaluate().isEmpty ? composerField : focused;
 }
 
-/// Types [text] where the focus is and presses Enter, which sends only where the harness was
-/// pumped with `enterSends`. Pumps a fixed time rather than settling, since the caret of a
+/// Types [text] where the focus is and presses Enter, which sends unless the harness was
+/// pumped with `enterSends: false`. Pumps a fixed time rather than settling, since the caret of a
 /// streaming answer never stops blinking.
 Future<void> typeAndEnter(WidgetTester tester, String text) async {
   await tester.enterText(typingInto, text);

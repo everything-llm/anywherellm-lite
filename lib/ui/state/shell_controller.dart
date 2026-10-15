@@ -158,9 +158,8 @@ class ShellController extends ChangeNotifier {
   /// Shows [page] over the chat, closing the shelf and the popup open.
   void openToolkitPage(ToolkitPage page) {
     if (_toolkitPage == page) return;
-    _shelfOpen = false;
+    _coverChat();
     _toolkitPage = page;
-    _popup.value = null;
     notifyListeners();
   }
 
@@ -285,35 +284,32 @@ class ShellController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Shows the chat, closing the Chats shelf, Settings, the workspace's pages and a page of the
-  /// toolkit's.
-  void openChat() {
-    _clearOverlays();
-    _settingsOpen = false;
-    notifyListeners();
+  /// What every cover over the chat does first: puts the shelf away, which would stay open
+  /// under it, and closes the popup open.
+  void _coverChat() {
+    _shelfOpen = false;
+    _popup.value = null;
   }
 
-  /// Closes what lies over the chat but Settings: the shelf, the workspace's pages, a page of the
-  /// toolkit's, the scanner and the walk-through. A document's text forgets what it was
-  /// opened over.
-  void _clearOverlays() {
-    _shelfOpen = false;
+  /// Shows the chat with nothing over it: the shelf, the sheet, the popup, Settings, the
+  /// workspace's pages and a page of the toolkit's are closed.
+  void openChat() => showTab(HomeTab.chats);
+
+  /// Shows [tab] with nothing over it: the shelf, the sheet, the popup, the workspace's pages, a
+  /// page of the toolkit's, the scanner and the walk-through are closed. A document's text
+  /// forgets what it was opened over.
+  void showTab(HomeTab tab) {
+    _coverChat();
     _sourcesUnder = null;
     _pane = Pane.chats;
     _workspacePage = null;
     _toolkitPage = null;
     _scanning = false;
     _guide = null;
-  }
-
-  /// Shows [tab] with nothing over it.
-  void showTab(HomeTab tab) {
-    _clearOverlays();
     _rightOpen = false;
     _settingsOpen = tab == HomeTab.settings;
     _settingsPage = null;
     _settingsDirect = false;
-    _popup.value = null;
     notifyListeners();
   }
 
@@ -381,10 +377,9 @@ class ShellController extends ChangeNotifier {
   void openSettings([SettingsPage? page]) {
     if (page == null) return showTab(HomeTab.settings);
     _settingsDirect = !_settingsOpen || _settingsDirect;
-    _shelfOpen = false;
+    _coverChat();
     _settingsPage = page;
     _settingsOpen = true;
-    _popup.value = null;
     notifyListeners();
   }
 
@@ -421,12 +416,11 @@ class ShellController extends ChangeNotifier {
 
   void showPane(Pane pane) {
     if (pane == _pane) return;
-    _shelfOpen = false;
+    _coverChat();
     _pane = pane;
     _workspacePage = null;
     _rightOpen = false;
     _sourcesUnder = null;
-    closePopup();
     notifyListeners();
   }
 

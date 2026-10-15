@@ -59,7 +59,7 @@ class AppScope extends InheritedWidget {
     this.appView,
     this.background,
     this.canSpellcheck = false,
-    this.enterSends = false,
+    required this.enterSends,
     required super.child,
   });
 
