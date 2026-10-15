@@ -124,14 +124,7 @@ class _MessageListState extends State<MessageList> {
     _sends = chat.sends;
     if (!sent) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scroll.hasClients || _scroll.offset == 0) return;
-      unawaited(
-        _scroll.animateTo(
-          0,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
-        ),
-      );
+      if (_scroll.hasClients && _scroll.offset != 0) _toNewest();
     });
   }
 
