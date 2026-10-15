@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/copy.dart';
 import '../app_scope.dart';
 import '../icons.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/headline.dart';
@@ -205,7 +206,7 @@ class _Header extends StatelessWidget {
                   onTap: () => thread != null
                       ? scope.shell.openChatSheet(thread)
                       : scope.shell.showPane(Pane.files),
-                  radius: BorderRadius.circular(12),
+                  radius: BorderRadius.circular(Sizes.small),
                   child: Container(
                     constraints: const BoxConstraints(minHeight: 48),
                     padding: const EdgeInsets.symmetric(horizontal: 8),

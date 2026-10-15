@@ -44,7 +44,7 @@ class ScanView extends StatelessWidget {
                   AspectRatio(
                     aspectRatio: 1,
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(28),
+                      borderRadius: BorderRadius.circular(Sizes.card),
                       child: ColoredBox(color: t.ink, child: camera),
                     ),
                   ),

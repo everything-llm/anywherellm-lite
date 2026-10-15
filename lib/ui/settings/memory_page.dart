@@ -382,10 +382,7 @@ class _SavedEditorState extends State<_SavedEditor> {
             maxLines: 4,
             autofocus: existing == null,
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: SectionLabel('Shown in', header: false),
-          ),
+          const SheetLabel('Shown in'),
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             spacing: 8,
