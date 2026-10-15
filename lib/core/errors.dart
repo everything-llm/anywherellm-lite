@@ -23,3 +23,9 @@ class NotConfigured extends ApiException {
 class CutOff extends ApiException {
   const CutOff(super.message);
 }
+
+final _exceptionPrefix = RegExp('^Exception: ');
+
+/// [error]'s message without Dart's `Exception: ` prefix.
+String plainMessage(Exception error) =>
+    '$error'.replaceFirst(_exceptionPrefix, '');

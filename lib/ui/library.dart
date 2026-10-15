@@ -3,13 +3,13 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../core/files.dart';
 import '../core/library.dart';
 import '../core/outputs.dart';
 import '../core/schedule.dart';
 import '../core/upload.dart';
 import 'app_scope.dart';
 import 'chat/generated_files.dart';
-import 'files/save_file.dart';
 import 'layout.dart';
 import 'links.dart';
 import 'settings/rows.dart';
@@ -19,7 +19,6 @@ import 'toolkit_page.dart';
 import 'tokens.dart';
 import 'type.dart';
 import 'widgets/buttons.dart';
-import 'widgets/controls.dart';
 import 'widgets/phone_page.dart';
 import 'widgets/segmented.dart';
 import 'widgets/tappable.dart';
@@ -56,10 +55,7 @@ class _LibraryPageState extends State<LibraryPage> {
     final scope = AppScope.of(context);
     final contents = toolkit.library;
     final slug = scope.chat.activeSlug;
-    final name = scope.chat.workspaces
-        .where((w) => w.slug == slug)
-        .firstOrNull
-        ?.name;
+    final name = scope.chat.active?.name;
     // The open workspace's first, then the rest, in the order the toolkit gave them.
     List<T> shown<T>(List<T> all, bool Function(T) here) => [
       ...all.where((x) => here(x)),
@@ -83,17 +79,13 @@ class _LibraryPageState extends State<LibraryPage> {
           ),
           const SizedBox(height: 20),
           FieldCard([
-            FieldRow(
+            FieldRow.toggle(
               label: 'All workspaces',
               help: _all
                   ? 'Every workspace${name == null ? '' : ', $name first'}'
                   : 'Only ${name ?? 'this workspace'}',
-              small: true,
-              control: AppSwitch(
-                value: _all,
-                label: 'All workspaces',
-                onChanged: (on) => setState(() => _all = on),
-              ),
+              value: _all,
+              onChanged: (on) => setState(() => _all = on),
             ),
           ]),
           const SizedBox(height: 20),
@@ -169,7 +161,7 @@ class _FileRowState extends State<_FileRow> {
     final file = widget.item.file;
     final bytes = await scope.chat.fileBytes(file);
     if (!mounted || bytes == null) return;
-    setState(() => _bytes = Uint8List.fromList(bytes));
+    setState(() => _bytes = bytesOf(bytes));
     scope.shell.togglePopup(file);
   }
 
@@ -240,9 +232,7 @@ class _FileRowState extends State<_FileRow> {
             'share',
             tooltip: 'Share ${file.name}',
             box: 44,
-            onPressed: () => unawaited(
-              shareFile(context, file.name, () => scope.chat.fileBytes(file)),
-            ),
+            onPressed: () => unawaited(shareMadeFile(context, file)),
           ),
         const SizedBox(width: 12),
       ],

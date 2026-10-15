@@ -1,5 +1,7 @@
-// The open workspace's pages, the name a document's text is saved under, and the answer
-// settings as JSON.
+// The open workspace's pages, the name a document's text is saved under, a file's bytes, and
+// the answer settings as JSON.
+
+import 'dart:typed_data';
 
 import 'errors.dart';
 import 'json.dart';
@@ -27,6 +29,10 @@ String textFileName(String title) {
   if (name.isEmpty) return 'document.txt';
   return _plainText.hasMatch(name) ? name : '$name.txt';
 }
+
+/// [bytes] as they are when they are already a [Uint8List], copied otherwise.
+Uint8List bytesOf(List<int> bytes) =>
+    bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
 
 /// The settings in [text] that differ from [was], ready to write. Throws [ApiException] when the
 /// text is not a JSON object, names a setting the app does not know, or gives one a value of the

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/files.dart';
 import '../../core/outputs.dart';
 import '../../core/upload.dart';
 import '../app_scope.dart';
 import '../files/save_file.dart';
 import '../sources/sources_panel.dart';
 import '../icons.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';
@@ -47,6 +49,12 @@ Future<bool> saveMadeFile(BuildContext context, GeneratedFile file) async {
     report: chat.report,
   );
   return where != null;
+}
+
+/// Reads [file] and hands it to the system's share sheet, where the device has one.
+Future<void> shareMadeFile(BuildContext context, GeneratedFile file) {
+  final chat = AppScope.of(context).chat;
+  return shareFile(context, file.name, () => chat.fileBytes(file));
 }
 
 /// Save, which asks where to save [file] and saves it, reading Saved once the file is saved.
@@ -174,7 +182,7 @@ class _MadeImageState extends State<_MadeImage> {
     super.didChangeDependencies();
     _bytes ??= AppScope.of(context).chat
         .fileBytes(widget.file)
-        .then((bytes) => bytes == null ? null : Uint8List.fromList(bytes));
+        .then((bytes) => bytes == null ? null : bytesOf(bytes));
   }
 
   @override
@@ -232,11 +240,7 @@ class _MadeImageState extends State<_MadeImage> {
                   IconBtn(
                     'share',
                     tooltip: 'Share ${file.name}',
-                    onPressed: () => shareFile(
-                      context,
-                      file.name,
-                      () => AppScope.of(context).chat.fileBytes(file),
-                    ),
+                    onPressed: () => shareMadeFile(context, file),
                     box: 30,
                     size: IconSize.xs,
                   ),
@@ -309,7 +313,7 @@ class ImageViewer extends StatelessWidget {
       child: Tappable(
         label: label,
         onTap: onTap,
-        radius: BorderRadius.circular(12),
+        radius: BorderRadius.circular(Sizes.small),
         color: filled ? light : Colors.transparent,
         side: filled
             ? null
@@ -418,11 +422,7 @@ class ImageViewer extends StatelessWidget {
                         button(
                           'Share',
                           'share',
-                          () => shareFile(
-                            context,
-                            file.name,
-                            () => AppScope.of(context).chat.fileBytes(file),
-                          ),
+                          () => shareMadeFile(context, file),
                           filled: false,
                         ),
                     ],

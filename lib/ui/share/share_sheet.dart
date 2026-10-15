@@ -1,8 +1,7 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 
 import '../../core/chat.dart';
+import '../../core/files.dart';
 import '../../core/outputs.dart';
 import '../../core/upload.dart';
 import '../sources/sources_panel.dart';
@@ -19,10 +18,6 @@ import '../widgets/fields.dart';
 import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
 import 'shared_item.dart';
-
-/// [bytes] as they are when they are already a [Uint8List], copied otherwise.
-Uint8List _bytesOf(List<int> bytes) =>
-    bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
 
 /// The bytes of a shared file, or [UnreadableFile] when it cannot be read, as a revoked
 /// permission or a file deleted since it was shared would leave it.
@@ -119,7 +114,7 @@ class _ShareSheetState extends State<ShareSheet> {
             ),
             SharedFile(:final name, :final read) => (
               '',
-              [Attachment.of(name, _bytesOf(await _readShared(read)))],
+              [Attachment.of(name, bytesOf(await _readShared(read)))],
             ),
           };
           chat.newChat();

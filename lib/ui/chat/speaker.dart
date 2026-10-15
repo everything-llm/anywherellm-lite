@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../core/chat.dart';
+import '../../core/errors.dart';
 import '../../core/markdown.dart';
 import '../../core/prefs.dart';
 import '../state/chat_controller.dart';
@@ -44,10 +45,7 @@ class ReadAloud extends ChangeNotifier {
       await _speaker.speak(plainText(splitReasoning(turn.text).answer));
     } on Exception catch (error) {
       if (identical(reading, turn)) {
-        _chat.report(
-          'Could not read the answer aloud',
-          '$error'.replaceFirst(RegExp('^Exception: '), ''),
-        );
+        _chat.report('Could not read the answer aloud', plainMessage(error));
       }
     }
     if (identical(reading, turn)) {

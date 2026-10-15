@@ -1,6 +1,6 @@
-import 'dart:typed_data';
-
 import 'package:file_picker/file_picker.dart';
+
+import '../../core/files.dart';
 
 /// The [FileSaver] the app uses on Android: the system's own save dialog, through the storage
 /// access framework. The dialog takes the bytes with it, so the file is fetched before it opens;
@@ -13,7 +13,7 @@ Future<String?> saveWithPicker(
   if (data == null) return null;
   final place = await FilePicker.saveFile(
     fileName: suggestedName,
-    bytes: data is Uint8List ? data : Uint8List.fromList(data),
+    bytes: bytesOf(data),
   );
   if (place == null) return null;
   return switch (place.scheme) {

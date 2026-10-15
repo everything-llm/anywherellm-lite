@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 
+import '../../core/errors.dart';
 import '../../core/files.dart';
 import '../app_scope.dart';
 
@@ -18,7 +19,7 @@ Future<String?> saveFile(
   try {
     return await scope.save(suggestedName, bytes);
   } on Exception catch (error) {
-    (report ?? scope.files.report)(failTitle, _plain(error));
+    (report ?? scope.files.report)(failTitle, plainMessage(error));
     return null;
   }
 }
@@ -39,7 +40,7 @@ Future<void> shareFile(
     final data = await bytes();
     if (data != null) await share(name, data);
   } on Exception catch (error) {
-    scope.chat.report(title, _plain(error));
+    scope.chat.report(title, plainMessage(error));
   }
 }
 
@@ -57,7 +58,3 @@ Future<String?> saveText(
   failTitle: 'Could not save $title',
   report: report,
 );
-
-/// [error]'s message without Dart's `Exception: ` prefix.
-String _plain(Exception error) =>
-    '$error'.replaceFirst(RegExp('^Exception: '), '');
