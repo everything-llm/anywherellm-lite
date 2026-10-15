@@ -151,6 +151,7 @@ class Harness extends Rig {
     bool canPickPhotos = false,
     bool canSpeak = false,
     this.canSpellcheck = false,
+    this.enterSends = false,
     this.canShare = false,
     this.shares,
     this.background,
@@ -167,6 +168,9 @@ class Harness extends Rig {
 
   /// Whether the message box may spellcheck, as on Android.
   final bool canSpellcheck;
+
+  /// Whether Enter sends the message, as on a desktop; a phone's Enter starts a new line.
+  final bool enterSends;
 
   /// The device's photos and camera, or null where there are none.
   final FakePhotos? photos;
@@ -272,6 +276,7 @@ class Harness extends Rig {
       readAloud: readAloud,
       background: background,
       canSpellcheck: canSpellcheck,
+      enterSends: enterSends,
       scanner: canScan
           ? (onCode) => TextButton(
               onPressed: () => onCode(scanCode),
@@ -292,8 +297,8 @@ const phoneSize = Size(390, 844);
 /// photos and camera, and with [canSpeak] each answer Read aloud. [toolkitServer] is the toolkit,
 /// present unless given absent, and [canViewApps] draws a page an answer links to with a
 /// [FakeAppView]. The window is a phone's,
-/// [phoneSize], unless [size] says otherwise. The chat shows full screen, as after a chat is
-/// tapped on the Chats tab, unless [onChat] is false, which leaves the home showing.
+/// [phoneSize], unless [size] says otherwise. The chat shows, as at start; with [shelf] the chats
+/// show as the shelf over it, as after the chat's menu button is tapped.
 Future<Harness> pumpApp(
   WidgetTester tester, {
   FakeAnythingLlm? llm,
@@ -307,10 +312,11 @@ Future<Harness> pumpApp(
   bool canPickPhotos = false,
   bool canSpeak = false,
   bool canSpellcheck = false,
+  bool enterSends = false,
   bool canShare = false,
   StreamController<SharedItem>? shares,
   FakeBackground? background,
-  bool onChat = true,
+  bool shelf = false,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -329,10 +335,11 @@ Future<Harness> pumpApp(
     canPickPhotos: canPickPhotos,
     canSpeak: canSpeak,
     canSpellcheck: canSpellcheck,
+    enterSends: enterSends,
   );
   addTearDown(harness.dispose);
   await harness.prefs.load();
-  if (onChat) harness.shell.openChat();
+  if (shelf) harness.shell.openShelf();
   await tester.pumpWidget(harness.app);
   await harness.chat.load();
   // Built now, as the app builds it at start, so it holds from the first answer.
@@ -350,6 +357,10 @@ Finder typingField([Finder? of]) {
 /// The composer's field, apart from the drawer's search and every other field on screen.
 Finder get composerField => typingField(find.byType(Composer));
 
+/// Whether the field [field] finds is the one being typed in.
+bool focused(WidgetTester tester, Finder field) =>
+    tester.widget<EditableText>(field).focusNode.hasFocus;
+
 /// The text field that has the focus, or else the composer.
 Finder get typingInto {
   final focused = find.byWidgetPredicate(
@@ -358,8 +369,9 @@ Finder get typingInto {
   return focused.evaluate().isEmpty ? composerField : focused;
 }
 
-/// Types [text] where the focus is and presses Enter. Pumps a fixed time rather than settling,
-/// since the caret of a streaming answer never stops blinking.
+/// Types [text] where the focus is and presses Enter, which sends only where the harness was
+/// pumped with `enterSends`. Pumps a fixed time rather than settling, since the caret of a
+/// streaming answer never stops blinking.
 Future<void> typeAndEnter(WidgetTester tester, String text) async {
   await tester.enterText(typingInto, text);
   await tester.pump();

@@ -23,7 +23,7 @@ Finder get _fields => typingField(find.byType(WorkspaceSheetView));
 void main() {
   testWidgets('a new workspace is made with its instructions', (tester) async {
     final llm = planningServer();
-    final h = await pumpApp(tester, llm: llm, onChat: false);
+    final h = await pumpApp(tester, llm: llm, shelf: true);
     await _openNew(tester);
     expect(_inSheet(find.text('Instructions')), findsOneWidget);
     await tester.enterText(_fields.at(0), 'Recipes');
@@ -35,7 +35,7 @@ void main() {
   });
 
   testWidgets('Rename workspace asks only for the name', (tester) async {
-    await pumpApp(tester, llm: planningServer(), onChat: false);
+    await pumpApp(tester, llm: planningServer(), shelf: true);
     await tester.tap(find.byTooltip('Workspace settings').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Rename').first);

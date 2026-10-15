@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -210,6 +211,14 @@ class _SessionHostState extends State<SessionHost> {
             .instance
             .platformDispatcher
             .nativeSpellCheckServiceDefined,
+        enterSends: switch (defaultTargetPlatform) {
+          TargetPlatform.linux ||
+          TargetPlatform.macOS ||
+          TargetPlatform.windows => true,
+          TargetPlatform.android ||
+          TargetPlatform.iOS ||
+          TargetPlatform.fuchsia => false,
+        },
         child: const AppShell(),
       );
     },

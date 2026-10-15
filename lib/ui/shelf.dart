@@ -8,7 +8,7 @@ import 'layout.dart';
 import 'tokens.dart';
 import 'widgets/rise.dart';
 
-/// The Chats tab as a shelf that slides in from the left over the chat, which shows dimmed
+/// The chats as a shelf that slides in from the left over the chat, which shows dimmed
 /// beside it: the chat's menu button opens it, and tapping the dimmed chat, a swipe to the
 /// left, Back or anything the shelf opens closes it.
 class ChatsShelf extends StatefulWidget {
@@ -34,6 +34,8 @@ class _ChatsShelfState extends State<ChatsShelf>
   @override
   void initState() {
     super.initState();
+    // The chat's field gives up the keyboard, which would cover the shelf.
+    FocusManager.instance.primaryFocus?.unfocus();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final slide = motion(context, const Duration(milliseconds: 220));

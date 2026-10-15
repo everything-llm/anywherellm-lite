@@ -19,7 +19,7 @@ import 'widgets/phone_page.dart';
 import 'widgets/tappable.dart';
 import 'workspace_switcher.dart';
 
-/// The bar at the foot of the home: Chats and Settings, the tab shown on a pill of [Tokens.sel]
+/// The bar at the foot of the window: Chats and Settings, the tab shown on a pill of [Tokens.sel]
 /// with its icon in the accent.
 class HomeTabBar extends StatelessWidget {
   const HomeTabBar({super.key});
@@ -121,10 +121,10 @@ class _Tab extends StatelessWidget {
   }
 }
 
-/// The Chats tab: the open workspace's name as its title, which opens the Workspaces sheet,
+/// The chats list, drawn in the shelf: the open workspace's name as its title, which opens the Workspaces sheet,
 /// with Workspace settings and New chat beside it; the search; the toolkit's card; then the
-/// workspace's chats under Chats, each with a More button that opens its sheet. A chat opens
-/// full screen over the home.
+/// workspace's chats under Chats, each with a More button that opens its sheet. A chat opens in
+/// the chat and closes the shelf.
 class ChatsTab extends StatefulWidget {
   const ChatsTab({super.key});
 
@@ -403,7 +403,7 @@ class _FoundWorkspace extends StatelessWidget {
 }
 
 /// A chat in the Chats tab: its name, after it its pin and whether its answer is ready, and a
-/// More button that opens its sheet. Tapped, it opens full screen.
+/// More button that opens its sheet. Tapped, it opens in the chat.
 class _ChatRow extends StatelessWidget {
   const _ChatRow(this.thread, {required this.workspace, required this.pinned});
 

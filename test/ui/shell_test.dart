@@ -7,6 +7,7 @@ import 'package:anywherellm/ui/chat/chat_view.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/home.dart';
+import 'package:anywherellm/ui/shelf.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/controls.dart';
@@ -79,7 +80,7 @@ void main() {
         final llm = planningServer()
           ..hold = true
           ..cited = ['Q3 roadmap.pdf'];
-        final h = await pumpApp(tester, llm: llm);
+        final h = await pumpApp(tester, enterSends: true, llm: llm);
         await typeAndEnter(tester, 'What is due?');
         expect(find.text('What is due?'), findsOneWidget);
         expect(find.byType(Caret), findsOneWidget);
@@ -108,7 +109,7 @@ void main() {
       tester,
     ) async {
       final llm = planningServer()..hold = true;
-      final h = await pumpApp(tester, llm: llm);
+      final h = await pumpApp(tester, enterSends: true, llm: llm);
       await typeAndEnter(tester, 'What is the budget?');
       llm.chat!.add(const TextChunk('About 40k.'));
       llm.chat!.add(
@@ -155,7 +156,7 @@ void main() {
       tester,
     ) async {
       final llm = planningServer();
-      await pumpApp(tester, llm: llm);
+      await pumpApp(tester, enterSends: true, llm: llm);
       await tester.enterText(find.byType(TextField).last, 'one');
       await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
@@ -167,7 +168,7 @@ void main() {
     testWidgets('a new chat keeps its question on screen while the first '
         'answer runs, whatever redraws the list', (tester) async {
       final llm = planningServer()..hold = true;
-      final h = await pumpApp(tester, llm: llm);
+      final h = await pumpApp(tester, enterSends: true, llm: llm);
       await h.chat.select('household');
       await tester.pump();
       final made = llm.gates['createThread'] = Completer<void>();
@@ -183,7 +184,7 @@ void main() {
 
     testWidgets('Stop ends the answer', (tester) async {
       final llm = planningServer()..hold = true;
-      final h = await pumpApp(tester, llm: llm);
+      final h = await pumpApp(tester, enterSends: true, llm: llm);
       await typeAndEnter(tester, 'Go');
       await tester.tap(control('Stop the answer'));
       await tester.pumpAndSettle();
@@ -300,7 +301,7 @@ void main() {
       'an agent answer shows its status, then folds its many sources',
       (tester) async {
         final llm = planningServer()..hold = true;
-        final h = await pumpApp(tester, llm: llm);
+        final h = await pumpApp(tester, enterSends: true, llm: llm);
         await typeAndEnter(tester, 'News?');
         llm.chat!.add(const StatusChunk('Running web-browsing'));
         await tester.pump(const Duration(milliseconds: 300));
@@ -417,27 +418,28 @@ void main() {
     Finder tab(String label) =>
         find.descendant(of: find.byType(HomeTabBar), matching: control(label));
 
-    testWidgets(
-      'stays under the chat, and its Chats tab goes back to the list',
-      (tester) async {
-        final h = await pumpApp(tester);
-        expect(h.shell.chatOpen, isTrue);
-        expect(find.byType(HomeTabBar), findsOneWidget);
-        // The composer sits above the bar, not under it.
-        expect(
-          tester.getBottomLeft(find.byType(ChatView)).dy,
-          lessThanOrEqualTo(tester.getTopLeft(find.byType(HomeTabBar)).dy),
-        );
+    testWidgets('stays under the chat, and its Chats tab puts the shelf away', (
+      tester,
+    ) async {
+      final h = await pumpApp(tester);
+      expect(find.byType(HomeTabBar), findsOneWidget);
+      // The composer sits above the bar, not under it.
+      expect(
+        tester.getBottomLeft(find.byType(ChatView)).dy,
+        lessThanOrEqualTo(tester.getTopLeft(find.byType(HomeTabBar)).dy),
+      );
 
-        await tester.tap(tab('Chats'));
-        await tester.pumpAndSettle();
-        expect(h.shell.chatOpen, isFalse);
-        expect(find.byType(HomeTabBar), findsOneWidget);
-      },
-    );
+      h.shell.openShelf();
+      await tester.pumpAndSettle();
+      expect(find.byType(ChatsShelf), findsOneWidget);
+      await tester.tap(tab('Chats'));
+      await tester.pumpAndSettle();
+      expect(h.shell.shelfOpen, isFalse);
+      expect(find.byType(HomeTabBar), findsOneWidget);
+    });
 
     testWidgets('stays under Settings\' pages and Upcoming', (tester) async {
-      final h = await pumpApp(tester, onChat: false);
+      final h = await pumpApp(tester, shelf: true);
       h.shell.openSettings(SettingsPage.appearance);
       await tester.pumpAndSettle();
       expect(find.byType(HomeTabBar), findsOneWidget);
@@ -463,7 +465,7 @@ void main() {
     });
 
     testWidgets('is not on the first run\'s welcome', (tester) async {
-      final h = await pumpApp(tester, connection: null, onChat: false);
+      final h = await pumpApp(tester, connection: null, shelf: true);
       h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
       expect(find.byType(HomeTabBar), findsNothing);
@@ -479,7 +481,6 @@ void main() {
         kind: PointerDeviceKind.touch,
       );
       await tester.pumpAndSettle();
-      expect(h.shell.chatOpen, isTrue);
     });
   });
 
@@ -513,7 +514,9 @@ void main() {
       expect(h.store.saved?.apiKey, 'K9');
       expect(find.text('The key was saved.'), findsOneWidget);
       expect(find.text('Saved'), findsOneWidget);
-      h.shell.showTab(HomeTab.chats);
+      h.shell
+        ..showTab(HomeTab.chats)
+        ..openShelf();
       await tester.pumpAndSettle();
       expect(inHome('Q3 planning'), findsOneWidget);
     });
@@ -598,7 +601,6 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(h.shell.settingsOpen, isFalse);
-      expect(h.shell.chatOpen, isTrue);
     });
 
     testWidgets('a scanned code connects as a typed key does', (tester) async {
@@ -617,7 +619,9 @@ void main() {
       expect(h.store.saved?.baseUrl, 'https://owen.example.ts.net');
       expect(h.store.saved?.apiKey, 'K9');
       expect(find.text('The key was saved.'), findsOneWidget);
-      h.shell.showTab(HomeTab.chats);
+      h.shell
+        ..showTab(HomeTab.chats)
+        ..openShelf();
       await tester.pumpAndSettle();
       expect(inHome('Q3 planning'), findsOneWidget);
     });

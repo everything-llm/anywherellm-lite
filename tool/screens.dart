@@ -424,7 +424,7 @@ const _metrics = AnswerMetrics(
   return (llm, toolkit);
 }
 
-/// A step that brings a screen up once the app shows its Chats tab.
+/// A step that brings a screen up once the app shows its chat.
 typedef _Setup = Future<void> Function(WidgetTester tester, Harness h);
 
 Future<void> _settle(WidgetTester tester) async {
@@ -677,7 +677,7 @@ void main() {
             llm: llm,
             toolkitServer: toolkit,
             canViewApps: true,
-            onChat: false,
+            shelf: true,
             canScan: !connected,
             canDictate: true,
             canSpeak: true,

@@ -28,11 +28,11 @@ import 'tokens.dart';
 import 'widgets/basics.dart';
 
 /// The window: the bar of tabs at its foot, always, but while the keyboard is up and on the
-/// first run's welcome, and above it the home, the Chats tab; the chat over it;
-/// the workspace's pages or Upcoming over those; Settings, its list or a page, over them all;
-/// and the sheets and popups over the whole window, the bar too. Esc and Back close the
-/// topmost thing open: the popup, Settings' page, the sheet, Upcoming, the workspace's pages a
-/// step at a time, then the chat.
+/// first run's welcome, and above it the chat, which is the Chats tab; the chats as a shelf over
+/// it; the workspace's pages or Upcoming over those; Settings, its list or a page, over them
+/// all; and the sheets and popups over the whole window, the bar too. Esc and Back close the
+/// topmost thing open: the popup, Settings' page, the shelf, the sheet, Upcoming, the workspace's
+/// pages a step at a time; with nothing open Back puts the app out of sight.
 class AppShell extends StatelessWidget {
   const AppShell({super.key});
 
@@ -71,7 +71,6 @@ class AppShell extends StatelessWidget {
         }
         return () => shell.showPane(Pane.chats);
       }
-      if (shell.chatOpen) return shell.closeChat;
       return null;
     }
 
@@ -79,14 +78,12 @@ class AppShell extends StatelessWidget {
       listenable: shell,
       builder: (context, _) {
         final files = shell.pane == Pane.files;
-        final chatShown = shell.chatOpen && !files;
+        // The chat is the Chats tab: it shows unless the workspace's pages, a page of the
+        // toolkit's or Settings cover it.
+        final chatShown =
+            !files && shell.toolkitPage == null && !shell.settingsOpen;
         // The first run's welcome stands alone, since no tab has anything to show yet.
         final tabs = !(shell.settingsOpen && !scope.settings.configured);
-        final homeCovered =
-            shell.chatOpen ||
-            files ||
-            shell.toolkitPage != null ||
-            shell.settingsOpen;
         final right = switch (shell.beside) {
           Beside.sources => const SourcesPanel(),
           Beside.passages => const PassagesPanel(),
@@ -122,16 +119,6 @@ class AppShell extends StatelessWidget {
                               Expanded(
                                 child: Stack(
                                   children: [
-                                    // The Chats tab, kept while anything covers it.
-                                    Positioned.fill(
-                                      child: Offstage(
-                                        offstage: homeCovered,
-                                        child: TickerMode(
-                                          enabled: !homeCovered,
-                                          child: const ChatsTab(),
-                                        ),
-                                      ),
-                                    ),
                                     // The chat stays built while it is off the screen, so a draft and a
                                     // running answer survive.
                                     Positioned.fill(
@@ -149,8 +136,8 @@ class AppShell extends StatelessWidget {
                                         ),
                                       ),
                                     ),
-                                    // The Chats tab as a shelf from the left over the chat.
-                                    if (shell.shelfOpen && chatShown)
+                                    // The chats as a shelf from the left over the chat.
+                                    if (shell.shelfOpen)
                                       const Positioned.fill(
                                         child: ChatsShelf(),
                                       ),
@@ -172,9 +159,8 @@ class AppShell extends StatelessWidget {
                                             const ActivityPage(),
                                         },
                                       ),
-                                    // A deleted chat is put back from over the chat or the Chats tab.
-                                    if (!shell.settingsOpen)
-                                      _PhoneUndo(overTabs: shell.atHome),
+                                    // A deleted chat is put back from over the chat's composer.
+                                    if (!shell.settingsOpen) const _PhoneUndo(),
                                     if (shell.settingsOpen)
                                       const Positioned.fill(
                                         child: SettingsDialog(),
@@ -250,12 +236,9 @@ class AppShell extends StatelessWidget {
   }
 }
 
-/// Undo for a chat just deleted, over the chat's composer or, with [overTabs], just over the bar
-/// of tabs, while it can be put back.
+/// Undo for a chat just deleted, over the chat's composer while it can be put back.
 class _PhoneUndo extends StatelessWidget {
-  const _PhoneUndo({required this.overTabs});
-
-  final bool overTabs;
+  const _PhoneUndo();
 
   @override
   Widget build(BuildContext context) {
@@ -267,7 +250,7 @@ class _PhoneUndo extends StatelessWidget {
           : Positioned(
               left: 20,
               right: 20,
-              bottom: overTabs ? 30 : 96,
+              bottom: 96,
               child: UndoBar(
                 'Chat deleted',
                 onUndo: chat.undoDelete,

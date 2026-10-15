@@ -115,9 +115,9 @@ void main() {
         expect(tester.takeException(), isNull);
       });
 
-      testWidgets('the Chats tab, the sheet and Settings fit', (tester) async {
+      testWidgets('the shelf, the sheet and Settings fit', (tester) async {
         final h = await pumpApp(tester, llm: awkward(), size: size);
-        h.shell.closeChat();
+        h.shell.openShelf();
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         h.shell.openSources();
@@ -222,7 +222,7 @@ void main() {
       });
 
       testWidgets('a search with long names fits', (tester) async {
-        await pumpApp(tester, llm: awkward(), size: size, onChat: false);
+        await pumpApp(tester, llm: awkward(), size: size, shelf: true);
         await tester.enterText(
           find.bySemanticsLabel('Search workspaces and chats').last,
           longWord.substring(0, 5),
@@ -453,7 +453,7 @@ void main() {
           llm: awkward(),
           toolkitServer: toolkit,
           size: size,
-          onChat: false,
+          shelf: true,
         );
         h.shell.openToolkitPage(ToolkitPage.upcoming);
         await tester.pumpAndSettle();
@@ -517,7 +517,7 @@ void main() {
           llm: awkward(),
           toolkitServer: toolkit,
           size: size,
-          onChat: false,
+          shelf: true,
         );
         expect(tester.takeException(), isNull, reason: 'the card');
         h.shell.openToolkitPage(ToolkitPage.library);
@@ -617,7 +617,7 @@ void main() {
       tester,
       llm: awkward(),
       size: const Size(360, 640),
-      onChat: false,
+      shelf: true,
     );
     h.shell.openSources();
     await tester.pumpAndSettle();

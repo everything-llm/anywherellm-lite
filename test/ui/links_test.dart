@@ -189,13 +189,11 @@ void main() {
       h.appView!.close!();
       await tester.pumpAndSettle();
       expect(h.shell.browserTab, isNull);
-      expect(h.shell.chatOpen, isTrue);
       await tapLink(tester, 'the tab');
       await tester.pumpAndSettle();
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(h.shell.browserTab, isNull);
-      expect(h.shell.chatOpen, isTrue);
     },
   );
 
@@ -218,13 +216,11 @@ void main() {
     h.appView!.close!();
     await tester.pumpAndSettle();
     expect(find.byType(PageSheet), findsNothing);
-    expect(h.shell.chatOpen, isTrue);
     await tapLink(tester, 'Groceries');
     await tester.pumpAndSettle();
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byType(PageSheet), findsNothing);
-    expect(h.shell.chatOpen, isTrue);
   });
 
   testWidgets('an app\'s card in an answer is one tap that opens its page', (

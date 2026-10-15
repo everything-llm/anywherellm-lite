@@ -159,7 +159,7 @@ void main() {
       tester,
     ) async {
       final background = FakeBackground();
-      await pumpApp(tester, background: background, onChat: false);
+      await pumpApp(tester, background: background);
       await tester.binding.handlePopRoute();
       await tester.pump();
       expect(background.left, 1);
@@ -171,13 +171,11 @@ void main() {
         tester,
         llm: planningServer(),
         background: background,
-        onChat: false,
       );
       final slug = h.chat.workspaces.first.slug;
       final thread = h.chat.threadsOf(slug).first.slug;
       background.tap((slug: slug, thread: thread));
       await tester.pumpAndSettle();
-      expect(h.shell.chatOpen, isTrue);
       expect((h.chat.activeSlug, h.chat.activeThread), (slug, thread));
     });
   });

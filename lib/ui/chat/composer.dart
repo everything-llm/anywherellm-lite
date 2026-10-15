@@ -30,7 +30,8 @@ import 'model_picker.dart';
 bool canSend(ChatController chat, String text) =>
     !chat.busy && chat.ready && chat.active != null && text.trim().isNotEmpty;
 
-/// Where a question is written. Enter sends it and Shift+Enter starts a new line. While this
+/// Where a question is written. On a desktop ([AppScope.enterSends]) Enter sends it and
+/// Shift+Enter starts a new line; on a phone Enter starts a new line and Send sends. While this
 /// chat answers, Send becomes Stop; while another chat answers, nothing can be sent. Files
 /// attached go with the next question only.
 class Composer extends StatefulWidget {
@@ -467,10 +468,13 @@ class _Form extends StatelessWidget {
     // done takes the chips' room, as they are off while the chat answers.
     final holdable = here && !held && draft.text.trim().isNotEmpty;
 
+    // On a phone the keyboard's Enter is left to the field, which starts a new line.
     final VoidCallback onEnter = here ? onHold : send;
     final bindings = <ShortcutActivator, VoidCallback>{
-      const SingleActivator(LogicalKeyboardKey.enter): onEnter,
-      const SingleActivator(LogicalKeyboardKey.numpadEnter): onEnter,
+      if (scope.enterSends) ...{
+        const SingleActivator(LogicalKeyboardKey.enter): onEnter,
+        const SingleActivator(LogicalKeyboardKey.numpadEnter): onEnter,
+      },
     };
 
     final card = AnswerFromAnchor(

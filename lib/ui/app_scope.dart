@@ -59,6 +59,7 @@ class AppScope extends InheritedWidget {
     this.appView,
     this.background,
     this.canSpellcheck = false,
+    this.enterSends = false,
     required super.child,
   });
 
@@ -109,6 +110,10 @@ class AppScope extends InheritedWidget {
 
   /// Whether the platform has a spell checker the message box can use.
   final bool canSpellcheck;
+
+  /// Whether Enter sends the message, as on a desktop, where Shift+Enter starts a new line. On a
+  /// phone the keyboard's Enter starts a new line and Send sends.
+  final bool enterSends;
 
   static AppScope of(BuildContext context) {
     // Never notifies, so no dependency is needed. That also lets initState read it.

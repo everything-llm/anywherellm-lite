@@ -32,7 +32,7 @@ void main() {
       tester,
       llm: planningServer(),
       toolkitServer: toolkit,
-      onChat: false,
+      shelf: true,
     );
     expect(find.textContaining('2 jobs · next today'), findsOneWidget);
     await tester.tap(find.text('Upcoming'));
@@ -72,7 +72,7 @@ void main() {
     final h = await pumpApp(
       tester,
       toolkitServer: FakeToolkit(present: false),
-      onChat: false,
+      shelf: true,
     );
     expect(find.text('Upcoming'), findsNothing);
     h.shell.openSettings();
@@ -87,7 +87,7 @@ void main() {
     tester,
   ) async {
     final toolkit = FakeToolkit(present: false);
-    final h = await pumpApp(tester, toolkitServer: toolkit, onChat: false);
+    final h = await pumpApp(tester, toolkitServer: toolkit, shelf: true);
     expect(h.toolkit.available, isFalse);
     toolkit.present = true;
     await h.settings.pair(

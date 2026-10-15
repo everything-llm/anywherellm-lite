@@ -73,7 +73,7 @@ Future<Harness> _open(
   tester,
   llm: llm ?? planningServer(),
   toolkitServer: toolkit,
-  onChat: false,
+  shelf: true,
   canViewApps: canViewApps,
   canShare: canShare,
   size: const Size(390, 1000),
@@ -281,7 +281,6 @@ void main() {
       expect(find.text('Done. The answer is in the chat.'), findsOneWidget);
       await tester.tap(control('Open the chat'));
       await tester.pumpAndSettle();
-      expect(h.shell.chatOpen, isTrue);
       expect(h.shell.toolkitPage, isNull);
       expect(h.chat.activeThread, 'budget');
     });

@@ -1,3 +1,4 @@
+import 'package:anywherellm/ui/chat/chat_view.dart';
 import 'package:anywherellm/ui/home.dart';
 import 'package:anywherellm/ui/shelf.dart';
 import 'package:flutter/widgets.dart';
@@ -13,6 +14,19 @@ Future<void> _openShelf(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets(
+    'the app opens on the chat, and the chats show only as the shelf',
+    (tester) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      await tester.pumpAndSettle();
+      expect(find.byType(ChatView), findsOneWidget);
+      expect(find.byType(ChatsTab), findsNothing);
+      h.shell.openShelf();
+      await tester.pumpAndSettle();
+      expect(find.byType(ChatsTab), findsOneWidget);
+    },
+  );
+
   testWidgets('the menu opens the chats from the left over the chat', (
     tester,
   ) async {
@@ -20,7 +34,6 @@ void main() {
     await tester.pumpAndSettle();
     await _openShelf(tester);
     expect(h.shell.shelfOpen, isTrue);
-    expect(h.shell.chatOpen, isTrue);
     expect(find.byType(ChatsShelf), findsOneWidget);
     expect(
       find.descendant(
@@ -43,6 +56,16 @@ void main() {
     expect(find.byType(ChatsShelf), findsNothing);
   });
 
+  testWidgets('opening the shelf puts the keyboard away', (tester) async {
+    await pumpApp(tester, llm: planningServer());
+    await tester.pumpAndSettle();
+    await tester.tap(composerField);
+    await tester.pump();
+    expect(focused(tester, composerField), isTrue);
+    await _openShelf(tester);
+    expect(focused(tester, composerField), isFalse);
+  });
+
   testWidgets('Back or a tap on the dimmed chat closes the shelf', (
     tester,
   ) async {
@@ -52,7 +75,6 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(h.shell.shelfOpen, isFalse);
-    expect(h.shell.chatOpen, isTrue);
 
     await _openShelf(tester);
     await tester.tapAt(

@@ -236,7 +236,7 @@ void main() {
         baseUrl: 'https://anythingllm.example.ts.net',
         apiKey: 'K1',
       ),
-      // A pinned chat, so the Chats tab shows it first.
+      // A pinned chat, so the shelf shows it first.
       prefsStore: FakePrefsStore(
         Prefs(
           theme: ThemePref.dark,
@@ -256,8 +256,8 @@ void main() {
     );
     await _capture(tester, 'phoneScreenshots/1_chat.png');
 
-    // The Chats tab with the workspace's chats, then the Workspaces sheet open over it.
-    h.shell.closeChat();
+    // The chats as the shelf over the chat, then the Workspaces sheet open over it.
+    h.shell.openShelf();
     await tester.pumpAndSettle();
     await _capture(tester, 'phoneScreenshots/2_chats.png');
     h.shell.togglePopup(Popup.workspaces);

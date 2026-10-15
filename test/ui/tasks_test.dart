@@ -39,7 +39,7 @@ Future<Harness> _open(WidgetTester tester, FakeToolkit toolkit) async {
     tester,
     llm: planningServer(),
     toolkitServer: toolkit,
-    onChat: false,
+    shelf: true,
     size: const Size(390, 1000),
   );
   h.shell.openToolkitPage(ToolkitPage.upcoming);

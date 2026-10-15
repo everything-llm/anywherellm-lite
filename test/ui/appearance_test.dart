@@ -44,9 +44,9 @@ void main() {
   ) async {
     final store = FakePrefsStore();
     final h = await pumpApp(tester, llm: planningServer(), prefsStore: store);
-    double answerScale() =>
-        MediaQuery.textScalerOf(tester.element(find.text('About 40k.')))
-            .scale(10);
+    double answerScale() => MediaQuery.textScalerOf(
+      tester.element(find.text('About 40k.', skipOffstage: false)),
+    ).scale(10);
     expect(answerScale(), 10);
     h.shell.openSettings(SettingsPage.appearance);
     await tester.pumpAndSettle();

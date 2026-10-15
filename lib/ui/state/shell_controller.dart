@@ -10,10 +10,10 @@ import 'chat_controller.dart';
 /// What the main pane shows: the chat, or the open workspace's pages.
 enum Pane { chats, files }
 
-/// A page of what the toolkit adds that lies over the Chats tab, opened from its card there.
+/// A page of what the toolkit adds that lies over the chat, opened from its card in the shelf.
 enum ToolkitPage { upcoming, library, activity }
 
-/// A tab of the bar at the foot of the home: the open workspace's chats, or Settings' list.
+/// A tab of the bar at the foot of the window: the chat, or Settings' list.
 enum HomeTab { chats, settings }
 
 /// What the sheet over the chat shows: Sources, the passages an answer read from one
@@ -67,13 +67,11 @@ enum WorkspaceSheet { create, rename, delete }
 /// is keyed by its [Turn] instead.
 enum Popup { workspaces, answerFrom, attach, memoryWorkspace }
 
-/// What is open over the home and its two tabs: the chat, full screen over them, the sheet over
-/// the chat ([Beside]: the Documents panel, Sources in the code, or an answer's passages or
-/// sources), Settings and the page of it shown, the [popup] open, and which [Pane] is on screen.
+/// What is open over the chat, which is the Chats tab: the chats as a shelf,
+/// the sheet over the chat ([Beside]: the Documents panel, Sources in the code, or an answer's
+/// passages or sources), Settings and the page of it shown, the [popup] open, and which [Pane] is on screen.
 class ShellController extends ChangeNotifier {
   ShellController();
-
-  bool _chatOpen = false;
 
   final _popup = ValueNotifier<Object?>(null);
 
@@ -153,11 +151,11 @@ class ShellController extends ChangeNotifier {
   int _guideStep = 0;
   ToolkitPage? _toolkitPage;
 
-  /// The page of what the toolkit shows that lies over the Chats tab, from its card there, or
+  /// The page of what the toolkit shows that lies over the chat, from its card in the shelf, or
   /// null.
   ToolkitPage? get toolkitPage => _toolkitPage;
 
-  /// Shows [page] over the Chats tab, closing the popup open.
+  /// Shows [page] over the chat, closing the shelf and the popup open.
   void openToolkitPage(ToolkitPage page) {
     if (_toolkitPage == page) return;
     _shelfOpen = false;
@@ -166,7 +164,7 @@ class ShellController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Closes the toolkit's page over the Chats tab, whichever it is.
+  /// Closes the toolkit's page over the chat, whichever it is.
   void closeToolkitPage() {
     if (_toolkitPage == null) return;
     _toolkitPage = null;
@@ -248,17 +246,8 @@ class ShellController extends ChangeNotifier {
   /// The citation whose passages the sheet over the chat shows, or showed last.
   Citation? get passages => _passages;
 
-  /// Whether the chat shows, full screen over the home.
-  bool get chatOpen => _chatOpen;
-
-  /// The tab the home shows: Settings while Settings is open, else Chats.
+  /// The tab shown: Settings while Settings is open, else Chats, which is the chat.
   HomeTab get tab => _settingsOpen ? HomeTab.settings : HomeTab.chats;
-
-  /// Whether the home shows, with the bar of its tabs: the Chats tab with nothing over it, or
-  /// Settings' list.
-  bool get atHome => _settingsOpen
-      ? _settingsPage == null
-      : !_chatOpen && _pane == Pane.chats && _toolkitPage == null;
 
   /// Whether the sheet over the chat, or over the workspace's pages, is open.
   bool get rightOpen => _rightOpen;
@@ -278,12 +267,13 @@ class ShellController extends ChangeNotifier {
 
   bool _shelfOpen = false;
 
-  /// Whether the Chats tab shows as a shelf from the left over the chat.
+  /// Whether the chats show as a shelf from the left over the chat, which is the only place
+  /// they show.
   bool get shelfOpen => _shelfOpen;
 
-  /// Slides the Chats tab in from the left over the chat.
+  /// Slides the chats in from the left over the chat.
   void openShelf() {
-    if (_shelfOpen || !_chatOpen) return;
+    if (_shelfOpen) return;
     _shelfOpen = true;
     _popup.value = null;
     notifyListeners();
@@ -295,24 +285,16 @@ class ShellController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Shows the chat full screen over the home, closing the Chats shelf, Settings, the
-  /// workspace's pages and a page over the Chats tab.
+  /// Shows the chat, closing the Chats shelf, Settings, the workspace's pages and a page of the
+  /// toolkit's.
   void openChat() {
-    if (_chatOpen &&
-        !_shelfOpen &&
-        !_settingsOpen &&
-        _pane == Pane.chats &&
-        _toolkitPage == null) {
-      return;
-    }
     _clearOverlays();
-    _chatOpen = true;
     _settingsOpen = false;
     notifyListeners();
   }
 
-  /// Closes what lies over the Chats tab but the chat and Settings: the shelf, the workspace's
-  /// pages, Upcoming, the scanner and the walk-through. A document's text forgets what it was
+  /// Closes what lies over the chat but Settings: the shelf, the workspace's pages, a page of the
+  /// toolkit's, the scanner and the walk-through. A document's text forgets what it was
   /// opened over.
   void _clearOverlays() {
     _shelfOpen = false;
@@ -324,21 +306,9 @@ class ShellController extends ChangeNotifier {
     _guide = null;
   }
 
-  /// Takes the chat off the screen, back to the Chats tab. It stays built, so a draft and a
-  /// running answer survive.
-  void closeChat() {
-    if (!_chatOpen) return;
-    _shelfOpen = false;
-    _chatOpen = false;
-    _rightOpen = false;
-    closePopup();
-    notifyListeners();
-  }
-
   /// Shows [tab] with nothing over it.
   void showTab(HomeTab tab) {
     _clearOverlays();
-    _chatOpen = false;
     _rightOpen = false;
     _settingsOpen = tab == HomeTab.settings;
     _settingsPage = null;
@@ -437,7 +407,7 @@ class ShellController extends ChangeNotifier {
 
   /// Goes back from the Settings page shown to the page it is reached from: the Server page, the
   /// list, or what showed under Settings when it opened on the page. From the list, Settings
-  /// closes, back to the Chats tab.
+  /// closes, back to the chat.
   void settingsBack() {
     final page = _settingsPage;
     if (page == null) {

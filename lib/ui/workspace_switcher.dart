@@ -14,7 +14,7 @@ import 'widgets/phone_page.dart';
 import 'widgets/sheet.dart';
 import 'widgets/tappable.dart';
 
-/// The Chats tab's title: the open workspace's name at 26 and a chevron, which open the
+/// The shelf's title: the open workspace's name at 26 and a chevron, which open the
 /// Workspaces sheet. Its documents are heard, not shown.
 class WorkspaceSwitcher extends StatelessWidget {
   const WorkspaceSwitcher({super.key});

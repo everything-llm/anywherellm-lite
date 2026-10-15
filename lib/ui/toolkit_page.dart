@@ -12,7 +12,7 @@ import 'widgets/basics.dart';
 import 'widgets/buttons.dart';
 import 'widgets/phone_page.dart';
 
-/// A page of what the toolkit adds over the Chats tab, such as Library: its title under a round
+/// A page of what the toolkit adds over the chat, such as Library: its title under a round
 /// Back, [action] at the end, and [body] below. It runs [read] once as it opens, so what it shows
 /// is read afresh.
 class ToolkitPageFrame extends StatefulWidget {

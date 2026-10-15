@@ -79,27 +79,26 @@ void main() {
     expect(h.shell.pane.name, 'files');
   });
 
-  testWidgets('the Chats tab leads to the workspace, the chats and Settings', (
+  testWidgets('the shelf leads to the workspace, the chats and Settings', (
     tester,
   ) async {
-    final h = await pumpApp(tester, llm: planningServer(), onChat: false);
+    final h = await pumpApp(tester, llm: planningServer(), shelf: true);
     expect(find.text('Chats'), findsOneWidget);
     expect(find.text('Upcoming'), findsOneWidget);
-    // A chat's More opens its sheet over the tab.
+    // A chat's More opens its sheet over the shelf.
     await tester.tap(control('Rename, pin or delete Budget questions'));
     await tester.pumpAndSettle();
     expect(h.shell.chatSheet?.thread.slug, 'budget');
-    expect(h.shell.chatOpen, isFalse);
+    expect(h.shell.shelfOpen, isTrue);
     h.shell.closePopup();
     await tester.pumpAndSettle();
-    // A chat opens full screen, and Back gives the tab back.
+    // A chat opens, and the shelf goes away.
     await tester.tap(control('Quarter priorities'));
     await tester.pumpAndSettle();
-    expect(h.shell.chatOpen, isTrue);
     expect(h.chat.activeThread, 'priorities');
-    await tester.binding.handlePopRoute();
+    expect(h.shell.shelfOpen, isFalse);
+    h.shell.openShelf();
     await tester.pumpAndSettle();
-    expect(h.shell.chatOpen, isFalse);
     await tester.tap(control('Workspace settings'));
     await tester.pumpAndSettle();
     expect(h.shell.pane.name, 'files');

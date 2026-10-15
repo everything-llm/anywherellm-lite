@@ -23,10 +23,6 @@ const sideKeyboard = 200.0;
 /// The composer's text field.
 Finder get composerField => typingField(find.byType(Composer));
 
-/// Whether the field [field] finds is still the one being typed in.
-bool focused(WidgetTester tester, Finder field) =>
-    tester.widget<EditableText>(field).focusNode.hasFocus;
-
 /// Expects what [finder] finds to lie wholly in the part of [screen] a keyboard [height]
 /// pixels tall leaves.
 void expectAboveKeyboard(
@@ -103,15 +99,14 @@ void main() {
     },
   );
 
-  testWidgets(
-    'the Chats tab on a phone on its side scrolls above the keyboard',
-    (tester) async {
-      await pumpApp(tester, llm: planningServer(), size: side, onChat: false);
-      raiseKeyboard(tester, sideKeyboard);
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-    },
-  );
+  testWidgets('the shelf on a phone on its side scrolls above the keyboard', (
+    tester,
+  ) async {
+    await pumpApp(tester, llm: planningServer(), size: side, shelf: true);
+    raiseKeyboard(tester, sideKeyboard);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'New workspace on a phone on its side keeps its fields above the keyboard',

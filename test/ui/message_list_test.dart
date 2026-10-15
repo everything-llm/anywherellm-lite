@@ -116,7 +116,7 @@ void main() {
     tester,
   ) async {
     final llm = answering(_long)..hold = true;
-    await pumpApp(tester, llm: llm);
+    await pumpApp(tester, enterSends: true, llm: llm);
     await tester.pumpAndSettle();
     await _scrollUp(tester);
 
