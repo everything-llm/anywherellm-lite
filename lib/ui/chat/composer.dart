@@ -166,22 +166,21 @@ class _ComposerState extends State<Composer> {
   /// unless something else was typed meanwhile.
   void _chatChanged() {
     final shown = _chatOnScreen();
-    if (shown != _chatShown && (_held != null || _picking)) {
-      setState(() {
-        _held = null;
-        _picking = false;
-      });
-    }
-    _sendHeld();
     if (shown != _chatShown) {
       _chatShown = shown;
-      if (_attached.isNotEmpty || _problem != null) {
+      if (_held != null ||
+          _picking ||
+          _attached.isNotEmpty ||
+          _problem != null) {
         setState(() {
+          _held = null;
+          _picking = false;
           _attached = const [];
           _problem = null;
         });
       }
     }
+    _sendHeld();
     // Taken only when it can go back: a message taken and not put back would be lost.
     if (widget.draft.text.isEmpty && _attached.isEmpty) {
       if (_scope.chat.takeForComposer() case final back?) {
@@ -303,13 +302,13 @@ class _ComposerState extends State<Composer> {
     _add(added, problems, shown);
   }
 
-  /// Attaches a picture of type [mime] pasted into the message, unless another chat than
-  /// [shown] is on screen by then. Says whether [mime] is a picture a message can carry.
-  bool _pasted(Uint8List bytes, String mime, Object shown) {
+  /// Attaches a picture of type [mime] pasted into the message. Says whether [mime] is a
+  /// picture a message can carry.
+  bool _pasted(Uint8List bytes, String mime) {
     final name = pastedImageName(mime, [for (final a in _attached) a.name]);
     if (name == null) return false;
     final wrong = attachmentProblem(name, bytes.length);
-    _add([if (wrong == null) Attachment.of(name, bytes)], [?wrong], shown);
+    _add([if (wrong == null) Attachment.of(name, bytes)], [?wrong], _chatShown);
     return true;
   }
 
@@ -379,11 +378,7 @@ class _ComposerState extends State<Composer> {
                   listening: _listening,
                   micProblem: _micProblem,
                   onInserted: (content) => switch (content.data) {
-                    final bytes? => _pasted(
-                      bytes,
-                      content.mimeType,
-                      _chatShown,
-                    ),
+                    final bytes? => _pasted(bytes, content.mimeType),
                     null => false,
                   },
                 ),

@@ -47,8 +47,7 @@ class _UploadQueueState extends State<UploadQueue> {
   }
 
   /// Lists [files], each replacing a waiting file of the same name.
-  Future<void> _add(List<UploadFile> files) async {
-    if (!mounted) return;
+  void _add(List<UploadFile> files) {
     setState(() {
       for (final file in files) {
         _remove(file.name);
@@ -92,7 +91,7 @@ class _UploadQueueState extends State<UploadQueue> {
     }
     // The picker may outlast the place it was opened for, as when the server changes.
     if (!mounted) return;
-    await _add([
+    _add([
       for (final file in picked)
         UploadFile(
           name: file.name,
