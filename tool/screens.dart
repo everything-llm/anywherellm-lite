@@ -22,6 +22,7 @@ import 'package:anywherellm/core/toolkit.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/ui/activity.dart' show ActivityOpen;
+import 'package:anywherellm/ui/chat/message_list.dart';
 import 'package:anywherellm/ui/settings/memory_page.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/settings/walkthrough.dart';
@@ -500,6 +501,14 @@ final _screens = <String, _Setup>{
   },
   'budget': (tester, h) => _openChat(tester, h, 'budget'),
   'research': (tester, h) => _openChat(tester, h, 'research'),
+  // Scrolled up from the newest text, with the button that jumps back to it.
+  'scrolled': (tester, h) async {
+    final once = h.llm.histories['research']!;
+    h.llm.histories['research'] = [...once, ...once, ...once];
+    await _openChat(tester, h, 'research');
+    await tester.drag(find.byType(MessageList), const Offset(0, 300));
+    await _settle(tester);
+  },
   'settings': (tester, h) async {
     h.shell.openSettings();
     await _settle(tester);

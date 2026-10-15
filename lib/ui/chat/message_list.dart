@@ -38,7 +38,8 @@ import 'speaker.dart';
 /// grows, and builds only the turns in view. Scrolled up from the newest text, what is in view
 /// stays put while the answer grows below it. Its parent rebuilds it when the chat changes; a
 /// streaming answer rebuilds only itself. Another chat opens at its newest turn, and a message
-/// sent scrolls there.
+/// sent scrolls there. Scrolled up past [_MessageListState._jumpFrom], a round button over the
+/// composer scrolls back to it.
 class MessageList extends StatefulWidget {
   const MessageList({super.key, required this.onSuggest});
 
@@ -58,13 +59,52 @@ class _MessageListState extends State<MessageList> {
   /// How far from the newest text the list may sit and still count as at the bottom.
   static const _atBottom = 8.0;
 
+  /// How far from the newest text the list must sit for the jump button to show.
+  static const _jumpFrom = 48.0;
+
+  /// Whether the list sits more than [_jumpFrom] from the newest text, as its last scroll or
+  /// change of size left it.
+  final _away = ValueNotifier(false);
+
   /// The newest turn's height as last laid out.
   final _newest = _Extent();
 
   @override
   void dispose() {
     _scroll.dispose();
+    _away.dispose();
     super.dispose();
+  }
+
+  /// Follows the list's offset, which a scroll changes and so does the newest turn growing
+  /// while [_HoldPlace] keeps what is in view put. A code block's own sideways scroll is
+  /// deeper and is left out.
+  bool _onScroll(Notification n) {
+    final metrics = switch (n) {
+      ScrollNotification(depth: 0, :final metrics) => metrics,
+      ScrollMetricsNotification(depth: 0, :final metrics) => metrics,
+      _ => null,
+    };
+    if (metrics != null && metrics.axis == Axis.vertical) {
+      _away.value = metrics.pixels > _jumpFrom;
+    }
+    return false;
+  }
+
+  /// Scrolls to the newest text, at once when the device asks for less motion.
+  void _toNewest() {
+    if (!_scroll.hasClients) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _scroll.jumpTo(0);
+      return;
+    }
+    unawaited(
+      _scroll.animateTo(
+        0,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      ),
+    );
   }
 
   /// Whether the newest turn's growth should leave what is in view put rather than push it up:
@@ -166,12 +206,36 @@ class _MessageListState extends State<MessageList> {
         ),
       ],
     );
-    final top = Align(alignment: Alignment.topCenter, child: list);
+    final top = Align(
+      alignment: Alignment.topCenter,
+      child: NotificationListener<Notification>(
+        onNotification: _onScroll,
+        child: list,
+      ),
+    );
     // MessageList is built afresh as the chat changes, so this follows refreshing.
-    return PullRefresh(
-      refreshing: chat.refreshing,
-      onRefresh: chat.refresh,
-      child: top,
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: PullRefresh(
+            refreshing: chat.refreshing,
+            onRefresh: chat.refresh,
+            child: top,
+          ),
+        ),
+        // Centred 8 above the composer, whose own padding puts it 16 above its card.
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 8,
+          child: ValueListenableBuilder(
+            valueListenable: _away,
+            builder: (context, away, _) => away
+                ? Center(child: _JumpButton(onTap: _toNewest))
+                : const SizedBox.shrink(),
+          ),
+        ),
+      ],
     );
   }
 
@@ -200,6 +264,45 @@ class _MessageListState extends State<MessageList> {
                     )
                   : _Answer(turn, retry: i == 0 ? _retryOf(chat) : null),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The round button over the composer that scrolls the chat back to its newest text: 48 across
+/// on [Tokens.panel], inside a [Tokens.line2] edge, floating on a shadow.
+class _JumpButton extends StatelessWidget {
+  const _JumpButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: t.shadow,
+            blurRadius: 24,
+            spreadRadius: -8,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Tappable(
+        label: 'Jump to the newest message',
+        tooltip: 'Jump to the newest message',
+        onTap: onTap,
+        shape: CircleBorder(side: BorderSide(color: t.line2)),
+        color: t.panel,
+        child: SizedBox.square(
+          dimension: 48,
+          child: Center(
+            child: AppIcon('arrowDown', size: IconSize.normal, color: t.ink),
           ),
         ),
       ),

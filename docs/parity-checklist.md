@@ -3,6 +3,11 @@
 ## Tasks, Email & Calendar
 
 - [x] Automated Web Tasks & Bookings: fills multi-step web forms for travel, tables, appointments
+  - [ ] Level 1: fills one form on one page; the page echoes every value
+  - [ ] Level 2: reads a fact off one page and enters it on another
+  - [ ] Level 3: walks a multi-page form where early choices change later options
+  - [ ] Level 4: compares sites, fills a booking up to the last button, asks you to approve
+  - [ ] Level 5: level 4 through a login, a rejected option and a bot check, even after you close the app
 - [ ] Background Task Resolution: finishes tasks after you close the app, pings you for decisions
 - [ ] Email Delegation: reads, sorts, summarizes, drafts, and sends email for you
 - [ ] Meeting & Calendar Coordination: resolves conflicts across calendars, protects focus time
@@ -24,6 +29,11 @@
 ## Interactive Apps, Artifacts & Games
 
 - [x] Live Interactive Apps & Dashboards: builds working mini web apps in chat, like trackers and calculators
+  - [ ] Level 1: builds a one-page calculator that works on the first open
+  - [ ] Level 2: builds a tracker that keeps its entries after a reload
+  - [ ] Level 3: builds a dashboard from data you attach, with a chart and a filter
+  - [ ] Level 4: changes an app you already have on request, and keeps its data
+  - [ ] Level 5: builds an app that refreshes itself from a source and is usable on a phone
 - [ ] Interactive Data Artifacts: builds live spreadsheets, trackers, and dashboards in chat
 - [ ] Dynamic Spreadsheets & Tables: turns raw data into filterable, sortable, editable tables
 - [ ] Embedded Approval Cards: shows UI widgets to review and authorize payments or email sends

@@ -1,5 +1,6 @@
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/errors.dart';
+import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/chat/answer_body.dart';
 import 'package:anywherellm/ui/chat/message_list.dart';
@@ -8,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
+import '../support/fake_settings.dart';
 import '../support/pump.dart';
 
 /// How far the chat is scrolled up from its newest turn.
@@ -128,6 +130,48 @@ void main() {
     }
     expect(_scrolledUp(tester), 0);
     expect(find.text('And then?'), findsOneWidget);
+  });
+
+  testWidgets('scrolled up, a button jumps back to the newest message', (
+    tester,
+  ) async {
+    final llm = answering(_long);
+    await pumpApp(tester, llm: llm);
+    await tester.pumpAndSettle();
+    final jump = control('Jump to the newest message');
+    expect(jump, findsNothing, reason: 'at the newest text it does not show');
+
+    await _scrollUp(tester);
+    expect(jump, findsOneWidget);
+    await tester.tap(jump);
+    await tester.pumpAndSettle();
+    expect(_scrolledUp(tester), 0);
+    expect(jump, findsNothing);
+  });
+
+  testWidgets('a streaming answer that runs past view shows the button', (
+    tester,
+  ) async {
+    final llm = planningServer()..hold = true;
+    final h = await pumpApp(
+      tester,
+      llm: llm,
+      size: const Size(390, 500),
+      prefsStore: FakePrefsStore(
+        const Prefs().withSwitch(ChatSwitch.followAnswer, false),
+      ),
+    );
+    await h.chat.send('Tell me everything.');
+    await tester.pump(const Duration(milliseconds: 300));
+    final jump = control('Jump to the newest message');
+    expect(jump, findsNothing);
+    for (var i = 0; i < 12; i++) {
+      llm.chat!.add(TextChunk('Paragraph $i.\n\n'));
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(jump, findsOneWidget);
+    await llm.chat!.close();
+    await tester.pump(const Duration(milliseconds: 100));
   });
 
   testWidgets('another chat opens at its newest turn', (tester) async {
