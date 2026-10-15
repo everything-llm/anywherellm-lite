@@ -245,6 +245,16 @@ void main() {
       expect(noWorkspace.pinnedIn(_s, 'home'), ['h']);
     });
 
+    test('a deleted workspace takes its switched-off documents with it', () {
+      final off = [OffDoc(path: 'f/a.json', title: 'a')];
+      final prefs = const Prefs()
+          .withOff(_s, 'q3', off)
+          .withOff(_s, 'home', off);
+      final noWorkspace = prefs.withoutWorkspace(_s, 'q3');
+      expect(noWorkspace.offIn(_s, 'q3'), isEmpty);
+      expect(noWorkspace.offIn(_s, 'home'), isNotEmpty);
+    });
+
     test('move with a workspace whose slug changes', () {
       final prefs = const Prefs()
           .withPin(_s, 'q3', 'a', on: true)

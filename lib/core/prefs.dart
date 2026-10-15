@@ -345,11 +345,13 @@ class Prefs {
       ? _with(_with(map, from, const []), to, map[from]!)
       : map;
 
-  /// These prefs with [slug] dropped from the order, and from the last chat when it is on
-  /// [server], as when the workspace is deleted.
+  /// These prefs with [slug] dropped from the order, from the last chat when it is on [server],
+  /// and with its pins, recent chats and switched-off documents forgotten, as when the
+  /// workspace is deleted.
   Prefs withoutWorkspace(String server, String slug) => _copy(
     workspaceOrder: [...workspaceOrder.where((s) => s != slug)],
     lastChat: () => lastChatIn(server, slug) ? null : lastChat,
+    switchedOff: _with(switchedOff, offKey(server, slug), const []),
     pinned: _with(pinned, offKey(server, slug), const []),
     recent: _with(recent, offKey(server, slug), const []),
   );

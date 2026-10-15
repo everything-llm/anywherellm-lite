@@ -634,7 +634,6 @@ class ChatController extends ChangeNotifier {
         for (final w in workspaces)
           if (w.slug != slug) w,
       ];
-      unawaited(_prefs.setOff(slug, const []));
       unawaited(_prefs.forgetWorkspace(slug));
       if (activeSlug == slug) await select(_firstSlug);
     });

@@ -96,13 +96,15 @@ class PrefsController extends ChangeNotifier {
     }
   }
 
-  /// Drops a deleted workspace from the arrangement and the last chat.
+  /// Drops a deleted workspace from the arrangement, the last chat, and what is kept of its
+  /// chats and switched-off documents.
   Future<void> forgetWorkspace(String slug) async {
     final server = _server;
     if (server == null) return;
     if (prefs.workspaceOrder.contains(slug) ||
         prefs.lastChatIn(server, slug) ||
-        prefs.keepsChatsOf(server, slug)) {
+        prefs.keepsChatsOf(server, slug) ||
+        prefs.offIn(server, slug).isNotEmpty) {
       await _change(prefs.withoutWorkspace(server, slug));
     }
   }
