@@ -32,14 +32,8 @@ class SourcesController extends ChangeNotifier {
 
   /// The workspace's documents, switched on first, and how many of them are on.
   List<SourceFile> get files => _files;
-  int get onCount => _onCount;
+  int get onCount => _files.where((f) => f.on).length;
   List<SourceFile> _files = const [];
-  int _onCount = 0;
-
-  void _setFiles(List<SourceFile> files) {
-    _files = files;
-    _onCount = files.where((f) => f.on).length;
-  }
 
   bool loading = false;
 
@@ -96,7 +90,7 @@ class SourcesController extends ChangeNotifier {
     if (_chat.activeSlug == _slug) return;
     _slug = _chat.activeSlug;
     read = null;
-    _setFiles(const []);
+    _files = const [];
     chatMode.value = null;
     problems = const [];
     loading = false;
@@ -148,7 +142,7 @@ class SourcesController extends ChangeNotifier {
 
   void _apply(Workspace workspace) {
     read = workspace;
-    _setFiles(mergeSources(workspace.documents, _prefs.offIn(workspace.slug)));
+    _files = mergeSources(workspace.documents, _prefs.offIn(workspace.slug));
     chatMode.value = ChatMode.fromServer(
       workspace.settings?.values['chatMode'],
     );
@@ -275,11 +269,7 @@ class SourcesController extends ChangeNotifier {
   Future<void> remove(SourceFile file) {
     final server = _chat.server;
     return _change('Could not remove ${file.title}', (slug) async {
-      if (file.on) {
-        await _embed(slug, file, on: false);
-      } else {
-        await _remember(slug, file, off: false);
-      }
+      await _put(slug, file, back: false);
       if (server != _chat.server || slug != _slug) return;
       _clearRemoved();
       removed = file;
@@ -294,14 +284,16 @@ class SourcesController extends ChangeNotifier {
     final file = removed;
     if (file == null) return;
     _clearRemoved();
-    await _change('Could not put ${file.title} back', (slug) async {
-      if (file.on) {
-        await _embed(slug, file, on: true);
-      } else {
-        await _remember(slug, file, off: true);
-      }
-    });
+    await _change(
+      'Could not put ${file.title} back',
+      (slug) => _put(slug, file, back: true),
+    );
   }
+
+  /// Takes [file] out of the workspace's answers, or puts it [back]: a switched-on file by its
+  /// embedding, a switched-off one by the note of it in the prefs.
+  Future<void> _put(String slug, SourceFile file, {required bool back}) =>
+      file.on ? _embed(slug, file, on: back) : _remember(slug, file, off: back);
 
   /// Finds the passages of the switched-on files that [query] would give an answer, as the
   /// workspace's own settings choose them.
@@ -310,20 +302,18 @@ class SourcesController extends ChangeNotifier {
     final server = _chat.server;
     final question = query.trim();
     if (slug == null || question.isEmpty) return;
+    bool current() =>
+        server == _chat.server && slug == _slug && searched == question;
     searched = question;
     searching = true;
     notifyListeners();
     try {
       final found = await _api.searchDocs(slug, question);
-      if (server != _chat.server || slug != _slug || searched != question) {
-        return;
-      }
+      if (!current()) return;
       hits = found;
       problems = const [];
     } on ApiException catch (error) {
-      if (server != _chat.server || slug != _slug || searched != question) {
-        return;
-      }
+      if (!current()) return;
       hits = null;
       problems = [Notice('Could not test the question', error.message)];
     }
