@@ -28,7 +28,7 @@ class AppLinkSyntax extends md.BlockSyntax {
 
   @override
   bool canParse(md.BlockParser parser) =>
-      parser.parentSyntax is! md.BlockquoteSyntax &&
+      parser.parentSyntax == null &&
       parser.current.content.contains(_folder) &&
       super.canParse(parser);
 
@@ -39,9 +39,7 @@ class AppLinkSyntax extends md.BlockSyntax {
   @override
   md.Node? parse(md.BlockParser parser) {
     final paragraph = const md.ParagraphSyntax().parse(parser);
-    return paragraph is md.Element && paragraph.tag == 'p'
-        ? md.Element(appCardTag, [paragraph])
-        : paragraph;
+    return paragraph == null ? null : md.Element(appCardTag, [paragraph]);
   }
 }
 

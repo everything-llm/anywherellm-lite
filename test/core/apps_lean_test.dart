@@ -75,6 +75,22 @@ void main() {
       expect(card('**[Groceries](/apps-lean/q9Z.html)**')!.lines, isEmpty);
     });
 
+    test('is not a list item that opens with the link', () {
+      bool holdsCard(List<md.Node> nodes) => nodes.any(
+        (n) =>
+            n is md.Element &&
+            (n.tag == appCardTag || holdsCard(n.children ?? const [])),
+      );
+      expect(
+        holdsCard(parseAnswer('- [Groceries](/apps-lean/q9Z.html) - Added Tea')),
+        isFalse,
+      );
+      expect(
+        holdsCard(parseAnswer('[Groceries](/apps-lean/q9Z.html) - Added Tea')),
+        isTrue,
+      );
+    });
+
     test('is not any other quote, nor a link in a paragraph', () {
       expect(card('> Groceries: [open](/apps-lean/q9Z.html)'), isNull);
       expect(card('> [Docs](https://evil.test/apps-lean/q9Z.html)'), isNull);
