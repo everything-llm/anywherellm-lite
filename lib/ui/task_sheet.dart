@@ -270,7 +270,7 @@ class _TaskFormState extends State<TaskForm> {
         ? 'Give it a name.'
         : prompt.isEmpty
         ? 'Say what it should do.'
-        : _spec.problem(now);
+        : _spec.problem();
     setState(() => _problem = problem);
     if (problem != null || cron == null) return;
     final done = await scope.toolkit.saveJob(
@@ -309,7 +309,7 @@ class _TaskFormState extends State<TaskForm> {
     final toolkit = scope.toolkit;
     final now = DateTime.now();
     final existing = widget.existing;
-    final problem = _problem ?? _spec.problem(now);
+    final problem = _problem ?? _spec.problem();
     // It scrolls where the keyboard or large text leaves the sheet too short for the form.
     return SingleChildScrollView(
       child: ListenableBuilder(

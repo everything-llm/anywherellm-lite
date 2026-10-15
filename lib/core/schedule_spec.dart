@@ -12,7 +12,7 @@ const minJobGap = 5;
 /// sends: five fields, and a minute field that does not fire more often than every
 /// [minJobGap] minutes.
 String? cronProblem(String text) {
-  final parts = text.trim().split(RegExp(r'\s+'));
+  final parts = cronFields(text);
   if (parts.length != 5 || !parts.every(_field.hasMatch)) {
     return 'A schedule is five fields, such as 0 */6 * * *.';
   }
@@ -98,7 +98,7 @@ class ScheduleSpec {
   /// that is not a time of day or days of the week is a custom one.
   static ScheduleSpec fromCron(String cron, DateTime now) {
     final custom = ScheduleSpec(repeat: Repeat.custom, cron: cron.trim());
-    final parts = cron.trim().split(RegExp(r'\s+'));
+    final parts = cronFields(cron);
     if (parts.length != 5) return custom;
     final [minute, hour, day, month, weekday] = parts;
     final m = int.tryParse(minute);
@@ -125,7 +125,7 @@ class ScheduleSpec {
   }
 
   /// What is wrong with the spec, in plain words, or null when [toCron] has a cron for it.
-  String? problem(DateTime now) {
+  String? problem() {
     switch (repeat) {
       case Repeat.daily:
         return null;
@@ -139,7 +139,7 @@ class ScheduleSpec {
   /// The UTC cron AnythingLLM stores for the spec, as [now]'s clock offset gives it, or null
   /// while [problem] says something is wrong.
   String? toCron(DateTime now) {
-    if (problem(now) != null) return null;
+    if (problem() != null) return null;
     if (repeat == Repeat.custom) return cron.trim();
     // The time of day in UTC as today's offset gives it, and how many days that moves the day.
     final utc = DateTime(now.year, now.month, now.day, hour, minute).toUtc();
@@ -159,7 +159,7 @@ class ScheduleSpec {
   /// A line under the sheet's schedule: when the task runs in the person's own time, and that a
   /// custom cron runs in UTC. Where the clocks change, a time of day moves an hour with them.
   String caption(DateTime now) {
-    final problem = this.problem(now);
+    final problem = this.problem();
     if (problem != null) return problem;
     final time = clockText(DateTime(0, 1, 1, hour, minute));
     final base = switch (repeat) {

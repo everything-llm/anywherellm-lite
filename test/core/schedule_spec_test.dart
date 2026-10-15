@@ -37,10 +37,10 @@ void main() {
   group('what is wrong with a schedule', () {
     test('a weekly task needs a day', () {
       expect(
-        const ScheduleSpec(repeat: Repeat.weekly).problem(now),
+        const ScheduleSpec(repeat: Repeat.weekly).problem(),
         'Pick at least one day.',
       );
-      expect(const ScheduleSpec().problem(now), isNull);
+      expect(const ScheduleSpec().problem(), isNull);
     });
 
     test('a cron is five fields and not more often than every 5 minutes', () {
