@@ -7,7 +7,6 @@
 // It sits outside `test/`, so the suite does not run it.
 
 import 'dart:io';
-import 'dart:ui' as ui;
 
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/prefs.dart';
@@ -17,8 +16,6 @@ import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/type.dart';
 import 'package:anywherellm/ui/widgets/robin_mark.dart';
-import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -26,6 +23,7 @@ import '../test/support/fake_api.dart';
 import '../test/support/fake_toolkit.dart';
 import '../test/support/fake_settings.dart';
 import '../test/support/pump.dart';
+import 'support.dart';
 
 /// A phone's screen in logical pixels, and the density its screenshots are drawn at.
 const _phone = Size(412, 892);
@@ -35,44 +33,12 @@ final _out = Directory(
   Platform.environment['STORE_GRAPHICS'] ?? 'build/store/en-US',
 );
 
-/// Loads the app's own faces, which a test otherwise draws as boxes.
-Future<void> _loadFonts() async {
-  const fonts = {
-    'Instrument Sans': ['InstrumentSans.ttf'],
-    'JetBrains Mono': ['JetBrainsMono.ttf'],
-  };
-  for (final MapEntry(key: family, value: files) in fonts.entries) {
-    final loader = FontLoader(family);
-    for (final file in files) {
-      loader.addFont(
-        File('assets/fonts/$file')
-            .readAsBytes()
-            .then((bytes) => ByteData.sublistView(bytes)),
-      );
-    }
-    await loader.load();
-  }
-}
-
 /// Writes what the window shows to [name], drawn at [density].
 Future<void> _capture(
   WidgetTester tester,
   String name, {
   double density = _density,
-}) async {
-  final view = tester.binding.renderViews.first;
-  final layer = view.debugLayer! as OffsetLayer;
-  await tester.runAsync(() async {
-    final image = await layer.toImage(
-      Offset.zero & view.size,
-      pixelRatio: density,
-    );
-    final png = await image.toByteData(format: ui.ImageByteFormat.png);
-    image.dispose();
-    final file = File('${_out.path}/$name')..parent.createSync(recursive: true);
-    file.writeAsBytesSync(png!.buffer.asUint8List());
-  });
-}
+}) => capture(tester, _out, name, density: density);
 
 /// A server with a few workspaces and a budget chat worth looking at.
 (FakeAnythingLlm, FakeToolkit) _server() {
@@ -215,7 +181,7 @@ class _FeatureGraphic extends StatelessWidget {
 }
 
 void main() {
-  setUpAll(_loadFonts);
+  setUpAll(loadFonts);
 
   testWidgets('the feature graphic', (tester) async {
     tester.view.physicalSize = const Size(1024, 500);

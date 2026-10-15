@@ -9,7 +9,6 @@
 // so the suite does not run it.
 
 import 'dart:io';
-import 'dart:ui' as ui;
 
 import 'package:anywherellm/core/activity.dart';
 import 'package:anywherellm/core/connection.dart';
@@ -29,7 +28,6 @@ import 'package:anywherellm/ui/settings/walkthrough.dart';
 import 'package:anywherellm/ui/share/shared_item.dart';
 import 'package:anywherellm/ui/task_sheet.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -38,40 +36,11 @@ import '../test/support/fake_api.dart';
 import '../test/support/fake_toolkit.dart';
 import '../test/support/fake_settings.dart';
 import '../test/support/pump.dart';
+import 'support.dart';
 
 const _server = 'https://anythingllm.example.ts.net:3001';
 
 final _out = Directory(Platform.environment['SCREENS'] ?? 'build/screens');
-
-/// Loads the app's own faces, which a test otherwise draws as boxes.
-Future<void> _loadFonts() async {
-  const fonts = {
-    'Instrument Sans': 'InstrumentSans.ttf',
-    'JetBrains Mono': 'JetBrainsMono.ttf',
-  };
-  for (final MapEntry(key: family, value: file) in fonts.entries) {
-    final loader = FontLoader(family)
-      ..addFont(
-        File('assets/fonts/$file')
-            .readAsBytes()
-            .then((bytes) => ByteData.sublistView(bytes)),
-      );
-    await loader.load();
-  }
-}
-
-/// Writes what the window shows to [name].
-Future<void> _capture(WidgetTester tester, String name) async {
-  final view = tester.binding.renderViews.first;
-  final layer = view.debugLayer! as OffsetLayer;
-  await tester.runAsync(() async {
-    final image = await layer.toImage(Offset.zero & view.size);
-    final png = await image.toByteData(format: ui.ImageByteFormat.png);
-    image.dispose();
-    final file = File('${_out.path}/$name')..parent.createSync(recursive: true);
-    file.writeAsBytesSync(png!.buffer.asUint8List());
-  });
-}
 
 WorkspaceDoc _doc(FakeAnythingLlm llm, String name, int words, {String? web}) {
   final doc = WorkspaceDoc(
@@ -674,7 +643,7 @@ final _signedOut = <String, _Setup>{
 };
 
 void main() {
-  setUpAll(_loadFonts);
+  setUpAll(loadFonts);
 
   for (final (screens, connected) in [(_screens, true), (_signedOut, false)]) {
     for (final MapEntry(key: name, value: setup) in screens.entries) {
@@ -699,7 +668,7 @@ void main() {
           );
           await _settle(tester);
           await setup(tester, h);
-          await _capture(tester, '$name-${theme.name}.png');
+          await capture(tester, _out, '$name-${theme.name}.png');
           // A fresh app for the next theme.
           await tester.pumpWidget(const SizedBox.shrink());
           await tester.pumpAndSettle();
