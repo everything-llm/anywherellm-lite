@@ -81,7 +81,8 @@ class AnswerBody extends StatelessWidget {
     final border = BorderSide(color: t.line);
     final settings = AppScope.of(context).settings;
     final server = settings.connection?.uri;
-    final linked = linkedImages(text);
+    // Parsing the answer again to find them is only worth it once an image is drawn.
+    Set<Uri>? linked;
     final card = AppCardBuilder(server);
     return TightListMarkdown(
       data: caret ? '$text$caretMark' : text,
@@ -94,7 +95,7 @@ class AnswerBody extends StatelessWidget {
         uri,
         alt: alt,
         server: server,
-        linked: linked.contains(uri),
+        linked: (linked ??= linkedImages(text)).contains(uri),
       ),
       bulletBuilder: (bullet) => listBullet(bullet, body),
       builders: {
