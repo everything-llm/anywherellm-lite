@@ -104,7 +104,7 @@ class _TaskDetailState extends State<TaskDetail> {
             spacing: 16,
             children: [
               if (toolkit.changeProblem case final problem?)
-                AlertBox(AlertKind.bad, problem.title, text: problem.text),
+                AlertBox.notice(AlertKind.bad, problem),
               FieldCard([
                 InfoRow(
                   describeSchedule(job.cron, now),
@@ -320,7 +320,7 @@ class _TaskFormState extends State<TaskForm> {
           spacing: 16,
           children: [
             if (toolkit.changeProblem case final failed?)
-              AlertBox(AlertKind.bad, failed.title, text: failed.text),
+              AlertBox.notice(AlertKind.bad, failed),
             AppField(
               controller: _name,
               label: 'Name',

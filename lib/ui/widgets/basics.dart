@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../layout.dart';
+import '../state/notice.dart';
 import '../tokens.dart';
 import '../type.dart';
 import 'tappable.dart';
@@ -18,6 +19,12 @@ class AlertBox extends StatelessWidget {
     this.action,
     this.plain = false,
   });
+
+  /// A box for [notice]: its title, over what went wrong.
+  AlertBox.notice(this.kind, Notice notice, {super.key, this.action})
+    : title = notice.title,
+      text = notice.text,
+      plain = false;
 
   final AlertKind kind;
   final String title;

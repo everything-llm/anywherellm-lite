@@ -318,7 +318,7 @@ class _KeyCardState extends State<_KeyCard> {
             child: HelpText(note, status: true),
           ),
         if (_settings.keyringProblem case final problem?)
-          AlertBox(AlertKind.warn, problem.title, text: problem.text),
+          AlertBox.notice(AlertKind.warn, problem),
         AppButton(
           saving && !_replacing ? 'Testing…' : 'Test connection',
           onPressed: saving ? null : _test,
@@ -451,7 +451,7 @@ class _KeyCardState extends State<_KeyCard> {
               onPressed: saving ? null : _save,
             ),
             if (_settings.keyringProblem case final problem?)
-              AlertBox(AlertKind.warn, problem.title, text: problem.text),
+              AlertBox.notice(AlertKind.warn, problem),
           ],
         ),
       ],

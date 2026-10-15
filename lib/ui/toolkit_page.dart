@@ -99,7 +99,7 @@ class NotRead extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       spacing: 12,
       children: [
-        AlertBox(AlertKind.warn, problem.title, text: problem.text),
+        AlertBox.notice(AlertKind.warn, problem),
         AppButton(
           'Open Connection',
           onPressed: () => shell

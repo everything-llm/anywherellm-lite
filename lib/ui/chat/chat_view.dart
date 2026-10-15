@@ -61,8 +61,7 @@ class _ChatViewState extends State<ChatView> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 spacing: 8,
                 children: [
-                  for (final n in notices)
-                    AlertBox(AlertKind.bad, n.title, text: n.text),
+                  for (final n in notices) AlertBox.notice(AlertKind.bad, n),
                 ],
               ),
             );

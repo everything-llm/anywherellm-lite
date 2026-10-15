@@ -58,7 +58,7 @@ class _ChatsPageState extends State<ChatsPage> {
           spacing: 16,
           children: [
             if (system.chatsProblem case final problem?)
-              AlertBox(AlertKind.bad, problem.title, text: problem.text),
+              AlertBox.notice(AlertKind.bad, problem),
             if (chats == null)
               if (system.chatsProblem == null)
                 const HelpText('Reading the chats…', status: true)
@@ -87,7 +87,7 @@ class _ChatsPageState extends State<ChatsPage> {
               ]),
             const SubHead('Export'),
             if (system.exportProblem case final problem?)
-              AlertBox(AlertKind.bad, problem.title, text: problem.text),
+              AlertBox.notice(AlertKind.bad, problem),
             ActionRow(alignment: WrapAlignment.start, [
               for (final format in ChatExport.values)
                 AppButton(

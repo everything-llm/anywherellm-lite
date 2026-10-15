@@ -46,8 +46,7 @@ class _ServerSettingsState extends State<ServerSettings> {
           spacing: 20,
           children: [
             ...widget.before,
-            if (problem != null)
-              AlertBox(AlertKind.bad, problem.title, text: problem.text),
+            if (problem != null) AlertBox.notice(AlertKind.bad, problem),
             if (values != null)
               widget.builder(values, system.settingsRevision)
             else if (problem == null)

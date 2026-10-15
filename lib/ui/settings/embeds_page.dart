@@ -47,7 +47,7 @@ class _EmbedsPageState extends State<EmbedsPage> {
           spacing: 20,
           children: [
             if (system.embedProblem case final problem?)
-              AlertBox(AlertKind.bad, problem.title, text: problem.text),
+              AlertBox.notice(AlertKind.bad, problem),
             if (embeds == null)
               HelpText(
                 system.changing ? 'Loading…' : 'The embeds could not be read.',

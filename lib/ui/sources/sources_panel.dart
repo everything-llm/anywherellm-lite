@@ -50,7 +50,7 @@ List<Widget> _notices(BuildContext context) {
     ],
     for (final problem in sources.problems) ...[
       const SizedBox(height: 10),
-      AlertBox(AlertKind.bad, problem.title, text: problem.text),
+      AlertBox.notice(AlertKind.bad, problem),
     ],
     if (sources.removed case final file?) ...[
       const SizedBox(height: 10),

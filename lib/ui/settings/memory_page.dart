@@ -122,7 +122,7 @@ class MemoryPage extends StatelessWidget {
     return [
       if (memory.savedProblem case final problem?) ...[
         const SizedBox(height: 20),
-        AlertBox(AlertKind.bad, problem.title, text: problem.text),
+        AlertBox.notice(AlertKind.bad, problem),
       ],
       if (switches == null) ...[
         if (memory.loading) ...[

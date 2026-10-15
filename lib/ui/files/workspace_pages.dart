@@ -123,11 +123,7 @@ class _WorkspacePagesState extends State<WorkspacePages> {
               for (final problem in _files.problems)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: AlertBox(
-                    AlertKind.bad,
-                    problem.title,
-                    text: problem.text,
-                  ),
+                  child: AlertBox.notice(AlertKind.bad, problem),
                 ),
               Expanded(
                 child: workspace == null

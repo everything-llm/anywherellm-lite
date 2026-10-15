@@ -90,7 +90,7 @@ class UpcomingPage extends StatelessWidget {
       padding: Sizes.pagePadding,
       children: [
         if (toolkit.changeProblem case final problem?) ...[
-          AlertBox(AlertKind.bad, problem.title, text: problem.text),
+          AlertBox.notice(AlertKind.bad, problem),
           const SizedBox(height: 12),
         ],
         if (jobs == null || toolkit.jobsProblem != null)
