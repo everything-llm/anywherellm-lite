@@ -98,13 +98,14 @@ void main() {
           '${again ? ', asked in the same words' : ''}', (tester) async {
         final (h, llm) = await _asking(tester);
         final thread = h.chat.activeThread!;
-        // An agent's closing chunk names no exchange.
+        // AnythingLLM saves an agent's answer before its closing chunk, which names no
+        // exchange.
+        _saved(llm, thread, 'The word game, in English.');
         llm.chat!
           ..add(const TextChunk('The word game, in English.'))
           ..add(const ChatDone([]));
         await llm.chat!.close();
         await tester.pump(const Duration(milliseconds: 300));
-        _saved(llm, thread, 'The word game, in English.');
 
         final second = again ? 'Can you build it in English?' : 'And French?';
         await h.chat.send(second);
@@ -135,6 +136,47 @@ void main() {
         expect(h.chat.working, isFalse);
       });
     }
+
+    testWidgets('a retried agent answer is not taken for the one it replaced', (
+      tester,
+    ) async {
+      final (h, llm) = await _asking(tester);
+      final thread = h.chat.activeThread!;
+      // AnythingLLM saves an agent's answer before its closing chunk, which names no exchange.
+      _saved(llm, thread, 'The word game, in English.');
+      llm.chat!
+        ..add(const TextChunk('The word game, in English.'))
+        ..add(const ChatDone([]));
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      await h.chat.retry();
+      await tester.pump();
+      llm.chat!.addError(_dropped);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump();
+      expect(find.text('Still answering on the server'), findsOneWidget);
+      expect(h.chat.turns.last.waiting, isTrue);
+
+      llm.histories[thread] = [
+        ...llm.histories[thread]!,
+        const ChatMessage(
+          role: Role.user,
+          text: 'Can you build it in English?',
+          chatId: 101,
+        ),
+        const ChatMessage(
+          role: Role.assistant,
+          text: 'A new word game.',
+          chatId: 101,
+        ),
+      ];
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump();
+      expect(find.text('A new word game.'), findsOneWidget);
+      expect(h.chat.finished?.text, 'A new word game.');
+    });
 
     testWidgets('an answer waited for says so when the chat moves on', (
       tester,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' show max;
 
 import 'package:flutter/foundation.dart';
 
@@ -115,6 +116,7 @@ class ChatController extends ChangeNotifier {
     _api,
     turnsOf: (thread) => _turns[thread],
     saved: (slug, thread, saved) {
+      _learnFrom(thread, saved.map((t) => t.chatId));
       _turns[thread] = saved;
       _markFinished(saved.last, slug, thread);
     },
@@ -301,6 +303,7 @@ class ChatController extends ChangeNotifier {
     workspaces = const [];
     _threads.clear();
     _turns.clear();
+    _newest.clear();
     _ready.clear();
     _draft = [];
     bytes.clear();
@@ -463,7 +466,9 @@ class ChatController extends ChangeNotifier {
     final server = _server;
     await _try('Could not read the chat', () async {
       final history = await _api.history(slug, threadSlug);
-      if (_server != server || isAnswering(threadSlug)) return;
+      if (_server != server) return;
+      _learnFrom(threadSlug, history.map((m) => m.chatId));
+      if (isAnswering(threadSlug)) return;
       // An answer the server is still writing is saved only once it ends; until then the chat
       // keeps what it showed, and stays unfinished so it is read again. A finished chat read
       // [again] takes what the server has, though it was cleared or cut short elsewhere.
@@ -544,6 +549,7 @@ class ChatController extends ChangeNotifier {
       if (_server != server) return;
       for (final t in threadsOf(slug)) {
         _turns.remove(t.slug);
+        _newest.remove(t.slug);
         _named.remove(t.slug);
       }
       _threads.remove(slug);
@@ -608,6 +614,7 @@ class ChatController extends ChangeNotifier {
     final list = [...was]..removeAt(at);
     _threads[slug] = list;
     _turns.remove(threadSlug);
+    _newest.remove(threadSlug);
     if (open) {
       _freshDraft();
       await this.open(null);
@@ -694,6 +701,7 @@ class ChatController extends ChangeNotifier {
         // A new server has started afresh: the chat belongs to the old one.
         if (_server != server) return true;
         threadSlug = made.slug;
+        _newest[made.slug] = -1;
         _threads[slug] = [...threadsOf(slug), made];
         _turns[made.slug] = turns;
         if (activeSlug == slug && activeThread == null && _draftGo == draftGo) {
@@ -772,7 +780,7 @@ class ChatController extends ChangeNotifier {
       return _finish(running, error: 'The connection dropped.');
     }
     // Waiting before the run ends, so [working] holds throughout.
-    waits.start(running.answer, running.slug, thread);
+    waits.start(running.answer, running.slug, thread, after: _newest[thread]);
     _finish(running);
   }
 
@@ -789,6 +797,42 @@ class ChatController extends ChangeNotifier {
     running.answer.stopped = true;
     if (running.answer.text.isEmpty) running.answer.text = 'Stopped.';
     _finish(running);
+  }
+
+  /// By chat, the newest exchange the server has saved, when it is known; -1 for a chat with
+  /// none. A dropped answer is the first exchange after it ([AnswerWaits.start]).
+  final _newest = <String, int>{};
+
+  /// Learns chat [thread]'s newest exchange from the [ids] the server gave its history.
+  void _learnFrom(String thread, Iterable<int?> ids) =>
+      _newest[thread] = ids.map((id) => id ?? -1).fold(-1, max);
+
+  /// Keeps chat [thread]'s newest exchange as [running]'s answer leaves it. An answer whose
+  /// closing chunk named its exchange is the newest. One that ran to its end without, as an
+  /// agent's does, is learnt from the history, read once. A stopped or failed one leaves it
+  /// unknown, since the server may still save that answer later; a dropped one is waited for.
+  void _settle(_Running running, String thread, {String? error}) {
+    final answer = running.answer;
+    if (answer.waiting) return;
+    if (answer.chatId case final id?) {
+      _newest[thread] = id;
+      return;
+    }
+    _newest.remove(thread);
+    if (error == null && !answer.stopped) {
+      unawaited(_learnNewest(running.slug, thread));
+    }
+  }
+
+  /// Reads chat [thread]'s history for its newest exchange alone, leaving its turns as they are.
+  Future<void> _learnNewest(String slug, String thread) async {
+    final server = _server;
+    try {
+      final history = await _api.history(slug, thread);
+      if (_server == server) _learnFrom(thread, history.map((m) => m.chatId));
+    } on ApiException {
+      // Still unknown: a dropped answer then falls back to reading its question.
+    }
   }
 
   /// Records [turn] as the last answer that ran to its end, and marks its chat ready unless it
@@ -812,6 +856,7 @@ class ChatController extends ChangeNotifier {
     // An answer in a chat, however it ended, is a use of it, for Recent.
     if (running.thread case final thread?) {
       unawaited(_prefs.useChat(running.slug, thread));
+      _settle(running, thread, error: error);
     }
     running.answer
       ..streaming = false

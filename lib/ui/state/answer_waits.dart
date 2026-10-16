@@ -19,8 +19,9 @@ class _Waiting {
   /// The question [answer] answers, trimmed.
   final String question;
 
-  /// The newest exchange the server had saved when a read did not find the answer yet, or null
-  /// before such a read.
+  /// The newest exchange the server had saved before the answer: as the chat knew it when the
+  /// answer dropped, or else as the first read that did not find the answer saw it; null until
+  /// then.
   int? floor;
 
   /// How many times the chat was read for it so far.
@@ -70,12 +71,13 @@ class AnswerWaits {
   /// Whether chat [thread]'s answer is waited for.
   bool has(String thread) => _waits.containsKey(thread);
 
-  /// Waits for [answer], the last turn of chat [thread] in workspace [slug].
-  void start(Turn answer, String slug, String thread) {
+  /// Waits for [answer], the last turn of chat [thread] in workspace [slug], whose exchange is
+  /// newer than [after], the newest the server had saved before it, when that is known.
+  void start(Turn answer, String slug, String thread, {int? after}) {
     final turns = turnsOf(thread) ?? const [];
     final at = turns.indexOf(answer);
     final question = at > 0 ? turns[at - 1].text.trim() : '';
-    final waiting = _Waiting(answer, slug, thread, question);
+    final waiting = _Waiting(answer, slug, thread, question)..floor = after;
     _waits[thread] = waiting;
     answer.waiting = true;
     _checkLater(waiting);
@@ -160,11 +162,10 @@ class AnswerWaits {
     changed();
   }
 
-  /// Whether [history] ends in [waiting]'s answer. Its last exchange is newer than the newest one
-  /// a read before it found, the [_Waiting.floor]. Before any read found one, the exchange must
-  /// be newer than every one [turns] know, ask [_Waiting.question], and the history must ask it
-  /// as often as [turns] do: an agent answer streamed here has no id, so its exchange can look
-  /// new.
+  /// Whether [history] ends in [waiting]'s answer: its last exchange is newer than the
+  /// [_Waiting.floor]. With none known, the exchange must be newer than every one [turns] know,
+  /// ask [_Waiting.question], and the history must ask it as often as [turns] do: an agent
+  /// answer streamed here has no id, so its exchange can look new.
   static bool _holds(
     _Waiting waiting,
     List<Turn> turns,

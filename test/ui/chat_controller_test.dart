@@ -323,6 +323,26 @@ void main() {
     expect(llm.calls.where((c) => c.startsWith('history')), isEmpty);
   });
 
+  test('an answer that names its exchange costs no read, and one that does not costs one', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    llm.calls.clear();
+    await rig.chat.send('And next quarter?');
+    await pumpEventQueue();
+    expect(llm.calls.where((c) => c.startsWith('history')), isEmpty);
+
+    llm.hold = true;
+    await rig.chat.send('And the one after?');
+    llm.chat!
+      ..add(const TextChunk('Later.'))
+      ..add(const ChatDone([]));
+    await llm.chat!.close();
+    await pumpEventQueue();
+    expect(llm.calls.where((c) => c.startsWith('history')), [
+      'history:${rig.chat.activeThread}',
+    ]);
+  });
+
   test('an agent answer shows its status, then its whole answer', () async {
     final llm = planningServer()..hold = true;
     final rig = await started(llm);
