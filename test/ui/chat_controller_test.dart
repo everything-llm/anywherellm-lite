@@ -353,25 +353,24 @@ void main() {
     expect(rig.chat.activeThread, isNull);
   });
 
-  test(
-    'deleting the chat on screen shows the one beside it, then a draft',
-    () async {
-      final llm = planningServer();
-      final rig = await started(llm);
-      await rig.chat.delete('budget');
-      expect(llm.calls, isNot(contains('deleteThread:budget')));
-      expect(rig.chat.deletedChat, 'Budget questions');
-      expect(rig.chat.activeThread, 'priorities');
-      // A second delete sends the first.
-      await rig.chat.delete('priorities');
-      expect(llm.calls, contains('deleteThread:budget'));
-      expect(rig.chat.activeThread, isNull);
-      expect(rig.chat.threadsOf('q3'), isEmpty);
-      await rig.chat.flushDelete();
-      expect(llm.calls, contains('deleteThread:priorities'));
-      expect(rig.chat.deletedChat, isNull);
-    },
-  );
+  test('deleting the chat on screen shows a new chat in its place', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    await rig.chat.delete('budget');
+    expect(llm.calls, isNot(contains('deleteThread:budget')));
+    expect(rig.chat.deletedChat, 'Budget questions');
+    expect(rig.chat.activeThread, isNull);
+    expect(rig.chat.activeSlug, 'q3');
+    // A second delete sends the first.
+    await rig.chat.open('priorities');
+    await rig.chat.delete('priorities');
+    expect(llm.calls, contains('deleteThread:budget'));
+    expect(rig.chat.activeThread, isNull);
+    expect(rig.chat.threadsOf('q3'), isEmpty);
+    await rig.chat.flushDelete();
+    expect(llm.calls, contains('deleteThread:priorities'));
+    expect(rig.chat.deletedChat, isNull);
+  });
 
   group('an answer ready', () {
     test('marks a chat whose answer ended while another showed', () async {

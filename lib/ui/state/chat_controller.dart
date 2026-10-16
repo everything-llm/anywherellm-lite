@@ -410,8 +410,7 @@ class ChatController extends ChangeNotifier {
   /// none.
   Future<void> select(String? slug, {String? thread}) async {
     activeSlug = slug;
-    _draft = [];
-    _draftGo++;
+    _freshDraft();
     await open(
       thread ?? (slug == null ? null : threadsOf(slug).lastOrNull?.slug),
     );
@@ -454,11 +453,16 @@ class ChatController extends ChangeNotifier {
     });
   }
 
+  /// Empties the draft, so a send or read meant for the one before leaves it alone.
+  void _freshDraft() {
+    _draft = [];
+    _draftGo++;
+  }
+
   /// Starts a draft, unless the chat on screen is already empty.
   void newChat() {
     if (turns.isEmpty) return;
-    _draft = [];
-    _draftGo++;
+    _freshDraft();
     activeThread = null;
     _rememberChat();
     notifyListeners();
@@ -556,8 +560,8 @@ class ChatController extends ChangeNotifier {
 
   /// Takes chat [threadSlug] of the workspace on screen out of the list at once, and deletes it
   /// on the server [undoFor] later, unless [undoDelete] puts it back first. Another delete, or
-  /// [flushDelete], sends the one waiting at once. The chat on screen gives way to the one
-  /// beside it, or a draft.
+  /// [flushDelete], sends the one waiting at once. The chat on screen gives way to a new chat,
+  /// a draft in the same workspace.
   Future<void> delete(String threadSlug) async {
     final slug = activeSlug;
     final server = _server;
@@ -581,10 +585,8 @@ class ChatController extends ChangeNotifier {
     _threads[slug] = list;
     _turns.remove(threadSlug);
     if (open) {
-      _draft = [];
-      await this.open(
-        list.isEmpty ? null : list[at.clamp(0, list.length - 1)].slug,
-      );
+      _freshDraft();
+      await this.open(null);
     } else {
       notifyListeners();
     }
