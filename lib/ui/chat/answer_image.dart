@@ -85,8 +85,8 @@ class _AnswerImageState extends State<AnswerImage> {
   void _read() {
     final chat = AppScope.of(context).chat;
     final loadable = widget.loadable;
-    _now = loadable ? chat.imageNow(widget.uri) : null;
-    _bytes = loadable && _now == null ? chat.imageBytes(widget.uri) : null;
+    _now = loadable ? chat.bytes.imageNow(widget.uri) : null;
+    _bytes = loadable && _now == null ? chat.bytes.image(widget.uri) : null;
   }
 
   /// The image's description, drawn as a link: the host it is not loaded from, or that it did

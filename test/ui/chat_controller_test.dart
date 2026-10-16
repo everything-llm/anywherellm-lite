@@ -180,12 +180,12 @@ void main() {
     final picture = Uri.parse('https://h:3001/pictures/a.png');
     final llm = planningServer()..errors['answerImage'] = Exception('down');
     final rig = await started(llm);
-    await expectLater(rig.chat.imageBytes(picture), throwsException);
+    await expectLater(rig.chat.bytes.image(picture), throwsException);
     llm
       ..errors.remove('answerImage')
       ..images[picture] = [1, 2, 3];
-    expect(await rig.chat.imageBytes(picture), [1, 2, 3]);
-    expect(await rig.chat.imageBytes(picture), [1, 2, 3]);
+    expect(await rig.chat.bytes.image(picture), [1, 2, 3]);
+    expect(await rig.chat.bytes.image(picture), [1, 2, 3]);
     expect(llm.calls.where((c) => c.startsWith('answerImage')), [
       'answerImage:$picture',
       'answerImage:$picture',

@@ -44,7 +44,7 @@ Future<bool> saveMadeFile(BuildContext context, GeneratedFile file) async {
   final where = await saveFile(
     context,
     file.name,
-    () => chat.fileBytes(file),
+    () => chat.bytes.file(file),
     failTitle: 'Could not save ${file.name}',
     report: chat.report,
   );
@@ -54,7 +54,7 @@ Future<bool> saveMadeFile(BuildContext context, GeneratedFile file) async {
 /// Reads [file] and hands it to the system's share sheet, where the device has one.
 Future<void> shareMadeFile(BuildContext context, GeneratedFile file) {
   final chat = AppScope.of(context).chat;
-  return shareFile(context, file.name, () => chat.fileBytes(file));
+  return shareFile(context, file.name, () => chat.bytes.file(file));
 }
 
 /// Save, which asks where to save [file] and saves it, reading Saved once the file is saved.
@@ -180,8 +180,8 @@ class _MadeImageState extends State<_MadeImage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _bytes ??= AppScope.of(context).chat
-        .fileBytes(widget.file)
+    _bytes ??= AppScope.of(context).chat.bytes
+        .file(widget.file)
         .then((bytes) => bytes == null ? null : bytesOf(bytes));
   }
 

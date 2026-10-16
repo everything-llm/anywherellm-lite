@@ -205,7 +205,7 @@ class _GalleryPageState extends State<GalleryPage> {
   /// The picture's bytes, or null when they cannot be read.
   Future<List<int>?> _bytes(Picture picture) async {
     try {
-      return await AppScope.of(context).chat.imageBytes(picture.image);
+      return await AppScope.of(context).chat.bytes.image(picture.image);
     } on ApiException {
       return null;
     }

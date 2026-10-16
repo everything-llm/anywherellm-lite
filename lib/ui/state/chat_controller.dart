@@ -4,9 +4,9 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/chat.dart';
 import '../../core/connection.dart';
-import '../../core/outputs.dart';
 import '../../core/ports.dart';
 import '../../core/server_models.dart';
+import 'answer_bytes.dart';
 import 'fleeting.dart';
 import 'notice.dart';
 import 'prefs_controller.dart';
@@ -71,24 +71,6 @@ class _Waiting {
   Future<void>? reading;
 
   void cancel() => next?.cancel();
-}
-
-/// One read of an answer image: its bytes as they are read, and [done] once they are.
-class _ImageRead {
-  _ImageRead(Uri url, ChatController chat) {
-    bytes = chat._api
-        .answerImage(url)
-        .then(
-          (value) => done = value,
-          onError: (Object error, StackTrace stack) {
-            if (identical(chat._images[url], this)) chat._images.remove(url);
-            Error.throwWithStackTrace(error, stack);
-          },
-        );
-  }
-
-  late final Future<Uint8List> bytes;
-  Uint8List? done;
 }
 
 /// The workspaces and their chats, the chat on screen, and the answers running.
@@ -203,14 +185,8 @@ class ChatController extends ChangeNotifier {
 
   late final _link = Fleeting<Notice>(linkNoticeFor, (_) => notifyListeners());
 
-  /// The bytes of each file an agent made, by storage name, read once per server.
-  final Map<String, Future<List<int>?>> _madeFiles = {};
-
-  /// The [imagesKept] images in an answer read last, by address, oldest first.
-  final Map<Uri, _ImageRead> _images = {};
-
-  /// How many answer images [imageBytes] keeps.
-  static const imagesKept = 12;
+  /// The files and images answers show, read once per server.
+  late final bytes = AnswerBytes(_api, report: report);
 
   static const linkNoticeFor = Duration(seconds: 6);
 
@@ -343,8 +319,7 @@ class ChatController extends ChangeNotifier {
     _turns.clear();
     _ready.clear();
     _draft = [];
-    _madeFiles.clear();
-    _images.clear();
+    bytes.clear();
     docCounts.clear();
     loading = false;
     unreachable.value = false;
@@ -944,40 +919,6 @@ class ChatController extends ChangeNotifier {
       for (final t in threadsOf(slug)) t.slug == thread.slug ? thread : t,
     ];
     notifyListeners();
-  }
-
-  /// The bytes of [file], which an agent made with an answer, read once; null when they could
-  /// not be read, and why shows as [problem]. A failed read is tried again next time.
-  Future<List<int>?> fileBytes(GeneratedFile file) =>
-      _madeFiles[file.storageName] ??= _readFile(file);
-
-  Future<List<int>?> _readFile(GeneratedFile file) async {
-    final server = _server;
-    try {
-      return await _api.generatedFile(file.storageName);
-    } on ApiException catch (error) {
-      _madeFiles.remove(file.storageName);
-      if (_server == server) {
-        report('Could not get ${file.name}', error.message);
-      }
-      return null;
-    }
-  }
-
-  /// The bytes of the image at [url] in an answer, read once per server. Fails with
-  /// [ApiException], and a failed read is tried again next time.
-  Future<Uint8List> imageBytes(Uri url) => _imageRead(url).bytes;
-
-  /// The bytes of the image at [url] when a read of it has already ended, else null.
-  Uint8List? imageNow(Uri url) =>
-      _images.containsKey(url) ? _imageRead(url).done : null;
-
-  /// The read of the image at [url], started when there is none, and now the newest kept.
-  _ImageRead _imageRead(Uri url) {
-    final read = _images.remove(url) ?? _ImageRead(url, this);
-    _images[url] = read;
-    if (_images.length > imagesKept) _images.remove(_images.keys.first);
-    return read;
   }
 
   /// Shows [text] as [problem], titled [title].

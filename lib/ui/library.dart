@@ -159,7 +159,7 @@ class _FileRowState extends State<_FileRow> {
   Future<void> _open() async {
     final scope = AppScope.of(context);
     final file = widget.item.file;
-    final bytes = await scope.chat.fileBytes(file);
+    final bytes = await scope.chat.bytes.file(file);
     if (!mounted || bytes == null) return;
     setState(() => _bytes = bytesOf(bytes));
     scope.shell.togglePopup(file);
