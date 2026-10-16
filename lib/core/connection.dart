@@ -140,7 +140,9 @@ final _v6LinkLocal = RegExp(r'^fe[89ab][0-9a-f]?:');
 /// `localhost`, a name with no dot (a home network's, such as `nas`), a name under `.local`,
 /// `.lan`, `.home.arpa` or `.ts.net`, an IPv4 address in `127/8`, `10/8`, `172.16/12`,
 /// `192.168/16`, `169.254/16` or `100.64/10` (Tailscale's), or an IPv6 address that is `::1`,
-/// unique-local (`fc00::/7`) or link-local (`fe80::/10`).
+/// unique-local (`fc00::/7`) or link-local (`fe80::/10`). An IPv4 address counts only as four
+/// plain decimal parts: a name a resolver may read as another address, such as `134744072`,
+/// `010.0.0.1` or `10.1`, is not private.
 bool isPrivateHost(String host) {
   final name = host.toLowerCase().replaceFirst(_trailingDot, '');
   if (isLoopback(name)) return true;
@@ -148,25 +150,38 @@ bool isPrivateHost(String host) {
     final v6 = name.replaceAll(_v6Brackets, '');
     return _v6UniqueLocal.hasMatch(v6) || _v6LinkLocal.hasMatch(v6);
   }
-  final parts = name.split('.');
-  final octets = [for (final part in parts) int.tryParse(part)];
-  if (parts.length == 4 &&
-      octets.every((o) => o != null && o >= 0 && o <= 255)) {
-    final [a, b, _, _] = [for (final o in octets) o!];
+  if (_ipv4(name) case [final a, final b, _, _]) {
     return a == 10 ||
         (a == 172 && b >= 16 && b <= 31) ||
         (a == 192 && b == 168) ||
         (a == 169 && b == 254) ||
         (a == 100 && b >= 64 && b <= 127);
   }
+  if (_numeric.hasMatch(name)) return false;
   return !name.contains('.') ||
       const ['.local', '.lan', '.home.arpa', '.ts.net'].any(name.endsWith);
 }
 
-/// Whether [host] names the machine it is used on: `localhost`, `127.x.x.x`, `::1` or
-/// `0.0.0.0`.
+final _octet = RegExp(r'^(?:0|[1-9]\d{0,2})$');
+
+/// A name some resolver reads as an IPv4 address in a form other than four decimal parts: digits,
+/// hex and dots, or a number alone, such as `134744072`, `0x7f000001` or `10.1`.
+final _numeric = RegExp(
+  r'^(?:0x[0-9a-f]*|\d+)(?:\.(?:0x[0-9a-f]*|\d*))*$|^[+-]',
+);
+
+/// [name]'s four octets when it is an IPv4 address written as four plain decimal parts, or null.
+List<int>? _ipv4(String name) {
+  final parts = name.split('.');
+  if (parts.length != 4 || !parts.every(_octet.hasMatch)) return null;
+  final octets = [for (final part in parts) int.parse(part)];
+  return octets.every((o) => o <= 255) ? octets : null;
+}
+
+/// Whether [host] names the machine it is used on: `localhost`, an IPv4 address in `127/8`,
+/// `::1` or `0.0.0.0`.
 bool isLoopback(String host) =>
     host == 'localhost' ||
-    host.startsWith('127.') ||
+    _ipv4(host)?.first == 127 ||
     host == '::1' ||
     host == '0.0.0.0';

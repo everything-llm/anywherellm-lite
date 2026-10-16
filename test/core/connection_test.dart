@@ -63,6 +63,46 @@ void main() {
       }
     });
 
+    test('a public host that looks private is refused', () {
+      for (final public in [
+        '127.evil.example',
+        '10.0.0.1.nip.io',
+        '134744072',
+        '0x7f000001',
+        '010.0.0.1',
+        '0x0a.0.0.1',
+        '10.1',
+        '127.1',
+        '+10.0.0.1',
+        '10.0.0.256',
+      ]) {
+        expect(isPrivateHost(public), isFalse, reason: public);
+      }
+      for (final home in [
+        '127.0.0.1',
+        '0.0.0.0',
+        '10.0.0.1',
+        '100.64.0.1',
+        'nas',
+        'nas.local',
+        'fd00::1',
+      ]) {
+        expect(isPrivateHost(home), isTrue, reason: home);
+      }
+      expect(isLoopback('127.evil.example'), isFalse);
+      expect(isLoopback('127.0.0.1'), isTrue);
+      expect(
+        () => normalizeBaseUrl('http://127.evil.example:3001'),
+        throwsA(
+          isA<ApiException>().having(
+            (e) => e.message,
+            'message',
+            plainHttpRefused,
+          ),
+        ),
+      );
+    });
+
     test('empty is refused', () {
       expect(() => normalizeBaseUrl('  '), throwsA(isA<ApiException>()));
     });
