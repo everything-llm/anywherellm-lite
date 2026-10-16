@@ -23,13 +23,13 @@ The web UI's own endpoints sign in with a session token, not the developer key, 
 
 | Gap | Why the developer API cannot do it |
 | --- | --- |
-| A model picker | `GET /v1/openai/models` lists the workspaces, not a provider's models (settled against v1.16.2's source on 2026-10-07). The web UI lists a provider's models with `POST /api/system/custom-models` (`provider`, `apiKey`, `basePath`), which takes the web login; a bridge rule `POST /system/custom-models` would pass it. Until then the model is a free-text field: in the workspace's Chat model picker, on Settings' AI provider pages and in Server settings as JSON and `settings.json`. |
+| A model picker | `GET /v1/openai/models` lists the workspaces, not a provider's models (settled against v1.16.2's source on 2026-10-07). The web UI lists a provider's models with `POST /api/system/custom-models` (`provider`, `apiKey`, `basePath`), which takes the web login; a bridge rule `POST /system/custom-models` would pass it. Until then the model is a free-text field in the workspace's Chat model picker. |
 | Fork a chat from a message | No fork call. |
 | Delete one message | `DELETE /system/workspace-chats/:id` deletes one stored chat, but the app deletes exchanges only as Edit and Retry do, from an id on. |
 | Reset Vector Database | Not in `/v1`. Detaching every document is the nearest equivalent. |
 | Default system prompt for new workspaces | Not in `/v1`. New workspace sets a prompt for the one workspace it makes, through `workspace/new`'s `openAiPrompt`. |
 | Custom system prompt variables | Adding, editing and deleting them is not in `/v1`. The server fills the built-in ones on every answer. |
-| Clear Chats | Not in `/v1`. Listing and exporting every chat are on Settings' Workspace chats page. |
+| Clear Chats | Not in `/v1`. |
 | Suggested chat messages | Not in `/v1`. |
 | Make, edit or delete a slash-command preset | No `/v1` call writes presets. |
 
@@ -41,7 +41,7 @@ The web UI's own endpoints sign in with a session token, not the developer key, 
 
 ## Out of scope
 
-Instance administration beyond what Settings writes to the server's `.env` stays in the web UI: switching the vector database (it deletes every vector), the server's password and signing secret, making and editing Scheduled Jobs without the toolkit (Upcoming changes them only where the toolkit's bridge passes their routes, and lists them read-only where it passes only the reads), a job's tools, Event Logs, Model Router, Telegram, Branding, the Community Hub, Developer API keys, multi-user mode and password protection, the Browser Extension and AnythingLLM Mobile pairing, and the web UI's display language (the app has no translations).
+Instance administration stays in the web UI, which Settings' Server page opens: the server's providers and models, voice and transcription, website chat widgets, listing and exporting every chat, its settings beyond anonymous telemetry, switching the vector database (it deletes every vector), the server's password and signing secret, making and editing Scheduled Jobs without the toolkit (Upcoming changes them only where the toolkit's bridge passes their routes, and lists them read-only where it passes only the reads), a job's tools, Event Logs, Model Router, Telegram, Branding, the Community Hub, Developer API keys, multi-user mode and password protection, the Browser Extension and AnythingLLM Mobile pairing, and the web UI's display language (the app has no translations).
 
 Since the app was simplified to AnywhereLLM Lite, a phone chat client rather than an admin console, these stay in the web UI as well: the agent's skills, flows, app integrations and MCP servers; users and invites; signing in to a multi-user server (such a server takes a pasted key); and the server's own text-to-speech, since answers are read aloud on the device.
 

@@ -2,9 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:anywherellm/core/chat.dart';
-import 'package:anywherellm/core/chat_log.dart';
 import 'package:anywherellm/core/connection.dart';
-import 'package:anywherellm/core/embeds.dart';
 import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
@@ -78,12 +76,6 @@ class FakeAnythingLlm implements AnythingLlmApi {
     'EmbeddingEngine': 'native',
     'VectorDB': 'lancedb',
   };
-
-  /// The server's chat embeds.
-  List<Embed> embedList = [];
-
-  /// The chats each embed has held, by uuid.
-  final Map<String, List<EmbedChat>> embedChatsOf = {};
 
   /// What [vectorCount] answers.
   int vectors = 796;
@@ -375,26 +367,6 @@ class FakeAnythingLlm implements AnythingLlmApi {
     '$slug:$query',
   );
 
-  /// What [exportChats] answers, for any format.
-  String exported = '{"prompt":"hi"}';
-
-  @override
-  Future<List<int>> exportChats(ChatExport format) =>
-      _run('exportChats', () => exported.codeUnits, format.name);
-
-  /// What [workspaceChats] pages through, newest first.
-  List<LoggedChat> chatLog = [];
-
-  @override
-  Future<ChatLog> workspaceChats({int page = 0}) => _run('workspaceChats', () {
-    const size = ChatLog.pageSize;
-    final start = page * size;
-    return ChatLog(
-      chatLog.skip(start).take(size).toList(),
-      more: chatLog.length > start + size,
-    );
-  }, '$page');
-
   /// Writes each change into [system]; a secret, which the server reports only as set, becomes
   /// true.
   @override
@@ -406,54 +378,6 @@ class FakeAnythingLlm implements AnythingLlmApi {
             key: system[key] is bool ? true : value,
         };
       }, changes.keys.join(','));
-
-  @override
-  Future<List<Embed>> embeds() => _run('embeds', () => [...embedList]);
-
-  /// Makes the embed with a uuid counting up, for the workspace whose slug it was given.
-  @override
-  Future<String> createEmbed(NewEmbed embed) => _run('createEmbed', () {
-    final uuid = 'embed-${embedList.length + 1}';
-    embedList = [
-      ...embedList,
-      Embed(
-        uuid: uuid,
-        workspace: spaces.firstWhere((w) => w.slug == embed.workspaceSlug).name,
-        mode: embed.mode,
-        enabled: true,
-      ),
-    ];
-    return uuid;
-  }, embed.workspaceSlug);
-
-  @override
-  Future<void> updateEmbed(String uuid, {bool? enabled, EmbedMode? mode}) =>
-      _run('updateEmbed', () {
-        embedList = [
-          for (final e in embedList)
-            e.uuid == uuid
-                ? Embed(
-                    uuid: uuid,
-                    workspace: e.workspace,
-                    mode: mode ?? e.mode,
-                    enabled: enabled ?? e.enabled,
-                    chats: e.chats,
-                  )
-                : e,
-        ];
-      }, uuid);
-
-  @override
-  Future<void> deleteEmbed(String uuid) => _run('deleteEmbed', () {
-    embedList = [
-      for (final e in embedList)
-        if (e.uuid != uuid) e,
-    ];
-  }, uuid);
-
-  @override
-  Future<List<EmbedChat>> embedChats(String uuid) =>
-      _run('embedChats', () => embedChatsOf[uuid] ?? const [], uuid);
 
   @override
   Future<int> vectorCount() => _run('vectorCount', () => vectors);

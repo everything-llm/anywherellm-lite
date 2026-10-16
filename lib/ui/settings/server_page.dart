@@ -6,8 +6,6 @@ import '../../core/system_settings.dart';
 import '../app_scope.dart';
 import '../links.dart';
 import '../state/system_controller.dart';
-import '../widgets/basics.dart';
-import '../widgets/buttons.dart';
 import '../widgets/phone_page.dart';
 import 'rows.dart';
 import 'server_settings.dart';
@@ -37,8 +35,8 @@ String serverSummary(SystemController system) {
   ].join(' · ');
 }
 
-/// The Server page: what AnythingLLM runs with, the pages in four groups, each row showing its
-/// value and opening the page that changes it, then a way to AnythingLLM's own web page.
+/// The Server page, read only: what AnythingLLM runs with, Privacy and data, then a row that
+/// opens AnythingLLM's own web page, where every one of these is changed.
 class ServerPage extends StatefulWidget {
   const ServerPage({super.key});
 
@@ -59,72 +57,61 @@ class _ServerPageState extends State<ServerPage> {
 
   @override
   Widget build(BuildContext context) {
-    return ServerSettings(builder: (values, _) => _page(context, values));
+    return ServerSettings(builder: (values) => _page(context, values));
   }
 
-  /// Four groups of rows, each with what the server is set to, then a way to AnythingLLM's web
-  /// page.
+  /// Running on your server, then Your data, then the web page.
   Widget _page(BuildContext context, Map<String, Object?> values) {
     final scope = AppScope.of(context);
-    final shell = scope.shell;
     final vectors = scope.system.vectors;
     final speech = _chosen(speechToTextProviders, values);
     final speaking = _chosen(textToSpeechProviders, values);
-    Widget row(SettingsPage page, [String? value]) => NavRow(
-      title: page.label,
-      about: value,
-      onTap: () => shell.showSettingsPage(page),
-    );
-    Widget group(String label, List<Widget> rows) => Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 6,
-      children: [SectionLabel(label), FieldCard(rows)],
-    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 18,
       children: [
-        group('Answers', [
-          row(SettingsPage.chatModel, _chatModel(values)),
-          row(SettingsPage.searchModel, _chosen(embedderProviders, values)),
-          row(
-            SettingsPage.storage,
-            [
+        const CardHeading('Running on your server', top: 0),
+        FieldCard([
+          InfoRow('Chat model', about: _chatModel(values)),
+          InfoRow(
+            'Document search model',
+            about: _chosen(embedderProviders, values),
+          ),
+          InfoRow(
+            'Document storage',
+            about: [
               _chosen(vectorProviders, values),
               if (vectors != null) plural(vectors, 'passage', 'passages'),
             ].join(' \u00b7 '),
           ),
-          // An image provider that is not chosen is not set up.
-          row(
-            SettingsPage.images,
-            settingText(values, imageProviders.chooser).isEmpty
-                ? 'None'
-                : _chosen(imageProviders, values),
+          InfoRow(
+            'Transcription',
+            about: _chosen(transcriptionProviders, values),
+          ),
+          InfoRow(
+            'Voice and speech',
+            about: speech == speaking ? speech : '$speech \u00b7 $speaking',
           ),
         ]),
-        group('Files and voice', [
-          row(
-            SettingsPage.transcription,
-            _chosen(transcriptionProviders, values),
-          ),
-          row(
-            SettingsPage.voice,
-            speech == speaking ? speech : '$speech \u00b7 $speaking',
+        const CardHeading('Your data'),
+        FieldCard([
+          NavRow(
+            title: SettingsPage.privacy.label,
+            about: 'Where your questions go',
+            onTap: () => scope.shell.showSettingsPage(SettingsPage.privacy),
           ),
         ]),
-        group('Data', [
-          row(SettingsPage.chats),
-          row(SettingsPage.embeds),
-          row(SettingsPage.privacy),
-        ]),
-        group('Advanced', [row(SettingsPage.json)]),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: AppButton(
-            'Open AnythingLLM\'s web page',
-            onPressed: () => openServerPage(context),
+        const SizedBox(height: 20),
+        FieldCard([
+          NavRow(
+            title: 'Open AnythingLLM\'s web page',
+            about:
+                'Change models, voice, widgets, chat exports and advanced settings there',
+            aboutLines: 2,
+            end: 'external',
+            accent: true,
+            onTap: () => openServerPage(context),
           ),
-        ),
+        ]),
       ],
     );
   }

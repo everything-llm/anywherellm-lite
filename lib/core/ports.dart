@@ -2,10 +2,8 @@ import 'dart:typed_data';
 
 import 'activity.dart';
 import 'chat.dart';
-import 'chat_log.dart';
 import 'companion.dart';
 import 'connection.dart';
-import 'embeds.dart';
 import 'library.dart';
 import 'memory.dart';
 import 'prefs.dart';
@@ -108,12 +106,6 @@ abstract interface class AnythingLlmApi {
   /// workspace's own number and threshold, as an answer would get them.
   Future<List<SearchHit>> searchDocs(String slug, String query);
 
-  /// Every chat on the server, in [format], as the file's bytes.
-  Future<List<int>> exportChats(ChatExport format);
-
-  /// Page [page] of every chat the server recorded, newest first, [ChatLog.pageSize] a page.
-  Future<ChatLog> workspaceChats({int page = 0});
-
   /// The bytes of a file or image an agent made, by the [storageName] the server gave it.
   Future<List<int>> generatedFile(String storageName);
 
@@ -129,20 +121,6 @@ abstract interface class AnythingLlmApi {
 
   /// How many vectors the server's vector database holds, across every workspace.
   Future<int> vectorCount();
-
-  /// The server's chat embeds.
-  Future<List<Embed>> embeds();
-
-  /// Makes a chat embed, and returns its uuid.
-  Future<String> createEmbed(NewEmbed embed);
-
-  /// Changes embed [uuid]: whether it is on, and the mode it answers in.
-  Future<void> updateEmbed(String uuid, {bool? enabled, EmbedMode? mode});
-
-  Future<void> deleteEmbed(String uuid);
-
-  /// The chats embed [uuid] has held, in the server's order.
-  Future<List<EmbedChat>> embedChats(String uuid);
 }
 
 /// A [Companion]: a server that may run beside AnythingLLM on its host and takes the same

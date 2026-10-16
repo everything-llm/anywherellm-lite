@@ -1,4 +1,3 @@
-import 'package:anywherellm/core/chat_log.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
@@ -32,23 +31,10 @@ Finder control(String label) => find.descendant(
 const phone = Size(360, 640);
 
 void main() {
-  testWidgets('a provider page folds the fields that are rarely changed', (
-    tester,
-  ) async {
-    final h = await pumpApp(tester, llm: planningServer());
-    h.shell.openSettings(SettingsPage.chatModel);
-    await tester.pumpAndSettle();
-    final fold = find.textContaining('Advanced (');
-    expect(fold, findsOneWidget);
-    expect(find.text('Longest answer'), findsNothing);
-    await tapShown(tester, fold);
-    expect(find.text('Context window'), findsOneWidget);
-  });
-
   testWidgets('with no server, only this device\'s pages show', (tester) async {
     final h = await pumpApp(tester, llm: planningServer(), connection: null);
     // A server's page opens on connecting instead.
-    h.shell.openSettings(SettingsPage.chatModel);
+    h.shell.openSettings(SettingsPage.server);
     await tester.pumpAndSettle();
     expect(control('Connect'), findsOneWidget);
     h.shell.openSettings();
@@ -75,13 +61,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(h.shell.settingsOpen, isTrue);
     expect(h.shell.settingsPage, isNull);
-    // Server lists the server's pages, and each goes back to it.
+    // Server opens Privacy and data, which goes back to it.
     await tapVisible(tester, find.text('Server', skipOffstage: false));
     await tester.pumpAndSettle();
     expect(h.shell.settingsPage, SettingsPage.server);
-    await tester.tap(find.text('Chat model'));
+    await tapVisible(tester, find.text('Privacy and data'));
     await tester.pumpAndSettle();
-    expect(h.shell.settingsPage, SettingsPage.chatModel);
+    expect(h.shell.settingsPage, SettingsPage.privacy);
     await tester.tap(find.byTooltip('Back to Server'));
     await tester.pumpAndSettle();
     expect(h.shell.settingsPage, SettingsPage.server);
@@ -247,55 +233,29 @@ void main() {
     expect(find.text('Saved'), findsWidgets);
   });
 
-  testWidgets('workspace chats show a page, then more, and export', (
-    tester,
-  ) async {
-    final llm = planningServer()
-      ..chatLog = [
-        for (var i = 25; i > 0; i--)
-          LoggedChat(workspace: 'Household', question: 'Question $i'),
-      ];
-    final h = await pumpApp(tester, llm: llm, size: const Size(740, 900));
-    h.saveChosen = false;
-    h.shell.openSettings(SettingsPage.chats);
-    await tester.pumpAndSettle();
-    expect(find.text('Question 25'), findsOneWidget);
-    expect(find.text('Question 1'), findsNothing);
-    expect(find.text('PROMPT'), findsOneWidget);
-    final xs = [
-      for (final label in ['CSV', 'JSON', 'JSONL', 'JSON (Alpaca)'])
-        tester.getTopLeft(control(label)).dx,
-    ];
-    expect(xs, [...xs]..sort(), reason: 'the export buttons in that order');
-    await tapVisible(tester, control('Show more'));
-    await tester.pumpAndSettle();
-    expect(find.text('Question 1'), findsOneWidget);
-    expect(control('Show more'), findsNothing);
-    await tapVisible(tester, control('JSON'));
-    await tester.pumpAndSettle();
-    expect(llm.calls, isNot(contains(startsWith('exportChats'))));
-    h.saveChosen = true;
-    await tapVisible(tester, control('JSON'));
-    await tester.pumpAndSettle();
-    expect(
-      String.fromCharCodes(h.saved['anythingllm-chats.json']!),
-      llm.exported,
-    );
-    expect(find.text('Saved to /saved/anythingllm-chats.json'), findsOneWidget);
-  });
-
-  testWidgets('an export that cannot be saved says why on the page', (
-    tester,
-  ) async {
-    final h = await pumpApp(tester, llm: planningServer());
-    h.saveThrows = Exception('Disk full');
-    h.shell.openSettings(SettingsPage.chats);
-    await tester.pumpAndSettle();
-    await tapVisible(tester, control('CSV'));
-    await tester.pumpAndSettle();
-    expect(find.text('Could not save the chats'), findsOneWidget);
-    expect(find.text('Disk full'), findsOneWidget);
-  });
+  testWidgets(
+    'the Server page says what the server runs with and opens its web page',
+    (tester) async {
+      final llm = planningServer();
+      final h = await pumpApp(tester, llm: llm, size: phone);
+      h.shell.openSettings(SettingsPage.server);
+      await tester.pumpAndSettle();
+      for (final row in [
+        'Chat model',
+        'Document search model',
+        'Document storage',
+        'Transcription',
+        'Voice and speech',
+      ]) {
+        expect(find.text(row, skipOffstage: false), findsOneWidget);
+      }
+      expect(find.text('Image generation', skipOffstage: false), findsNothing);
+      expect(find.text('Where your questions go'), findsOneWidget);
+      await tapVisible(tester, find.text("Open AnythingLLM's web page"));
+      await tester.pumpAndSettle();
+      expect(h.opened, [sampleConnection.uri]);
+    },
+  );
 
   testWidgets("a phone's Settings opens on the server, which it can test", (
     tester,

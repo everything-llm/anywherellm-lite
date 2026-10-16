@@ -11,14 +11,10 @@ import '../tokens.dart';
 import '../type.dart';
 import '../widgets/phone_page.dart';
 import '../widgets/sheet.dart';
-import 'chats_page.dart';
 import 'connection_page.dart';
 import 'device_pages.dart';
-import 'embeds_page.dart';
-import 'json_page.dart';
 import 'memory_page.dart';
 import 'privacy_page.dart';
-import 'provider_page.dart';
 import 'rows.dart';
 import 'server_page.dart';
 import 'settings_pages.dart';
@@ -340,32 +336,6 @@ class _PageView extends StatelessWidget {
     SettingsPage.memory => const MemoryPage(),
     SettingsPage.appearance => const AppearancePage(),
     SettingsPage.chat => const ChatPage(),
-    SettingsPage.chatModel => ProviderPage(
-      providerPages[page]!,
-      fieldsNote: 'These fields change with the provider.',
-    ),
-    SettingsPage.searchModel => ProviderPage(
-      providerPages[page]!,
-      before: const [SearchModelWarning()],
-    ),
-    SettingsPage.storage => ProviderPage(
-      providerPages[page]!,
-      lead: const [StoredPassages()],
-    ),
-    SettingsPage.voice => ProviderPage(
-      providerPages[page]!,
-      after: const [
-        PageNote(
-          'Read aloud and dictation in AnywhereLLM use the device\'s own engines, whatever '
-          'is set here.',
-        ),
-      ],
-    ),
-    SettingsPage.images ||
-    SettingsPage.transcription => ProviderPage(providerPages[page]!),
-    SettingsPage.chats => const ChatsPage(),
-    SettingsPage.embeds => const EmbedsPage(),
     SettingsPage.privacy => const PrivacyPage(),
-    SettingsPage.json => const JsonPage(),
   };
 }

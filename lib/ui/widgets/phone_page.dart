@@ -79,28 +79,36 @@ class PhonePageHeader extends StatelessWidget {
 }
 
 /// A row that opens another page: an [icon] at 24, [title], the line [about] under it, and a
-/// chevron.
+/// chevron, or the [end] icon in its place.
 class NavRow extends StatelessWidget {
   const NavRow({
     super.key,
     required this.title,
     required this.onTap,
     this.about,
+    this.aboutLines = 1,
     this.heard,
     this.icon,
-    this.chevron = true,
+    this.end = 'chevron',
+    this.accent = false,
     this.selected,
   });
 
   final String title;
   final String? about;
+
+  /// How many lines [about] may take before it is cut short.
+  final int aboutLines;
   final VoidCallback? onTap;
 
   /// An icon before [title], as Settings' rows have.
   final String? icon;
 
-  /// Whether the row ends in a chevron.
-  final bool chevron;
+  /// The icon the row ends in, such as `external` for a page outside the app, or none.
+  final String? end;
+
+  /// Whether [title] is in the accent, as a link out of the app is.
+  final bool accent;
 
   /// What a screen reader hears, when it says more than [title] and [about].
   final String? heard;
@@ -131,21 +139,29 @@ class NavRow extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: Type.sans(17, weight: FontWeight.w500, color: t.ink),
+                    style: Type.sans(
+                      17,
+                      weight: FontWeight.w500,
+                      color: accent ? t.accent : t.ink,
+                    ),
                   ),
                   if (about case final about? when about.isNotEmpty)
                     Text(
                       about,
-                      maxLines: 1,
+                      maxLines: aboutLines,
                       overflow: TextOverflow.ellipsis,
                       style: Type.sans(13, color: t.muted),
                     ),
                 ],
               ),
             ),
-            if (chevron) ...[
+            if (end case final end?) ...[
               const SizedBox(width: 8),
-              AppIcon('chevron', size: IconSize.xs, color: t.muted),
+              AppIcon(
+                end,
+                size: end == 'chevron' ? IconSize.xs : IconSize.small,
+                color: t.muted,
+              ),
             ],
           ],
         ),

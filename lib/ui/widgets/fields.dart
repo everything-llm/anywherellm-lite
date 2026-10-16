@@ -158,7 +158,6 @@ class SecretField extends StatefulWidget {
     required this.controller,
     required this.label,
     this.hint,
-    this.onChanged,
     this.onSubmitted,
     this.keyboardType,
   });
@@ -166,7 +165,6 @@ class SecretField extends StatefulWidget {
   final TextEditingController controller;
   final String label;
   final String? hint;
-  final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
   final TextInputType? keyboardType;
 
@@ -188,7 +186,6 @@ class _SecretFieldState extends State<SecretField> {
       obscure: !_shown,
       private: true,
       keyboardType: widget.keyboardType,
-      onChanged: widget.onChanged,
       onSubmitted: widget.onSubmitted,
       suffix: Tappable(
         label: '$verb ${widget.label}',

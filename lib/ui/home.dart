@@ -292,7 +292,7 @@ class _FoundWorkspace extends StatelessWidget {
       about: count != null && count > 0 ? plural(count, 'doc', 'docs') : null,
       heard: workspace.name,
       selected: active,
-      chevron: false,
+      end: null,
       onTap: () {
         if (!active) chat.select(workspace.slug);
       },

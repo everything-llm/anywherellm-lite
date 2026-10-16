@@ -1,6 +1,3 @@
-import 'dart:convert';
-
-import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/core/system_settings.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -23,153 +20,26 @@ const _server = <String, Object?>{
 };
 
 void main() {
-  test('each chat provider with a model names a setting the server takes', () {
-    expect(
-      systemChoices['LLMProvider']!.where((p) => !chatModelKeys.containsKey(p)),
-      ['textgenwebui', 'anythingllm-router'],
-    );
-    expect(
-      chatModelKeys.keys,
-      everyElement(isIn(systemChoices['LLMProvider']!)),
-    );
-    expect(chatModelKeys.values, everyElement(isIn(systemKeys)));
-  });
-
-  group('the settings', () {
-    test(
-      'are writable ones with a value, providers always, set secrets only',
-      () {
-        final fields = systemFields(_server);
-        expect(
-          [for (final f in fields) (f.key, f.value, f.secret)],
-          [
-            ('AgentSearXNGApiUrl', 'https://search.example/search', false),
-            ('AgentSkillRerankerEnabled', 'true', false),
-            ('EmbeddingEngine', 'native', false),
-            ('GenericOpenAiKey', '', true),
-            ('GenericOpenAiModelPref', 'glm-5.3-flash', false),
-            ('GenericOpenAiTokenLimit', '128000', false),
-            ('ImageGenerationProvider', '', false),
-            ('LLMProvider', 'generic-openai', false),
-            ('VectorDB', 'lancedb', false),
-          ],
-        );
-      },
-    );
-
-    test('a setting reads as text, and a secret as empty', () {
-      expect(settingText(_server, 'LLMProvider'), 'generic-openai');
-      expect(settingText(_server, 'GenericOpenAiKey'), '');
-      expect(settingText(_server, 'Nope'), '');
-      expect(settingText(null, 'LLMProvider'), '');
-    });
-
-    test('the server\'s password and signing secret are never written', () {
-      expect(systemKeys, isNot(contains('AuthToken')));
-      expect(systemKeys, isNot(contains('JWTSecret')));
+  test(
+    'every chat provider the server takes but two names its model setting',
+    () {
       expect(
-        () => parseSystemSettings('{"AuthToken": "x"}', _server),
-        throwsA(isA<ApiException>()),
-      );
-    });
-
-    test('the JSON holds no secret', () {
-      final json = jsonDecode(systemText(_server)) as Map<String, dynamic>;
-      expect(json.keys, isNot(contains('GenericOpenAiKey')));
-      expect(json.keys, isNot(contains('OpenAiKey')));
-      expect(json['LLMProvider'], 'generic-openai');
-    });
-  });
-
-  group('a save', () {
-    test(
-      'the JSON as shown saves as no change, a provider not set included',
-      () {
-        expect(_server['ImageGenerationProvider'], isNull);
-        expect(parseSystemSettings(systemText(_server), _server), isEmpty);
-      },
-    );
-
-    test('a null secret, set or not, is left as it is', () {
-      expect(
-        parseSystemSettings(
-          '{"OpenAiKey": null, "GenericOpenAiKey": null}',
-          _server,
+        systemChoices['LLMProvider']!.where(
+          (p) => !chatModelKeys.containsKey(p),
         ),
-        isEmpty,
+        ['textgenwebui', 'anythingllm-router'],
       );
-    });
+      expect(
+        chatModelKeys.keys,
+        everyElement(isIn(systemChoices['LLMProvider']!)),
+      );
+    },
+  );
 
-    test('a secret given as true or false, as the server shows it, is left as it is', () {
-      expect(
-        parseSystemSettings(
-          '{"OpenAiKey": true, "GenericOpenAiKey": false}',
-          _server,
-        ),
-        isEmpty,
-      );
-    });
-
-    test('sends only what changed, as text', () {
-      expect(
-        parseSystemSettings(
-          jsonEncode({
-            'LLMProvider': 'generic-openai',
-            'GenericOpenAiModelPref': 'glm-5.3',
-            'GenericOpenAiTokenLimit': 128000,
-            'AgentSkillRerankerEnabled': false,
-            'VectorDB': 'lancedb',
-          }),
-          _server,
-        ),
-        {
-          'GenericOpenAiModelPref': 'glm-5.3',
-          'AgentSkillRerankerEnabled': 'false',
-        },
-      );
-    });
-
-    test('sends a secret when one is given, and a new setting', () {
-      expect(
-        parseSystemSettings(
-          '{"GenericOpenAiKey": "sk-new", "OpenAiKey": "", "AnthropicModelPref": "claude"}',
-          _server,
-        ),
-        {'GenericOpenAiKey': 'sk-new', 'AnthropicModelPref': 'claude'},
-      );
-    });
-
-    test('refuses what the server would drop or reject', () {
-      String why(String json) {
-        try {
-          parseSystemSettings(json, _server);
-        } on ApiException catch (e) {
-          return e.message;
-        }
-        return 'no problem';
-      }
-
-      expect(why('{"VectorDB": "pgvector"}'), contains('deletes every vector'));
-      expect(
-        why('{"MadeUpKey": "1"}'),
-        'MadeUpKey is not a setting the server takes from the app.',
-      );
-      expect(
-        why('{"LLMProvider": "skynet"}'),
-        startsWith('LLMProvider must be one of openai,'),
-      );
-      expect(
-        why('{"GenericOpenAiModelPref": ""}'),
-        contains('cannot be emptied'),
-      );
-      expect(why('{"GenericOpenAiModelPref": "***"}'), contains('asterisks'));
-      expect(why('{"LLMProvider": null}'), contains('cannot be emptied'));
-      expect(
-        why('{"LLMProvider": [1]}'),
-        contains('text, a number or true or false'),
-      );
-      expect(why('[1]'), 'The settings must be one JSON object.');
-      expect(why('{'), startsWith('The settings are not valid JSON'));
-    });
+  test('a setting reads as text, and a secret as empty', () {
+    expect(settingText(_server, 'LLMProvider'), 'generic-openai');
+    expect(settingText(_server, 'GenericOpenAiKey'), '');
+    expect(settingText(_server, 'Nope'), '');
+    expect(settingText(null, 'LLMProvider'), '');
   });
 }

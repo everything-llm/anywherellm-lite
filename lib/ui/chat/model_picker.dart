@@ -83,7 +83,7 @@ class _ModelPickerState extends State<ModelPicker> {
     final systemLabel = system.provider.isEmpty
         ? 'System default'
         : 'System default (${chatProviders.labelOf(system.provider)})';
-    // The providers the server takes, as Settings' Chat model page offers them.
+    // The providers the server takes, in the order the app lists them.
     final choices = [
       '',
       ...chatProviders.choices(_provider).where((v) => v.isNotEmpty),

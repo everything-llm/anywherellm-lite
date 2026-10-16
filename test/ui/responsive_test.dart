@@ -1,9 +1,7 @@
 import 'dart:ui' show Offset, Size;
 
 import 'package:anywherellm/core/chat.dart';
-import 'package:anywherellm/core/chat_log.dart';
 import 'package:anywherellm/core/connection.dart';
-import 'package:anywherellm/core/embeds.dart';
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/activity.dart';
@@ -15,9 +13,9 @@ import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/settings/memory_page.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/settings/walkthrough.dart';
-import 'package:anywherellm/ui/shelf.dart';
 import 'package:anywherellm/ui/files/workspace_pages.dart';
 import 'package:anywherellm/ui/home.dart';
+import 'package:anywherellm/ui/shelf.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/activity.dart' show ActivityOpen;
 import 'package:anywherellm/ui/state/shell_controller.dart';
@@ -130,23 +128,7 @@ void main() {
       });
 
       testWidgets('every Settings page fits', (tester) async {
-        final llm = awkward()
-          ..chatLog = [
-            LoggedChat(
-              workspace: longWord,
-              question: longWord,
-              at: DateTime(2026, 10, 7),
-            ),
-          ]
-          ..embedList = [
-            Embed(
-              uuid: 'e-$longWord',
-              workspace: 'name-$longWord',
-              mode: EmbedMode.query,
-              enabled: true,
-              chats: 123456,
-            ),
-          ];
+        final llm = awkward();
         final h = await pumpApp(
           tester,
           llm: llm,

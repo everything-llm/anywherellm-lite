@@ -497,7 +497,6 @@ final _screens = <String, _Setup>{
     h.shell.togglePopup(Popup.memoryWorkspace);
     await _settle(tester);
   },
-  'chatmodel': (tester, h) => _settings(tester, h, SettingsPage.chatModel),
   'privacy': (tester, h) => _settings(tester, h, SettingsPage.privacy),
   'upcoming': (tester, h) async {
     h.shell.openToolkitPage(ToolkitPage.upcoming);

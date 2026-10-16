@@ -517,20 +517,3 @@ class SearchHit {
   final String text;
   final double score;
 }
-
-/// The formats the server exports every chat in, with the extension of each.
-enum ChatExport {
-  csv('CSV', 'csv'),
-  json('JSON', 'json'),
-  jsonl('JSONL', 'jsonl'),
-  jsonAlpaca('JSON (Alpaca)', 'json');
-
-  const ChatExport(this.label, this.extension);
-
-  final String label;
-  final String extension;
-
-  /// The name a saved export gets by default.
-  String get fileName =>
-      'anythingllm-chats${this == jsonAlpaca ? '-alpaca' : ''}.$extension';
-}

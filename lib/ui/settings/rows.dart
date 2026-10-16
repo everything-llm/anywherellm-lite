@@ -179,7 +179,6 @@ class FieldRow extends StatelessWidget {
     required this.control,
     this.help = '',
     this.small = false,
-    this.tag,
   });
 
   /// A small row of [label] over the line [help] with a switch, which a screen reader hears as
@@ -209,9 +208,6 @@ class FieldRow extends StatelessWidget {
   final Widget control;
   final bool small;
 
-  /// A badge beside the label, such as Recommended.
-  final Widget? tag;
-
   /// The least width of a row with its control beside its label rather than under it.
   static const sideBySide = 520.0;
 
@@ -223,21 +219,13 @@ class FieldRow extends StatelessWidget {
     final about = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 4,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Text(
-              label,
-              style: Type.sans(
-                17,
-                weight: inSheet ? FontWeight.w400 : FontWeight.w500,
-                color: t.ink,
-              ),
-            ),
-            ?tag,
-          ],
+        Text(
+          label,
+          style: Type.sans(
+            17,
+            weight: inSheet ? FontWeight.w400 : FontWeight.w500,
+            color: t.ink,
+          ),
         ),
         if (help.isNotEmpty) HelpText(help),
       ],
@@ -432,29 +420,6 @@ class ReadOnlyRow extends StatelessWidget {
   }
 }
 
-/// A section's heading inside a page, in the sans face.
-class SubHead extends StatelessWidget {
-  const SubHead(this.title, {super.key});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 10),
-    child: Semantics(
-      header: true,
-      child: Text(
-        title,
-        style: Type.sans(
-          17,
-          weight: FontWeight.w600,
-          color: Tokens.of(context).ink,
-        ),
-      ),
-    ),
-  );
-}
-
 /// A line of muted text between a page's cards.
 class PageNote extends StatelessWidget {
   const PageNote(this.text, {super.key});
@@ -465,75 +430,6 @@ class PageNote extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return Text(text, style: Type.sans(13.5, color: t.muted, height: 1.55));
-  }
-}
-
-/// A warning between a page's cards, on the warning ground.
-class PageWarning extends StatelessWidget {
-  const PageWarning(this.text, {super.key});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: t.warnbg,
-        borderRadius: BorderRadius.circular(Sizes.card),
-      ),
-      child: Text(text, style: Type.sans(14, color: t.warnfg, height: 1.5)),
-    );
-  }
-}
-
-/// A button that opens or closes what is under it: a chevron that turns, then [label]. Heard as
-/// expanded or collapsed.
-class Fold extends StatelessWidget {
-  const Fold({
-    super.key,
-    required this.label,
-    required this.open,
-    required this.onToggle,
-  });
-
-  final String label;
-  final bool open;
-  final VoidCallback onToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Tappable(
-        label: label,
-        expanded: open,
-        onTap: onToggle,
-        radius: BorderRadius.circular(8),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 36),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            spacing: 6,
-            children: [
-              RotatedBox(
-                quarterTurns: open ? 1 : 0,
-                child: AppIcon('chevron', size: IconSize.xs, color: t.ink2),
-              ),
-              // Wraps where the line is too narrow for it.
-              Flexible(
-                child: Text(
-                  label,
-                  style: Type.sans(14, weight: FontWeight.w500, color: t.ink2),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 

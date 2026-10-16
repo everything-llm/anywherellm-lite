@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 
 import '../../core/providers.dart';
@@ -16,7 +14,7 @@ class PrivacyPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final system = AppScope.of(context).system;
     return ServerSettings(
-      builder: (values, _) {
+      builder: (values) {
         final telemetry = switch (values['DisableTelemetry']) {
           true || 'true' => false,
           _ => true,
@@ -34,9 +32,9 @@ class PrivacyPage extends StatelessWidget {
             value: telemetry,
             onChanged: system.saving
                 ? null
-                : (on) => system.saveSettings(
-                    jsonEncode({'DisableTelemetry': on ? 'false' : 'true'}),
-                  ),
+                : (on) => system.saveSettings({
+                    'DisableTelemetry': on ? 'false' : 'true',
+                  }),
           ),
         ]);
       },

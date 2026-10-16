@@ -6,9 +6,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import '../core/chat.dart';
-import '../core/chat_log.dart';
 import '../core/connection.dart';
-import '../core/embeds.dart';
 import '../core/json.dart';
 import '../core/ports.dart';
 import '../core/server_models.dart';
@@ -237,10 +235,6 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   );
 
   @override
-  Future<List<int>> exportChats(ChatExport format) =>
-      _file('/api/v1/system/export-chats?type=${format.name}');
-
-  @override
   Future<List<int>> generatedFile(String storageName) => _file(
     '/api/v1/document/generated-files/${Uri.encodeComponent(storageName)}',
   );
@@ -342,63 +336,6 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       throw ApiException('The server did not write ${missing.join(', ')}.');
     }
   }
-
-  @override
-  Future<List<Embed>> embeds() async =>
-      _list(await _get('/api/v1/embed'), 'embeds', Embed.fromJson);
-
-  /// The server answers the new embed, or null with an `error` when it made none.
-  @override
-  Future<String> createEmbed(NewEmbed embed) async {
-    final answer = await _send(
-      'POST',
-      '/api/v1/embed/new',
-      embed.toJson(),
-      refused: 'The server did not make the embed.',
-    );
-    _failOnError(answer);
-    return switch (_field(answer, 'embed')) {
-      {'uuid': final String uuid} => uuid,
-      _ => throw const ApiException('The server did not make the embed.'),
-    };
-  }
-
-  @override
-  Future<void> updateEmbed(
-    String uuid, {
-    bool? enabled,
-    EmbedMode? mode,
-  }) async {
-    final answer = await _send(
-      'POST',
-      '/api/v1/embed/${Uri.encodeComponent(uuid)}',
-      {'enabled': ?enabled, 'chat_mode': ?mode?.name},
-      refused: 'The server did not change the embed.',
-    );
-    _failOnError(answer);
-  }
-
-  @override
-  Future<void> deleteEmbed(String uuid) => _send(
-    'DELETE',
-    '/api/v1/embed/${Uri.encodeComponent(uuid)}',
-    null,
-    refused: 'The server did not delete the embed.',
-  );
-
-  @override
-  Future<List<EmbedChat>> embedChats(String uuid) async => _list(
-    await _get('/api/v1/embed/${Uri.encodeComponent(uuid)}/chats'),
-    'chats',
-    EmbedChat.fromJson,
-  );
-
-  /// `/v1/admin/workspace-chats` answers every workspace's chats on any server, though its
-  /// other `/v1/admin` routes refuse one with a single user.
-  @override
-  Future<ChatLog> workspaceChats({int page = 0}) async => ChatLog.fromJson(
-    await _send('POST', '/api/v1/admin/workspace-chats', {'offset': page}),
-  );
 
   @override
   Future<int> vectorCount() async => switch (_field(
