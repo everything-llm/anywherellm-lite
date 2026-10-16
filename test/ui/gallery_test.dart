@@ -62,6 +62,21 @@ void main() {
     },
   );
 
+  testWidgets('Next moves at once when the device asks for less motion', (
+    tester,
+  ) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    await pumpApp(tester, llm: _searched(3));
+    await tester.tap(control('Picture 2: Unit 2, from site2.example'));
+    await tester.pumpAndSettle();
+    await tester.tap(control('Next picture'));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    expect(find.text('3 of 3'), findsOneWidget);
+  });
+
   testWidgets('a picture that does not load shows its site in its place', (
     tester,
   ) async {

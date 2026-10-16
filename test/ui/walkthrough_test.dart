@@ -69,6 +69,25 @@ void main() {
       expect(h.shell.settingsOpen, isTrue);
     });
 
+    testWidgets('it steps at once when the device asks for less motion', (
+      tester,
+    ) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await _firstRun(tester);
+      await _openGuide(tester);
+      await tester.tap(find.text('Begin'));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(find.text('2 of ${connectSteps.length}'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+      expect(find.text('3 of ${connectSteps.length}'), findsOneWidget);
+    });
+
     testWidgets('a swipe and the arrow keys move between screens', (
       tester,
     ) async {

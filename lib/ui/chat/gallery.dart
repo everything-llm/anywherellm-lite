@@ -192,13 +192,14 @@ class _GalleryPageState extends State<GalleryPage> {
     super.dispose();
   }
 
-  void _go(int to) => unawaited(
-    _pages.animateToPage(
-      to,
-      duration: motion(context, const Duration(milliseconds: 250)),
-      curve: Curves.easeOutCubic,
-    ),
-  );
+  void _go(int to) {
+    final duration = motion(context, const Duration(milliseconds: 250));
+    // A page controller refuses to animate over no time.
+    if (duration == Duration.zero) return _pages.jumpToPage(to);
+    unawaited(
+      _pages.animateToPage(to, duration: duration, curve: Curves.easeOutCubic),
+    );
+  }
 
   void _close() => AppScope.of(context).shell.closePopup();
 
