@@ -7,6 +7,7 @@ import '../../core/connection.dart';
 import '../../core/ports.dart';
 import '../../core/server_models.dart';
 import 'answer_bytes.dart';
+import 'answer_waits.dart';
 import 'fleeting.dart';
 import 'notice.dart';
 import 'prefs_controller.dart';
@@ -52,25 +53,6 @@ class _Running {
   /// The message a chat this answer's message made is named after when the answer ends, however
   /// it ends; null for a chat that already had a name.
   String? nameAs;
-}
-
-/// An answer whose connection dropped, read for in its chat's history until the server saved
-/// it, or [ChatController.waitReads] reads found nothing.
-class _Waiting {
-  _Waiting(this.answer, this.slug, this.thread);
-
-  final Turn answer;
-  final String slug;
-  final String thread;
-
-  /// How many times the chat was read for it so far.
-  int reads = 0;
-  Timer? next;
-
-  /// The read under way, which another check joins.
-  Future<void>? reading;
-
-  void cancel() => next?.cancel();
 }
 
 /// The workspaces and their chats, the chat on screen, and the answers running.
@@ -128,20 +110,22 @@ class ChatController extends ChangeNotifier {
   };
   ({Turn turn, String slug, String thread})? _finished;
 
-  /// The answers whose connection dropped, by chat, read for until the server saved them.
-  final _waiting = <String, _Waiting>{};
-
-  /// How many times the chat of an answer whose connection dropped is read before it counts as
-  /// failed: every 5 s for 2 minutes, then every 20 s to 30 minutes.
-  static const waitReads = 24 + 84;
-  static const _quickReads = 24;
+  /// The answers whose connection dropped, read for until the server saved them.
+  late final waits = AnswerWaits(
+    _api,
+    turnsOf: (thread) => _turns[thread],
+    saved: (slug, thread, saved) {
+      _turns[thread] = saved;
+      _markFinished(saved.last, slug, thread);
+    },
+    changed: notifyListeners,
+  );
 
   /// Whether an answer is running or [Turn.waiting] anywhere, which the app keeps alive for.
-  bool get working => _runs.isNotEmpty || _waiting.isNotEmpty;
+  bool get working => _runs.isNotEmpty || waits.any;
 
   /// The workspace of an answer running or waiting, for the note that keeps the app alive.
-  String? get workingIn =>
-      _runs.firstOrNull?.slug ?? _waiting.values.firstOrNull?.slug;
+  String? get workingIn => _runs.firstOrNull?.slug ?? waits.firstSlug;
 
   /// The answers running, at most one in each workspace.
   final _runs = <_Running>[];
@@ -295,7 +279,7 @@ class ChatController extends ChangeNotifier {
     for (final running in _runs) {
       running.stream?.cancel();
     }
-    _stopWaiting();
+    waits.clear();
     _link.take();
     unreachable.dispose();
     super.dispose();
@@ -312,7 +296,7 @@ class ChatController extends ChangeNotifier {
       running.stream?.cancel();
     }
     _runs.clear();
-    _stopWaiting();
+    waits.clear();
     _forComposer.clear();
     workspaces = const [];
     _threads.clear();
@@ -447,7 +431,7 @@ class ChatController extends ChangeNotifier {
     final slug = activeSlug;
     if (slug == null || threadSlug == null) return;
     // An answer waited for is checked for, which also says when it is ready.
-    if (_waiting[threadSlug] case final waiting?) return _check(waiting);
+    if (waits.has(threadSlug)) return waits.check(threadSlug);
     final known = _turns[threadSlug];
     if (known != null &&
         (isAnswering(threadSlug) ||
@@ -762,94 +746,13 @@ class ChatController extends ChangeNotifier {
       return _finish(running, error: 'The connection dropped.');
     }
     // Waiting before the run ends, so [working] holds throughout.
-    final waiting = _Waiting(running.answer, running.slug, thread);
-    _waiting[thread] = waiting;
-    running.answer.waiting = true;
+    waits.start(running.answer, running.slug, thread);
     _finish(running);
-    _checkLater(waiting);
-  }
-
-  /// Reads the chat again for [waiting]'s answer: every 5 s at first, then every 20 s.
-  void _checkLater(_Waiting waiting) {
-    waiting.cancel();
-    waiting.next = Timer(
-      Duration(seconds: waiting.reads < _quickReads ? 5 : 20),
-      () => unawaited(_check(waiting)),
-    );
   }
 
   /// Reads each chat whose answer is [Turn.waiting] now, as when the app comes back to the
   /// front or Check now is tapped.
-  Future<void> checkWaiting() => Future.wait([
-    for (final waiting in [..._waiting.values]) _check(waiting),
-  ]);
-
-  /// Reads [waiting]'s chat now, or joins the read under way.
-  Future<void> _check(_Waiting waiting) {
-    waiting.cancel();
-    return waiting.reading ??= _read(waiting)
-        .whenComplete(() => waiting.reading = null);
-  }
-
-  /// Takes [waiting]'s answer from its chat's history once the server saved it: a last exchange
-  /// newer than every one the chat showed. The chat then shows what the server has. After
-  /// [waitReads] reads the answer fails; a chat that moved on, as by a new message, stops the
-  /// reading.
-  Future<void> _read(_Waiting waiting) async {
-    final (answer, slug, thread) = (
-      waiting.answer,
-      waiting.slug,
-      waiting.thread,
-    );
-    final server = _server;
-    waiting.reads++;
-    List<ChatMessage>? history;
-    try {
-      history = await _api.history(slug, thread);
-    } on ApiException {
-      // Out of reach for now: read again next time.
-    }
-    if (_server != server || !identical(_waiting[thread], waiting)) return;
-    final turns = _turns[thread];
-    if (turns == null || !identical(turns.lastOrNull, answer)) {
-      return _endWaiting(waiting);
-    }
-    if (history case [..., final said]
-        when said.role == Role.assistant &&
-            said.chatId != null &&
-            _newerThanAll(turns, said.chatId!)) {
-      final saved = [for (final m in history) Turn.saved(m)];
-      _turns[thread] = saved;
-      _markFinished(saved.last, slug, thread);
-      return _endWaiting(waiting);
-    }
-    if (waiting.reads >= waitReads) {
-      answer.error = 'The connection dropped, and the server saved no answer within 30 minutes.';
-      return _endWaiting(waiting);
-    }
-    _checkLater(waiting);
-  }
-
-  /// Ends [waiting], with whatever was set on its answer, telling both once.
-  void _endWaiting(_Waiting waiting) {
-    waiting.cancel();
-    _waiting.remove(waiting.thread);
-    waiting.answer
-      ..waiting = false
-      ..notifyListeners();
-    notifyListeners();
-  }
-
-  void _stopWaiting() {
-    for (final waiting in _waiting.values) {
-      waiting.cancel();
-    }
-    _waiting.clear();
-  }
-
-  /// Whether [id] is newer than every exchange [turns] know, so it was saved after them.
-  static bool _newerThanAll(List<Turn> turns, int id) =>
-      turns.every((t) => t.chatId == null || t.chatId! < id);
+  Future<void> checkWaiting() => waits.checkAll();
 
   /// Stops the answer running in the chat on screen, keeping what came so far. Letting go of the
   /// response is what stops it on the server.

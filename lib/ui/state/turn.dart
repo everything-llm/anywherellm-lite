@@ -59,6 +59,12 @@ class Turn extends ChangeNotifier {
   /// What an agent is doing while the answer runs, such as a tool it runs, or null.
   String? status;
 
+  /// Ends the wait for a [waiting] answer, showing whatever was set on it meanwhile.
+  void stopWaiting() {
+    waiting = false;
+    notifyListeners();
+  }
+
   /// Takes [event] of the streamed answer: more text, a status line, the whole answer, or what
   /// came with its end. Only what is drawn as it streams notifies.
   void take(ChatEvent event) {

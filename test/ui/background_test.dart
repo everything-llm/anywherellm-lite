@@ -1,7 +1,7 @@
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/core/server_models.dart';
-import 'package:anywherellm/ui/state/chat_controller.dart';
+import 'package:anywherellm/ui/state/answer_waits.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -78,7 +78,7 @@ void main() {
       final (h, llm) = await _asking(tester);
       llm.chat!.addError(_dropped);
       await tester.pump(const Duration(milliseconds: 300));
-      for (var i = 0; i < ChatController.waitReads; i++) {
+      for (var i = 0; i < AnswerWaits.waitReads; i++) {
         await tester.pump(const Duration(seconds: 20));
       }
       await tester.pump();
