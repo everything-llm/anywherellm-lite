@@ -260,6 +260,19 @@ void main() {
   });
 
   group('the Attach sheet', () {
+    testWidgets('opening it puts the keyboard away', (tester) async {
+      await pumpApp(tester, llm: planningServer());
+      await tester.pumpAndSettle();
+      await tester.tap(composerField);
+      await tester.pump();
+      expect(focused(tester, composerField), isTrue);
+      await tester.tap(
+        find.byTooltip('Add files or shortcuts to this message'),
+      );
+      await tester.pumpAndSettle();
+      expect(focused(tester, composerField), isFalse);
+    });
+
     testWidgets(
       'Attach opens a sheet that lists the files and takes them off',
       (tester) async {

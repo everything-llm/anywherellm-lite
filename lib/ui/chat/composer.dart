@@ -442,7 +442,11 @@ class _ComposerState extends State<Composer> {
                   attached: _attached,
                   shortcut: _shortcut,
                   problem: _problem,
-                  onAttach: () => scope.shell.togglePopup(Popup.attach),
+                  onAttach: () {
+                    // The field gives up the keyboard, which would cover the sheet.
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    scope.shell.togglePopup(Popup.attach);
+                  },
                   onSelectShortcut: _selectShortcut,
                   onClearShortcut: _clearShortcut,
                   onSend: _send,
