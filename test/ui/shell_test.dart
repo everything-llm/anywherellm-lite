@@ -66,12 +66,12 @@ void main() {
       await h.chat.select('household');
       await tester.pumpAndSettle();
       expect(
-        find.text('Ask about Household.', findRichText: true),
+        inChat(find.text('Ask about', findRichText: true)),
         findsOneWidget,
       );
-      await tester.tap(control('What can I do here?'));
-      await tester.pump();
-      expect(find.text('What can I do here?'), findsWidgets);
+      expect(control('Workspace: Household. Switch workspace'), findsOneWidget);
+      expect(control('No documents yet. Open Documents'), findsOneWidget);
+      expect(control('What can I do here?'), findsNothing);
     });
 
     testWidgets(
@@ -193,54 +193,60 @@ void main() {
       expect(h.chat.busy, isFalse);
     });
 
-    testWidgets(
-      'an empty chat names its workspace and suggests from its documents',
-      (tester) async {
-        final h = await pumpApp(tester, llm: planningServer());
-        h.chat.newChat();
-        await tester.pumpAndSettle();
-        expect(
-          inChat(find.text('Ask about Q3 planning.', findRichText: true)),
-          findsOneWidget,
-        );
-        expect(control('Summarise Q3 roadmap'), findsOneWidget);
-        expect(
-          control('Compare Q3 roadmap with Customer interviews'),
-          findsOneWidget,
-        );
-        expect(find.text('Ask anything…'), findsOneWidget);
-        // A document switched off is not suggested.
-        h.shell.openSources();
-        await tester.pumpAndSettle();
-        await tester.tap(find.byType(AppSwitch).first);
-        h.shell.closeSources();
-        await tester.pumpAndSettle();
-        expect(control('Summarise Customer interviews'), findsOneWidget);
-        expect(control('Summarise Q3 roadmap'), findsNothing);
-      },
-    );
+    testWidgets('an empty chat shows the prototype layout and actions', (
+      tester,
+    ) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      h.chat.newChat();
+      await tester.pumpAndSettle();
 
-    testWidgets(
-      'a long document is named short in a suggestion and whole in the message',
-      (tester) async {
-        const title =
-            'Evidence-Based Gamification Design: What Works, When, and Why.pdf';
-        final llm = planningServer();
-        llm.spaces.first.docs.insert(0, libraryDoc(llm, title));
-        final h = await pumpApp(tester, llm: llm, size: const Size(360, 720));
-        h.chat.newChat();
-        await tester.pumpAndSettle();
-        expect(control('Compare the first two documents'), findsOneWidget);
-        await tester.tap(
-          control('Summarise Evidence-Based Gamification Design'),
-        );
-        await tester.pump();
-        expect(
-          tester.widget<EditableText>(composerField).controller.text,
-          'Summarise Evidence-Based Gamification Design: What Works, When, and Why',
-        );
-      },
-    );
+      expect(
+        inChat(find.text('Ask about', findRichText: true)),
+        findsOneWidget,
+      );
+      expect(
+        control('Workspace: Q3 planning. Switch workspace'),
+        findsOneWidget,
+      );
+      expect(control('2 documents in use. Open Documents'), findsOneWidget);
+      expect(control('Summarise Q3 roadmap'), findsNothing);
+      expect(
+        control('Compare Q3 roadmap with Customer interviews'),
+        findsNothing,
+      );
+
+      await tester.tap(control('2 documents in use. Open Documents'));
+      await tester.pumpAndSettle();
+      expect(h.shell.sourcesOpen, isTrue);
+      h.shell.closeSources();
+      await tester.pumpAndSettle();
+
+      await tester.tap(control('Workspace: Q3 planning. Switch workspace'));
+      await tester.pumpAndSettle();
+      expect(find.text('Workspaces'), findsOneWidget);
+      await tester.tap(control('Household'));
+      await tester.pumpAndSettle();
+      expect(h.chat.activeSlug, 'household');
+      expect(control('No documents yet. Open Documents'), findsOneWidget);
+    });
+
+    testWidgets('the empty chat document line reflects switched-off files', (
+      tester,
+    ) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      h.chat.newChat();
+      await tester.pumpAndSettle();
+
+      h.shell.openSources();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(AppSwitch).first);
+      await tester.pumpAndSettle();
+      expect(control('1 document in use. Open Documents'), findsOneWidget);
+      await tester.tap(find.byType(AppSwitch).first);
+      h.shell.closeSources();
+      await tester.pumpAndSettle();
+      expect(control('No documents in use. Open Documents'), findsOneWidget);
+    });
 
     testWidgets(
       'the composer follows the chat mode before the server answers',

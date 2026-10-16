@@ -23,9 +23,11 @@ import 'sources/sources_panel.dart';
 import 'activity.dart';
 import 'library.dart';
 import 'upcoming.dart';
+import 'workspace_switcher.dart';
 import 'state/shell_controller.dart';
 import 'tokens.dart';
 import 'widgets/basics.dart';
+import 'widgets/sheet.dart';
 
 /// The window: the chat, which is the base screen; the chats as a shelf over it, with Settings
 /// at its foot; the workspace's pages or Upcoming over those; Settings, its list or a page, over
@@ -165,6 +167,21 @@ class AppShell extends StatelessWidget {
                             valueListenable: shell.popup,
                             builder: (context, popup, _) => Stack(
                               children: [
+                                if (popup == Popup.workspaces)
+                                  Positioned.fill(
+                                    child: ModalSheet(
+                                      title: 'Workspaces',
+                                      onClose: () =>
+                                          shell.closePopup(Popup.workspaces),
+                                      child: SingleChildScrollView(
+                                        child: WorkspaceMenu(
+                                          onCreate: () => shell.togglePopup(
+                                            WorkspaceSheet.create,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 if (popup case final GalleryOpen open)
                                   Positioned.fill(
                                     child: GalleryPage(

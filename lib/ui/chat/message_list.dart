@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../core/chat.dart';
+import '../../core/copy.dart';
 import '../../core/prefs.dart';
 import '../../core/server_models.dart';
-import '../../core/sources.dart';
 import '../app_scope.dart';
 import '../links.dart';
 import '../icons.dart';
@@ -129,7 +129,7 @@ class _MessageListState extends State<MessageList> {
     if (workspace == null) return const SizedBox.shrink();
     _follow(chat);
     if (turns.isEmpty) {
-      return _Empty(workspace: workspace.name, onSuggest: widget.onSuggest);
+      return _Empty(workspace: workspace.name);
     }
     // The person's text size scales the turns, not the controls around them. The turns are
     // built once here: a change to another pref, such as a pin, leaves the scale as it was, so
@@ -408,87 +408,123 @@ class _RenderHoldPlace extends RenderProxySliver {
 }
 
 class _Empty extends StatelessWidget {
-  const _Empty({required this.workspace, required this.onSuggest});
+  const _Empty({required this.workspace});
 
   final String workspace;
-  final ValueChanged<String> onSuggest;
 
   @override
   Widget build(BuildContext context) {
-    final sources = AppScope.of(context).sources;
-    // The suggestions stack under the headline, as the Lite prototype draws them.
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-        child: Rise(
-          duration: const Duration(milliseconds: 400),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-                child: Headline(
-                  'Ask about ',
-                  name: workspace,
-                  after: '.',
-                  textAlign: TextAlign.center,
+    final scope = AppScope.of(context);
+    final sources = scope.sources;
+    final top = (MediaQuery.sizeOf(context).height * 0.12).clamp(24.0, 110.0);
+    final titleStyle = Headline.styleOf(context).copyWith(
+      fontWeight: FontWeight.w700,
+      fontVariations: const [FontVariation('wght', 700)],
+      color: Tokens.of(context).accent,
+    );
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(16, top, 16, 16),
+      child: Rise(
+        duration: const Duration(milliseconds: 400),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: double.infinity,
+              child: Headline('Ask about', textAlign: TextAlign.center),
+            ),
+            const SizedBox(height: 6),
+            ListenableBuilder(
+              listenable: scope.shell.popup,
+              builder: (context, _) => SizedBox(
+                width: MediaQuery.sizeOf(context).width - 32,
+                child: Tappable(
+                  label: 'Workspace: $workspace. Switch workspace',
+                  expanded: scope.shell.menuOpen,
+                  radius: BorderRadius.circular(Sizes.small),
+                  onTap: () => scope.shell.togglePopup(Popup.workspaces),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 44),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(width: 22),
+                        Expanded(
+                          child: Text(
+                            workspace,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: titleStyle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        AppIcon(
+                          'down',
+                          size: IconSize.row,
+                          color: Tokens.of(context).muted,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 14),
-              ListenableBuilder(
-                listenable: sources,
-                builder: (context, _) {
-                  final suggestions = [
-                    // Only the first two switched-on files are named.
-                    for (final s in suggestionsFor([
-                      ...sources.files
-                          .where((f) => f.on)
-                          .map((f) => f.title)
-                          .take(2),
-                    ]))
-                      _Suggestion(s.label, onTap: () => onSuggest(s.prompt)),
-                  ];
-                  return Column(spacing: 14, children: suggestions);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Suggestion extends StatelessWidget {
-  const _Suggestion(this.text, {required this.onTap});
-
-  final String text;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Tappable(
-      label: text,
-      onTap: onTap,
-      // A pill on one line; a label that wraps keeps its corners rather than bulging.
-      radius: BorderRadius.circular(24),
-      color: t.panel,
-      side: BorderSide(color: t.edge),
-      hoverColor: Colors.transparent,
-      child: Container(
-        constraints: BoxConstraints(
-          minHeight: 44,
-          // The column of suggestions keeps to the screen's width.
-          maxWidth: MediaQuery.sizeOf(context).width - 32,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-        child: Text(
-          text,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: Type.sans(15, color: t.ink),
+            ),
+            const SizedBox(height: 6),
+            ListenableBuilder(
+              listenable: sources,
+              builder: (context, _) {
+                if (sources.loading || sources.read == null) {
+                  return const SizedBox.shrink();
+                }
+                final label = sources.onCount > 0
+                    ? plural(sources.onCount, 'document', 'documents') +
+                          ' in use'
+                    : sources.files.isNotEmpty
+                    ? 'No documents in use'
+                    : 'No documents yet';
+                return Tappable(
+                  label: '$label. Open Documents',
+                  radius: BorderRadius.circular(Sizes.small),
+                  onTap: scope.shell.openSources,
+                  child: SizedBox(
+                    width: MediaQuery.sizeOf(context).width - 32,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 44),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          AppIcon(
+                            'doc',
+                            size: IconSize.xs,
+                            color: Tokens.of(context).muted,
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Type.sans(
+                                14,
+                                color: Tokens.of(context).muted,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          AppIcon(
+                            'chevron',
+                            size: IconSize.tiny,
+                            color: Tokens.of(context).muted,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
         ),
       ),
     );

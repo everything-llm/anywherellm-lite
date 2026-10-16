@@ -10,7 +10,6 @@ import 'tokens.dart';
 import 'type.dart';
 import 'settings/rows.dart';
 import 'widgets/basics.dart';
-import 'widgets/sheet.dart';
 import 'widgets/tappable.dart';
 
 /// The shelf's title: the open workspace's name at 26 and a chevron, which open the
@@ -38,45 +37,35 @@ class WorkspaceSwitcher extends StatelessWidget {
         final name = active == null
             ? 'Workspaces'
             : 'Workspace: ${active.name}$docs. Switch workspace';
-        return PopupSheet(
-          open: shell.menuOpen,
-          onClose: () => shell.closePopup(Popup.workspaces),
-          title: 'Workspaces',
-          sheet: (context) => SingleChildScrollView(
-            child: WorkspaceMenu(
-              onCreate: () => shell.togglePopup(WorkspaceSheet.create),
-            ),
-          ),
-          child: Tappable(
-            label: elsewhere ? '$name, an answer is ready in another' : name,
-            expanded: shell.menuOpen,
-            radius: BorderRadius.circular(Sizes.small),
-            onTap: () => shell.togglePopup(Popup.workspaces),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 48),
-              child: Row(
-                spacing: 6,
-                children: [
-                  Flexible(
-                    child: Semantics(
-                      header: true,
-                      child: Text(
-                        active?.name ?? 'No workspace yet',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Type.sans(
-                          26,
-                          weight: FontWeight.w600,
-                          letterSpacing: -0.3,
-                          color: active == null ? t.muted : t.ink,
-                        ),
+        return Tappable(
+          label: elsewhere ? '$name, an answer is ready in another' : name,
+          expanded: shell.menuOpen,
+          radius: BorderRadius.circular(Sizes.small),
+          onTap: () => shell.togglePopup(Popup.workspaces),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Row(
+              spacing: 6,
+              children: [
+                Flexible(
+                  child: Semantics(
+                    header: true,
+                    child: Text(
+                      active?.name ?? 'No workspace yet',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Type.sans(
+                        26,
+                        weight: FontWeight.w600,
+                        letterSpacing: -0.3,
+                        color: active == null ? t.muted : t.ink,
                       ),
                     ),
                   ),
-                  AppIcon('down', color: t.muted),
-                  if (elsewhere) const ReadyDot(gap: false),
-                ],
-              ),
+                ),
+                AppIcon('down', color: t.muted),
+                if (elsewhere) const ReadyDot(gap: false),
+              ],
             ),
           ),
         );
