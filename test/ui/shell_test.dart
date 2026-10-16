@@ -747,6 +747,24 @@ void main() {
       expect(h.chat.refreshing, isFalse);
     });
 
+    testWidgets('a Settings page opens over the Documents sheet', (
+      tester,
+    ) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      h.shell.openSources();
+      await tester.pumpAndSettle();
+      h.shell.openSettings(SettingsPage.connection);
+      await tester.pumpAndSettle();
+      expect(find.text('Test connection').hitTestable(), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(h.shell.settingsOpen, isFalse);
+      expect(h.shell.sourcesOpen, isTrue);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(h.shell.sourcesOpen, isFalse);
+    });
+
     testWidgets('on a phone, Documents is a sheet over the chat', (
       tester,
     ) async {

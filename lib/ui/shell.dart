@@ -142,10 +142,12 @@ class AppShell extends StatelessWidget {
                           ),
                         // A deleted chat is put back from over the chat's composer.
                         if (!shell.settingsOpen) const _PhoneUndo(),
-                        if (shell.settingsOpen)
-                          const Positioned.fill(child: SettingsDialog()),
                         // The sheet's own scrim closes it.
                         if (shell.rightOpen) Positioned.fill(child: right),
+                        // Over the sheet, since a page opened from elsewhere, as a pairing
+                        // link opens Connection, shows over what showed.
+                        if (shell.settingsOpen)
+                          const Positioned.fill(child: SettingsDialog()),
                         // What another app shared, over everything but a popup.
                         if (shell.shared case final SharedPairing link)
                           Positioned.fill(
