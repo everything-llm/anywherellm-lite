@@ -10,7 +10,6 @@ import 'tokens.dart';
 import 'type.dart';
 import 'settings/rows.dart';
 import 'widgets/basics.dart';
-import 'widgets/phone_page.dart';
 import 'widgets/sheet.dart';
 import 'widgets/tappable.dart';
 
@@ -65,7 +64,12 @@ class WorkspaceSwitcher extends StatelessWidget {
                         active?.name ?? 'No workspace yet',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TabTitle.style(active == null ? t.muted : t.ink),
+                        style: Type.sans(
+                          26,
+                          weight: FontWeight.w600,
+                          letterSpacing: -0.3,
+                          color: active == null ? t.muted : t.ink,
+                        ),
                       ),
                     ),
                   ),

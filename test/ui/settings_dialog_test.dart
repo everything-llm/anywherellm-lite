@@ -89,7 +89,7 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(h.shell.settingsPage, isNull);
-    // The list is a tab: Back gives the Chats tab back.
+    // Back from the list gives the chat back.
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(h.shell.settingsOpen, isFalse);

@@ -24,10 +24,9 @@ import 'server_page.dart';
 import 'settings_pages.dart';
 import 'walkthrough.dart';
 
-/// Settings: its list as the Settings tab, under its title, in two groups, This app and
-/// AnythingLLM, whose Server row opens the Server page, which lists the server's pages; a page
-/// shows over what showed under a back arrow and its name. The shell draws the bar of tabs
-/// under both.
+/// Settings: its list over the chat, opened from the shelf's foot, in two groups, This app and
+/// AnythingLLM, whose Server row opens the Server page; a page shows over what showed. Each is
+/// under a back arrow and its name.
 class SettingsDialog extends StatefulWidget {
   const SettingsDialog({super.key});
 
@@ -70,7 +69,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
   }
 }
 
-/// The list as a tab, or a page under a back arrow and its name.
+/// The list or a page, each under a back arrow and its name.
 class _Frame extends StatelessWidget {
   const _Frame({required this.page, required this.configured});
 
@@ -85,28 +84,21 @@ class _Frame extends StatelessWidget {
     if (page != null && page.needsServer && !configured) {
       page = SettingsPage.connection;
     }
-    // A first run opens on its welcome alone, with no bar over it; Back still closes it.
+    // A first run opens on its welcome alone, with no header over it; Back still closes it.
     if (page == SettingsPage.connection && !configured) {
       return const _PageView(SettingsPage.connection);
-    }
-    if (page == null) {
-      return const Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TabTitle('Settings'),
-          Expanded(child: _Nav()),
-        ],
-      );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         PhonePageHeader(
-          title: page.label,
-          back: 'Back to ${page.parent?.label ?? 'Settings'}',
+          title: page?.label ?? 'Settings',
+          back: page == null
+              ? 'Back to the chat'
+              : 'Back to ${page.parent?.label ?? 'Settings'}',
           onBack: shell.settingsBack,
         ),
-        Expanded(child: _PageView(page)),
+        Expanded(child: page == null ? const _Nav() : _PageView(page)),
       ],
     );
   }
@@ -168,10 +160,10 @@ class _Nav extends StatelessWidget {
                     Text(
                       scope.toolkit.available ?? false
                           ? 'The toolkit answers, but lets none of this app\'s calls through. '
-                                'Run its install again to add Memory here, and Upcoming on '
-                                'the Chats tab.'
+                                'Run its install again to add Memory here, and Upcoming in '
+                                'the chats.'
                           : 'Install the free toolkit beside AnythingLLM to add Memory here, '
-                                'and Upcoming on the Chats tab.',
+                                'and Upcoming in the chats.',
                       style: Type.sans(13, color: Tokens.of(context).muted),
                     ),
                   ],

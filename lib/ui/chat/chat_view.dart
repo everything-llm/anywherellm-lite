@@ -142,7 +142,7 @@ class _Body extends StatelessWidget {
             ? ('Loading…', '')
             : (
                 'No workspaces yet',
-                'Make one with New workspace, under the workspace\'s name at the top of the Chats tab.',
+                'Make one with New workspace, under the workspace\'s name at the top of the chats.',
               );
         return Center(
           child: SingleChildScrollView(

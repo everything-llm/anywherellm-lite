@@ -22,7 +22,7 @@ abstract final class Sizes {
   /// A button's or a field's corners.
   static const control = 16.0;
 
-  /// A small button's corners, and a tab's or a title's press.
+  /// A small button's corners, and a title's press.
   static const small = 12.0;
 
   /// Around a phone page's cards, under its header.
@@ -40,11 +40,8 @@ abstract final class Sizes {
   /// The least height of a row that only says something, or holds a switch.
   static const infoRow = 88.0;
 
-  /// The least height of a page's or a tab's header bar, which grows with the text.
+  /// The least height of a page's header bar, which grows with the text.
   static const header = 72.0;
-
-  /// The least height of a tab in the bar under the home.
-  static const tab = 56.0;
 
   /// A one-line field's height.
   static const field = 52.0;

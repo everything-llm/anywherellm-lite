@@ -18,7 +18,6 @@ import 'settings/settings_dialog.dart';
 import 'share/share_sheet.dart';
 import 'shelf.dart';
 import 'share/shared_item.dart';
-import 'home.dart';
 import 'workspace_sheets.dart';
 import 'sources/sources_panel.dart';
 import 'activity.dart';
@@ -28,12 +27,11 @@ import 'state/shell_controller.dart';
 import 'tokens.dart';
 import 'widgets/basics.dart';
 
-/// The window: the bar of tabs at its foot, always, but while the keyboard is up and on the
-/// first run's welcome, and above it the chat, which is the Chats tab; the chats as a shelf over
-/// it; the workspace's pages or Upcoming over those; Settings, its list or a page, over them
-/// all; and the sheets and popups over the whole window, the bar too. Esc and Back close the
-/// topmost thing open: the popup, Settings' page, the shelf, the sheet, Upcoming, the workspace's
-/// pages a step at a time; with nothing open Back puts the app out of sight.
+/// The window: the chat, which is the base screen; the chats as a shelf over it, with Settings
+/// at its foot; the workspace's pages or Upcoming over those; Settings, its list or a page, over
+/// them all; and the sheets and popups over the whole window. Esc and Back close the topmost
+/// thing open: the popup, Settings' page, the shelf, the sheet, Upcoming, the workspace's pages a
+/// step at a time; with nothing open Back puts the app out of sight.
 class AppShell extends StatelessWidget {
   const AppShell({super.key});
 
@@ -54,11 +52,7 @@ class AppShell extends StatelessWidget {
       if (shell.scanning) return () => shell.setScanning(false);
       if (shell.shared != null) return shell.closeShared;
       if (shell.popup.value != null) return shell.closePopup;
-      if (shell.settingsOpen) {
-        return shell.settingsPage != null
-            ? shell.settingsBack
-            : shell.closeSettings;
-      }
+      if (shell.settingsOpen) return shell.settingsBack;
       if (shell.shelfOpen) return shell.closeShelf;
       if (shell.passagesOpen) return shell.closePassages;
       if (shell.citedOpen) return shell.closeCited;
@@ -79,12 +73,10 @@ class AppShell extends StatelessWidget {
       listenable: shell,
       builder: (context, _) {
         final files = shell.pane == Pane.files;
-        // The chat is the Chats tab: it shows unless the workspace's pages, a page of the
+        // The chat is the base screen: it shows unless the workspace's pages, a page of the
         // toolkit's or Settings cover it.
         final chatShown =
             !files && shell.toolkitPage == null && !shell.settingsOpen;
-        // The first run's welcome stands alone, since no tab has anything to show yet.
-        final tabs = !(shell.settingsOpen && !scope.settings.configured);
         final right = switch (shell.beside) {
           Beside.sources => const SourcesPanel(),
           Beside.passages => const PassagesPanel(),
@@ -113,66 +105,45 @@ class AppShell extends StatelessWidget {
                   child: SafeArea(
                     child: Stack(
                       children: [
+                        // The chat stays built while it is off the screen, so a draft and a
+                        // running answer survive.
                         Positioned.fill(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Expanded(
-                                child: Stack(
-                                  children: [
-                                    // The chat stays built while it is off the screen, so a draft and a
-                                    // running answer survive.
-                                    Positioned.fill(
-                                      child: Offstage(
-                                        offstage: !chatShown,
-                                        child: TickerMode(
-                                          enabled: chatShown,
-                                          child: ExcludeFocus(
-                                            excluding: !chatShown,
-                                            child: ColoredBox(
-                                              color: t.bg,
-                                              child: const ChatView(),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    // The chats as a shelf from the left over the chat.
-                                    if (shell.shelfOpen)
-                                      const Positioned.fill(
-                                        child: ChatsShelf(),
-                                      ),
-                                    if (files)
-                                      Positioned.fill(
-                                        child: ColoredBox(
-                                          color: t.bg,
-                                          child: const WorkspacePages(),
-                                        ),
-                                      ),
-                                    if (shell.toolkitPage case final page?)
-                                      Positioned.fill(
-                                        child: switch (page) {
-                                          ToolkitPage.upcoming =>
-                                            const UpcomingPage(),
-                                          ToolkitPage.library =>
-                                            const LibraryPage(),
-                                          ToolkitPage.activity =>
-                                            const ActivityPage(),
-                                        },
-                                      ),
-                                    // A deleted chat is put back from over the chat's composer.
-                                    if (!shell.settingsOpen) const _PhoneUndo(),
-                                    if (shell.settingsOpen)
-                                      const Positioned.fill(
-                                        child: SettingsDialog(),
-                                      ),
-                                  ],
+                          child: Offstage(
+                            offstage: !chatShown,
+                            child: TickerMode(
+                              enabled: chatShown,
+                              child: ExcludeFocus(
+                                excluding: !chatShown,
+                                child: ColoredBox(
+                                  color: t.bg,
+                                  child: const ChatView(),
                                 ),
                               ),
-                              if (tabs) const _TabsUnlessTyping(),
-                            ],
+                            ),
                           ),
                         ),
+                        // The chats as a shelf from the left over the chat.
+                        if (shell.shelfOpen)
+                          const Positioned.fill(child: ChatsShelf()),
+                        if (files)
+                          Positioned.fill(
+                            child: ColoredBox(
+                              color: t.bg,
+                              child: const WorkspacePages(),
+                            ),
+                          ),
+                        if (shell.toolkitPage case final page?)
+                          Positioned.fill(
+                            child: switch (page) {
+                              ToolkitPage.upcoming => const UpcomingPage(),
+                              ToolkitPage.library => const LibraryPage(),
+                              ToolkitPage.activity => const ActivityPage(),
+                            },
+                          ),
+                        // A deleted chat is put back from over the chat's composer.
+                        if (!shell.settingsOpen) const _PhoneUndo(),
+                        if (shell.settingsOpen)
+                          const Positioned.fill(child: SettingsDialog()),
                         // The sheet's own scrim closes it.
                         if (shell.rightOpen) Positioned.fill(child: right),
                         // What another app shared, over everything but a popup.
@@ -318,7 +289,7 @@ class _BackGuard extends StatelessWidget {
 /// [child] above the on-screen keyboard. Android keeps the window full height under the
 /// keyboard and reports it as a bottom view inset, which a Scaffold would stand clear of; the
 /// shell has none. The inset is taken out below, so nothing applies it twice, and the
-/// keyboard's animation rebuilds this and not [child]; [_Typing] says whether it is up.
+/// keyboard's animation rebuilds this and not [child].
 class _AboveKeyboard extends StatelessWidget {
   const _AboveKeyboard({required this.child});
 
@@ -332,32 +303,9 @@ class _AboveKeyboard extends StatelessWidget {
       child: MediaQuery.removeViewInsets(
         context: context,
         removeBottom: true,
-        child: _Typing(typing: inset > 0, child: child),
+        child: child,
       ),
     );
-  }
-}
-
-/// Whether the keyboard is up, for what [_AboveKeyboard] holds, which no longer sees its inset.
-/// Only a change of it rebuilds those that read it, not each frame of the keyboard's rise.
-class _Typing extends InheritedWidget {
-  const _Typing({required this.typing, required super.child});
-
-  final bool typing;
-
-  @override
-  bool updateShouldNotify(_Typing old) => typing != old.typing;
-}
-
-/// The bar of tabs, put away while the keyboard is up, so the field typed in keeps the room.
-class _TabsUnlessTyping extends StatelessWidget {
-  const _TabsUnlessTyping();
-
-  @override
-  Widget build(BuildContext context) {
-    final typing =
-        context.dependOnInheritedWidgetOfExactType<_Typing>()?.typing ?? false;
-    return Offstage(offstage: typing, child: const HomeTabBar());
   }
 }
 

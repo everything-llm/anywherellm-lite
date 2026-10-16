@@ -11,7 +11,7 @@ import 'widgets/phone_page.dart';
 
 /// What the toolkit adds to the shelf, a card under a 20 px gap with a row for each thing it
 /// serves: Library, Activity and Upcoming, each with a line of what is in it once read, which a
-/// tap opens as a page over the tab. It reads each the first time it shows on a server, and shows
+/// tap opens as a page over the chat. It reads each the first time it shows on a server, and shows
 /// nothing while the toolkit serves none.
 class ToolkitCard extends StatefulWidget {
   const ToolkitCard({super.key});

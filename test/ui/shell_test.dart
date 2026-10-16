@@ -14,7 +14,6 @@ import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/controls.dart';
 import 'package:anywherellm/ui/widgets/sheet.dart';
 import 'package:anywherellm/core/server_models.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,7 +23,7 @@ import '../support/pump.dart';
 
 /// [text] in the Chats tab, drawn while Settings is closed.
 Finder inHome(String text) =>
-    find.descendant(of: find.byType(ChatsTab), matching: find.text(text));
+    find.descendant(of: find.byType(ChatsList), matching: find.text(text));
 
 Finder inSources(Finder finder) =>
     find.descendant(of: find.byType(SourcesPanel), matching: finder);
@@ -445,73 +444,32 @@ void main() {
     });
   });
 
-  group('the bar of tabs', () {
-    Finder tab(String label) =>
-        find.descendant(of: find.byType(HomeTabBar), matching: control(label));
+  group('the shelf\'s Settings row', () {
+    Finder inShelf(Finder f) =>
+        find.descendant(of: find.byType(ChatsShelf), matching: f);
 
-    testWidgets('stays under the chat, and its Chats tab puts the shelf away', (
+    testWidgets('opens Settings over the chat, and Back gives the chat back', (
       tester,
     ) async {
-      final h = await pumpApp(tester);
-      expect(find.byType(HomeTabBar), findsOneWidget);
-      // The composer sits above the bar, not under it.
-      expect(
-        tester.getBottomLeft(find.byType(ChatView)).dy,
-        lessThanOrEqualTo(tester.getTopLeft(find.byType(HomeTabBar)).dy),
-      );
-
-      h.shell.openShelf();
-      await tester.pumpAndSettle();
-      expect(find.byType(ChatsShelf), findsOneWidget);
-      await tester.tap(tab('Chats'));
-      await tester.pumpAndSettle();
-      expect(h.shell.shelfOpen, isFalse);
-      expect(find.byType(HomeTabBar), findsOneWidget);
-    });
-
-    testWidgets('stays under Settings\' pages and Upcoming', (tester) async {
       final h = await pumpApp(tester, shelf: true);
-      h.shell.openSettings(SettingsPage.appearance);
+      await tester.tap(inShelf(control('Settings')));
       await tester.pumpAndSettle();
-      expect(find.byType(HomeTabBar), findsOneWidget);
-      expect(h.shell.tab, HomeTab.settings);
+      expect(h.shell.settingsOpen, isTrue);
+      expect(h.shell.settingsPage, isNull);
+      expect(h.shell.shelfOpen, isFalse);
+      expect(control('Back to the chat'), findsOneWidget);
 
-      await tester.tap(tab('Chats'));
+      await tester.tap(control('Back to the chat'));
       await tester.pumpAndSettle();
-      h.shell.openToolkitPage(ToolkitPage.upcoming);
-      await tester.pumpAndSettle();
-      expect(find.byType(HomeTabBar), findsOneWidget);
+      expect(h.shell.settingsOpen, isFalse);
+      expect(find.byType(ChatView), findsOneWidget);
     });
 
-    testWidgets('gives way to the keyboard', (tester) async {
+    testWidgets('leaves the chat the whole window, with no bar under it', (
+      tester,
+    ) async {
       await pumpApp(tester);
-      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
-      addTearDown(tester.view.resetViewInsets);
-      await tester.pumpAndSettle();
-      expect(find.byType(HomeTabBar), findsNothing);
-
-      tester.view.resetViewInsets();
-      await tester.pumpAndSettle();
-      expect(find.byType(HomeTabBar), findsOneWidget);
-    });
-
-    testWidgets('is not on the first run\'s welcome', (tester) async {
-      final h = await pumpApp(tester, connection: null, shelf: true);
-      h.shell.openSettings(SettingsPage.connection);
-      await tester.pumpAndSettle();
-      expect(find.byType(HomeTabBar), findsNothing);
-    });
-
-    testWidgets('a sheet covers it', (tester) async {
-      final h = await pumpApp(tester);
-      h.shell.openSources();
-      await tester.pumpAndSettle();
-      // The sheet lies over the bar, so its Chats tab cannot be reached.
-      await tester.tapAt(
-        tester.getCenter(tab('Chats')),
-        kind: PointerDeviceKind.touch,
-      );
-      await tester.pumpAndSettle();
+      expect(tester.getBottomLeft(find.byType(ChatView)).dy, phoneSize.height);
     });
   });
 

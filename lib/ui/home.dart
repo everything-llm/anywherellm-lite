@@ -19,120 +19,18 @@ import 'widgets/phone_page.dart';
 import 'widgets/tappable.dart';
 import 'workspace_switcher.dart';
 
-/// The bar at the foot of the window: Chats and Settings, the tab shown on a pill of [Tokens.sel]
-/// with its icon in the accent.
-class HomeTabBar extends StatelessWidget {
-  const HomeTabBar({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    final shell = scope.shell;
-    final t = Tokens.of(context);
-    return ListenableBuilder(
-      listenable: shell,
-      builder: (context, _) => Semantics(
-        container: true,
-        label: 'Sections',
-        explicitChildNodes: true,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
-          decoration: BoxDecoration(
-            color: t.side,
-            border: Border(top: BorderSide(color: t.line2)),
-          ),
-          child: Row(
-            children: [
-              for (final (tab, label, icon) in [
-                (HomeTab.chats, 'Chats', 'chat'),
-                (HomeTab.settings, 'Settings', 'settings'),
-              ])
-                Expanded(
-                  child: _Tab(
-                    label: label,
-                    icon: icon,
-                    on: shell.tab == tab,
-                    onTap: () => shell.showTab(tab),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Tab extends StatelessWidget {
-  const _Tab({
-    required this.label,
-    required this.icon,
-    required this.on,
-    required this.onTap,
-  });
-
-  final String label;
-  final String icon;
-  final bool on;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Tappable(
-      label: label,
-      selected: on,
-      radius: BorderRadius.circular(Sizes.small),
-      onTap: onTap,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: Sizes.tab),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          spacing: 4,
-          children: [
-            Container(
-              width: 60,
-              height: 32,
-              decoration: BoxDecoration(
-                color: on ? t.sel : null,
-                borderRadius: BorderRadius.circular(99),
-              ),
-              child: Center(
-                child: AppIcon(
-                  icon,
-                  size: IconSize.medium,
-                  color: on ? t.accent : t.ink2,
-                ),
-              ),
-            ),
-            Text(
-              label,
-              style: Type.sans(
-                12.5,
-                weight: on ? FontWeight.w600 : FontWeight.w500,
-                color: on ? t.ink : t.muted,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// The chats list, drawn in the shelf: the open workspace's name as its title, which opens the Workspaces sheet,
 /// with Workspace settings and New chat beside it; the search; the toolkit's card; then the
 /// workspace's chats under Chats, each with a More button that opens its sheet. A chat opens in
 /// the chat and closes the shelf.
-class ChatsTab extends StatefulWidget {
-  const ChatsTab({super.key});
+class ChatsList extends StatefulWidget {
+  const ChatsList({super.key});
 
   @override
-  State<ChatsTab> createState() => _ChatsTabState();
+  State<ChatsList> createState() => _ChatsListState();
 }
 
-class _ChatsTabState extends State<ChatsTab> {
+class _ChatsListState extends State<ChatsList> {
   final _search = TextEditingController();
   final _searchFocus = FocusNode(debugLabel: 'Search chats');
 
@@ -402,7 +300,7 @@ class _FoundWorkspace extends StatelessWidget {
   }
 }
 
-/// A chat in the Chats tab: its name, after it its pin and whether its answer is ready, and a
+/// A chat in the chats list: its name, after it its pin and whether its answer is ready, and a
 /// More button that opens its sheet. Tapped, it opens in the chat.
 class _ChatRow extends StatelessWidget {
   const _ChatRow(this.thread, {required this.workspace, required this.pinned});

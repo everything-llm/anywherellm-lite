@@ -15,6 +15,7 @@ import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/settings/memory_page.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/settings/walkthrough.dart';
+import 'package:anywherellm/ui/shelf.dart';
 import 'package:anywherellm/ui/files/workspace_pages.dart';
 import 'package:anywherellm/ui/home.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
@@ -623,11 +624,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(
-      tester.getTopLeft(find.byType(ChatsTab)).dy,
+      tester.getTopLeft(find.byType(ChatsList)).dy,
       greaterThanOrEqualTo(24),
     );
     expect(
-      tester.getBottomLeft(find.byType(HomeTabBar)).dy,
+      tester.getBottomLeft(find.byType(ChatsShelf)).dy,
       lessThanOrEqualTo(640 - 24),
     );
   });

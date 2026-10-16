@@ -13,9 +13,6 @@ enum Pane { chats, files }
 /// A page of what the toolkit adds that lies over the chat, opened from its card in the shelf.
 enum ToolkitPage { upcoming, library, activity }
 
-/// A tab of the bar at the foot of the window: the chat, or Settings' list.
-enum HomeTab { chats, settings }
-
 /// What the sheet over the chat shows: Sources, the passages an answer read from one
 /// file, or all of an answer's sources ([cited]).
 enum Beside { sources, passages, cited }
@@ -67,7 +64,7 @@ enum WorkspaceSheet { create, rename, delete }
 /// is keyed by its [Turn] instead.
 enum Popup { workspaces, answerFrom, attach, memoryWorkspace }
 
-/// What is open over the chat, which is the Chats tab: the chats as a shelf,
+/// What is open over the chat, which is the base screen: the chats as a shelf,
 /// the sheet over the chat ([Beside]: the Documents panel, Sources in the code, or an answer's
 /// passages or sources), Settings and the page of it shown, the [popup] open, and which [Pane] is on screen.
 class ShellController extends ChangeNotifier {
@@ -261,9 +258,6 @@ class ShellController extends ChangeNotifier {
   /// The citation whose passages the sheet over the chat shows, or showed last.
   Citation? get passages => _passages;
 
-  /// The tab shown: Settings while Settings is open, else Chats, which is the chat.
-  HomeTab get tab => _settingsOpen ? HomeTab.settings : HomeTab.chats;
-
   /// Whether the sheet over the chat, or over the workspace's pages, is open.
   bool get rightOpen => _rightOpen;
 
@@ -309,12 +303,15 @@ class ShellController extends ChangeNotifier {
 
   /// Shows the chat with nothing over it: the shelf, the sheet, the popup, Settings, the
   /// workspace's pages and a page of the toolkit's are closed.
-  void openChat() => showTab(HomeTab.chats);
+  void openChat() {
+    _reset();
+    notifyListeners();
+  }
 
-  /// Shows [tab] with nothing over it: the shelf, the sheet, the popup, the workspace's pages, a
-  /// page of the toolkit's, the scanner and the walk-through are closed. A document's text
-  /// forgets what it was opened over.
-  void showTab(HomeTab tab) {
+  /// Closes everything over the chat, without telling listeners: the shelf, the sheet, the popup,
+  /// the workspace's pages, a page of the toolkit's, the scanner, the walk-through and Settings.
+  /// A document's text forgets what it was opened over.
+  void _reset() {
     _coverChat();
     _sourcesUnder = null;
     _pane = Pane.chats;
@@ -323,10 +320,9 @@ class ShellController extends ChangeNotifier {
     _scanning = false;
     _guide = null;
     _rightOpen = false;
-    _settingsOpen = tab == HomeTab.settings;
+    _settingsOpen = false;
     _settingsPage = null;
     _settingsDirect = false;
-    notifyListeners();
   }
 
   void openSources() => _setRight(open: true, beside: Beside.sources);
@@ -389,9 +385,13 @@ class ShellController extends ChangeNotifier {
   }
 
   /// Opens Settings on [page], over what shows, so that Back from it gives that back; or on its
-  /// list, the Settings tab, in place of whatever showed.
+  /// list, over the chat with nothing else open, as the shelf's Settings row does.
   void openSettings([SettingsPage? page]) {
-    if (page == null) return showTab(HomeTab.settings);
+    if (page == null) {
+      _reset();
+      _settingsOpen = true;
+      return notifyListeners();
+    }
     _settingsDirect = !_settingsOpen || _settingsDirect;
     _coverChat();
     _settingsPage = page;

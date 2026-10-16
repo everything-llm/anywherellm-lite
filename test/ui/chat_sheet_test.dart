@@ -83,7 +83,7 @@ void main() {
     tester,
   ) async {
     final h = await pumpApp(tester, llm: planningServer(), shelf: true);
-    expect(find.text('Chats'), findsOneWidget);
+    expect(find.text('CHATS'), findsOneWidget);
     expect(find.text('Upcoming'), findsOneWidget);
     // A chat's More opens its sheet over the shelf.
     await tester.tap(control('Rename, pin or delete Budget questions'));
@@ -104,11 +104,14 @@ void main() {
     expect(h.shell.pane.name, 'files');
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
+    // Settings sits at the shelf's foot, and its Back gives the chat back.
+    h.shell.openShelf();
+    await tester.pumpAndSettle();
     await tester.tap(control('Settings'));
     await tester.pumpAndSettle();
     expect(h.shell.settingsOpen, isTrue);
     expect(h.shell.settingsPage, isNull);
-    await tester.tap(control('Chats'));
+    await tester.tap(find.byTooltip('Back to the chat'));
     await tester.pumpAndSettle();
     expect(h.shell.settingsOpen, isFalse);
   });

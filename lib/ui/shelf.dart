@@ -6,11 +6,12 @@ import 'app_scope.dart';
 import 'home.dart';
 import 'layout.dart';
 import 'tokens.dart';
+import 'widgets/phone_page.dart';
 import 'widgets/rise.dart';
 
 /// The chats as a shelf that slides in from the left over the chat, which shows dimmed
-/// beside it: the chat's menu button opens it, and tapping the dimmed chat, a swipe to the
-/// left, Back or anything the shelf opens closes it.
+/// beside it, with Settings at its foot: the chat's menu button opens it, and tapping the dimmed
+/// chat, a swipe to the left, Back or anything the shelf opens closes it.
 class ChatsShelf extends StatefulWidget {
   const ChatsShelf({super.key});
 
@@ -96,13 +97,42 @@ class _ChatsShelfState extends State<ChatsShelf>
                     borderRadius: corner,
                     clipBehavior: Clip.antiAlias,
                     elevation: 0,
-                    child: const ChatsTab(),
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: ChatsList()),
+                        _SettingsFoot(),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The shelf's foot: a row that opens Settings' list over the chat, under a rule.
+class _SettingsFoot extends StatelessWidget {
+  const _SettingsFoot();
+
+  @override
+  Widget build(BuildContext context) {
+    final shell = AppScope.of(context).shell;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: Tokens.of(context).line2)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        child: NavRow(
+          icon: 'settings',
+          title: 'Settings',
+          onTap: shell.openSettings,
+        ),
       ),
     );
   }

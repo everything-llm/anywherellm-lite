@@ -78,37 +78,6 @@ class PhonePageHeader extends StatelessWidget {
   }
 }
 
-/// The title over a tab of the home, such as Settings: at 26, from the start of the line.
-class TabTitle extends StatelessWidget {
-  const TabTitle(this.title, {super.key});
-
-  final String title;
-
-  /// A tab's title in [color]: semibold at 26.
-  static TextStyle style(Color color) =>
-      Type.sans(26, weight: FontWeight.w600, letterSpacing: -0.3, color: color);
-
-  @override
-  Widget build(BuildContext context) => ConstrainedBox(
-    constraints: const BoxConstraints(minHeight: Sizes.header),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Semantics(
-          header: true,
-          child: Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: style(Tokens.of(context).ink),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
 /// A row that opens another page: an [icon] at 24, [title], the line [about] under it, and a
 /// chevron.
 class NavRow extends StatelessWidget {

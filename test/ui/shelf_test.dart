@@ -20,10 +20,10 @@ void main() {
       final h = await pumpApp(tester, llm: planningServer());
       await tester.pumpAndSettle();
       expect(find.byType(ChatView), findsOneWidget);
-      expect(find.byType(ChatsTab), findsNothing);
+      expect(find.byType(ChatsList), findsNothing);
       h.shell.openShelf();
       await tester.pumpAndSettle();
-      expect(find.byType(ChatsTab), findsOneWidget);
+      expect(find.byType(ChatsList), findsOneWidget);
     },
   );
 
@@ -38,7 +38,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byType(ChatsShelf),
-        matching: find.byType(ChatsTab),
+        matching: find.byType(ChatsList),
       ),
       findsOneWidget,
     );
