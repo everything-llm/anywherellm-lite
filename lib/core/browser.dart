@@ -5,7 +5,12 @@ import 'chat.dart';
 /// answer's image may be ([loadableImage]).
 bool isSkillPage(Uri link, Uri? server, String folder) =>
     loadableImage(link, server) &&
-    RegExp('^/$folder/[A-Za-z0-9_-]+\\.html\$').hasMatch(link.path);
+    _pages
+        .putIfAbsent(folder, () => RegExp('^/$folder/[A-Za-z0-9_-]+\\.html\$'))
+        .hasMatch(link.path);
+
+/// Each folder's page path, built once.
+final _pages = <String, RegExp>{};
 
 /// Whether [link] is browser-lean's page for an agent's tab: `/browser-lean/<token>.html`, which
 /// the skill links its tab's card to.
