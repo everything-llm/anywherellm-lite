@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/ui/chat/chat_view.dart';
+import 'package:anywherellm/ui/chat/wait_line.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/home.dart';
@@ -83,7 +84,8 @@ void main() {
         final h = await pumpApp(tester, llm: llm);
         await typeAndEnter(tester, 'What is due?');
         expect(find.text('What is due?'), findsOneWidget);
-        expect(find.byType(Caret), findsOneWidget);
+        expect(find.byType(WaitLine), findsOneWidget);
+        expect(find.byType(Caret), findsNothing);
         expect(control('Stop the answer'), findsOneWidget);
 
         llm.chat!.add(const TextChunk('The roadmap.'));
@@ -179,7 +181,7 @@ void main() {
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       await tester.pump();
       expect(find.text('What is due?'), findsOneWidget);
-      expect(find.byType(Caret), findsOneWidget);
+      expect(find.byType(WaitLine), findsOneWidget);
     });
 
     testWidgets('Stop ends the answer', (tester) async {
@@ -294,6 +296,35 @@ void main() {
         expect(key.keyboardType, TextInputType.visiblePassword);
         expect(key.autofillHints, isNull);
         expect(key.enableIMEPersonalizedLearning, isFalse);
+      },
+    );
+
+    testWidgets(
+      'until its first words an answer says what it waits on, and past 10 s for how long',
+      (tester) async {
+        final llm = planningServer()..hold = true;
+        llm.spaces[0].settings['chatModel'] = 'glm-5.3';
+        await pumpApp(tester, llm: llm);
+        await typeAndEnter(tester, 'What is due?');
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(find.text('Asking glm-5.3…'), findsOneWidget);
+        expect(find.textContaining(' s'), findsNothing);
+
+        llm.chat!.add(const StatusChunk('Running web-browsing'));
+        await tester.pump(const Duration(seconds: 11));
+        expect(find.text('Running web-browsing'), findsOneWidget);
+        expect(find.text('Asking glm-5.3…'), findsNothing);
+        expect(find.text(' · 11 s'), findsOneWidget);
+        expect(find.byType(Caret), findsNothing);
+
+        llm.chat!.add(const TextChunk('The roadmap.'));
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(find.byType(WaitLine), findsNothing);
+        expect(find.byType(Caret), findsOneWidget);
+        expect(find.text('Running web-browsing'), findsOneWidget);
+        llm.chat!.add(const ChatDone([]));
+        await llm.chat!.close();
+        await tester.pumpAndSettle();
       },
     );
 

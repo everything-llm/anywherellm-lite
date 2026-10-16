@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../core/chat.dart';
@@ -9,9 +10,14 @@ import '../../core/server_models.dart';
 class Turn extends ChangeNotifier {
   Turn.user(this.text, {this.attachments = const []})
     : role = Role.user,
-      streaming = false;
+      streaming = false,
+      asked = null;
 
-  Turn.answer() : role = Role.assistant, text = '', streaming = true;
+  Turn.answer()
+    : role = Role.assistant,
+      text = '',
+      streaming = true,
+      asked = clock.now();
 
   Turn.saved(ChatMessage message)
     : role = message.role,
@@ -21,10 +27,14 @@ class Turn extends ChangeNotifier {
       files = message.files,
       metrics = message.metrics,
       chatId = message.chatId,
-      streaming = false;
+      streaming = false,
+      asked = null;
 
   final Role role;
   String text;
+
+  /// When an answer's question was sent, or null for a question or a saved answer.
+  final DateTime? asked;
 
   /// The files sent with a question.
   List<SentFile> attachments = const [];

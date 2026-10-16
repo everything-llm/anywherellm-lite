@@ -32,6 +32,7 @@ import 'answer_menu.dart';
 import 'generated_files.dart';
 import 'passages_sheet.dart';
 import 'speaker.dart';
+import 'wait_line.dart';
 
 /// The chat on screen, newest at the bottom. Empty, it invites a first question.
 ///
@@ -669,11 +670,15 @@ class _Answer extends StatelessWidget {
           AlertBox(AlertKind.bad, 'The model did not answer', text: failure)
         else if (split.answer.isNotEmpty)
           AnswerBody(split.answer, muted: cut, caret: inline),
-        if (turn.streaming && turn.status != null) _Status(turn.status!),
-        if (turn.streaming && !inline)
-          // The caret alone, as the Lite prototype draws it, from the send on, while a
-          // model's reasoning is hidden too.
-          const Padding(padding: EdgeInsets.only(top: 6), child: Caret()),
+        // Until the first words, while a model's reasoning is hidden too, what it waits on.
+        if (turn.streaming && split.answer.isEmpty)
+          WaitLine(turn)
+        else ...[
+          if (turn.streaming && turn.status != null) _Status(turn.status!),
+          if (turn.streaming && !inline)
+            // The caret alone where the text cannot end with it, as in a code fence.
+            const Padding(padding: EdgeInsets.only(top: 6), child: Caret()),
+        ],
         if (turn.waiting) ...[
           const SizedBox(height: 10),
           AlertBox(

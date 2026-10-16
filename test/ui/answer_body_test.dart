@@ -2,6 +2,7 @@ import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/chat/answer_body.dart';
 import 'package:anywherellm/ui/chat/markdown_lists.dart';
+import 'package:anywherellm/ui/chat/wait_line.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:anywherellm/ui/widgets/controls.dart';
@@ -300,7 +301,7 @@ $$\frac{a}{b}$$
     llm.chat!.add(const TextChunk('<think>Hmm, a red'));
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Thinking…'), findsNothing);
-    expect(find.byType(Caret), findsOneWidget);
+    expect(find.byType(WaitLine), findsOneWidget);
     expect(find.textContaining('Hmm', findRichText: true), findsNothing);
     llm.chat!.add(const TextChunk(' square.</think>red'));
     await tester.pump(const Duration(milliseconds: 100));

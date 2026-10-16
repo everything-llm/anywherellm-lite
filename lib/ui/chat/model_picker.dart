@@ -13,14 +13,18 @@ import '../widgets/fields.dart';
 
 /// The model the open workspace answers with: its own, its own provider's name when it names no
 /// model, the system's, or `Chat model` while none is known.
-String workspaceModel(AppScope scope) {
+String workspaceModel(AppScope scope) =>
+    knownWorkspaceModel(scope) ?? 'Chat model';
+
+/// [workspaceModel], or null while none is known.
+String? knownWorkspaceModel(AppScope scope) {
   final sources = scope.sources;
   final system = systemChatModel(scope.system.settings);
   return switch ((sources.chatModel, sources.chatProvider)) {
     (final own?, _) => own,
     (_, final provider?) => chatProviders.labelOf(provider),
     _ when system.model.isNotEmpty => system.model,
-    _ => 'Chat model',
+    _ => null,
   };
 }
 
