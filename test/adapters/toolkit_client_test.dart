@@ -18,7 +18,7 @@ const _connection = Connection(
 
 const _health = {
   'ok': true,
-  'service': 'anythingllm-toolkit',
+  'service': 'anythingllm-bridge',
   'allow': ['GET /memories', 'not a rule'],
 };
 

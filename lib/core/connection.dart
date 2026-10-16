@@ -48,15 +48,14 @@ class ConnectionHolder {
 
   Connection? current;
 
-  /// Where each companion runs, by [Companion.service], when the person or a pairing code said;
+  /// Where each companion runs, by [Companion.code], when the person or a pairing code said;
   /// a companion not named here is where [Companion.base] guesses.
   Map<String, Uri> companions = const {};
 
   /// Where [companion] runs beside the server in use: where it was said to, or else
   /// [Companion.base]'s guess. Null with no server.
   Uri? addressOf(Companion companion) => switch (current) {
-    final server? =>
-      companions[companion.service] ?? companion.base(server.uri),
+    final server? => companions[companion.code] ?? companion.base(server.uri),
     null => null,
   };
 }
@@ -90,7 +89,7 @@ String normalizeBaseUrl(String raw) {
 }
 
 /// A connection and where each of its companions runs when that was said, by
-/// [Companion.service]: what a pairing code carries, and what the keyring keeps.
+/// [Companion.code]: what a pairing code carries, and what the keyring keeps.
 class Pairing {
   const Pairing(this.connection, [this.companions = const {}]);
 
@@ -104,9 +103,7 @@ class Pairing {
 /// `toolkit=...` by each one's [Companion.code]. Throws [ApiException] when [raw] is not a
 /// pairing code or what it carries cannot be used.
 Pairing parsePairingCode(String raw) {
-  const notOurs = ApiException(
-    'This QR code is not an AnywhereLLM connection.',
-  );
+  const notOurs = ApiException('This is not an AnywhereLLM pairing code.');
   final uri = Uri.tryParse(raw.trim());
   if (uri == null || uri.scheme != 'anywherellm' || uri.host != 'connect') {
     throw notOurs;
@@ -116,7 +113,7 @@ Pairing parsePairingCode(String raw) {
   if (url == null || key == null) throw notOurs;
   return Pairing(Connection.parse(url, key), {
     if (uri.queryParameters[toolkitCompanion.code] case final address?)
-      toolkitCompanion.service: _companionAddress(address),
+      toolkitCompanion.code: _companionAddress(address),
   });
 }
 

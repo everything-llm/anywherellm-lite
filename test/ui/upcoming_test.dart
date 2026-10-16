@@ -92,7 +92,7 @@ void main() {
     toolkit.present = true;
     await h.settings.pair(
       Pairing(sampleConnection, {
-        toolkitCompanion.service: Uri.parse('https://toolkit.example.com'),
+        toolkitCompanion.code: Uri.parse('https://toolkit.example.com'),
       }),
     );
     await tester.pumpAndSettle();

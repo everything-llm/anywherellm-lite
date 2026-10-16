@@ -51,7 +51,7 @@ void main() {
         'server', () async {
       final seen = <http.Request>[];
       final api = _answering({
-        'service': 'anythingllm-toolkit',
+        'service': 'anythingllm-bridge',
         'server': 'toolkit',
         'ok': true,
       }, seen: seen);
@@ -63,6 +63,13 @@ void main() {
       expect(seen.single.headers.containsKey('Authorization'), isFalse);
     });
 
+    test('believes the toolkit by its name before the suite', () async {
+      expect(
+        await _answering({'service': 'anythingllm-toolkit'}).health(),
+        isA<Map<String, dynamic>>(),
+      );
+    });
+
     test('is null for anything else that answers, or nothing', () async {
       expect(await _answering({'service': 'other'}).health(), isNull);
       expect(
@@ -72,7 +79,7 @@ void main() {
       );
       expect(
         await _answering({
-          'service': 'anythingllm-toolkit',
+          'service': 'anythingllm-bridge',
         }, status: 502).health(),
         isNull,
       );
@@ -88,7 +95,7 @@ void main() {
       final holder = ConnectionHolder(_connection);
       final api = _api((request) async {
         asked++;
-        return http.Response('{"service":"anythingllm-toolkit"}', 200);
+        return http.Response('{"service":"anythingllm-bridge"}', 200);
       }, holder: holder);
       await api.health();
       await api.health();
@@ -109,7 +116,7 @@ void main() {
         var asked = 0;
         Future<http.Response> count(http.Request _) async {
           asked++;
-          return http.Response('{"service":"anythingllm-toolkit"}', 200);
+          return http.Response('{"service":"anythingllm-bridge"}', 200);
         }
 
         expect(await _api(count, holder: ConnectionHolder()).health(), isNull);
@@ -118,9 +125,7 @@ void main() {
             count,
             holder: ConnectionHolder(_connection)
               ..companions = {
-                toolkitCompanion.service: Uri.parse(
-                  'http://toolkit.example.com',
-                ),
+                toolkitCompanion.code: Uri.parse('http://toolkit.example.com'),
               },
           ).health(),
           isNull,
@@ -135,11 +140,11 @@ void main() {
     final api = _api(
       (request) async {
         seen.add(request.url);
-        return http.Response('{"service":"anythingllm-toolkit"}', 200);
+        return http.Response('{"service":"anythingllm-bridge"}', 200);
       },
       holder: ConnectionHolder(_connection)
         ..companions = {
-          toolkitCompanion.service: Uri.parse('http://toolkit.lan/v2'),
+          toolkitCompanion.code: Uri.parse('http://toolkit.lan/v2'),
         },
     );
     expect(await api.health(), isA<Map<String, dynamic>>());

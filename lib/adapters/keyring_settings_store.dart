@@ -4,10 +4,12 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../core/connection.dart';
 import '../core/ports.dart';
+import '../core/toolkit.dart';
 
 /// [SettingsStore] in the Android Keystore, as one entry holding the address, the key and where
-/// its companions run, when said. An entry an older version saved with the server's password
-/// is written again without it.
+/// its companions run, when said. An entry an older version saved with the server's password,
+/// or with a companion's address under the name its `/health` gave, is written again as this
+/// version keeps it ([companionKey]).
 class KeyringSettingsStore implements SettingsStore {
   KeyringSettingsStore({FlutterSecureStorage? storage})
     : _storage = storage ?? const FlutterSecureStorage();
@@ -22,7 +24,7 @@ class KeyringSettingsStore implements SettingsStore {
     if (stored == null) return null;
     final Connection connection;
     final Map<String, Uri> companions;
-    final bool hadPassword;
+    final bool outdated;
     try {
       final json = jsonDecode(stored) as Map<String, dynamic>;
       connection = Connection(
@@ -33,15 +35,19 @@ class KeyringSettingsStore implements SettingsStore {
       companions = {
         if (named is Map)
           for (final MapEntry(:key, :value) in named.entries)
-            if (key is String && value is String) key: Uri.parse(value),
+            if (key is String && value is String)
+              companionKey(key): Uri.parse(value),
       };
-      hadPassword = json.containsKey('password');
+      outdated =
+          json.containsKey('password') ||
+          (named is Map &&
+              named.keys.any((key) => companionKey('$key') != key));
     } on Object {
       throw const ApiException(
         'The saved connection in the keyring is unreadable. Enter it again and save.',
       );
     }
-    if (hadPassword) {
+    if (outdated) {
       try {
         await save(Pairing(connection, companions));
       } on ApiException {

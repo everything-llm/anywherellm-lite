@@ -8,13 +8,21 @@ class Companion {
     required this.port,
     required this.name,
     required this.code,
+    this.formerly = const [],
   });
 
-  /// What its `/health` names itself, as `anythingllm-toolkit`.
+  /// What its `/health` names itself, as `anythingllm-bridge`.
   final String service;
+
+  /// What an older version's `/health` named it, which is still taken as this companion.
+  final List<String> formerly;
+
+  /// Every name its `/health` may give: its [service], then those it had [formerly].
+  List<String> get names => [service, ...formerly];
   final int port;
 
-  /// What a pairing code names its address by, as `toolkit` in `&toolkit=...`.
+  /// What a pairing code names its address by, as `toolkit` in `&toolkit=...`, and what the
+  /// app keeps that address under.
   final String code;
 
   /// How a message names it, as `The toolkit`.
@@ -23,8 +31,8 @@ class Companion {
   /// Its address beside the AnythingLLM server at [server]: the same host on [port].
   Uri base(Uri server) => Uri(scheme: 'https', host: server.host, port: port);
 
-  /// Whether [json], an answer to `GET /health`, is this companion's.
-  bool isHealth(Object? json) => json is Map && json['service'] == service;
+  /// Whether [json], an answer to `GET /health`, is this companion's, under any of its [names].
+  bool isHealth(Object? json) => json is Map && names.contains(json['service']);
 }
 
 /// The parts of [uri]'s path, without empty ones.

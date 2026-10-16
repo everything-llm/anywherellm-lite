@@ -1,5 +1,6 @@
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/toolkit.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -140,7 +141,7 @@ void main() {
       );
       expect(pairing.connection.baseUrl, 'https://ai.example.com');
       expect(pairing.companions, {
-        'anythingllm-toolkit': Uri.parse('https://toolkit.example.com'),
+        'toolkit': Uri.parse('https://toolkit.example.com'),
       });
       expect(
         () => parsePairingCode(
@@ -173,7 +174,7 @@ void main() {
             isA<ApiException>().having(
               (e) => e.message,
               'message',
-              contains('not an AnywhereLLM connection'),
+              contains('not an AnywhereLLM pairing code'),
             ),
           ),
           reason: bad,
@@ -186,6 +187,28 @@ void main() {
       expect(() => parsePairingCode(code), throwsA(isA<ApiException>()));
     });
   });
+
+  test(
+    'a companion runs where its code says, or is guessed beside the server',
+    () {
+      final holder =
+          ConnectionHolder(
+              const Connection(baseUrl: 'https://ai.example.com', apiKey: 'K'),
+            )
+            ..companions = {
+              toolkitCompanion.code: Uri.parse('https://bridge.example.com'),
+            };
+      expect(
+        holder.addressOf(toolkitCompanion),
+        Uri.parse('https://bridge.example.com'),
+      );
+      holder.companions = const {};
+      expect(
+        holder.addressOf(toolkitCompanion),
+        Uri.parse('https://ai.example.com:8467'),
+      );
+    },
+  );
 }
 
 /// The pairing code that carries [connection], as AnywhereLLM on a computer drew it.

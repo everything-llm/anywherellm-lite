@@ -92,4 +92,14 @@ void main() {
       expect(all, isNot(contains(ToolkitFeature.activity)));
     });
   });
+
+  test(
+    'a companion\'s address kept under a /health name moves to its code',
+    () {
+      expect(companionKey('anythingllm-toolkit'), toolkitCompanion.code);
+      expect(companionKey('anythingllm-bridge'), toolkitCompanion.code);
+      expect(companionKey('toolkit'), 'toolkit');
+      expect(companionKey('other'), 'other');
+    },
+  );
 }

@@ -1,14 +1,26 @@
 import 'companion.dart';
 
-/// The toolkit, anythingllm-toolkit, as a [Companion]: a bridge that passes the routes of
+/// The toolkit, anythingllm-suite's bridge, as a [Companion]: it passes the routes of
 /// AnythingLLM's internal API (`/api`) its owner allows, for the developer key. The app uses it
 /// for what AnythingLLM keeps behind its web login: the saved memories and the scheduled jobs.
+/// Before the suite it was anythingllm-toolkit, whose `/health` and saved address still count.
 const toolkitCompanion = Companion(
-  service: 'anythingllm-toolkit',
+  service: 'anythingllm-bridge',
+  formerly: ['anythingllm-toolkit'],
   port: 8467,
   name: 'The toolkit',
   code: 'toolkit',
 );
+
+/// Every companion the app knows.
+const knownCompanions = [toolkitCompanion];
+
+/// [key], under which an older version kept a companion's address, as the app keys it now: a
+/// companion's [Companion.code] in place of any of its [Companion.names], and any other key as it
+/// is.
+String companionKey(String key) =>
+    knownCompanions.where((c) => c.names.contains(key)).firstOrNull?.code ??
+    key;
 
 /// The features the app finds in what the toolkit allows ([bridgeFeatures]).
 abstract final class ToolkitFeature {

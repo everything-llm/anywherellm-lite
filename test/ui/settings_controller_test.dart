@@ -137,16 +137,16 @@ void main() {
       'a pairing code saves where they run, once the key opens the server',
       () async {
         final saved = await settings.pair(
-          Pairing(_saved, {toolkitCompanion.service: toolkit}),
+          Pairing(_saved, {toolkitCompanion.code: toolkit}),
         );
         expect(saved, isTrue);
         expect(settings.addressOf(toolkitCompanion), toolkit);
-        expect(store.savedCompanions, {toolkitCompanion.service: toolkit});
+        expect(store.savedCompanions, {toolkitCompanion.code: toolkit});
       },
     );
 
     test('another key keeps them, and another server forgets them', () async {
-      await settings.pair(Pairing(_saved, {toolkitCompanion.service: toolkit}));
+      await settings.pair(Pairing(_saved, {toolkitCompanion.code: toolkit}));
       await settings.save(_saved.baseUrl, 'K2');
       expect(settings.addressOf(toolkitCompanion), toolkit);
       expect(store.savedCompanions, isNotEmpty);

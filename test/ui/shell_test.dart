@@ -698,7 +698,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(h.store.saved, isNull);
       expect(
-        find.text('This QR code is not an AnywhereLLM connection.'),
+        find.text('This is not an AnywhereLLM pairing code.'),
         findsOneWidget,
       );
       expect(control('Connect'), findsOneWidget);

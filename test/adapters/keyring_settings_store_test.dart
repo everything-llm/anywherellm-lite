@@ -41,11 +41,26 @@ void main() {
   test('companions\' addresses load back with the connection', () async {
     FlutterSecureStorage.setMockInitialValues({});
     final store = KeyringSettingsStore();
-    final toolkit = {
-      'anythingllm-toolkit': Uri.parse('https://toolkit.example.com'),
-    };
+    final toolkit = {'toolkit': Uri.parse('https://toolkit.example.com')};
     await store.save(Pairing(_connection, toolkit));
     expect((await store.load())?.companions, toolkit);
+  });
+
+  test('a companion kept under its /health name is written again under its code', () async {
+    FlutterSecureStorage.setMockInitialValues({
+      'anythingllm-connection':
+          '{"baseUrl":"https://h:3001","apiKey":"K",'
+          '"companions":{"anythingllm-toolkit":"https://toolkit.example.com"}}',
+    });
+    final loaded = await KeyringSettingsStore().load();
+    expect(loaded?.companions, {
+      'toolkit': Uri.parse('https://toolkit.example.com'),
+    });
+    final stored = await const FlutterSecureStorage().read(
+      key: 'anythingllm-connection',
+    );
+    expect(stored, contains('"toolkit"'));
+    expect(stored, isNot(contains('anythingllm-toolkit')));
   });
 
   test('clear removes it', () async {
