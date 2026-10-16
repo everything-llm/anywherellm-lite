@@ -1,6 +1,6 @@
 # What the full Settings design can reach on AnythingLLM
 
-Findings from reading AnythingLLM v1.16.2's server source (`server/endpoints/`, tag `v1.16.2`) on 2026-10-07, for the proposed desktop Settings on the design canvas (`DesktopSettings.dc.html`). Nothing was run against a server. Route paths below are relative to `/api`.
+Findings from reading AnythingLLM v1.16.2's server source (`server/endpoints/`, tag `v1.16.2`) on 2026-10-07, for the proposed desktop Settings on the retired Design canvas (`DesktopSettings.dc.html`). Nothing was run against a server. Route paths below are relative to `/api`.
 
 ## Two ways in
 
