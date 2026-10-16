@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/chat/browser_sheet.dart';
 import 'package:anywherellm/ui/chat/page_sheet.dart';
@@ -323,4 +325,33 @@ void main() {
       expect(find.text('You: Book Tuesday'), findsNothing);
     },
   );
+
+  testWidgets('a message the bar cannot send after the hand back stays typed', (
+    tester,
+  ) async {
+    final llm = answering('Done: [the tab](/browser-lean/3kQ.html)');
+    final h = await pumpApp(tester, llm: llm, canViewApps: true);
+    await tapLink(tester, 'the tab');
+    await tester.pumpAndSettle();
+    final page = h.appView!.channel!;
+    page.onMessage('{"who":"user"}');
+    await tester.pumpAndSettle();
+    final bar = find.descendant(
+      of: find.byType(AgentBar),
+      matching: find.byType(EditableText),
+    );
+    await tester.enterText(bar, 'Book Tuesday');
+    await tester.pump();
+    await tester.tap(control('Send to the agent'));
+    await tester.pump();
+    // The workspace starts answering while the tab is handed back.
+    llm.hold = true;
+    unawaited(h.chat.send('Something else'));
+    await tester.pump();
+    page.onMessage('{"gave":true}');
+    await tester.pump(const Duration(seconds: 1));
+    expect(tester.widget<EditableText>(bar).controller.text, 'Book Tuesday');
+    await llm.chat!.close();
+    await tester.pump(const Duration(seconds: 1));
+  });
 }

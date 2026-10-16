@@ -135,7 +135,12 @@ class _AgentBarState extends State<AgentBar> {
     if (!canSend(chat, text)) return;
     _draft.clear();
     await widget.onGive();
-    if (!mounted || !canSend(chat, text)) return;
+    if (!mounted) return;
+    if (!canSend(chat, text)) {
+      // Not sent, so it stays to send again, unless something was typed meanwhile.
+      if (_draft.text.isEmpty) _draft.text = text;
+      return;
+    }
     // The answer is in the chat's turns as soon as the message is taken.
     unawaited(chat.send(text));
     setState(() => _said = (text, chat.turns.last));
