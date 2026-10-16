@@ -13,6 +13,7 @@ import '../links.dart';
 import '../icons.dart';
 import '../layout.dart';
 import '../state/chat_controller.dart';
+import '../state/turn.dart';
 import '../state/prefs_controller.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';

@@ -11,77 +11,7 @@ import 'fleeting.dart';
 import 'notice.dart';
 import 'prefs_controller.dart';
 import 'settings_controller.dart';
-
-/// One turn on screen. An answer grows while it streams, and notifies only its own listeners
-/// as it does, so a chunk rebuilds the answer and nothing else.
-class Turn extends ChangeNotifier {
-  Turn.user(this.text, {this.attachments = const []})
-    : role = Role.user,
-      streaming = false;
-
-  Turn.answer() : role = Role.assistant, text = '', streaming = true;
-
-  Turn.saved(ChatMessage message)
-    : role = message.role,
-      text = message.text,
-      citations = message.citations,
-      attachments = message.attachments,
-      files = message.files,
-      metrics = message.metrics,
-      chatId = message.chatId,
-      streaming = false;
-
-  final Role role;
-  String text;
-
-  /// The files sent with a question.
-  List<SentFile> attachments = const [];
-  List<Citation> citations = const [];
-
-  /// What an agent made with the answer.
-  List<GeneratedFile> files = const [];
-
-  /// How the answer ran, when the server measured it.
-  AnswerMetrics? metrics;
-
-  /// The server's id for the exchange, once it has said, which tells a saved answer from the
-  /// ones before it.
-  int? chatId;
-  bool streaming;
-
-  /// Why the answer failed, or null.
-  String? error;
-
-  /// Whether the person stopped the answer.
-  bool stopped = false;
-
-  /// Whether the connection dropped while the server may still be writing the answer: the chat
-  /// is read until the server has saved it ([ChatController.checkWaiting]).
-  bool waiting = false;
-
-  /// Whether the server may finish this answer after the app let go of it: it failed, was
-  /// stopped or is [waiting].
-  bool get unfinished =>
-      role == Role.assistant && (error != null || stopped || waiting);
-
-  /// What an agent is doing while the answer runs, such as a tool it runs, or null.
-  String? status;
-
-  void _grow(String more) {
-    text += more;
-    notifyListeners();
-  }
-
-  void _setStatus(String line) {
-    status = line;
-    notifyListeners();
-  }
-
-  void _replace(String whole) {
-    text = whole;
-    notifyListeners();
-  }
-}
+import 'turn.dart';
 
 /// A chat [ChatController.delete] took out of the list and has not deleted on the server yet.
 class _Deleted {
@@ -803,36 +733,15 @@ class ChatController extends ChangeNotifier {
     final thread = threadSlug;
     _follow(
       running,
-      answer,
       _api.streamChat(slug, thread, text, attachments: attachments),
     );
     return true;
   }
 
-  /// Reads [events] into [answer], the answer [running] is, until it ends or fails.
-  void _follow(_Running running, Turn answer, Stream<ChatEvent> events) {
+  /// Reads [events] into the answer [running] is, until it ends or fails.
+  void _follow(_Running running, Stream<ChatEvent> events) {
     running.stream = events.listen(
-      (event) {
-        switch (event) {
-          case TextChunk(:final text):
-            answer._grow(text);
-          case StatusChunk(:final text):
-            answer._setStatus(text);
-          case WholeAnswer(:final text):
-            answer._replace(text);
-          case ChatDone(
-            :final citations,
-            :final files,
-            :final metrics,
-            :final chatId,
-          ):
-            answer
-              ..citations = citations
-              ..files = files
-              ..metrics = metrics
-              ..chatId = chatId;
-        }
-      },
+      running.answer.take,
       onError: (Object error) {
         if (error is CutOff) return _wait(running);
         _finish(

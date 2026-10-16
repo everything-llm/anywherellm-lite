@@ -5,6 +5,7 @@ import '../../core/errors.dart';
 import '../../core/markdown.dart';
 import '../../core/prefs.dart';
 import '../state/chat_controller.dart';
+import '../state/turn.dart';
 import '../state/prefs_controller.dart';
 
 /// Reads text aloud with the device's own speech.

@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import '../../core/chat.dart';
 import '../../core/markdown.dart';
 import '../state/chat_controller.dart';
+import '../state/turn.dart';
 import '../state/shell_controller.dart';
 
 /// The chat a tapped notification opens.

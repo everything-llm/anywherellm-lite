@@ -5,7 +5,7 @@ import '../../core/gallery.dart';
 import '../../core/server_models.dart';
 import '../settings/settings_pages.dart';
 import '../share/shared_item.dart';
-import 'chat_controller.dart';
+import 'turn.dart';
 
 /// What the main pane shows: the chat, or the open workspace's pages.
 enum Pane { chats, files }

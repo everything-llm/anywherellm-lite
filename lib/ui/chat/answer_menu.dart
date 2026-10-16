@@ -4,7 +4,7 @@ import '../../core/outputs.dart';
 import '../../core/prefs.dart';
 import '../app_scope.dart';
 import '../icons.dart';
-import '../state/chat_controller.dart';
+import '../state/turn.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../type.dart';

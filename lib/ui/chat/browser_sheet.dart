@@ -9,6 +9,7 @@ import '../apps/app_view.dart';
 import '../icons.dart';
 import '../links.dart';
 import '../state/chat_controller.dart';
+import '../state/turn.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/controls.dart';
