@@ -353,6 +353,42 @@ void main() {
     expect(rig.chat.activeThread, isNull);
   });
 
+  test('new chat starts a draft while the chat on screen is read', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    final gate = llm.gates['history'] = Completer<void>();
+    final opening = rig.chat.select('q3', thread: 'priorities');
+    await pumpEventQueue();
+    expect(rig.chat.turns, isEmpty);
+    rig.chat.newChat();
+    expect(rig.chat.activeThread, isNull);
+    gate.complete();
+    await opening;
+  });
+
+  test(
+    'a chat tapped before the workspaces are read opens once they are',
+    () async {
+      final store = FakeSettingsStore()..saved = sampleConnection;
+      final rig = Rig(
+        llm: planningServer(),
+        store: store,
+        prefsStore: FakePrefsStore(
+          const Prefs(lastChat: LastChat('household', null)),
+        ),
+      );
+      addTearDown(rig.dispose);
+      await rig.chat.openTapped('q3', 'priorities');
+      await rig.prefs.load();
+      await rig.settings.load();
+      await pumpEventQueue();
+      expect(
+        (rig.chat.activeSlug, rig.chat.activeThread),
+        ('q3', 'priorities'),
+      );
+    },
+  );
+
   test('deleting the chat on screen shows a new chat in its place', () async {
     final llm = planningServer();
     final rig = await started(llm);

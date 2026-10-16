@@ -344,13 +344,32 @@ class ChatController extends ChangeNotifier {
     if (_server != server) return;
     loading = false;
     unreachable.value = failed;
-    if (active == null) {
+    final tapped = failed ? null : _tapped;
+    if (!failed) _tapped = null;
+    if (tapped case (final slug, final thread)
+        when workspaces.any((w) => w.slug == slug)) {
+      await select(slug, thread: thread);
+    } else if (active == null) {
       final (slug, thread) = _startChat;
       await select(slug, thread: thread);
     } else {
       notifyListeners();
     }
     unawaited(_countDocs());
+  }
+
+  /// The chat a tapped notification asked for before the workspaces were read, which [load]
+  /// opens in place of the last chat.
+  (String, String)? _tapped;
+
+  /// Opens chat [thread] of workspace [slug], as a tapped notification asks. Before the
+  /// workspaces are read, as when the tap started the app, [load] opens it once they are.
+  Future<void> openTapped(String slug, String thread) {
+    if (_server == null || workspaces.isEmpty) {
+      _tapped = (slug, thread);
+      return Future.value();
+    }
+    return select(slug, thread: thread);
   }
 
   /// Asks each workspace how many documents it holds, all at once. Best effort: a count that
@@ -459,9 +478,13 @@ class ChatController extends ChangeNotifier {
     _draftGo++;
   }
 
-  /// Starts a draft, unless the chat on screen is already empty.
+  /// Starts a draft, unless the chat on screen is already empty: a draft, or a chat read with no
+  /// turns. A chat whose turns are still being read is not empty.
   void newChat() {
-    if (turns.isEmpty) return;
+    final thread = activeThread;
+    if (thread == null ? _draft.isEmpty : _turns[thread]?.isEmpty == true) {
+      return;
+    }
     _freshDraft();
     activeThread = null;
     _rememberChat();

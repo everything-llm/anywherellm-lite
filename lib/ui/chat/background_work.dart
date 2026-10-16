@@ -97,7 +97,7 @@ class KeepAnswering {
       _chat.workspaces.where((w) => w.slug == slug).firstOrNull?.name;
 
   void _open(ChatTarget target) {
-    unawaited(_chat.select(target.slug, thread: target.thread));
+    unawaited(_chat.openTapped(target.slug, target.thread));
     _shell.openChat();
   }
 
