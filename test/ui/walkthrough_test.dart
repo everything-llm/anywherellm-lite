@@ -143,7 +143,7 @@ void main() {
       expect(find.text('1 of ${toolkitSteps.length}'), findsOneWidget);
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pumpAndSettle();
-      expect(find.textContaining('anythingllm-toolkit gui'), findsOneWidget);
+      expect(find.textContaining('tools/install --bridge'), findsOneWidget);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(h.shell.guiding, isFalse);
@@ -163,29 +163,17 @@ void main() {
       expect(find.text('Memory'), findsNothing);
     });
 
-    testWidgets('the installer\'s page says which AnythingLLM is picked', (
-      tester,
-    ) async {
-      final h = await _settings(tester);
-      h.shell.showGuide(Guide.toolkit);
-      await tester.pumpAndSettle();
-      await tester.tap(control('Screen 3: Step 2 · Add it'));
-      await tester.pumpAndSettle();
-      expect(find.textContaining('AnythingLLM Desktop: its'), findsOneWidget);
-      await tester.tap(control('anythingllm, a podman container'));
-      await tester.pumpAndSettle();
-      expect(find.textContaining('anythingllm: a podman'), findsOneWidget);
-    });
-
     testWidgets('its end opens Connection with the camera reading', (
       tester,
     ) async {
       final h = await _settings(tester, canScan: true);
       h.shell.showGuide(Guide.toolkit);
       await tester.pumpAndSettle();
-      await tester.tap(control('Screen ${toolkitSteps.length}: Step 3 · Scan'));
+      await tester.tap(
+        control('Screen ${toolkitSteps.length}: Step 3 · Connect'),
+      );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Scan the installer\'s code'));
+      await tester.tap(find.text('Scan the pairing code'));
       await tester.pumpAndSettle();
       expect(h.shell.guiding, isFalse);
       expect(h.shell.settingsPage, SettingsPage.connection);
@@ -197,9 +185,11 @@ void main() {
       final h = await _settings(tester);
       h.shell.showGuide(Guide.toolkit);
       await tester.pumpAndSettle();
-      await tester.tap(control('Screen ${toolkitSteps.length}: Step 3 · Scan'));
+      await tester.tap(
+        control('Screen ${toolkitSteps.length}: Step 3 · Connect'),
+      );
       await tester.pumpAndSettle();
-      await tester.tap(control('Close, scan it on a phone with a camera'));
+      await tester.tap(control('Close, then open the link on this phone'));
       await tester.pumpAndSettle();
       expect(h.shell.guiding, isFalse);
       expect(h.shell.scanning, isFalse);

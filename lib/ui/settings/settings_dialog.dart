@@ -197,7 +197,7 @@ class _Nav extends StatelessWidget {
 }
 
 /// Add the toolkit, over the list of Settings. Its end opens the Connection page with the
-/// camera reading, for the code the toolkit's installer shows, where there is a camera.
+/// camera reading, for the pairing link drawn as a QR code, where there is a camera.
 class _ToolkitGuide extends StatelessWidget {
   const _ToolkitGuide();
 
@@ -210,10 +210,10 @@ class _ToolkitGuide extends StatelessWidget {
       title: 'Add the toolkit',
       steps: toolkitSteps,
       onClose: () => shell.showGuide(null),
-      end: canScan ? 'Scan the installer\'s code' : 'Close',
+      end: canScan ? 'Scan the pairing code' : 'Close',
       endAbout: canScan
-          ? 'or close and scan it later'
-          : 'scan it on a phone with a camera',
+          ? 'or open the link on this phone'
+          : 'then open the link on this phone',
       onEnd: () {
         shell.showGuide(null);
         if (!canScan) return;

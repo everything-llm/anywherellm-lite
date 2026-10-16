@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -71,8 +73,8 @@ const connectSteps = [
   ),
 ];
 
-/// Add the toolkit: what it adds, then installing it, adding it to an AnythingLLM and scanning
-/// the code its installer shows.
+/// Add the toolkit: what it adds, then installing anythingllm-suite's bridge, printing its
+/// pairing link, and opening or scanning that link here.
 const toolkitSteps = [
   GuideStep(
     'The toolkit',
@@ -85,22 +87,30 @@ const toolkitSteps = [
   ),
   GuideStep(
     'Step 1 · Install',
-    'On that computer, run this and open the address it prints.',
+    'On the computer AnythingLLM runs on, with Node 20.3 or later, run this.',
     code: [
-      '\$ uv run anythingllm-toolkit gui',
-      '~  Open this address in the browser:',
-      '  [http://127.0.0.1:8470/?token=…]',
+      '\$ git clone https://github.com/BinaryBand/anythingllm-suite',
+      '\$ cd anythingllm-suite',
+      '\$ tools/install --bridge',
+      '# Docker: add --storage and the folder',
+      '# mounted at /app/server/storage',
     ],
   ),
   GuideStep(
-    'Step 2 · Add it',
-    'Pick your AnythingLLM and choose Add the toolkit.',
-    art: GuideArt.pick,
+    'Step 2 · Pair',
+    'Then print the link that connects this phone.',
+    sub:
+        'Your phone must reach AnythingLLM and the toolkit first; the bridge\'s README says '
+        'how.',
+    code: [
+      '\$ node packages/bridge/dist/anythingllm-suite.cjs pair',
+      '~  [anywherellm://connect?url=…&key=…&toolkit=…]',
+    ],
   ),
   GuideStep(
-    'Step 3 · Scan',
-    'Scan the code the page shows. Memory then appears here.',
-    sub: 'If the page says your phone can\'t reach it yet, copy the fix it shows.',
+    'Step 3 · Connect',
+    'Open that link on this phone, or turn it into a QR code and scan it.',
+    sub: 'Memory then appears here.',
     art: GuideArt.pair,
   ),
 ];
@@ -318,6 +328,9 @@ class _Marks extends StatelessWidget {
   }
 }
 
+/// The room around a screen of a walk-through.
+const _screenPadding = EdgeInsets.fromLTRB(16, 12, 16, 28);
+
 /// One screen, centred in its room, scrolling when it is taller: its kicker, what it says and
 /// the line under it, then its picture, code or list.
 class _Screen extends StatelessWidget {
@@ -341,9 +354,11 @@ class _Screen extends StatelessWidget {
     final code = step.code;
     return LayoutBuilder(
       builder: (context, room) => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+        padding: _screenPadding,
         child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: room.maxHeight - 40),
+          constraints: BoxConstraints(
+            minHeight: math.max(0, room.maxHeight - _screenPadding.vertical),
+          ),
           child: Rise(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,

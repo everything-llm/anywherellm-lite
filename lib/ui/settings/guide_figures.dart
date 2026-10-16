@@ -4,7 +4,6 @@ import 'package:path_drawing/path_drawing.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/rise.dart';
-import '../widgets/tappable.dart';
 import 'rows.dart';
 
 /// The pictures of the walk-throughs, drawn on a 300 by 180 unit box as the Lite prototype
@@ -22,13 +21,9 @@ enum GuideArt {
     'Settings, expanded',
     'The toolkit beside AnythingLLM adds a Memory row to this app\'s Settings',
   ),
-  pick(
-    'Installer page',
-    'The installer\'s page lists each AnythingLLM it found, with Add the toolkit',
-  ),
   pair(
     'Pairing code',
-    'The installer\'s page shows a code, and the phone scans it',
+    'The pairing link drawn as a QR code, and the phone scanning it',
   );
 
   const GuideArt(this.name, this.label);
@@ -40,49 +35,17 @@ enum GuideArt {
   final String label;
 }
 
-/// Each AnythingLLM the installer's page offers in [GuideArt.pick], with what its readout
-/// says when it is picked.
-const _found = [
-  (
-    'AnythingLLM Desktop',
-    'the app on this computer',
-    'AnythingLLM Desktop: its storage folder on this computer.',
-  ),
-  (
-    'anythingllm',
-    'a podman container',
-    'anythingllm: a podman container. The toolkit goes into the storage it mounts.',
-  ),
-];
-
 /// [art] as a component, in a card as wide as the page: the picture, at most [maxHeight]
-/// tall, which grows in as it shows; for [GuideArt.pick] a readout of the AnythingLLM tapped;
-/// and the figure's name under a rule.
-class GuideFigure extends StatefulWidget {
+/// tall, which grows in as it shows, and the figure's name under a rule.
+class GuideFigure extends StatelessWidget {
   const GuideFigure(this.art, {super.key, required this.maxHeight});
 
   final GuideArt art;
   final double maxHeight;
 
   @override
-  State<GuideFigure> createState() => _GuideFigureState();
-}
-
-class _GuideFigureState extends State<GuideFigure> {
-  /// Which of [_found] the installer's page has picked.
-  int _picked = 0;
-
-  @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final art = widget.art;
-    final picture = AspectRatio(
-      aspectRatio: 300 / 180,
-      // Its own layer, so the screen's rise moves it without painting it again.
-      child: RepaintBoundary(
-        child: CustomPaint(painter: _FigurePainter(art, t, _picked)),
-      ),
-    );
     return Container(
       decoration: cardDecoration(t),
       clipBehavior: Clip.antiAlias,
@@ -90,27 +53,24 @@ class _GuideFigureState extends State<GuideFigure> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            constraints: BoxConstraints(maxHeight: widget.maxHeight),
+            constraints: BoxConstraints(maxHeight: maxHeight),
             padding: const EdgeInsets.fromLTRB(6, 6, 6, 2),
             child: Center(
               child: _Grow(
-                child: art == GuideArt.pick
-                    ? _picker(picture)
-                    : Semantics(image: true, label: art.label, child: picture),
-              ),
-            ),
-          ),
-          if (art == GuideArt.pick)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 2, 18, 8),
-              child: Semantics(
-                liveRegion: true,
-                child: Text(
-                  _found[_picked].$3,
-                  style: Type.sans(13, color: t.ink2, height: 1.4),
+                child: Semantics(
+                  image: true,
+                  label: art.label,
+                  child: AspectRatio(
+                    aspectRatio: 300 / 180,
+                    // Its own layer, so the screen's rise moves it without painting it again.
+                    child: RepaintBoundary(
+                      child: CustomPaint(painter: _FigurePainter(art, t)),
+                    ),
+                  ),
                 ),
               ),
             ),
+          ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
             decoration: BoxDecoration(
@@ -125,41 +85,6 @@ class _GuideFigureState extends State<GuideFigure> {
       ),
     );
   }
-
-  /// [picture] with a tap target over each AnythingLLM the installer's page lists.
-  Widget _picker(Widget picture) => Semantics(
-    label: widget.art.label,
-    container: true,
-    child: Stack(
-      children: [
-        picture,
-        Positioned.fill(
-          child: LayoutBuilder(
-            builder: (context, box) {
-              final unit = box.maxWidth / 300;
-              return Stack(
-                children: [
-                  for (final (n, (name, about, _)) in _found.indexed)
-                    Positioned(
-                      left: 24 * unit,
-                      top: (60 + n * 40) * unit,
-                      width: 252 * unit,
-                      height: 34 * unit,
-                      child: Tappable(
-                        label: '$name, $about',
-                        selected: n == _picked,
-                        onTap: () => setState(() => _picked = n),
-                        child: const SizedBox.expand(),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 /// [child] growing in from a little smaller as it shows, unless the system asks for reduced
@@ -181,11 +106,10 @@ class _Grow extends StatelessWidget {
 }
 
 class _FigurePainter extends CustomPainter {
-  _FigurePainter(this.art, this.t, this.picked);
+  _FigurePainter(this.art, this.t);
 
   final GuideArt art;
   final Tokens t;
-  final int picked;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -230,33 +154,6 @@ class _FigurePainter extends CustomPainter {
           ..box(144, 128, 134, 28, 8, fill: t.accentbg)
           ..text(154, 146, 'Memory', _Ink.name)
           ..text(268, 146, 'new', _Ink.note, end: true);
-      case GuideArt.pick:
-        pen
-          ..window(14, 12, 272, 156, address: '127.0.0.1:8470')
-          ..text(28, 52, 'Pick an AnythingLLM for the toolkit.', _Ink.name);
-        for (final (n, (name, about, _)) in _found.indexed) {
-          final y = 60.0 + n * 40;
-          final on = n == picked;
-          pen
-            ..box(
-              24,
-              y,
-              252,
-              34,
-              8,
-              fill: on ? t.accentbg : t.panel,
-              edge: true,
-              edgeColor: on ? t.accent : t.line,
-            )
-            ..ring(38, y + 17, 5, strong: true);
-          if (on) pen.dot(38, y + 17, 3);
-          pen
-            ..text(50, y + 14, name, _Ink.name)
-            ..text(50, y + 27, about, _Ink.note);
-        }
-        pen
-          ..box(24, 140, 110, 22, 8, fill: t.accent)
-          ..text(79, 155, 'Add the toolkit', _Ink.onAccent, centred: true);
       case GuideArt.pair:
         pen
           ..window(14, 22, 156, 136)
@@ -269,8 +166,7 @@ class _FigurePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_FigurePainter old) =>
-      old.art != art || old.t != t || old.picked != picked;
+  bool shouldRepaint(_FigurePainter old) => old.art != art || old.t != t;
 }
 
 /// The kinds of words in a figure: a muted note, a name, words on the accent, and a key.
@@ -284,9 +180,9 @@ class _Pen {
   final Canvas canvas;
   final Tokens t;
 
-  Paint _stroke({bool faint = false, Color? color}) => Paint()
+  Paint _stroke({bool faint = false}) => Paint()
     ..style = PaintingStyle.stroke
-    ..color = color ?? (faint ? t.muted : t.ink2)
+    ..color = faint ? t.muted : t.ink2
     ..strokeWidth = faint ? 1.2 : 1.5
     ..strokeCap = StrokeCap.round
     ..strokeJoin = StrokeJoin.round;
@@ -301,7 +197,7 @@ class _Pen {
   void path(String data, {bool faint = false, bool dashed = false}) =>
       _draw(parseSvgPathData(data), _stroke(faint: faint), dashed);
 
-  /// A rounded box, filled with [fill], edged in [edgeColor], or [Tokens.ink2], with [edge].
+  /// A rounded box, filled with [fill], edged in [Tokens.ink2] with [edge].
   void box(
     double x,
     double y,
@@ -310,7 +206,6 @@ class _Pen {
     double r, {
     Color? fill,
     bool edge = false,
-    Color? edgeColor,
   }) {
     final shape = RRect.fromRectAndRadius(
       Rect.fromLTWH(x, y, w, h),
@@ -318,28 +213,24 @@ class _Pen {
     );
     if (fill != null) canvas.drawRRect(shape, Paint()..color = fill);
     if (edge) {
-      _draw(Path()..addRRect(shape), _stroke(color: edgeColor), false);
+      _draw(Path()..addRRect(shape), _stroke(), false);
     }
   }
 
-  /// A browser window: its frame, a bar with two dots, and the [address] in it.
-  void window(double x, double y, double w, double h, {String? address}) {
+  /// A browser window: its frame and a bar with two dots.
+  void window(double x, double y, double w, double h) {
     box(x, y, w, h, 10, fill: t.panel, edge: true);
     path('M$x ${y + 20}h$w', faint: true);
-    ring(x + 12, y + 10, 3);
-    ring(x + 22, y + 10, 3);
-    if (address != null) text(x + 38, y + 13, address, _Ink.mono);
+    _ring(x + 12, y + 10, 3);
+    _ring(x + 22, y + 10, 3);
   }
 
   /// A faint rule, drawn as the prototype's two-unit outlined bar.
   void _bar(double x, double y, double w) =>
       canvas.drawRect(Rect.fromLTWH(x, y, w, 2), _stroke(faint: true));
 
-  void ring(double x, double y, double r, {bool strong = false}) =>
-      canvas.drawCircle(Offset(x, y), r, _stroke(faint: !strong));
-
-  /// A dot in the accent.
-  void dot(double x, double y, double r) => _dot(x, y, r, t.accent);
+  void _ring(double x, double y, double r) =>
+      canvas.drawCircle(Offset(x, y), r, _stroke(faint: true));
 
   void _dot(double x, double y, double r, Color color) =>
       canvas.drawCircle(Offset(x, y), r, Paint()..color = color);
