@@ -129,7 +129,7 @@ class _SettingsFoot extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
         child: NavRow(
-          icon: 'settings',
+          icon: 'gear',
           title: 'Settings',
           onTap: shell.openSettings,
         ),
