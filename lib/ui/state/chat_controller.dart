@@ -7,6 +7,7 @@ import '../../core/connection.dart';
 import '../../core/outputs.dart';
 import '../../core/ports.dart';
 import '../../core/server_models.dart';
+import 'fleeting.dart';
 import 'notice.dart';
 import 'prefs_controller.dart';
 import 'settings_controller.dart';
@@ -268,9 +269,9 @@ class ChatController extends ChangeNotifier {
 
   /// Why a link in an answer did not open. It clears after [linkNoticeFor], or on the next
   /// message or chat opened.
-  Notice? linkNotice;
+  Notice? get linkNotice => _link.value;
 
-  Timer? _linkTimer;
+  late final _link = Fleeting<Notice>(linkNoticeFor, (_) => notifyListeners());
 
   /// The bytes of each file an agent made, by storage name, read once per server.
   final Map<String, Future<List<int>?>> _madeFiles = {};
@@ -389,7 +390,7 @@ class ChatController extends ChangeNotifier {
       running.stream?.cancel();
     }
     _stopWaiting();
-    _linkTimer?.cancel();
+    _link.take();
     unreachable.dispose();
     super.dispose();
   }
@@ -420,7 +421,7 @@ class ChatController extends ChangeNotifier {
     activeSlug = null;
     activeThread = null;
     problem = null;
-    _clearLinkNotice();
+    _link.take();
     notifyListeners();
     if (_server != null) unawaited(load());
   }
@@ -443,7 +444,7 @@ class ChatController extends ChangeNotifier {
           for (final w in workspaces) w.slug: [...w.threads],
         });
       // A chat deleted in the list but not yet on the server is still in the server's list.
-      if (_deleted case final deleted?
+      if (_deleted.value case final deleted?
           when _threads.containsKey(deleted.slug)) {
         _threads[deleted.slug] = [
           for (final t in _threads[deleted.slug]!)
@@ -535,7 +536,7 @@ class ChatController extends ChangeNotifier {
     if (threadSlug != null) _ready.remove(threadSlug);
     // What waits for the composer goes back only in its own chat.
     _forComposer.removeWhere((thread, _) => thread != threadSlug);
-    _clearLinkNotice();
+    _link.take();
     _rememberChat();
     notifyListeners();
     final slug = activeSlug;
@@ -656,14 +657,13 @@ class ChatController extends ChangeNotifier {
   static const undoFor = Duration(seconds: 6);
 
   /// The chat deleted from the list but not yet on the server, while it can be put back.
-  _Deleted? _deleted;
-  Timer? _deleteTimer;
+  late final _deleted = Fleeting<_Deleted>(undoFor, (d) => unawaited(_send(d)));
 
   /// Whether [dispose] ran, after which a delete that comes back changes nothing.
   bool _disposed = false;
 
   /// The name of the chat that [undoDelete] would put back, or null.
-  String? get deletedChat => _deleted?.chat.name;
+  String? get deletedChat => _deleted.value?.chat.name;
 
   /// Takes chat [threadSlug] of the workspace on screen out of the list at once, and deletes it
   /// on the server [undoFor] later, unless [undoDelete] puts it back first. Another delete, or
@@ -678,18 +678,19 @@ class ChatController extends ChangeNotifier {
     final at = was.indexWhere((t) => t.slug == threadSlug);
     if (at < 0) return;
     final open = activeThread == threadSlug;
-    _deleted = _Deleted(
-      server: server,
-      slug: slug,
-      chat: was[at],
-      at: at,
-      turns: _turns[threadSlug],
-      open: open,
+    _deleted.show(
+      _Deleted(
+        server: server,
+        slug: slug,
+        chat: was[at],
+        at: at,
+        turns: _turns[threadSlug],
+        open: open,
+      ),
     );
     final list = [...was]..removeAt(at);
     _threads[slug] = list;
     _turns.remove(threadSlug);
-    _deleteTimer = Timer(undoFor, () => unawaited(flushDelete()));
     if (open) {
       _draft = [];
       await this.open(
@@ -700,17 +701,9 @@ class ChatController extends ChangeNotifier {
     }
   }
 
-  /// The chat [delete] took out, which is no longer waiting, or null when none was.
-  _Deleted? _takeDeleted() {
-    final deleted = _deleted;
-    _deleteTimer?.cancel();
-    _deleted = null;
-    return deleted;
-  }
-
   /// Puts the chat [delete] took out back where it was, and on screen if it was.
   Future<void> undoDelete() async {
-    final deleted = _takeDeleted();
+    final deleted = _deleted.take();
     if (deleted == null) return;
     _restore(deleted);
     if (deleted.open && activeSlug == deleted.slug) {
@@ -722,8 +715,10 @@ class ChatController extends ChangeNotifier {
 
   /// Deletes on the server, now, the chat [delete] took out, on the server it was on. A delete
   /// the server refuses puts the chat back.
-  Future<void> flushDelete() async {
-    final deleted = _takeDeleted();
+  Future<void> flushDelete() => _send(_deleted.take());
+
+  /// Deletes [deleted] on its server, putting it back when the server refuses.
+  Future<void> _send(_Deleted? deleted) async {
     if (deleted == null) return;
     notifyListeners();
     final thread = deleted.chat.slug;
@@ -759,7 +754,7 @@ class ChatController extends ChangeNotifier {
     final slug = activeSlug;
     final text = message.trim();
     if (slug == null || text.isEmpty || busy || !ready) return false;
-    _clearLinkNotice();
+    _link.take();
     final user = Turn.user(
       text,
       attachments: [
@@ -1084,19 +1079,8 @@ class ChatController extends ChangeNotifier {
 
   /// Shows why a link in an answer did not open, for [linkNoticeFor].
   void reportLink(String title, String text) {
-    linkNotice = Notice(title, text);
-    _linkTimer?.cancel();
-    _linkTimer = Timer(linkNoticeFor, () {
-      linkNotice = null;
-      notifyListeners();
-    });
+    _link.show(Notice(title, text));
     notifyListeners();
-  }
-
-  void _clearLinkNotice() {
-    _linkTimer?.cancel();
-    _linkTimer = null;
-    linkNotice = null;
   }
 
   /// Runs [op], showing its failure as a [Notice] titled [failTitle]. A new server meanwhile has

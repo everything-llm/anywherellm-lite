@@ -10,6 +10,7 @@ import '../../core/sources.dart';
 import '../../core/system_settings.dart';
 import '../../core/upload.dart';
 import 'chat_controller.dart';
+import 'fleeting.dart';
 import 'notice.dart';
 import 'prefs_controller.dart';
 
@@ -58,12 +59,12 @@ class SourcesController extends ChangeNotifier {
   List<Notice> problems = const [];
 
   /// The file just removed, for the undo toast.
-  SourceFile? removed;
-  Timer? _removedTimer;
+  SourceFile? get removed => _removed.value;
+  late final _removed = Fleeting<SourceFile>(undoFor, (_) => notifyListeners());
 
-  /// The file a citation pointed at, lit up for a moment.
-  String? flashed;
-  Timer? _flashTimer;
+  /// The path of the file a citation pointed at, lit up for a moment.
+  String? get flashed => _flashed.value;
+  late final _flashed = Fleeting<String>(flashFor, (_) => notifyListeners());
 
   /// The question last tested, and what it found, or null before one is tested.
   String? searched;
@@ -81,8 +82,8 @@ class SourcesController extends ChangeNotifier {
   void dispose() {
     _chat.removeListener(_chatChanged);
     chatMode.dispose();
-    _removedTimer?.cancel();
-    _flashTimer?.cancel();
+    _removed.take();
+    _flashed.take();
     super.dispose();
   }
 
@@ -99,7 +100,7 @@ class SourcesController extends ChangeNotifier {
     searched = null;
     hits = null;
     searching = false;
-    _clearRemoved();
+    _removed.take();
     notifyListeners();
     if (_slug != null) unawaited(refresh());
   }
@@ -271,19 +272,13 @@ class SourcesController extends ChangeNotifier {
     return _change('Could not remove ${file.title}', (slug) async {
       await _put(slug, file, back: false);
       if (server != _chat.server || slug != _slug) return;
-      _clearRemoved();
-      removed = file;
-      _removedTimer = Timer(undoFor, () {
-        removed = null;
-        notifyListeners();
-      });
+      _removed.show(file);
     });
   }
 
   Future<void> undo() async {
-    final file = removed;
+    final file = _removed.take();
     if (file == null) return;
-    _clearRemoved();
     await _change(
       'Could not put ${file.title} back',
       (slug) => _put(slug, file, back: true),
@@ -383,12 +378,7 @@ class SourcesController extends ChangeNotifier {
   void flash(String title) {
     final file = byTitle(title);
     if (file == null) return;
-    _flashTimer?.cancel();
-    flashed = file.path;
-    _flashTimer = Timer(flashFor, () {
-      flashed = null;
-      notifyListeners();
-    });
+    _flashed.show(file.path);
     notifyListeners();
   }
 
@@ -396,11 +386,6 @@ class SourcesController extends ChangeNotifier {
   void report(String title, String text) {
     problems = [...problems, Notice(title, text)];
     notifyListeners();
-  }
-
-  void _clearRemoved() {
-    _removedTimer?.cancel();
-    removed = null;
   }
 
   /// Puts [file] in the workspace on the server, or takes it out.
