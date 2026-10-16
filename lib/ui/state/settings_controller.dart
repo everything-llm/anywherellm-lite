@@ -49,9 +49,11 @@ class SettingsController extends ChangeNotifier {
   Uri? addressOf(Companion companion) => _holder.addressOf(companion);
 
   /// Connects as [pairing] says, once the server takes its key, keeping where its companions
-  /// run. True when it did.
-  Future<bool> pair(Pairing pairing) =>
-      _connect(pairing.connection, pairing.companions);
+  /// run. A code that names none keeps those saved for the same server. True when it did.
+  Future<bool> pair(Pairing pairing) => _connect(
+    pairing.connection,
+    pairing.companions.isEmpty ? null : pairing.companions,
+  );
 
   /// Asks the server whether [url] and [key] open it. Saves nothing.
   Future<void> test(String url, String key) async {

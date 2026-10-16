@@ -157,5 +157,14 @@ void main() {
         reason: 'guessed again on another server',
       );
     });
+
+    test('a code that names none keeps them on the same server', () async {
+      await settings.pair(Pairing(_saved, {toolkitCompanion.code: toolkit}));
+      await settings.pair(
+        const Pairing(Connection(baseUrl: 'https://h:3001', apiKey: 'K2')),
+      );
+      expect(settings.addressOf(toolkitCompanion), toolkit);
+      expect(store.savedCompanions, {toolkitCompanion.code: toolkit});
+    });
   });
 }
