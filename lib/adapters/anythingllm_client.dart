@@ -134,6 +134,15 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     return _events('${_thread(slug, thread)}/stream-chat', body, limit);
   }
 
+  /// A `stream-chat` with `reset` and no message, which clears the history and answers with
+  /// one closing chunk.
+  @override
+  Future<void> resetChat(String slug, String thread) => _events(
+    '${_thread(slug, thread)}/stream-chat',
+    {'reset': true},
+    timeout,
+  ).drain<void>();
+
   @override
   Future<void> updateEmbeddings(
     String slug, {

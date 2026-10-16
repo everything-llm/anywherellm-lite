@@ -57,6 +57,9 @@ class _ComposerState extends State<Composer> {
   PromptShortcut? _shortcut;
   bool _shortcutsTab = false;
 
+  /// Whether the person is being asked to confirm clearing the chat.
+  bool _asking = false;
+
   /// Why the last pick added nothing, or null.
   String? _problem;
 
@@ -180,12 +183,14 @@ class _ComposerState extends State<Composer> {
       if (_held != null ||
           _picking ||
           _shortcut != null ||
+          _asking ||
           _attached.isNotEmpty ||
           _problem != null) {
         setState(() {
           _held = null;
           _picking = false;
           _shortcut = null;
+          _asking = false;
           _attached = const [];
           _problem = null;
         });
@@ -384,6 +389,9 @@ class _ComposerState extends State<Composer> {
   /// the person has typed again or another chat shows.
   Future<void> _send(String text) async {
     final shortcut = _shortcut;
+    if (shortcut == null && _scope.chat.canReset && isResetCommand(text)) {
+      return _askReset();
+    }
     if (shortcut?.requiresDetail == true && text.trim().isEmpty) return;
     final message = shortcut?.expand(text) ?? text;
     if (message.trim().isEmpty) return;
@@ -410,6 +418,19 @@ class _ComposerState extends State<Composer> {
     _shortcut = shortcut;
     _setDraft(text);
     setState(() => _attached = attached);
+  }
+
+  /// Asks whether to clear the chat's history, which nothing here brings back.
+  void _askReset() {
+    _setDraft('');
+    setState(() => _asking = true);
+  }
+
+  void _keepChat() => setState(() => _asking = false);
+
+  void _clearChat() {
+    setState(() => _asking = false);
+    unawaited(_scope.chat.reset());
   }
 
   void _selectShortcut(PromptShortcut shortcut) {
@@ -449,6 +470,10 @@ class _ComposerState extends State<Composer> {
                   },
                   onSelectShortcut: _selectShortcut,
                   onClearShortcut: _clearShortcut,
+                  asking: _asking,
+                  onAskReset: _askReset,
+                  onKeepChat: _keepChat,
+                  onClearChat: _clearChat,
                   onSend: _send,
                   held: _held != null,
                   onHold: _hold,
@@ -485,6 +510,10 @@ class _Form extends StatelessWidget {
     required this.onAttach,
     required this.onSelectShortcut,
     required this.onClearShortcut,
+    required this.asking,
+    required this.onAskReset,
+    required this.onKeepChat,
+    required this.onClearChat,
     required this.onSend,
     required this.held,
     required this.onHold,
@@ -507,6 +536,12 @@ class _Form extends StatelessWidget {
   final VoidCallback onAttach;
   final ValueChanged<PromptShortcut> onSelectShortcut;
   final VoidCallback onClearShortcut;
+
+  /// Whether the person is being asked to clear the chat, and what each answer does.
+  final bool asking;
+  final VoidCallback onAskReset;
+  final VoidCallback onKeepChat;
+  final VoidCallback onClearChat;
   final ValueChanged<String> onSend;
 
   /// Whether the message waits for the answer running here to end.
@@ -562,6 +597,9 @@ class _Form extends StatelessWidget {
                     item.label.toLowerCase().startsWith(slashQuery),
               )
               .toList();
+    // `/reset` is listed beside the shortcuts, on a chat that has a history to clear.
+    final resetMatch =
+        slashQuery != null && chat.canReset && 'reset'.startsWith(slashQuery);
     // A shortcut always has a prompt to send, so it needs a detail only when it asks for one.
     final sendable = shortcut == null
         ? canSend(chat, draft.text)
@@ -575,6 +613,8 @@ class _Form extends StatelessWidget {
     void enter() {
       if (shortcut == null && slashQuery != null && matches.isNotEmpty) {
         onSelectShortcut(matches.first);
+      } else if (resetMatch) {
+        onAskReset();
       } else {
         send();
       }
@@ -601,6 +641,14 @@ class _Form extends StatelessWidget {
         AlertBox(AlertKind.bad, 'Could not attach', text: problem),
       if (micProblem case final problem?)
         AlertBox(AlertKind.bad, 'Could not listen', text: problem),
+      if (asking)
+        _FormNote(
+          'Clear this chat? The model forgets it, and it no longer shows here or in AnythingLLM.',
+          action: 'Clear',
+          onAction: onClearChat,
+          other: 'Keep',
+          onOther: onKeepChat,
+        ),
       if (held)
         _FormNote(
           'Sends when this answer ends.',
@@ -616,6 +664,7 @@ class _Form extends StatelessWidget {
           query: slashQuery,
           shortcuts: matches,
           onSelect: onSelectShortcut,
+          onReset: resetMatch ? onAskReset : null,
         ),
     ];
 
@@ -796,11 +845,15 @@ class _ShortcutSuggestions extends StatelessWidget {
     required this.query,
     required this.shortcuts,
     required this.onSelect,
+    required this.onReset,
   });
 
   final String query;
   final List<PromptShortcut> shortcuts;
   final ValueChanged<PromptShortcut> onSelect;
+
+  /// What choosing `/reset` does, listed after the shortcuts; null when it is not listed.
+  final VoidCallback? onReset;
 
   @override
   Widget build(BuildContext context) {
@@ -810,7 +863,7 @@ class _ShortcutSuggestions extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: cardDecoration(t)
           .copyWith(boxShadow: [BoxShadow(color: t.shadow, blurRadius: 18)]),
-      child: shortcuts.isEmpty
+      child: shortcuts.isEmpty && onReset == null
           ? Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
@@ -824,6 +877,18 @@ class _ShortcutSuggestions extends StatelessWidget {
               children: [
                 for (final shortcut in shortcuts)
                   _ShortcutRow(shortcut, onSelect, large: true),
+                if (onReset != null)
+                  CardRow(
+                    'Clear this chat',
+                    icon: 'trash',
+                    large: true,
+                    heard: 'Clear this chat, /reset. Asks first',
+                    trailing: Text(
+                      '/reset',
+                      style: Type.mono(12, color: t.muted),
+                    ),
+                    onTap: onReset,
+                  ),
               ],
             ),
     );
@@ -961,11 +1026,21 @@ class RoundButton extends StatelessWidget {
 
 /// A line over the field about the message, with the [action] that undoes it.
 class _FormNote extends StatelessWidget {
-  const _FormNote(this.text, {required this.action, required this.onAction});
+  const _FormNote(
+    this.text, {
+    required this.action,
+    required this.onAction,
+    this.other,
+    this.onOther,
+  });
 
   final String text;
   final String action;
   final VoidCallback onAction;
+
+  /// A second answer beside [action], such as Keep.
+  final String? other;
+  final VoidCallback? onOther;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -978,7 +1053,14 @@ class _FormNote extends StatelessWidget {
             style: Type.sans(12, color: Tokens.of(context).muted),
           ),
         ),
-        TextAction('close', action, onAction),
+        if (other case final other?) ...[
+          TextAction.plain(other, onOther!),
+          const SizedBox(width: 12),
+        ],
+        if (other == null)
+          TextAction('close', action, onAction)
+        else
+          TextAction.plain(action, onAction, weight: FontWeight.w600),
       ],
     ),
   );

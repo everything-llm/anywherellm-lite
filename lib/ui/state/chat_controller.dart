@@ -205,8 +205,15 @@ class ChatController extends ChangeNotifier {
       activeThread == null ? _draft : (_turns[activeThread] ?? const []);
 
   /// Whether the chat on screen can take no message now: a chat of its workspace answers, this
-  /// one or another.
-  bool get busy => workspaceAnswering;
+  /// one or another, or this one's history is being cleared.
+  bool get busy => workspaceAnswering || _clearing.contains(activeThread);
+
+  /// The chats whose history is being cleared on the server.
+  final _clearing = <String>{};
+
+  /// Whether the chat on screen has a history [reset] can clear: it is a chat, not a draft, it
+  /// is read and nothing holds it.
+  bool get canReset => activeThread != null && ready && !busy;
 
   /// Whether the chat on screen can take a message: a draft, or a chat whose history is read.
   bool get ready => activeThread == null || _turns.containsKey(activeThread);
@@ -316,6 +323,7 @@ class ChatController extends ChangeNotifier {
     _threads.clear();
     _turns.clear();
     _newest.clear();
+    _clearing.clear();
     _ready.clear();
     _draft = [];
     bytes.clear();
@@ -790,6 +798,28 @@ class ChatController extends ChangeNotifier {
     final question = turns[turns.length - 2];
     _setTurns(turns.sublist(0, turns.length - 2));
     await send(question.text);
+  }
+
+  /// Clears the history of the chat on screen, on the server and here, so the model starts the
+  /// chat afresh. The server keeps the rows hidden and nothing here brings them back. A failure
+  /// shows as [problem] and leaves the turns as they were.
+  Future<void> reset() async {
+    final slug = activeSlug;
+    final thread = activeThread;
+    if (slug == null || thread == null || !canReset) return;
+    final server = _server;
+    _clearing.add(thread);
+    notifyListeners();
+    await _try('Could not clear the chat', () async {
+      try {
+        await _api.resetChat(slug, thread);
+        if (_server != server) return;
+        _turns[thread] = [];
+        _newest[thread] = -1;
+      } finally {
+        _clearing.remove(thread);
+      }
+    });
   }
 
   /// Ends [running], whose connection dropped, without failing it: AnythingLLM may still finish

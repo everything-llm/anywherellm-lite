@@ -60,6 +60,10 @@ abstract interface class AnythingLlmApi {
     List<Attachment> attachments = const [],
   });
 
+  /// Clears the chat's history: the model no longer sees its exchanges, and history no longer
+  /// lists them. The server keeps the rows, and nothing here brings them back.
+  Future<void> resetChat(String slug, String thread);
+
   /// Embeds the documents at [adds] in the workspace and drops those at [deletes], by
   /// `folder/name.json` path.
   Future<void> updateEmbeddings(

@@ -102,6 +102,7 @@ class PromptShortcut {
           : null,
     );
   }
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -159,6 +160,10 @@ class ShortcutUse {
   @override
   int get hashCode => Object.hash(label, detail);
 }
+
+/// Whether [text] is the `/reset` command, which clears the chat's history instead of being
+/// sent.
+bool isResetCommand(String text) => text.trim().toLowerCase() == '/reset';
 
 /// A shortcut identifier accepted by the composer and editor.
 final _shortcutName = RegExp(r'^[a-z][a-z0-9-]{0,23}$');

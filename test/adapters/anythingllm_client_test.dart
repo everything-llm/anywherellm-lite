@@ -712,6 +712,26 @@ void main() {
       );
     });
 
+    test(
+      'resetChat posts reset with no message and reads the one chunk',
+      () async {
+        final seen = <http.BaseRequest>[];
+        await streaming([
+          data({
+            'type': 'textResponse',
+            'textResponse': 'Chat history was reset!',
+            'close': true,
+            'sources': [],
+          }),
+        ], seen: seen).resetChat('w', 't');
+        expect(
+          seen.single.url.path,
+          '/api/v1/workspace/w/thread/t/stream-chat',
+        );
+        expect(jsonDecode((seen.single as http.Request).body), {'reset': true});
+      },
+    );
+
     test('an answer that goes silent is given up after idle', () async {
       final silent = StreamController<List<int>>();
       addTearDown(silent.close);
