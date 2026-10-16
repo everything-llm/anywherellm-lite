@@ -20,7 +20,7 @@ void main() {
     final h = await pumpApp(tester, llm: planningServer());
     // Attach is drawn 30 px across; its target is 44.
     final attach = tester.getCenter(
-      find.byTooltip('Attach files to this message'),
+      find.byTooltip('Add files or shortcuts to this message'),
     );
     await tester.tapAt(attach + const Offset(0, 20));
     await tester.pump(const Duration(milliseconds: 300));

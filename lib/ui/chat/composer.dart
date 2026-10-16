@@ -8,10 +8,12 @@ import 'package:flutter/services.dart';
 import '../../core/chat.dart';
 import '../../core/copy.dart';
 import '../../core/prefs.dart';
+import '../../core/shortcuts.dart';
 import '../app_scope.dart';
 import '../icons.dart';
 import '../layout.dart';
 import '../settings/settings_pages.dart';
+import '../settings/rows.dart';
 import '../state/chat_controller.dart';
 import '../state/turn.dart';
 import '../state/shell_controller.dart';
@@ -19,12 +21,15 @@ import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
+import '../widgets/fields.dart';
 import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
+import '../widgets/segmented.dart';
 import 'answer_from.dart';
 import 'attach_sheet.dart';
 import 'dictation.dart';
 import 'model_picker.dart';
+import 'shortcut_chip.dart';
 
 /// Whether [text] can be sent in the chat on screen: nothing runs, the chat is ready, a workspace
 /// is open and there is something to send.
@@ -48,6 +53,9 @@ class Composer extends StatefulWidget {
 class _ComposerState extends State<Composer> {
   /// The files picked for the next question.
   List<Attachment> _attached = const [];
+
+  PromptShortcut? _shortcut;
+  bool _shortcutsTab = false;
 
   /// Why the last pick added nothing, or null.
   String? _problem;
@@ -171,11 +179,13 @@ class _ComposerState extends State<Composer> {
       _chatShown = shown;
       if (_held != null ||
           _picking ||
+          _shortcut != null ||
           _attached.isNotEmpty ||
           _problem != null) {
         setState(() {
           _held = null;
           _picking = false;
+          _shortcut = null;
           _attached = const [];
           _problem = null;
         });
@@ -192,8 +202,28 @@ class _ComposerState extends State<Composer> {
     }
   }
 
+  /// `/name ` and what follows it, which turns the name into a chip.
+  static final _typedShortcut = RegExp(
+    r'^/([a-z0-9-]+)\s([\s\S]*)$',
+    caseSensitive: false,
+  );
+
   void _changed() {
     if (widget.draft.text == _typed) return;
+    if (_shortcut == null && widget.draft.text.startsWith('/')) {
+      final match = _typedShortcut.firstMatch(widget.draft.text);
+      if (match != null) {
+        final shortcut = _scope.prefs
+            .shortcutsIn(_scope.chat.activeSlug)
+            .where((item) => item.name == match[1]!.toLowerCase())
+            .firstOrNull;
+        if (shortcut != null) {
+          _shortcut = shortcut;
+          _setDraft(match[2] ?? '');
+          return;
+        }
+      }
+    }
     // Typing more lets go of a held message: what goes is what was held.
     _held = null;
     if (_listening && widget.draft.text != _dictated) {
@@ -261,21 +291,42 @@ class _ComposerState extends State<Composer> {
       builder: (context, popup, child) => PopupSheet(
         open: popup == Popup.attach,
         onClose: close,
-        title: 'Attach',
-        sheet: (context) => AttachSheet(
-          attached: _attached,
-          onRemove: _remove,
-          onPhotos: photos == null
-              ? null
-              : () => _pickWith(photos.choose, 'The photos did not open'),
-          onCamera: photos == null
-              ? null
-              : () => _pickWith(
-                  () async => [?await photos.take()],
-                  'The camera did not open',
-                ),
-          onFiles: _attach,
-          onDone: close,
+        title: _shortcutsTab ? 'Shortcuts' : 'Attach',
+        sheet: (context) => Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 12,
+          children: [
+            Segmented<bool>(
+              options: const [(false, 'Attach'), (true, 'Shortcuts')],
+              value: _shortcutsTab,
+              onChanged: (show) => setState(() => _shortcutsTab = show),
+            ),
+            if (_shortcutsTab)
+              _ShortcutPicker(
+                onSelect: _selectShortcut,
+                onManage: () {
+                  close();
+                  shell.openSettings(SettingsPage.shortcuts);
+                },
+              )
+            else
+              AttachSheet(
+                attached: _attached,
+                onRemove: _remove,
+                onPhotos: photos == null
+                    ? null
+                    : () => _pickWith(photos.choose, 'The photos did not open'),
+                onCamera: photos == null
+                    ? null
+                    : () => _pickWith(
+                        () async => [?await photos.take()],
+                        'The camera did not open',
+                      ),
+                onFiles: _attach,
+                onDone: close,
+              ),
+          ],
         ),
         child: child!,
       ),
@@ -332,6 +383,10 @@ class _ComposerState extends State<Composer> {
   /// as when an edit's old exchange could not be deleted, the text and files come back, unless
   /// the person has typed again or another chat shows.
   Future<void> _send(String text) async {
+    final shortcut = _shortcut;
+    if (shortcut?.requiresDetail == true && text.trim().isEmpty) return;
+    final message = shortcut?.expand(text) ?? text;
+    if (message.trim().isEmpty) return;
     final attached = _attached;
     final shown = _chatShown;
     widget.draft.clear();
@@ -341,13 +396,31 @@ class _ComposerState extends State<Composer> {
       _attached = const [];
       _problem = null;
       _listening = false;
+      _shortcut = null;
     });
-    final sent = await _scope.chat.send(text, attachments: attached);
+    final sent = await _scope.chat.send(
+      message,
+      attachments: attached,
+      shortcutUse: shortcut == null
+          ? null
+          : ShortcutUse(label: shortcut.label, detail: text.trim()),
+    );
     if (sent || !mounted || _chatShown != shown) return;
     if (widget.draft.text.isNotEmpty || _attached.isNotEmpty) return;
+    _shortcut = shortcut;
     _setDraft(text);
     setState(() => _attached = attached);
   }
+
+  void _selectShortcut(PromptShortcut shortcut) {
+    _scope.shell.closePopup(Popup.attach);
+    _shortcut = shortcut;
+    _setDraft('');
+    setState(() => _shortcutsTab = false);
+    widget.focus.requestFocus();
+  }
+
+  void _clearShortcut() => setState(() => _shortcut = null);
 
   @override
   Widget build(BuildContext context) {
@@ -367,8 +440,11 @@ class _ComposerState extends State<Composer> {
                   draft: draft,
                   focus: widget.focus,
                   attached: _attached,
+                  shortcut: _shortcut,
                   problem: _problem,
                   onAttach: () => scope.shell.togglePopup(Popup.attach),
+                  onSelectShortcut: _selectShortcut,
+                  onClearShortcut: _clearShortcut,
                   onSend: _send,
                   held: _held != null,
                   onHold: _hold,
@@ -393,12 +469,18 @@ class _ComposerState extends State<Composer> {
 }
 
 class _Form extends StatelessWidget {
+  /// A message that is only a `/` and what is typed of a shortcut's name.
+  static final _slashOnly = RegExp(r'^/\S*$');
+
   const _Form({
     required this.draft,
     required this.focus,
     required this.attached,
+    required this.shortcut,
     required this.problem,
     required this.onAttach,
+    required this.onSelectShortcut,
+    required this.onClearShortcut,
     required this.onSend,
     required this.held,
     required this.onHold,
@@ -414,10 +496,13 @@ class _Form extends StatelessWidget {
   final TextEditingController draft;
   final FocusNode focus;
   final List<Attachment> attached;
+  final PromptShortcut? shortcut;
   final String? problem;
 
   /// Opens the Attach sheet.
   final VoidCallback onAttach;
+  final ValueChanged<PromptShortcut> onSelectShortcut;
+  final VoidCallback onClearShortcut;
   final ValueChanged<String> onSend;
 
   /// Whether the message waits for the answer running here to end.
@@ -454,10 +539,41 @@ class _Form extends StatelessWidget {
             ChatMode.automatic || ChatMode.chat => 'Ask anything…',
             ChatMode.query || null => 'Ask about your files…',
           };
-    final sendable = canSend(chat, draft.text);
+    final slashQuery =
+        shortcut == null &&
+            draft.text.startsWith('/') &&
+            scope.shell.popup.value == null &&
+            !chat.busy &&
+            _slashOnly.hasMatch(draft.text)
+        ? draft.text.substring(1).toLowerCase()
+        : null;
+    final matches = slashQuery == null
+        ? const <PromptShortcut>[]
+        : scope.prefs
+              .shortcutsIn(chat.activeSlug)
+              .where(
+                (item) =>
+                    slashQuery.isEmpty ||
+                    item.name.startsWith(slashQuery) ||
+                    item.label.toLowerCase().startsWith(slashQuery),
+              )
+              .toList();
+    // A shortcut always has a prompt to send, so it needs a detail only when it asks for one.
+    final sendable = shortcut == null
+        ? canSend(chat, draft.text)
+        : canSend(chat, shortcut!.prompt) &&
+              !(shortcut!.requiresDetail && draft.text.trim().isEmpty);
 
     void send() {
       if (sendable) onSend(draft.text);
+    }
+
+    void enter() {
+      if (shortcut == null && slashQuery != null && matches.isNotEmpty) {
+        onSelectShortcut(matches.first);
+      } else {
+        send();
+      }
     }
 
     // While this chat answers, a message typed is held to go when the answer ends. Send when
@@ -465,12 +581,14 @@ class _Form extends StatelessWidget {
     final holdable = here && !held && draft.text.trim().isNotEmpty;
 
     // On a phone the keyboard's Enter is left to the field, which starts a new line.
-    final VoidCallback onEnter = here ? onHold : send;
+    final VoidCallback onEnter = here ? onHold : enter;
     final bindings = <ShortcutActivator, VoidCallback>{
       if (scope.enterSends) ...{
         const SingleActivator(LogicalKeyboardKey.enter): onEnter,
         const SingleActivator(LogicalKeyboardKey.numpadEnter): onEnter,
       },
+      if (shortcut != null && draft.text.isEmpty)
+        const SingleActivator(LogicalKeyboardKey.backspace): onClearShortcut,
     };
 
     final card = AnswerFromAnchor(
@@ -521,6 +639,12 @@ class _Form extends StatelessWidget {
                     ModelPicker(onClose: onPickModel),
                     Divider(height: 21, thickness: 1, color: t.line),
                   ],
+                  if (slashQuery != null)
+                    _ShortcutSuggestions(
+                      query: slashQuery,
+                      shortcuts: matches,
+                      onSelect: onSelectShortcut,
+                    ),
                   ConstrainedBox(
                     constraints: const BoxConstraints(
                       minHeight: 30,
@@ -529,48 +653,75 @@ class _Form extends StatelessWidget {
                     child: CallbackShortcuts(
                       bindings: bindings,
                       child: Semantics(
-                        label: 'Message',
+                        label: shortcut == null
+                            ? 'Message'
+                            : 'Message, with the ${shortcut!.label} shortcut',
                         textField: true,
                         // Only the field follows the prefs, for its spellcheck.
                         child: ListenableBuilder(
                           listenable: scope.prefs,
-                          builder: (context, _) => TextField(
-                            controller: draft,
-                            focusNode: focus,
-                            // Open while this chat answers, for the next message.
-                            enabled: !chat.busy || here,
-                            spellCheckConfiguration:
-                                scope.canSpellcheck &&
-                                    scope.prefs.prefs.isOn(
-                                      ChatSwitch.spellcheck,
-                                    )
-                                ? const SpellCheckConfiguration()
-                                : const SpellCheckConfiguration.disabled(),
-                            minLines: 1,
-                            maxLines: null,
-                            keyboardType: TextInputType.multiline,
-                            textInputAction: TextInputAction.newline,
-                            // The keyboard starts each sentence with a capital.
-                            textCapitalization: TextCapitalization.sentences,
-                            style: Type.textArea(Type.chat, t.ink),
-                            cursorColor: t.accent,
-                            // A picture from the keyboard's clipboard; the rest goes in as text.
-                            contentInsertionConfiguration:
-                                ContentInsertionConfiguration(
-                                  allowedMimeTypes: imageMimes.toList(),
-                                  onContentInserted: onInserted,
+                          builder: (context, _) {
+                            final field = TextField(
+                              controller: draft,
+                              focusNode: focus,
+                              enabled: !chat.busy || here,
+                              spellCheckConfiguration:
+                                  scope.canSpellcheck &&
+                                      scope.prefs.prefs.isOn(
+                                        ChatSwitch.spellcheck,
+                                      )
+                                  ? const SpellCheckConfiguration()
+                                  : const SpellCheckConfiguration.disabled(),
+                              minLines: 1,
+                              maxLines: null,
+                              keyboardType: TextInputType.multiline,
+                              textInputAction: TextInputAction.newline,
+                              textCapitalization: TextCapitalization.sentences,
+                              style: Type.textArea(Type.chat, t.ink),
+                              cursorColor: t.accent,
+                              contentInsertionConfiguration:
+                                  ContentInsertionConfiguration(
+                                    allowedMimeTypes: imageMimes.toList(),
+                                    onContentInserted: onInserted,
+                                  ),
+                              decoration: InputDecoration(
+                                isCollapsed: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 3,
                                 ),
-                            decoration: InputDecoration(
-                              isCollapsed: true,
-                              // One line sits in the middle of the field's 30 px.
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 3,
+                                border: InputBorder.none,
+                                hintText: shortcut?.requiresDetail == true
+                                    ? shortcut!.detailHint
+                                    : shortcut == null
+                                    ? hint
+                                    : 'Add a detail (optional)',
+                                hintStyle: Type.textArea(Type.chat, t.muted),
                               ),
-                              border: InputBorder.none,
-                              hintText: hint,
-                              hintStyle: Type.textArea(Type.chat, t.muted),
-                            ),
-                          ),
+                            );
+                            // The field keeps its place in the row, so choosing or
+                            // clearing a shortcut does not rebuild it.
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              spacing: 6,
+                              children: [
+                                if (shortcut case final chosen?)
+                                  ShortcutChip(chosen.label, maxWidth: 116),
+                                Expanded(
+                                  key: const ValueKey('message'),
+                                  child: field,
+                                ),
+                                if (shortcut case final chosen?)
+                                  IconBtn(
+                                    'close',
+                                    tooltip:
+                                        'Remove the ${chosen.label} shortcut',
+                                    onPressed: onClearShortcut,
+                                    box: 28,
+                                    size: IconSize.tiny,
+                                  ),
+                              ],
+                            );
+                          },
                         ),
                       ),
                     ),
@@ -582,8 +733,8 @@ class _Form extends StatelessWidget {
             Row(
               children: [
                 IconBtn(
-                  'attach',
-                  tooltip: 'Attach files to this message',
+                  'plus',
+                  tooltip: 'Add files or shortcuts to this message',
                   onPressed: chat.busy ? null : onAttach,
                   box: 30,
                   size: IconSize.small,
@@ -643,6 +794,99 @@ class _Form extends StatelessWidget {
       ),
     );
     return SizedBox(width: double.infinity, child: card);
+  }
+}
+
+class _ShortcutSuggestions extends StatelessWidget {
+  const _ShortcutSuggestions({
+    required this.query,
+    required this.shortcuts,
+    required this.onSelect,
+  });
+
+  final String query;
+  final List<PromptShortcut> shortcuts;
+  final ValueChanged<PromptShortcut> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 220),
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: cardDecoration(t)
+          .copyWith(boxShadow: [BoxShadow(color: t.shadow, blurRadius: 18)]),
+      child: shortcuts.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'No shortcut called /$query. It is sent as typed.',
+                style: Type.sans(14, color: t.muted),
+              ),
+            )
+          : ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.all(6),
+              children: [
+                for (final shortcut in shortcuts)
+                  _ShortcutRow(shortcut, onSelect, large: true),
+              ],
+            ),
+    );
+  }
+}
+
+/// A shortcut in a list: its label and its `/name`, which [onSelect] adds to the message.
+class _ShortcutRow extends StatelessWidget {
+  const _ShortcutRow(this.shortcut, this.onSelect, {this.large = false});
+
+  final PromptShortcut shortcut;
+  final ValueChanged<PromptShortcut> onSelect;
+  final bool large;
+
+  @override
+  Widget build(BuildContext context) => CardRow(
+    shortcut.label,
+    icon: 'slash',
+    large: large,
+    heard: '${shortcut.label}, /${shortcut.name}. Add to the message',
+    trailing: Text(
+      '/${shortcut.name}',
+      style: Type.mono(12, color: Tokens.of(context).muted),
+    ),
+    onTap: () => onSelect(shortcut),
+  );
+}
+
+class _ShortcutPicker extends StatelessWidget {
+  const _ShortcutPicker({required this.onSelect, required this.onManage});
+
+  final ValueChanged<PromptShortcut> onSelect;
+  final VoidCallback onManage;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final shortcuts = scope.prefs.shortcutsIn(scope.chat.activeSlug);
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 12,
+        children: [
+          const CardCaption(
+            'Tap one to add it to your message, then add a detail if it asks. Type / in the message to find them too.',
+          ),
+          if (shortcuts.isNotEmpty)
+            FieldCard([
+              for (final shortcut in shortcuts)
+                _ShortcutRow(shortcut, onSelect),
+            ])
+          else
+            const HelpText('No shortcuts are available yet.'),
+          CardRow('Edit shortcuts', icon: 'pencil', onTap: onManage),
+        ],
+      ),
+    );
   }
 }
 

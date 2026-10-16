@@ -1,0 +1,42 @@
+import 'package:anywherellm/core/prefs.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import '../support/fake_api.dart';
+import '../support/pump.dart';
+
+void main() {
+  testWidgets('slash shortcut expands before sending and can be hidden', (
+    tester,
+  ) async {
+    final llm = planningServer();
+    final h = await pumpApp(tester, llm: llm);
+    h.chat.newChat();
+    await tester.pumpAndSettle();
+
+    await tester.enterText(composerField, '/translate');
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(find.text('Translate'), findsOneWidget);
+
+    await tester.enterText(composerField, 'French');
+    await tester.pump();
+    await tester.tap(control('Send'));
+    await tester.pumpAndSettle();
+
+    const expanded = 'Translate your last answer into French.';
+    expect(llm.calls, contains('streamChat:th-1:$expanded'));
+    expect(find.text(expanded), findsWidgets);
+
+    await h.prefs.setSwitch(ChatSwitch.hideShortcutPrompts, true);
+    await tester.pumpAndSettle();
+    expect(find.text(expanded), findsOneWidget);
+    expect(find.text('Translate'), findsOneWidget);
+    expect(find.text('French'), findsOneWidget);
+    expect(
+      find.text('Shortcut · the server keeps the full prompt'),
+      findsOneWidget,
+    );
+  });
+}

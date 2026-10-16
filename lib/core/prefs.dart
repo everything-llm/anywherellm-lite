@@ -3,6 +3,7 @@
 import 'dart:convert';
 
 import 'json.dart';
+import 'shortcuts.dart';
 
 /// A document switched off in a workspace: no longer embedded there, but still listed in its
 /// Sources so it can be switched back on.
@@ -112,7 +113,10 @@ enum ChatSwitch {
 
   /// Shows how each answer ran, its model, time, tokens, speed and cost, under it, rather than
   /// only in its More menu.
-  answerDetails(false);
+  answerDetails(false),
+
+  /// Shows a shortcut chip instead of the expanded question it sent.
+  hideShortcutPrompts(false);
 
   const ChatSwitch(this.byDefault);
 
@@ -129,10 +133,15 @@ class Prefs {
     this.switches = const {},
     this.pinned = const {},
     this.recent = const {},
+    this.shortcuts = const [],
+    this.shortcutUses = const {},
   });
 
   /// How many chats [recent] keeps for a workspace.
   static const recentMax = 10;
+
+  /// How many shortcut uses [shortcutUses] remembers across chats.
+  static const shortcutUsesMax = 500;
 
   /// The documents switched off in each workspace, by [offKey]: its server's address and its
   /// slug, since two servers can each have a workspace of the same name. A key that is a slug
@@ -160,6 +169,13 @@ class Prefs {
   /// [recentMax] a workspace. The server sends no time for a chat.
   final Map<String, List<String>> recent;
 
+  /// User-made prompt shortcuts. Built-in prompts are kept in [builtInPromptShortcuts].
+  final List<PromptShortcut> shortcuts;
+
+  /// Shortcut labels and details for exchanges on this device, keyed by server, workspace,
+  /// thread and AnythingLLM's exchange id.
+  final Map<String, ShortcutUse> shortcutUses;
+
   /// The chats pinned in workspace [slug] on [server].
   List<String> pinnedIn(String server, String slug) =>
       pinned[offKey(server, slug)] ?? const [];
@@ -181,6 +197,13 @@ class Prefs {
   bool get hasUnowned =>
       switchedOff.keys.any((k) => !k.contains(' ')) ||
       (lastChat != null && lastChat!.server == null);
+
+  static String shortcutUseKey(
+    String server,
+    String slug,
+    String thread,
+    int chatId,
+  ) => '${offKey(server, slug)} $thread $chatId';
 
   /// [a] and [b] as one list, one document a path, [b]'s where both have it.
   static List<OffDoc> _merged(List<OffDoc> a, List<OffDoc> b) => {
@@ -229,6 +252,8 @@ class Prefs {
     Map<ChatSwitch, bool>? switches,
     Map<String, List<String>>? pinned,
     Map<String, List<String>>? recent,
+    List<PromptShortcut>? shortcuts,
+    Map<String, ShortcutUse>? shortcutUses,
   }) => Prefs(
     switchedOff: switchedOff ?? this.switchedOff,
     workspaceOrder: workspaceOrder ?? this.workspaceOrder,
@@ -238,6 +263,8 @@ class Prefs {
     switches: switches ?? this.switches,
     pinned: pinned ?? this.pinned,
     recent: recent ?? this.recent,
+    shortcuts: shortcuts ?? this.shortcuts,
+    shortcutUses: shortcutUses ?? this.shortcutUses,
   );
 
   /// [map] with [key] set to [list], or without it when [list] is empty.
@@ -333,6 +360,19 @@ class Prefs {
           : lastChat,
       pinned: _moved(pinned, fromKey, toKey),
       recent: _moved(recent, fromKey, toKey),
+      shortcuts: [
+        for (final shortcut in shortcuts)
+          shortcut.workspaceKey == fromKey
+              ? shortcut.inWorkspace(toKey)
+              : shortcut,
+      ],
+      shortcutUses: {
+        for (final entry in shortcutUses.entries)
+          entry.key.startsWith('$fromKey ')
+                  ? '$toKey ${entry.key.substring(fromKey.length + 1)}'
+                  : entry.key:
+              entry.value,
+      },
     );
   }
 
@@ -368,6 +408,17 @@ class Prefs {
   Prefs withSwitch(ChatSwitch which, bool on) =>
       _copy(switches: {...switches, which: on});
 
+  Prefs withShortcuts(List<PromptShortcut> shortcuts) =>
+      _copy(shortcuts: List.unmodifiable(shortcuts));
+
+  Prefs withShortcutUse(String key, ShortcutUse use) {
+    final next = {...shortcutUses, key: use};
+    if (next.length > shortcutUsesMax) {
+      next.remove(next.keys.first);
+    }
+    return _copy(shortcutUses: next);
+  }
+
   String encode() => jsonEncode({
     'switchedOff': {
       for (final entry in switchedOff.entries)
@@ -382,6 +433,13 @@ class Prefs {
     },
     if (pinned.isNotEmpty) 'pinned': pinned,
     if (recent.isNotEmpty) 'recent': recent,
+    if (shortcuts.isNotEmpty)
+      'shortcuts': [for (final shortcut in shortcuts) shortcut.toJson()],
+    if (shortcutUses.isNotEmpty)
+      'shortcutUses': {
+        for (final entry in shortcutUses.entries)
+          entry.key: entry.value.toJson(),
+      },
   });
 
   /// Reads what [encode] wrote. Anything it cannot read falls back to the default, and keys it
@@ -419,6 +477,12 @@ class Prefs {
       },
       pinned: _chatsOf(json['pinned']),
       recent: _chatsOf(json['recent']),
+      shortcuts: [
+        if (json['shortcuts'] is List)
+          for (final item in json['shortcuts'] as List)
+            ?PromptShortcut.fromJson(item),
+      ],
+      shortcutUses: _shortcutUsesOf(json['shortcutUses']),
     );
   }
 
@@ -434,4 +498,16 @@ class Prefs {
               case final threads when threads.isNotEmpty)
             key: threads,
   };
+
+  static Map<String, ShortcutUse> _shortcutUsesOf(Object? json) {
+    if (json is! Map) return const {};
+    final uses = <String, ShortcutUse>{};
+    for (final entry in json.entries) {
+      final use = ShortcutUse.fromJson(entry.value);
+      if (entry.key is String && use != null) {
+        uses[entry.key as String] = use;
+      }
+    }
+    return uses;
+  }
 }

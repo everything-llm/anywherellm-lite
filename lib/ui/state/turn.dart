@@ -3,12 +3,13 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/chat.dart';
 import '../../core/outputs.dart';
+import '../../core/shortcuts.dart';
 import '../../core/server_models.dart';
 
 /// One turn on screen. An answer grows while it streams, and notifies only its own listeners
 /// as it does, so a chunk rebuilds the answer and nothing else.
 class Turn extends ChangeNotifier {
-  Turn.user(this.text, {this.attachments = const []})
+  Turn.user(this.text, {this.attachments = const [], this.shortcutUse})
     : role = Role.user,
       streaming = false,
       asked = null;
@@ -19,7 +20,7 @@ class Turn extends ChangeNotifier {
       streaming = true,
       asked = clock.now();
 
-  Turn.saved(ChatMessage message)
+  Turn.saved(ChatMessage message, {this.shortcutUse})
     : role = message.role,
       text = message.text,
       citations = message.citations,
@@ -39,6 +40,9 @@ class Turn extends ChangeNotifier {
   /// The files sent with a question.
   List<SentFile> attachments = const [];
   List<Citation> citations = const [];
+
+  /// The local shortcut and detail that produced this question, if known.
+  ShortcutUse? shortcutUse;
 
   /// What an agent made with the answer.
   List<GeneratedFile> files = const [];

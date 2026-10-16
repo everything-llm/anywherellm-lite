@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../../core/prefs.dart';
 import '../app_scope.dart';
 import '../widgets/fields.dart';
+import '../widgets/phone_page.dart';
 import '../widgets/segmented.dart';
 import 'rows.dart';
+import 'settings_pages.dart';
 
 /// The theme, and the size of a chat's text.
 class AppearancePage extends StatelessWidget {
@@ -68,6 +70,7 @@ class ChatPage extends StatelessWidget {
         (ChatSwitch.spellcheck, 'Spellcheck the message'),
       (ChatSwitch.followAnswer, 'Follow a streaming answer'),
       (ChatSwitch.answerDetails, 'Show answer details'),
+      (ChatSwitch.hideShortcutPrompts, 'Hide a shortcut’s prompt'),
     ];
     return ListenableBuilder(
       listenable: prefs,
@@ -83,6 +86,15 @@ class ChatPage extends StatelessWidget {
                 value: prefs.prefs.isOn(which),
                 onChanged: (on) => prefs.setSwitch(which, on),
               ),
+          ]),
+          FieldCard([
+            NavRow(
+              icon: 'slash',
+              title: 'Shortcuts',
+              about:
+                  '${scope.prefs.shortcutsIn(scope.chat.activeSlug).length} prompts · type / to use them',
+              onTap: () => scope.shell.showSettingsPage(SettingsPage.shortcuts),
+            ),
           ]),
           if (prefs.problem case final problem?)
             HelpText('${problem.title}. ${problem.text}', status: true),

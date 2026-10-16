@@ -25,7 +25,7 @@ Finder _inSheet(Finder f) =>
 
 /// Attaches what the file picker gives, through the Attach sheet's Files.
 Future<void> attachFiles(WidgetTester tester) async {
-  await tester.tap(find.byTooltip('Attach files to this message'));
+  await tester.tap(find.byTooltip('Add files or shortcuts to this message'));
   await tester.pumpAndSettle();
   await tester.tap(control('Files'));
   await tester.pumpAndSettle();
@@ -106,7 +106,7 @@ void main() {
       contract(),
     ], picked: picked.future);
     final h = await pumpApp(tester, llm: planningServer());
-    await tester.tap(find.byTooltip('Attach files to this message'));
+    await tester.tap(find.byTooltip('Add files or shortcuts to this message'));
     await tester.pumpAndSettle();
     await tester.tap(control('Files'));
     await tester.pump();
@@ -265,7 +265,9 @@ void main() {
       (tester) async {
         FilePickerPlatform.instance = FakePicker([contract()]);
         await pumpApp(tester, llm: planningServer());
-        await tester.tap(find.byTooltip('Attach files to this message'));
+        await tester.tap(
+          find.byTooltip('Add files or shortcuts to this message'),
+        );
         await tester.pumpAndSettle();
         // No photos on this device: Files alone.
         expect(_inSheet(find.text('Photo library')), findsNothing);
@@ -300,7 +302,9 @@ void main() {
         h.photos!
           ..chosen = [photo()]
           ..cameraFails = true;
-        await tester.tap(find.byTooltip('Attach files to this message'));
+        await tester.tap(
+          find.byTooltip('Add files or shortcuts to this message'),
+        );
         await tester.pumpAndSettle();
         await tester.tap(control('Photo library'));
         await tester.pumpAndSettle();

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/ports.dart';
 import '../../core/prefs.dart';
+import '../../core/shortcuts.dart';
 import 'notice.dart';
 
 /// The app's preferences: read once at start, written on every change.
@@ -115,6 +116,9 @@ class PrefsController extends ChangeNotifier {
     if (server == null) return;
     if (prefs.workspaceOrder.contains(from) ||
         prefs.switchedOff.containsKey(Prefs.offKey(server, from)) ||
+        prefs.shortcuts.any(
+          (shortcut) => shortcut.workspaceKey == Prefs.offKey(server, from),
+        ) ||
         prefs.keepsChatsOf(server, from) ||
         prefs.lastChatIn(server, from)) {
       await _change(prefs.withRenamedWorkspace(server, from, to));
@@ -127,6 +131,64 @@ class PrefsController extends ChangeNotifier {
 
   Future<void> setSwitch(ChatSwitch which, bool on) =>
       _change(prefs.withSwitch(which, on));
+
+  /// The built-in and user-made shortcuts available in workspace [slug].
+  List<PromptShortcut> shortcutsIn(String? slug) {
+    final server = _server;
+    if (server == null || slug == null) return const [];
+    final key = Prefs.offKey(server, slug);
+    return [
+      ...builtInPromptShortcuts,
+      ...prefs.shortcuts,
+    ].where((shortcut) => shortcut.appliesTo(key)).toList();
+  }
+
+  /// Whether [name] is free among the built-in and user-made shortcuts.
+  bool shortcutNameAvailable(String name, {String? exceptId}) =>
+      validShortcutName(name) &&
+      ![
+        ...builtInPromptShortcuts,
+        ...prefs.shortcuts.where((shortcut) => shortcut.id != exceptId),
+      ].any((shortcut) => shortcut.name == name);
+
+  Future<void> saveShortcut(PromptShortcut shortcut) => _change(
+    prefs.withShortcuts([
+      ...prefs.shortcuts.where((item) => item.id != shortcut.id),
+      shortcut,
+    ]),
+  );
+
+  Future<void> deleteShortcut(String id) => _change(
+    prefs.withShortcuts(
+      prefs.shortcuts.where((shortcut) => shortcut.id != id).toList(),
+    ),
+  );
+
+  /// Remembers how a local shortcut labelled an exchange on this device.
+  Future<void> rememberShortcutUse(
+    String slug,
+    String thread,
+    int chatId,
+    ShortcutUse use,
+  ) async {
+    final server = _server;
+    if (server == null) return;
+    final key = Prefs.shortcutUseKey(server, slug, thread, chatId);
+    await _change(prefs.withShortcutUse(key, use));
+  }
+
+  /// The shortcut label and detail saved for this exchange, if any.
+  ShortcutUse? shortcutUse(String slug, String thread, int chatId) {
+    final server = _server;
+    return server == null || prefs.shortcutUses.isEmpty
+        ? null
+        : prefs.shortcutUses[Prefs.shortcutUseKey(
+            server,
+            slug,
+            thread,
+            chatId,
+          )];
+  }
 
   Future<void> _change(Prefs next) async {
     prefs = next;

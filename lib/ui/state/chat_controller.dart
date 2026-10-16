@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/chat.dart';
 import '../../core/connection.dart';
 import '../../core/ports.dart';
+import '../../core/shortcuts.dart';
 import '../../core/server_models.dart';
 import 'answer_bytes.dart';
 import 'answer_waits.dart';
@@ -42,7 +43,7 @@ class _Deleted {
 /// An answer running: the chat it belongs to, null while its draft's thread is being made, and
 /// the stream it reads.
 class _Running {
-  _Running(this.answer, this.slug);
+  _Running(this.answer, this.slug, this.shortcutUse);
 
   final Turn answer;
 
@@ -54,6 +55,8 @@ class _Running {
   /// The message a chat this answer's message made is named after when the answer ends, however
   /// it ends; null for a chat that already had a name.
   String? nameAs;
+
+  final ShortcutUse? shortcutUse;
 }
 
 /// The workspaces and their chats, the chat on screen, and the answers running.
@@ -111,12 +114,21 @@ class ChatController extends ChangeNotifier {
   };
   ({Turn turn, String slug, String thread})? _finished;
 
+  /// The shortcut a saved question was sent with on this device, if it was one.
+  ShortcutUse? _useOf(String slug, String thread, Role role, int? chatId) =>
+      role == Role.user && chatId != null
+      ? _prefs.shortcutUse(slug, thread, chatId)
+      : null;
+
   /// The answers whose connection dropped, read for until the server saved them.
   late final waits = AnswerWaits(
     _api,
     turnsOf: (thread) => _turns[thread],
     saved: (slug, thread, saved) {
       _learnFrom(thread, saved.map((t) => t.chatId));
+      for (final turn in saved) {
+        turn.shortcutUse = _useOf(slug, thread, turn.role, turn.chatId);
+      }
       _turns[thread] = saved;
       _markFinished(saved.last, slug, thread);
     },
@@ -477,7 +489,13 @@ class ChatController extends ChangeNotifier {
           history.length < known.length) {
         return;
       }
-      _turns[threadSlug] = [for (final m in history) Turn.saved(m)];
+      _turns[threadSlug] = [
+        for (final m in history)
+          Turn.saved(
+            m,
+            shortcutUse: _useOf(slug, threadSlug, m.role, m.chatId),
+          ),
+      ];
     });
   }
 
@@ -672,6 +690,7 @@ class ChatController extends ChangeNotifier {
   Future<bool> send(
     String message, {
     List<Attachment> attachments = const [],
+    ShortcutUse? shortcutUse,
   }) async {
     final slug = activeSlug;
     final text = message.trim();
@@ -679,6 +698,7 @@ class ChatController extends ChangeNotifier {
     _link.take();
     final user = Turn.user(
       text,
+      shortcutUse: shortcutUse,
       attachments: [
         for (final a in attachments)
           a.isImage ? SentFile.picture(a.name, a.bytes) : SentFile(a.name),
@@ -686,7 +706,7 @@ class ChatController extends ChangeNotifier {
     );
     final answer = Turn.answer();
     final turns = [...this.turns, user, answer];
-    final running = _Running(answer, slug)..thread = activeThread;
+    final running = _Running(answer, slug, shortcutUse)..thread = activeThread;
     _runs.add(running);
     final server = _server;
     final draftGo = _draftGo;
@@ -856,6 +876,12 @@ class ChatController extends ChangeNotifier {
     // An answer in a chat, however it ended, is a use of it, for Recent.
     if (running.thread case final thread?) {
       unawaited(_prefs.useChat(running.slug, thread));
+      final chatId = running.answer.chatId;
+      if (running.shortcutUse case final use? when chatId != null) {
+        unawaited(
+          _prefs.rememberShortcutUse(running.slug, thread, chatId, use),
+        );
+      }
       _settle(running, thread, error: error);
     }
     running.answer

@@ -15,6 +15,7 @@ import 'connection_page.dart';
 import 'device_pages.dart';
 import 'memory_page.dart';
 import 'privacy_page.dart';
+import 'shortcuts_page.dart';
 import 'rows.dart';
 import 'server_page.dart';
 import 'settings_pages.dart';
@@ -336,6 +337,7 @@ class _PageView extends StatelessWidget {
     SettingsPage.memory => const MemoryPage(),
     SettingsPage.appearance => const AppearancePage(),
     SettingsPage.chat => const ChatPage(),
+    SettingsPage.shortcuts => const ShortcutsPage(),
     SettingsPage.privacy => const PrivacyPage(),
   };
 }

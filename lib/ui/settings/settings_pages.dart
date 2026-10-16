@@ -4,6 +4,11 @@ enum SettingsPage {
   connection('Connection', null, needsServer: false),
   appearance('Appearance', null, needsServer: false),
   chat('Chat', null, needsServer: false),
+  shortcuts(
+    'Shortcuts',
+    'Type `/` in a message, or tap + beside it.',
+    needsServer: false,
+  ),
   memory('Memory', null),
   server('Server', null),
   privacy('Privacy and data', 'Where your questions and files go.');
@@ -20,5 +25,9 @@ enum SettingsPage {
 
   /// The page this one is reached from and goes back to: [server] for [privacy], or null, the
   /// list, for the others.
-  SettingsPage? get parent => this == privacy ? server : null;
+  SettingsPage? get parent => switch (this) {
+    privacy => server,
+    shortcuts => chat,
+    _ => null,
+  };
 }

@@ -1,4 +1,5 @@
 import 'package:anywherellm/core/prefs.dart';
+import 'package:anywherellm/core/shortcuts.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _s = 'https://s:3001';
@@ -18,6 +19,26 @@ void main() {
     expect(
       (doc.path, doc.title, doc.words),
       ('custom-documents/a.json', 'a.md', 9),
+    );
+  });
+
+  test('shortcuts and their sent exchange details round-trip', () {
+    const shortcut = PromptShortcut(
+      id: 'formal',
+      name: 'formal',
+      label: 'Make it formal',
+      prompt: 'Rewrite {text} formally.',
+      workspaceKey: '$_s q3',
+    );
+    const use = ShortcutUse(label: 'Translate', detail: 'French');
+    final prefs = const Prefs(shortcuts: [shortcut])
+        .withShortcutUse(Prefs.shortcutUseKey(_s, 'q3', 'thread', 42), use);
+
+    final back = Prefs.decode(prefs.encode());
+    expect(back.shortcuts.single.toJson(), shortcut.toJson());
+    expect(
+      back.shortcutUses[Prefs.shortcutUseKey(_s, 'q3', 'thread', 42)]?.toJson(),
+      use.toJson(),
     );
   });
 

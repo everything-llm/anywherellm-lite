@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart';
 import '../../core/chat.dart';
 import '../../core/copy.dart';
 import '../../core/prefs.dart';
+import '../../core/shortcuts.dart';
 import '../../core/server_models.dart';
 import '../app_scope.dart';
 import '../links.dart';
@@ -28,6 +29,7 @@ import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
 import 'answer_body.dart';
 import 'markdown_lists.dart';
+import 'shortcut_chip.dart';
 import 'answer_menu.dart';
 import 'generated_files.dart';
 import 'passages_sheet.dart';
@@ -226,6 +228,7 @@ class _MessageListState extends State<MessageList> {
 
   /// The [i]th turn from the newest.
   Widget _turn(ChatController chat, List<Turn> turns, int i) {
+    final scope = AppScope.of(context);
     final turn = turns[turns.length - 1 - i];
     final first = i == turns.length - 1;
     // Every turn is 14 from the one before.
@@ -242,11 +245,24 @@ class _MessageListState extends State<MessageList> {
             padding: EdgeInsets.only(top: first ? 0 : 16),
             child: Rise(
               child: turn.role == Role.user
-                  ? _UserBubble(
-                      turn.text,
-                      attachments: turn.attachments,
-                      onEdit: () => widget.onSuggest(turn.text),
-                    )
+                  ? turn.shortcutUse == null
+                        ? _UserBubble(
+                            turn.text,
+                            attachments: turn.attachments,
+                            onEdit: () => widget.onSuggest(turn.text),
+                          )
+                        : ListenableBuilder(
+                            listenable: scope.prefs,
+                            builder: (context, _) => _UserBubble(
+                              turn.text,
+                              attachments: turn.attachments,
+                              shortcutUse: turn.shortcutUse,
+                              hideShortcutPrompt: scope.prefs.prefs.isOn(
+                                ChatSwitch.hideShortcutPrompts,
+                              ),
+                              onEdit: () => widget.onSuggest(turn.text),
+                            ),
+                          )
                   : _Answer(turn, retry: i == 0 ? _retryOf(chat) : null),
             ),
           ),
@@ -478,8 +494,7 @@ class _Empty extends StatelessWidget {
                   return const SizedBox.shrink();
                 }
                 final label = sources.onCount > 0
-                    ? plural(sources.onCount, 'document', 'documents') +
-                          ' in use'
+                    ? '${plural(sources.onCount, 'document', 'documents')} in use'
                     : sources.files.isNotEmpty
                     ? 'No documents in use'
                     : 'No documents yet';
@@ -551,6 +566,8 @@ class _UserBubble extends StatelessWidget {
   const _UserBubble(
     this.text, {
     this.attachments = const [],
+    this.shortcutUse,
+    this.hideShortcutPrompt = false,
     required this.onEdit,
   });
 
@@ -558,6 +575,8 @@ class _UserBubble extends StatelessWidget {
 
   /// The files sent with the question: a picture drawn small, any other by its name.
   final List<SentFile> attachments;
+  final ShortcutUse? shortcutUse;
+  final bool hideShortcutPrompt;
 
   /// Puts [text] back in the composer, to ask again as a new message.
   final VoidCallback onEdit;
@@ -585,6 +604,7 @@ class _UserBubble extends StatelessWidget {
 
   Widget _bubble(BuildContext context) {
     final t = Tokens.of(context);
+    final compact = hideShortcutPrompt ? shortcutUse : null;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -599,7 +619,27 @@ class _UserBubble extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(text, style: Type.sans(Type.chat, color: t.ink, height: 1.5)),
+          if (compact case final use?) ...[
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                ShortcutChip(use.label),
+                if (use.detail.isNotEmpty)
+                  Text(
+                    use.detail,
+                    style: Type.sans(Type.chat, color: t.ink, height: 1.5),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Shortcut · the server keeps the full prompt',
+              style: Type.note(t.muted),
+            ),
+          ] else
+            Text(text, style: Type.sans(Type.chat, color: t.ink, height: 1.5)),
           for (final file in attachments)
             Padding(
               padding: const EdgeInsets.only(top: 6),
