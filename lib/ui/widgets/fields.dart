@@ -98,7 +98,7 @@ class AppField extends StatelessWidget {
           borderSide: BorderSide(color: color, width: width),
           gapPadding: 0,
         );
-    // Several lines are set apart, as the design canvas sets a text area.
+    // Several lines are set apart, as the Lite prototype sets a text area.
     final text = Type.sans(
       size,
       height: maxLines > 1 ? Type.textAreaLine : null,

@@ -46,7 +46,7 @@ enum SettingsPage {
 
   final String label;
 
-  /// The line under the page's title, or null for a page the design canvas draws without one.
+  /// The line under the page's title, or null for a page the Lite prototype draws without one.
   final String? about;
 
   /// Whether the page is about the server, and so shows only once one is saved.

@@ -335,7 +335,7 @@ class _SavedEditorState extends State<_SavedEditor> {
   }
 
   /// Whether the list for [global] is full, so this memory cannot move into it. A list that is
-  /// full takes no memory from the other, as the design canvas draws it.
+  /// full takes no memory from the other, as the Lite prototype draws it.
   bool _full(bool global) {
     final saved = AppScope.of(context).memory.saved;
     final existing = widget.memory;

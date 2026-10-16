@@ -6,7 +6,7 @@ import '../type.dart';
 import 'tappable.dart';
 
 /// A row of equal segments, one of them chosen. [onChanged] null shows it disabled. Each segment
-/// is at least 44 tall, its label at 14.5, as the design canvas draws it.
+/// is at least 44 tall, its label at 14.5, as the Lite prototype draws it.
 class Segmented<T> extends StatelessWidget {
   const Segmented({
     super.key,

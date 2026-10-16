@@ -85,7 +85,7 @@ class _SettingsFormState extends State<SettingsForm> {
   @override
   Widget build(BuildContext context) {
     final dirty = _dirty;
-    // The buttons show only once something has changed, as the design canvas draws the page at
+    // The buttons show only once something has changed, as the Lite prototype draws the page at
     // rest.
     return _form(
       context,

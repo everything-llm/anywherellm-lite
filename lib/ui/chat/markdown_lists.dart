@@ -151,7 +151,7 @@ class CaretSyntax extends md.InlineSyntax {
 }
 
 /// Draws a `caret` element as the [Caret], in the line of text it ends, 3 px after its last
-/// letter, as the design canvas draws a running answer.
+/// letter, as the Lite prototype draws a running answer.
 class CaretBuilder extends MarkdownElementBuilder {
   @override
   Widget? visitElementAfterWithContext(

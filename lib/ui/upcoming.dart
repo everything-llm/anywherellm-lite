@@ -100,7 +100,7 @@ class UpcomingPage extends StatelessWidget {
             style: Type.sans(14, color: t.muted),
           )
         else
-          // One card, a rule between its jobs, as the design canvas draws it.
+          // One card, a rule between its jobs, as the Lite prototype draws it.
           FieldCard([
             for (final job in jobs)
               _JobRow(

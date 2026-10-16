@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:path_drawing/path_drawing.dart';
 
-/// The icon paths, the design canvas's own, drawn as strokes on a 16 unit box.
+/// The icon paths, the Lite prototype's own, drawn as strokes on a 16 unit box.
 const _paths = {
   'server': 'M2.5 3h11v4h-11z M2.5 9h11v4h-11z M5 5h.01 M5 11h.01',
   'chat': 'M3 3.5h10v7.5H7.5L4.5 13.5V11H3z',

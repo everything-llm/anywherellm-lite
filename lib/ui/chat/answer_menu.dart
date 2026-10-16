@@ -12,7 +12,7 @@ import '../widgets/buttons.dart';
 import '../settings/rows.dart';
 import '../widgets/sheet.dart';
 
-/// The circle an answer's action button takes, its icon at [IconSize.xs], as the design canvas
+/// The circle an answer's action button takes, its icon at [IconSize.xs], as the Lite prototype
 /// sets the buttons side by side.
 const answerAction = 44.0;
 

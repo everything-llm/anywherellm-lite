@@ -169,7 +169,7 @@ class _MessageListState extends State<MessageList> {
     final chat = scope.chat;
     // A pull down past the oldest turn reads the chat again.
     // The list is reversed, so a long chat opens at its newest turn; it is as tall as its turns
-    // and sits at the top, so a short chat starts under the header, as the design canvas
+    // and sits at the top, so a short chat starts under the header, as the Lite prototype
     // draws it.
     final list = CustomScrollView(
       // Another chat gets a list of its own, which starts at its newest turn.
@@ -424,7 +424,7 @@ class _Empty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sources = AppScope.of(context).sources;
-    // The suggestions stack under the headline, as the design canvas draws them.
+    // The suggestions stack under the headline, as the Lite prototype draws them.
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -534,7 +534,7 @@ class _UserBubble extends StatelessWidget {
   /// Puts [text] back in the composer, to ask again as a new message.
   final VoidCallback onEdit;
 
-  /// The bubble stands alone, at most 300 wide, as the design canvas draws it, and a long press
+  /// The bubble stands alone, at most 300 wide, as the Lite prototype draws it, and a long press
   /// on it is Edit.
   @override
   Widget build(BuildContext context) {
@@ -670,7 +670,7 @@ class _Answer extends StatelessWidget {
           AnswerBody(split.answer, muted: cut, caret: inline),
         if (turn.streaming && turn.status != null) _Status(turn.status!),
         if (turn.streaming && !inline)
-          // The caret alone, as the design canvas draws it, from the send on, while a
+          // The caret alone, as the Lite prototype draws it, from the send on, while a
           // model's reasoning is hidden too.
           const Padding(padding: EdgeInsets.only(top: 6), child: Caret()),
         if (turn.waiting) ...[
@@ -818,7 +818,7 @@ class _Citations extends StatelessWidget {
       listenable: shell,
       builder: (context, _) {
         final open = shell.citedOpen && identical(shell.cited, citations);
-        // The line is 44 tall around its chips, as the design canvas draws it.
+        // The line is 44 tall around its chips, as the Lite prototype draws it.
         return ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 44),
           child: Align(
@@ -957,7 +957,7 @@ class _CitationState extends State<_Citation> {
           ? null
           : () => openLink(context, url.toString()),
       radius: BorderRadius.circular(99),
-      // A chip is the panel's colour, outlined, as the design canvas draws it.
+      // A chip is the panel's colour, outlined, as the Lite prototype draws it.
       color: t.panel,
       side: BorderSide(color: t.edge),
       child: ConstrainedBox(

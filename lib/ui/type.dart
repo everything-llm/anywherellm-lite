@@ -33,7 +33,7 @@ abstract final class Type {
     letterSpacing: letterSpacing,
   );
 
-  /// The line height of a field of several lines, as the design canvas sets a text area.
+  /// The line height of a field of several lines, as the Lite prototype sets a text area.
   static const textAreaLine = 1.5;
 
   /// Text in a field of several lines at [size], in [color].

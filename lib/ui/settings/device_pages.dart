@@ -38,7 +38,7 @@ class AppearancePage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           spacing: 20,
           children: [
-            // Each name sits over its choices in a card of its own, as the design canvas
+            // Each name sits over its choices in a card of its own, as the Lite prototype
             // draws it.
             PanelCard(children: [NamedControl('Theme', theme)]),
             PanelCard(children: [NamedControl('Chat text size', size)]),
@@ -76,7 +76,7 @@ class ChatPage extends StatelessWidget {
         spacing: 12,
         children: [
           FieldCard([
-            // Each switch is named alone, as the design canvas draws them.
+            // Each switch is named alone, as the Lite prototype draws them.
             for (final (which, label) in rows)
               FieldRow.toggle(
                 label: label,

@@ -100,7 +100,7 @@ class _EditorState extends State<_Editor> {
           ),
           const SizedBox(height: 20),
           // Only the buttons follow the draft, so typing rebuilds nothing else. They show once
-          // the text has changed, in a line kept for them, as the design canvas draws it.
+          // the text has changed, in a line kept for them, as the Lite prototype draws it.
           ListenableBuilder(
             listenable: _draft,
             builder: (context, _) => ConstrainedBox(

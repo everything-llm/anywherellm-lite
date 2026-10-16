@@ -7,7 +7,7 @@ import '../type.dart';
 import 'tappable.dart';
 
 /// The button: bordered, with a filled `primary` form, 52 tall with its label at 16, as the
-/// design canvas draws it. In an [ActionRow.even] it keeps 8 px either side of its
+/// Lite prototype draws it. In an [ActionRow.even] it keeps 8 px either side of its
 /// label rather than 16.
 class AppButton extends StatelessWidget {
   const AppButton(

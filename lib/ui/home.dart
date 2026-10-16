@@ -330,7 +330,7 @@ class _Search extends StatelessWidget {
     return ListenableBuilder(
       listenable: focus,
       builder: (context, child) => Container(
-        // Its edge sits outside the field's height, as the design canvas draws it.
+        // Its edge sits outside the field's height, as the Lite prototype draws it.
         constraints: const BoxConstraints(minHeight: Sizes.field + 2),
         padding: EdgeInsets.only(left: 16, right: searching ? 4 : 16),
         decoration: BoxDecoration(

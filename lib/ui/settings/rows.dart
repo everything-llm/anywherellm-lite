@@ -171,7 +171,7 @@ class CardHairline extends CustomPainter {
 /// A setting in a [FieldCard]: its [label] and [help] on the left and its [control] on the
 /// right, or the control under them where the row is narrow. A [small] control, such as a
 /// switch, stays on the right however narrow, in a 52 px column at the card's inset, in a row
-/// as tall as an [InfoRow], as the design canvas draws it.
+/// as tall as an [InfoRow], as the Lite prototype draws it.
 class FieldRow extends StatelessWidget {
   const FieldRow({
     super.key,
@@ -330,7 +330,7 @@ class NamedControl extends StatelessWidget {
 
 /// A row of a [FieldCard] that only says something: [title] at 17, with [tag] beside it, over
 /// the line [about], in the mono face when [mono], or the line [aboutSpan] drawn as it says. It
-/// is taller than a row that opens something, as the design canvas draws it.
+/// is taller than a row that opens something, as the Lite prototype draws it.
 class InfoRow extends StatelessWidget {
   const InfoRow(
     this.title, {

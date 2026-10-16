@@ -25,7 +25,7 @@ class RadioCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     // The card rings itself in the selection colour when chosen, and marks the choice with a
-    // thick ring rather than a dot, as the design canvas draws it.
+    // thick ring rather than a dot, as the Lite prototype draws it.
     return Tappable(
       label: [title, ?about].join('. '),
       selected: selected,

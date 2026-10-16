@@ -477,7 +477,7 @@ class _Form extends StatelessWidget {
         if (!picking) onPickModel();
       },
       child: Container(
-        // The buttons run nearer the card's edges than its text, as the design canvas draws
+        // The buttons run nearer the card's edges than its text, as the Lite prototype draws
         // them; what sits over them is indented to the text's edge.
         padding: const EdgeInsets.fromLTRB(8, 14, 8, 6),
         decoration: BoxDecoration(
@@ -626,7 +626,7 @@ class _Form extends StatelessWidget {
                 else
                   RoundButton(
                     label: 'Send',
-                    // Send keeps the accent, as the design canvas draws it.
+                    // Send keeps the accent, as the Lite prototype draws it.
                     color: t.accent,
                     onTap: sendable ? send : null,
                     child: AppIcon(
