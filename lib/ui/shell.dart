@@ -13,6 +13,7 @@ import 'chat_sheet.dart';
 import 'chat/page_sheet.dart';
 import 'chat/passages_sheet.dart';
 import 'files/workspace_pages.dart';
+import 'settings/pairing_sheet.dart';
 import 'settings/settings_dialog.dart';
 import 'share/share_sheet.dart';
 import 'shelf.dart';
@@ -175,7 +176,14 @@ class AppShell extends StatelessWidget {
                         // The sheet's own scrim closes it.
                         if (shell.rightOpen) Positioned.fill(child: right),
                         // What another app shared, over everything but a popup.
-                        if (shell.shared case final item?)
+                        if (shell.shared case final SharedPairing link)
+                          Positioned.fill(
+                            child: PairingSheet(
+                              link.code,
+                              key: ObjectKey(link),
+                            ),
+                          )
+                        else if (shell.shared case final SharedContent item)
                           Positioned.fill(
                             child: ShareSheet(item, key: ObjectKey(item)),
                           ),

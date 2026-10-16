@@ -192,6 +192,22 @@ class ShellController extends ChangeNotifier {
   /// Whether Settings is reading a pairing code with the camera, which Esc and Back stop first.
   bool get scanning => _scanning;
 
+  String? _pairing;
+
+  /// Opens Settings' Connection page to connect with [code], a pairing code, as if it had been
+  /// scanned there.
+  void pairWith(String code) {
+    _pairing = code;
+    openSettings(SettingsPage.connection);
+  }
+
+  /// The pairing code [pairWith] left for the Connection page, once; null when none waits.
+  String? takePairing() {
+    final code = _pairing;
+    _pairing = null;
+    return code;
+  }
+
   void setScanning(bool on) {
     if (on == _scanning) return;
     _scanning = on;

@@ -145,10 +145,19 @@ class _KeyCardState extends State<_KeyCard> {
   void initState() {
     super.initState();
     _url.text = _settings.connection?.baseUrl ?? '';
+    _shell.addListener(_takePairing);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _takePairing());
+  }
+
+  /// Connects with a pairing code [ShellController.pairWith] left, as with a scanned one.
+  void _takePairing() {
+    if (!mounted) return;
+    if (_shell.takePairing() case final code?) unawaited(_scanned(code));
   }
 
   @override
   void dispose() {
+    _shell.removeListener(_takePairing);
     _forgetTimer?.cancel();
     _url.dispose();
     _key.dispose();

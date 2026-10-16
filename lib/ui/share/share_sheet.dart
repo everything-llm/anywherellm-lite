@@ -39,7 +39,7 @@ enum _Use { add, ask }
 class ShareSheet extends StatefulWidget {
   const ShareSheet(this.item, {super.key});
 
-  final SharedItem item;
+  final SharedContent item;
 
   @override
   State<ShareSheet> createState() => _ShareSheetState();
