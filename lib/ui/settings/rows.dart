@@ -232,11 +232,7 @@ class FieldRow extends StatelessWidget {
     );
     return ConstrainedBox(
       constraints: BoxConstraints(
-        minHeight: inSheet
-            ? Sizes.cardRow
-            : small
-            ? Sizes.infoRow
-            : Sizes.navRow,
+        minHeight: inSheet ? Sizes.cardRow : Sizes.pageRow,
       ),
       child: Padding(
         padding: EdgeInsets.symmetric(
@@ -318,7 +314,7 @@ class NamedControl extends StatelessWidget {
 
 /// A row of a [FieldCard] that only says something: [title] at 17, with [tag] beside it, over
 /// the line [about], in the mono face when [mono], or the line [aboutSpan] drawn as it says. It
-/// is taller than a row that opens something, as the Lite prototype draws it.
+/// is as tall as a row that opens something, or a sheet's row in a sheet.
 class InfoRow extends StatelessWidget {
   const InfoRow(
     this.title, {
@@ -345,7 +341,9 @@ class InfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return Container(
-      constraints: const BoxConstraints(minHeight: Sizes.infoRow),
+      constraints: BoxConstraints(
+        minHeight: SheetFrame.holds(context) ? Sizes.cardRow : Sizes.pageRow,
+      ),
       padding: const EdgeInsets.symmetric(
         horizontal: FieldCard.inset,
         vertical: 10,
@@ -488,7 +486,7 @@ class CardRow extends StatelessWidget {
       dimWhenDisabled: 0.5,
       child: Container(
         constraints: BoxConstraints(
-          minHeight: large ? Sizes.navRow : Sizes.cardRow,
+          minHeight: large ? Sizes.pageRow : Sizes.cardRow,
         ),
         padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
         child: Row(

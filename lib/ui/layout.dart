@@ -31,14 +31,12 @@ abstract final class Sizes {
   /// The least height of a row in a card: a sheet's, a chat's or a document's.
   static const cardRow = 64.0;
 
-  /// The least height of a page's row that opens something, as in Settings.
-  static const navRow = 68.0;
+  /// The least height of a row in a page's card, whether it opens something, only says
+  /// something or holds a switch, as the Lite prototype draws them all.
+  static const pageRow = 68.0;
 
   /// The least height of a source an answer cited, in the sheet that lists them.
   static const citedRow = 80.0;
-
-  /// The least height of a row that only says something, or holds a switch.
-  static const infoRow = 88.0;
 
   /// The least height of a page's header bar, which grows with the text.
   static const header = 72.0;
