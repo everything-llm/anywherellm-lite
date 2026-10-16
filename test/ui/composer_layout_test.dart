@@ -7,18 +7,52 @@ import '../support/fake_api.dart';
 import '../support/pump.dart';
 
 void main() {
-  testWidgets('Send sits at the composer\'s right edge after the chips', (
+  /// The composer's card: the box with a shadow around the message field.
+  Rect cardRect(WidgetTester tester) => tester.getRect(
+    find
+        .ancestor(of: composerField, matching: find.byType(Container))
+        .evaluate()
+        .map((e) => find.byElementPredicate((x) => x == e))
+        .firstWhere((f) {
+          final box = (f.evaluate().single.widget as Container).decoration;
+          return box is BoxDecoration && box.boxShadow != null;
+        }),
+  );
+
+  testWidgets('an empty composer is one line, with Send at its right edge', (
     tester,
   ) async {
     await pumpApp(tester, llm: planningServer());
-    final field = tester.getRect(composerField);
+    final card = cardRect(tester);
     final send = tester.getRect(find.byTooltip('Send'));
-    expect((field.right - send.right).abs(), lessThan(16));
+    expect(card.height, lessThan(60));
+    expect(card.right - send.right, lessThan(16));
+    expect((send.center.dy - card.center.dy).abs(), lessThan(4));
+  });
+
+  testWidgets('the message field grows a line at a time, up to a limit', (
+    tester,
+  ) async {
+    await pumpApp(tester, llm: planningServer());
+    final one = cardRect(tester).height;
+    await tester.enterText(composerField, 'one\ntwo\nthree');
+    await tester.pump();
+    final three = cardRect(tester).height;
+    expect(three, greaterThan(one + 40));
+    await tester.enterText(composerField, List.filled(20, 'line').join('\n'));
+    await tester.pump();
+    final many = cardRect(tester).height;
+    // The field stops at 156 and scrolls, so the card stays near 156 + the row's padding.
+    expect(many, lessThan(one + 156));
+    // Send stays at the bottom, beside the last line.
+    final card = cardRect(tester);
+    final send = tester.getRect(find.byTooltip('Send'));
+    expect(card.bottom - send.bottom, lessThan(8));
   });
 
   testWidgets('a tap beside a small control still reaches it', (tester) async {
     final h = await pumpApp(tester, llm: planningServer());
-    // Attach is drawn 30 px across; its target is 44.
+    // Attach is a 48 px square, so a tap 20 px under its middle is still on it.
     final attach = tester.getCenter(
       find.byTooltip('Add files or shortcuts to this message'),
     );

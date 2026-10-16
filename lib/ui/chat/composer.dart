@@ -577,7 +577,7 @@ class _Form extends StatelessWidget {
     }
 
     // While this chat answers, a message typed is held to go when the answer ends. Send when
-    // done takes the chips' room, as they are off while the chat answers.
+    // done takes the chips' place, as they are off while the chat answers.
     final holdable = here && !held && draft.text.trim().isNotEmpty;
 
     // On a phone the keyboard's Enter is left to the field, which starts a new line.
@@ -591,14 +591,35 @@ class _Form extends StatelessWidget {
         const SingleActivator(LogicalKeyboardKey.backspace): onClearShortcut,
     };
 
+    // What sits over the field, in the card's own padding.
+    final notes = [
+      if (problem case final problem?)
+        AlertBox(AlertKind.bad, 'Could not attach', text: problem),
+      if (micProblem case final problem?)
+        AlertBox(AlertKind.bad, 'Could not listen', text: problem),
+      if (held)
+        _FormNote(
+          'Sends when this answer ends.',
+          action: "Don't send",
+          onAction: onRelease,
+        ),
+      if (picking) ...[
+        ModelPicker(onClose: onPickModel),
+        Divider(height: 21, thickness: 1, color: t.line),
+      ],
+      if (slashQuery != null)
+        _ShortcutSuggestions(
+          query: slashQuery,
+          shortcuts: matches,
+          onSelect: onSelectShortcut,
+        ),
+    ];
+
     final card = AnswerFromAnchor(
       onPickModel: () {
         if (!picking) onPickModel();
       },
       child: Container(
-        // The buttons run nearer the card's edges than its text, as the Lite prototype draws
-        // them; what sits over them is indented to the text's edge.
-        padding: const EdgeInsets.fromLTRB(8, 14, 8, 6),
         decoration: BoxDecoration(
           color: t.panel,
           borderRadius: BorderRadius.circular(Sizes.composer),
@@ -616,40 +637,62 @@ class _Form extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (notes.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 12, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  spacing: 8,
+                  children: notes,
+                ),
+              ),
+            // What goes with the message: the shortcut, the files and where answers come from,
+            // over the field. The row is no taller than nothing while none of them shows.
             Padding(
-              padding: const EdgeInsets.only(left: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              padding: const EdgeInsets.only(left: 12, right: 4),
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 6,
                 children: [
-                  if (problem case final problem?) ...[
-                    AlertBox(AlertKind.bad, 'Could not attach', text: problem),
-                    const SizedBox(height: 8),
-                  ],
-                  if (micProblem case final problem?) ...[
-                    AlertBox(AlertKind.bad, 'Could not listen', text: problem),
-                    const SizedBox(height: 8),
-                  ],
-                  if (held)
-                    _FormNote(
-                      'Sends when this answer ends.',
-                      action: "Don't send",
-                      onAction: onRelease,
+                  if (shortcut case final chosen?)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: ShortcutChip(
+                        chosen.label,
+                        maxWidth: 220,
+                        onClear: onClearShortcut,
+                      ),
                     ),
-                  if (picking) ...[
-                    ModelPicker(onClose: onPickModel),
-                    Divider(height: 21, thickness: 1, color: t.line),
-                  ],
-                  if (slashQuery != null)
-                    _ShortcutSuggestions(
-                      query: slashQuery,
-                      shortcuts: matches,
-                      onSelect: onSelectShortcut,
+                  if (attached.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: _FilesPill(attached.length, onTap: onAttach),
                     ),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      minHeight: 30,
-                      maxHeight: 140,
+                  // The model is a row in the Answer from sheet, since the row has room for
+                  // one chip.
+                  const AnswerFromChip(),
+                  if (holdable)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: _SendWhenDone(onTap: onHold),
                     ),
+                ],
+              ),
+            ),
+            // One line to start with, growing with the message up to 156.
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                IconBtn(
+                  'plus',
+                  tooltip: 'Add files or shortcuts to this message',
+                  onPressed: chat.busy ? null : onAttach,
+                  box: 48,
+                  size: IconSize.small,
+                ),
+                Expanded(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 156),
                     child: CallbackShortcuts(
                       bindings: bindings,
                       child: Semantics(
@@ -660,103 +703,48 @@ class _Form extends StatelessWidget {
                         // Only the field follows the prefs, for its spellcheck.
                         child: ListenableBuilder(
                           listenable: scope.prefs,
-                          builder: (context, _) {
-                            final field = TextField(
-                              controller: draft,
-                              focusNode: focus,
-                              enabled: !chat.busy || here,
-                              spellCheckConfiguration:
-                                  scope.canSpellcheck &&
-                                      scope.prefs.prefs.isOn(
-                                        ChatSwitch.spellcheck,
-                                      )
-                                  ? const SpellCheckConfiguration()
-                                  : const SpellCheckConfiguration.disabled(),
-                              minLines: 1,
-                              maxLines: null,
-                              keyboardType: TextInputType.multiline,
-                              textInputAction: TextInputAction.newline,
-                              textCapitalization: TextCapitalization.sentences,
-                              style: Type.textArea(Type.chat, t.ink),
-                              cursorColor: t.accent,
-                              contentInsertionConfiguration:
-                                  ContentInsertionConfiguration(
-                                    allowedMimeTypes: imageMimes.toList(),
-                                    onContentInserted: onInserted,
-                                  ),
-                              decoration: InputDecoration(
-                                isCollapsed: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  vertical: 3,
+                          builder: (context, _) => TextField(
+                            controller: draft,
+                            focusNode: focus,
+                            enabled: !chat.busy || here,
+                            spellCheckConfiguration:
+                                scope.canSpellcheck &&
+                                    scope.prefs.prefs.isOn(
+                                      ChatSwitch.spellcheck,
+                                    )
+                                ? const SpellCheckConfiguration()
+                                : const SpellCheckConfiguration.disabled(),
+                            minLines: 1,
+                            maxLines: null,
+                            keyboardType: TextInputType.multiline,
+                            textInputAction: TextInputAction.newline,
+                            textCapitalization: TextCapitalization.sentences,
+                            style: Type.textArea(Type.chat, t.ink),
+                            cursorColor: t.accent,
+                            contentInsertionConfiguration:
+                                ContentInsertionConfiguration(
+                                  allowedMimeTypes: imageMimes.toList(),
+                                  onContentInserted: onInserted,
                                 ),
-                                border: InputBorder.none,
-                                hintText: shortcut?.requiresDetail == true
-                                    ? shortcut!.detailHint
-                                    : shortcut == null
-                                    ? hint
-                                    : 'Add a detail (optional)',
-                                hintStyle: Type.textArea(Type.chat, t.muted),
+                            decoration: InputDecoration(
+                              isCollapsed: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 12,
                               ),
-                            );
-                            // The field keeps its place in the row, so choosing or
-                            // clearing a shortcut does not rebuild it.
-                            return Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              spacing: 6,
-                              children: [
-                                if (shortcut case final chosen?)
-                                  ShortcutChip(chosen.label, maxWidth: 116),
-                                Expanded(
-                                  key: const ValueKey('message'),
-                                  child: field,
-                                ),
-                                if (shortcut case final chosen?)
-                                  IconBtn(
-                                    'close',
-                                    tooltip:
-                                        'Remove the ${chosen.label} shortcut',
-                                    onPressed: onClearShortcut,
-                                    box: 28,
-                                    size: IconSize.tiny,
-                                  ),
-                              ],
-                            );
-                          },
+                              border: InputBorder.none,
+                              hintText: shortcut?.requiresDetail == true
+                                  ? shortcut!.detailHint
+                                  : shortcut == null
+                                  ? hint
+                                  : 'Add a detail (optional)',
+                              hintStyle: Type.textArea(Type.chat, t.muted),
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                IconBtn(
-                  'plus',
-                  tooltip: 'Add files or shortcuts to this message',
-                  onPressed: chat.busy ? null : onAttach,
-                  box: 30,
-                  size: IconSize.small,
-                ),
-                // How many files go along shows beside Attach, and its sheet lists them, so the
-                // composer keeps its height.
-                if (attached.isNotEmpty) ...[
-                  const SizedBox(width: 4),
-                  _FilesPill(attached.length, onTap: onAttach),
-                ],
-                const SizedBox(width: 2),
-                // Takes all the room left, so Send sits at the right edge. The model is a row in
-                // the Answer from sheet, since the row has room for one chip.
-                Expanded(
-                  child: holdable
-                      ? Align(
-                          alignment: Alignment.centerRight,
-                          child: _SendWhenDone(onTap: onHold),
-                        )
-                      : const Row(
-                          children: [Flexible(child: AnswerFromChip())],
-                        ),
                 ),
                 if (onDictate != null)
                   IconBtn(
@@ -764,29 +752,31 @@ class _Form extends StatelessWidget {
                     tooltip: listening ? 'Stop dictating' : 'Dictate',
                     active: listening,
                     onPressed: chat.busy ? null : onDictate,
-                    box: 34,
+                    box: 48,
                     size: IconSize.small,
                   ),
-                if (holdable) const SizedBox(width: 8),
-                if (here)
-                  RoundButton(
-                    label: 'Stop the answer',
-                    color: t.ink,
-                    onTap: chat.stop,
-                    child: const StopMark(),
-                  )
-                else
-                  RoundButton(
-                    label: 'Send',
-                    // Send keeps the accent, as the Lite prototype draws it.
-                    color: t.accent,
-                    onTap: sendable ? send : null,
-                    child: AppIcon(
-                      'send',
-                      size: IconSize.small,
-                      color: t.onaccent,
-                    ),
-                  ),
+                // The round button is 40 across in a 48 square, as the Lite prototype draws it.
+                Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: here
+                      ? RoundButton(
+                          label: 'Stop the answer',
+                          color: t.ink,
+                          onTap: chat.stop,
+                          child: const StopMark(),
+                        )
+                      : RoundButton(
+                          label: 'Send',
+                          // Send keeps the accent, as the Lite prototype draws it.
+                          color: t.accent,
+                          onTap: sendable ? send : null,
+                          child: AppIcon(
+                            'send',
+                            size: IconSize.small,
+                            color: t.onaccent,
+                          ),
+                        ),
+                ),
               ],
             ),
           ],

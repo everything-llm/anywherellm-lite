@@ -82,15 +82,18 @@ class _AnswerFromChipState extends State<AnswerFromChip> {
           return const SizedBox.shrink();
         }
         final text = mode?.title ?? 'Answer from';
-        return ComposerChip(
-          text: text,
-          label: mode == null ? text : 'Answer from: $text',
-          tooltip: 'What answers in this workspace draw on',
-          open: scope.shell.answerFromOpen,
-          tinted: mode == ChatMode.query,
-          onTap: _canChoose(scope)
-              ? () => scope.shell.togglePopup(Popup.answerFrom)
-              : null,
+        return Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: ComposerChip(
+            text: text,
+            label: mode == null ? text : 'Answer from: $text',
+            tooltip: 'What answers in this workspace draw on',
+            open: scope.shell.answerFromOpen,
+            tinted: mode == ChatMode.query,
+            onTap: _canChoose(scope)
+                ? () => scope.shell.togglePopup(Popup.answerFrom)
+                : null,
+          ),
         );
       },
     );
