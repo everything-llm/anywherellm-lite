@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -159,16 +158,7 @@ class _WalkthroughState extends State<Walkthrough> {
   void _go(int to) {
     final next = to.clamp(0, widget.steps.length - 1);
     if (next == _at) return;
-    final duration = motion(context, const Duration(milliseconds: 280));
-    // A page controller refuses to animate over no time.
-    if (duration == Duration.zero) return _pages.jumpToPage(next);
-    unawaited(
-      _pages.animateToPage(
-        next,
-        duration: duration,
-        curve: Curves.easeOutCubic,
-      ),
-    );
+    _pages.turnTo(context, next, const Duration(milliseconds: 280));
   }
 
   @override

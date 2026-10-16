@@ -49,11 +49,10 @@ class SettingsController extends ChangeNotifier {
   Uri? addressOf(Companion companion) => _holder.addressOf(companion);
 
   /// Connects as [pairing] says, once the server takes its key, keeping where its companions
-  /// run. A code that names none keeps those saved for the same server. True when it did.
-  Future<bool> pair(Pairing pairing) => _connect(
-    pairing.connection,
-    pairing.companions.isEmpty ? null : pairing.companions,
-  );
+  /// run. One it names none for keeps where it was saved to run on the same server. True when it
+  /// did.
+  Future<bool> pair(Pairing pairing) =>
+      _connect(pairing.connection, pairing.companions);
 
   /// Asks the server whether [url] and [key] open it. Saves nothing.
   Future<void> test(String url, String key) async {
@@ -115,8 +114,8 @@ class SettingsController extends ChangeNotifier {
   }
 
   /// Uses [candidate] from now on and keeps it in the keyring, saying [saved] once it is there.
-  /// Where companions run is [companions] when given, kept when the server's address stays, and
-  /// forgotten for another server. If the keyring refuses, it is still used for this run and
+  /// Where companions run is kept when the server's address stays and forgotten for another
+  /// server, with [companions] over it. If the keyring refuses, it is still used for this run and
   /// the refusal is shown.
   Future<void> _use(
     Connection candidate,
@@ -128,7 +127,7 @@ class SettingsController extends ChangeNotifier {
         : const <String, Uri>{};
     _holder
       ..current = candidate
-      ..companions = companions ?? kept;
+      ..companions = {...kept, ...?companions};
     check = ConnectionCheck.idle;
     notifyListeners();
     await _keyring(

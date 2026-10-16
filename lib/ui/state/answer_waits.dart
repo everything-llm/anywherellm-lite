@@ -170,21 +170,18 @@ class AnswerWaits {
     List<Turn> turns,
     List<ChatMessage> history,
   ) {
-    if (history case [..., final asked, final said]
-        when said.role == Role.assistant && said.chatId != null) {
-      final id = said.chatId!;
+    if (history case [
+      ...,
+      final asked,
+      ChatMessage(role: Role.assistant, chatId: final int id),
+    ]) {
       if (waiting.floor case final floor?) return id > floor;
-      int asking(Iterable<String> texts) =>
-          texts.where((text) => text.trim() == waiting.question).length;
+      bool asks(Role role, String text) =>
+          role == Role.user && text.trim() == waiting.question;
       return turns.every((t) => t.chatId == null || t.chatId! < id) &&
-          asked.role == Role.user &&
-          asked.text.trim() == waiting.question &&
-          asking(
-                history.where((m) => m.role == Role.user).map((m) => m.text),
-              ) >=
-              asking(
-                turns.where((t) => t.role == Role.user).map((t) => t.text),
-              );
+          asks(asked.role, asked.text) &&
+          history.where((m) => asks(m.role, m.text)).length >=
+              turns.where((t) => asks(t.role, t.text)).length;
     }
     return false;
   }

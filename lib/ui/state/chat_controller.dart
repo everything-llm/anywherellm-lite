@@ -344,8 +344,11 @@ class ChatController extends ChangeNotifier {
     if (_server != server) return;
     loading = false;
     unreachable.value = failed;
-    final tapped = failed ? null : _tapped;
-    if (!failed) _tapped = null;
+    (String, String)? tapped;
+    if (!failed) {
+      tapped = _tapped;
+      _tapped = null;
+    }
     if (tapped case (final slug, final thread)
         when workspaces.any((w) => w.slug == slug)) {
       await select(slug, thread: thread);
@@ -365,7 +368,8 @@ class ChatController extends ChangeNotifier {
   /// Opens chat [thread] of workspace [slug], as a tapped notification asks. Before the
   /// workspaces are read, as when the tap started the app, [load] opens it once they are.
   Future<void> openTapped(String slug, String thread) {
-    if (_server == null || workspaces.isEmpty) {
+    // No server means no workspaces: a new one empties them.
+    if (workspaces.isEmpty) {
       _tapped = (slug, thread);
       return Future.value();
     }
@@ -481,10 +485,7 @@ class ChatController extends ChangeNotifier {
   /// Starts a draft, unless the chat on screen is already empty: a draft, or a chat read with no
   /// turns. A chat whose turns are still being read is not empty.
   void newChat() {
-    final thread = activeThread;
-    if (thread == null ? _draft.isEmpty : _turns[thread]?.isEmpty == true) {
-      return;
-    }
+    if (ready && turns.isEmpty) return;
     _freshDraft();
     activeThread = null;
     _rememberChat();

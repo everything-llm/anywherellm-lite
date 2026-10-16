@@ -157,18 +157,16 @@ bool isPrivateHost(String host) {
         (a == 169 && b == 254) ||
         (a == 100 && b >= 64 && b <= 127);
   }
-  if (_numeric.hasMatch(name)) return false;
-  return !name.contains('.') ||
-      const ['.local', '.lan', '.home.arpa', '.ts.net'].any(name.endsWith);
+  if (!name.contains('.')) return !_number.hasMatch(name);
+  return const ['.local', '.lan', '.home.arpa', '.ts.net'].any(name.endsWith);
 }
 
 final _octet = RegExp(r'^(?:0|[1-9]\d{0,2})$');
 
-/// A name some resolver reads as an IPv4 address in a form other than four decimal parts: digits,
-/// hex and dots, or a number alone, such as `134744072`, `0x7f000001` or `10.1`.
-final _numeric = RegExp(
-  r'^(?:0x[0-9a-f]*|\d+)(?:\.(?:0x[0-9a-f]*|\d*))*$|^[+-]',
-);
+/// A name with no dot that a resolver may read as an IPv4 address, such as `134744072` or
+/// `0x7f000001`. A dotted one that is not four decimal parts, such as `10.1`, has none of the
+/// private suffixes, so it is refused anyway.
+final _number = RegExp(r'^[+-]?(?:\d+|0x[0-9a-f]*)$');
 
 /// [name]'s four octets when it is an IPv4 address written as four plain decimal parts, or null.
 List<int>? _ipv4(String name) {

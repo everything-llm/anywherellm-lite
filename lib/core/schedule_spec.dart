@@ -49,24 +49,22 @@ Set<int>? _values(String field, int last) {
 
 /// The least gap, in minutes, between two runs that the cron [minutes] and [hours] fields allow:
 /// within an hour, and from an hour's last run to the next hour's first when [hours] holds two
-/// hours in a row. Null for a field with one run an hour or one this does not read; 0 for a
-/// step of 0.
+/// hours in a row. Null for a field this does not read, or for one run an hour in hours that
+/// never follow one another; 0 for a step of 0.
 int? _minuteGap(String minutes, String hours) {
   final values = _values(minutes, 59);
   if (values == null) return null;
   if (values.isEmpty) return 0;
   final sorted = values.toList()..sort();
+  final inHours = _values(hours, 23);
+  // The next hour's first run, when the hours run on into it.
+  if (inHours != null && inHours.any((h) => inHours.contains((h + 1) % 24))) {
+    sorted.add(sorted.first + 60);
+  }
   int? least;
   for (var i = 1; i < sorted.length; i++) {
     final gap = sorted[i] - sorted[i - 1];
     if (least == null || gap < least) least = gap;
-  }
-  final inHours = _values(hours, 23);
-  if (least != null &&
-      inHours != null &&
-      inHours.any((h) => inHours.contains((h + 1) % 24))) {
-    final wrap = sorted.first + 60 - sorted.last;
-    if (wrap < least) least = wrap;
   }
   return least;
 }

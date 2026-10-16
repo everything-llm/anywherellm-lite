@@ -96,17 +96,7 @@ class _MessageListState extends State<MessageList> {
   /// Scrolls to the newest text, at once when the device asks for less motion.
   void _toNewest() {
     if (!_scroll.hasClients) return;
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _scroll.jumpTo(0);
-      return;
-    }
-    unawaited(
-      _scroll.animateTo(
-        0,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOut,
-      ),
-    );
+    _scroll.glideTo(context, 0, const Duration(milliseconds: 250));
   }
 
   /// Whether the newest turn's growth should leave what is in view put rather than push it up:
