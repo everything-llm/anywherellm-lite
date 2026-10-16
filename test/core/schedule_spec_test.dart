@@ -52,6 +52,18 @@ void main() {
       expect(cronProblem('0,1,2 * * * *'), contains('more often than every 5'));
       expect(cronProblem('0-30 * * * *'), contains('more often than every 5'));
       expect(cronProblem('0,15,30,45 * * * *'), isNull);
+      expect(cronProblem('0,59 * * * *'), contains('more often than every 5'));
+      expect(cronProblem('58,2 * * * *'), contains('more often than every 5'));
+      expect(
+        cronProblem('0,59 5-6 * * *'),
+        contains('more often than every 5'),
+      );
+      expect(
+        cronProblem('0,59 23,0 * * *'),
+        contains('more often than every 5'),
+      );
+      expect(cronProblem('0,59 5 * * *'), isNull);
+      expect(cronProblem('0,59 5,7 * * *'), isNull);
       expect(cronProblem('nonsense'), contains('five fields'));
       expect(cronProblem('0 6 * * mon'), contains('five fields'));
       expect(

@@ -9,47 +9,64 @@ enum Repeat { daily, weekly, custom }
 const minJobGap = 5;
 
 /// What is wrong with the cron [text], in plain words, or null when it is a schedule the app
-/// sends: five fields, and a minute field that does not fire more often than every
-/// [minJobGap] minutes.
+/// sends: five fields that do not fire more often than every [minJobGap] minutes, across the
+/// turn of an hour too.
 String? cronProblem(String text) {
   final parts = cronFields(text);
   if (parts.length != 5 || !parts.every(_field.hasMatch)) {
     return 'A schedule is five fields, such as 0 */6 * * *.';
   }
-  final gap = _minuteGap(parts.first);
+  final gap = _minuteGap(parts[0], parts[1]);
   if (gap != null && gap < minJobGap) {
     return 'That runs more often than every $minJobGap minutes. Leave more time between runs.';
   }
   return null;
 }
 
-final _minuteItem = RegExp(r'^(?:\*|(\d+)(?:-(\d+))?)(?:/(\d+))?$');
+final _item = RegExp(r'^(?:\*|(\d+)(?:-(\d+))?)(?:/(\d+))?$');
 
-/// The least gap, in minutes, between two runs within an hour that the cron minute [field] allows:
-/// `*`, `*/N`, `A-B`, `A-B/N`, `A/N` and numbers, joined by commas. Null for a field with one
-/// run an hour or one this does not read; 0 for a step of 0.
-int? _minuteGap(String field) {
-  final minutes = <int>{};
+/// The values the cron [field] allows, from 0 to [last]: `*`, `*/N`, `A-B`, `A-B/N`, `A/N` and
+/// numbers, joined by commas. Null for a field this does not read; empty for a step of 0.
+Set<int>? _values(String field, int last) {
+  final values = <int>{};
   for (final item in field.split(',')) {
-    final match = _minuteItem.firstMatch(item);
+    final match = _item.firstMatch(item);
     if (match == null) return null;
     final star = item.startsWith('*');
     final step = int.parse(match[3] ?? '1');
     final from = star ? 0 : int.parse(match[1]!);
     final to = star || (match[2] == null && match[3] != null)
-        ? 59
+        ? last
         : int.parse(match[2] ?? match[1]!);
-    if (step < 1) return 0;
-    if (from > to || to > 59) return null;
+    if (step < 1) return {};
+    if (from > to || to > last) return null;
     for (var at = from; at <= to; at += step) {
-      minutes.add(at);
+      values.add(at);
     }
   }
-  final sorted = minutes.toList()..sort();
+  return values;
+}
+
+/// The least gap, in minutes, between two runs that the cron [minutes] and [hours] fields allow:
+/// within an hour, and from an hour's last run to the next hour's first when [hours] holds two
+/// hours in a row. Null for a field with one run an hour or one this does not read; 0 for a
+/// step of 0.
+int? _minuteGap(String minutes, String hours) {
+  final values = _values(minutes, 59);
+  if (values == null) return null;
+  if (values.isEmpty) return 0;
+  final sorted = values.toList()..sort();
   int? least;
   for (var i = 1; i < sorted.length; i++) {
     final gap = sorted[i] - sorted[i - 1];
     if (least == null || gap < least) least = gap;
+  }
+  final inHours = _values(hours, 23);
+  if (least != null &&
+      inHours != null &&
+      inHours.any((h) => inHours.contains((h + 1) % 24))) {
+    final wrap = sorted.first + 60 - sorted.last;
+    if (wrap < least) least = wrap;
   }
   return least;
 }
