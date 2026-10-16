@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
@@ -9,11 +10,18 @@ import 'turn.dart';
 /// An answer whose connection dropped, read for in its chat's history until the server saved
 /// it, or [AnswerWaits.waitReads] reads found nothing.
 class _Waiting {
-  _Waiting(this.answer, this.slug, this.thread);
+  _Waiting(this.answer, this.slug, this.thread, this.question);
 
   final Turn answer;
   final String slug;
   final String thread;
+
+  /// The question [answer] answers, trimmed.
+  final String question;
+
+  /// The newest exchange the server had saved when a read did not find the answer yet, or null
+  /// before such a read.
+  int? floor;
 
   /// How many times the chat was read for it so far.
   int reads = 0;
@@ -64,7 +72,10 @@ class AnswerWaits {
 
   /// Waits for [answer], the last turn of chat [thread] in workspace [slug].
   void start(Turn answer, String slug, String thread) {
-    final waiting = _Waiting(answer, slug, thread);
+    final turns = turnsOf(thread) ?? const [];
+    final at = turns.indexOf(answer);
+    final question = at > 0 ? turns[at - 1].text.trim() : '';
+    final waiting = _Waiting(answer, slug, thread, question);
     _waits[thread] = waiting;
     answer.waiting = true;
     _checkLater(waiting);
@@ -103,9 +114,9 @@ class AnswerWaits {
         .whenComplete(() => waiting.reading = null);
   }
 
-  /// Takes [waiting]'s answer from its chat's history once the server saved it: a last exchange
-  /// newer than every one the chat showed. After [waitReads] reads the answer fails; a chat that
-  /// moved on, as by a new message, stops the reading. A wait [clear] ended changes nothing.
+  /// Takes [waiting]'s answer from its chat's history once the server saved it ([_holds]).
+  /// After [waitReads] reads the answer fails; a chat that moved on, as by a new message, stops
+  /// the reading and says why the answer is missing. A wait [clear] ended changes nothing.
   Future<void> _read(_Waiting waiting) async {
     final (answer, slug, thread) = (
       waiting.answer,
@@ -122,14 +133,17 @@ class AnswerWaits {
     if (!identical(_waits[thread], waiting)) return;
     final turns = turnsOf(thread);
     if (turns == null || !identical(turns.lastOrNull, answer)) {
+      answer.error =
+          'The connection dropped before this answer came. Pull down to read what the server '
+          'saved.';
       return _end(waiting);
     }
-    if (history case [..., final said]
-        when said.role == Role.assistant &&
-            said.chatId != null &&
-            _newerThanAll(turns, said.chatId!)) {
-      saved(slug, thread, [for (final m in history) Turn.saved(m)]);
-      return _end(waiting);
+    if (history != null) {
+      if (_holds(waiting, turns, history)) {
+        saved(slug, thread, [for (final m in history) Turn.saved(m)]);
+        return _end(waiting);
+      }
+      waiting.floor = history.map((m) => m.chatId ?? -1).fold<int>(-1, max);
     }
     if (waiting.reads >= waitReads) {
       answer.error = 'The connection dropped, and the server saved no answer within 30 minutes.';
@@ -146,7 +160,32 @@ class AnswerWaits {
     changed();
   }
 
-  /// Whether [id] is newer than every exchange [turns] know, so it was saved after them.
-  static bool _newerThanAll(List<Turn> turns, int id) =>
-      turns.every((t) => t.chatId == null || t.chatId! < id);
+  /// Whether [history] ends in [waiting]'s answer. Its last exchange is newer than the newest one
+  /// a read before it found, the [_Waiting.floor]. Before any read found one, the exchange must
+  /// be newer than every one [turns] know, ask [_Waiting.question], and the history must ask it
+  /// as often as [turns] do: an agent answer streamed here has no id, so its exchange can look
+  /// new.
+  static bool _holds(
+    _Waiting waiting,
+    List<Turn> turns,
+    List<ChatMessage> history,
+  ) {
+    if (history case [..., final asked, final said]
+        when said.role == Role.assistant && said.chatId != null) {
+      final id = said.chatId!;
+      if (waiting.floor case final floor?) return id > floor;
+      int asking(Iterable<String> texts) =>
+          texts.where((text) => text.trim() == waiting.question).length;
+      return turns.every((t) => t.chatId == null || t.chatId! < id) &&
+          asked.role == Role.user &&
+          asked.text.trim() == waiting.question &&
+          asking(
+                history.where((m) => m.role == Role.user).map((m) => m.text),
+              ) >=
+              asking(
+                turns.where((t) => t.role == Role.user).map((t) => t.text),
+              );
+    }
+    return false;
+  }
 }

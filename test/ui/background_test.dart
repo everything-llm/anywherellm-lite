@@ -93,6 +93,67 @@ void main() {
       expect(h.chat.working, isFalse);
     });
 
+    for (final again in [false, true]) {
+      testWidgets('an agent answer before it is not taken for it'
+          '${again ? ', asked in the same words' : ''}', (tester) async {
+        final (h, llm) = await _asking(tester);
+        final thread = h.chat.activeThread!;
+        // An agent's closing chunk names no exchange.
+        llm.chat!
+          ..add(const TextChunk('The word game, in English.'))
+          ..add(const ChatDone([]));
+        await llm.chat!.close();
+        await tester.pump(const Duration(milliseconds: 300));
+        _saved(llm, thread, 'The word game, in English.');
+
+        final second = again ? 'Can you build it in English?' : 'And French?';
+        await h.chat.send(second);
+        await tester.pump();
+        llm.chat!.addError(_dropped);
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pump(const Duration(seconds: 5));
+        await tester.pump();
+        expect(find.text('Still answering on the server'), findsOneWidget);
+        final turns = h.chat.turns;
+        expect(turns[turns.length - 2].text, second);
+        expect(turns.last.waiting, isTrue);
+        expect(h.chat.working, isTrue);
+
+        llm.histories[thread] = [
+          ...llm.histories[thread]!,
+          ChatMessage(role: Role.user, text: second, chatId: 101),
+          const ChatMessage(
+            role: Role.assistant,
+            text: 'Le jeu de mots.',
+            chatId: 101,
+          ),
+        ];
+        await tester.pump(const Duration(seconds: 5));
+        await tester.pump();
+        expect(find.text('Le jeu de mots.'), findsOneWidget);
+        expect(h.chat.finished?.text, 'Le jeu de mots.');
+        expect(h.chat.working, isFalse);
+      });
+    }
+
+    testWidgets('an answer waited for says so when the chat moves on', (
+      tester,
+    ) async {
+      final (h, llm) = await _asking(tester);
+      llm.chat!.addError(_dropped);
+      await tester.pump(const Duration(milliseconds: 300));
+      await h.chat.send('Never mind, something else.');
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump();
+      expect(find.text('Still answering on the server'), findsNothing);
+      expect(
+        find.textContaining('The connection dropped before this answer came.'),
+        findsOneWidget,
+      );
+      await llm.chat!.close();
+      await tester.pump(const Duration(seconds: 1));
+    });
+
     testWidgets('a real failure still fails at once', (tester) async {
       final (h, llm) = await _asking(tester);
       llm.chat!.addError(const ApiException('The server stopped the answer.'));
