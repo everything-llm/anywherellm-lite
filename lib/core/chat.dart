@@ -216,14 +216,16 @@ final _thought = RegExp(
 );
 
 /// Splits [text] into the reasoning a model wrapped in `<think>` or `<thinking>` tags and the
-/// answer around it. A tag inside a code span or block is answer. [Reasoned.thinking] is true while a block is still open, as when the
-/// answer is streaming. Text with no such block is all answer, except the start of an opening
-/// tag that has not all arrived yet, which is held back. Once the text is no longer
+/// answer around it. A tag inside a code span or block is answer. [Reasoned.thinking] is true
+/// while a block is still open, as when the answer is streaming. Text with no such block is all
+/// answer, except, while [streaming], the start of an opening tag that has not all arrived yet,
+/// which is held back. Once the text is no longer
 /// [streaming], a block that never closed is answer unless the text opens with it, since a
 /// bare tag in prose would otherwise take the rest of the answer with it.
 Reasoned splitReasoning(String text, {bool streaming = false}) {
   final start = text.trimLeft();
-  if (start.isNotEmpty &&
+  if (streaming &&
+      start.isNotEmpty &&
       start.length < '<thinking>'.length &&
       ('<thinking>'.startsWith(start) || '<think>'.startsWith(start))) {
     return (reasoning: '', answer: '', thinking: true);

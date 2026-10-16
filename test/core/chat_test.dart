@@ -93,11 +93,19 @@ void main() {
       expect(split.thinking, isTrue);
     });
 
-    test('the start of an opening tag is held back', () {
+    test('the start of an opening tag is held back while it streams', () {
       for (final partial in ['<', '<th', '<think', '  <thinki']) {
-        final split = splitReasoning(partial);
+        final split = splitReasoning(partial, streaming: true);
         expect(split.answer, isEmpty, reason: partial);
         expect(split.thinking, isTrue, reason: partial);
+      }
+    });
+
+    test('a finished answer that looks like the start of a tag is answer', () {
+      for (final whole in ['<', '<th', '<think']) {
+        final split = splitReasoning(whole);
+        expect(split.answer, whole, reason: whole);
+        expect(split.thinking, isFalse, reason: whole);
       }
     });
 
