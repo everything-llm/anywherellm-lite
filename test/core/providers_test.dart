@@ -58,6 +58,25 @@ void main() {
     );
   });
 
+  test('privacy reads a private address by the rule the key follows', () {
+    String at(String host) => chatModelPrivacy({
+      'LLMProvider': 'ollama',
+      'OllamaLLMBasePath': 'http://$host:11434',
+    });
+    for (final home in ['nas', 'box.local', '169.254.1.2', '[fd00::5]']) {
+      expect(at(home), endsWith('Questions go to that machine.'), reason: home);
+    }
+    for (final away in ['10.1', '10.evil.com', '134744072']) {
+      expect(
+        at(away),
+        endsWith('Shared under that service\'s terms.'),
+        reason: away,
+      );
+    }
+    expect(at('127.0.0.1'), endsWith('Runs on the server.'));
+    expect(at('ollama.internal'), endsWith('Questions go to that machine.'));
+  });
+
   test('privacy says where documents are prepared and kept', () {
     expect(
       searchModelPrivacy({'EmbeddingEngine': 'native'}),

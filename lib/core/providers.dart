@@ -194,14 +194,11 @@ enum _Reach {
   service,
 }
 
-final _privateHost = RegExp(
-  r'^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)'
-  r'|\.(local|lan|internal|home\.arpa|ts\.net)$'
-  r'|^[^.:]+$',
-);
-
 _Reach _reach(String host) {
   if (host.isEmpty) return _Reach.service;
   if (isLoopback(host) || host == 'host.docker.internal') return _Reach.server;
-  return _privateHost.hasMatch(host) ? _Reach.network : _Reach.service;
+  // A name under .internal is Docker's for another container beside the server.
+  return isPrivateHost(host) || host.endsWith('.internal')
+      ? _Reach.network
+      : _Reach.service;
 }
