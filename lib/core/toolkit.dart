@@ -40,7 +40,7 @@ abstract final class ToolkitFeature {
 const _methods = {'GET', 'POST', 'PUT', 'DELETE'};
 
 /// One entry of the toolkit's allow list, `[METHOD ]/path/prefix`: a [method], or null for all
-/// four, on any path whose first segments are [prefix].
+/// four, on any path whose first segments are [prefix], where a `*` takes any one segment.
 class BridgeRule {
   const BridgeRule(this.method, this.prefix);
 
@@ -68,7 +68,7 @@ class BridgeRule {
     if (segments == null || segments.length < prefix.length) return false;
     if (this.method != null && this.method != method) return false;
     for (var i = 0; i < prefix.length; i++) {
-      if (segments[i] != prefix[i]) return false;
+      if (prefix[i] != '*' && segments[i] != prefix[i]) return false;
     }
     return true;
   }

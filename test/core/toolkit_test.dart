@@ -22,6 +22,14 @@ void main() {
       expect(get.permits('GET', '/admin'), isFalse);
     });
 
+    test('a * takes any one segment', () {
+      final rule = BridgeRule.parse('GET /workspace/*/thread/*/chats')!;
+      expect(rule.permits('GET', '/workspace/a/thread/b/chats'), isTrue);
+      expect(rule.permits('GET', '/workspace/a/thread/b/chats/c'), isTrue);
+      expect(rule.permits('GET', '/workspace/a/chats'), isFalse);
+      expect(rule.permits('GET', '/workspace/a/thread'), isFalse);
+    });
+
     test('is none for what the toolkit would not read as one', () {
       for (final entry in [
         '',
@@ -59,6 +67,20 @@ void main() {
         ToolkitFeature.jobs,
         ToolkitFeature.jobsWrite,
       });
+    });
+
+    test('rules narrowed with * still pass their features', () {
+      expect(
+        bridgeFeatures(
+          _rules([
+            '/workspaces/*/memories',
+            '/memories',
+            'GET /admin/system-preferences-for',
+            'POST /admin/system-preferences',
+          ]),
+        ),
+        {ToolkitFeature.memories},
+      );
     });
 
     test('nothing passes nothing', () {
