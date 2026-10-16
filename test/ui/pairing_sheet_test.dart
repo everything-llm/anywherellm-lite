@@ -92,6 +92,31 @@ void main() {
     await shares.close();
   });
 
+  testWidgets('a refused key shows in its field over a saved server too', (
+    tester,
+  ) async {
+    final shares = StreamController<SharedItem>();
+    final h = await pumpApp(tester, shares: shares);
+    final saved = h.settings.connection;
+    h.llm.verifyError = const ApiException('The server refused this API key.');
+    await _open(tester, shares, _link());
+    await tester.tap(_inSheet(control('Connect')));
+    await tester.pumpAndSettle();
+    expect(h.settings.connection, saved);
+    expect(find.text('The server refused this API key.'), findsOneWidget);
+    Finder holding(String text) => find.byWidgetPredicate(
+      (w) => w is EditableText && w.controller.text == text,
+    );
+    expect(holding('K9'), findsOneWidget);
+    await tester.tap(control('Cancel'));
+    await tester.pumpAndSettle();
+    await tester.tap(control('Edit connection'));
+    await tester.pumpAndSettle();
+    expect(holding('K9'), findsNothing, reason: 'the refused key is let go');
+    expect(holding(saved!.baseUrl), findsOneWidget);
+    await shares.close();
+  });
+
   testWidgets('it names the server it replaces, and Cancel keeps that one', (
     tester,
   ) async {

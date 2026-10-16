@@ -206,7 +206,8 @@ class _KeyCardState extends State<_KeyCard> {
   }
 
   /// Uses a scanned [code] as if its address and key had been typed, and connects with them,
-  /// keeping where the code says its companions run.
+  /// keeping where the code says its companions run. Over a saved server the form opens, so a
+  /// key the server refuses shows there.
   Future<void> _scanned(String code) async {
     final Pairing pairing;
     try {
@@ -222,6 +223,7 @@ class _KeyCardState extends State<_KeyCard> {
       _shell.setScanning(false);
       _scanProblem = null;
       // A key the server refuses then shows in its field, under why.
+      if (_settings.connection != null) _replacing = true;
       _url.text = pairing.connection.baseUrl;
       _key.text = pairing.connection.apiKey;
     });
@@ -337,6 +339,12 @@ class _KeyCardState extends State<_KeyCard> {
           onPressed: () => setState(() {
             _replacing = !_replacing;
             _shell.setScanning(false);
+            // Cancel lets go of what was typed or scanned, so the form opens on the saved
+            // connection next time.
+            if (!_replacing) {
+              _url.text = connection.baseUrl;
+              _key.clear();
+            }
           }),
         ),
         AppButton(
