@@ -102,6 +102,29 @@ void main() {
     await shares.close();
   });
 
+  testWidgets(
+    'with no workspace open, the share goes to the one shown chosen',
+    (tester) async {
+      final shares = StreamController<SharedItem>();
+      final h = await pumpApp(tester, llm: planningServer(), shares: shares);
+      // As at a cold start, when the sheet is built before a workspace opens.
+      await h.chat.select(null);
+      await share(tester, shares, const SharedText('Service due in May.'));
+      final first = h.prefs.prefs
+          .inOrder(h.chat.workspaces, (w) => w.slug)
+          .first;
+      await tester.tap(inSheet(control('Ask about it')));
+      await tester.pumpAndSettle();
+      expect(find.byType(ShareSheet), findsNothing);
+      expect(h.chat.activeSlug, first.slug);
+      expect(
+        tester.widget<EditableText>(composerField).controller.text,
+        '> Service due in May.\n\n',
+      );
+      await shares.close();
+    },
+  );
+
   testWidgets('a shared file goes with the message, but not past 20 MB', (
     tester,
   ) async {

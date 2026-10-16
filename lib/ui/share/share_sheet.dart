@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/chat.dart';
 import '../../core/files.dart';
 import '../../core/outputs.dart';
+import '../../core/server_models.dart';
 import '../../core/upload.dart';
 import '../sources/sources_panel.dart';
 import '../app_scope.dart';
@@ -65,9 +66,27 @@ class _ShareSheetState extends State<ShareSheet> {
     ),
   };
 
+  /// The workspaces in the person's order, the open one first.
+  List<Workspace> _workspaces(AppScope scope) {
+    final ordered = scope.prefs.prefs.inOrder(
+      scope.chat.workspaces,
+      (w) => w.slug,
+    );
+    final active = scope.chat.activeSlug;
+    return [
+      ...ordered.where((w) => w.slug == active),
+      ...ordered.where((w) => w.slug != active),
+    ];
+  }
+
+  /// The workspace the item goes to: the one tapped, else the first of [workspaces].
+  Workspace? _chosen(List<Workspace> workspaces) =>
+      workspaces.where((w) => w.slug == _slug).firstOrNull ??
+      workspaces.firstOrNull;
+
   Future<void> _go(_Use use) async {
     final scope = AppScope.of(context);
-    final slug = _slug;
+    final slug = _chosen(_workspaces(scope))?.slug;
     if (slug == null) return;
     final item = widget.item;
     if (item case SharedFile(:final name, :final size)
@@ -144,19 +163,8 @@ class _ShareSheetState extends State<ShareSheet> {
         child: ListenableBuilder(
           listenable: Listenable.merge([scope.chat, scope.settings]),
           builder: (context, _) {
-            final chat = scope.chat;
-            final ordered = scope.prefs.prefs.inOrder(
-              chat.workspaces,
-              (w) => w.slug,
-            );
-            final active = chat.activeSlug;
-            final workspaces = [
-              ...ordered.where((w) => w.slug == active),
-              ...ordered.where((w) => w.slug != active),
-            ];
-            final chosen =
-                workspaces.where((w) => w.slug == _slug).firstOrNull ??
-                workspaces.firstOrNull;
+            final workspaces = _workspaces(scope);
+            final chosen = _chosen(workspaces);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               spacing: 16,
