@@ -8,7 +8,6 @@
 // memory, so each launch starts from the same state. It sits outside `lib/`, so the shipping app
 // never holds the fakes.
 
-import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/main.dart' show SessionHost;
 import 'package:anywherellm/ui/app.dart';
@@ -17,31 +16,14 @@ import 'package:anywherellm/ui/state/settings_controller.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter/material.dart';
 
-import '../test/support/fake_api.dart';
 import '../test/support/fake_settings.dart';
 import 'sample.dart';
 
 const _signedOut = bool.fromEnvironment('AUDIT_SIGNED_OUT');
 
-/// A server that takes a moment to answer, as a real one does. An answer that ends before
-/// Android has started the foreground service that holds the app crashes it, which a real server
-/// is too slow to do.
-class _SlowServer extends FakeAnythingLlm {
-  @override
-  Stream<ChatEvent> streamChat(
-    String slug,
-    String thread,
-    String message, {
-    List<Attachment> attachments = const [],
-  }) async* {
-    await Future<void>.delayed(const Duration(seconds: 2));
-    yield* super.streamChat(slug, thread, message, attachments: attachments);
-  }
-}
-
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  final (llm, toolkit) = sampleServer(server: _SlowServer());
+  final (llm, toolkit) = sampleServer();
   final prefs = PrefsController(FakePrefsStore());
   runApp(
     AnywhereLlmApp(

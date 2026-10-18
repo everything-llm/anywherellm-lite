@@ -13,6 +13,7 @@ import '../state/turn.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/controls.dart';
+import '../widgets/fields.dart';
 import '../widgets/sheet.dart';
 import '../widgets/buttons.dart';
 import 'composer.dart';
@@ -173,9 +174,8 @@ class _AgentBarState extends State<AgentBar> {
             builder: (context, _) => Row(
               children: [
                 Expanded(
-                  child: Semantics(
+                  child: FieldName(
                     label: 'Message the agent',
-                    textField: true,
                     child: TextField(
                       controller: _draft,
                       enabled: !chat.busy,

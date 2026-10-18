@@ -66,6 +66,7 @@ class _ChatsShelfState extends State<ChatsShelf>
             child: FadeTransition(
               opacity: _out,
               child: Semantics(
+                container: true,
                 label: 'Close the chats',
                 button: true,
                 child: GestureDetector(

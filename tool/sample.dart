@@ -44,11 +44,10 @@ const _metrics = AnswerMetrics(
 );
 
 /// The prototype's server: Household and Q3 planning, their documents and chats, the saved
-/// memories, the scheduled jobs, the Library and the Activity. [server] is the fake AnythingLLM to fill, a subclass where a
-/// caller needs it to behave otherwise.
-(FakeAnythingLlm, FakeToolkit) sampleServer({FakeAnythingLlm? server}) {
+/// memories, the scheduled jobs, the Library and the Activity.
+(FakeAnythingLlm, FakeToolkit) sampleServer() {
   final toolkit = FakeToolkit();
-  final llm = (server ?? FakeAnythingLlm())
+  final llm = FakeAnythingLlm()
     ..answer =
         'This is a sample answer. The prototype does not reach a server, so '
         'every question gets this reply.';

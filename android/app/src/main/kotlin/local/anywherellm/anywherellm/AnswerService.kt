@@ -13,6 +13,9 @@ import android.os.IBinder
  * Keeps the app running while an answer streams or is waited for, so Android neither ends it
  * nor cuts its connection when it goes out of sight: a foreground service with an ongoing
  * notification saying what it does.
+ *
+ * A service started with `startForegroundService` must reach `startForeground` before it stops,
+ * or Android ends the app, so a let-go that comes first is carried out by [onStartCommand].
  */
 class AnswerService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
@@ -24,6 +27,9 @@ class AnswerService : Service() {
         } else {
             startForeground(Notes.ONGOING_ID, note)
         }
+        running = true
+        // Let go of before it started, as when an answer ends at once.
+        if (!wanted) stopSelf(startId)
         return START_NOT_STICKY
     }
 
@@ -31,26 +37,35 @@ class AnswerService : Service() {
     override fun onTimeout(startId: Int, fgsType: Int) = stopSelf()
 
     override fun onDestroy() {
-        held = false
+        running = false
         super.onDestroy()
     }
 
     companion object {
         private const val EXTRA_TEXT = "local.anywherellm.answering"
 
-        /** Whether the service runs, so a new text only redraws its notification. */
+        /** Whether the app asked to be held and has not let go since. */
         @Volatile
-        private var held = false
+        private var wanted = false
+
+        /** Whether the service is in the foreground, so a new text only redraws its notification
+         * and a let-go can stop it. */
+        @Volatile
+        private var running = false
 
         /** Holds the app with an ongoing notification saying [text], or lets it go when null. */
         fun hold(context: Context, text: String?) {
             val intent = Intent(context, AnswerService::class.java)
             if (text == null) {
-                held = false
-                context.stopService(intent)
+                wanted = false
+                if (running) {
+                    running = false
+                    context.stopService(intent)
+                }
                 return
             }
-            if (held) {
+            wanted = true
+            if (running) {
                 context.getSystemService(NotificationManager::class.java)
                     .notify(Notes.ONGOING_ID, Notes.ongoing(context, text))
                 return
@@ -62,7 +77,6 @@ class AnswerService : Service() {
                 } else {
                     context.startService(intent)
                 }
-                held = true
             } catch (e: IllegalStateException) {
                 // Out of sight already, where Android 12 and later refuse to start one
                 // (ForegroundServiceStartNotAllowedException): the answer goes on while it can.

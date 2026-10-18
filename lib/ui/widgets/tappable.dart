@@ -96,6 +96,8 @@ class Tappable extends StatelessWidget {
       result = Opacity(opacity: enabled ? 1 : dim, child: result);
     }
     if (tooltip != null) result = Tooltip(message: tooltip, child: result);
+    // Its own node with its tooltip, so its label and bounds never merge into what holds it.
+    result = Semantics(container: true, child: result);
     if (!touchTarget) return result;
     return GestureDetector(
       onTap: onTap,

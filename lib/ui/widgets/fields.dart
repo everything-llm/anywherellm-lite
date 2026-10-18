@@ -103,9 +103,8 @@ class AppField extends StatelessWidget {
       size,
       height: maxLines > 1 ? Type.textAreaLine : null,
     );
-    return Semantics(
+    return FieldName(
       label: label,
-      textField: true,
       child: TextField(
         autofocus: autofocus,
         controller: controller,
@@ -277,4 +276,18 @@ class HelpText extends StatelessWidget {
     );
     return status ? Semantics(liveRegion: true, child: body) : body;
   }
+}
+
+/// Names [child], a text field, for a screen reader as [label]: one node, the name on the field
+/// itself, not a node beside it or merged into what holds it.
+class FieldName extends StatelessWidget {
+  const FieldName({super.key, required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => MergeSemantics(
+    child: Semantics(label: label, textField: true, child: child),
+  );
 }

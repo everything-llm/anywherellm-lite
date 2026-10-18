@@ -195,16 +195,6 @@ class Walk:
                 x, y = (l + r) // 2, (t + b) // 2
                 self.d.shell(f"input swipe {x} {y} {x} {y} {900 if verb == 'hold' else 40}")
                 time.sleep(0.6)
-            case "tapin":
-                # A control whose parts have no labels of their own: FX FY are fractions of its box.
-                fx, fy, label = arg.split(None, 2)
-                l, t, r, b = self.locate(label)["box"]
-                self.d.shell(f"input tap {int(l + float(fx) * (r - l))} {int(t + float(fy) * (b - t))}")
-                time.sleep(0.6)
-            case "tapxy":
-                fx, fy = (float(v) for v in arg.split())
-                self.d.shell(f"input tap {int(fx * self.d.size[0])} {int(fy * self.d.size[1])}")
-                time.sleep(0.6)
             case "type":
                 self.d.shell("input text " + shlex.quote(arg.replace(" ", "%s")))
                 time.sleep(0.4)

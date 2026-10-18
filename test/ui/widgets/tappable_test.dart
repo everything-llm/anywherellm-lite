@@ -125,6 +125,28 @@ void main() {
     expect(find.byTooltip('Do the thing'), findsOneWidget);
   });
 
+  testWidgets('is a node of its own, not merged into the area that holds it', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.light),
+        home: Semantics(
+          label: 'Shelf',
+          child: Align(
+            alignment: Alignment.bottomLeft,
+            child: make(onTap: () {}),
+          ),
+        ),
+      ),
+    );
+    final node = find.semantics.byLabel('Go').evaluate().single;
+    expect(node.label, 'Go');
+    expect(node.rect.size, const Size(60, 40));
+    handle.dispose();
+  });
+
   testWidgets('the ink well is an ancestor of the child', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

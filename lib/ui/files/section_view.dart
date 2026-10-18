@@ -82,9 +82,8 @@ class _EditorState extends State<_Editor> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: Semantics(
+            child: FieldName(
               label: 'PROMPT.md',
-              textField: true,
               child: Scrollbar(
                 controller: _scroll,
                 child: TextField(

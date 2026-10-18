@@ -14,6 +14,7 @@ import 'type.dart';
 import 'toolkit_card.dart';
 import 'widgets/basics.dart';
 import 'widgets/buttons.dart';
+import 'widgets/fields.dart';
 import 'widgets/min_height.dart';
 import 'widgets/phone_page.dart';
 import 'widgets/tappable.dart';
@@ -243,9 +244,8 @@ class _Search extends StatelessWidget {
         children: [
           AppIcon('search', size: IconSize.small, color: t.muted),
           Expanded(
-            child: Semantics(
+            child: FieldName(
               label: 'Search workspaces and chats',
-              textField: true,
               child: TextField(
                 controller: controller,
                 focusNode: focus,

@@ -202,6 +202,8 @@ class _SheetFrameState extends State<SheetFrame>
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: widget.onClose,
+                // The sheet's Close, or Back for a bare one, says the same to a screen reader.
+                excludeFromSemantics: true,
                 child: ColoredBox(color: t.scrim),
               ),
             ),

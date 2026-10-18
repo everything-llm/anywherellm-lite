@@ -770,11 +770,10 @@ class _Form extends StatelessWidget {
                     constraints: const BoxConstraints(maxHeight: 156),
                     child: CallbackShortcuts(
                       bindings: bindings,
-                      child: Semantics(
+                      child: FieldName(
                         label: shortcut == null
                             ? 'Message'
                             : 'Message, with the ${shortcut!.label} shortcut',
-                        textField: true,
                         // Only the field follows the prefs, for its spellcheck.
                         child: ListenableBuilder(
                           listenable: scope.prefs,

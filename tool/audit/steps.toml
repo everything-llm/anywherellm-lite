@@ -7,8 +7,6 @@
 #   tap LABEL        tap the control whose label is LABEL (exact, then ignoring case, then as a
 #                    start, then as a part); scrolls up to four times to find it
 #   hold LABEL       long press
-#   tapin FX FY LABEL  tap at a fraction of LABEL's box, for a part that has no label of its own
-#   tapxy FX FY      tap at a fraction of the screen, for what has no label of its own
 #   type TEXT        type into the focused field
 #   key NAME         back, enter, left, right, up, down
 #   swipe WAY        up, down, left or right across the middle of the screen
@@ -19,10 +17,9 @@
 #
 # `signed_out = true` runs the step on a build with no server saved.
 
-# Where steps start. The shelf's Settings row has no label of its own: its node spans the whole
-# shelf, so it is tapped where it is drawn.
+# Where steps start.
 [from]
-settings = ["tap Chats", "tapxy 0.22 0.93"]
+settings = ["tap Chats", "tap Settings"]
 workspace = ["tap Chats", "tap Workspace settings"]
 documents = ["tap Chats", "tap Workspace settings", "tap Documents"]
 q3 = ["tap Chats", "tap Workspace: Household", "tap Q3 planning"]
@@ -119,7 +116,7 @@ do = ["tap Chats", "tap Workspace: Household", "wait Q3 planning"]
 [[step]]
 name = "workspace-new"
 group = "shelf"
-do = ["tap Chats", "tap Workspace: Household", "wait Q3 planning", "tapin 0.5 0.9 New workspace", "sleep 1"]
+do = ["tap Chats", "tap Workspace: Household", "wait Q3 planning", "tap New workspace", "sleep 1"]
 
 # --- The workspace's pages ---------------------------------------------------------------
 
@@ -175,7 +172,7 @@ do = ["tap Answer from", "tap Chat model", "sleep 1"]
 name = "rename"
 group = "workspace"
 from = "workspace"
-do = ["tapin 0.08 0.85 Household", "wait Rename workspace", "sleep 1"]
+do = ["tap Rename", "wait Rename workspace", "sleep 1"]
 
 [[step]]
 name = "delete"
