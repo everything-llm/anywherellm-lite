@@ -18,6 +18,7 @@ flutter build apk --release                    # needs android/key.properties
 flutter test tool/store_graphics.dart          # store graphics -> build/store/en-US, or $STORE_GRAPHICS
 flutter test tool/screens.dart                 # each screen at 390x844, light and dark -> build/screens, or $SCREENS
 flutter test tool/app_icon.dart                # icon pictures -> assets/icon, and the notification icon
+uv run tool/audit/audit.py                     # walk the app on an emulator over the test fakes, light and dark -> build/audit/*.zip; `--help` lists the options
 uv run tool/parity/parity.py --help            # Muse parity test harness: docs/protocols/muse-parity-process.md
 ```
 

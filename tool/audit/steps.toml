@@ -1,0 +1,346 @@
+# The walk `audit.py` makes of the app, in order. Each [[step]] launches the app afresh (the fakes
+# are in memory, so every launch starts from the same sample data), runs the actions of the start
+# its `from` names, then its own `do` actions, and takes a screenshot at the end, or at each
+# `shot`. A control is found by its accessibility label, or an empty field by its hint:
+# `uv run tool/audit/audit.py --try "tap Chats; tap Settings"` prints the labels it finds.
+#
+#   tap LABEL        tap the control whose label is LABEL (exact, then ignoring case, then as a
+#                    start, then as a part); scrolls up to four times to find it
+#   hold LABEL       long press
+#   tapin FX FY LABEL  tap at a fraction of LABEL's box, for a part that has no label of its own
+#   tapxy FX FY      tap at a fraction of the screen, for what has no label of its own
+#   type TEXT        type into the focused field
+#   key NAME         back, enter, left, right, up, down
+#   swipe WAY        up, down, left or right across the middle of the screen
+#   wait LABEL       wait until LABEL shows
+#   sleep SECONDS
+#   intent ARGS      `adb shell am ARGS`, with {pkg} for the app's id
+#   shot [NAME]      a screenshot, named after the step and NAME
+#
+# `signed_out = true` runs the step on a build with no server saved.
+
+# Where steps start. The shelf's Settings row has no label of its own: its node spans the whole
+# shelf, so it is tapped where it is drawn.
+[from]
+settings = ["tap Chats", "tapxy 0.22 0.93"]
+workspace = ["tap Chats", "tap Workspace settings"]
+documents = ["tap Chats", "tap Workspace settings", "tap Documents"]
+q3 = ["tap Chats", "tap Workspace: Household", "tap Q3 planning"]
+
+# --- The chat ----------------------------------------------------------------------------
+
+[[step]]
+name = "home"
+group = "chat"
+do = []
+
+[[step]]
+name = "answer-details"
+group = "chat"
+do = ["tap More for this answer", "wait This answer"]
+
+[[step]]
+name = "attach-sheet"
+group = "chat"
+do = ["tap Add files or shortcuts", "wait Photo library"]
+
+[[step]]
+name = "draft"
+group = "chat"
+do = ["tap New chat", "wait Ask about"]
+
+[[step]]
+name = "shortcuts"
+group = "chat"
+do = ["tap Ask anything", "type /", "sleep 1"]
+
+[[step]]
+name = "keyboard"
+group = "chat"
+do = ["tap Ask anything", "type Hello there", "sleep 1"]
+
+[[step]]
+name = "ask-and-answer"
+group = "chat"
+do = ["tap New chat", "tap Ask anything", "type Summarise the Boiler manual", "tap Send", "wait Copy answer"]
+
+[[step]]
+name = "edit-message"
+group = "chat"
+do = ["hold When is the boiler service due?", "sleep 1"]
+
+[[step]]
+name = "chat-sheet"
+group = "chat"
+do = [
+  "tap Weekend errands. Rename",
+  "wait Pin to the top",
+  "shot",
+  "tap Delete chat",
+  "wait Keep",
+  "shot confirm",
+]
+
+[[step]]
+name = "passages"
+group = "chat"
+from = "q3"
+do = ["tap Budget questions", "tap Source 1: Q3 roadmap", "wait Passages read"]
+
+[[step]]
+name = "many-citations"
+group = "chat"
+from = "q3"
+do = ["tap Interview research", "sleep 1"]
+
+[[step]]
+name = "all-sources"
+group = "chat"
+from = "q3"
+do = ["tap Interview research", "tap 4 more sources", "sleep 1"]
+
+# --- The shelf and the workspaces --------------------------------------------------------
+
+[[step]]
+name = "shelf"
+group = "shelf"
+do = ["tap Chats"]
+
+[[step]]
+name = "search"
+group = "shelf"
+do = ["tap Chats", "tap Search chats", "type boiler", "sleep 1"]
+
+[[step]]
+name = "workspaces"
+group = "shelf"
+do = ["tap Chats", "tap Workspace: Household", "wait Q3 planning"]
+
+[[step]]
+name = "workspace-new"
+group = "shelf"
+do = ["tap Chats", "tap Workspace: Household", "wait Q3 planning", "tapin 0.5 0.9 New workspace", "sleep 1"]
+
+# --- The workspace's pages ---------------------------------------------------------------
+
+[[step]]
+name = "workspace"
+group = "workspace"
+from = "workspace"
+do = []
+
+[[step]]
+name = "documents"
+group = "workspace"
+from = "documents"
+do = ["wait Add a link"]
+
+[[step]]
+name = "document-text"
+group = "workspace"
+from = "documents"
+do = ["tap View extracted text of Boiler manual", "sleep 1"]
+
+[[step]]
+name = "add-link"
+group = "workspace"
+from = "documents"
+do = ["tap Add a link", "sleep 1"]
+
+[[step]]
+name = "paste-text"
+group = "workspace"
+from = "documents"
+do = ["tap Paste text", "sleep 1"]
+
+[[step]]
+name = "instructions"
+group = "workspace"
+from = "workspace"
+do = ["tap Instructions"]
+
+[[step]]
+name = "answer-from"
+group = "workspace"
+from = "workspace"
+do = ["tap Answer from", "wait MODEL"]
+
+[[step]]
+name = "model-picker"
+group = "workspace"
+from = "workspace"
+do = ["tap Answer from", "tap Chat model", "sleep 1"]
+
+[[step]]
+name = "rename"
+group = "workspace"
+from = "workspace"
+do = ["tapin 0.08 0.85 Household", "wait Rename workspace", "sleep 1"]
+
+[[step]]
+name = "delete"
+group = "workspace"
+from = "workspace"
+do = ["tap Delete workspace", "sleep 1"]
+
+# --- Settings ----------------------------------------------------------------------------
+
+[[step]]
+name = "list"
+group = "settings"
+from = "settings"
+do = ["wait THIS APP"]
+
+[[step]]
+name = "connection"
+group = "settings"
+from = "settings"
+do = ["tap Connection"]
+
+[[step]]
+name = "connection-edit"
+group = "settings"
+from = "settings"
+do = ["tap Connection", "tap Edit connection", "sleep 1"]
+
+[[step]]
+name = "connection-forget"
+group = "settings"
+from = "settings"
+do = ["tap Connection", "tap Forget this server", "sleep 1"]
+
+[[step]]
+name = "appearance"
+group = "settings"
+from = "settings"
+do = ["tap Appearance"]
+
+[[step]]
+name = "chat"
+group = "settings"
+from = "settings"
+do = ["tap Chat", "swipe up", "shot more"]
+
+[[step]]
+name = "shortcuts"
+group = "settings"
+from = "settings"
+do = ["tap Chat", "tap Shortcuts", "sleep 1"]
+
+[[step]]
+name = "server"
+group = "settings"
+from = "settings"
+do = ["tap Server"]
+
+[[step]]
+name = "privacy"
+group = "settings"
+from = "settings"
+do = ["tap Server", "tap Privacy"]
+
+[[step]]
+name = "memory"
+group = "settings"
+from = "settings"
+do = ["tap Memory", "wait SAVED MEMORIES"]
+
+[[step]]
+name = "memory-edit"
+group = "settings"
+from = "settings"
+do = ["tap Memory", "tap Name is Anna", "sleep 1"]
+
+[[step]]
+name = "memory-workspace"
+group = "settings"
+from = "settings"
+do = ["tap Memory", "tap Workspace: Household", "sleep 1"]
+
+# --- The toolkit's pages -----------------------------------------------------------------
+
+[[step]]
+name = "library"
+group = "toolkit"
+do = ["tap Chats", "tap Library", "wait Groceries"]
+
+[[step]]
+name = "activity"
+group = "toolkit"
+do = ["tap Chats", "tap Activity", "wait TODAY"]
+
+[[step]]
+name = "activity-run"
+group = "toolkit"
+do = ["tap Chats", "tap Activity", "tap Check the boiler service price", "sleep 1"]
+
+[[step]]
+name = "upcoming"
+group = "toolkit"
+do = ["tap Chats", "tap Upcoming", "wait Morning brief"]
+
+[[step]]
+name = "task"
+group = "toolkit"
+do = ["tap Chats", "tap Upcoming", "tap Morning brief", "sleep 1"]
+
+[[step]]
+name = "task-new"
+group = "toolkit"
+do = ["tap Chats", "tap Upcoming", "tap New task", "sleep 1"]
+
+# --- What other apps hand over -----------------------------------------------------------
+
+[[step]]
+name = "share-link"
+group = "intents"
+do = [
+  "intent start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT https://energy-advice.example/boilers -n {pkg}/local.anywherellm.anywherellm.MainActivity",
+  "sleep 1",
+]
+
+[[step]]
+name = "pairing-link"
+group = "intents"
+do = [
+  "intent start -a android.intent.action.VIEW -d 'anywherellm://connect?url=https%3A%2F%2Fother.example%3A3001&key=K2'",
+  "sleep 1",
+]
+
+# --- First run, with no server saved -----------------------------------------------------
+
+[[step]]
+name = "welcome"
+group = "first-run"
+signed_out = true
+do = []
+
+[[step]]
+name = "how-connecting"
+group = "first-run"
+signed_out = true
+do = [
+  "tap How connecting works",
+  "sleep 1",
+  "shot 1",
+  "key right",
+  "shot 2",
+  "key right",
+  "shot 3",
+]
+
+[[skipped]]
+name = "scan-code"
+reason = "the emulator has no camera"
+
+[[skipped]]
+name = "dictation and read aloud"
+reason = "the emulator has no speech service"
+
+[[skipped]]
+name = "add-the-toolkit guide"
+reason = "the sample toolkit serves every feature, so the card that opens it does not show"
+
+[[skipped]]
+name = "browser and app sheets"
+reason = "they load a page from the server, which the fakes do not serve"
