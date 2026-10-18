@@ -30,6 +30,7 @@ import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
 import 'answer_body.dart';
 import 'markdown_lists.dart';
+import 'follow_ups.dart';
 import 'shortcut_chip.dart';
 import 'answer_menu.dart';
 import 'generated_files.dart';
@@ -268,7 +269,11 @@ class _MessageListState extends State<MessageList> {
                               onEdit: () => widget.onSuggest(turn.text),
                             ),
                           )
-                  : _Answer(turn, retry: i == 0 ? _retryOf(chat) : null),
+                  : _Answer(
+                      turn,
+                      retry: i == 0 ? _retryOf(chat) : null,
+                      onMore: () => widget.onSuggest('/'),
+                    ),
             ),
           ),
         ),
@@ -737,9 +742,12 @@ class _Picture extends StatelessWidget {
 }
 
 class _Answer extends StatelessWidget {
-  const _Answer(this.turn, {this.retry});
+  const _Answer(this.turn, {this.retry, this.onMore});
 
   final Turn turn;
+
+  /// What More does in the follow-ups under the chat's last answer.
+  final VoidCallback? onMore;
 
   /// Retry, on the chat's last answer only.
   final _Retry? retry;
@@ -848,6 +856,15 @@ class _Answer extends StatelessWidget {
             ),
           ),
         ],
+        // Under the chat's last answer, once it ran to its end.
+        if (retry != null &&
+            onMore != null &&
+            answered &&
+            !turn.streaming &&
+            !turn.stopped &&
+            !turn.unfinished &&
+            turn.error == null)
+          FollowUps(onMore: onMore!),
       ],
     );
   }
