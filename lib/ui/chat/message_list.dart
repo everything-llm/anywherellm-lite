@@ -17,6 +17,7 @@ import '../state/chat_controller.dart';
 import '../state/turn.dart';
 import '../state/prefs_controller.dart';
 import '../state/shell_controller.dart';
+import '../state/sources_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/headline.dart';
@@ -436,115 +437,140 @@ class _Empty extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final sources = scope.sources;
-    final top = (MediaQuery.sizeOf(context).height * 0.12).clamp(24.0, 110.0);
     final titleStyle = Headline.styleOf(context).copyWith(
       fontWeight: FontWeight.w700,
       fontVariations: const [FontVariation('wght', 700)],
       color: Tokens.of(context).accent,
     );
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(16, top, 16, 16),
-      child: Rise(
-        duration: const Duration(milliseconds: 400),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(
-              width: double.infinity,
-              child: Headline('Ask about', textAlign: TextAlign.center),
+    // Centred in the room the keyboard leaves, a little above the middle: the header sits over
+    // it and the composer under it, so the true middle reads low. It moves up with the keyboard
+    // because the list is laid out in the space above it.
+    return LayoutBuilder(
+      builder: (context, box) {
+        final below = (box.maxHeight * 0.085).clamp(0.0, 72.0);
+        final pad = EdgeInsets.fromLTRB(16, 16, 16, 16 + below);
+        return SingleChildScrollView(
+          padding: pad,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: (box.maxHeight - pad.vertical).clamp(
+                0.0,
+                double.infinity,
+              ),
             ),
-            const SizedBox(height: 6),
-            ListenableBuilder(
-              listenable: scope.shell.popup,
-              builder: (context, _) => SizedBox(
-                width: MediaQuery.sizeOf(context).width - 32,
-                child: Tappable(
-                  label: 'Workspace: $workspace. Switch workspace',
-                  expanded: scope.shell.menuOpen,
-                  radius: BorderRadius.circular(Sizes.small),
-                  onTap: () => scope.shell.togglePopup(Popup.workspaces),
+            child: Center(child: _hero(context, scope, sources, titleStyle)),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _hero(
+    BuildContext context,
+    AppScope scope,
+    SourcesController sources,
+    TextStyle titleStyle,
+  ) {
+    return Rise(
+      duration: const Duration(milliseconds: 400),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: double.infinity,
+            child: Headline('Ask about', textAlign: TextAlign.center),
+          ),
+          const SizedBox(height: 6),
+          ListenableBuilder(
+            listenable: scope.shell.popup,
+            builder: (context, _) => SizedBox(
+              width: MediaQuery.sizeOf(context).width - 32,
+              child: Tappable(
+                label: 'Workspace: $workspace. Switch workspace',
+                expanded: scope.shell.menuOpen,
+                radius: BorderRadius.circular(Sizes.small),
+                onTap: () => scope.shell.togglePopup(Popup.workspaces),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 44),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    // The chevron sits against the name, so it reads as part of what opens.
+                    children: [
+                      Flexible(
+                        child: Text(
+                          workspace,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: titleStyle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      AppIcon(
+                        'down',
+                        size: IconSize.row,
+                        color: Tokens.of(context).muted,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          ListenableBuilder(
+            listenable: sources,
+            builder: (context, _) {
+              if (sources.loading || sources.read == null) {
+                return const SizedBox.shrink();
+              }
+              final label = sources.onCount > 0
+                  ? '${plural(sources.onCount, 'document', 'documents')} in use'
+                  : sources.files.isNotEmpty
+                  ? 'No documents in use'
+                  : 'No documents yet';
+              return Tappable(
+                label: '$label. Open Documents',
+                radius: BorderRadius.circular(Sizes.small),
+                onTap: scope.shell.openSources,
+                child: SizedBox(
+                  width: MediaQuery.sizeOf(context).width - 32,
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(minHeight: 44),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      // The chevron sits against the name, so it reads as part of what opens.
                       children: [
+                        AppIcon(
+                          'doc',
+                          size: IconSize.xs,
+                          color: Tokens.of(context).muted,
+                        ),
+                        const SizedBox(width: 8),
                         Flexible(
                           child: Text(
-                            workspace,
+                            label,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: titleStyle,
+                            style: Type.sans(
+                              14,
+                              color: Tokens.of(context).muted,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 8),
                         AppIcon(
-                          'down',
-                          size: IconSize.row,
+                          'chevron',
+                          size: IconSize.tiny,
                           color: Tokens.of(context).muted,
                         ),
                       ],
                     ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 6),
-            ListenableBuilder(
-              listenable: sources,
-              builder: (context, _) {
-                if (sources.loading || sources.read == null) {
-                  return const SizedBox.shrink();
-                }
-                final label = sources.onCount > 0
-                    ? '${plural(sources.onCount, 'document', 'documents')} in use'
-                    : sources.files.isNotEmpty
-                    ? 'No documents in use'
-                    : 'No documents yet';
-                return Tappable(
-                  label: '$label. Open Documents',
-                  radius: BorderRadius.circular(Sizes.small),
-                  onTap: scope.shell.openSources,
-                  child: SizedBox(
-                    width: MediaQuery.sizeOf(context).width - 32,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 44),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          AppIcon(
-                            'doc',
-                            size: IconSize.xs,
-                            color: Tokens.of(context).muted,
-                          ),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Type.sans(
-                                14,
-                                color: Tokens.of(context).muted,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          AppIcon(
-                            'chevron',
-                            size: IconSize.tiny,
-                            color: Tokens.of(context).muted,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
