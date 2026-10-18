@@ -591,21 +591,14 @@ class SummaryCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(
                     horizontal: FieldCard.inset,
                   ),
-                  child: Row(
-                    spacing: 8,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          link,
-                          style: Type.sans(
-                            17,
-                            weight: FontWeight.w500,
-                            color: t.accent,
-                          ),
-                        ),
-                      ),
-                      AppIcon('chevron', size: IconSize.xs, color: t.accent),
-                    ],
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    link,
+                    style: Type.sans(
+                      17,
+                      weight: FontWeight.w500,
+                      color: t.accent,
+                    ),
                   ),
                 ),
               ),

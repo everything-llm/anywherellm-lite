@@ -189,20 +189,36 @@ class _AnswerImageState extends State<AnswerImage> {
         errorBuilder: broken,
       );
     }
+    final picture = Image.memory(
+      frame,
+      fit: BoxFit.contain,
+      cacheHeight: (widget.maxHeight * MediaQuery.devicePixelRatioOf(context))
+          .round(),
+      gaplessPlayback: true,
+      semanticLabel: widget.alt,
+      errorBuilder: broken,
+    );
+    if (!widget.linked) {
+      return ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: widget.maxHeight),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: picture,
+        ),
+      );
+    }
+    // A picture that is a link, such as a browser tab's card, sits in a thin rounded frame.
+    final frameLine = BorderRadius.circular(Sizes.row + 6);
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: widget.maxHeight),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Image.memory(
-          frame,
-          fit: BoxFit.contain,
-          cacheHeight:
-              (widget.maxHeight * MediaQuery.devicePixelRatioOf(context))
-                  .round(),
-          gaplessPlayback: true,
-          semanticLabel: widget.alt,
-          errorBuilder: broken,
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(borderRadius: frameLine),
+        foregroundDecoration: BoxDecoration(
+          borderRadius: frameLine,
+          border: Border.all(color: Tokens.of(context).line2),
         ),
+        child: picture,
       ),
     );
   }
