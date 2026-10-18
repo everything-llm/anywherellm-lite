@@ -5,7 +5,7 @@
 //
 // writes `assets/icon/icon.png`, `icon-foreground.png` and `splash.png`. Then run
 // `dart run flutter_launcher_icons` and `dart run flutter_native_splash:create`. It also writes
-// the notification icon, the bird alone in white, straight to each density's
+// the notification icon, the bird alone in one colour, straight to each density's
 // `android/app/src/main/res/drawable-<density>/ic_notification.png`.
 // It sits outside `test/`, so the suite does not run it.
 
@@ -32,12 +32,15 @@ const _outlineMiddle = Offset(521, 500);
 const _tile = 640.0;
 const _tileRadius = 0.225 * _tile;
 
-/// The bird at [scale] of the mark's box, its [middle] on the picture's.
+/// The bird at [scale] of the mark's box, its [middle] on the picture's. A notification icon
+/// has no [breast] colour: Android tints only an icon with no colour of its own, and leaves any
+/// other as drawn, so a white bird vanishes on a light status bar.
 class _Bird extends StatelessWidget {
-  const _Bird(this.scale, {this.middle = _centre});
+  const _Bird(this.scale, {this.middle = _centre, this.breast = true});
 
   final double scale;
   final Offset middle;
+  final bool breast;
 
   @override
   Widget build(BuildContext context) => Transform(
@@ -45,7 +48,7 @@ class _Bird extends StatelessWidget {
       ..translateByDouble(_side / 2, _side / 2, 0, 1)
       ..scaleByDouble(scale, scale, 1, 1)
       ..translateByDouble(-middle.dx, -middle.dy, 0, 1),
-    child: const RobinMark(size: _side, color: iconInk),
+    child: RobinMark(size: _side, color: iconInk, breast: breast),
   );
 }
 
@@ -129,7 +132,7 @@ void main() {
         in _notificationSides.entries) {
       await _draw(
         tester,
-        const _Bird(0.9, middle: _outlineMiddle),
+        const _Bird(0.9, middle: _outlineMiddle, breast: false),
         'android/app/src/main/res/drawable-$density/ic_notification.png',
         side: side,
       );

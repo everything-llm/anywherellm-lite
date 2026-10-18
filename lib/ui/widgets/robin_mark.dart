@@ -51,32 +51,45 @@ final _paths = (
 );
 
 /// The app's robin mark, drawn in [color] with an orange breast, on the 1024 unit box the
-/// design draws it on.
+/// design draws it on. With [breast] false it is one colour: the belly under the breast takes
+/// [color].
 class RobinMark extends StatelessWidget {
-  const RobinMark({super.key, required this.size, required this.color});
+  const RobinMark({
+    super.key,
+    required this.size,
+    required this.color,
+    this.breast = true,
+  });
 
   final double size;
   final Color color;
+  final bool breast;
 
   @override
-  Widget build(BuildContext context) =>
-      CustomPaint(size: Size.square(size), painter: _RobinPainter(color));
+  Widget build(BuildContext context) => CustomPaint(
+    size: Size.square(size),
+    painter: _RobinPainter(color, breast),
+  );
 }
 
 class _RobinPainter extends CustomPainter {
-  _RobinPainter(this.color);
+  _RobinPainter(this.color, this.breast);
 
   final Color color;
+  final bool breast;
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.scale(size.width / 1024, size.height / 1024);
     final ink = Paint()..color = color;
     canvas.drawPath(_paths.body, ink);
-    canvas.drawPath(_paths.breast, Paint()..color = _breastColor);
+    if (breast) {
+      canvas.drawPath(_paths.breast, Paint()..color = _breastColor);
+    }
     canvas.drawPath(_paths.eye, ink);
   }
 
   @override
-  bool shouldRepaint(_RobinPainter old) => old.color != color;
+  bool shouldRepaint(_RobinPainter old) =>
+      old.color != color || old.breast != breast;
 }
