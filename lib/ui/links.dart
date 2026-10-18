@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 
 import '../core/apps_lean.dart';
 import '../core/browser.dart';
@@ -36,14 +36,18 @@ Future<void> openLink(BuildContext context, String href) async {
 
 /// Opens [href], a link in an answer: where the device has a web view, browser-lean's page for
 /// an agent's tab opens in its sheet ([isBrowserTab]) and an apps-lean app's page in the page's
-/// sheet ([isAppsLeanPage]); anything else opens as [openLink] does.
+/// sheet ([isAppsLeanPage]), in the theme the app shows in ([pageInTheme]); anything else opens
+/// as [openLink] does.
 Future<void> openAnswerLink(BuildContext context, String href) async {
   final scope = AppScope.of(context);
   final server = scope.settings.connection?.uri;
   final url = openableLink(href, server: server);
   if (url != null && scope.appView != null) {
     if (isBrowserTab(url, server)) return scope.shell.openBrowser(url);
-    if (isAppsLeanPage(url, server)) return scope.shell.openPage(url);
+    if (isAppsLeanPage(url, server)) {
+      final dark = Theme.of(context).brightness == Brightness.dark;
+      return scope.shell.openPage(pageInTheme(url, dark: dark));
+    }
   }
   await openLink(context, url?.toString() ?? href);
 }

@@ -10,6 +10,13 @@ bool isAppsLeanPage(Uri link, Uri? server) =>
 
 const _folder = 'apps-lean';
 
+/// [page] opened in the light or dark theme, as `?theme=light` or `?theme=dark`, which the
+/// skill's `app.js` reads to keep the page to that theme whatever the web view's own scheme is.
+/// The rest of the address is kept, and a `theme` it already had is replaced.
+Uri pageInTheme(Uri page, {required bool dark}) => page.replace(
+  queryParameters: {...page.queryParameters, 'theme': dark ? 'dark' : 'light'},
+);
+
 /// The element [AppLinkSyntax] wraps a paragraph in.
 const appCardTag = 'appcard';
 

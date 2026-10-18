@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/chat/browser_sheet.dart';
 import 'package:anywherellm/ui/chat/page_sheet.dart';
@@ -9,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
+import '../support/fake_settings.dart';
 import '../support/pixels.dart';
 import '../support/pump.dart';
 
@@ -209,7 +211,9 @@ void main() {
     );
     await tapLink(tester, 'Groceries');
     await tester.pumpAndSettle();
-    final page = Uri.parse('https://h:3001/apps-lean/q9Zx_-1aB2.html');
+    final page = Uri.parse(
+      'https://h:3001/apps-lean/q9Zx_-1aB2.html?theme=light',
+    );
     expect(h.shell.popup.value, isA<PageOpen>());
     expect(find.byType(PageSheet), findsOneWidget);
     expect(find.text('Web view of $page'), findsOneWidget);
@@ -223,6 +227,35 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byType(PageSheet), findsNothing);
+  });
+
+  testWidgets('an app\'s page opens in the theme the app shows in', (
+    tester,
+  ) async {
+    final h = await pumpApp(
+      tester,
+      llm: answering('Made it: [Groceries](/apps-lean/q9Zx_-1aB2.html)'),
+      prefsStore: FakePrefsStore(const Prefs(theme: ThemePref.dark)),
+      canViewApps: true,
+    );
+    await tapLink(tester, 'Groceries');
+    await tester.pumpAndSettle();
+    expect(h.appView!.shown.single.queryParameters, {'theme': 'dark'});
+  });
+
+  testWidgets('an app\'s page follows the device while the theme is System', (
+    tester,
+  ) async {
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+    addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+    final h = await pumpApp(
+      tester,
+      llm: answering('Made it: [Groceries](/apps-lean/q9Zx_-1aB2.html)'),
+      canViewApps: true,
+    );
+    await tapLink(tester, 'Groceries');
+    await tester.pumpAndSettle();
+    expect(h.appView!.shown.single.queryParameters, {'theme': 'dark'});
   });
 
   testWidgets('an app\'s card in an answer is one tap that opens its page', (

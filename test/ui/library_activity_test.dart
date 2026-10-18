@@ -146,7 +146,7 @@ void main() {
       await tester.tap(find.text('Budget'));
       await tester.pumpAndSettle();
       expect(
-        find.text('Web view of https://h:3001/apps-lean/b1.html'),
+        find.text('Web view of https://h:3001/apps-lean/b1.html?theme=light'),
         findsOneWidget,
       );
       expect(h.opened, isEmpty);
@@ -311,7 +311,7 @@ void main() {
         await tester.tap(control('Open it'));
         await tester.pumpAndSettle();
         expect(
-          find.text('Web view of https://h:3001/apps-lean/g1.html'),
+          find.text('Web view of https://h:3001/apps-lean/g1.html?theme=light'),
           findsOneWidget,
         );
         h.shell.closePopup();

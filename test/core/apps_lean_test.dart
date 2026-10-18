@@ -7,6 +7,27 @@ void main() {
   final server = Uri.parse('https://owen.example.ts.net:3001');
   bool page(String link, {Uri? on}) => isAppsLeanPage(Uri.parse(link), on);
 
+  test(
+    'a page opens in the light or dark theme, keeping the rest of its address',
+    () {
+      final page = Uri.parse(
+        'https://owen.example.ts.net:3001/apps-lean/q9Z.html',
+      );
+      expect(
+        pageInTheme(page, dark: false).toString(),
+        'https://owen.example.ts.net:3001/apps-lean/q9Z.html?theme=light',
+      );
+      expect(
+        pageInTheme(
+          page.replace(query: 'tab=2&theme=light'),
+          dark: true,
+        ).queryParameters,
+        {'tab': '2', 'theme': 'dark'},
+      );
+      expect(isAppsLeanPage(pageInTheme(page, dark: true), server), isTrue);
+    },
+  );
+
   test('an app\'s page on the server\'s host is an apps-lean page', () {
     expect(
       page(
@@ -82,7 +103,9 @@ void main() {
             (n.tag == appCardTag || holdsCard(n.children ?? const [])),
       );
       expect(
-        holdsCard(parseAnswer('- [Groceries](/apps-lean/q9Z.html) - Added Tea')),
+        holdsCard(
+          parseAnswer('- [Groceries](/apps-lean/q9Z.html) - Added Tea'),
+        ),
         isFalse,
       );
       expect(
