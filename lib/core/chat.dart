@@ -167,6 +167,15 @@ class Attachment {
 /// The type the server takes for an attached document, which it reads in for that message.
 const documentMime = 'application/anythingllm-document';
 
+/// The mode a message with [attachments] is sent in, over the workspace's [mode], or null to
+/// leave it to the workspace: [ChatMode.chat] when a document goes in [ChatMode.automatic].
+/// AnythingLLM 1.16.2 reads a document in only outside an agent run; its agent sends every
+/// attachment to the model as a picture.
+ChatMode? modeForFiles(ChatMode? mode, List<Attachment> attachments) =>
+    mode == ChatMode.automatic && attachments.any((a) => !a.isImage)
+    ? ChatMode.chat
+    : null;
+
 /// The largest file one message may carry.
 const maxAttachmentBytes = 20 * 1024 * 1024;
 

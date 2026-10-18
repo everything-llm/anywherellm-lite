@@ -50,14 +50,15 @@ abstract interface class AnythingLlmApi {
   Future<List<ChatMessage>> history(String slug, String thread);
 
   /// Asks [message] in the chat, with [attachments] for this message only, and streams the
-  /// answer in the workspace's own chat mode. The stream fails with [ApiException]. Cancelling
-  /// the subscription lets go of the answer, which stops it, though an agent may still finish
-  /// it and save it to the chat.
+  /// answer in [mode], or in the workspace's own chat mode when it is null. The stream fails
+  /// with [ApiException]. Cancelling the subscription lets go of the answer, which stops it,
+  /// though an agent may still finish it and save it to the chat.
   Stream<ChatEvent> streamChat(
     String slug,
     String thread,
     String message, {
     List<Attachment> attachments = const [],
+    ChatMode? mode,
   });
 
   /// Clears the chat's history: the model no longer sees its exchanges, and history no longer

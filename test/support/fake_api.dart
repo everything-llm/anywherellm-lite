@@ -108,6 +108,9 @@ class FakeAnythingLlm implements AnythingLlmApi {
   /// The files sent with the last message asked.
   List<Attachment> lastAttachments = const [];
 
+  /// The mode the last message asked was sent in, or null for the workspace's own.
+  ChatMode? lastMode;
+
   /// The details each added document was given, by path.
   final Map<String, DocMeta> metaOf = {};
 
@@ -226,9 +229,11 @@ class FakeAnythingLlm implements AnythingLlmApi {
     String thread,
     String message, {
     List<Attachment> attachments = const [],
+    ChatMode? mode,
   }) {
     calls.add('streamChat:$thread:$message');
     lastAttachments = attachments;
+    lastMode = mode;
     final error = errors['streamChat'];
     if (error != null) return Stream.error(error);
     if (hold) {

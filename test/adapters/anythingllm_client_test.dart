@@ -732,6 +732,19 @@ void main() {
       },
     );
 
+    test('a message sends a mode only when it is given one', () async {
+      final seen = <http.BaseRequest>[];
+      Future<void> ask(ChatMode? mode) => streaming([
+        data({'type': 'textResponseChunk', 'textResponse': '', 'close': true}),
+      ], seen: seen).streamChat('w', 't', 'Hi', mode: mode).drain<void>();
+      await ask(null);
+      await ask(ChatMode.chat);
+      expect([for (final r in seen) jsonDecode((r as http.Request).body)], [
+        {'message': 'Hi'},
+        {'message': 'Hi', 'mode': 'chat'},
+      ]);
+    });
+
     test('an answer that goes silent is given up after idle', () async {
       final silent = StreamController<List<int>>();
       addTearDown(silent.close);

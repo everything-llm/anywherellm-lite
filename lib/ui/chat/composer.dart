@@ -418,6 +418,7 @@ class _ComposerState extends State<Composer> {
     final sent = await _scope.chat.send(
       message,
       attachments: attached,
+      mode: _scope.sources.chatMode.value,
       shortcutUse: shortcut == null
           ? null
           : ShortcutUse(label: shortcut.label, detail: text.trim()),

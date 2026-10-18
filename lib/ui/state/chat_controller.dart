@@ -691,11 +691,13 @@ class ChatController extends ChangeNotifier {
   }
 
   /// Asks [message], with [attachments], in the chat on screen, making its thread first when it
-  /// is a draft. True when the message was taken.
+  /// is a draft. [mode] is the workspace's chat mode, from which [modeForFiles] picks the mode
+  /// a document is sent in. True when the message was taken.
   Future<bool> send(
     String message, {
     List<Attachment> attachments = const [],
     ShortcutUse? shortcutUse,
+    ChatMode? mode,
   }) async {
     final slug = activeSlug;
     final text = message.trim();
@@ -751,7 +753,13 @@ class ChatController extends ChangeNotifier {
     final thread = threadSlug;
     _follow(
       running,
-      _api.streamChat(slug, thread, text, attachments: attachments),
+      _api.streamChat(
+        slug,
+        thread,
+        text,
+        attachments: attachments,
+        mode: modeForFiles(mode, attachments),
+      ),
     );
     return true;
   }

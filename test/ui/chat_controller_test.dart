@@ -959,6 +959,21 @@ void main() {
     expect(question.attachments.last.picture, isNull);
   });
 
+  test('a document sent in the agent\'s mode goes in chat mode', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    await rig.chat.send(
+      'What is on this page?',
+      attachments: [Attachment.of('page.html', Uint8List(1))],
+      mode: ChatMode.automatic,
+    );
+    await pumpEventQueue();
+    expect(llm.lastMode, ChatMode.chat);
+    await rig.chat.send('And now?', mode: ChatMode.automatic);
+    await pumpEventQueue();
+    expect(llm.lastMode, isNull);
+  });
+
   test(
     'a message that starts with a slash goes to the server as typed',
     () async {

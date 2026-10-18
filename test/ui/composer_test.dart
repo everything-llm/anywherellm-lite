@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:anywherellm/core/chat.dart' show ChatMode;
 import 'package:anywherellm/ui/chat/composer.dart';
 import 'package:anywherellm/ui/widgets/sheet.dart';
 import 'package:cross_file/cross_file.dart';
@@ -76,6 +77,21 @@ void main() {
     expect(find.bySemanticsLabel('photo.png'), findsOneWidget);
     expect(find.text('photo.png'), findsNothing);
     expect(find.text('contract.pdf'), findsOneWidget);
+  });
+
+  testWidgets('a document sent in the agent\'s mode goes in chat mode', (
+    tester,
+  ) async {
+    FilePickerPlatform.instance = FakePicker([Picked('page.html')]);
+    final llm = planningServer();
+    await pumpApp(tester, llm: llm);
+    await attachFiles(tester);
+    await tester.enterText(composerField, 'What is on this page?');
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(llm.lastAttachments.map((a) => a.name), ['page.html']);
+    expect(llm.lastMode, ChatMode.chat);
   });
 
   testWidgets(

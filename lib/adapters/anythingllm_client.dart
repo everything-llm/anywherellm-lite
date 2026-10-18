@@ -123,10 +123,12 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     String thread,
     String message, {
     List<Attachment> attachments = const [],
+    ChatMode? mode,
   }) {
-    // No `mode`: the server then answers in the workspace's own chat mode.
+    // With no `mode` the server answers in the workspace's own chat mode.
     final body = {
       'message': message,
+      'mode': ?mode?.name,
       if (attachments.isNotEmpty)
         'attachments': [for (final a in attachments) attachmentJson(a)],
     };

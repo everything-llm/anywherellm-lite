@@ -180,6 +180,22 @@ void main() {
       );
     });
 
+    test('a document sent in the agent\'s mode goes in chat mode', () {
+      final page = Attachment.of('page.html', Uint8List(1));
+      final photo = Attachment.of('photo.png', Uint8List(1));
+      expect(
+        [
+          modeForFiles(ChatMode.automatic, [photo, page]),
+          modeForFiles(ChatMode.automatic, [photo]),
+          modeForFiles(ChatMode.automatic, const []),
+          modeForFiles(ChatMode.chat, [page]),
+          modeForFiles(ChatMode.query, [page]),
+          modeForFiles(null, [page]),
+        ],
+        [ChatMode.chat, null, null, null, null, null],
+      );
+    });
+
     test('an agent\'s thoughts read as plain status lines', () {
       expect(
         agentStatus('@agent is executing `web-browsing` tool {\n "q": 1\n}'),
