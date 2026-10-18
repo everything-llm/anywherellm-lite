@@ -8,15 +8,19 @@ import '../tokens.dart';
 import '../type.dart';
 import 'buttons.dart';
 import 'rise.dart';
+import 'window_insets.dart';
+import 'scroll_fades.dart';
 
 /// How tall a [SheetFrame] stands: [tall] fills the screen but for [SheetFrame.gap] above it,
 /// and [fit] takes the height of what it holds, at most [SheetFrame.fitFraction] of the screen.
 enum SheetHeight { tall, fit }
 
-/// A sheet over the chat on a phone, filling what it is given: the scrim, which closes it when
-/// tapped, and the sheet itself at the bottom, under a drag handle, with [title] and Close, then
-/// [child]. Dragging the handle or the header down past 120 px, or flinging it, closes it; a
-/// shorter drag puts it back.
+/// A sheet over the chat on a phone, filling what it is given, which is the whole window: the
+/// scrim, which closes it when tapped and dims the system bars too, and the sheet itself at the
+/// bottom, under a drag handle, with [title] and Close, then [child]. The sheet's ground runs
+/// down behind the navigation bar, and its words keep clear of the bars by the window's insets.
+/// Dragging the handle or the header down past 120 px, or flinging it, closes it; a shorter drag
+/// puts it back.
 ///
 /// A [bare] sheet has only the drag handle over [child], which draws its own controls; [title]
 /// then names it to a screen reader alone.
@@ -105,6 +109,7 @@ class _SheetFrameState extends State<SheetFrame>
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final tall = widget.height == SheetHeight.tall;
+    final bars = WindowInsets.of(context);
     final header = GestureDetector(
       behavior: HitTestBehavior.opaque,
       onVerticalDragUpdate: _dragged,
@@ -126,19 +131,25 @@ class _SheetFrameState extends State<SheetFrame>
             ),
           ),
           if (!widget.bare)
-            SheetHeader(
-              title: widget.title,
-              onClose: widget.onClose,
-              divided: tall,
+            Padding(
+              padding: EdgeInsets.only(left: bars.left, right: bars.right),
+              child: SheetHeader(
+                title: widget.title,
+                onClose: widget.onClose,
+                divided: tall,
+              ),
             ),
         ],
       ),
     );
     return LayoutBuilder(
       builder: (context, box) {
+        // The room under the status bar, which the sheet's own height includes the bottom bar's
+        // inset of.
+        final room = math.max(0.0, box.maxHeight - bars.top);
         final most = tall
-            ? math.max(0.0, box.maxHeight - SheetFrame.gap)
-            : box.maxHeight * SheetFrame.fitFraction;
+            ? math.max(0.0, room - SheetFrame.gap)
+            : room * SheetFrame.fitFraction;
         final sheet = Semantics(
           container: true,
           explicitChildNodes: true,
@@ -169,11 +180,18 @@ class _SheetFrameState extends State<SheetFrame>
                   fit: tall ? FlexFit.tight : FlexFit.loose,
                   child: _InSheet(
                     child: Padding(
-                      padding: widget.padding,
-                      child: widget.child,
+                      padding: widget.padding.copyWith(
+                        left: widget.padding.left + bars.left,
+                        right: widget.padding.right + bars.right,
+                      ),
+                      child: widget.bare
+                          ? widget.child
+                          : ScrollFades(color: t.panel, child: widget.child),
                     ),
                   ),
                 ),
+                // The sheet's ground goes on behind the navigation bar.
+                SizedBox(height: bars.bottom),
               ],
             ),
           ),
@@ -366,9 +384,7 @@ class ModalSheet extends StatelessWidget {
     bindings: {const SingleActivator(LogicalKeyboardKey.escape): onClose},
     child: Focus(
       autofocus: autofocus,
-      child: SafeArea(
-        child: SheetFrame(title: title, onClose: onClose, child: child),
-      ),
+      child: SheetFrame(title: title, onClose: onClose, child: child),
     ),
   );
 }

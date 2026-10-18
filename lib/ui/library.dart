@@ -64,7 +64,7 @@ class _LibraryPageState extends State<LibraryPage> {
     final apps = shown(contents?.apps ?? const [], (a) => a.isIn(slug));
     final files = shown(contents?.files ?? const [], (f) => f.isIn(slug));
     return ListView(
-      padding: Sizes.pagePadding,
+      padding: Sizes.pageIn(context),
       children: [
         if (contents == null || toolkit.libraryProblem != null)
           NotRead(toolkit.libraryProblem)

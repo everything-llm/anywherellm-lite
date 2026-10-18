@@ -61,8 +61,8 @@ class _Running {
 
 /// The workspaces and their chats, the chat on screen, and the answers running.
 ///
-/// One answer runs at a time in each workspace, since AnythingLLM gives an agent run no thread
-/// of its own.
+/// One answer runs at a time in each chat; chats of one workspace answer at once, since
+/// AnythingLLM keeps each run's history and saved answer by its thread.
 ///
 /// A chat not yet asked anything is a draft: it lives only here until its first message, which
 /// makes the thread on the server. Everything it knows is about the server in [_settings]; a new
@@ -141,7 +141,7 @@ class ChatController extends ChangeNotifier {
   /// The workspace of an answer running or waiting, for the note that keeps the app alive.
   String? get workingIn => _runs.firstOrNull?.slug ?? waits.firstSlug;
 
-  /// The answers running, at most one in each workspace.
+  /// The answers running, at most one in each chat.
   final _runs = <_Running>[];
 
   /// What waits for each chat's composer, by chat (null for a new one): what another app shared
@@ -204,9 +204,9 @@ class ChatController extends ChangeNotifier {
   List<Turn> get turns =>
       activeThread == null ? _draft : (_turns[activeThread] ?? const []);
 
-  /// Whether the chat on screen can take no message now: a chat of its workspace answers, this
-  /// one or another, or this one's history is being cleared.
-  bool get busy => workspaceAnswering || _clearing.contains(activeThread);
+  /// Whether the chat on screen can take no message now: it answers, or its history is being
+  /// cleared.
+  bool get busy => answeringHere || _clearing.contains(activeThread);
 
   /// The chats whose history is being cleared on the server.
   final _clearing = <String>{};
@@ -287,9 +287,6 @@ class ChatController extends ChangeNotifier {
 
   /// Whether a chat of workspace [slug] is answering, a draft whose chat is being made included.
   bool answeringIn(String slug) => _runs.any((r) => r.slug == slug);
-
-  /// Whether a chat of the workspace on screen is answering, this one or another.
-  bool get workspaceAnswering => activeSlug != null && answeringIn(activeSlug!);
 
   @override
   void dispose() {

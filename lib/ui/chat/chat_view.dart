@@ -74,7 +74,17 @@ class _ChatViewState extends State<ChatView> {
       child: CustomMultiChildLayout(
         delegate: _chatLayout,
         children: [
-          LayoutId(id: _Slot.top, child: top),
+          // The header keeps to the column the turns and the composer share, so on a wide
+          // window its buttons line up with them.
+          LayoutId(
+            id: _Slot.top,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: Sizes.column),
+                child: top,
+              ),
+            ),
+          ),
           LayoutId(
             id: _Slot.body,
             child: _Body(onSuggest: _suggest),

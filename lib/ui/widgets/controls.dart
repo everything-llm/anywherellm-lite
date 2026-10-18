@@ -98,7 +98,10 @@ class SwitchTrack extends StatelessWidget {
       child: Container(
         width: knob,
         height: knob,
-        decoration: BoxDecoration(color: t.panel, shape: BoxShape.circle),
+        decoration: BoxDecoration(
+          color: value ? t.panel : t.knob,
+          shape: BoxShape.circle,
+        ),
       ),
     );
   }

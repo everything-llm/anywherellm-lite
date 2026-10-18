@@ -1,3 +1,5 @@
+import 'package:anywherellm/ui/tokens.dart';
+import 'package:anywherellm/ui/type.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:flutter/material.dart';
@@ -56,9 +58,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(store.saved.textSize, TextSize.large);
     expect(answerScale(), closeTo(12, 0.001));
+    // The page sets a line at the size chosen, so the choice can be judged on it.
+    final preview = tester.widget<Text>(
+      find.text('An answer in the chat reads like this.'),
+    );
+    expect(preview.style!.fontSize, closeTo(Type.chat * 1.2, 0.001));
     final settings = MediaQuery.textScalerOf(
       tester.element(find.text('Chat text size')),
     );
     expect(settings.scale(10), 10);
+  });
+
+  test('the chosen segment is lighter than its track, in light and dark', () {
+    for (final t in [Tokens.light, Tokens.dark]) {
+      expect(
+        t.chosen.computeLuminance(),
+        greaterThan(t.hover.computeLuminance()),
+      );
+    }
   });
 }

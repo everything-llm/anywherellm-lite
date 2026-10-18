@@ -7,6 +7,7 @@ import '../tokens.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';
 import '../widgets/fields.dart';
+import '../widgets/rise.dart';
 import 'text_viewer.dart';
 import 'settings_form.dart';
 
@@ -29,8 +30,10 @@ class Blank extends StatelessWidget {
   );
 }
 
-/// The editor for a workspace's `PROMPT.md`, as prose, with Revert and Save sharing the line.
-/// Its key changes each time the text is read afresh, which drops the draft.
+/// The editor for a workspace's `PROMPT.md`, in the mono face its Markdown and tags read best
+/// in, with a scrollbar once the text runs past the field. It takes all the height there is;
+/// Revert and Save slide in under it once the text has changed. Its key changes each time the
+/// text is read afresh, which drops the draft.
 class _Editor extends StatefulWidget {
   const _Editor({super.key, required this.prompt});
 
@@ -44,6 +47,7 @@ class _Editor extends StatefulWidget {
 class _EditorState extends State<_Editor> {
   late final TextEditingController _draft;
   late final String _saved;
+  final _scroll = ScrollController();
   bool _saving = false;
 
   @override
@@ -55,6 +59,7 @@ class _EditorState extends State<_Editor> {
 
   @override
   void dispose() {
+    _scroll.dispose();
     _draft.dispose();
     super.dispose();
   }
@@ -72,7 +77,7 @@ class _EditorState extends State<_Editor> {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return Padding(
-      padding: Sizes.pagePadding,
+      padding: Sizes.pageIn(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -80,40 +85,48 @@ class _EditorState extends State<_Editor> {
             child: Semantics(
               label: 'PROMPT.md',
               textField: true,
-              child: TextField(
-                controller: _draft,
-                expands: true,
-                maxLines: null,
-                textAlignVertical: TextAlignVertical.top,
-                autocorrect: false,
-                enableSuggestions: false,
-                style: Type.textArea(15.5, t.ink),
-                cursorColor: t.accent,
-                decoration: editorDecoration(context, t.panel).copyWith(
-                  // An empty prompt says what applies instead.
-                  hintText:
-                      'Empty: the server\'s default system prompt applies.',
-                  hintStyle: Type.textArea(15.5, t.muted),
+              child: Scrollbar(
+                controller: _scroll,
+                child: TextField(
+                  controller: _draft,
+                  scrollController: _scroll,
+                  expands: true,
+                  maxLines: null,
+                  textAlignVertical: TextAlignVertical.top,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  style: Type.textAreaMono(14.5, t.ink),
+                  cursorColor: t.accent,
+                  decoration: editorDecoration(context, t.panel).copyWith(
+                    // An empty prompt says what applies instead.
+                    hintText:
+                        'Empty: the server\'s default system prompt applies.',
+                    hintStyle: Type.textAreaMono(14.5, t.muted),
+                  ),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          // Only the buttons follow the draft, so typing rebuilds nothing else. They show once
-          // the text has changed, in a line kept for them, as the Lite prototype draws it.
+          // Only the buttons follow the draft, so typing rebuilds nothing else. They slide in
+          // once the text has changed, and until then the field has their room.
           ListenableBuilder(
             listenable: _draft,
-            builder: (context, _) => ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 52),
+            builder: (context, _) => AnimatedSize(
+              duration: motion(context, const Duration(milliseconds: 160)),
+              curve: Curves.easeOut,
+              alignment: Alignment.topCenter,
               child: !_dirty && !_saving
                   ? null
-                  : ActionRow(
-                      even: true,
-                      saveRevertButtons(
-                        dirty: _dirty,
-                        saving: _saving,
-                        onSave: _save,
-                        onRevert: () => _draft.text = _saved,
+                  : Padding(
+                      padding: const EdgeInsets.only(top: 20),
+                      child: ActionRow(
+                        even: true,
+                        saveRevertButtons(
+                          dirty: _dirty,
+                          saving: _saving,
+                          onSave: _save,
+                          onRevert: () => _draft.text = _saved,
+                        ),
                       ),
                     ),
             ),

@@ -125,31 +125,42 @@ void main() {
     },
   );
 
-  test('an answer streams in, and only one runs in a workspace', () async {
-    final llm = planningServer()..hold = true;
-    final rig = await started(llm);
-    await rig.chat.send('Summarise');
-    expect(rig.chat.answeringHere, isTrue);
-    final answer = rig.chat.turns.last;
-    expect(answer.streaming, isTrue);
+  test(
+    'an answer streams in, and another chat of its workspace answers meanwhile',
+    () async {
+      final llm = planningServer()..hold = true;
+      final rig = await started(llm);
+      await rig.chat.send('Summarise');
+      expect(rig.chat.answeringHere, isTrue);
+      final answer = rig.chat.turns.last;
+      final first = llm.chat!;
+      expect(answer.streaming, isTrue);
 
-    llm.chat!.add(const TextChunk('Part one'));
-    await pumpEventQueue();
-    expect(answer.text, 'Part one');
+      first.add(const TextChunk('Part one'));
+      await pumpEventQueue();
+      expect(answer.text, 'Part one');
 
-    await rig.chat.open('priorities');
-    expect(rig.chat.busy, isTrue);
-    expect(rig.chat.answeringHere, isFalse);
-    await rig.chat.send('another');
-    expect(llm.calls.where((c) => c.startsWith('streamChat')), hasLength(1));
+      await rig.chat.open('priorities');
+      expect(rig.chat.busy, isFalse);
+      expect(rig.chat.answeringHere, isFalse);
+      expect(await rig.chat.send('another'), isTrue);
+      await pumpEventQueue();
+      expect(llm.calls.where((c) => c.startsWith('streamChat')), hasLength(2));
+      final second = rig.chat.runningHere!;
+      llm.chats['priorities']!.add(const TextChunk('Ship the beta.'));
+      await pumpEventQueue();
+      expect(second.text, 'Ship the beta.');
+      expect(answer.text, 'Part one');
 
-    llm.chat!.add(const ChatDone([Citation('Q3 roadmap.pdf')]));
-    await llm.chat!.close();
-    await pumpEventQueue();
-    expect(answer.streaming, isFalse);
-    expect(answer.citations.map((c) => c.title), ['Q3 roadmap.pdf']);
-    expect(rig.chat.busy, isFalse);
-  });
+      first.add(const ChatDone([Citation('Q3 roadmap.pdf')]));
+      await first.close();
+      await pumpEventQueue();
+      expect(answer.streaming, isFalse);
+      expect(answer.citations.map((c) => c.title), ['Q3 roadmap.pdf']);
+      expect(second.streaming, isTrue);
+      expect(rig.chat.answeringIn('q3'), isTrue);
+    },
+  );
 
   test('stop keeps what came, or says Stopped when nothing did', () async {
     final llm = planningServer()..hold = true;

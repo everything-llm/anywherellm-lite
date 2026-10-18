@@ -1,4 +1,6 @@
-import 'package:flutter/painting.dart';
+import 'package:flutter/widgets.dart';
+
+import 'widgets/window_insets.dart';
 
 abstract final class Sizes {
   /// The widest the chat's turns and composer are laid out.
@@ -27,6 +29,12 @@ abstract final class Sizes {
 
   /// Around a phone page's cards, under its header.
   static const pagePadding = EdgeInsets.fromLTRB(16, 8, 16, 24);
+
+  /// [pagePadding] with the navigation bar's inset under it, for a page that is not padded by
+  /// it and scrolls on through it, so its cards are not cut off above the bar.
+  static EdgeInsets pageIn(BuildContext context) => pagePadding.copyWith(
+    bottom: pagePadding.bottom + WindowInsets.of(context).bottom,
+  );
 
   /// The least height of a row in a card: a sheet's, a chat's or a document's.
   static const cardRow = 64.0;

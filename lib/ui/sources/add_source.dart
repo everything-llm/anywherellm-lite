@@ -67,8 +67,16 @@ class _AddSourceState extends State<AddSource> {
     runSpacing: 8,
     children: [
       widget.leading,
-      AppButton('Add a link', onPressed: () => _open(_Adding.link)),
-      AppButton('Paste text', onPressed: () => _open(_Adding.text)),
+      AppButton(
+        'Add a link',
+        leading: 'link',
+        onPressed: () => _open(_Adding.link),
+      ),
+      AppButton(
+        'Paste text',
+        leading: 'pencil',
+        onPressed: () => _open(_Adding.text),
+      ),
     ],
   );
 

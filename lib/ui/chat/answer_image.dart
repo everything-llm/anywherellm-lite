@@ -6,6 +6,7 @@ import '../../core/chat.dart';
 import '../../core/ports.dart';
 import '../app_scope.dart';
 import '../icons.dart';
+import '../layout.dart';
 import '../links.dart';
 import '../tokens.dart';
 import '../type.dart';
@@ -89,43 +90,90 @@ class _AnswerImageState extends State<AnswerImage> {
     _bytes = loadable && _now == null ? chat.bytes.image(widget.uri) : null;
   }
 
-  /// The image's description, drawn as a link: the host it is not loaded from, or that it did
-  /// not load, with [failure] in its tooltip.
-  Widget _described(BuildContext context, {String? failure}) {
-    final t = Tokens.of(context);
-    final alt = widget.alt?.trim();
-    final name = alt != null && alt.isNotEmpty ? alt : 'image';
-    final failed = widget.loadable;
-    final text = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AppIcon('link', size: IconSize.xs, color: t.accent),
-        const SizedBox(width: 6),
-        Flexible(
-          child: Text(
-            '[$name: ${failed ? 'did not load' : widget.uri.host}]',
-            style: Type.sans(
-              14,
-              color: t.accent,
-            ).copyWith(decoration: TextDecoration.underline),
-          ),
-        ),
-      ],
-    );
-    final why = failed
-        ? failure ?? 'The image did not load.'
-        : 'Not loaded: images load only from the server\'s own host.';
-    if (widget.linked) return Tooltip(message: why, child: text);
+  /// The tap on a description or a missing picture: it opens the image's address, unless the
+  /// image is [AnswerImage.linked], where the link around it takes the tap and [why] is only
+  /// its tooltip.
+  Widget _tappable(
+    BuildContext context,
+    String name,
+    String why,
+    Widget child,
+  ) {
+    if (widget.linked) return Tooltip(message: why, child: child);
     return Tappable(
       label: 'Open $name',
       tooltip: why,
       onTap: () => openLink(context, widget.uri.toString()),
-      child: text,
+      child: child,
     );
   }
 
-  Widget _unloaded(BuildContext context, {String? failure}) =>
-      widget.unloaded?.call(context) ?? _described(context, failure: failure);
+  /// An image that is not loaded, because it is not on the server's own host, drawn as a link
+  /// to its host.
+  Widget _described(BuildContext context, String name) {
+    final t = Tokens.of(context);
+    return _tappable(
+      context,
+      name,
+      'Not loaded: images load only from the server\'s own host.',
+      Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AppIcon('link', size: IconSize.xs, color: t.accent),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              '[$name: ${widget.uri.host}]',
+              style: Type.sans(
+                14,
+                color: t.accent,
+              ).copyWith(decoration: TextDecoration.underline),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// What shows for an image that could be loaded and did not: a muted, outlined box with a
+  /// picture mark and the description, so it reads as a picture that is missing rather than a
+  /// link. It keeps the description's words, `[name: did not load]`, and says why in its
+  /// tooltip.
+  Widget _missing(BuildContext context, String name, {String? failure}) {
+    final t = Tokens.of(context);
+    final box = Container(
+      constraints: const BoxConstraints(minHeight: 44),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: t.panel2,
+        borderRadius: BorderRadius.circular(Sizes.row + 2),
+        border: Border.all(color: t.line),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        spacing: 10,
+        children: [
+          AppIcon('image', size: IconSize.normal, color: t.muted),
+          Flexible(
+            child: Text(
+              '[$name: did not load]',
+              style: Type.sans(13.5, color: t.muted, height: 1.35),
+            ),
+          ),
+        ],
+      ),
+    );
+    return _tappable(context, name, failure ?? 'The image did not load.', box);
+  }
+
+  Widget _unloaded(BuildContext context, {String? failure}) {
+    if (widget.unloaded case final unloaded?) return unloaded(context);
+    final alt = widget.alt?.trim();
+    final name = alt != null && alt.isNotEmpty ? alt : 'image';
+    return widget.loadable
+        ? _missing(context, name, failure: failure)
+        : _described(context, name);
+  }
 
   /// The image drawn from [frame].
   Widget _image(BuildContext context, Uint8List frame) {

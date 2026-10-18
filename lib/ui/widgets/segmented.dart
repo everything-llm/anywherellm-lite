@@ -41,7 +41,7 @@ class Segmented<T> extends StatelessWidget {
                   selected: value == option,
                   onTap: onChanged == null ? null : () => onChanged(option),
                   radius: BorderRadius.circular(13),
-                  color: value == option ? t.panel : null,
+                  color: value == option ? t.chosen : null,
                   child: Container(
                     constraints: const BoxConstraints(minHeight: 44),
                     alignment: Alignment.center,

@@ -180,7 +180,8 @@ void main() {
       inPages(find.byType(TextField)),
       'Answer in French.',
     );
-    await tester.pump();
+    // Save slides in under the field.
+    await tester.pumpAndSettle();
     await tester.tap(inPages(control('Save')));
     await tester.pumpAndSettle();
     expect(llm.spaces.first.prompt, 'Answer in French.');

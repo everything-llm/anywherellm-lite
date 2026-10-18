@@ -89,7 +89,7 @@ class _WorkspaceSheetViewState extends State<WorkspaceSheetView> {
               controller: _name,
               label: 'Name',
               autofocus: true,
-              onSubmitted: (_) => _named(),
+              onSubmitted: (_) => _name.text.trim().isEmpty ? null : _named(),
             ),
           ),
           if (create)
@@ -104,13 +104,18 @@ class _WorkspaceSheetViewState extends State<WorkspaceSheetView> {
                 maxLines: 8,
               ),
             ),
-          ActionRow(even: true, [
-            AppButton(
-              create ? 'Create' : 'Save',
-              primary: true,
-              onPressed: _named,
-            ),
-          ]),
+          // Nothing to save without a name, so the button is off rather than closing the
+          // sheet and doing nothing.
+          ListenableBuilder(
+            listenable: _name,
+            builder: (context, _) => ActionRow(even: true, [
+              AppButton(
+                create ? 'Create' : 'Save',
+                primary: true,
+                onPressed: _name.text.trim().isEmpty ? null : _named,
+              ),
+            ]),
+          ),
         ],
       ),
     );

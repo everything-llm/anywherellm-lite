@@ -277,6 +277,8 @@ class _Item extends StatelessWidget {
                 ),
               ),
             ),
+            // A memory opens in a sheet to change, which the chevron says.
+            if (!add) AppIcon('chevron', size: IconSize.xs, color: t.muted),
           ],
         ),
       ),

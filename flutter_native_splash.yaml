@@ -1,11 +1,13 @@
-# The launch screen, made from assets/icon by `dart run flutter_native_splash:create`. The app
-# opens on its dark background, so the launch screen uses it in light and dark mode alike.
+# The launch screen, made from assets/icon by `dart run flutter_native_splash:create`. It opens
+# on the app's own background, which follows the system's light or dark mode.
 flutter_native_splash:
-  color: "#181922"
+  color: "#FCF8F3"
+  color_dark: "#181922"
   image: assets/icon/splash.png
   android: true
   ios: false
   android_12:
-    color: "#181922"
+    color: "#FCF8F3"
+    color_dark: "#181922"
     image: assets/icon/icon-foreground.png
     icon_background_color: "#4B5DC3"

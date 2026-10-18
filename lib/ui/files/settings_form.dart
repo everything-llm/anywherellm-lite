@@ -108,7 +108,7 @@ class _SettingsFormState extends State<SettingsForm> {
     final scope = AppScope.of(context);
     final workspace = scope.chat.active?.name ?? 'this workspace';
     return ListView(
-      padding: Sizes.pagePadding,
+      padding: Sizes.pageIn(context),
       children: [
         const CardHeading('Answer from', top: 0),
         Semantics(
@@ -160,9 +160,12 @@ class _SettingsFormState extends State<SettingsForm> {
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 8),
-        HelpText(
-          'What Files only says when no document matches. These apply to every chat in '
-          '$workspace. Chat history, temperature and document search stay as the server has them.',
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
+          child: HelpText(
+            'What Files only says when no document matches. These apply to every chat in '
+            '$workspace. Chat history, temperature and document search stay as the server has them.',
+          ),
         ),
         if (buttons != null) ...[const SizedBox(height: 20), buttons],
       ],

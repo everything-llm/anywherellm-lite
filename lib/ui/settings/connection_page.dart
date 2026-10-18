@@ -332,6 +332,7 @@ class _KeyCardState extends State<_KeyCard> {
           AlertBox.notice(AlertKind.warn, problem),
         AppButton(
           saving && !_replacing ? 'Testing…' : 'Test connection',
+          primary: true,
           onPressed: saving ? null : _test,
         ),
         AppButton(
@@ -347,9 +348,11 @@ class _KeyCardState extends State<_KeyCard> {
             }
           }),
         ),
+        const SizedBox(height: 8),
         AppButton(
           _confirmForget ? 'Really forget it?' : 'Forget this server',
           danger: true,
+          quiet: true,
           onPressed: _forget,
         ),
       ],

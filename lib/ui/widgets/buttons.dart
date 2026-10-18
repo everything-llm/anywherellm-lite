@@ -16,6 +16,7 @@ class AppButton extends StatelessWidget {
     required this.onPressed,
     this.primary = false,
     this.danger = false,
+    this.quiet = false,
     this.icon,
     this.leading,
   });
@@ -26,6 +27,10 @@ class AppButton extends StatelessWidget {
 
   /// A destructive action that is not the primary one: its label in [Tokens.badfg].
   final bool danger;
+
+  /// A button with no edge or fill, for an action that should not weigh as much as the ones
+  /// around it, such as forgetting a server.
+  final bool quiet;
 
   /// An icon after the label, such as `external` for a button that leaves the app.
   final String? icon;
@@ -46,8 +51,14 @@ class AppButton extends StatelessWidget {
       label: label,
       onTap: onPressed,
       radius: BorderRadius.circular(Sizes.control),
-      color: primary ? t.accent : t.panel,
-      side: BorderSide(color: primary ? t.accent : t.edge),
+      color: primary
+          ? t.accent
+          : quiet
+          ? Colors.transparent
+          : t.panel,
+      side: quiet
+          ? BorderSide.none
+          : BorderSide(color: primary ? t.accent : t.edge),
       hoverColor: primary ? t.onaccent.withValues(alpha: 0.1) : null,
       dimWhenDisabled: 0.5,
       child: ConstrainedBox(

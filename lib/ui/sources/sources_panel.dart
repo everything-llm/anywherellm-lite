@@ -117,7 +117,11 @@ class _Body extends StatelessWidget {
                 onProblem: sources.report,
                 trigger: (browse) => AddSource(
                   key: ValueKey(('add', slug)),
-                  leading: AppButton('Add a file', onPressed: browse),
+                  leading: AppButton(
+                    'Add a file',
+                    leading: 'doc',
+                    onPressed: browse,
+                  ),
                 ),
               ),
               const SizedBox(height: 4),

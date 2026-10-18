@@ -43,7 +43,7 @@ class PhonePageHeader extends StatelessWidget {
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: Sizes.header),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
             if (onBack case final onBack?)

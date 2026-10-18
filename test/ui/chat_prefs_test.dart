@@ -32,9 +32,14 @@ void main() {
     h.shell.openSettings(SettingsPage.chat);
     await tester.pumpAndSettle();
     expect(control('Follow a streaming answer'), findsOneWidget);
+    // Each switch says what it does under its name.
+    expect(
+      find.text('Keeps the newest words in view while an answer is written.'),
+      findsOneWidget,
+    );
     // Reasoning opens from an answer's More menu only.
     expect(control('Show reasoning open'), findsNothing);
-    expect(control('Send dictation when I stop talking'), findsNothing);
+    expect(control('Send when I stop talking'), findsNothing);
     expect(control('Read answers aloud'), findsNothing);
     expect(control('Spellcheck the message'), findsNothing);
     await tester.tap(control('Follow a streaming answer'));

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:cross_file/cross_file.dart';
 import 'package:file_picker/file_picker.dart';
@@ -22,6 +23,7 @@ import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/fields.dart';
+import '../widgets/rise.dart';
 import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
 import '../widgets/segmented.dart';
@@ -296,7 +298,7 @@ class _ComposerState extends State<Composer> {
       builder: (context, popup, child) => PopupSheet(
         open: popup == Popup.attach,
         onClose: close,
-        title: _shortcutsTab ? 'Shortcuts' : 'Attach',
+        title: 'Add to your message',
         sheet: (context) => Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -307,30 +309,37 @@ class _ComposerState extends State<Composer> {
               value: _shortcutsTab,
               onChanged: (show) => setState(() => _shortcutsTab = show),
             ),
-            if (_shortcutsTab)
-              _ShortcutPicker(
-                onSelect: _selectShortcut,
-                onManage: () {
-                  close();
-                  shell.openSettings(SettingsPage.shortcuts);
-                },
-              )
-            else
-              AttachSheet(
-                attached: _attached,
-                onRemove: _remove,
-                onPhotos: photos == null
-                    ? null
-                    : () => _pickWith(photos.choose, 'The photos did not open'),
-                onCamera: photos == null
-                    ? null
-                    : () => _pickWith(
-                        () async => [?await photos.take()],
-                        'The camera did not open',
-                      ),
-                onFiles: _attach,
-                onDone: close,
-              ),
+            AnimatedSize(
+              duration: motion(context, const Duration(milliseconds: 180)),
+              curve: Curves.easeOut,
+              alignment: Alignment.topCenter,
+              child: _shortcutsTab
+                  ? _ShortcutPicker(
+                      onSelect: _selectShortcut,
+                      onManage: () {
+                        close();
+                        shell.openSettings(SettingsPage.shortcuts);
+                      },
+                    )
+                  : AttachSheet(
+                      attached: _attached,
+                      onRemove: _remove,
+                      onPhotos: photos == null
+                          ? null
+                          : () => _pickWith(
+                              photos.choose,
+                              'The photos did not open',
+                            ),
+                      onCamera: photos == null
+                          ? null
+                          : () => _pickWith(
+                              () async => [?await photos.take()],
+                              'The camera did not open',
+                            ),
+                      onFiles: _attach,
+                      onDone: close,
+                    ),
+            ),
           ],
         ),
         child: child!,
@@ -572,8 +581,6 @@ class _Form extends StatelessWidget {
     final here = chat.answeringHere;
     final hint = here
         ? 'Answering…'
-        : chat.workspaceAnswering
-        ? 'Another chat in this workspace is still answering…'
         : switch (scope.sources.chatMode.value) {
             ChatMode.automatic || ChatMode.chat => 'Ask anything…',
             ChatMode.query || null => 'Ask about your files…',
@@ -668,6 +675,17 @@ class _Form extends StatelessWidget {
         ),
     ];
 
+    // One line of the field: its text's line and its padding, at least a button's 48.
+    final line = math.max(
+      48.0,
+      MediaQuery.textScalerOf(context).scale(Type.chat) * Type.textAreaLine +
+          24,
+    );
+    Widget oneLine(Widget button) => SizedBox(
+      height: line,
+      child: Center(child: button),
+    );
+
     final card = AnswerFromAnchor(
       onPickModel: () {
         if (!picking) onPickModel();
@@ -732,16 +750,20 @@ class _Form extends StatelessWidget {
                 ],
               ),
             ),
-            // One line to start with, growing with the message up to 156.
+            // One line to start with, growing with the message up to 156. The buttons sit at the
+            // foot, each centred on one line of the field, which is taller than 48 once the
+            // text is large, so they stay level with the first line's words.
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                IconBtn(
-                  'plus',
-                  tooltip: 'Add files or shortcuts to this message',
-                  onPressed: chat.busy ? null : onAttach,
-                  box: 48,
-                  size: IconSize.small,
+                oneLine(
+                  IconBtn(
+                    'plus',
+                    tooltip: 'Add files or shortcuts to this message',
+                    onPressed: chat.busy ? null : onAttach,
+                    box: 48,
+                    size: IconSize.small,
+                  ),
                 ),
                 Expanded(
                   child: ConstrainedBox(
@@ -800,35 +822,39 @@ class _Form extends StatelessWidget {
                   ),
                 ),
                 if (onDictate != null)
-                  IconBtn(
-                    'mic',
-                    tooltip: listening ? 'Stop dictating' : 'Dictate',
-                    active: listening,
-                    onPressed: chat.busy ? null : onDictate,
-                    box: 48,
-                    size: IconSize.small,
+                  oneLine(
+                    IconBtn(
+                      'mic',
+                      tooltip: listening ? 'Stop dictating' : 'Dictate',
+                      active: listening,
+                      onPressed: chat.busy ? null : onDictate,
+                      box: 48,
+                      size: IconSize.small,
+                    ),
                   ),
                 // The round button is 40 across in a 48 square, as the Lite prototype draws it.
-                Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: here
-                      ? RoundButton(
-                          label: 'Stop the answer',
-                          color: t.ink,
-                          onTap: chat.stop,
-                          child: const StopMark(),
-                        )
-                      : RoundButton(
-                          label: 'Send',
-                          // Send keeps the accent, as the Lite prototype draws it.
-                          color: t.accent,
-                          onTap: sendable ? send : null,
-                          child: AppIcon(
-                            'send',
-                            size: IconSize.small,
-                            color: t.onaccent,
+                oneLine(
+                  Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: here
+                        ? RoundButton(
+                            label: 'Stop the answer',
+                            color: t.ink,
+                            onTap: chat.stop,
+                            child: const StopMark(),
+                          )
+                        : RoundButton(
+                            label: 'Send',
+                            // Send keeps the accent, as the Lite prototype draws it.
+                            color: t.accent,
+                            onTap: sendable ? send : null,
+                            child: AppIcon(
+                              'send',
+                              size: IconSize.small,
+                              color: t.onaccent,
+                            ),
                           ),
-                        ),
+                  ),
                 ),
               ],
             ),
@@ -906,7 +932,6 @@ class _ShortcutRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => CardRow(
     shortcut.label,
-    icon: 'slash',
     large: large,
     heard: '${shortcut.label}, /${shortcut.name}. Add to the message',
     trailing: Text(
@@ -942,7 +967,18 @@ class _ShortcutPicker extends StatelessWidget {
             ])
           else
             const HelpText('No shortcuts are available yet.'),
-          CardRow('Edit shortcuts', icon: 'pencil', onTap: onManage),
+          FieldCard([
+            CardRow(
+              'Edit shortcuts',
+              icon: 'pencil',
+              onTap: onManage,
+              trailing: AppIcon(
+                'chevron',
+                size: IconSize.xs,
+                color: Tokens.of(context).muted,
+              ),
+            ),
+          ]),
         ],
       ),
     );

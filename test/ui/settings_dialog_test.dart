@@ -68,6 +68,11 @@ void main() {
     await tapVisible(tester, find.text('Privacy and data'));
     await tester.pumpAndSettle();
     expect(h.shell.settingsPage, SettingsPage.privacy);
+    // What each provider shows starts where its name does, as the telemetry line's does.
+    expect(
+      tester.getTopLeft(find.textContaining('Runs on the server').first).dx,
+      tester.getTopLeft(find.text('Document search model')).dx,
+    );
     await tester.tap(find.byTooltip('Back to Server'));
     await tester.pumpAndSettle();
     expect(h.shell.settingsPage, SettingsPage.server);

@@ -1,3 +1,4 @@
+import 'package:anywherellm/ui/task_sheet.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/toolkit.dart';
 import 'package:anywherellm/core/ports.dart';
@@ -99,5 +100,47 @@ void main() {
     expect(h.toolkit.available, isTrue);
     expect(find.text('Upcoming'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('an empty Upcoming says what a task is and makes one', (
+    tester,
+  ) async {
+    final toolkit = FakeToolkit()
+      ..served = {
+        ToolkitFeature.memories,
+        ToolkitFeature.jobs,
+        ToolkitFeature.jobsWrite,
+      };
+    final h = await pumpApp(
+      tester,
+      llm: planningServer(),
+      toolkitServer: toolkit,
+    );
+    h.shell.openToolkitPage(ToolkitPage.upcoming);
+    await tester.pumpAndSettle();
+    expect(find.text('No scheduled tasks'), findsOneWidget);
+    expect(
+      find.textContaining('such as a summary every morning'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('New task').last);
+    await tester.pumpAndSettle();
+    // The same sheet the plus opens.
+    expect(h.shell.popup.value, isA<TaskSheet>());
+  });
+
+  testWidgets('an empty Upcoming that is read only offers no New task', (
+    tester,
+  ) async {
+    final h = await pumpApp(
+      tester,
+      llm: planningServer(),
+      toolkitServer: FakeToolkit(),
+    );
+    h.shell.openToolkitPage(ToolkitPage.upcoming);
+    await tester.pumpAndSettle();
+    expect(find.text('No scheduled tasks'), findsOneWidget);
+    expect(find.text('Nothing is scheduled on your server.'), findsOneWidget);
+    expect(find.text('New task'), findsNothing);
   });
 }

@@ -227,16 +227,19 @@ void main() {
     );
 
     testWidgets(
-      'the box stays off while another chat of the workspace answers',
+      'another chat of the workspace takes a message while one answers',
       (tester) async {
-        final (h, _) = await answering(tester);
+        final (h, llm) = await answering(tester);
         await h.chat.open('priorities');
         await tester.pump(const Duration(milliseconds: 300));
-        expect(field(tester).enabled, isFalse);
-        expect(
-          field(tester).decoration!.hintText,
-          'Another chat in this workspace is still answering…',
-        );
+        expect(field(tester).enabled, isTrue);
+        expect(field(tester).decoration!.hintText, 'Ask anything…');
+        await tester.enterText(composerField, 'Second');
+        await tester.pump();
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(sent(llm, 'Second'), 1);
+        expect(h.chat.answeringHere, isTrue);
       },
     );
 

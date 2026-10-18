@@ -20,6 +20,8 @@ import 'rows.dart';
 import 'server_page.dart';
 import 'settings_pages.dart';
 import 'walkthrough.dart';
+import '../widgets/window_insets.dart';
+import '../widgets/scroll_fades.dart';
 
 /// Settings: its list over the chat, opened from the shelf's foot, in two groups, This app and
 /// AnythingLLM, whose Server row opens the Server page; a page shows over what showed. Each is
@@ -95,7 +97,11 @@ class _Frame extends StatelessWidget {
               : 'Back to ${page.parent?.label ?? 'Settings'}',
           onBack: shell.settingsBack,
         ),
-        Expanded(child: page == null ? const _Nav() : _PageView(page)),
+        Expanded(
+          child: ScrollFades(
+            child: page == null ? const _Nav() : _PageView(page),
+          ),
+        ),
       ],
     );
   }
@@ -117,7 +123,7 @@ class _Nav extends StatelessWidget {
       builder: (context, _) {
         final connection = settings.connection;
         final list = ListView(
-          padding: Sizes.pagePadding,
+          padding: Sizes.pageIn(context),
           children: [
             if (connection != null) const _ServerCard(),
             CardHeading('This app', top: connection != null ? 20 : 0),
@@ -295,17 +301,18 @@ class _PageView extends StatelessWidget {
     if (!firstRun) {
       return SingleChildScrollView(
         key: ValueKey(page),
-        padding: Sizes.pagePadding,
+        padding: Sizes.pageIn(context),
         child: column,
       );
     }
     // The first run is top-aligned and scrolls, so a short screen loses nothing. How connecting
     // works sits at the foot while there is room, and follows Connect where there is not.
-    const top = 56.0, bottom = 8.0;
+    const top = 56.0;
+    final bottom = 8.0 + WindowInsets.of(context).bottom;
     return LayoutBuilder(
       key: ValueKey(page),
       builder: (context, box) => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, top, 16, bottom),
+        padding: EdgeInsets.fromLTRB(16, top, 16, bottom),
         child: ConstrainedBox(
           constraints: BoxConstraints(
             minHeight: math.max(0, box.maxHeight - top - bottom),

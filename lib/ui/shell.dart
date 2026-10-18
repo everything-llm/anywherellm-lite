@@ -28,6 +28,7 @@ import 'state/shell_controller.dart';
 import 'tokens.dart';
 import 'widgets/basics.dart';
 import 'widgets/sheet.dart';
+import 'widgets/window_insets.dart';
 
 /// The window: the chat, which is the base screen; the chats as a shelf over it, with Settings
 /// at its foot; the workspace's pages or Upcoming over those; Settings, its list or a page, over
@@ -84,27 +85,30 @@ class AppShell extends StatelessWidget {
           Beside.passages => const PassagesPanel(),
           Beside.cited => const CitedPanel(),
         };
-        return _BackGuard(
-          popup: shell.popup,
-          open: topClose() != null,
-          onBack: () => topClose()?.call(),
-          onLeave: switch (scope.background) {
-            final background? => () => unawaited(background.leave()),
-            null => null,
-          },
-          child: CallbackShortcuts(
-            bindings: {
-              const SingleActivator(LogicalKeyboardKey.escape): () =>
-                  topClose()?.call(),
+        // WindowInsets holds the bars' insets from before any page is padded by them, for what
+        // reaches the window's edges: the scrims, the sheets and the shelf.
+        return WindowInsets(
+          child: _BackGuard(
+            popup: shell.popup,
+            open: topClose() != null,
+            onBack: () => topClose()?.call(),
+            onLeave: switch (scope.background) {
+              final background? => () => unawaited(background.leave()),
+              null => null,
             },
-            child: Focus(
-              autofocus: true,
-              // InkWell needs a Material above it, and the shell has no Scaffold.
-              child: Material(
-                color: t.bg,
-                child: _AboveKeyboard(
-                  // Clear of the status and navigation bars.
-                  child: SafeArea(
+            child: CallbackShortcuts(
+              bindings: {
+                const SingleActivator(LogicalKeyboardKey.escape): () =>
+                    topClose()?.call(),
+              },
+              child: Focus(
+                autofocus: true,
+                // InkWell needs a Material above it, and the shell has no Scaffold.
+                child: Material(
+                  color: t.bg,
+                  child: _AboveKeyboard(
+                    // Full window: each page keeps itself clear of the system bars, and what
+                    // reaches the window's edges, the scrims, sheets and shelf, covers them.
                     child: Stack(
                       children: [
                         // The chat stays built while it is off the screen, so a draft and a
@@ -118,7 +122,7 @@ class AppShell extends StatelessWidget {
                                 excluding: !chatShown,
                                 child: ColoredBox(
                                   color: t.bg,
-                                  child: const ChatView(),
+                                  child: const SafeArea(child: ChatView()),
                                 ),
                               ),
                             ),
@@ -131,16 +135,22 @@ class AppShell extends StatelessWidget {
                           Positioned.fill(
                             child: ColoredBox(
                               color: t.bg,
-                              child: const WorkspacePages(),
+                              child: const SafeArea(
+                                bottom: false,
+                                child: WorkspacePages(),
+                              ),
                             ),
                           ),
                         if (shell.toolkitPage case final page?)
                           Positioned.fill(
-                            child: switch (page) {
-                              ToolkitPage.upcoming => const UpcomingPage(),
-                              ToolkitPage.library => const LibraryPage(),
-                              ToolkitPage.activity => const ActivityPage(),
-                            },
+                            child: SafeArea(
+                              bottom: false,
+                              child: switch (page) {
+                                ToolkitPage.upcoming => const UpcomingPage(),
+                                ToolkitPage.library => const LibraryPage(),
+                                ToolkitPage.activity => const ActivityPage(),
+                              },
+                            ),
                           ),
                         // A deleted chat is put back from over the chat's composer.
                         if (!shell.settingsOpen) const _PhoneUndo(),
@@ -149,7 +159,12 @@ class AppShell extends StatelessWidget {
                         // Over the sheet, since a page opened from elsewhere, as a pairing
                         // link opens Connection, shows over what showed.
                         if (shell.settingsOpen)
-                          const Positioned.fill(child: SettingsDialog()),
+                          const Positioned.fill(
+                            child: SafeArea(
+                              bottom: false,
+                              child: SettingsDialog(),
+                            ),
+                          ),
                         // What another app shared, over everything but a popup.
                         if (shell.shared case final SharedPairing link)
                           Positioned.fill(
@@ -241,14 +256,15 @@ class _PhoneUndo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chat = AppScope.of(context).chat;
+    final bars = WindowInsets.of(context);
     return ListenableBuilder(
       listenable: chat,
       builder: (context, _) => chat.deletedChat == null
           ? const SizedBox.shrink()
           : Positioned(
-              left: 20,
-              right: 20,
-              bottom: 96,
+              left: 20 + bars.left,
+              right: 20 + bars.right,
+              bottom: 96 + bars.bottom,
               child: UndoBar(
                 'Chat deleted',
                 onUndo: chat.undoDelete,

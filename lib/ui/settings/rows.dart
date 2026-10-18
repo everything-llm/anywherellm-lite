@@ -41,7 +41,8 @@ class PanelCard extends StatelessWidget {
   }
 }
 
-/// A muted line of words in line with the cards' edges, 8 px in from the page's sides.
+/// A muted line of words in line with a [CardHeading] and the text of a card's rows, which is
+/// [FieldCard.inset] in from the card's sides.
 class CardCaption extends StatelessWidget {
   const CardCaption(this.text, {super.key});
 
@@ -49,7 +50,7 @@ class CardCaption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 8),
+    padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
     child: Text(text, style: Type.note(Tokens.of(context).muted)),
   );
 }
@@ -390,32 +391,17 @@ class InfoRow extends StatelessWidget {
   }
 }
 
-/// A row that only shows a [value], right-aligned, beside its [label].
+/// A row that only shows a [value] under its [label], left-aligned with the rows around it,
+/// which may take up to four lines.
 class ReadOnlyRow extends StatelessWidget {
-  const ReadOnlyRow({
-    super.key,
-    required this.label,
-    required this.value,
-    this.help = '',
-  });
+  const ReadOnlyRow({super.key, required this.label, required this.value});
 
   final String label;
   final String value;
-  final String help;
 
   @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return FieldRow(
-      label: label,
-      help: help,
-      control: Text(
-        value,
-        textAlign: TextAlign.end,
-        style: Type.sans(13.5, color: t.ink2, height: 1.45),
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      InfoRow(label, about: value, aboutLines: 4);
 }
 
 /// A line of muted text between a page's cards.
@@ -551,52 +537,81 @@ class SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    return PanelCard(
-      spacing: 8,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          spacing: 12,
-          children: [
-            Expanded(
-              child: Text(
-                title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Type.sans(19, weight: FontWeight.w500, color: t.ink),
-              ),
-            ),
-            ?trailing,
-          ],
-        ),
-        ...lines,
-        if (link case final link?)
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: cardDecoration(t),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           Padding(
-            padding: const EdgeInsets.only(top: 10),
-            child: Tappable(
-              label: link,
-              onTap: onLink,
-              dimWhenDisabled: 0.5,
-              child: Container(
-                constraints: const BoxConstraints(minHeight: 44),
-                padding: const EdgeInsets.only(top: 6),
-                alignment: Alignment.centerLeft,
-                decoration: BoxDecoration(
-                  border: Border(top: BorderSide(color: t.line2)),
+            // Less under the lines when a link follows, which has its own room.
+            padding: EdgeInsets.fromLTRB(
+              FieldCard.inset,
+              FieldCard.inset,
+              FieldCard.inset,
+              link == null ? FieldCard.inset : 12,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              spacing: 8,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  spacing: 12,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Type.sans(
+                          19,
+                          weight: FontWeight.w500,
+                          color: t.ink,
+                        ),
+                      ),
+                    ),
+                    ?trailing,
+                  ],
                 ),
-                child: Text(
-                  link,
-                  style: Type.sans(
-                    17,
-                    weight: FontWeight.w500,
-                    color: t.accent,
+                ...lines,
+              ],
+            ),
+          ),
+          if (link case final link?)
+            Ruled(
+              ruled: true,
+              child: Tappable(
+                label: link,
+                onTap: onLink,
+                dimWhenDisabled: 0.5,
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 56),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: FieldCard.inset,
+                  ),
+                  child: Row(
+                    spacing: 8,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          link,
+                          style: Type.sans(
+                            17,
+                            weight: FontWeight.w500,
+                            color: t.accent,
+                          ),
+                        ),
+                      ),
+                      AppIcon('chevron', size: IconSize.xs, color: t.accent),
+                    ],
                   ),
                 ),
               ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }

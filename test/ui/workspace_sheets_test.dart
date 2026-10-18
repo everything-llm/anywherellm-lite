@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+import 'package:anywherellm/ui/widgets/sheet.dart';
 import 'package:anywherellm/ui/workspace_sheets.dart';
 import 'package:anywherellm/ui/workspace_switcher.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,5 +44,53 @@ void main() {
     await tester.pumpAndSettle();
     expect(_fields, findsOneWidget);
     expect(_inSheet(find.text('Instructions')), findsNothing);
+  });
+
+  testWidgets('Create waits for a name instead of closing on nothing', (
+    tester,
+  ) async {
+    final llm = planningServer();
+    final h = await pumpApp(tester, llm: llm, shelf: true);
+    final before = h.chat.workspaces.length;
+    await _openNew(tester);
+    await tester.tap(find.text('Create'));
+    await tester.pumpAndSettle();
+    // Still open, and nothing made.
+    expect(find.byType(WorkspaceSheetView), findsOneWidget);
+    expect(h.chat.workspaces.length, before);
+    await tester.enterText(_fields.at(0), 'Recipes');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Create'));
+    await tester.pumpAndSettle();
+    expect(find.byType(WorkspaceSheetView), findsNothing);
+    expect(h.chat.active!.name, 'Recipes');
+  });
+
+  testWidgets('a sheet covers the system bars and keeps its words clear', (
+    tester,
+  ) async {
+    tester.view.padding = const FakeViewPadding(top: 24, bottom: 24);
+    addTearDown(tester.view.resetPadding);
+    await pumpApp(
+      tester,
+      llm: planningServer(),
+      size: const Size(360, 640),
+      shelf: true,
+    );
+    await _openNew(tester);
+    // The scrim and the sheet's ground reach the window's edges...
+    expect(
+      tester.getRect(find.byType(SheetFrame)),
+      const Rect.fromLTWH(0, 0, 360, 640),
+    );
+    // ...and the title and the button stay between the bars.
+    expect(
+      tester.getTopLeft(find.text('New workspace').last).dy,
+      greaterThanOrEqualTo(24),
+    );
+    expect(
+      tester.getBottomLeft(find.text('Create')).dy,
+      lessThanOrEqualTo(640 - 24),
+    );
   });
 }

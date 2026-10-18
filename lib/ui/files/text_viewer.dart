@@ -23,7 +23,7 @@ class TextViewer extends StatelessWidget {
     final file = scope.sources.files.where((f) => f.path == path).firstOrNull;
     final text = files.text;
     return ListView(
-      padding: Sizes.pagePadding,
+      padding: Sizes.pageIn(context),
       children: [
         if (file != null)
           Padding(

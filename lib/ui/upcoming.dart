@@ -79,12 +79,11 @@ class UpcomingPage extends StatelessWidget {
 
   Widget _body(BuildContext context, ToolkitController toolkit) {
     final scope = AppScope.of(context);
-    final t = Tokens.of(context);
     final jobs = toolkit.jobs;
     final now = DateTime.now();
     final writable = toolkit.jobsWritable;
     return ListView(
-      padding: Sizes.pagePadding,
+      padding: Sizes.pageIn(context),
       children: [
         if (toolkit.changeProblem case final problem?) ...[
           AlertBox.notice(AlertKind.bad, problem),
@@ -93,12 +92,7 @@ class UpcomingPage extends StatelessWidget {
         if (jobs == null || toolkit.jobsProblem != null)
           NotRead(toolkit.jobsProblem)
         else if (jobs.isEmpty)
-          Text(
-            writable
-                ? 'No scheduled tasks. Make one with +, or ask the agent to.'
-                : 'No scheduled jobs.',
-            style: Type.sans(14, color: t.muted),
-          )
+          _NoTasks(writable: writable)
         else
           // One card, a rule between its jobs, as the Lite prototype draws it.
           FieldCard([
@@ -179,6 +173,66 @@ class _JobRow extends StatelessWidget {
             padding: const EdgeInsets.only(right: 20),
             child: AppIcon('chevron', size: IconSize.xs, color: t.muted),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// What shows before anything is scheduled: a clock, what a task is, and where a task is made
+/// from, so the empty page says what to do rather than only that there is nothing.
+class _NoTasks extends StatelessWidget {
+  const _NoTasks({required this.writable});
+
+  /// Whether tasks can be made here, which adds a New task button.
+  final bool writable;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final shell = AppScope.of(context).shell;
+    return Padding(
+      padding: const EdgeInsets.only(top: 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        spacing: 12,
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: t.accentbg,
+              shape: BoxShape.circle,
+            ),
+            child: AppIcon('clock', size: IconSize.large, color: t.accent),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'No scheduled tasks',
+            textAlign: TextAlign.center,
+            style: Type.sans(19, weight: FontWeight.w500, color: t.ink),
+          ),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: Text(
+              writable
+                  ? 'A task runs on a schedule, such as a summary every morning. '
+                        'Make one here, or ask the agent to.'
+                  : 'Nothing is scheduled on your server.',
+              textAlign: TextAlign.center,
+              style: Type.sans(14.5, color: t.muted, height: 1.5),
+            ),
+          ),
+          if (writable) ...[
+            const SizedBox(height: 8),
+            AppButton(
+              'New task',
+              primary: true,
+              leading: 'plus',
+              onPressed: () => shell.togglePopup(const TaskSheet()),
+            ),
+          ],
         ],
       ),
     );

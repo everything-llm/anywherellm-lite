@@ -11,6 +11,7 @@ import 'type.dart';
 import 'settings/rows.dart';
 import 'widgets/basics.dart';
 import 'widgets/tappable.dart';
+import 'widgets/scroll_fades.dart';
 
 /// The shelf's title: the open workspace's name at 26 and a chevron, which open the
 /// Workspaces sheet. Its documents are heard, not shown.
@@ -91,23 +92,26 @@ class WorkspaceMenu extends StatelessWidget {
     );
     final list = ConstrainedBox(
       constraints: const BoxConstraints(maxHeight: 400),
-      child: ReorderableListView.builder(
-        shrinkWrap: true,
-        // The row starts a drag, not a handle beside it.
-        buildDefaultDragHandles: false,
-        itemCount: ordered.length,
-        onReorderItem: (from, to) {
-          final slugs = [for (final w in ordered) w.slug];
-          slugs.insert(to, slugs.removeAt(from));
-          scope.prefs.setWorkspaceOrder(slugs);
-        },
-        // The dragged row is drawn in the app's overlay, outside AppScope, so it is shown as
-        // a name alone.
-        proxyDecorator: (child, i, animation) => _DragGhost(ordered[i].name),
-        itemBuilder: (context, i) => _WorkspaceItem(
-          ordered[i],
-          key: ValueKey(ordered[i].slug),
-          index: i,
+      // A card in a sheet is the page's own ground, which the fades blend into.
+      child: ScrollFades(
+        child: ReorderableListView.builder(
+          shrinkWrap: true,
+          // The row starts a drag, not a handle beside it.
+          buildDefaultDragHandles: false,
+          itemCount: ordered.length,
+          onReorderItem: (from, to) {
+            final slugs = [for (final w in ordered) w.slug];
+            slugs.insert(to, slugs.removeAt(from));
+            scope.prefs.setWorkspaceOrder(slugs);
+          },
+          // The dragged row is drawn in the app's overlay, outside AppScope, so it is shown as
+          // a name alone.
+          proxyDecorator: (child, i, animation) => _DragGhost(ordered[i].name),
+          itemBuilder: (context, i) => _WorkspaceItem(
+            ordered[i],
+            key: ValueKey(ordered[i].slug),
+            index: i,
+          ),
         ),
       ),
     );

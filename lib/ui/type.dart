@@ -40,6 +40,10 @@ abstract final class Type {
   static TextStyle textArea(double size, Color color) =>
       sans(size, color: color, height: textAreaLine);
 
+  /// [textArea] in the mono face, for text that reads as code or markup, such as a prompt.
+  static TextStyle textAreaMono(double size, Color color) =>
+      mono(size, color: color, height: textAreaLine);
+
   /// The size of what is said in a chat, before the person's Chat text size and the system's:
   /// Material's body large, with its line 1.6, which keeps the pitch the chat had at 15.5.
   static const chat = 16.0;

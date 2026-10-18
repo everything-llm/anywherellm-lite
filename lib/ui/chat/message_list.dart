@@ -35,6 +35,7 @@ import 'generated_files.dart';
 import 'passages_sheet.dart';
 import 'speaker.dart';
 import 'wait_line.dart';
+import '../widgets/scroll_fades.dart';
 
 /// The chat on screen, newest at the bottom. Empty, it invites a first question.
 ///
@@ -129,6 +130,9 @@ class _MessageListState extends State<MessageList> {
     final workspace = chat.active;
     final turns = chat.turns;
     if (workspace == null) return const SizedBox.shrink();
+    // The turns are built once below and held, so the list is built again, and they with it,
+    // when the system's text size changes while the chat shows.
+    MediaQuery.textScalerOf(context);
     _follow(chat);
     if (turns.isEmpty) {
       return _Empty(workspace: workspace.name);
@@ -197,7 +201,7 @@ class _MessageListState extends State<MessageList> {
       alignment: Alignment.topCenter,
       child: NotificationListener<Notification>(
         onNotification: _onScroll,
-        child: list,
+        child: ScrollFades(child: list),
       ),
     );
     // MessageList is built afresh as the chat changes, so this follows refreshing.
@@ -463,9 +467,9 @@ class _Empty extends StatelessWidget {
                     constraints: const BoxConstraints(minHeight: 44),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
+                      // The chevron sits against the name, so it reads as part of what opens.
                       children: [
-                        const SizedBox(width: 22),
-                        Expanded(
+                        Flexible(
                           child: Text(
                             workspace,
                             maxLines: 1,
@@ -474,7 +478,7 @@ class _Empty extends StatelessWidget {
                             style: titleStyle,
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         AppIcon(
                           'down',
                           size: IconSize.row,
@@ -789,7 +793,12 @@ class _Answer extends StatelessWidget {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 if (answered)
-                  CopyButton(split.answer, tooltip: 'Copy answer', box: action),
+                  CopyButton(
+                    split.answer,
+                    tooltip: 'Copy answer',
+                    box: action,
+                    size: answerActionIcon,
+                  ),
                 if (AppScope.of(context).readAloud case final aloud?
                     when answered)
                   _ReadAloudButton(aloud, turn),
@@ -799,7 +808,7 @@ class _Answer extends StatelessWidget {
                     tooltip: retry.tooltip,
                     onPressed: retry.onPressed,
                     box: action,
-                    size: IconSize.xs,
+                    size: answerActionIcon,
                   ),
                 if (turn.metrics case final metrics?) AnswerMore(turn, metrics),
                 // In Agent mode the server may go on to finish the answer and save it, which
@@ -835,7 +844,7 @@ class _ReadAloudButton extends StatelessWidget {
         tooltip: reading ? 'Stop reading' : 'Read aloud',
         onPressed: () => aloud.toggle(turn),
         box: answerAction,
-        size: IconSize.xs,
+        size: answerActionIcon,
       );
     },
   );
@@ -1029,9 +1038,10 @@ class _CitationState extends State<_Citation> {
           ? null
           : () => openLink(context, url.toString()),
       radius: BorderRadius.circular(99),
-      // A chip is the panel's colour, outlined, as the Lite prototype draws it.
+      // A chip is the panel's colour, outlined, as the Lite prototype draws it. One that opens
+      // nothing, as a file since removed, is fainter all through, not only in its number.
       color: t.panel,
-      side: BorderSide(color: t.edge),
+      side: BorderSide(color: live ? t.edge : t.line),
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 36),
         child: Padding(
@@ -1049,7 +1059,7 @@ class _CitationState extends State<_Citation> {
                     url?.host ?? title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Type.sans(13.5, color: t.ink2),
+                    style: Type.sans(13.5, color: live ? t.ink2 : t.muted),
                   ),
                 ),
               ),

@@ -16,6 +16,9 @@ import '../widgets/sheet.dart';
 /// sets the buttons side by side.
 const answerAction = 44.0;
 
+/// The size of an answer's action icons: Copy, Read aloud, Retry and More.
+const answerActionIcon = IconSize.normal;
+
 /// More, under a finished answer the server measured: its sheet, This answer, names the
 /// answer's model, time, tokens, speed and cost, as far as [metrics] has them, then Show
 /// details under every answer, [ChatSwitch.answerDetails]. With that switch on, the whole line
@@ -75,7 +78,7 @@ class _AnswerMoreState extends State<AnswerMore> {
           filled: open,
           onPressed: () => shell.togglePopup(widget.turn),
           box: answerAction,
-          size: IconSize.xs,
+          size: answerActionIcon,
         );
         return Row(
           mainAxisSize: MainAxisSize.min,

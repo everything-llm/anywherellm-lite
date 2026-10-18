@@ -207,7 +207,7 @@ void main() {
     await h.chat.select('household');
     h.shell.showPane(Pane.files);
     await tester.pumpAndSettle();
-    await tapVisible(tester, control('Memory, What chats are shown'));
+    await tapVisible(tester, control('Memory, What chats are told about you'));
     await tester.pumpAndSettle();
     expect(_inPage(find.text('The boiler is from 2019.')), findsOneWidget);
   });

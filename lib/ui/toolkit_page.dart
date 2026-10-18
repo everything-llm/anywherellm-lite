@@ -10,6 +10,7 @@ import 'type.dart';
 import 'widgets/basics.dart';
 import 'widgets/buttons.dart';
 import 'widgets/phone_page.dart';
+import 'widgets/scroll_fades.dart';
 
 /// A page of what the toolkit adds over the chat, such as Library: its title under a round
 /// Back, [action] at the end, and [body] below. It runs [read] once as it opens, so what it shows
@@ -67,7 +68,7 @@ class _ToolkitPageFrameState extends State<ToolkitPageFrame> {
             onBack: shell.closeToolkitPage,
             action: widget.action,
           ),
-          Expanded(child: widget.body),
+          Expanded(child: ScrollFades(child: widget.body)),
         ],
       ),
     );

@@ -311,4 +311,22 @@ $$\frac{a}{b}$$
     await llm.chat!.close();
     await tester.pump(const Duration(milliseconds: 100));
   });
+
+  testWidgets(
+    'an answer follows the system text size changing while it shows',
+    (tester) async {
+      final dispatcher =
+          TestWidgetsFlutterBinding.ensureInitialized().platformDispatcher;
+      addTearDown(dispatcher.clearTextScaleFactorTestValue);
+      await pumpApp(tester, llm: answering('Hello there my friend'));
+      await tester.pumpAndSettle();
+      final answer = find.byWidgetPredicate(
+        (w) => w is EditableText && w.controller.text.contains('Hello there'),
+      );
+      final before = tester.getSize(answer.first);
+      dispatcher.textScaleFactorTestValue = 1.6;
+      await tester.pumpAndSettle();
+      expect(tester.getSize(answer.first).height, greaterThan(before.height));
+    },
+  );
 }

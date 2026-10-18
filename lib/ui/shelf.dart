@@ -92,17 +92,25 @@ class _ChatsShelfState extends State<ChatsShelf>
                       shell.closeShelf();
                     }
                   },
+                  // The shelf runs the window's full height, behind the bars, and keeps its
+                  // rows clear of them. Its edge is ruled so it stands off the dimmed chat.
                   child: Material(
                     color: t.bg,
-                    borderRadius: corner,
                     clipBehavior: Clip.antiAlias,
                     elevation: 0,
-                    child: const Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(child: ChatsList()),
-                        _SettingsFoot(),
-                      ],
+                    shape: RoundedRectangleBorder(
+                      borderRadius: corner,
+                      side: BorderSide(color: t.line2),
+                    ),
+                    child: const SafeArea(
+                      right: false,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(child: ChatsList()),
+                          _SettingsFoot(),
+                        ],
+                      ),
                     ),
                   ),
                 ),

@@ -17,6 +17,7 @@ import 'section_view.dart';
 import 'save_file.dart';
 import '../settings/rows.dart';
 import '../settings/settings_pages.dart';
+import '../widgets/scroll_fades.dart';
 
 /// Closes the document's text shown, giving back the Documents sheet when the text was opened
 /// from it.
@@ -122,11 +123,13 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                   child: AlertBox.notice(AlertKind.bad, problem),
                 ),
               Expanded(
-                child: workspace == null
-                    ? const Blank('No workspace is open.')
-                    : reading != null || page != null
-                    ? workspaceSection(context)
-                    : _overview(context, workspace.name),
+                child: ScrollFades(
+                  child: workspace == null
+                      ? const Blank('No workspace is open.')
+                      : reading != null || page != null
+                      ? workspaceSection(context)
+                      : _overview(context, workspace.name),
+                ),
               ),
             ],
           ),
@@ -157,7 +160,7 @@ class _WorkspacePagesState extends State<WorkspacePages> {
         final prompt = _files.detail(slug)?.prompt?.trim();
         final mode = scope.sources.chatMode.value;
         return ListView(
-          padding: Sizes.pagePadding,
+          padding: Sizes.pageIn(context),
           children: [
             SummaryCard(
               title: name,
@@ -205,7 +208,7 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                 NavRow(
                   icon: 'memory',
                   title: 'Memory',
-                  about: 'What chats are shown',
+                  about: 'What chats are told about you',
                   onTap: () {
                     scope.memory.show(slug);
                     shell.openSettings(SettingsPage.memory);

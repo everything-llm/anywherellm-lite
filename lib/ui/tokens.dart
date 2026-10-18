@@ -32,6 +32,8 @@ class Tokens extends ThemeExtension<Tokens> {
     required this.shadow,
     required this.bubble,
     required this.off,
+    required this.chosen,
+    required this.knob,
   });
 
   final Color bg;
@@ -68,6 +70,13 @@ class Tokens extends ThemeExtension<Tokens> {
   /// A switch that is off, and a send button with nothing to send.
   final Color off;
 
+  /// The fill of the chosen segment of a segmented control: lighter than the [hover] track it
+  /// sits in, in light and dark alike.
+  final Color chosen;
+
+  /// The knob of a switch that is off: light against [off] in light and dark alike.
+  final Color knob;
+
   static final light = Tokens(
     bg: oklch(0.982, 0.008, 75),
     side: oklch(0.958, 0.013, 75),
@@ -95,6 +104,8 @@ class Tokens extends ThemeExtension<Tokens> {
     shadow: oklch(0.35, 0.04, 280, 0.14),
     bubble: oklch(0.945, 0.026, 272),
     off: oklch(0.84, 0.012, 75),
+    chosen: oklch(0.995, 0.003, 75),
+    knob: oklch(0.995, 0.003, 75),
   );
 
   static final dark = Tokens(
@@ -124,6 +135,8 @@ class Tokens extends ThemeExtension<Tokens> {
     shadow: oklch(0, 0, 0, 0.35),
     bubble: oklch(0.31, 0.04, 272),
     off: oklch(0.42, 0.02, 280),
+    chosen: oklch(0.4, 0.03, 280),
+    knob: oklch(0.81, 0.014, 75),
   );
 
   static Tokens of(BuildContext context) =>

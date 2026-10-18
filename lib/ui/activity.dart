@@ -99,7 +99,7 @@ class _ActivityPageState extends State<ActivityPage> {
       days.putIfAbsent(dayText(e.at, now), () => []).add(e);
     }
     return ListView(
-      padding: Sizes.pagePadding,
+      padding: Sizes.pageIn(context),
       children: [
         if (events == null || toolkit.activityProblem != null)
           NotRead(toolkit.activityProblem)

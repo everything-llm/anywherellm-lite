@@ -609,8 +609,10 @@ void main() {
       tester.getTopLeft(find.byType(ChatsList)).dy,
       greaterThanOrEqualTo(24),
     );
+    // The shelf runs behind the bars, and its last row stays clear of the bottom one.
+    expect(tester.getBottomLeft(find.byType(ChatsShelf)).dy, 640);
     expect(
-      tester.getBottomLeft(find.byType(ChatsShelf)).dy,
+      tester.getBottomLeft(find.text('Settings')).dy,
       lessThanOrEqualTo(640 - 24),
     );
   });

@@ -70,10 +70,20 @@ class AttachSheet extends StatelessWidget {
             ]),
           FieldCard([
             if (onPhotos case final onPhotos?)
-              CardRow('Photo library', onTap: onPhotos, trailing: plus),
+              CardRow(
+                'Photo library',
+                icon: 'image',
+                onTap: onPhotos,
+                trailing: plus,
+              ),
             if (onCamera case final onCamera?)
-              CardRow('Take a photo', onTap: onCamera, trailing: plus),
-            CardRow('Files', onTap: onFiles, trailing: plus),
+              CardRow(
+                'Take a photo',
+                icon: 'camera',
+                onTap: onCamera,
+                trailing: plus,
+              ),
+            CardRow('Files', icon: 'attach', onTap: onFiles, trailing: plus),
           ]),
           ActionRow(even: true, [
             AppButton('Done', primary: true, onPressed: onDone),
