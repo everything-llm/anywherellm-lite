@@ -20,34 +20,42 @@ import 'package:flutter_test/flutter_test.dart';
 /// Each picture's side in pixels, and the mark's own box.
 const _side = 1024.0;
 
-/// The middle of the bird's outline on the mark's box, which each picture centres.
-const _middle = Offset(498, 507);
+/// The middle of the mark's box, which the master tile centres the bird on: [RobinMark] already
+/// places the bird as that tile does, optical offset included.
+const _centre = Offset(512, 512);
+
+/// The middle of the bird's outline on the mark's box, which the notification icon centres,
+/// since it has the bird alone and no tile to place it on.
+const _outlineMiddle = Offset(521, 500);
 
 /// The splash's tile: its side and its corner radius, as the design's icon tile rounds it.
 const _tile = 640.0;
 const _tileRadius = 0.225 * _tile;
 
-/// The bird at [scale] of the mark's box, its middle on the picture's.
+/// The bird at [scale] of the mark's box, its [middle] on the picture's.
 class _Bird extends StatelessWidget {
-  const _Bird(this.scale);
+  const _Bird(this.scale, {this.middle = _centre});
 
   final double scale;
+  final Offset middle;
 
   @override
   Widget build(BuildContext context) => Transform(
     transform: Matrix4.identity()
       ..translateByDouble(_side / 2, _side / 2, 0, 1)
       ..scaleByDouble(scale, scale, 1, 1)
-      ..translateByDouble(-_middle.dx, -_middle.dy, 0, 1),
+      ..translateByDouble(-middle.dx, -middle.dy, 0, 1),
     child: const RobinMark(size: _side, color: iconInk),
   );
 }
 
-/// The legacy launcher icon and the web icons: the bird on a square of the ground.
-const _icon = ColoredBox(color: iconGround, child: _Bird(0.8));
+/// The legacy launcher icon and the web icons: the master tile, the bird on a square of the
+/// ground at 76% of its width.
+const _icon = ColoredBox(color: iconGround, child: _Bird(1));
 
-/// The adaptive icon's foreground, inside the circle every launcher's mask keeps.
-const _foreground = _Bird(0.66);
+/// The adaptive icon's foreground, inside the circle every launcher's mask keeps: the master
+/// tile at 72 of the layer's 108 dp.
+const _foreground = _Bird(72 / 108);
 
 /// The launch screen: the bird on a rounded tile of the ground.
 final _splash = Stack(
@@ -62,7 +70,7 @@ final _splash = Stack(
         ),
       ),
     ),
-    const _Bird(0.5),
+    const _Bird(_tile / _side),
   ],
 );
 
@@ -121,7 +129,7 @@ void main() {
         in _notificationSides.entries) {
       await _draw(
         tester,
-        const _Bird(0.9),
+        const _Bird(0.9, middle: _outlineMiddle),
         'android/app/src/main/res/drawable-$density/ic_notification.png',
         side: side,
       );

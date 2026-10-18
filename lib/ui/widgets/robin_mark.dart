@@ -1,18 +1,24 @@
 import 'package:flutter/widgets.dart';
 import 'package:path_drawing/path_drawing.dart';
 
-// The bird with an angular tail and no spike, from the logo study "AnywhereLLM Ribbon Trim",
-// in its own units; [_place] puts it on the 1024 unit box.
+// The bird of the "AnywhereLLM Icon" artifact's variant C: an even line weight, an open wing
+// gap and every straight edge on the 60 degree grid, in its own units; [_place] puts it on the
+// 1024 unit box as that artifact's master tile does.
 const _body =
-    'M 507,715 L 441,599 V 562 L 481,492 H 629 L 600.5,542 H 510 L 491,575 V 585 L 536,665 H 588 L 759,365 C 787,316 823,282 867,282 C 899,282 925,294 952,314 L 1045,375 L 1007,417 V 450 H 956 L 917,510 V 424 C 917,391 898,368 869,368 C 847,368 830,380 816,404 L 641,715 Z';
+    'M 766.9,365 C 794.9,316.5 823,282 867,282 C 899,282 925,294 952,314 L 1045,375 L 1007,417 V 450 H 956 L 917,510 V 424 C 917,391 898,368 869,368 C 847,368 830,380 816,404 L 636.4,715 L 564.9,715 L 508,715 L 441,599 L 441,562 L 481.4,492 L 635.9,492 L 600.1,554 L 517.2,554 L 503,578.6 L 503,582.4 L 543.8,653 L 600.6,653 Z';
 const _belly =
-    'M 734.3,587.2 C 759.3,606.5 798.0,623.2 825.0,621.9 C 867.0,618.1 906.0,561.5 917.0,510.0 L 956.0,450.0 L 1007.0,450.0 L 1007.0,500.0 C 1007.0,614.2 916.0,703.0 831.0,703.0 C 786.0,703.0 721.8,682.4 689.8,654.1 Z';
+    'M 736.8,589.1 C 761.9,607.6 798.9,623.2 825,621.9 C 867,618.1 906,561.5 917,510 L 956,450 L 1007,450 L 1007,500 C 1007,614.2 916,703 831,703 C 788.9,703 729.9,684.9 696.3,659.4 Z';
 const _breast =
-    'M 956.0,450.0 L 1007.0,450.0 L 1007.0,500.0 C 1007.0,614.2 916.0,703.0 831.0,703.0 C 817.0,703.0 804.0,701.7 791.0,697.9 L 825.0,621.9 C 867.0,618.1 906.0,561.5 917.0,510.0 Z';
+    'M 830.4,621.1 C 870.3,613.3 906.5,559.3 917,510 L 956,450 L 1007,450 L 1007,500 C 1007,614.2 916,703 831,703 C 817.4,703 801.9,701.1 786.2,697.7 Z';
 
-/// The bird's units on the 1024 unit box: centred, at 1.25562 of its size.
+/// The bird's units on the 1024 unit box, as the master tile places them: at 1.25562 of their
+/// size, then shrunk to 0.985 about the middle and moved 14 right and 6 down.
 final _place =
     (Matrix4.identity()
+          ..translateByDouble(14, 6, 0, 1)
+          ..translateByDouble(512, 512, 0, 1)
+          ..scaleByDouble(0.985, 0.985, 1, 1)
+          ..translateByDouble(-512, -512, 0, 1)
           ..translateByDouble(512, 512, 0, 1)
           ..scaleByDouble(1.25562, 1.25562, 1, 1)
           ..translateByDouble(-747.03, -513.06, 0, 1))
@@ -36,10 +42,10 @@ final _paths = (
       (Path()
             ..fillType = PathFillType.evenOdd
             ..addOval(
-              Rect.fromCircle(center: const Offset(875, 408), radius: 22),
+              Rect.fromCircle(center: const Offset(875, 408), radius: 27),
             )
             ..addOval(
-              Rect.fromCircle(center: const Offset(882, 401), radius: 7.5),
+              Rect.fromCircle(center: const Offset(884.3, 398.7), radius: 10),
             ))
           .transform(_place),
 );
