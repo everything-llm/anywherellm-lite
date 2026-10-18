@@ -1,14 +1,14 @@
 # The walk `audit.py` makes of the app, in order. Each [[step]] launches the app afresh (the fakes
 # are in memory, so every launch starts from the same sample data), runs the actions of the start
 # its `from` names, then its own `do` actions, and takes a screenshot at the end, or at each
-# `shot`. A control is found by its accessibility label, or an empty field by its hint:
-# `uv run tool/audit/audit.py --try "tap Chats; tap Settings"` prints the labels it finds.
+# `shot`, once in each theme. A control is found by its accessibility label, or an empty field
+# by its hint: `uv run tool/audit/audit.py --try "tap Chats; tap Settings"` prints the labels it
+# finds.
 #
 #   tap LABEL        tap the control whose label is LABEL (exact, then ignoring case, then as a
 #                    start, then as a part); scrolls up to four times to find it
 #   hold LABEL       long press
 #   type TEXT        type into the focused field
-#   key NAME         back, enter, left, right, up, down
 #   swipe WAY        up, down, left or right across the middle of the screen
 #   wait LABEL       wait until LABEL shows
 #   sleep SECONDS
@@ -320,9 +320,11 @@ do = [
   "tap How connecting works",
   "sleep 1",
   "shot 1",
-  "key right",
+  "tap Begin",
+  "wait 2 of 3",
   "shot 2",
-  "key right",
+  "tap Continue",
+  "wait 3 of 3",
   "shot 3",
 ]
 

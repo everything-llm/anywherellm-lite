@@ -5,10 +5,10 @@
 """Walks AnywhereLLM Lite on an Android emulator and packages what it saw for auditing.
 
 It builds `tool/audit_app.dart` (the real UI over the test fakes and the prototype's sample
-data), installs it, then runs the steps in `steps.toml` once per theme: each step launches the
-app, taps through it by accessibility label, and takes screenshots. The result is a folder and
-a zip holding the screenshots, each screen's UI dump, the log lines each step produced, a
-manifest and an `index.html` contact sheet.
+data), installs it, then runs the steps in `steps.toml`: each step launches the app, taps
+through it by accessibility label, and takes each screenshot once in each theme, switching the
+device's theme there. The result is a folder and a zip holding the screenshots, each screen's
+UI dump, the log lines each step produced, a manifest and an `index.html` contact sheet.
 
     uv run tool/audit/audit.py                 # reuse a running emulator, or boot one
     uv run tool/audit/audit.py --only chat     # steps whose name or group matches
@@ -38,7 +38,6 @@ PACKAGE = "local.anywherellm.lite"
 ENTRYPOINT = "tool/audit_app.dart"
 APK = ROOT / "build/app/outputs/flutter-apk/app-debug.apk"
 SCALES = ("window_animation_scale", "transition_animation_scale", "animator_duration_scale")
-KEYS = {"back": 4, "enter": 66, "right": 22, "left": 21, "down": 20, "up": 19}
 # Lines in the log that an audit reader wants to see.
 FINDINGS = {
     "overflow": re.compile(r"RenderFlex overflowed|overflowed by"),
@@ -90,6 +89,10 @@ class Device:
 
     def shell(self, command: str, **kwargs) -> str:
         return self.run("shell", command, **kwargs)
+
+    def night(self, mode: str) -> None:
+        """Sets the device's dark theme: yes, no or auto."""
+        self.shell(f"cmd uimode night {mode}", check=False)
 
     def prop(self, name: str) -> str:
         return self.shell(f"getprop {name}").strip()
@@ -146,36 +149,65 @@ def find(nodes: list[dict], wanted: str) -> dict | None:
 
 
 class Walk:
-    def __init__(self, device: Device, out: Path):
+    """Runs steps on the device, taking each screenshot once in each of [themes]: the app follows
+    the device's theme as it changes, so one walk serves them all."""
+
+    def __init__(self, device: Device, out: Path, themes: list[str]):
         self.d = device
         self.out = out
+        self.themes = themes
+        self.theme = ""  # the device's theme, once this walk has set it
         self.step = {"index": 0, "name": "try"}
-        self.theme = "light"
         self.shots: list[dict] = []
+        # An input went in that the screen may still be answering. A dump waits for the screen
+        # to settle (uiautomator waits for a second of quiet), so only an action that does not
+        # dump first waits for it, in [settle].
+        self.unsettled = False
 
     def stem(self) -> str:
         return f"{self.step['index']:02d}-{self.step['name']}"
 
+    def use_theme(self, theme: str) -> bool:
+        """Switches the device to [theme], and says whether it changed."""
+        if theme == self.theme:
+            return False
+        self.d.night("yes" if theme == "dark" else "no")
+        self.theme = theme
+        return True
+
+    def settle(self) -> None:
+        if self.unsettled:
+            time.sleep(0.6)
+            self.unsettled = False
+
+    def nodes(self) -> list[dict]:
+        """The nodes on screen, once it has settled."""
+        nodes = self.d.dump()
+        self.unsettled = False
+        return nodes
+
     def launch(self) -> None:
         self.d.shell(f"am force-stop {PACKAGE}")
+        if self.themes:
+            self.use_theme(self.themes[0])
         self.d.shell(f"monkey -p {PACKAGE} -c android.intent.category.LAUNCHER 1")
 
         def shows() -> bool:
             try:
-                return any(n["package"] == PACKAGE and n["label"] for n in self.d.dump())
+                return any(n["package"] == PACKAGE and n["label"] for n in self.nodes())
             except StepError:
                 return False
 
         poll(shows, 30, 0.5, "the app did not show anything within 30 s")
-        time.sleep(0.8)
+        self.unsettled = True
 
     def locate(self, wanted: str) -> dict:
         """The control labelled [wanted], scrolling up to four times to find it."""
         for _ in range(4):
-            if node := find(self.d.dump(), wanted):
+            if node := find(self.nodes(), wanted):
                 return node
             self.swipe("up")
-        if node := find(self.d.dump(), wanted):
+        if node := find(self.nodes(), wanted):
             return node
         raise StepError(f"no control labelled {wanted!r}")
 
@@ -184,7 +216,7 @@ class Walk:
         x, y = w // 2, h // 2
         dx, dy = {"up": (0, -h // 4), "down": (0, h // 4), "left": (-w // 3, 0), "right": (w // 3, 0)}[way]
         self.d.shell(f"input swipe {x} {y} {x + dx} {y + dy} 250")
-        time.sleep(0.5)
+        self.unsettled = True
 
     def do(self, action: str) -> None:
         verb, _, arg = action.partition(" ")
@@ -194,20 +226,21 @@ class Walk:
                 l, t, r, b = self.locate(arg)["box"]
                 x, y = (l + r) // 2, (t + b) // 2
                 self.d.shell(f"input swipe {x} {y} {x} {y} {900 if verb == 'hold' else 40}")
-                time.sleep(0.6)
+                self.unsettled = True
             case "type":
+                self.settle()
                 self.d.shell("input text " + shlex.quote(arg.replace(" ", "%s")))
                 time.sleep(0.4)
-            case "key":
-                self.d.shell(f"input keyevent {KEYS[arg]}")
-                time.sleep(0.6)
             case "swipe":
+                self.settle()
                 self.swipe(arg)
             case "wait":
-                poll(lambda: find(self.d.dump(), arg), 12, 0.6, f"{arg!r} never showed")
+                poll(lambda: find(self.nodes(), arg), 12, 0.6, f"{arg!r} never showed")
             case "sleep":
                 time.sleep(float(arg))
+                self.unsettled = False
             case "intent":
+                self.settle()
                 self.d.shell("am " + arg.replace("{pkg}", PACKAGE))
                 time.sleep(1.5)
             case "shot":
@@ -216,24 +249,27 @@ class Walk:
                 raise StepError(f"unknown action {action!r}")
 
     def shoot(self, suffix: str = "", failed: bool = False) -> None:
-        stem = self.stem() + (f"-{suffix}" if suffix else "") + ("-FAILED" if failed else "") + f"-{self.theme}"
-        nodes = self.d.dump()
-        (self.out / f"{stem}.xml").write_text(self.d.xml)
-        self.d.screenshot(self.out / f"{stem}.png")
-        self.shots.append({
-            "file": f"{stem}.png",
-            "dump": f"{stem}.xml",
-            "labels": [n["label"] for n in nodes if n["label"]],
-            # A control a screen reader reaches but cannot name.
-            "unlabelled": sum(
-                1 for n in nodes
-                if n["clickable"] and not n["label"] and n["package"] == PACKAGE
-            ),
-        })
+        """A screenshot in each theme, starting in the device's own, and the screen's dump."""
+        stem = self.stem() + (f"-{suffix}" if suffix else "") + ("-FAILED" if failed else "")
+        # What a screen reader reaches is the same in every theme, so one dump serves them all.
+        nodes = self.nodes()
+        labels = [n["label"] for n in nodes if n["label"]]
+        # A control a screen reader reaches but cannot name.
+        unlabelled = sum(
+            1 for n in nodes if n["clickable"] and not n["label"] and n["package"] == PACKAGE
+        )
+        for theme in sorted(self.themes, key=lambda t: t != self.theme):
+            if self.use_theme(theme):
+                # The app redraws in the new theme, which the theme's 200 ms change follows.
+                time.sleep(0.8)
+            (self.out / f"{stem}-{theme}.xml").write_text(self.d.xml)
+            self.d.screenshot(self.out / f"{stem}-{theme}.png")
+            self.shots.append({"theme": theme, "file": f"{stem}-{theme}.png", "dump": f"{stem}-{theme}.xml",
+                               "labels": labels, "unlabelled": unlabelled})
 
-    def run(self, step: dict, actions: list[str], theme: str) -> dict:
-        self.step, self.theme, self.shots = step, theme, []
-        record = {"name": step["name"], "group": step["group"], "theme": theme,
+    def run(self, step: dict, actions: list[str]) -> dict:
+        self.step, self.shots = step, []
+        record = {"name": step["name"], "group": step["group"], "signed_out": bool(step.get("signed_out")),
                   "status": "ok", "shots": self.shots, "findings": {}}
         started = time.time()
         self.d.shell("logcat -c", check=False)
@@ -256,7 +292,7 @@ class Walk:
             if count:
                 record["findings"][name] = count
         if record["findings"]:
-            record["log"] = f"{self.stem()}-{theme}.log"
+            record["log"] = f"{self.stem()}.log"
             (self.out / record["log"]).write_text(log)
         record["seconds"] = round(time.time() - started, 1)
         return record
@@ -341,7 +377,7 @@ def restore(device: Device, before: dict) -> None:
     for k, v in before["scales"].items():
         device.shell(f"settings put global {k} {v if v != 'null' else 1}", check=False)
     device.shell("am broadcast -a com.android.systemui.demo -e command exit", check=False)
-    device.shell(f"cmd uimode night {before['night'] if before['night'] in ('yes', 'no') else 'auto'}", check=False)
+    device.night(before["night"] if before["night"] in ("yes", "no") else "auto")
 
 
 def git(*args: str) -> str:
@@ -350,9 +386,6 @@ def git(*args: str) -> str:
 
 def contact_sheet(manifest: dict) -> str:
     rows = sorted(manifest["steps"], key=lambda s: s["status"] == "ok")
-    by_step: dict[tuple, dict] = {}
-    for s in rows:
-        by_step.setdefault((s["variant"], s["group"], s["name"]), {})[s["theme"]] = s
     parts = [
         "<!doctype html><meta charset=utf-8><title>AnywhereLLM audit</title>",
         "<style>body{font:14px system-ui;margin:24px;background:#fafafa;color:#111}"
@@ -366,23 +399,20 @@ def contact_sheet(manifest: dict) -> str:
         f"{manifest['device']['size']} &middot; {manifest['date']}</p>",
         f"<p>{manifest['summary']}</p>",
     ]
-    for (variant, group, name), themed in by_step.items():
-        bad = any(t["status"] != "ok" or t["findings"] for t in themed.values())
-        parts.append(f"<section><h2 class={'bad' if bad else 'ok'}>{html.escape(group)} / {html.escape(name)}</h2><div class=row>")
-        for theme in manifest["themes"]:
-            s = themed.get(theme)
-            if not s:
-                continue
-            for shot in s["shots"]:
-                parts.append(
-                    f"<figure><a href='{shot['file']}'><img loading=lazy src='{shot['file']}'></a>"
-                    f"<figcaption>{html.escape(shot['file'])}</figcaption></figure>"
-                )
-            if s["status"] != "ok":
-                parts.append(f"<p class=bad>{theme}: {html.escape(s.get('error', ''))}</p>")
-            if s["findings"]:
-                parts.append(f"<p class=bad>{theme}: {html.escape(json.dumps(s['findings']))}</p>")
-        parts.append("</div></section>")
+    for s in rows:
+        bad = s["status"] != "ok" or s["findings"]
+        parts.append(f"<section><h2 class={'bad' if bad else 'ok'}>{html.escape(s['group'])} / {html.escape(s['name'])}</h2><div class=row>")
+        for shot in s["shots"]:
+            parts.append(
+                f"<figure><a href='{shot['file']}'><img loading=lazy src='{shot['file']}'></a>"
+                f"<figcaption>{html.escape(shot['file'])}</figcaption></figure>"
+            )
+        parts.append("</div>")
+        if s["status"] != "ok":
+            parts.append(f"<p class=bad>{html.escape(s.get('error', ''))}</p>")
+        if s["findings"]:
+            parts.append(f"<p class=bad>{html.escape(json.dumps(s['findings']))}</p>")
+        parts.append("</section>")
     for skip in manifest["skipped"]:
         parts.append(f"<p>Skipped {html.escape(skip['name'])}: {html.escape(skip['reason'])}</p>")
     return "\n".join(parts)
@@ -414,7 +444,7 @@ def main() -> int:
     device.size = (int(m.group(1)), int(m.group(2)))
     if args.dump or args.try_:
         if args.try_:
-            walk = Walk(device, Path(tempfile.gettempdir()))
+            walk = Walk(device, Path(tempfile.gettempdir()), [])
             walk.launch()
             for action in args.try_.split(";"):
                 walk.do(action.strip())
@@ -445,19 +475,16 @@ def main() -> int:
         elif not apks[signed_out].exists():
             sys.exit(f"{apks[signed_out]} does not exist; run once without --no-build")
     before = steady(device)
-    walk = Walk(device, folder)
+    walk = Walk(device, folder, themes)
     results = []
     try:
         for signed_out, apk in apks.items():
             install(device, apk)
-            for theme in themes:
-                device.shell(f"cmd uimode night {'yes' if theme == 'dark' else 'no'}")
-                for step in (s for s in steps if bool(s.get("signed_out")) == signed_out):
-                    print(f"[{theme}] {step['group']}/{step['name']}", end=" ", flush=True)
-                    record = walk.run(step, starts.get(step.get("from"), []) + step["do"], theme)
-                    record["variant"] = "signed-out" if signed_out else "connected"
-                    print(record["status"], record["findings"] or "")
-                    results.append(record)
+            for step in (s for s in steps if bool(s.get("signed_out")) == signed_out):
+                print(f"{step['group']}/{step['name']}", end=" ", flush=True)
+                record = walk.run(step, starts.get(step.get("from"), []) + step["do"])
+                print(record["status"], record["findings"] or "")
+                results.append(record)
     finally:
         restore(device, before)
         if booted and not args.keep_emulator:
@@ -478,7 +505,8 @@ def main() -> int:
             "size": f"{device.size[0]}x{device.size[1]} @ {device.shell('wm density').split()[-1]} dpi",
         },
         "themes": themes,
-        "summary": f"{len(results)} runs, {len(failed)} failed, {len(noted)} with log findings, "
+        "summary": f"{len(results)} steps in {' and '.join(themes)}, {len(failed)} failed, "
+                   f"{len(noted)} with log findings, "
                    f"{unlabelled} unlabelled controls",
         "skipped": plan.get("skipped", []),
         "steps": results,
