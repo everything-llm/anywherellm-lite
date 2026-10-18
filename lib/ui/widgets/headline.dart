@@ -3,7 +3,7 @@ import 'package:flutter/widgets.dart';
 import '../tokens.dart';
 import '../type.dart';
 
-/// A screen's big line, such as Ask about Q3 planning.: [before], then [name] in the accent,
+/// A screen's big line, such as Connect to your AnythingLLM.: [before], then [name] in the accent,
 /// then [after], at 32 in [Tokens.ink2].
 class Headline extends StatelessWidget {
   const Headline(

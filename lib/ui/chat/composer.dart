@@ -88,7 +88,7 @@ class _ComposerState extends State<Composer> {
   String _before = '';
 
   /// The message as dictation last left it. A message changed from it otherwise, by typing, a
-  /// suggestion or Edit, ends the go, so what is heard never overwrites that change.
+  /// shortcut or Edit, ends the go, so what is heard never overwrites that change.
   String _dictated = '';
 
   /// Counts the goes, so words that arrive after a message was sent are not put in the next.

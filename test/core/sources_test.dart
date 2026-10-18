@@ -42,48 +42,6 @@ void main() {
     expect(uncounted.meta, 'Not used');
   });
 
-  test('a title loses the extension of the file it came from', () {
-    expect(shortTitle('Q3 roadmap.pdf'), 'Q3 roadmap');
-    expect(shortTitle('Pricing page'), 'Pricing page');
-    expect(shortTitle('notes.v2-final'), 'notes.v2-final');
-    expect(shortTitle('Version 2.0'), 'Version 2.0');
-    expect(shortTitle('.md'), '.md');
-  });
-
-  test('an empty chat suggests from the documents\' names', () {
-    List<String> labels(List<String> titles) => [
-      for (final s in suggestionsFor(titles)) s.label,
-    ];
-    expect(labels([]), ['What can I do here?']);
-    expect(labels(['Q3 roadmap.pdf']), ['Summarise Q3 roadmap']);
-    expect(labels(['Q3 roadmap.pdf', 'Customer interviews.docx', 'x.md']), [
-      'Summarise Q3 roadmap',
-      'Compare Q3 roadmap with Customer interviews',
-    ]);
-    expect(
-      suggestionsFor(['Q3 roadmap.pdf']).single.prompt,
-      'Summarise Q3 roadmap',
-    );
-  });
-
-  test('a long name is cut in the label and whole in the prompt', () {
-    const long =
-        'Evidence-Based Gamification Design: What Works, When, and Why.pdf';
-    const longer =
-        'Open Software Engineering Jobs and Market Outlook in Sweden for a .NET Candidate';
-    final [summary, compare] = suggestionsFor([long, longer]);
-    // A subtitle after a colon goes first.
-    expect(summary.label, 'Summarise Evidence-Based Gamification Design');
-    expect(
-      summary.prompt,
-      'Summarise Evidence-Based Gamification Design: What Works, When, and Why',
-    );
-    expect(compare.label, 'Compare the first two documents');
-    expect(compare.prompt, endsWith('for a .NET Candidate'));
-    final [cut] = suggestionsFor([longer]);
-    expect(cut.label, 'Summarise Open Software Engineering Jobs and\u2026');
-  });
-
   test('the type comes from the stored name, whatever the title', () {
     const id = '6c3f0a1e-2b4d-4c5e-8f90-a1b2c3d4e5f6';
     String tile(String name, String title) =>

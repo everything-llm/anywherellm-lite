@@ -29,7 +29,6 @@ import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
 import 'answer_body.dart';
 import 'markdown_lists.dart';
-import 'follow_ups.dart';
 import 'shortcut_chip.dart';
 import 'answer_menu.dart';
 import 'generated_files.dart';
@@ -47,10 +46,10 @@ import '../widgets/scroll_fades.dart';
 /// sent scrolls there. Scrolled up past [_MessageListState._jumpFrom], a round button over the
 /// composer scrolls back to it.
 class MessageList extends StatefulWidget {
-  const MessageList({super.key, required this.onSuggest});
+  const MessageList({super.key, required this.onEdit});
 
-  /// Puts a suggested question in the composer.
-  final ValueChanged<String> onSuggest;
+  /// Puts a sent message's text back in the composer, to send as a new message.
+  final ValueChanged<String> onEdit;
 
   @override
   State<MessageList> createState() => _MessageListState();
@@ -254,7 +253,7 @@ class _MessageListState extends State<MessageList> {
                         ? _UserBubble(
                             turn.text,
                             attachments: turn.attachments,
-                            onEdit: () => widget.onSuggest(turn.text),
+                            onEdit: () => widget.onEdit(turn.text),
                           )
                         : ListenableBuilder(
                             listenable: scope.prefs,
@@ -265,16 +264,10 @@ class _MessageListState extends State<MessageList> {
                               hideShortcutPrompt: scope.prefs.prefs.isOn(
                                 ChatSwitch.hideShortcutPrompts,
                               ),
-                              onEdit: () => widget.onSuggest(turn.text),
+                              onEdit: () => widget.onEdit(turn.text),
                             ),
                           )
-                  : _Answer(
-                      turn,
-                      retry: i == 0 ? _retryOf(chat) : null,
-                      onMore: i == 0 && !chat.busy
-                          ? () => widget.onSuggest('/')
-                          : null,
-                    ),
+                  : _Answer(turn, retry: i == 0 ? _retryOf(chat) : null),
             ),
           ),
         ),
@@ -748,13 +741,9 @@ class _Picture extends StatelessWidget {
 }
 
 class _Answer extends StatelessWidget {
-  const _Answer(this.turn, {this.retry, this.onMore});
+  const _Answer(this.turn, {this.retry});
 
   final Turn turn;
-
-  /// What More does in the follow-ups, given to the chat's last answer while nothing runs in
-  /// the chat; the follow-ups show only with it.
-  final VoidCallback? onMore;
 
   /// Retry, on the chat's last answer only.
   final _Retry? retry;
@@ -863,10 +852,6 @@ class _Answer extends StatelessWidget {
             ),
           ),
         ],
-        // Under the chat's last answer, once it ran to its end.
-        if (onMore case final onMore?
-            when answered && !turn.streaming && !turn.unfinished)
-          FollowUps(onMore: onMore),
       ],
     );
   }

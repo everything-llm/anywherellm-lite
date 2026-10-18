@@ -36,7 +36,7 @@ class _ChatViewState extends State<ChatView> {
     super.dispose();
   }
 
-  void _suggest(String text) {
+  void _edit(String text) {
     _draft.text = text;
     _focus.requestFocus();
   }
@@ -87,7 +87,7 @@ class _ChatViewState extends State<ChatView> {
           ),
           LayoutId(
             id: _Slot.body,
-            child: _Body(onSuggest: _suggest),
+            child: _Body(onEdit: _edit),
           ),
           // Last, so it paints over the header when there is no room for both.
           LayoutId(
@@ -130,9 +130,9 @@ class _ChatLayout extends MultiChildLayoutDelegate {
 }
 
 class _Body extends StatelessWidget {
-  const _Body({required this.onSuggest});
+  const _Body({required this.onEdit});
 
-  final ValueChanged<String> onSuggest;
+  final ValueChanged<String> onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -142,7 +142,7 @@ class _Body extends StatelessWidget {
       listenable: Listenable.merge([scope.chat, scope.settings]),
       builder: (context, _) {
         final chat = scope.chat;
-        if (chat.active != null) return MessageList(onSuggest: onSuggest);
+        if (chat.active != null) return MessageList(onEdit: onEdit);
         final (title, text) = !scope.settings.configured
             ? (
                 'Welcome to AnywhereLLM',

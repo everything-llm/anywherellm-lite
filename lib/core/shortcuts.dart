@@ -208,10 +208,3 @@ const builtInPromptShortcuts = [
     detailHint: 'Which language?',
   ),
 ];
-
-/// The built-in shortcuts offered under the chat's last answer, in this order, each sent with
-/// no detail.
-final followUpShortcuts = [
-  for (final id in const ['shorter', 'explain', 'list'])
-    builtInPromptShortcuts.firstWhere((shortcut) => shortcut.id == id),
-];
