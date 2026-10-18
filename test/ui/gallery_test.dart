@@ -1,3 +1,4 @@
+import 'package:anywherellm/ui/chat/answer_image.dart';
 import 'package:anywherellm/ui/chat/gallery.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -75,6 +76,27 @@ void main() {
     await tester.pump();
     expect(tester.takeException(), isNull);
     expect(find.text('3 of 3'), findsOneWidget);
+  });
+
+  testWidgets('a lone picture in a link is framed', (tester) async {
+    await pumpApp(tester, llm: _searched(1));
+    expect(tester.widget<AnswerImage>(find.byType(AnswerImage)).framed, isTrue);
+  });
+
+  testWidgets('the gallery page draws its picture without a frame', (
+    tester,
+  ) async {
+    await pumpApp(tester, llm: _searched(3));
+    await tester.tap(control('Picture 2: Unit 2, from site2.example'));
+    await tester.pumpAndSettle();
+    final shown = find.descendant(
+      of: find.byType(GalleryPage),
+      matching: find.byType(AnswerImage),
+    );
+    expect(shown, findsWidgets);
+    for (final image in tester.widgetList<AnswerImage>(shown)) {
+      expect(image.framed, isFalse);
+    }
   });
 
   testWidgets('a picture that does not load shows its site in its place', (

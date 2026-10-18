@@ -91,12 +91,16 @@ class AnswerBody extends StatelessWidget {
       onTapLink: (_, href, _) {
         if (href != null) openAnswerLink(context, href);
       },
-      imageBuilder: (uri, _, alt) => AnswerImage(
-        uri,
-        alt: alt,
-        server: server,
-        linked: (linked ??= linkedImages(text)).contains(uri),
-      ),
+      imageBuilder: (uri, _, alt) {
+        final inLink = (linked ??= linkedImages(text)).contains(uri);
+        return AnswerImage(
+          uri,
+          alt: alt,
+          server: server,
+          linked: inLink,
+          framed: inLink,
+        );
+      },
       bulletBuilder: (bullet) => listBullet(bullet, body),
       builders: {
         'pre': _CodeBlockBuilder(),

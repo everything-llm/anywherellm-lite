@@ -39,9 +39,7 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester, llm: answering('About 40k.'));
-    await tester.ensureVisible(control('More shortcuts'));
-    await tester.pump();
-    await tester.tap(control('More shortcuts'));
+    await tapVisible(tester, control('More shortcuts'));
     await tester.pump();
     expect(tester.widget<EditableText>(composerField).controller.text, '/');
   });

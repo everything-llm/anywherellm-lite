@@ -8,13 +8,9 @@ import '../tokens.dart';
 import '../type.dart';
 import '../widgets/tappable.dart';
 
-/// The built-in shortcuts offered under the chat's last answer, in this order.
-const followUpIds = ['shorter', 'explain', 'list'];
-
-/// A row of pills under the chat's last answer: Make it shorter, Explain simply and Make a
-/// list, each sending its shortcut as the next message with no detail, then More, which puts
-/// `/` in the message to list every shortcut. It scrolls sideways when it is wider than the
-/// chat, and shows nothing while an answer runs or the chat has no history.
+/// A row of pills under the chat's last answer: the [followUpShortcuts], each sending its
+/// shortcut as the next message with no detail, then More, which puts `/` in the message to
+/// list every shortcut. It scrolls sideways when it is wider than the chat.
 class FollowUps extends StatelessWidget {
   const FollowUps({super.key, required this.onMore});
 
@@ -23,46 +19,29 @@ class FollowUps extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    return ListenableBuilder(
-      listenable: Listenable.merge([scope.chat, scope.prefs]),
-      builder: (context, _) {
-        if (scope.chat.busy || !scope.chat.ready) {
-          return const SizedBox.shrink();
-        }
-        final all = scope.prefs.shortcutsIn(scope.chat.activeSlug);
-        final shown = [
-          for (final id in followUpIds)
-            ...all.where((shortcut) => shortcut.id == id).take(1),
-        ];
-        if (shown.isEmpty) return const SizedBox.shrink();
-        return Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            clipBehavior: Clip.none,
-            child: Row(
-              spacing: 8,
-              children: [
-                for (final shortcut in shown)
-                  _Pill(
-                    shortcut.label,
-                    onTap: () => unawaited(
-                      scope.chat.send(
-                        shortcut.expand(''),
-                        shortcutUse: ShortcutUse(
-                          label: shortcut.label,
-                          detail: '',
-                        ),
-                      ),
-                    ),
+    final chat = AppScope.of(context).chat;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        clipBehavior: Clip.none,
+        child: Row(
+          spacing: 8,
+          children: [
+            for (final shortcut in followUpShortcuts)
+              _Pill(
+                shortcut.label,
+                onTap: () => unawaited(
+                  chat.send(
+                    shortcut.expand(''),
+                    shortcutUse: ShortcutUse(label: shortcut.label, detail: ''),
                   ),
-                _Pill('More', onTap: onMore, label: 'More shortcuts'),
-              ],
-            ),
-          ),
-        );
-      },
+                ),
+              ),
+            _Pill('More', onTap: onMore, label: 'More shortcuts'),
+          ],
+        ),
+      ),
     );
   }
 }

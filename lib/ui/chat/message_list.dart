@@ -17,7 +17,6 @@ import '../state/chat_controller.dart';
 import '../state/turn.dart';
 import '../state/prefs_controller.dart';
 import '../state/shell_controller.dart';
-import '../state/sources_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/headline.dart';
@@ -272,7 +271,9 @@ class _MessageListState extends State<MessageList> {
                   : _Answer(
                       turn,
                       retry: i == 0 ? _retryOf(chat) : null,
-                      onMore: () => widget.onSuggest('/'),
+                      onMore: i == 0 && !chat.busy
+                          ? () => widget.onSuggest('/')
+                          : null,
                     ),
             ),
           ),
@@ -440,13 +441,8 @@ class _Empty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    final sources = scope.sources;
-    final titleStyle = Headline.styleOf(context).copyWith(
-      fontWeight: FontWeight.w700,
-      fontVariations: const [FontVariation('wght', 700)],
-      color: Tokens.of(context).accent,
-    );
+    // Built once, so the keyboard sliding in lays the hero out again without rebuilding it.
+    final hero = Center(child: _Hero(workspace));
     // Centred in the room the keyboard leaves, a little above the middle: the header sits over
     // it and the composer under it, so the true middle reads low. It moves up with the keyboard
     // because the list is laid out in the space above it.
@@ -463,19 +459,29 @@ class _Empty extends StatelessWidget {
                 double.infinity,
               ),
             ),
-            child: Center(child: _hero(context, scope, sources, titleStyle)),
+            child: hero,
           ),
         );
       },
     );
   }
+}
 
-  Widget _hero(
-    BuildContext context,
-    AppScope scope,
-    SourcesController sources,
-    TextStyle titleStyle,
-  ) {
+/// Ask about the workspace, which switches it, over its documents in use, which open Documents.
+class _Hero extends StatelessWidget {
+  const _Hero(this.workspace);
+
+  final String workspace;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final sources = scope.sources;
+    final titleStyle = Headline.styleOf(context).copyWith(
+      fontWeight: FontWeight.w700,
+      fontVariations: const [FontVariation('wght', 700)],
+      color: Tokens.of(context).accent,
+    );
     return Rise(
       duration: const Duration(milliseconds: 400),
       child: Column(
@@ -746,7 +752,8 @@ class _Answer extends StatelessWidget {
 
   final Turn turn;
 
-  /// What More does in the follow-ups under the chat's last answer.
+  /// What More does in the follow-ups, given to the chat's last answer while nothing runs in
+  /// the chat; the follow-ups show only with it.
   final VoidCallback? onMore;
 
   /// Retry, on the chat's last answer only.
@@ -857,14 +864,9 @@ class _Answer extends StatelessWidget {
           ),
         ],
         // Under the chat's last answer, once it ran to its end.
-        if (retry != null &&
-            onMore != null &&
-            answered &&
-            !turn.streaming &&
-            !turn.stopped &&
-            !turn.unfinished &&
-            turn.error == null)
-          FollowUps(onMore: onMore!),
+        if (onMore case final onMore?
+            when answered && !turn.streaming && !turn.unfinished)
+          FollowUps(onMore: onMore),
       ],
     );
   }

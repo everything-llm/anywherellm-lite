@@ -24,6 +24,7 @@ class AnswerImage extends StatefulWidget {
     required this.alt,
     required this.server,
     required this.linked,
+    this.framed = false,
     this.maxHeight = 360,
     this.fit = BoxFit.contain,
     this.unloaded,
@@ -40,6 +41,10 @@ class AnswerImage extends StatefulWidget {
 
   /// Whether the image sits inside a link, which then takes a tap on its description.
   final bool linked;
+
+  /// Whether it sits in a thin rounded frame, as a picture inside an answer's Markdown link,
+  /// such as a browser tab's card, does.
+  final bool framed;
 
   /// The tallest it is drawn.
   final double maxHeight;
@@ -189,36 +194,30 @@ class _AnswerImageState extends State<AnswerImage> {
         errorBuilder: broken,
       );
     }
-    final picture = Image.memory(
-      frame,
-      fit: BoxFit.contain,
-      cacheHeight: (widget.maxHeight * MediaQuery.devicePixelRatioOf(context))
-          .round(),
-      gaplessPlayback: true,
-      semanticLabel: widget.alt,
-      errorBuilder: broken,
+    final corners = BorderRadius.circular(
+      widget.framed ? Sizes.control : Sizes.row,
     );
-    if (!widget.linked) {
-      return ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: widget.maxHeight),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: picture,
-        ),
-      );
-    }
-    // A picture that is a link, such as a browser tab's card, sits in a thin rounded frame.
-    final frameLine = BorderRadius.circular(Sizes.row + 6);
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: widget.maxHeight),
       child: Container(
         clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(borderRadius: frameLine),
-        foregroundDecoration: BoxDecoration(
-          borderRadius: frameLine,
-          border: Border.all(color: Tokens.of(context).line2),
+        decoration: BoxDecoration(borderRadius: corners),
+        foregroundDecoration: widget.framed
+            ? BoxDecoration(
+                borderRadius: corners,
+                border: Border.all(color: Tokens.of(context).line2),
+              )
+            : null,
+        child: Image.memory(
+          frame,
+          fit: BoxFit.contain,
+          cacheHeight:
+              (widget.maxHeight * MediaQuery.devicePixelRatioOf(context))
+                  .round(),
+          gaplessPlayback: true,
+          semanticLabel: widget.alt,
+          errorBuilder: broken,
         ),
-        child: picture,
       ),
     );
   }
