@@ -51,6 +51,11 @@ abstract final class Type {
   /// A muted note at 13, as under a card or a sheet's title, in [color].
   static TextStyle note(Color color) => sans(13, color: color, height: 1.45);
 
+  /// The line under a screen's big line, as the first run's welcome and a walk-through screen
+  /// have, at 16 in [color].
+  static TextStyle lead(Color color) =>
+      sans(16, color: color, height: textAreaLine);
+
   static TextStyle mono(
     double size, {
     FontWeight weight = FontWeight.w400,

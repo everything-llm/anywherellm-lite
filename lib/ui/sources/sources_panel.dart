@@ -127,7 +127,12 @@ class _Body extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: open == null
                       ? const SizedBox.shrink()
-                      : TextAction('search', 'Test a question', open),
+                      : TextAction(
+                          'search',
+                          'Test a question',
+                          open,
+                          weight: FontWeight.w600,
+                        ),
                 ),
               ),
             ],

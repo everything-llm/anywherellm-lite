@@ -368,12 +368,7 @@ class _Screen extends StatelessWidget {
                   ),
                 ),
                 if (step.sub case final sub?)
-                  _Padded(
-                    Text(
-                      sub,
-                      style: Type.sans(16, color: t.muted, height: 1.5),
-                    ),
-                  ),
+                  _Padded(Text(sub, style: Type.lead(t.muted))),
                 if (art != null)
                   GuideFigure(art, maxHeight: height * (short ? 0.22 : 0.26)),
                 if (code != null) _Code(code),

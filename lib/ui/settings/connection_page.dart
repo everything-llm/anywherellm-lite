@@ -44,7 +44,7 @@ class ConnectionPage extends StatelessWidget {
   }
 }
 
-/// The first run, over the key form: what to do to connect.
+/// The first run, over the key form: what to do to connect, inset to line up with the field labels.
 class _Welcome extends StatelessWidget {
   const _Welcome();
 
@@ -52,21 +52,21 @@ class _Welcome extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final scan = AppScope.of(context).scanner != null;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Headline('Connect to your ', name: 'AnythingLLM', after: '.'),
-        const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Text(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: 8,
+        children: [
+          const Headline('Connect to your ', name: 'AnythingLLM', after: '.'),
+          Text(
             scan
                 ? 'Already set up on your computer? Scan its code and this phone is connected.'
                 : 'Enter your AnythingLLM server\'s address and a developer key.',
-            style: Type.note(t.muted),
+            style: Type.lead(t.muted),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
