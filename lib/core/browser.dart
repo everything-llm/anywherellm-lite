@@ -13,3 +13,8 @@ final _page = RegExp(r'^/([^/]+)/[A-Za-z0-9_-]+\.html$');
 /// the skill links its tab's card to.
 bool isBrowserTab(Uri link, Uri? server) =>
     isSkillPage(link, server, 'browser-lean');
+
+/// Whether [link] is library-lean's Library page, `/library-lean/<token>.html`, where the person
+/// gives a service's key or OAuth client without the agent seeing it.
+bool isLibraryPage(Uri link, Uri? server) =>
+    isSkillPage(link, server, 'library-lean');

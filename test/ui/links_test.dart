@@ -355,6 +355,33 @@ void main() {
     expect(control('Groceries, Open the app'), findsNothing);
   });
 
+  group('the Library page', () {
+    const answer = 'Enter it on [the Library page](/library-lean/aB3_-x9.html)';
+    final page = Uri.parse('https://h:3001/library-lean/aB3_-x9.html');
+
+    testWidgets('opens in a sheet over the chat', (tester) async {
+      final h = await pumpApp(
+        tester,
+        llm: answering(answer),
+        canViewApps: true,
+      );
+      await tapLink(tester, 'the Library page');
+      await tester.pumpAndSettle();
+      expect(h.shell.popup.value, isA<PageOpen>());
+      expect(find.text('Web view of $page'), findsOneWidget);
+      expect(h.opened, isEmpty);
+      h.appView!.close!();
+      await tester.pumpAndSettle();
+      expect(find.byType(PageSheet), findsNothing);
+    });
+
+    testWidgets('opens in the browser without a web view', (tester) async {
+      final h = await pumpApp(tester, llm: answering(answer));
+      await tapLink(tester, 'the Library page');
+      expect(h.opened, [page]);
+    });
+  });
+
   testWidgets('without a web view an apps-lean page opens in the browser', (
     tester,
   ) async {

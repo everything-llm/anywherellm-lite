@@ -47,4 +47,21 @@ void main() {
       );
     },
   );
+
+  test('the Library page is library-lean\'s page on the server\'s host', () {
+    bool library(String link) => isLibraryPage(Uri.parse(link), server);
+    expect(
+      library('https://owen.example.ts.net:3001/library-lean/aB3_-x9.html'),
+      isTrue,
+    );
+    expect(library('https://evil.test/library-lean/aB3.html'), isFalse);
+    expect(
+      library('https://owen.example.ts.net:3001/apps-lean/aB3.html'),
+      isFalse,
+    );
+    expect(
+      library('https://owen.example.ts.net:3001/library-lean/s-aB3.json'),
+      isFalse,
+    );
+  });
 }

@@ -48,12 +48,15 @@
                 <data android:mimeType="*/*"/>
             </intent-filter>
             <!-- A pairing link, anywherellm://connect?url=...&key=..., as the toolkit's pair
-                 prints it; the app asks before it connects. -->
+                 prints it; the app asks before it connects. A signed-in link,
+                 anywherellm://signed-in?service=..., from library-lean's OAuth return page,
+                 brings the chat back with the message in its composer. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="anywherellm" android:host="connect"/>
+                <data android:scheme="anywherellm" android:host="signed-in"/>
             </intent-filter>
         </activity>
         <service
