@@ -121,4 +121,38 @@ void main() {
       expect(card('Made it: [Groceries](/apps-lean/q9Z.html)'), isNull);
     });
   });
+
+  group('a comment from a page', () {
+    test('is the page\'s message, trimmed, for the app\'s workspace', () {
+      expect(
+        pageCommentOf({
+          'comment': {'workspace': 'home', 'message': ' Why? '},
+        }),
+        (workspace: 'home', message: 'Why?'),
+      );
+    });
+
+    test('is cut to its longest', () {
+      final comment = pageCommentOf({
+        'comment': {'workspace': 'home', 'message': 'x' * 5000},
+      });
+      expect(comment?.message.length, commentMax);
+    });
+
+    test('is none without a message or a workspace', () {
+      expect(
+        pageCommentOf({
+          'comment': {'workspace': 'home', 'message': '  '},
+        }),
+        isNull,
+      );
+      expect(
+        pageCommentOf({
+          'comment': {'message': 'Why?'},
+        }),
+        isNull,
+      );
+      expect(pageCommentOf('Why?'), isNull);
+    });
+  });
 }

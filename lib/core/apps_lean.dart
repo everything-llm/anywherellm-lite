@@ -130,6 +130,28 @@ md.Element? _linkIn(md.Node node) {
   return null;
 }
 
+/// What an apps-lean page's Comment sends: the person's message about the app, as the page wrote
+/// it, which names the app and what they picked on it, for the chat of the workspace the app is in.
+typedef PageComment = ({String workspace, String message});
+
+/// The comment a page posted, `{"comment": {workspace, message}}`, its message cut to
+/// [commentMax] characters; null when it is not one or says nothing.
+PageComment? pageCommentOf(Object? json) => switch (json) {
+  {
+    'comment': {
+      'workspace': final String workspace,
+      'message': final String message,
+    },
+  }
+      when message.trim().isNotEmpty =>
+    (workspace: workspace, message: clip(message.trim(), commentMax)),
+  _ => null,
+};
+
+/// The most characters a [PageComment]'s message may take: room for the page's 1000 of the
+/// person's words and its 5 picks.
+const commentMax = 4000;
+
 /// The text of [block], one entry for each item when it is a list.
 Iterable<String> _textsOf(md.Node block) =>
     block is md.Element && (block.tag == 'ul' || block.tag == 'ol')

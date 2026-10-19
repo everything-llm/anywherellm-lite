@@ -229,6 +229,59 @@ void main() {
     expect(find.byType(PageSheet), findsNothing);
   });
 
+  group('a comment from an app\'s page', () {
+    String comment(String workspace) =>
+        '{"comment":{"workspace":"$workspace",'
+        '"message":"About my Groceries page: bigger buttons?"}}';
+
+    Future<Harness> opened(WidgetTester tester, FakeAnythingLlm llm) async {
+      final h = await pumpApp(tester, llm: llm, canViewApps: true);
+      await tapLink(tester, 'Groceries');
+      await tester.pumpAndSettle();
+      return h;
+    }
+
+    testWidgets('goes in the chat as the person\'s message, and the page '
+        'closes so the answer shows', (tester) async {
+      final llm = answering('Made it: [Groceries](/apps-lean/q9Zx_-1aB2.html)');
+      final h = await opened(tester, llm);
+      h.appView!.channel!.onMessage(comment('q3'));
+      await tester.pumpAndSettle();
+      expect(
+        llm.calls.last,
+        'streamChat:budget:About my Groceries page: bigger buttons?',
+      );
+      expect(h.appView!.ran.single, contains('{"ok":true}'));
+      expect(find.byType(PageSheet), findsNothing);
+    });
+
+    testWidgets('on an app of another workspace stays on the page, which '
+        'says why', (tester) async {
+      final llm = answering('Made it: [Groceries](/apps-lean/q9Zx_-1aB2.html)');
+      final h = await opened(tester, llm);
+      h.appView!.channel!.onMessage(comment('household'));
+      await tester.pumpAndSettle();
+      expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
+      expect(h.appView!.ran.single, contains('another workspace'));
+      expect(find.byType(PageSheet), findsOneWidget);
+    });
+
+    testWidgets('while the chat answers stays on the page, which says why', (
+      tester,
+    ) async {
+      final llm = answering('Made it: [Groceries](/apps-lean/q9Zx_-1aB2.html)')
+        ..hold = true;
+      final h = await opened(tester, llm);
+      await h.chat.send('Anything else?');
+      await tester.pump();
+      h.appView!.channel!.onMessage(comment('q3'));
+      await tester.pump();
+      await tester.pump();
+      expect(h.appView!.ran.single, contains('try again once it’s free'));
+      expect(find.byType(PageSheet), findsOneWidget);
+    });
+  });
+
   testWidgets('an app\'s page opens in the theme the app shows in', (
     tester,
   ) async {
