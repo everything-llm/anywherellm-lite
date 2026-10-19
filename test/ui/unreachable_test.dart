@@ -25,6 +25,17 @@ void main() {
     expect(find.text('No workspaces yet'), findsNothing);
   });
 
+  testWidgets('a later failure shows under the banner', (tester) async {
+    final llm = planningServer()
+      ..errors['workspaces'] = const ApiException('Down')
+      ..errors['createWorkspace'] = const ApiException('Refused');
+    final h = await pumpApp(tester, llm: llm);
+    await h.chat.createWorkspace('Trips');
+    await tester.pump();
+    expect(find.text(title), findsOneWidget);
+    expect(find.text('Could not make the workspace'), findsOneWidget);
+  });
+
   testWidgets('Try again reads the workspaces at once and clears the banner', (
     tester,
   ) async {

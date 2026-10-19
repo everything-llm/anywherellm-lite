@@ -232,6 +232,19 @@ void main() {
       expect(rig.chat.turns, hasLength(before));
     });
 
+    test('stays after a pull down reads the chat again', () async {
+      final llm = planningServer()
+        ..errors['streamChat'] = const NotSent('Could not reach h');
+      final rig = await started(llm);
+      final before = rig.chat.turns.length;
+      await rig.chat.send('How much is recruiting?');
+      await pumpEventQueue();
+      await rig.chat.refresh();
+      expect(rig.chat.turns, hasLength(before + 1));
+      expect(rig.chat.turns.last.notSent, isTrue);
+      expect(rig.chat.turns.last.text, 'How much is recruiting?');
+    });
+
     test('in a new chat leaves the question in the draft', () async {
       final llm = planningServer()
         ..errors['createThread'] = const ApiException('Could not reach h');

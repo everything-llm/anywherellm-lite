@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 
 import '../core/chat.dart';
 import '../core/connection.dart';
@@ -25,7 +26,14 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     this.timeout = const Duration(seconds: 15),
     this.uploadTimeout = const Duration(minutes: 5),
     this.idle = const Duration(minutes: 5),
-  }) : _client = client ?? http.Client();
+  }) : assert(client != null || connectTimeout < timeout),
+       _client =
+           client ?? IOClient(HttpClient()..connectionTimeout = connectTimeout);
+
+  /// How long connecting may take, shorter than [timeout]: a server that cannot be reached fails
+  /// as a [SocketException], so a [TimeoutException] means a server that took the request and has
+  /// not answered.
+  static const connectTimeout = Duration(seconds: 10);
 
   final ConnectionHolder _holder;
 
@@ -383,11 +391,11 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       _send('GET', path, null, on: on);
 
   /// The events of a POST of [body] to [path], whose answer streams server-sent events. A
-  /// failed status, or a server that cannot be reached, is a [NotSent] with the server's words; a
-  /// stream that drops or falls silent once it has begun is a [CutOff], since the server may
-  /// still finish it. A cancel lets go of the response at once, even before the first event, as the `async*`
-  /// readers of [chatEvents] would not until their next `yield`: the server stops answering
-  /// when the connection closes.
+  /// failed status, or a server that cannot be reached, is a [NotSent] with the server's words.
+  /// A stream that drops or falls silent, once it has begun or after the request went out, is a
+  /// [CutOff], since the server may have the question and still finish it. A cancel lets go of
+  /// the response at once, even before the first event, as the `async*` readers of [chatEvents]
+  /// would not until their next `yield`: the server stops answering when the connection closes.
   Stream<ChatEvent> _events(
     String path,
     Map<String, Object?> body,
@@ -413,8 +421,8 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
         http.ClientException(:final message) => ApiException(
           'The answer was cut off: $message',
         ),
-        NotConfigured() => error,
-        // Before the headers came the server never took the question.
+        NotConfigured() || CutOff() => error,
+        // Otherwise, before the headers came the server never took the question.
         ApiException(:final message, :final status) when !began => NotSent(
           message,
           status: status,
@@ -429,11 +437,23 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
         final connection = _current;
         final request = _request(connection, 'POST', path, body)
           ..headers['Accept'] = 'text/event-stream';
-        final answer = await _fetch(
-          connection,
-          limit,
-          () => _client.send(request),
-        );
+        final http.StreamedResponse answer;
+        try {
+          answer = await _client.send(request).timeout(limit);
+        } on Exception catch (error) {
+          throw switch (error) {
+            // Connecting takes less than [limit], so the request went out.
+            TimeoutException() => CutOff(
+              'The server took the question but sent nothing within ${_duration(limit)}. It may '
+              'still be answering.',
+            ),
+            // An [HttpException]: the server closed the connection after the request went out.
+            http.ClientException(:final message)
+                when error is! SocketException =>
+              CutOff('The connection closed before the answer began: $message'),
+            _ => _unreachable(connection, error, limit),
+          };
+        }
         if (cancelled) {
           unawaited(answer.stream.listen(null).cancel());
           return;

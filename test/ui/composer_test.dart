@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:anywherellm/core/chat.dart' show ChatMode;
+import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/ui/chat/composer.dart';
 import 'package:anywherellm/ui/widgets/sheet.dart';
 import 'package:cross_file/cross_file.dart';
@@ -214,9 +215,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
     });
 
-    testWidgets('Enter queues it too, and Stop sends the next', (
-      tester,
-    ) async {
+    testWidgets('Enter queues it too, and Stop sends the next', (tester) async {
       final (_, llm) = await answering(tester);
       await tester.enterText(composerField, 'Second');
       await tester.pump();
@@ -267,6 +266,31 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       expect(h.chat.isReady(thread), isTrue);
     });
+
+    testWidgets(
+      'while they wait for an answer the server writes, Send alone queues',
+      (tester) async {
+        final (h, llm) = await answering(tester);
+        await queue(tester, 'Second');
+        llm.chat!.addError(const CutOff('The connection dropped'));
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.enterText(composerField, 'Third');
+        await tester.pump();
+        expect(sendWhenDone(), findsNothing);
+        await tester.tap(find.byTooltip('Send'));
+        await tester.pump();
+        expect(typed(tester), isEmpty);
+        expect(find.text('Third'), findsOneWidget);
+        expect(sent(llm, 'Third'), 0);
+
+        // The server saves the answer, which ends the reading for it.
+        final thread = h.chat.activeThread!;
+        llm.saveExchange(thread, 'First', 'Done');
+        await tester.pump(const Duration(seconds: 5));
+        await tester.pump();
+        expect(sent(llm, 'Second'), 1);
+      },
+    );
 
     testWidgets('/reset is not queued, since it asks first', (tester) async {
       await answering(tester);

@@ -852,10 +852,9 @@ class _Answer extends StatelessWidget {
     const action = answerAction;
     // The red box asks again itself, so Retry does not show twice.
     // The box for a model that cannot see pictures has no Ask again, so Retry stays then.
-    final askAgain =
-        turn.error != null &&
-        !refusesPictures(turn.error!) &&
-        retry?.onPressed != null;
+    final error = turn.error;
+    final noPictures = error != null && refusesPictures(error);
+    final askAgain = error != null && !noPictures && retry?.onPressed != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -889,10 +888,10 @@ class _Answer extends StatelessWidget {
             ),
           ),
         ],
-        if (turn.error case final error? when refusesPictures(error)) ...[
+        if (noPictures) ...[
           const SizedBox(height: 10),
           const _NoPictures(),
-        ] else if (turn.error case final error?) ...[
+        ] else if (error != null) ...[
           const SizedBox(height: 10),
           AlertBox(
             AlertKind.bad,

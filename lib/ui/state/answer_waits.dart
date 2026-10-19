@@ -182,7 +182,7 @@ class AnswerWaits {
       return turns.every((t) => t.chatId == null || t.chatId! < id) &&
           asks(asked.role, asked.text) &&
           history.where((m) => asks(m.role, m.text)).length >=
-              turns.where((t) => asks(t.role, t.text)).length;
+              turns.where((t) => !t.notSent && asks(t.role, t.text)).length;
     }
     return false;
   }

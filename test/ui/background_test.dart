@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/core/server_models.dart';
@@ -26,17 +28,8 @@ Future<(Harness, FakeAnythingLlm)> _asking(
 }
 
 /// The server saves the answer to [thread] after the connection dropped, as an agent does.
-void _saved(FakeAnythingLlm llm, String thread, String text) {
-  llm.histories[thread] = [
-    ...?llm.histories[thread],
-    const ChatMessage(
-      role: Role.user,
-      text: 'Can you build it in English?',
-      chatId: 100,
-    ),
-    ChatMessage(role: Role.assistant, text: text, chatId: 100),
-  ];
-}
+void _saved(FakeAnythingLlm llm, String thread, String text) =>
+    llm.saveExchange(thread, 'Can you build it in English?', text);
 
 /// How many times [text] was asked.
 int _sent(FakeAnythingLlm llm, String text) =>
@@ -228,6 +221,54 @@ void main() {
       expect(find.text('A new word game.'), findsOneWidget);
       expect(h.chat.finished?.text, 'A new word game.');
     });
+
+    testWidgets(
+      'a read for an earlier agent answer does not outlast a later one',
+      (tester) async {
+        final (h, llm) = await _asking(tester);
+        final thread = h.chat.activeThread!;
+        expect(h.chat.sendWhenDone('And French?'), isTrue);
+        // The first agent answer ends; its history read is held while the waiting message goes.
+        final first = llm.gates['history'] = Completer<void>();
+        _saved(llm, thread, 'The word game, in English.');
+        llm.chat!
+          ..add(const TextChunk('The word game, in English.'))
+          ..add(const ChatDone([]));
+        await llm.chat!.close();
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(_sent(llm, 'And French?'), 1);
+
+        // The second agent answer ends too, and its read is held behind its own gate.
+        final second = llm.gates['history'] = Completer<void>();
+        llm.chat!
+          ..add(const TextChunk('Le jeu de mots.'))
+          ..add(const ChatDone([]));
+        await llm.chat!.close();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        // The first read answers before the server saved the second exchange, the second after.
+        first.complete();
+        await tester.pump();
+        llm.saveExchange(thread, 'And French?', 'Le jeu de mots.', chatId: 101);
+        second.complete();
+        await tester.pump();
+
+        // A third answer drops: the French one, already shown, is not taken for it.
+        await h.chat.send('And German?');
+        await tester.pump();
+        llm.chat!.addError(_dropped);
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pump(const Duration(seconds: 5));
+        await tester.pump();
+        expect(h.chat.turns.last.waiting, isTrue);
+        expect(find.text('Still answering on the server'), findsOneWidget);
+
+        llm.saveExchange(thread, 'And German?', 'Das Wortspiel.', chatId: 102);
+        await tester.pump(const Duration(seconds: 5));
+        await tester.pump();
+        expect(h.chat.finished?.text, 'Das Wortspiel.');
+      },
+    );
 
     testWidgets('an answer waited for says so when the chat moves on', (
       tester,

@@ -63,6 +63,19 @@ class FakeAnythingLlm implements AnythingLlmApi {
   List<FakeWorkspace> spaces = [];
   final Map<String, List<ChatMessage>> histories = {};
 
+  /// Adds [question] and its [answer] to [thread]'s history as exchange [chatId], as the server
+  /// saves an answer.
+  void saveExchange(
+    String thread,
+    String question,
+    String answer, {
+    int chatId = 100,
+  }) => histories[thread] = [
+    ...?histories[thread],
+    ChatMessage(role: Role.user, text: question, chatId: chatId),
+    ChatMessage(role: Role.assistant, text: answer, chatId: chatId),
+  ];
+
   /// Every document the server holds, by path, embedded or not.
   final Map<String, WorkspaceDoc> library = {};
 

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../../core/connection.dart';
 import '../../core/ports.dart';
@@ -16,6 +17,7 @@ import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
 import '../widgets/fields.dart';
 import '../widgets/keyboard_up.dart';
+import '../widgets/scroll_fades.dart';
 import '../widgets/window_insets.dart';
 import 'walkthrough.dart';
 import 'rows.dart';
@@ -391,7 +393,8 @@ class _KeyCardState extends State<_KeyCard> {
   }
 
   /// [child], the first run's scroll, held at its end while the keyboard is [typing] up, which
-  /// is where the fields are, until a drag moves it.
+  /// is where the fields are, until a drag moves it. It stops short of the end where the end would
+  /// take the field in use out of view, under the top fade.
   Widget _atEnd(bool typing, {required Widget child}) {
     if (typing && !_wasTyping) _pinned = true;
     if (!typing) _pinned = false;
@@ -399,7 +402,11 @@ class _KeyCardState extends State<_KeyCard> {
     if (_pinned) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_pinned && _scroll.hasClients) {
-          _scroll.jumpTo(_scroll.position.maxScrollExtent);
+          final position = _scroll.position;
+          final end = position.maxScrollExtent;
+          _scroll.jumpTo(
+            (_focusTop() ?? end).clamp(position.minScrollExtent, end),
+          );
         }
       });
     }
@@ -410,6 +417,18 @@ class _KeyCardState extends State<_KeyCard> {
       },
       child: child,
     );
+  }
+
+  /// The scroll offset that puts the top of the field in use just under the first run's top
+  /// fade, or null when no field in this scroll has the focus.
+  double? _focusTop() {
+    final focus = FocusManager.instance.primaryFocus?.context;
+    final scrollable = focus?.findAncestorStateOfType<ScrollableState>();
+    final box = focus?.findRenderObject();
+    if (scrollable?.position != _scroll.position || box == null) return null;
+    final viewport = RenderAbstractViewport.maybeOf(box);
+    if (viewport == null) return null;
+    return viewport.getOffsetToReveal(box, 0).offset - ScrollFades.height;
   }
 
   /// The first run: the welcome, Scan QR code first where there is a camera, then the address and

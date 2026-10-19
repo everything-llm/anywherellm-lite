@@ -5,6 +5,7 @@ import 'package:anywherellm/ui/settings/settings_dialog.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
+import 'package:anywherellm/ui/widgets/scroll_fades.dart';
 import 'package:anywherellm/ui/workspace_sheets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -97,6 +98,42 @@ void main() {
     // The page is all fields now: the help link waits for the keyboard to go.
     expect(control('How connecting works'), findsNothing);
   });
+
+  testWidgets(
+    'on a short screen the first run keeps the field in use in view',
+    (tester) async {
+      const short = Size(360, 480);
+      const shortKeyboard = 240.0;
+      final h = await pumpApp(
+        tester,
+        llm: planningServer(),
+        size: short,
+        connection: null,
+        canScan: true,
+      );
+      h.shell.openSettings(SettingsPage.connection);
+      await tester.pumpAndSettle();
+      final fields = typingField(find.byType(SettingsDialog));
+      for (final field in [fields.first, fields.last]) {
+        await tapVisible(tester, field);
+        raiseKeyboard(tester, shortKeyboard);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(focused(tester, field), isTrue);
+        final scroll = tester.getRect(
+          find.ancestor(of: field, matching: find.byType(Scrollable)).first,
+        );
+        expect(
+          tester.getRect(field).top,
+          greaterThanOrEqualTo(scroll.top + ScrollFades.height - 0.5),
+        );
+        expectAboveKeyboard(tester, field, short, shortKeyboard);
+        expectAboveKeyboard(tester, control('Connect'), short, shortKeyboard);
+        tester.view.resetViewInsets();
+        await tester.pumpAndSettle();
+      }
+    },
+  );
 
   testWidgets('a phone on its side keeps the composer above the keyboard', (
     tester,

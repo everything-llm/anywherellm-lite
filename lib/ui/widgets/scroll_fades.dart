@@ -13,13 +13,14 @@ class ScrollFades extends StatefulWidget {
   /// The ground the fades blend into; [Tokens.bg] when null.
   final Color? color;
 
+  /// How tall each fade is.
+  static const height = 16.0;
+
   @override
   State<ScrollFades> createState() => _ScrollFadesState();
 }
 
 class _ScrollFadesState extends State<ScrollFades> {
-  static const _height = 16.0;
-
   bool _top = false;
   bool _bottom = false;
 
@@ -55,7 +56,7 @@ class _ScrollFadesState extends State<ScrollFades> {
           opacity: on ? 1 : 0,
           duration: const Duration(milliseconds: 150),
           child: Container(
-            height: _height,
+            height: ScrollFades.height,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: top ? Alignment.topCenter : Alignment.bottomCenter,

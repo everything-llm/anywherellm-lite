@@ -15,7 +15,6 @@ import '../widgets/buttons.dart';
 import '../widgets/phone_page.dart';
 import '../widgets/tappable.dart';
 import '../settings/settings_pages.dart';
-import '../state/chat_controller.dart';
 import '../state/shell_controller.dart';
 import 'composer.dart';
 import 'message_list.dart';
@@ -61,13 +60,8 @@ class _ChatViewState extends State<ChatView> {
             // A server that cannot be reached has the banner, in place of the read's failure.
             final unreachable =
                 scope.chat.unreachable.value && scope.settings.configured;
-            final problem = scope.chat.problem;
-            final readFailed =
-                unreachable && problem?.title == ChatController.readFailed;
             final notices = [
-              ?(readFailed
-                  ? scope.prefs.problem
-                  : problem ?? scope.prefs.problem),
+              ?(scope.chat.notice ?? scope.prefs.problem),
               ?scope.chat.linkNotice,
             ];
             if (!unreachable && notices.isEmpty) return const SizedBox.shrink();

@@ -608,8 +608,9 @@ class _Form extends StatelessWidget {
     }
 
     // While this chat answers, each message typed waits its turn, to go when the answer before
-    // it ends. Send when done takes the chips' place, as they are off while the chat answers.
-    // `/reset` is not one: it asks first, which would hold up the messages after it.
+    // it ends. Send when done takes the chips' place, as they are off while the chat answers;
+    // while messages wait and nothing answers, Send alone queues. `/reset` is not one: it asks
+    // first, which would hold up the messages after it.
     final holdable =
         filled &&
         chat.canSendWhenDone &&
@@ -728,7 +729,7 @@ class _Form extends StatelessWidget {
                   // The model is a row in the Answer from sheet, since the row has room for
                   // one chip.
                   const AnswerFromChip(),
-                  if (holdable)
+                  if (holdable && here)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: _SendWhenDone(onTap: onHold),

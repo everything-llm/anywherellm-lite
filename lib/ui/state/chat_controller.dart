@@ -138,7 +138,7 @@ class ChatController extends ChangeNotifier {
       for (final turn in saved) {
         turn.shortcutUse = _useOf(slug, thread, turn.role, turn.chatId);
       }
-      _turns[thread] = saved;
+      _turns[thread] = _withUnsent(thread, saved);
       _markFinished(saved.last, slug, thread);
     },
     changed: () {
@@ -271,6 +271,14 @@ class ChatController extends ChangeNotifier {
 
   /// Why the last load or change failed.
   Notice? problem;
+
+  /// The [problem] a failed [load] left, which the unreachable banner says in its own words.
+  Notice? _readNotice;
+
+  /// The [problem] to show under the header: none while it is [load]'s own failure and the
+  /// server is [unreachable], since the banner says it.
+  Notice? get notice =>
+      unreachable.value && identical(problem, _readNotice) ? null : problem;
 
   /// Why a link in an answer did not open. It clears after [linkNoticeFor], or on the next
   /// message or chat opened.
@@ -433,9 +441,8 @@ class ChatController extends ChangeNotifier {
     if (_server != null) unawaited(load());
   }
 
-  /// The title of the [problem] a failed [load] leaves, which the unreachable banner says in its
-  /// own words.
-  static const readFailed = 'Could not read the workspaces';
+  /// The title of the [problem] a failed [load] leaves.
+  static const _readFailed = 'Could not read the workspaces';
 
   /// Reads the workspaces and their chats, keeping the one on screen when it still exists.
   Future<void> load() async {
@@ -444,7 +451,7 @@ class ChatController extends ChangeNotifier {
     loading = true;
     notifyListeners();
     var failed = true;
-    await _try(readFailed, () async {
+    await _try(_readFailed, () async {
       final read = await _api.workspaces();
       if (_server != server) return;
       failed = false;
@@ -465,6 +472,7 @@ class ChatController extends ChangeNotifier {
     });
     if (_server != server) return;
     loading = false;
+    _readNotice = failed ? problem : null;
     unreachable.value = failed;
     (String, String)? tapped;
     if (!failed) {
@@ -593,18 +601,25 @@ class ChatController extends ChangeNotifier {
       // [again] takes what the server has, though it was cleared or cut short elsewhere.
       if (known != null &&
           known.lastOrNull?.unfinished == true &&
-          history.length < known.length) {
+          history.length < known.where((t) => !t.notSent).length) {
         return;
       }
-      _turns[threadSlug] = [
+      _turns[threadSlug] = _withUnsent(threadSlug, [
         for (final m in history)
           Turn.saved(
             m,
             shortcutUse: _useOf(slug, threadSlug, m.role, m.chatId),
           ),
-      ];
+      ]);
     });
   }
+
+  /// [saved], chat [thread]'s turns as the server has them, followed by its questions the server
+  /// never took, which are in no history and stay to be sent again or edited.
+  List<Turn> _withUnsent(String thread, List<Turn> saved) => [
+    ...saved,
+    ...?_turns[thread]?.where((t) => t.notSent),
+  ];
 
   /// Empties the draft, so a send or read meant for the one before leaves it alone.
   void _freshDraft() {
@@ -997,6 +1012,9 @@ class ChatController extends ChangeNotifier {
   /// none. A dropped answer is the first exchange after it ([AnswerWaits.start]).
   final _newest = <String, int>{};
 
+  /// By chat, the history read [_learnNewest] has under way, which only it may take.
+  final _learning = <String, Object>{};
+
   /// Learns chat [thread]'s newest exchange from the [ids] the server gave its history.
   void _learnFrom(String thread, Iterable<int?> ids) =>
       _newest[thread] = ids.map((id) => id ?? -1).fold(-1, max);
@@ -1008,6 +1026,8 @@ class ChatController extends ChangeNotifier {
   void _settle(_Running running, String thread, {String? error}) {
     final answer = running.answer;
     if (answer.waiting) return;
+    // A read started for an earlier answer would say less than this one does.
+    _learning.remove(thread);
     if (answer.chatId case final id?) {
       _newest[thread] = id;
       return;
@@ -1021,14 +1041,18 @@ class ChatController extends ChangeNotifier {
   /// Reads chat [thread]'s history for its newest exchange alone, leaving its turns as they are.
   Future<void> _learnNewest(String slug, String thread) async {
     final server = _server;
+    final go = _learning[thread] = Object();
     try {
       final history = await _api.history(slug, thread);
-      // A newer answer, as a waiting message sent meanwhile, may have named its exchange since.
-      if (_server == server && !_newest.containsKey(thread)) {
+      // Only the latest read counts: an answer that ended meanwhile, as a waiting message
+      // sent since, settled the chat afresh.
+      if (_server == server && identical(_learning[thread], go)) {
         _learnFrom(thread, history.map((m) => m.chatId));
       }
     } on ApiException {
       // Still unknown: a dropped answer then falls back to reading its question.
+    } finally {
+      if (identical(_learning[thread], go)) _learning.remove(thread);
     }
   }
 
@@ -1061,7 +1085,8 @@ class ChatController extends ChangeNotifier {
           _prefs.rememberShortcutUse(running.slug, thread, chatId, use),
         );
       }
-      _settle(running, thread, error: error);
+      // A question the server never took leaves its newest exchange as it was.
+      if (!notSent) _settle(running, thread, error: error);
     }
     running.answer
       ..streaming = false

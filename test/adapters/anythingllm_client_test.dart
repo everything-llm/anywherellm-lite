@@ -739,10 +739,13 @@ void main() {
       ], seen: seen).streamChat('w', 't', 'Hi', mode: mode).drain<void>();
       await ask(null);
       await ask(ChatMode.chat);
-      expect([for (final r in seen) jsonDecode((r as http.Request).body)], [
-        {'message': 'Hi'},
-        {'message': 'Hi', 'mode': 'chat'},
-      ]);
+      expect(
+        [for (final r in seen) jsonDecode((r as http.Request).body)],
+        [
+          {'message': 'Hi'},
+          {'message': 'Hi', 'mode': 'chat'},
+        ],
+      );
     });
 
     test('an answer that goes silent is given up after idle', () async {
@@ -774,6 +777,46 @@ void main() {
       final error = await _failure(api.streamChat('w', 't', 'Hi').drain());
       expect(error, isA<CutOff>());
       expect(error.message, 'The connection dropped: Connection reset');
+    });
+
+    // Before the answer's headers, whether the server has the question decides between waiting
+    // for its answer and Not sent.
+    Future<ApiException> openingFails(
+      Future<http.Response> Function() answer,
+    ) => _failure(
+      _api(
+        (_) => answer(),
+        timeout: const Duration(milliseconds: 50),
+      ).streamChat('w', 't', 'Hi').drain(),
+    );
+
+    test(
+      'no headers within the limit is a CutOff, since the request went out',
+      () async {
+        final error = await openingFails(
+          () => Completer<http.Response>().future,
+        );
+        expect(error, isA<CutOff>());
+        expect(error.message, contains('may still be answering'));
+      },
+    );
+
+    test('a connection closed before the headers is a CutOff', () async {
+      final error = await openingFails(
+        () => throw http.ClientException(
+          'Connection closed before full header was received',
+        ),
+      );
+      expect(error, isA<CutOff>());
+      expect(error.message, contains('closed before the answer began'));
+    });
+
+    test('a server that cannot be reached is Not sent', () async {
+      final error = await openingFails(
+        () => throw const SocketException('Connection refused'),
+      );
+      expect(error, isA<NotSent>());
+      expect(error.message, contains('Connection refused'));
     });
 
     test('sends no mode, so the workspace\'s own chat mode applies', () async {
@@ -1098,13 +1141,13 @@ void main() {
       );
     });
 
-    test('a refused request is decoded like any other', () async {
+    test('a refused request is decoded like any other, and Not sent', () async {
       final stream = streaming([
         '{"error":"Invalid API Key"}',
       ], status: 403).streamChat('w', 't', 'Hi');
       await expectLater(
         stream.toList(),
-        throwsA(isA<ApiException>().having((e) => e.status, 'status', 403)),
+        throwsA(isA<NotSent>().having((e) => e.status, 'status', 403)),
       );
     });
 
