@@ -11,7 +11,7 @@ class Companion {
     this.formerly = const [],
   });
 
-  /// What its `/health` names itself, as `anythingllm-bridge`.
+  /// What its `/health` names itself, as `anywherellm-bridge`.
   final String service;
 
   /// What an older version's `/health` named it, which is still taken as this companion.

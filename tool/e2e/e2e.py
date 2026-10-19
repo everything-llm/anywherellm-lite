@@ -4,7 +4,7 @@
 # ///
 """Runs AnywhereLLM Lite against a real AnythingLLM and the suite's bridge, from the suite's head.
 
-It fetches anythingllm-suite's `main` from GitHub into `build/e2e/suite`, with no pin, so a suite
+It fetches anywherellm-suite's `main` from GitHub into `build/e2e/suite`, with no pin, so a suite
 change that breaks the app fails here, and runs the suite's `tools/e2e` with this script's
 `inside` as its command. `tools/e2e` starts a throwaway AnythingLLM in a container, installs the
 bridge beside it, and removes both afterwards; `inside` starts the model stub in that container,
@@ -49,7 +49,7 @@ from device import (
     tool,
 )
 
-SUITE = "https://github.com/BinaryBand/anythingllm-suite.git"
+SUITE = "https://github.com/BinaryBand/anywherellm-suite.git"
 OUT = ROOT / "build/e2e"
 APK = ROOT / "build/app/outputs/flutter-apk/app-debug.apk"
 STUB_PORT = 8901
@@ -240,7 +240,7 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("stage", nargs="?", choices=["inside"], help=argparse.SUPPRESS)
     p.add_argument("--only", choices=["all", "contract", "phone"], default="all", help="run one half")
-    p.add_argument("--suite", help="a local checkout of anythingllm-suite in place of GitHub's head")
+    p.add_argument("--suite", help="a local checkout of anywherellm-suite in place of GitHub's head")
     p.add_argument("--headless", action="store_true", help="boot without a window")
     p.add_argument("--keep-emulator", action="store_true",
                    help=f"leave {AVD} running, for the next run to use as it is")

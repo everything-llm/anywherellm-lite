@@ -51,7 +51,7 @@ void main() {
         'server', () async {
       final seen = <http.Request>[];
       final api = _answering({
-        'service': 'anythingllm-bridge',
+        'service': 'anywherellm-bridge',
         'server': 'toolkit',
         'ok': true,
       }, seen: seen);
@@ -66,6 +66,13 @@ void main() {
     test('believes the toolkit by its name before the suite', () async {
       expect(
         await _answering({'service': 'anythingllm-toolkit'}).health(),
+        isA<Map<String, dynamic>>(),
+      );
+    });
+
+    test('believes the bridge by its name before the rename', () async {
+      expect(
+        await _answering({'service': 'anythingllm-bridge'}).health(),
         isA<Map<String, dynamic>>(),
       );
     });

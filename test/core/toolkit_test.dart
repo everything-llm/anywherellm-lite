@@ -120,6 +120,7 @@ void main() {
     () {
       expect(companionKey('anythingllm-toolkit'), toolkitCompanion.code);
       expect(companionKey('anythingllm-bridge'), toolkitCompanion.code);
+      expect(companionKey('anywherellm-bridge'), toolkitCompanion.code);
       expect(companionKey('toolkit'), 'toolkit');
       expect(companionKey('other'), 'other');
     },
