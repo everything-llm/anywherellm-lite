@@ -234,6 +234,24 @@ $$\frac{a}{b}$$
     expect(find.byTooltip('Retry'), findsOneWidget);
   });
 
+  testWidgets('a model that cannot see a picture says so, and offers another', (
+    tester,
+  ) async {
+    await _show(
+      tester,
+      'The agent model failed to respond: 400 messages.content.type is invalid, '
+      "allowed values: ['text']",
+    );
+    expect(find.text('This model cannot see pictures'), findsOneWidget);
+    expect(find.text('The model did not answer'), findsNothing);
+    await tester.tap(find.text('Change the model'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Applies to every chat in Q3 planning.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('a streaming answer has no Copy until it ends', (tester) async {
     final llm = _server()..hold = true;
     final h = await pumpApp(tester, llm: llm);

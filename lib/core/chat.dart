@@ -136,6 +136,22 @@ String? modelFailure(String answer) {
   return text.startsWith('The agent model failed to respond') ? text : null;
 }
 
+/// The ways a model's provider says it takes text only, as when a picture was sent: Z.ai's
+/// `allowed values: ['text']`, OpenAI's `image_url is only supported by certain models`,
+/// OpenRouter's `No endpoints found that support image input`, and the plain `does not support
+/// image(s)` or `vision` others send.
+final _textOnly = RegExp(
+  r"allowed values: \[\s*'text'\s*\]"
+  r'|image_url is only supported'
+  r'|support(s)? image input'
+  r'|(does not|doesn.t|not) support (image|images|vision|multimodal)',
+  caseSensitive: false,
+);
+
+/// Whether [failure], a model's failure or a failed answer's error, says the model refused a
+/// picture because it takes text only.
+bool refusesPictures(String failure) => _textOnly.hasMatch(failure);
+
 /// The name a chat takes from its first [message]: its first line, cut to 42 characters.
 String defaultTitle(String message) {
   final line = message.trim().split('\n').first.trim();

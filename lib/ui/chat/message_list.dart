@@ -740,6 +740,25 @@ class _Picture extends StatelessWidget {
   );
 }
 
+/// In place of a failure that says the workspace's chat model takes text only, with Change the
+/// model, which opens the Answer from sheet and its Chat model row.
+class _NoPictures extends StatelessWidget {
+  const _NoPictures();
+
+  @override
+  Widget build(BuildContext context) => AlertBox(
+    AlertKind.bad,
+    'This model cannot see pictures',
+    text:
+        "The workspace's chat model reads text only, so it refused the picture. Choose one "
+        'that reads images in Answer from, Chat model, or ask without the picture.',
+    action: AppButton(
+      'Change the model',
+      onPressed: () => AppScope.of(context).shell.togglePopup(Popup.answerFrom),
+    ),
+  );
+}
+
 class _Answer extends StatelessWidget {
   const _Answer(this.turn, {this.retry});
 
@@ -766,7 +785,9 @@ class _Answer extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (failure != null)
+        if (failure != null && refusesPictures(failure))
+          const _NoPictures()
+        else if (failure != null)
           AlertBox(AlertKind.bad, 'The model did not answer', text: failure)
         else if (split.answer.isNotEmpty)
           AnswerBody(split.answer, muted: cut, caret: inline),
@@ -794,7 +815,10 @@ class _Answer extends StatelessWidget {
             ),
           ),
         ],
-        if (turn.error case final error?) ...[
+        if (turn.error case final error? when refusesPictures(error)) ...[
+          const SizedBox(height: 10),
+          const _NoPictures(),
+        ] else if (turn.error case final error?) ...[
           const SizedBox(height: 10),
           AlertBox(
             AlertKind.bad,

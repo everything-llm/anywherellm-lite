@@ -221,6 +221,25 @@ void main() {
     expect(modelFailure(''), isNull);
   });
 
+  test('a text-only model refusing a picture is told from other failures', () {
+    for (final refusal in [
+      "The agent model failed to respond: 400 messages.content.type is invalid, allowed values: ['text']",
+      'Invalid content type. image_url is only supported by certain models.',
+      'No endpoints found that support image input',
+      'This model does not support images.',
+      "model doesn't support vision",
+    ]) {
+      expect(refusesPictures(refusal), isTrue, reason: refusal);
+    }
+    for (final other in [
+      'The agent model failed to respond: 400 bad input',
+      'The answer took too long.',
+      'The connection dropped.',
+    ]) {
+      expect(refusesPictures(other), isFalse, reason: other);
+    }
+  });
+
   test('only web and mail links open', () {
     expect(
       [
