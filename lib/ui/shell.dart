@@ -26,6 +26,7 @@ import 'upcoming.dart';
 import 'workspace_switcher.dart';
 import 'state/shell_controller.dart';
 import 'tokens.dart';
+import 'widgets/keyboard_up.dart';
 import 'widgets/basics.dart';
 import 'widgets/sheet.dart';
 import 'widgets/window_insets.dart';
@@ -335,10 +336,13 @@ class _AboveKeyboard extends StatelessWidget {
     final inset = MediaQuery.viewInsetsOf(context).bottom;
     return Padding(
       padding: EdgeInsets.only(bottom: inset),
-      child: MediaQuery.removeViewInsets(
-        context: context,
-        removeBottom: true,
-        child: child,
+      child: KeyboardUp(
+        up: inset > 0,
+        child: MediaQuery.removeViewInsets(
+          context: context,
+          removeBottom: true,
+          child: child,
+        ),
       ),
     );
   }

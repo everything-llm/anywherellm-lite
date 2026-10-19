@@ -46,6 +46,50 @@ void main() {
     expect(find.text('The answer stopped'), findsOneWidget);
   });
 
+  testWidgets('a question the server never took says Not sent', (tester) async {
+    final llm = planningServer()
+      ..errors['streamChat'] = const NotSent('Could not reach the server.');
+    final h = await pumpApp(tester, llm: llm);
+    await typeAndEnter(tester, 'How much is recruiting?');
+    await tester.pumpAndSettle();
+    expect(find.text('How much is recruiting?'), findsOneWidget);
+    expect(find.text('Not sent'), findsOneWidget);
+    expect(control('Try again'), findsOneWidget);
+    expect(control('Edit'), findsOneWidget);
+    // The question is all there is: no answer box under it.
+    expect(find.text('The answer stopped'), findsNothing);
+    expect(h.chat.turns.last.notSent, isTrue);
+  });
+
+  testWidgets('Try again sends a question that was not sent', (tester) async {
+    final llm = planningServer()
+      ..errors['streamChat'] = const NotSent('Could not reach the server.');
+    await pumpApp(tester, llm: llm);
+    await typeAndEnter(tester, 'How much is recruiting?');
+    await tester.pumpAndSettle();
+    llm.errors.remove('streamChat');
+    await tester.tap(control('Try again'));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Not sent'), findsNothing);
+    expect(find.text('How much is recruiting?'), findsOneWidget);
+    expect(find.text('Here is what your sources say.'), findsOneWidget);
+  });
+
+  testWidgets('Edit puts a question that was not sent back in the box', (
+    tester,
+  ) async {
+    final llm = planningServer()
+      ..errors['streamChat'] = const NotSent('Could not reach the server.');
+    await pumpApp(tester, llm: llm);
+    await typeAndEnter(tester, 'How much is recruiting?');
+    await tester.pumpAndSettle();
+    await tester.tap(control('Edit'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(composerText(tester), 'How much is recruiting?');
+    expect(find.text('Not sent'), findsNothing);
+    expect(find.text('How much is recruiting?'), findsOneWidget);
+  });
+
   testWidgets('a failed last answer can be asked again', (tester) async {
     final llm = planningServer()..hold = true;
     final h = await pumpApp(tester, llm: llm);

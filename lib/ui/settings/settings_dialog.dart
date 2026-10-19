@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -20,7 +19,6 @@ import 'rows.dart';
 import 'server_page.dart';
 import 'settings_pages.dart';
 import 'walkthrough.dart';
-import '../widgets/window_insets.dart';
 import '../widgets/scroll_fades.dart';
 
 /// Settings: its list over the chat, opened from the shelf's foot, in two groups, This app and
@@ -298,43 +296,14 @@ class _PageView extends StatelessWidget {
         ),
       ),
     );
-    if (!firstRun) {
-      return SingleChildScrollView(
-        key: ValueKey(page),
-        padding: Sizes.pageIn(context),
-        child: column,
-      );
+    // The first run lays out and scrolls itself, to keep Connect above the keyboard.
+    if (firstRun) {
+      return KeyedSubtree(key: ValueKey(page), child: _body(page));
     }
-    // The first run is top-aligned and scrolls, so a short screen loses nothing. How connecting
-    // works sits at the foot while there is room, and follows Connect where there is not.
-    const top = 56.0;
-    final bottom = 8.0 + WindowInsets.of(context).bottom;
-    return LayoutBuilder(
+    return SingleChildScrollView(
       key: ValueKey(page),
-      builder: (context, box) => SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(16, top, 16, bottom),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minHeight: math.max(0, box.maxHeight - top - bottom),
-          ),
-          child: IntrinsicHeight(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                column,
-                const Spacer(),
-                Padding(
-                  padding: const EdgeInsets.only(top: 16),
-                  child: GuideLink(
-                    'How connecting works',
-                    onTap: () => scope.shell.showGuide(Guide.connect),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      padding: Sizes.pageIn(context),
+      child: column,
     );
   }
 

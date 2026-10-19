@@ -249,24 +249,30 @@ class _MessageListState extends State<MessageList> {
             padding: EdgeInsets.only(top: first ? 0 : 16),
             child: Rise(
               child: turn.role == Role.user
-                  ? turn.shortcutUse == null
-                        ? _UserBubble(
-                            turn.text,
-                            attachments: turn.attachments,
-                            onEdit: () => widget.onEdit(turn.text),
-                          )
-                        : ListenableBuilder(
-                            listenable: scope.prefs,
-                            builder: (context, _) => _UserBubble(
-                              turn.text,
-                              attachments: turn.attachments,
-                              shortcutUse: turn.shortcutUse,
-                              hideShortcutPrompt: scope.prefs.prefs.isOn(
-                                ChatSwitch.hideShortcutPrompts,
-                              ),
-                              onEdit: () => widget.onEdit(turn.text),
+                  ? ListenableBuilder(
+                      // Only a shortcut's bubble depends on the preference.
+                      listenable: turn.shortcutUse == null
+                          ? turn
+                          : Listenable.merge([turn, scope.prefs]),
+                      builder: (context, _) => _UserBubble(
+                        turn.text,
+                        attachments: turn.attachments,
+                        shortcutUse: turn.shortcutUse,
+                        hideShortcutPrompt:
+                            turn.shortcutUse != null &&
+                            scope.prefs.prefs.isOn(
+                              ChatSwitch.hideShortcutPrompts,
                             ),
-                          )
+                        notSent: turn.notSent,
+                        onTryAgain: chat.canSendAgain(turn)
+                            ? () => unawaited(chat.sendAgain(turn))
+                            : null,
+                        onEdit: () {
+                          chat.discard(turn);
+                          widget.onEdit(turn.text);
+                        },
+                      ),
+                    )
                   : _Answer(turn, retry: i == 0 ? _retryOf(chat) : null),
             ),
           ),
@@ -602,6 +608,8 @@ class _UserBubble extends StatelessWidget {
     this.attachments = const [],
     this.shortcutUse,
     this.hideShortcutPrompt = false,
+    this.notSent = false,
+    this.onTryAgain,
     required this.onEdit,
   });
 
@@ -612,27 +620,42 @@ class _UserBubble extends StatelessWidget {
   final ShortcutUse? shortcutUse;
   final bool hideShortcutPrompt;
 
+  /// Whether the message never reached the server: its edge is red, with Not sent under it.
+  final bool notSent;
+
+  /// Sends it again, or null when that cannot be done now or the files it carried are gone.
+  final VoidCallback? onTryAgain;
+
   /// Puts [text] back in the composer, to ask again as a new message.
   final VoidCallback onEdit;
 
   /// The bubble stands alone, at most 300 wide, as the Lite prototype draws it, and a long press
-  /// on it is Edit.
+  /// on it is Edit. A message that was not sent has Not sent, Try again and Edit under it.
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Semantics(
-        customSemanticsActions: {
-          const CustomSemanticsAction(label: 'Edit'): onEdit,
-        },
-        child: GestureDetector(
-          onLongPress: onEdit,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 300),
-            child: _bubble(context),
-          ),
+    final bubble = Semantics(
+      customSemanticsActions: {
+        const CustomSemanticsAction(label: 'Edit'): onEdit,
+      },
+      child: GestureDetector(
+        onLongPress: onEdit,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 300),
+          child: _bubble(context),
         ),
       ),
+    );
+    if (!notSent) return Align(alignment: Alignment.centerRight, child: bubble);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        bubble,
+        // The buttons are 44 tall, so the row tucks up under the bubble and out to the right.
+        Transform.translate(
+          offset: const Offset(12, -6),
+          child: _NotSent(onTryAgain: onTryAgain, onEdit: onEdit),
+        ),
+      ],
     );
   }
 
@@ -643,6 +666,7 @@ class _UserBubble extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: t.bubble,
+        border: notSent ? Border.all(color: t.badfg) : null,
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(24),
           topRight: Radius.circular(24),
@@ -682,6 +706,39 @@ class _UserBubble extends StatelessWidget {
                 null => _FileName(file.name),
               },
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// What stands under a message that did not reach the server: Not sent in red, then Try again,
+/// which sends it as it was, and Edit, which puts its words back in the message box.
+class _NotSent extends StatelessWidget {
+  const _NotSent({required this.onTryAgain, required this.onEdit});
+
+  final VoidCallback? onTryAgain;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AppIcon('alert', size: IconSize.small, color: t.badfg),
+          const SizedBox(width: 6),
+          Text(
+            'Not sent',
+            style: Type.sans(13, weight: FontWeight.w700, color: t.badfg),
+          ),
+          const SizedBox(width: 6),
+          if (onTryAgain case final again?)
+            TextAction.plain('Try again', again, weight: FontWeight.w600),
+          TextAction.plain('Edit', onEdit, weight: FontWeight.w600),
         ],
       ),
     );

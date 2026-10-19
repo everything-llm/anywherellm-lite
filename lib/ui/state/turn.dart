@@ -58,6 +58,10 @@ class Turn extends ChangeNotifier {
   /// Why the answer failed, or null.
   String? error;
 
+  /// Whether this question never reached the server: the chat shows it as Not sent, to try
+  /// again or edit.
+  bool notSent = false;
+
   /// Whether the person stopped the answer.
   bool stopped = false;
 

@@ -19,11 +19,15 @@ class AppButton extends StatelessWidget {
     this.quiet = false,
     this.icon,
     this.leading,
+    this.compact = false,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final bool primary;
+
+  /// A button 48 tall with its label at 15, for two side by side inside a card.
+  final bool compact;
 
   /// A destructive action that is not the primary one: its label in [Tokens.badfg].
   final bool danger;
@@ -41,7 +45,7 @@ class AppButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    const height = 52.0;
+    final height = compact ? 48.0 : 52.0;
     final fg = primary
         ? t.onaccent
         : danger
@@ -80,7 +84,11 @@ class AppButton extends StatelessWidget {
                 child: Text(
                   label,
                   textAlign: TextAlign.center,
-                  style: Type.sans(16, weight: FontWeight.w500, color: fg),
+                  style: Type.sans(
+                    compact ? 15 : 16,
+                    weight: FontWeight.w500,
+                    color: fg,
+                  ),
                 ),
               ),
               if (icon case final icon?) ...[

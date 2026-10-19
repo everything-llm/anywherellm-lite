@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:async';
 
 import 'package:anywherellm/core/chat.dart';
+import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/server_models.dart';
@@ -185,6 +186,74 @@ void main() {
     await pumpEventQueue();
     expect(rig.chat.turns.last.error, 'No LLM set');
     expect(rig.chat.busy, isFalse);
+  });
+
+  group('a question the server never took', () {
+    test('stays in the chat as Not sent, with no answer under it', () async {
+      final llm = planningServer()
+        ..errors['streamChat'] = const NotSent('Could not reach h');
+      final rig = await started(llm);
+      final before = rig.chat.turns.length;
+      await rig.chat.send('How much is recruiting?');
+      await pumpEventQueue();
+      expect(rig.chat.turns, hasLength(before + 1));
+      final question = rig.chat.turns.last;
+      expect(question.role, Role.user);
+      expect(question.notSent, isTrue);
+      expect(rig.chat.busy, isFalse);
+    });
+
+    test('goes again with Try again, in its place', () async {
+      final llm = planningServer()
+        ..errors['streamChat'] = const NotSent('Could not reach h');
+      final rig = await started(llm);
+      final before = rig.chat.turns.length;
+      await rig.chat.send('How much is recruiting?');
+      await pumpEventQueue();
+      llm.errors.remove('streamChat');
+      final question = rig.chat.turns.last;
+      expect(rig.chat.canSendAgain(question), isTrue);
+      await rig.chat.sendAgain(question);
+      await pumpEventQueue();
+      expect(rig.chat.turns, hasLength(before + 2));
+      expect(rig.chat.turns[before].notSent, isFalse);
+      expect(rig.chat.turns[before].text, 'How much is recruiting?');
+      expect(rig.chat.turns.last.role, Role.assistant);
+    });
+
+    test('is taken out of the chat when it is edited instead', () async {
+      final llm = planningServer()
+        ..errors['streamChat'] = const NotSent('Could not reach h');
+      final rig = await started(llm);
+      final before = rig.chat.turns.length;
+      await rig.chat.send('How much is recruiting?');
+      await pumpEventQueue();
+      rig.chat.discard(rig.chat.turns.last);
+      expect(rig.chat.turns, hasLength(before));
+    });
+
+    test('in a new chat leaves the question in the draft', () async {
+      final llm = planningServer()
+        ..errors['createThread'] = const ApiException('Could not reach h');
+      final rig = await started(llm);
+      rig.chat.newChat();
+      await rig.chat.send('First question');
+      await pumpEventQueue();
+      expect(rig.chat.turns, hasLength(1));
+      expect(rig.chat.turns.single.notSent, isTrue);
+    });
+
+    test('with the files it carried cannot be sent again', () async {
+      final llm = planningServer()
+        ..errors['streamChat'] = const NotSent('Could not reach h');
+      final rig = await started(llm);
+      await rig.chat.send(
+        'Read this',
+        attachments: [Attachment.of('a.txt', Uint8List(1))],
+      );
+      await pumpEventQueue();
+      expect(rig.chat.canSendAgain(rig.chat.turns.last), isFalse);
+    });
   });
 
   test('an image is read once, and again after a failed read', () async {

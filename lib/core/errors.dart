@@ -24,6 +24,12 @@ class CutOff extends ApiException {
   const CutOff(super.message);
 }
 
+/// A message that did not reach the server: it could not be reached or refused the question
+/// before any answer began, so nothing was saved and sending it again is safe.
+class NotSent extends ApiException {
+  const NotSent(super.message, {super.status});
+}
+
 final _exceptionPrefix = RegExp('^Exception: ');
 
 /// [error]'s message without Dart's `Exception: ` prefix.

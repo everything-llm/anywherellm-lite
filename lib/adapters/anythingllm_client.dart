@@ -383,9 +383,9 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       _send('GET', path, null, on: on);
 
   /// The events of a POST of [body] to [path], whose answer streams server-sent events. A
-  /// failed status is an [ApiException] with the server's words; a stream that drops or falls
-  /// silent once it has begun is a [CutOff], since the server may still finish it. A
-  /// cancel lets go of the response at once, even before the first event, as the `async*`
+  /// failed status, or a server that cannot be reached, is a [NotSent] with the server's words; a
+  /// stream that drops or falls silent once it has begun is a [CutOff], since the server may
+  /// still finish it. A cancel lets go of the response at once, even before the first event, as the `async*`
   /// readers of [chatEvents] would not until their next `yield`: the server stops answering
   /// when the connection closes.
   Stream<ChatEvent> _events(
@@ -412,6 +412,12 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
         ),
         http.ClientException(:final message) => ApiException(
           'The answer was cut off: $message',
+        ),
+        NotConfigured() => error,
+        // Before the headers came the server never took the question.
+        ApiException(:final message, :final status) when !began => NotSent(
+          message,
+          status: status,
         ),
         _ => error,
       });

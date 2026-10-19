@@ -67,6 +67,30 @@ void main() {
     expectAboveKeyboard(tester, key, phone, keyboard);
   });
 
+  testWidgets('Connect stays above the keyboard on the first run', (
+    tester,
+  ) async {
+    final h = await pumpApp(
+      tester,
+      llm: planningServer(),
+      size: phone,
+      connection: null,
+    );
+    h.shell.openSettings(SettingsPage.connection);
+    await tester.pumpAndSettle();
+    expect(control('How connecting works'), findsOneWidget);
+    final field = typingField(find.byType(SettingsDialog)).first;
+    await tester.tap(field);
+    raiseKeyboard(tester, keyboard);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(focused(tester, field), isTrue);
+    expectAboveKeyboard(tester, control('Connect'), phone, keyboard);
+    expectAboveKeyboard(tester, field, phone, keyboard);
+    // The page is all fields now: the help link waits for the keyboard to go.
+    expect(control('How connecting works'), findsNothing);
+  });
+
   testWidgets('a phone on its side keeps the composer above the keyboard', (
     tester,
   ) async {

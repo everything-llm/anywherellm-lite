@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -13,6 +14,8 @@ import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/phone_page.dart';
 import '../widgets/tappable.dart';
+import '../settings/settings_pages.dart';
+import '../state/chat_controller.dart';
 import '../state/shell_controller.dart';
 import 'composer.dart';
 import 'message_list.dart';
@@ -49,19 +52,34 @@ class _ChatViewState extends State<ChatView> {
       children: [
         const _Header(),
         ListenableBuilder(
-          listenable: Listenable.merge([scope.chat, scope.prefs]),
+          listenable: Listenable.merge([
+            scope.chat,
+            scope.prefs,
+            scope.chat.unreachable,
+          ]),
           builder: (context, _) {
+            // A server that cannot be reached has the banner, in place of the read's failure.
+            final unreachable =
+                scope.chat.unreachable.value && scope.settings.configured;
+            final problem = scope.chat.problem;
+            final readFailed =
+                unreachable && problem?.title == ChatController.readFailed;
             final notices = [
-              ?(scope.chat.problem ?? scope.prefs.problem),
+              ?(readFailed
+                  ? scope.prefs.problem
+                  : problem ?? scope.prefs.problem),
               ?scope.chat.linkNotice,
             ];
-            if (notices.isEmpty) return const SizedBox.shrink();
+            if (!unreachable && notices.isEmpty) return const SizedBox.shrink();
             return Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              padding: unreachable
+                  ? const EdgeInsets.fromLTRB(16, 4, 16, 0)
+                  : const EdgeInsets.fromLTRB(20, 12, 20, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 spacing: 8,
                 children: [
+                  if (unreachable) const _Unreachable(),
                   for (final n in notices) AlertBox.notice(AlertKind.bad, n),
                 ],
               ),
@@ -95,6 +113,120 @@ class _ChatViewState extends State<ChatView> {
             child: Composer(draft: _draft, focus: _focus),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The banner under the header while the server cannot be reached: what to check, the address,
+/// Try again, which reads the workspaces at once, and Connection, which opens the address and
+/// key. The chat stays readable and the message box stays open.
+class _Unreachable extends StatelessWidget {
+  const _Unreachable();
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final t = Tokens.of(context);
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+        decoration: BoxDecoration(
+          color: t.panel,
+          border: Border.all(color: t.line2),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: t.shadow,
+              blurRadius: 24,
+              spreadRadius: -12,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 14,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: 12,
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: t.hover,
+                    shape: BoxShape.circle,
+                  ),
+                  child: AppIcon(
+                    'alert',
+                    size: IconSize.normal,
+                    color: t.badfg,
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    spacing: 4,
+                    children: [
+                      Text(
+                        'Can’t reach your AnythingLLM',
+                        style: Type.sans(
+                          16,
+                          weight: FontWeight.w600,
+                          color: t.ink,
+                          height: 1.3,
+                        ),
+                      ),
+                      Text(
+                        'Check that the computer is on and that this phone is on the '
+                        'same network.',
+                        style: Type.sans(14, color: t.ink2, height: 1.45),
+                      ),
+                      if (scope.settings.connection case final server?)
+                        Text(
+                          server.baseUrl,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Type.mono(12, color: t.muted),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            Row(
+              spacing: 8,
+              children: [
+                Expanded(
+                  child: ListenableBuilder(
+                    listenable: scope.chat,
+                    builder: (context, _) => AppButton(
+                      'Try again',
+                      primary: true,
+                      compact: true,
+                      onPressed: scope.chat.loading
+                          ? null
+                          : () => unawaited(scope.chat.load()),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: AppButton(
+                    'Connection',
+                    compact: true,
+                    onPressed: () =>
+                        scope.shell.openSettings(SettingsPage.connection),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

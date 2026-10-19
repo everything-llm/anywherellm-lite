@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -14,6 +15,8 @@ import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
 import '../widgets/fields.dart';
+import '../widgets/keyboard_up.dart';
+import '../widgets/window_insets.dart';
 import 'walkthrough.dart';
 import 'rows.dart';
 import 'scan_view.dart';
@@ -26,22 +29,7 @@ class ConnectionPage extends StatelessWidget {
   const ConnectionPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final settings = AppScope.of(context).settings;
-    return ListenableBuilder(
-      listenable: settings,
-      builder: (context, child) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: 28,
-        children: [
-          // With nothing saved, it opens on the first run's welcome.
-          if (settings.connection == null) const _Welcome(),
-          child!,
-        ],
-      ),
-      child: const _KeyCard(),
-    );
-  }
+  Widget build(BuildContext context) => const _KeyCard();
 }
 
 /// The first run, over the key form: what to do to connect, inset to line up with the field labels.
@@ -395,16 +383,51 @@ class _KeyCardState extends State<_KeyCard> {
     );
   }
 
-  /// The first run: Scan QR code first where there is a camera, then the address and the
-  /// developer key, each under its name, where to find a key, and Connect, in groups 28 apart
-  /// with 12 or less inside one. Connect is the filled button; Scan QR code is outlined, with a
-  /// QR icon before its label. How connecting works is under the page, in the settings dialog.
+  /// The first run: the welcome, Scan QR code first where there is a camera, then the address and
+  /// the developer key, each under its name, where to find a key, and Connect, in groups 28
+  /// apart with 12 or less inside one. Connect is the filled button; Scan QR code is outlined,
+  /// with a QR icon before its label. It is top-aligned and scrolls, so a short screen loses
+  /// nothing: How connecting works sits at the foot while there is room and follows Connect where
+  /// there is not. With the keyboard up Connect leaves the page and stays above the keyboard, in
+  /// a bar of its own.
   Widget _firstRun(BuildContext context, bool saving, VoidCallback startScan) {
     final scanner = _scanner;
-    return Column(
+    final typing = KeyboardUp.of(context);
+    final t = Tokens.of(context);
+    final connect = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 12,
+      children: [
+        // Why the last try failed, in a line kept for it, which the bar over the keyboard has
+        // only while there is something to say.
+        if (!typing || _notes.isNotEmpty)
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 20),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: 8,
+                children: [
+                  for (final note in _notes) HelpText(note, status: true),
+                ],
+              ),
+            ),
+          ),
+        AppButton(
+          saving ? 'Checking…' : 'Connect',
+          primary: true,
+          onPressed: saving ? null : _save,
+        ),
+        if (_settings.keyringProblem case final problem?)
+          AlertBox.notice(AlertKind.warn, problem),
+      ],
+    );
+    final page = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       spacing: 28,
       children: [
+        const _Welcome(),
         if (scanner != null)
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -447,33 +470,67 @@ class _KeyCardState extends State<_KeyCard> {
             ),
           ],
         ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 12,
-          children: [
-            // Why the last try failed, in a line kept for it.
-            ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 20),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  spacing: 8,
-                  children: [
-                    for (final note in _notes) HelpText(note, status: true),
-                  ],
+        if (!typing) connect,
+      ],
+    );
+    const top = 56.0;
+    final foot = 8.0 + WindowInsets.of(context).bottom;
+    final bottom = typing ? 16.0 : foot;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, box) => SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(16, top, 16, bottom),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: math.max(0, box.maxHeight - top - bottom),
+                ),
+                child: IntrinsicHeight(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Align(
+                        alignment: Alignment.topLeft,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 680),
+                          child: page,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (!typing)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 16),
+                          child: GuideLink(
+                            'How connecting works',
+                            onTap: () => _shell.showGuide(Guide.connect),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
-            AppButton(
-              saving ? 'Checking…' : 'Connect',
-              primary: true,
-              onPressed: saving ? null : _save,
-            ),
-            if (_settings.keyringProblem case final problem?)
-              AlertBox.notice(AlertKind.warn, problem),
-          ],
+          ),
         ),
+        if (typing)
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: t.bg,
+              border: Border(top: BorderSide(color: t.line2)),
+            ),
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 680),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: connect,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

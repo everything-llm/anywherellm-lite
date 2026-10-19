@@ -43,8 +43,9 @@ class _Deleted {
 /// An answer running: the chat it belongs to, null while its draft's thread is being made, and
 /// the stream it reads.
 class _Running {
-  _Running(this.answer, this.slug, this.shortcutUse);
+  _Running(this.question, this.answer, this.slug, this.shortcutUse);
 
+  final Turn question;
   final Turn answer;
 
   /// The workspace the answer runs in.
@@ -230,7 +231,7 @@ class ChatController extends ChangeNotifier {
       final user = Turn.user(first.text, shortcutUse: first.shortcutUse);
       final answer = Turn.answer();
       _turns[thread] = [...turns, user, answer];
-      final running = _Running(answer, deck.slug, first.shortcutUse)
+      final running = _Running(user, answer, deck.slug, first.shortcutUse)
         ..thread = thread;
       _runs.add(running);
       if (thread == activeThread) _sends++;
@@ -432,6 +433,10 @@ class ChatController extends ChangeNotifier {
     if (_server != null) unawaited(load());
   }
 
+  /// The title of the [problem] a failed [load] leaves, which the unreachable banner says in its
+  /// own words.
+  static const readFailed = 'Could not read the workspaces';
+
   /// Reads the workspaces and their chats, keeping the one on screen when it still exists.
   Future<void> load() async {
     if (_server == null) return;
@@ -439,7 +444,7 @@ class ChatController extends ChangeNotifier {
     loading = true;
     notifyListeners();
     var failed = true;
-    await _try('Could not read the workspaces', () async {
+    await _try(readFailed, () async {
       final read = await _api.workspaces();
       if (_server != server) return;
       failed = false;
@@ -812,7 +817,8 @@ class ChatController extends ChangeNotifier {
     );
     final answer = Turn.answer();
     final turns = [...this.turns, user, answer];
-    final running = _Running(answer, slug, shortcutUse)..thread = activeThread;
+    final running = _Running(user, answer, slug, shortcutUse)
+      ..thread = activeThread;
     _runs.add(running);
     final server = _server;
     final draftGo = _draftGo;
@@ -840,7 +846,7 @@ class ChatController extends ChangeNotifier {
           ..thread = made.slug
           ..nameAs = text;
       } on ApiException catch (error) {
-        _finish(running, error: error.message);
+        _finish(running, error: error.message, notSent: true);
         return true;
       }
       // Stopped while the thread was being made: the chat stays, the answer does not run.
@@ -872,6 +878,7 @@ class ChatController extends ChangeNotifier {
         _finish(
           running,
           error: error is ApiException ? error.message : '$error',
+          notSent: error is NotSent,
         );
       },
       onDone: () => _finish(running),
@@ -892,6 +899,39 @@ class ChatController extends ChangeNotifier {
         !turns.last.waiting &&
         turns[turns.length - 2].role == Role.user &&
         turns[turns.length - 2].attachments.isEmpty;
+  }
+
+  /// Takes [turn] out of whichever chat holds it, as a new list.
+  void _dropTurn(Turn turn) {
+    List<Turn> without(List<Turn> turns) => [
+      for (final t in turns)
+        if (!identical(t, turn)) t,
+    ];
+    for (final thread in _turns.keys.toList()) {
+      if (_turns[thread]!.any((t) => identical(t, turn))) {
+        _turns[thread] = without(_turns[thread]!);
+      }
+    }
+    if (_draft.any((t) => identical(t, turn))) _draft = without(_draft);
+  }
+
+  /// Whether [sendAgain] can send [question], a [Turn.notSent] one, now: it carried no files,
+  /// whose bytes are not kept, and the chat can take a message.
+  bool canSendAgain(Turn question) =>
+      question.notSent && question.attachments.isEmpty && !busy && ready;
+
+  /// Sends [question], which did not reach the server, again in its place.
+  Future<void> sendAgain(Turn question) async {
+    if (!canSendAgain(question)) return;
+    _dropTurn(question);
+    await send(question.text, shortcutUse: question.shortcutUse);
+  }
+
+  /// Takes [question], which did not reach the server, out of the chat, to be written again.
+  void discard(Turn question) {
+    if (!question.notSent) return;
+    _dropTurn(question);
+    notifyListeners();
   }
 
   /// Asks the chat's last question again, in place of its answer here. The server keeps the old
@@ -999,8 +1039,10 @@ class ChatController extends ChangeNotifier {
     if (thread != activeThread || slug != activeSlug) _ready[thread] = slug;
   }
 
-  /// Ends [running], with [error] when it failed, unless it was already stopped or dropped.
-  void _finish(_Running running, {String? error}) {
+  /// Ends [running], with [error] when it failed, unless it was already stopped or dropped. A
+  /// [notSent] question never reached the server: it stays in the chat marked [Turn.notSent],
+  /// with no answer under it.
+  void _finish(_Running running, {String? error, bool notSent = false}) {
     if (!_runs.remove(running)) return;
     if ((running.thread, running.nameAs) case (final thread?, final message?)
         when !_named.contains(thread)) {
@@ -1026,6 +1068,12 @@ class ChatController extends ChangeNotifier {
       ..status = null
       ..error = error
       ..notifyListeners();
+    if (notSent) {
+      running.question
+        ..notSent = true
+        ..notifyListeners();
+      _dropTurn(running.answer);
+    }
     // Before telling anyone, so [working] holds while a chat has messages waiting.
     _sendOnDeck();
     notifyListeners();

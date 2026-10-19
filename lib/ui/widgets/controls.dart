@@ -107,7 +107,7 @@ class SwitchTrack extends StatelessWidget {
   }
 }
 
-/// The block that blinks at the end of an answer while it streams. Still when the system asks
+/// The bar, 2 wide and 18 tall, that blinks at the end of an answer while it streams. Still when the system asks
 /// for reduced motion.
 class Caret extends StatefulWidget {
   const Caret({super.key});
@@ -146,7 +146,7 @@ class _CaretState extends State<Caret> with SingleTickerProviderStateMixin {
         animation: _blink,
         builder: (context, child) =>
             Opacity(opacity: _blink.value < 0.5 ? 1 : 0, child: child),
-        child: Container(width: 7, height: 16, color: t.accent),
+        child: Container(width: 2, height: 18, color: t.accent),
       ),
     );
   }
