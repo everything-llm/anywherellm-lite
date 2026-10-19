@@ -14,7 +14,13 @@ final _page = RegExp(r'^/([^/]+)/[A-Za-z0-9_-]+\.html$');
 bool isBrowserTab(Uri link, Uri? server) =>
     isSkillPage(link, server, 'browser-lean');
 
-/// Whether [link] is library-lean's Library page, `/library-lean/<token>.html`, where the person
-/// gives a service's key or OAuth client without the agent seeing it.
+/// Whether [link] is library-lean's Library page, `/library-lean/<token>.html`, its toolkits and
+/// runs.
 bool isLibraryPage(Uri link, Uri? server) =>
     isSkillPage(link, server, 'library-lean');
+
+/// Whether [link] is the Vault, `/vault-lean/<token>.html`, the page the skills that keep secrets
+/// share: where the person gives a service's key or OAuth client without the agent seeing it, and
+/// sees and deletes every saved key, sign-in and login.
+bool isVaultPage(Uri link, Uri? server) =>
+    isSkillPage(link, server, 'vault-lean');

@@ -382,6 +382,26 @@ void main() {
     });
   });
 
+  testWidgets('the Vault opens in a sheet over the chat, in the app\'s theme', (
+    tester,
+  ) async {
+    final h = await pumpApp(
+      tester,
+      llm: answering('Enter it on [the Vault](/vault-lean/aB3_-x9.html)'),
+      canViewApps: true,
+    );
+    await tapLink(tester, 'the Vault');
+    await tester.pumpAndSettle();
+    expect(h.shell.popup.value, isA<PageOpen>());
+    expect(
+      find.text(
+        'Web view of https://h:3001/vault-lean/aB3_-x9.html?theme=light',
+      ),
+      findsOneWidget,
+    );
+    expect(h.opened, isEmpty);
+  });
+
   testWidgets('without a web view an apps-lean page opens in the browser', (
     tester,
   ) async {

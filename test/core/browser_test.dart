@@ -48,6 +48,23 @@ void main() {
     },
   );
 
+  test('the Vault is its page on the server\'s host', () {
+    bool vault(String link) => isVaultPage(Uri.parse(link), server);
+    expect(
+      vault('https://owen.example.ts.net:3001/vault-lean/aB3_-x9.html'),
+      isTrue,
+    );
+    expect(vault('https://evil.test/vault-lean/aB3.html'), isFalse);
+    expect(
+      vault('https://owen.example.ts.net:3001/library-lean/aB3.html'),
+      isFalse,
+    );
+    expect(
+      vault('https://owen.example.ts.net:3001/vault-lean/aB3-keys.json'),
+      isFalse,
+    );
+  });
+
   test('the Library page is library-lean\'s page on the server\'s host', () {
     bool library(String link) => isLibraryPage(Uri.parse(link), server);
     expect(
