@@ -18,26 +18,34 @@ UI dump, the log lines each step produced, a manifest and an `index.html` contac
 import argparse
 import html
 import json
-import os
 import re
-import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
 import tomllib
-from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from xml.etree import ElementTree
 
 HERE = Path(__file__).parent
 ROOT = HERE.parent.parent
-PACKAGE = "local.anywherellm.lite"
+sys.path.insert(0, str(ROOT / "tool"))
+from device import (
+    PACKAGE,
+    Device,
+    Driver,
+    StepError,
+    close_device,
+    install,
+    open_device,
+    print_labels,
+    restore,
+    steady,
+)
+
 ENTRYPOINT = "tool/audit_app.dart"
 APK = ROOT / "build/app/outputs/flutter-apk/app-debug.apk"
-SCALES = ("window_animation_scale", "transition_animation_scale", "animator_duration_scale")
 # Lines in the log that an audit reader wants to see.
 FINDINGS = {
     "overflow": re.compile(r"RenderFlex overflowed|overflowed by"),
@@ -46,123 +54,17 @@ FINDINGS = {
 }
 
 
-class StepError(Exception):
-    """A step could not do what it says; the walk goes on with the next step."""
-
-
-def poll(test: Callable[[], object], seconds: float, every: float, failure: str) -> None:
-    """Calls [test] every [every] seconds until it is true, or fails with [failure]."""
-    deadline = time.time() + seconds
-    while time.time() < deadline:
-        if test():
-            return
-        time.sleep(every)
-    raise StepError(failure)
-
-
-def sdk() -> Path:
-    home = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT")
-    return Path(home) if home else Path.home() / "Android/Sdk"
-
-
-def tool(name: str, sub: str) -> str:
-    return shutil.which(name) or str(sdk() / sub / name)
-
-
-class Device:
-    """One emulator, driven through adb."""
-
-    def __init__(self, serial: str):
-        self.serial = serial
-        self.adb = tool("adb", "platform-tools")
-        self.size = (0, 0)
-        self.xml = ""  # the last dump's XML
-
-    def run(self, *args: str, check: bool = True, timeout: float = 120, binary: bool = False):
-        done = subprocess.run(
-            [self.adb, "-s", self.serial, *args],
-            capture_output=True, text=not binary, timeout=timeout,
-        )
-        if check and done.returncode != 0:
-            raise StepError(f"adb {' '.join(args)}: {(done.stderr or done.stdout)!s:.500}")
-        return done.stdout
-
-    def shell(self, command: str, **kwargs) -> str:
-        return self.run("shell", command, **kwargs)
-
-    def night(self, mode: str) -> None:
-        """Sets the device's dark theme: yes, no or auto."""
-        self.shell(f"cmd uimode night {mode}", check=False)
-
-    def prop(self, name: str) -> str:
-        return self.shell(f"getprop {name}").strip()
-
-    def screenshot(self, path: Path) -> None:
-        png = self.run("exec-out", "screencap", "-p", binary=True)
-        if not png.startswith(b"\x89PNG"):
-            raise StepError("screencap returned no picture")
-        path.write_bytes(png)
-
-    def dump(self) -> list[dict]:
-        """The nodes on screen: label, bounds, kind and whether they take a tap. A field's label
-        is its hint while it is empty."""
-        for _ in range(4):
-            if "dumped" in self.shell("uiautomator dump /sdcard/audit.xml", check=False):
-                break
-            time.sleep(0.5)
-        else:
-            raise StepError("uiautomator could not dump the screen")
-        self.xml = self.run("exec-out", "cat", "/sdcard/audit.xml")
-        nodes = []
-        w, h = self.size
-        for node in ElementTree.fromstring(self.xml).iter("node"):
-            m = re.match(r"\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]", node.get("bounds", ""))
-            if not m:
-                continue
-            l, t, r, b = map(int, m.groups())
-            if r <= l or b <= t or r <= 0 or l >= w or b <= 0 or t >= h:
-                continue
-            nodes.append({
-                "label": node.get("content-desc") or node.get("text") or node.get("hint") or "",
-                "kind": node.get("class", "").rsplit(".", 1)[-1],
-                "clickable": node.get("clickable") == "true",
-                "package": node.get("package", ""),
-                "box": (max(l, 0), max(t, 0), min(r, w), min(b, h)),
-            })
-        return nodes
-
-
-def find(nodes: list[dict], wanted: str) -> dict | None:
-    """The first node whose label is [wanted], tried exactly, ignoring case, as a start, then as
-    a part."""
-    labeled = [n for n in nodes if n["label"]]
-    low = wanted.lower()
-    for test in (
-        lambda s: s == wanted,
-        lambda s: s.lower() == low,
-        lambda s: s.lower().startswith(low),
-        lambda s: low in s.lower(),
-    ):
-        if hit := next((n for n in labeled if test(n["label"])), None):
-            return hit
-    return None
-
-
-class Walk:
+class Walk(Driver):
     """Runs steps on the device, taking each screenshot once in each of [themes]: the app follows
-    the device's theme as it changes, so one walk serves them all."""
+    the device's theme as it changes, so one walk serves them all. A failed step does not stop
+    the walk; the next step goes on."""
 
     def __init__(self, device: Device, out: Path, themes: list[str]):
-        self.d = device
-        self.out = out
+        super().__init__(device, out)
         self.themes = themes
         self.theme = ""  # the device's theme, once this walk has set it
         self.step = {"index": 0, "name": "try"}
         self.shots: list[dict] = []
-        # An input went in that the screen may still be answering. A dump waits for the screen
-        # to settle (uiautomator waits for a second of quiet), so only an action that does not
-        # dump first waits for it, in [settle].
-        self.unsettled = False
 
     def stem(self) -> str:
         return f"{self.step['index']:02d}-{self.step['name']}"
@@ -175,78 +77,9 @@ class Walk:
         self.theme = theme
         return True
 
-    def settle(self) -> None:
-        if self.unsettled:
-            time.sleep(0.6)
-            self.unsettled = False
-
-    def nodes(self) -> list[dict]:
-        """The nodes on screen, once it has settled."""
-        nodes = self.d.dump()
-        self.unsettled = False
-        return nodes
-
-    def launch(self) -> None:
-        self.d.shell(f"am force-stop {PACKAGE}")
+    def before_launch(self) -> None:
         if self.themes:
             self.use_theme(self.themes[0])
-        self.d.shell(f"monkey -p {PACKAGE} -c android.intent.category.LAUNCHER 1")
-
-        def shows() -> bool:
-            try:
-                return any(n["package"] == PACKAGE and n["label"] for n in self.nodes())
-            except StepError:
-                return False
-
-        poll(shows, 30, 0.5, "the app did not show anything within 30 s")
-        self.unsettled = True
-
-    def locate(self, wanted: str) -> dict:
-        """The control labelled [wanted], scrolling up to four times to find it."""
-        for _ in range(4):
-            if node := find(self.nodes(), wanted):
-                return node
-            self.swipe("up")
-        if node := find(self.nodes(), wanted):
-            return node
-        raise StepError(f"no control labelled {wanted!r}")
-
-    def swipe(self, way: str) -> None:
-        w, h = self.d.size
-        x, y = w // 2, h // 2
-        dx, dy = {"up": (0, -h // 4), "down": (0, h // 4), "left": (-w // 3, 0), "right": (w // 3, 0)}[way]
-        self.d.shell(f"input swipe {x} {y} {x + dx} {y + dy} 250")
-        self.unsettled = True
-
-    def do(self, action: str) -> None:
-        verb, _, arg = action.partition(" ")
-        arg = arg.strip()
-        match verb:
-            case "tap" | "hold":
-                l, t, r, b = self.locate(arg)["box"]
-                x, y = (l + r) // 2, (t + b) // 2
-                self.d.shell(f"input swipe {x} {y} {x} {y} {900 if verb == 'hold' else 40}")
-                self.unsettled = True
-            case "type":
-                self.settle()
-                self.d.shell("input text " + shlex.quote(arg.replace(" ", "%s")))
-                time.sleep(0.4)
-            case "swipe":
-                self.settle()
-                self.swipe(arg)
-            case "wait":
-                poll(lambda: find(self.nodes(), arg), 12, 0.6, f"{arg!r} never showed")
-            case "sleep":
-                time.sleep(float(arg))
-                self.unsettled = False
-            case "intent":
-                self.settle()
-                self.d.shell("am " + arg.replace("{pkg}", PACKAGE))
-                time.sleep(1.5)
-            case "shot":
-                self.shoot(arg)
-            case _:
-                raise StepError(f"unknown action {action!r}")
 
     def shoot(self, suffix: str = "", failed: bool = False) -> None:
         """A screenshot in each theme, starting in the device's own, and the screen's dump."""
@@ -301,38 +134,6 @@ class Walk:
 # --- Device, build and packaging ---------------------------------------------------------
 
 
-def running_emulators() -> list[str]:
-    out = subprocess.run([tool("adb", "platform-tools"), "devices"], capture_output=True, text=True).stdout
-    return [line.split()[0] for line in out.splitlines()[1:] if line.startswith("emulator-") and "device" in line]
-
-
-def boot(avd: str | None, headless: bool) -> tuple[str, subprocess.Popen]:
-    emulator = tool("emulator", "emulator")
-    if not avd:
-        avds = subprocess.run([emulator, "-list-avds"], capture_output=True, text=True).stdout.split()
-        if not avds:
-            sys.exit("no emulator is running and no AVD exists; make one with avdmanager")
-        avd = avds[0]
-    args = [emulator, "-avd", avd, "-no-snapshot-save", "-no-audio", "-no-boot-anim"]
-    if headless:
-        args.append("-no-window")
-    print(f"booting {avd}...")
-    process = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-    def booted() -> bool:
-        if process.poll() is not None:
-            sys.exit(f"the emulator exited with {process.returncode}")
-        serials = running_emulators()
-        return bool(serials) and Device(serials[0]).prop("sys.boot_completed") == "1"
-
-    try:
-        poll(booted, 300, 3, "the emulator did not boot within 5 minutes")
-    except StepError as error:
-        process.terminate()
-        sys.exit(str(error))
-    return running_emulators()[0], process
-
-
 def build(signed_out: bool, target: Path) -> None:
     command = ["flutter", "build", "apk", "--debug", "-t", ENTRYPOINT, "--target-platform", "android-x64"]
     if signed_out:
@@ -342,42 +143,6 @@ def build(signed_out: bool, target: Path) -> None:
     if done.returncode != 0:
         sys.exit(done.stdout[-3000:] + done.stderr[-3000:])
     shutil.copy(APK, target)
-
-
-def install(device: Device, apk: Path) -> None:
-    """Installs [apk] in place of whatever build is there; the fakes keep nothing worth keeping."""
-    device.run("uninstall", PACKAGE, check=False)
-    try:
-        device.run("install", str(apk))
-    except StepError as error:
-        sys.exit(f"install failed: {error}")
-    device.shell(f"pm grant {PACKAGE} android.permission.POST_NOTIFICATIONS", check=False)
-
-
-def steady(device: Device) -> dict:
-    """Animations off and the status bar fixed, so two runs of the same code draw the same
-    pictures. Returns what to put back."""
-    before = {k: device.shell(f"settings get global {k}").strip() for k in SCALES}
-    for k in SCALES:
-        device.shell(f"settings put global {k} 0")
-    device.shell("settings put global sysui_demo_allowed 1", check=False)
-    for extra in (
-        "-e command enter",
-        "-e command clock -e hhmm 1200",
-        "-e command battery -e level 100 -e plugged false",
-        "-e command network -e wifi show -e level 4",
-        "-e command notifications -e visible false",
-    ):
-        device.shell(f"am broadcast -a com.android.systemui.demo {extra}", check=False)
-    night = device.shell("cmd uimode night", check=False).strip().rsplit(" ", 1)[-1]
-    return {"scales": before, "night": night}
-
-
-def restore(device: Device, before: dict) -> None:
-    for k, v in before["scales"].items():
-        device.shell(f"settings put global {k} {v if v != 'null' else 1}", check=False)
-    device.shell("am broadcast -a com.android.systemui.demo -e command exit", check=False)
-    device.night(before["night"] if before["night"] in ("yes", "no") else "auto")
 
 
 def git(*args: str) -> str:
@@ -433,24 +198,14 @@ def main() -> int:
                    help="launch, run these actions (separated by ';') and print the labels, to write steps")
     args = p.parse_args()
 
-    booted = None
-    serial = args.serial or next(iter(running_emulators()), None)
-    if not serial:
-        serial, booted = boot(args.avd, args.headless)
-    device = Device(serial)
-    if device.prop("ro.kernel.qemu") != "1":
-        sys.exit(f"{serial} is not an emulator; the audit replaces the installed app")
-    m = re.search(r"(\d+)x(\d+)", device.shell("wm size"))
-    device.size = (int(m.group(1)), int(m.group(2)))
+    device, booted = open_device(args.serial, args.avd, args.headless, "the audit replaces the installed app")
     if args.dump or args.try_:
         if args.try_:
             walk = Walk(device, Path(tempfile.gettempdir()), [])
             walk.launch()
             for action in args.try_.split(";"):
                 walk.do(action.strip())
-        for n in device.dump():
-            if n["label"]:
-                print(f"{n['kind']:<10} {'tap ' if n['clickable'] else '    '}{n['label']!r}  {n['box']}")
+        print_labels(device)
         return 0
 
     plan = tomllib.loads((HERE / "steps.toml").read_text())
@@ -487,9 +242,7 @@ def main() -> int:
                 results.append(record)
     finally:
         restore(device, before)
-        if booted and not args.keep_emulator:
-            device.run("emu", "kill", check=False)
-            booted.wait(timeout=60)
+        close_device(device, booted, args.keep_emulator)
 
     failed = [r for r in results if r["status"] != "ok"]
     noted = [r for r in results if r["findings"]]
@@ -499,7 +252,7 @@ def main() -> int:
         "dirty": bool(git("status", "--porcelain")),
         "date": datetime.now().isoformat(timespec="seconds"),
         "device": {
-            "serial": serial,
+            "serial": device.serial,
             "model": device.prop("ro.product.model"),
             "api": device.prop("ro.build.version.sdk"),
             "size": f"{device.size[0]}x{device.size[1]} @ {device.shell('wm density').split()[-1]} dpi",

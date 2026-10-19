@@ -1,0 +1,86 @@
+# The walk `e2e.py` makes of the real app against the throwaway server, in order, in one launch:
+# each step goes on from where the one before it left the app, and the walk stops at the first
+# step that fails. The actions are `tool/device.py`'s (see `tool/audit/steps.toml`), and a `wait`
+# or `gone` may end with `within N s`. `{pairing}` is the server's pairing link, with its key and
+# the bridge's address as the emulator reaches them.
+
+[[step]]
+name = "pair"
+do = [
+  "wait Connect to your AnythingLLM",
+  "intent start -a android.intent.action.VIEW -d '{pairing}'",
+  "wait Connect to this server?",
+  "tap Connect",
+  "wait The key was saved within 30 s",
+  "key back",
+  "wait E2E Workspace within 30 s",
+]
+
+[[step]]
+name = "ask"
+do = [
+  "tap Ask anything",
+  "type What is the weather",
+  "tap Send",
+  "wait E2E answer to: What is the weather within 60 s",
+]
+
+[[step]]
+name = "chat-sheet"
+do = [
+  "tap Rename, pin or delete this chat",
+  "wait Delete chat",
+  "tap Close",
+  "gone Delete chat",
+]
+
+[[step]]
+name = "upcoming"
+do = [
+  "tap Chats",
+  "wait What is the weather",
+  "wait Upcoming within 20 s",
+  "tap Upcoming",
+  "wait Morning check within 20 s",
+  "key back",
+  "gone Morning check",
+]
+
+[[step]]
+name = "documents"
+do = [
+  "tap Chats",
+  "tap Workspace settings",
+  "tap Documents",
+  "tap Paste text",
+  "tap Title",
+  "type Harbour notes",
+  "tap Paste the text here",
+  "type The harbour opens at dawn.",
+  "key back",
+  "tap Add",
+  "wait harbour-notes within 60 s",
+  "tap Close",
+  "tap Back",
+  "wait Chats",
+]
+
+[[step]]
+name = "server"
+do = [
+  "tap Chats",
+  "tap Settings",
+  "wait Connected within 20 s",
+  "tap Server",
+  "wait e2e-model within 20 s",
+]
+
+[[step]]
+name = "forget"
+do = [
+  "tap Back",
+  "tap Connection",
+  "tap Forget this server",
+  "tap Really forget it?",
+  "wait Connect to your AnythingLLM within 20 s",
+]
