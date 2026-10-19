@@ -29,7 +29,7 @@ The F-Droid store page's feature graphic and phone screenshots come from `tool/s
 
 ## Naming
 
-- The product on this branch is **AnywhereLLM Lite**, published in the personal F-Droid repo as a separate app from AnywhereLLM (`master`): launcher label `AnywhereLLM Lite` (`android/app/src/main/AndroidManifest.xml`) and application ID `local.anywherellm.lite` (`applicationId` in `android/app/build.gradle.kts`). The Kotlin `namespace` stays `local.anywherellm.anywherellm`, which only names the generated classes. The store builds it from a clone at `~/Dev/Apps/anywherellm_lite` kept on this branch, so that clone's `android/key.properties` holds Lite's own release key. The Dart package is `anywherellm`, so imports are `package:anywherellm/...`. The repository folder is still `everything`.
+- The product is **AnywhereLLM Lite**, on `master`. The earlier, full AnywhereLLM (`local.anywherellm.anywherellm`), a separate app in the personal F-Droid repo, is retired; its last source is the tag `archive/anywherellm-2.16.0`. Lite has launcher label `AnywhereLLM Lite` (`android/app/src/main/AndroidManifest.xml`) and application ID `local.anywherellm.lite` (`applicationId` in `android/app/build.gradle.kts`). The Kotlin `namespace` stays `local.anywherellm.anywherellm`, which only names the generated classes. The store builds it from a clone at `~/Dev/Apps/anywherellm_lite` kept on `master`, so that clone's `android/key.properties` holds Lite's own release key. The Dart package is `anywherellm`, so imports are `package:anywherellm/...`. The repository folder is still `everything`.
 - `flutter_secure_storage` keys its keyring entry by the application ID. Changing `applicationId` orphans any saved key.
 
 ## Architecture
