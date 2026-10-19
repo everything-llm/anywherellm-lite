@@ -38,6 +38,10 @@ void _saved(FakeAnythingLlm llm, String thread, String text) {
   ];
 }
 
+/// How many times [text] was asked.
+int _sent(FakeAnythingLlm llm, String text) =>
+    llm.calls.where((c) => c.endsWith(':$text')).length;
+
 void main() {
   group('a dropped answer', () {
     testWidgets('waits for the server instead of failing', (tester) async {
@@ -62,7 +66,7 @@ void main() {
 
     testWidgets('a message waiting goes only once it is saved', (tester) async {
       final (h, llm) = await _asking(tester);
-      int sent() => llm.calls.where((c) => c.endsWith(':And French?')).length;
+      int sent() => _sent(llm, 'And French?');
       expect(h.chat.sendWhenDone('And French?'), isTrue);
       llm.chat!.addError(_dropped);
       await tester.pump(const Duration(milliseconds: 300));
@@ -75,6 +79,34 @@ void main() {
       expect(sent(), 1);
       expect(h.chat.onDeck, isEmpty);
       expect(h.chat.answeringHere, isTrue);
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+    });
+
+    testWidgets('a message sent meanwhile goes after those waiting', (
+      tester,
+    ) async {
+      final (h, llm) = await _asking(tester);
+      expect(h.chat.sendWhenDone('And French?'), isTrue);
+      llm.chat!.addError(_dropped);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.enterText(composerField, 'And German?');
+      await tester.pump();
+      await tester.tap(control('Send'));
+      await tester.pump();
+      expect(_sent(llm, 'And German?'), 0);
+      expect(h.chat.onDeck.map((o) => o.text), ['And French?', 'And German?']);
+      expect(find.text('Still answering on the server'), findsOneWidget);
+
+      _saved(llm, h.chat.activeThread!, 'Here is the English word game.');
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump();
+      expect(find.text('Here is the English word game.'), findsOneWidget);
+      expect(_sent(llm, 'And French?'), 1);
+      expect(_sent(llm, 'And German?'), 0);
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(_sent(llm, 'And German?'), 1);
       await llm.chat!.close();
       await tester.pump(const Duration(milliseconds: 300));
     });

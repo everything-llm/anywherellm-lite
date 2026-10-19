@@ -616,13 +616,12 @@ class _Form extends StatelessWidget {
         (shortcut != null || !isResetCommand(draft.text));
     final onDeck = chat.onDeck;
 
-    // On a phone the keyboard's Enter is left to the field, which starts a new line.
-    // Enter holds only what Send when done would: never `/reset`.
-    final VoidCallback onEnter = here
-        ? () {
-            if (holdable) onHold();
-          }
-        : enter;
+    // While a message typed now waits its turn, Enter and Send hold only what Send when done
+    // would: never `/reset`. On a phone the keyboard's Enter is left to the field, which starts
+    // a new line.
+    final queues = chat.canSendWhenDone;
+    final VoidCallback? hold = holdable ? onHold : null;
+    final VoidCallback onEnter = queues ? () => hold?.call() : enter;
     final bindings = <ShortcutActivator, VoidCallback>{
       if (scope.enterSends) ...{
         const SingleActivator(LogicalKeyboardKey.enter): onEnter,
@@ -765,7 +764,7 @@ class _Form extends StatelessWidget {
                           builder: (context, _) => TextField(
                             controller: draft,
                             focusNode: focus,
-                            enabled: !chat.busy || here,
+                            enabled: !chat.busy || queues,
                             spellCheckConfiguration:
                                 scope.canSpellcheck &&
                                     scope.prefs.prefs.isOn(
@@ -831,7 +830,11 @@ class _Form extends StatelessWidget {
                             label: 'Send',
                             // Send keeps the accent, as the Lite prototype draws it.
                             color: t.accent,
-                            onTap: sendable ? send : null,
+                            onTap: queues
+                                ? hold
+                                : sendable
+                                ? send
+                                : null,
                             child: AppIcon(
                               'send',
                               size: IconSize.small,

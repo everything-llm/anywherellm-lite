@@ -163,8 +163,13 @@ class ChatController extends ChangeNotifier {
   List<OnDeck> get onDeck => _onDeck[activeThread]?.next ?? const [];
 
   /// Whether [sendWhenDone] can take a message: an answer runs in the chat on screen, whose
-  /// thread is made.
-  bool get canSendWhenDone => activeThread != null && answeringHere;
+  /// thread is made, or messages already wait there.
+  bool get canSendWhenDone =>
+      activeThread != null && (answeringHere || _queued);
+
+  /// Whether messages wait in the chat on screen, held back by [_sendOnDeck]: one sent now
+  /// would go ahead of them, so it joins them instead.
+  bool get _queued => _onDeck.containsKey(activeThread);
 
   /// Puts [message] at the end of the messages waiting in the chat on screen. Each is sent in
   /// turn, when the answer before it ends, however it ends, while another chat shows or the app
@@ -293,9 +298,9 @@ class ChatController extends ChangeNotifier {
   List<Turn> get turns =>
       activeThread == null ? _draft : (_turns[activeThread] ?? const []);
 
-  /// Whether the chat on screen can take no message now: it answers, or its history is being
-  /// cleared.
-  bool get busy => answeringHere || _clearing.contains(activeThread);
+  /// Whether the chat on screen can take no message now: it answers, messages wait there, or
+  /// its history is being cleared.
+  bool get busy => answeringHere || _queued || _clearing.contains(activeThread);
 
   /// The chats whose history is being cleared on the server.
   final _clearing = <String>{};
