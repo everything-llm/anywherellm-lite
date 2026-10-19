@@ -67,7 +67,7 @@ class RadioCard extends StatelessWidget {
                   if (about case final about?)
                     Text(
                       about,
-                      style: Type.sans(12.5, color: t.muted, height: 1.4),
+                      style: Type.sans(13, color: t.muted, height: 1.4),
                     ),
                 ],
               ),

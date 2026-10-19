@@ -251,8 +251,8 @@ class TypeTile extends StatelessWidget {
     return Opacity(
       opacity: on ? 1 : 0.5,
       child: Container(
-        width: 32,
-        height: 38,
+        width: 40,
+        height: 40,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: t.accentbg,
@@ -260,7 +260,7 @@ class TypeTile extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: Type.sans(9.5, weight: FontWeight.w700, color: t.accent),
+          style: Type.sans(12, weight: FontWeight.w700, color: t.accent),
         ),
       ),
     );

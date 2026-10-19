@@ -235,7 +235,7 @@ class _Header extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: Type.sans(
-                                  12.5,
+                                  13,
                                   weight: FontWeight.w700,
                                   color: t.muted,
                                   height: 1.3,

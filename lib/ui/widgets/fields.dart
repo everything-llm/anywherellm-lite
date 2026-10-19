@@ -35,6 +35,32 @@ InputDecoration editorDecoration(
   );
 }
 
+/// A 2 px ring in the accent, drawn inside [child]'s box with corners of 14, while [focus] has the
+/// focus, as the Lite prototype outlines a field it sits in. It takes no room of its own.
+class FocusRing extends StatelessWidget {
+  const FocusRing({super.key, required this.focus, required this.child});
+
+  final FocusNode focus;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Tokens.of(context).accent;
+    return ListenableBuilder(
+      listenable: focus,
+      builder: (context, child) => DecoratedBox(
+        position: DecorationPosition.foreground,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: focus.hasFocus ? Border.all(color: accent, width: 2) : null,
+        ),
+        child: child,
+      ),
+      child: child,
+    );
+  }
+}
+
 /// The input: one line 52px tall, or [maxLines] lines, rounded, a ring in the
 /// accent on focus.
 class AppField extends StatelessWidget {

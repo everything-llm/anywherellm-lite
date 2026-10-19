@@ -214,8 +214,8 @@ class _ChatsListState extends State<ChatsList> {
   }
 }
 
-/// The search: a field on the panel inside a [Tokens.line] edge, which turns [Tokens.ink]
-/// while it has the focus.
+/// The search: a field on the panel inside a [Tokens.line] edge, with the [FocusRing] round the
+/// text while it has the focus.
 class _Search extends StatelessWidget {
   const _Search(this.controller, {required this.focus});
 
@@ -226,37 +226,36 @@ class _Search extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final searching = controller.text.isNotEmpty;
-    return ListenableBuilder(
-      listenable: focus,
-      builder: (context, child) => Container(
-        // Its edge sits outside the field's height, as the Lite prototype draws it.
-        constraints: const BoxConstraints(minHeight: Sizes.field + 2),
-        padding: EdgeInsets.only(left: 16, right: searching ? 4 : 16),
-        decoration: BoxDecoration(
-          color: t.panel,
-          borderRadius: BorderRadius.circular(Sizes.control),
-          border: Border.all(color: focus.hasFocus ? t.ink : t.line),
-        ),
-        child: child,
+    return Container(
+      // Its edge sits outside the field's height, as the Lite prototype draws it.
+      constraints: const BoxConstraints(minHeight: Sizes.field + 2),
+      padding: EdgeInsets.only(left: 16, right: searching ? 4 : 16),
+      decoration: BoxDecoration(
+        color: t.panel,
+        borderRadius: BorderRadius.circular(Sizes.control),
+        border: Border.all(color: t.line),
       ),
       child: Row(
         spacing: 10,
         children: [
           AppIcon('search', size: IconSize.small, color: t.muted),
           Expanded(
-            child: FieldName(
-              label: 'Search workspaces and chats',
-              child: TextField(
-                controller: controller,
-                focusNode: focus,
-                autocorrect: false,
-                style: Type.sans(16, color: t.ink),
-                cursorColor: t.accent,
-                decoration: InputDecoration(
-                  isCollapsed: true,
-                  border: InputBorder.none,
-                  hintText: 'Search chats',
-                  hintStyle: Type.sans(16, color: t.muted),
+            child: FocusRing(
+              focus: focus,
+              child: FieldName(
+                label: 'Search workspaces and chats',
+                child: TextField(
+                  controller: controller,
+                  focusNode: focus,
+                  autocorrect: false,
+                  style: Type.sans(16, color: t.ink),
+                  cursorColor: t.accent,
+                  decoration: InputDecoration(
+                    isCollapsed: true,
+                    border: InputBorder.none,
+                    hintText: 'Search chats',
+                    hintStyle: Type.sans(16, color: t.muted),
+                  ),
                 ),
               ),
             ),

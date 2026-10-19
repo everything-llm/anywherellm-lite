@@ -133,7 +133,7 @@ class CitationNumber extends StatelessWidget {
       child: Text(
         '$number',
         style: Type.sans(
-          10.5,
+          12,
           weight: FontWeight.w600,
           color: t.onaccent,
           height: 1,

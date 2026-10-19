@@ -622,6 +622,8 @@ class _Form extends StatelessWidget {
     final queues = chat.canSendWhenDone;
     final VoidCallback? hold = holdable ? onHold : null;
     final VoidCallback onEnter = queues ? () => hold?.call() : enter;
+    final VoidCallback? tap = queues ? hold : (sendable ? send : null);
+    final canTap = tap != null;
     final bindings = <ShortcutActivator, VoidCallback>{
       if (scope.enterSends) ...{
         const SingleActivator(LogicalKeyboardKey.enter): onEnter,
@@ -754,49 +756,52 @@ class _Form extends StatelessWidget {
                     constraints: const BoxConstraints(maxHeight: 156),
                     child: CallbackShortcuts(
                       bindings: bindings,
-                      child: FieldName(
-                        label: shortcut == null
-                            ? 'Message'
-                            : 'Message, with the ${shortcut!.label} shortcut',
-                        // Only the field follows the prefs, for its spellcheck.
-                        child: ListenableBuilder(
-                          listenable: scope.prefs,
-                          builder: (context, _) => TextField(
-                            controller: draft,
-                            focusNode: focus,
-                            enabled: !chat.busy || queues,
-                            spellCheckConfiguration:
-                                scope.canSpellcheck &&
-                                    scope.prefs.prefs.isOn(
-                                      ChatSwitch.spellcheck,
-                                    )
-                                ? const SpellCheckConfiguration()
-                                : const SpellCheckConfiguration.disabled(),
-                            minLines: 1,
-                            maxLines: null,
-                            keyboardType: TextInputType.multiline,
-                            textInputAction: TextInputAction.newline,
-                            textCapitalization: TextCapitalization.sentences,
-                            style: Type.textArea(Type.chat, t.ink),
-                            cursorColor: t.accent,
-                            contentInsertionConfiguration:
-                                ContentInsertionConfiguration(
-                                  allowedMimeTypes: imageMimes.toList(),
-                                  onContentInserted: onInserted,
+                      child: FocusRing(
+                        focus: focus,
+                        child: FieldName(
+                          label: shortcut == null
+                              ? 'Message'
+                              : 'Message, with the ${shortcut!.label} shortcut',
+                          // Only the field follows the prefs, for its spellcheck.
+                          child: ListenableBuilder(
+                            listenable: scope.prefs,
+                            builder: (context, _) => TextField(
+                              controller: draft,
+                              focusNode: focus,
+                              enabled: !chat.busy || queues,
+                              spellCheckConfiguration:
+                                  scope.canSpellcheck &&
+                                      scope.prefs.prefs.isOn(
+                                        ChatSwitch.spellcheck,
+                                      )
+                                  ? const SpellCheckConfiguration()
+                                  : const SpellCheckConfiguration.disabled(),
+                              minLines: 1,
+                              maxLines: null,
+                              keyboardType: TextInputType.multiline,
+                              textInputAction: TextInputAction.newline,
+                              textCapitalization: TextCapitalization.sentences,
+                              style: Type.textArea(Type.chat, t.ink),
+                              cursorColor: t.accent,
+                              contentInsertionConfiguration:
+                                  ContentInsertionConfiguration(
+                                    allowedMimeTypes: imageMimes.toList(),
+                                    onContentInserted: onInserted,
+                                  ),
+                              decoration: InputDecoration(
+                                isCollapsed: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 12,
                                 ),
-                            decoration: InputDecoration(
-                              isCollapsed: true,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 12,
+                                border: InputBorder.none,
+                                hintText: shortcut?.requiresDetail == true
+                                    ? shortcut!.detailHint
+                                    : shortcut == null
+                                    ? hint
+                                    : 'Add a detail (optional)',
+                                hintStyle: Type.textArea(Type.chat, t.muted),
                               ),
-                              border: InputBorder.none,
-                              hintText: shortcut?.requiresDetail == true
-                                  ? shortcut!.detailHint
-                                  : shortcut == null
-                                  ? hint
-                                  : 'Add a detail (optional)',
-                              hintStyle: Type.textArea(Type.chat, t.muted),
                             ),
                           ),
                         ),
@@ -828,17 +833,14 @@ class _Form extends StatelessWidget {
                           )
                         : RoundButton(
                             label: 'Send',
-                            // Send keeps the accent, as the Lite prototype draws it.
-                            color: t.accent,
-                            onTap: queues
-                                ? hold
-                                : sendable
-                                ? send
-                                : null,
+                            // Send is the accent while it can send, and `hover` with a muted
+                            // arrow while it cannot, as the Lite prototype draws it.
+                            color: canTap ? t.accent : t.hover,
+                            onTap: canTap ? tap : null,
                             child: AppIcon(
                               'send',
                               size: IconSize.small,
-                              color: t.onaccent,
+                              color: canTap ? t.onaccent : t.muted,
                             ),
                           ),
                   ),

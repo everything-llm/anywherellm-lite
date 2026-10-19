@@ -1028,7 +1028,7 @@ class _MoreSources extends StatelessWidget {
             heightFactor: 1,
             child: Text(
               '+$count',
-              style: Type.sans(13.5, color: open ? t.accent : t.ink2),
+              style: Type.sans(14, color: open ? t.accent : t.ink2),
             ),
           ),
         ),
@@ -1130,7 +1130,7 @@ class _CitationState extends State<_Citation> {
                     url?.host ?? title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Type.sans(13.5, color: live ? t.ink2 : t.muted),
+                    style: Type.sans(14, color: live ? t.ink2 : t.muted),
                   ),
                 ),
               ),
