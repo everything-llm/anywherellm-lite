@@ -16,7 +16,6 @@ import '../layout.dart';
 import '../settings/settings_pages.dart';
 import '../settings/rows.dart';
 import '../state/chat_controller.dart';
-import '../state/turn.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
@@ -74,10 +73,6 @@ class _ComposerState extends State<Composer> {
   late Object _chatShown;
 
   String _typed = '';
-
-  /// The answer a held message waits for: it goes when that answer ends, however it ends,
-  /// while it is still on screen and the message unchanged.
-  Turn? _held;
 
   /// Whether the workspace's chat model picker shows over the field.
   bool _picking = false;
@@ -182,14 +177,12 @@ class _ComposerState extends State<Composer> {
     final shown = _chatOnScreen();
     if (shown != _chatShown) {
       _chatShown = shown;
-      if (_held != null ||
-          _picking ||
+      if (_picking ||
           _shortcut != null ||
           _asking ||
           _attached.isNotEmpty ||
           _problem != null) {
         setState(() {
-          _held = null;
           _picking = false;
           _shortcut = null;
           _asking = false;
@@ -198,7 +191,6 @@ class _ComposerState extends State<Composer> {
         });
       }
     }
-    _sendHeld();
     // Taken only when it can go back: a message taken and not put back would be lost.
     if (widget.draft.text.isEmpty && _attached.isEmpty) {
       if (_scope.chat.takeForComposer() case final back?) {
@@ -231,8 +223,6 @@ class _ComposerState extends State<Composer> {
         }
       }
     }
-    // Typing more lets go of a held message: what goes is what was held.
-    _held = null;
     if (_listening && widget.draft.text != _dictated) {
       _go++;
       _scope.dictation?.stop();
@@ -241,28 +231,26 @@ class _ComposerState extends State<Composer> {
     setState(() => _typed = widget.draft.text);
   }
 
-  /// Holds the message typed while this chat answers, to go when the answer ends.
+  /// Puts the message typed while this chat answers after the messages waiting in it, emptying
+  /// the composer for the next.
   void _hold() {
-    final answer = _scope.chat.runningHere;
-    if (answer == null || widget.draft.text.trim().isEmpty) return;
-    setState(() => _held = answer);
+    final (message, use) = _outgoing(widget.draft.text);
+    if (message.trim().isEmpty) return;
+    if (!_scope.chat.sendWhenDone(message, shortcutUse: use)) return;
+    widget.draft.clear();
+    setState(() => _shortcut = null);
   }
 
-  void _release() => setState(() => _held = null);
-
-  /// Sends the held message once its answer has ended. It waits for the controller to finish
-  /// telling everyone, so the chat is no longer busy when it sends.
-  void _sendHeld() {
-    final held = _held;
-    final chat = _scope.chat;
-    if (held == null || identical(chat.runningHere, held)) return;
-    _held = null;
-    if (!chat.turns.contains(held)) return;
-    scheduleMicrotask(() {
-      if (mounted && canSend(_scope.chat, widget.draft.text)) {
-        unawaited(_send(widget.draft.text));
-      }
-    });
+  /// The message [text] sends, with the shortcut it was sent with; empty when the shortcut
+  /// needs a detail and has none.
+  (String, ShortcutUse?) _outgoing(String text) {
+    final shortcut = _shortcut;
+    if (shortcut == null) return (text, null);
+    if (shortcut.requiresDetail && text.trim().isEmpty) return ('', null);
+    return (
+      shortcut.expand(text),
+      ShortcutUse(label: shortcut.label, detail: text.trim()),
+    );
   }
 
   /// Attaches the files picked, unless another chat was shown while the picker was open.
@@ -401,8 +389,7 @@ class _ComposerState extends State<Composer> {
     if (shortcut == null && _scope.chat.canReset && isResetCommand(text)) {
       return _askReset();
     }
-    if (shortcut?.requiresDetail == true && text.trim().isEmpty) return;
-    final message = shortcut?.expand(text) ?? text;
+    final (message, use) = _outgoing(text);
     if (message.trim().isEmpty) return;
     final attached = _attached;
     final shown = _chatShown;
@@ -419,9 +406,7 @@ class _ComposerState extends State<Composer> {
       message,
       attachments: attached,
       mode: _scope.sources.chatMode.value,
-      shortcutUse: shortcut == null
-          ? null
-          : ShortcutUse(label: shortcut.label, detail: text.trim()),
+      shortcutUse: use,
     );
     if (sent || !mounted || _chatShown != shown) return;
     if (widget.draft.text.isNotEmpty || _attached.isNotEmpty) return;
@@ -485,9 +470,7 @@ class _ComposerState extends State<Composer> {
                   onKeepChat: _keepChat,
                   onClearChat: _clearChat,
                   onSend: _send,
-                  held: _held != null,
                   onHold: _hold,
-                  onRelease: _release,
                   picking: _picking,
                   onPickModel: () => setState(() => _picking = !_picking),
                   onDictate: scope.dictation == null ? null : _dictate,
@@ -525,9 +508,7 @@ class _Form extends StatelessWidget {
     required this.onKeepChat,
     required this.onClearChat,
     required this.onSend,
-    required this.held,
     required this.onHold,
-    required this.onRelease,
     required this.picking,
     required this.onPickModel,
     required this.onDictate,
@@ -554,10 +535,8 @@ class _Form extends StatelessWidget {
   final VoidCallback onClearChat;
   final ValueChanged<String> onSend;
 
-  /// Whether the message waits for the answer running here to end.
-  final bool held;
+  /// Puts the message after the ones waiting for the answer running here to end.
   final VoidCallback onHold;
-  final VoidCallback onRelease;
 
   /// Whether the workspace's chat model picker shows, which [onPickModel] opens and closes.
   final bool picking;
@@ -609,10 +588,10 @@ class _Form extends StatelessWidget {
     final resetMatch =
         slashQuery != null && chat.canReset && 'reset'.startsWith(slashQuery);
     // A shortcut always has a prompt to send, so it needs a detail only when it asks for one.
-    final sendable = shortcut == null
-        ? canSend(chat, draft.text)
-        : canSend(chat, shortcut!.prompt) &&
-              !(shortcut!.requiresDetail && draft.text.trim().isEmpty);
+    final filled = shortcut == null
+        ? draft.text.trim().isNotEmpty
+        : !(shortcut!.requiresDetail && draft.text.trim().isEmpty);
+    final sendable = filled && canSend(chat, shortcut?.prompt ?? draft.text);
 
     void send() {
       if (sendable) onSend(draft.text);
@@ -628,9 +607,14 @@ class _Form extends StatelessWidget {
       }
     }
 
-    // While this chat answers, a message typed is held to go when the answer ends. Send when
-    // done takes the chips' place, as they are off while the chat answers.
-    final holdable = here && !held && draft.text.trim().isNotEmpty;
+    // While this chat answers, each message typed waits its turn, to go when the answer before
+    // it ends. Send when done takes the chips' place, as they are off while the chat answers.
+    // `/reset` is not one: it asks first, which would hold up the messages after it.
+    final holdable =
+        filled &&
+        chat.canSendWhenDone &&
+        (shortcut != null || !isResetCommand(draft.text));
+    final onDeck = chat.onDeck;
 
     // On a phone the keyboard's Enter is left to the field, which starts a new line.
     final VoidCallback onEnter = here ? onHold : enter;
@@ -657,12 +641,7 @@ class _Form extends StatelessWidget {
           other: 'Keep',
           onOther: onKeepChat,
         ),
-      if (held)
-        _FormNote(
-          'Sends when this answer ends.',
-          action: "Don't send",
-          onAction: onRelease,
-        ),
+      if (onDeck.isNotEmpty) _OnDeckList(onDeck, onDrop: chat.dropOnDeck),
       if (picking) ...[
         ModelPicker(onClose: onPickModel),
         Divider(height: 21, thickness: 1, color: t.line),
@@ -1102,8 +1081,74 @@ class _FormNote extends StatelessWidget {
   );
 }
 
-/// Holds the message typed while this chat answers, to go when the answer ends. There is no
-/// Send now: a chat runs one answer at a time.
+/// The messages waiting in the chat on screen, first to go first, each with Don't send. A long
+/// list scrolls, so the field keeps its room.
+class _OnDeckList extends StatelessWidget {
+  const _OnDeckList(this.items, {required this.onDrop});
+
+  final List<OnDeck> items;
+  final ValueChanged<OnDeck> onDrop;
+
+  /// What a waiting message shows: its shortcut and detail for one sent with a shortcut.
+  static String _shown(OnDeck item) => switch (item.shortcutUse) {
+    null => item.text,
+    ShortcutUse(:final label, detail: '') => label,
+    ShortcutUse(:final label, :final detail) => '$label: $detail',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            items.length == 1
+                ? 'Sends when this answer ends.'
+                : 'Each sends in turn, when the answer before it ends.',
+            style: Type.sans(12, color: t.muted),
+          ),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 132),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final item in items)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _shown(item),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Type.sans(13.5, color: t.ink2),
+                          ),
+                        ),
+                        IconBtn(
+                          'close',
+                          tooltip: "Don't send",
+                          heard: "Don't send ${_shown(item)}",
+                          onPressed: () => onDrop(item),
+                          box: 36,
+                          size: IconSize.xs,
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Puts the message typed while this chat answers after the ones waiting there, each to go when
+/// the answer before it ends. There is no Send now: a chat runs one answer at a time.
 class _SendWhenDone extends StatelessWidget {
   const _SendWhenDone({required this.onTap});
 

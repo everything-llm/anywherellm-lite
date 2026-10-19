@@ -59,6 +59,14 @@ class _Running {
   final ShortcutUse? shortcutUse;
 }
 
+/// A message waiting in a chat to be sent when the answer before it ends ([sendWhenDone]).
+class OnDeck {
+  OnDeck(this.text, {this.shortcutUse});
+
+  final String text;
+  final ShortcutUse? shortcutUse;
+}
+
 /// The workspaces and their chats, the chat on screen, and the answers running.
 ///
 /// One answer runs at a time in each chat; chats of one workspace answer at once, since
@@ -132,7 +140,10 @@ class ChatController extends ChangeNotifier {
       _turns[thread] = saved;
       _markFinished(saved.last, slug, thread);
     },
-    changed: notifyListeners,
+    changed: () {
+      _sendOnDeck();
+      notifyListeners();
+    },
   );
 
   /// Whether an answer is running or [Turn.waiting] anywhere, which the app keeps alive for.
@@ -143,6 +154,81 @@ class ChatController extends ChangeNotifier {
 
   /// The answers running, at most one in each chat.
   final _runs = <_Running>[];
+
+  /// The messages waiting in each chat, by chat, in the order they go, with the chat's
+  /// workspace. Each list is replaced, never changed, as the turns are.
+  final _onDeck = <String, ({String slug, List<OnDeck> next})>{};
+
+  /// The messages waiting in the chat on screen, first to go first.
+  List<OnDeck> get onDeck => _onDeck[activeThread]?.next ?? const [];
+
+  /// Whether [sendWhenDone] can take a message: an answer runs in the chat on screen, whose
+  /// thread is made.
+  bool get canSendWhenDone => activeThread != null && answeringHere;
+
+  /// Puts [message] at the end of the messages waiting in the chat on screen. Each is sent in
+  /// turn, when the answer before it ends, however it ends, while another chat shows or the app
+  /// is out of sight too. True when it was taken.
+  bool sendWhenDone(String message, {ShortcutUse? shortcutUse}) {
+    final slug = activeSlug;
+    final thread = activeThread;
+    final text = message.trim();
+    if (slug == null || thread == null || text.isEmpty || !canSendWhenDone) {
+      return false;
+    }
+    _onDeck[thread] = (
+      slug: slug,
+      next: [...onDeck, OnDeck(text, shortcutUse: shortcutUse)],
+    );
+    notifyListeners();
+    return true;
+  }
+
+  /// Takes [item] out of the messages waiting in the chat on screen.
+  void dropOnDeck(OnDeck item) {
+    final thread = activeThread;
+    final deck = _onDeck[thread];
+    if (thread == null || deck == null) return;
+    _setDeck(thread, deck.slug, [
+      for (final o in deck.next)
+        if (!identical(o, item)) o,
+    ]);
+    notifyListeners();
+  }
+
+  /// Keeps [next] as the messages waiting in chat [thread] of workspace [slug], or none.
+  void _setDeck(String thread, String slug, List<OnDeck> next) {
+    if (next.isEmpty) {
+      _onDeck.remove(thread);
+    } else {
+      _onDeck[thread] = (slug: slug, next: next);
+    }
+  }
+
+  /// Sends the first message waiting in each chat that can take one: nothing runs, is waited
+  /// for or clears there, its turns are read and [refresh] is not reading them again.
+  void _sendOnDeck() {
+    if (_refreshing) return;
+    for (final MapEntry(key: thread, value: deck) in [..._onDeck.entries]) {
+      final turns = _turns[thread];
+      if (turns == null ||
+          isAnswering(thread) ||
+          waits.has(thread) ||
+          _clearing.contains(thread)) {
+        continue;
+      }
+      final first = deck.next.first;
+      _setDeck(thread, deck.slug, deck.next.sublist(1));
+      final user = Turn.user(first.text, shortcutUse: first.shortcutUse);
+      final answer = Turn.answer();
+      _turns[thread] = [...turns, user, answer];
+      final running = _Running(answer, deck.slug, first.shortcutUse)
+        ..thread = thread;
+      _runs.add(running);
+      if (thread == activeThread) _sends++;
+      _follow(running, _api.streamChat(deck.slug, thread, first.text));
+    }
+  }
 
   /// What waits for each chat's composer, by chat (null for a new one): what another app shared
   /// ([putInComposer]). The composer takes it with [takeForComposer].
@@ -281,6 +367,7 @@ class ChatController extends ChangeNotifier {
       }
     } finally {
       _refreshing = false;
+      _sendOnDeck();
       notifyListeners();
     }
   }
@@ -316,6 +403,7 @@ class ChatController extends ChangeNotifier {
     _runs.clear();
     waits.clear();
     _forComposer.clear();
+    _onDeck.clear();
     workspaces = const [];
     _threads.clear();
     _turns.clear();
@@ -574,6 +662,7 @@ class ChatController extends ChangeNotifier {
         _turns.remove(t.slug);
         _newest.remove(t.slug);
         _named.remove(t.slug);
+        _onDeck.remove(t.slug);
       }
       _threads.remove(slug);
       docCounts.remove(slug);
@@ -638,6 +727,7 @@ class ChatController extends ChangeNotifier {
     _threads[slug] = list;
     _turns.remove(threadSlug);
     _newest.remove(threadSlug);
+    _onDeck.remove(threadSlug);
     if (open) {
       _freshDraft();
       await this.open(null);
@@ -924,6 +1014,8 @@ class ChatController extends ChangeNotifier {
       ..status = null
       ..error = error
       ..notifyListeners();
+    // Before telling anyone, so [working] holds while a chat has messages waiting.
+    _sendOnDeck();
     notifyListeners();
   }
 

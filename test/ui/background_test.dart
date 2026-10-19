@@ -60,6 +60,25 @@ void main() {
       expect(h.chat.finished?.text, 'Here is the English word game.');
     });
 
+    testWidgets('a message waiting goes only once it is saved', (tester) async {
+      final (h, llm) = await _asking(tester);
+      int sent() => llm.calls.where((c) => c.endsWith(':And French?')).length;
+      expect(h.chat.sendWhenDone('And French?'), isTrue);
+      llm.chat!.addError(_dropped);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(sent(), 0);
+      expect(h.chat.onDeck.map((o) => o.text), ['And French?']);
+
+      _saved(llm, h.chat.activeThread!, 'Here is the English word game.');
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump();
+      expect(sent(), 1);
+      expect(h.chat.onDeck, isEmpty);
+      expect(h.chat.answeringHere, isTrue);
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+    });
+
     testWidgets('Check now reads the chat at once', (tester) async {
       final (h, llm) = await _asking(tester);
       llm.chat!.addError(_dropped);

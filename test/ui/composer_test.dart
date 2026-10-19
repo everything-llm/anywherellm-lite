@@ -168,7 +168,18 @@ void main() {
     int sent(FakeAnythingLlm llm, String message) =>
         llm.calls.where((c) => c.endsWith(':$message')).length;
 
-    testWidgets('can be typed, and is held to go when the answer ends', (
+    /// Types [text] and puts it after the messages waiting.
+    Future<void> queue(WidgetTester tester, String text) async {
+      await tester.enterText(composerField, text);
+      await tester.pump();
+      await tester.tap(sendWhenDone());
+      await tester.pump();
+    }
+
+    String typed(WidgetTester tester) =>
+        tester.widget<EditableText>(composerField).controller.text;
+
+    testWidgets('each waits its turn, to go when the answer before it ends', (
       tester,
     ) async {
       final (_, llm) = await answering(tester);
@@ -178,23 +189,41 @@ void main() {
       expect(sendWhenDone(), findsOneWidget);
       await tester.tap(sendWhenDone());
       await tester.pump();
+      expect(typed(tester), isEmpty);
       expect(find.text('Sends when this answer ends.'), findsOneWidget);
+      await queue(tester, 'Third');
+      expect(
+        find.text('Each sends in turn, when the answer before it ends.'),
+        findsOneWidget,
+      );
+      expect(find.text('Second'), findsOneWidget);
+      expect(find.text('Third'), findsOneWidget);
       expect(sent(llm, 'Second'), 0);
+
       await llm.chat!.close();
       await tester.pump(const Duration(milliseconds: 300));
       expect(sent(llm, 'Second'), 1);
+      expect(sent(llm, 'Third'), 0);
+      expect(find.text('Sends when this answer ends.'), findsOneWidget);
+
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(sent(llm, 'Third'), 1);
       expect(find.text('Sends when this answer ends.'), findsNothing);
       await llm.chat!.close();
       await tester.pump(const Duration(milliseconds: 300));
     });
 
-    testWidgets('Enter holds it too, and Stop sends it', (tester) async {
+    testWidgets('Enter queues it too, and Stop sends the next', (
+      tester,
+    ) async {
       final (_, llm) = await answering(tester);
       await tester.enterText(composerField, 'Second');
       await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pump();
       expect(find.text('Sends when this answer ends.'), findsOneWidget);
+      expect(typed(tester), isEmpty);
       await tester.tap(find.byTooltip('Stop the answer'));
       await tester.pump(const Duration(milliseconds: 300));
       expect(sent(llm, 'Second'), 1);
@@ -202,36 +231,48 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
     });
 
-    testWidgets("typing more or Don't send lets it go", (tester) async {
+    testWidgets("Don't send takes one out, and typing keeps the rest", (
+      tester,
+    ) async {
       final (_, llm) = await answering(tester);
-      await tester.enterText(composerField, 'Second');
+      await queue(tester, 'Second');
+      await queue(tester, 'Third');
+      await tester.enterText(composerField, 'Not yet');
       await tester.pump();
-      await tester.tap(sendWhenDone());
+      await tester.tap(find.bySemanticsLabel("Don't send Second"));
       await tester.pump();
-      await tester.enterText(composerField, 'Second, longer');
-      await tester.pump();
-      expect(find.text('Sends when this answer ends.'), findsNothing);
-      await tester.tap(sendWhenDone());
-      await tester.pump();
-      await tester.tap(find.bySemanticsLabel("Don't send"));
-      await tester.pump();
-      await llm.chat!.close();
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(sent(llm, 'Second, longer'), 0);
-      expect(find.text('Second, longer'), findsOneWidget);
-    });
-
-    testWidgets('another chat shown lets it go', (tester) async {
-      final (h, llm) = await answering(tester);
-      await tester.enterText(composerField, 'Second');
-      await tester.pump();
-      await tester.tap(sendWhenDone());
-      await tester.pump();
-      await h.chat.open('priorities');
-      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Second'), findsNothing);
       await llm.chat!.close();
       await tester.pump(const Duration(milliseconds: 300));
       expect(sent(llm, 'Second'), 0);
+      expect(sent(llm, 'Third'), 1);
+      expect(typed(tester), 'Not yet');
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+    });
+
+    testWidgets('they go on while another chat shows', (tester) async {
+      final (h, llm) = await answering(tester);
+      final thread = h.chat.activeThread!;
+      await queue(tester, 'Second');
+      await h.chat.open('priorities');
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Sends when this answer ends.'), findsNothing);
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(sent(llm, 'Second'), 1);
+      expect(h.chat.isAnswering(thread), isTrue);
+      expect(h.chat.answeringHere, isFalse);
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(h.chat.isReady(thread), isTrue);
+    });
+
+    testWidgets('/reset is not queued, since it asks first', (tester) async {
+      await answering(tester);
+      await tester.enterText(composerField, '/reset');
+      await tester.pump();
+      expect(sendWhenDone(), findsNothing);
     });
 
     /// The composer's field, found by its type, since a field that is off is read only.
