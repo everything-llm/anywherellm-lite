@@ -741,22 +741,35 @@ class _Picture extends StatelessWidget {
 }
 
 /// In place of a failure that says the workspace's chat model takes text only, with Change the
-/// model, which opens the Answer from sheet and its Chat model row.
+/// model, which opens the Answer from sheet and its Chat model row. It is off while an answer
+/// runs in the workspace, as the sheet is.
 class _NoPictures extends StatelessWidget {
   const _NoPictures();
 
   @override
-  Widget build(BuildContext context) => AlertBox(
-    AlertKind.bad,
-    'This model cannot see pictures',
-    text:
-        "The workspace's chat model reads text only, so it refused the picture. Choose one "
-        'that reads images in Answer from, Chat model, or ask without the picture.',
-    action: AppButton(
-      'Change the model',
-      onPressed: () => AppScope.of(context).shell.togglePopup(Popup.answerFrom),
-    ),
-  );
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    return ListenableBuilder(
+      listenable: scope.chat,
+      builder: (context, _) {
+        final slug = scope.chat.activeSlug;
+        final open = slug != null && !scope.chat.answeringIn(slug);
+        return AlertBox(
+          AlertKind.bad,
+          'This model cannot see pictures',
+          text:
+              "The workspace's chat model reads text only, so it refused the picture. Choose "
+              'one that reads images in Answer from, Chat model, or ask without the picture.',
+          action: AppButton(
+            'Change the model',
+            onPressed: open
+                ? () => scope.shell.togglePopup(Popup.answerFrom)
+                : null,
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _Answer extends StatelessWidget {
@@ -781,7 +794,11 @@ class _Answer extends StatelessWidget {
     final cut = !turn.streaming && turn.unfinished;
     const action = answerAction;
     // The red box asks again itself, so Retry does not show twice.
-    final askAgain = turn.error != null && retry?.onPressed != null;
+    // The box for a model that cannot see pictures has no Ask again, so Retry stays then.
+    final askAgain =
+        turn.error != null &&
+        !refusesPictures(turn.error!) &&
+        retry?.onPressed != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

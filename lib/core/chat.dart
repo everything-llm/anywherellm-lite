@@ -144,7 +144,7 @@ final _textOnly = RegExp(
   r"allowed values: \[\s*'text'\s*\]"
   r'|image_url is only supported'
   r'|support(s)? image input'
-  r'|(does not|doesn.t|not) support (image|images|vision|multimodal)',
+  r'|(does not|doesn.t|not) support (images?|vision|multimodal)\b(?! generation)',
   caseSensitive: false,
 );
 

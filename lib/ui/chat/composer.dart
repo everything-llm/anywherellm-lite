@@ -617,7 +617,12 @@ class _Form extends StatelessWidget {
     final onDeck = chat.onDeck;
 
     // On a phone the keyboard's Enter is left to the field, which starts a new line.
-    final VoidCallback onEnter = here ? onHold : enter;
+    // Enter holds only what Send when done would: never `/reset`.
+    final VoidCallback onEnter = here
+        ? () {
+            if (holdable) onHold();
+          }
+        : enter;
     final bindings = <ShortcutActivator, VoidCallback>{
       if (scope.enterSends) ...{
         const SingleActivator(LogicalKeyboardKey.enter): onEnter,

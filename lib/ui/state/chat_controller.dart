@@ -178,7 +178,10 @@ class ChatController extends ChangeNotifier {
     }
     _onDeck[thread] = (
       slug: slug,
-      next: [...onDeck, OnDeck(text, shortcutUse: shortcutUse)],
+      next: [
+        ...onDeck,
+        OnDeck(text, shortcutUse: shortcutUse),
+      ],
     );
     notifyListeners();
     return true;
@@ -361,6 +364,7 @@ class ChatController extends ChangeNotifier {
           !isAnswering(thread) &&
           !threadsOf(slug).any((t) => t.slug == thread)) {
         _turns.remove(thread);
+        _onDeck.remove(thread);
         await select(slug);
       } else {
         await open(thread, again: true);
@@ -974,7 +978,10 @@ class ChatController extends ChangeNotifier {
     final server = _server;
     try {
       final history = await _api.history(slug, thread);
-      if (_server == server) _learnFrom(thread, history.map((m) => m.chatId));
+      // A newer answer, as a waiting message sent meanwhile, may have named its exchange since.
+      if (_server == server && !_newest.containsKey(thread)) {
+        _learnFrom(thread, history.map((m) => m.chatId));
+      }
     } on ApiException {
       // Still unknown: a dropped answer then falls back to reading its question.
     }

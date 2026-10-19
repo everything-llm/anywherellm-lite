@@ -37,7 +37,8 @@ Future<void> openLink(BuildContext context, String href) async {
 /// Opens [href], a link in an answer: where the device has a web view, browser-lean's page for
 /// an agent's tab opens in its sheet ([isBrowserTab]) and an apps-lean app's page in the page's
 /// sheet ([isAppsLeanPage]), in the theme the app shows in ([pageInTheme]), as does the Vault
-/// ([isVaultPage]), and the Library page ([isLibraryPage]); anything else opens as [openLink] does.
+/// ([isVaultPage]); the Library page ([isLibraryPage]) opens in that sheet as it is; anything
+/// else opens as [openLink] does.
 Future<void> openAnswerLink(BuildContext context, String href) async {
   final scope = AppScope.of(context);
   final server = scope.settings.connection?.uri;
