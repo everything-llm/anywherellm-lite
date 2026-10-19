@@ -9,6 +9,7 @@
 // never holds the fakes.
 
 import 'package:anywherellm/core/connection.dart';
+import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/main.dart' show SessionHost;
 import 'package:anywherellm/ui/app.dart';
 import 'package:anywherellm/ui/state/prefs_controller.dart';
@@ -21,9 +22,21 @@ import 'sample.dart';
 
 const _signedOut = bool.fromEnvironment('AUDIT_SIGNED_OUT');
 
+/// A state the fakes start in, for the screens the sample server never shows: `unreachable` (the
+/// server does not answer) or `unsent` (it refuses each question before an answer begins).
+const _state = String.fromEnvironment('AUDIT_STATE');
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   final (llm, toolkit) = sampleServer();
+  switch (_state) {
+    case 'unreachable':
+      llm.errors['workspaces'] = const ApiException(
+        'Could not reach the server.',
+      );
+    case 'unsent':
+      llm.errors['streamChat'] = const NotSent('Could not reach the server.');
+  }
   final prefs = PrefsController(FakePrefsStore());
   runApp(
     AnywhereLlmApp(

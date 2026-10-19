@@ -15,7 +15,8 @@
 #   intent ARGS      `adb shell am ARGS`, with {pkg} for the app's id
 #   shot [NAME]      a screenshot, named after the step and NAME
 #
-# `signed_out = true` runs the step on a build with no server saved.
+# `signed_out = true` runs the step on a build with no server saved. `state = "unreachable"` or
+# `"unsent"` runs it on a build whose fakes start in that state (`tool/audit_app.dart`).
 
 # Where steps start.
 [from]
@@ -95,6 +96,18 @@ name = "all-sources"
 group = "chat"
 from = "q3"
 do = ["tap Interview research", "tap 4 more sources", "sleep 1"]
+
+[[step]]
+name = "unreachable"
+group = "states"
+state = "unreachable"
+do = ["wait Try again"]
+
+[[step]]
+name = "not-sent"
+group = "states"
+state = "unsent"
+do = ["tap Ask anything", "type How much is recruiting?", "tap Send", "wait Try again"]
 
 # --- The shelf and the workspaces --------------------------------------------------------
 
@@ -311,6 +324,12 @@ name = "welcome"
 group = "first-run"
 signed_out = true
 do = []
+
+[[step]]
+name = "keyboard-connect"
+group = "first-run"
+signed_out = true
+do = ["tap Server address", "sleep 1"]
 
 [[step]]
 name = "how-connecting"

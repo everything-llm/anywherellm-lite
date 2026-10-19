@@ -124,6 +124,12 @@ class _KeyCardState extends State<_KeyCard> {
 
   /// Why the last scanned code could not be used.
   String? _scanProblem;
+
+  /// The first run's scroll, kept at its end while the keyboard rises, so the fields show
+  /// above Connect, until the person scrolls it.
+  final _scroll = ScrollController();
+  bool _wasTyping = false;
+  bool _pinned = false;
   Timer? _forgetTimer;
 
   /// The address the field shows as an example.
@@ -147,6 +153,7 @@ class _KeyCardState extends State<_KeyCard> {
   void dispose() {
     _shell.removeListener(_takePairing);
     _forgetTimer?.cancel();
+    _scroll.dispose();
     _url.dispose();
     _key.dispose();
     super.dispose();
@@ -383,6 +390,28 @@ class _KeyCardState extends State<_KeyCard> {
     );
   }
 
+  /// [child], the first run's scroll, held at its end while the keyboard is [typing] up, which
+  /// is where the fields are, until a drag moves it.
+  Widget _atEnd(bool typing, {required Widget child}) {
+    if (typing && !_wasTyping) _pinned = true;
+    if (!typing) _pinned = false;
+    _wasTyping = typing;
+    if (_pinned) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_pinned && _scroll.hasClients) {
+          _scroll.jumpTo(_scroll.position.maxScrollExtent);
+        }
+      });
+    }
+    return NotificationListener<ScrollStartNotification>(
+      onNotification: (n) {
+        if (n.dragDetails != null) _pinned = false;
+        return false;
+      },
+      child: child,
+    );
+  }
+
   /// The first run: the welcome, Scan QR code first where there is a camera, then the address and
   /// the developer key, each under its name, where to find a key, and Connect, in groups 28
   /// apart with 12 or less inside one. Connect is the filled button; Scan QR code is outlined,
@@ -398,20 +427,16 @@ class _KeyCardState extends State<_KeyCard> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       spacing: 12,
       children: [
-        // Why the last try failed, in a line kept for it, which the bar over the keyboard has
-        // only while there is something to say.
-        if (!typing || _notes.isNotEmpty)
-          ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 20),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                spacing: 8,
-                children: [
-                  for (final note in _notes) HelpText(note, status: true),
-                ],
-              ),
+        // Why the last try failed, which takes room only while there is something to say.
+        if (_notes.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              spacing: 8,
+              children: [
+                for (final note in _notes) HelpText(note, status: true),
+              ],
             ),
           ),
         AppButton(
@@ -481,33 +506,37 @@ class _KeyCardState extends State<_KeyCard> {
       children: [
         Expanded(
           child: LayoutBuilder(
-            builder: (context, box) => SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(16, top, 16, bottom),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: math.max(0, box.maxHeight - top - bottom),
-                ),
-                child: IntrinsicHeight(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Align(
-                        alignment: Alignment.topLeft,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 680),
-                          child: page,
-                        ),
-                      ),
-                      const Spacer(),
-                      if (!typing)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 16),
-                          child: GuideLink(
-                            'How connecting works',
-                            onTap: () => _shell.showGuide(Guide.connect),
+            builder: (context, box) => _atEnd(
+              typing,
+              child: SingleChildScrollView(
+                controller: _scroll,
+                padding: EdgeInsets.fromLTRB(16, top, 16, bottom),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: math.max(0, box.maxHeight - top - bottom),
+                  ),
+                  child: IntrinsicHeight(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Align(
+                          alignment: Alignment.topLeft,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 680),
+                            child: page,
                           ),
                         ),
-                    ],
+                        const Spacer(),
+                        if (!typing)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16),
+                            child: GuideLink(
+                              'How connecting works',
+                              onTap: () => _shell.showGuide(Guide.connect),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),

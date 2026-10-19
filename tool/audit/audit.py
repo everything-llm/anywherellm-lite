@@ -134,10 +134,17 @@ class Walk(Driver):
 # --- Device, build and packaging ---------------------------------------------------------
 
 
-def build(signed_out: bool, target: Path) -> None:
+def variant(step: dict) -> tuple[bool, str]:
+    """The build a step runs on: whether no server is saved, and the state the fakes start in."""
+    return bool(step.get("signed_out")), step.get("state", "")
+
+
+def build(signed_out: bool, state: str, target: Path) -> None:
     command = ["flutter", "build", "apk", "--debug", "-t", ENTRYPOINT, "--target-platform", "android-x64"]
     if signed_out:
         command.append("--dart-define=AUDIT_SIGNED_OUT=true")
+    if state:
+        command.append(f"--dart-define=AUDIT_STATE={state}")
     print("building:", " ".join(command))
     done = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
     if done.returncode != 0:
@@ -223,19 +230,28 @@ def main() -> int:
     folder = args.out / f"anywherellm-audit-{commit}-{stamp}"
     folder.mkdir(parents=True)
     apks = {}
-    for signed_out in {bool(s.get("signed_out")) for s in steps}:
-        apks[signed_out] = args.out / ("app-signed-out.apk" if signed_out else "app.apk")
+    for kind in dict.fromkeys(variant(s) for s in steps):
+        signed_out, state = kind
+        name = "app" + ("-signed-out" if signed_out else "") + (f"-{state}" if state else "") + ".apk"
+        apks[kind] = args.out / name
         if not args.no_build:
-            build(signed_out, apks[signed_out])
-        elif not apks[signed_out].exists():
-            sys.exit(f"{apks[signed_out]} does not exist; run once without --no-build")
+            build(signed_out, state, apks[kind])
+        elif not apks[kind].exists():
+            sys.exit(f"{apks[kind]} does not exist; run once without --no-build")
     before = steady(device)
+    # Read now: an emulator this tool booted is closed before the manifest is written.
+    device_info = {
+        "serial": device.serial,
+        "model": device.prop("ro.product.model"),
+        "api": device.prop("ro.build.version.sdk"),
+        "size": f"{device.size[0]}x{device.size[1]} @ {device.shell('wm density').split()[-1]} dpi",
+    }
     walk = Walk(device, folder, themes)
     results = []
     try:
-        for signed_out, apk in apks.items():
+        for kind, apk in apks.items():
             install(device, apk)
-            for step in (s for s in steps if bool(s.get("signed_out")) == signed_out):
+            for step in (s for s in steps if variant(s) == kind):
                 print(f"{step['group']}/{step['name']}", end=" ", flush=True)
                 record = walk.run(step, starts.get(step.get("from"), []) + step["do"])
                 print(record["status"], record["findings"] or "")
@@ -251,12 +267,7 @@ def main() -> int:
         "commit": commit,
         "dirty": bool(git("status", "--porcelain")),
         "date": datetime.now().isoformat(timespec="seconds"),
-        "device": {
-            "serial": device.serial,
-            "model": device.prop("ro.product.model"),
-            "api": device.prop("ro.build.version.sdk"),
-            "size": f"{device.size[0]}x{device.size[1]} @ {device.shell('wm density').split()[-1]} dpi",
-        },
+        "device": device_info,
         "themes": themes,
         "summary": f"{len(results)} steps in {' and '.join(themes)}, {len(failed)} failed, "
                    f"{len(noted)} with log findings, "

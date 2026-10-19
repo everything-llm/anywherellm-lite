@@ -271,10 +271,18 @@ class _Body extends StatelessWidget {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
     return ListenableBuilder(
-      listenable: Listenable.merge([scope.chat, scope.settings]),
+      listenable: Listenable.merge([
+        scope.chat,
+        scope.settings,
+        scope.chat.unreachable,
+      ]),
       builder: (context, _) {
         final chat = scope.chat;
         if (chat.active != null) return MessageList(onEdit: onEdit);
+        // The banner says why there is nothing to show, so no empty state says otherwise.
+        if (scope.settings.configured && chat.unreachable.value) {
+          return const SizedBox.shrink();
+        }
         final (title, text) = !scope.settings.configured
             ? (
                 'Welcome to AnywhereLLM',

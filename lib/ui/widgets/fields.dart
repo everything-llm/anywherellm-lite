@@ -36,27 +36,53 @@ InputDecoration editorDecoration(
 }
 
 /// A 2 px ring in the accent, drawn inside [child]'s box with corners of 14, while [focus] has the
-/// focus, as the Lite prototype outlines a field it sits in. It takes no room of its own.
-class FocusRing extends StatelessWidget {
+/// focus from a keyboard, as the Lite prototype's `:focus-visible` outlines a field it sits in: a
+/// tap with a finger shows the caret alone. It takes no room of its own.
+class FocusRing extends StatefulWidget {
   const FocusRing({super.key, required this.focus, required this.child});
 
   final FocusNode focus;
   final Widget child;
 
   @override
+  State<FocusRing> createState() => _FocusRingState();
+}
+
+class _FocusRingState extends State<FocusRing> {
+  @override
+  void initState() {
+    super.initState();
+    FocusManager.instance.addHighlightModeListener(_changed);
+  }
+
+  @override
+  void dispose() {
+    FocusManager.instance.removeHighlightModeListener(_changed);
+    super.dispose();
+  }
+
+  void _changed(FocusHighlightMode _) => setState(() {});
+
+  @override
   Widget build(BuildContext context) {
     final accent = Tokens.of(context).accent;
     return ListenableBuilder(
-      listenable: focus,
-      builder: (context, child) => DecoratedBox(
-        position: DecorationPosition.foreground,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          border: focus.hasFocus ? Border.all(color: accent, width: 2) : null,
-        ),
-        child: child,
-      ),
-      child: child,
+      listenable: widget.focus,
+      builder: (context, child) {
+        final ring =
+            widget.focus.hasFocus &&
+            FocusManager.instance.highlightMode ==
+                FocusHighlightMode.traditional;
+        return DecoratedBox(
+          position: DecorationPosition.foreground,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: ring ? Border.all(color: accent, width: 2) : null,
+          ),
+          child: child,
+        );
+      },
+      child: widget.child,
     );
   }
 }

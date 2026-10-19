@@ -21,6 +21,8 @@ void main() {
     expect(find.text('Could not read the workspaces'), findsNothing);
     // The message box stays open.
     expect(composerField, findsOneWidget);
+    // Nothing was read, so no empty state claims there are no workspaces.
+    expect(find.text('No workspaces yet'), findsNothing);
   });
 
   testWidgets('Try again reads the workspaces at once and clears the banner', (

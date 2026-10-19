@@ -87,6 +87,13 @@ void main() {
     expect(focused(tester, field), isTrue);
     expectAboveKeyboard(tester, control('Connect'), phone, keyboard);
     expectAboveKeyboard(tester, field, phone, keyboard);
+    // The page scrolls to its fields, so the key's field is in view too.
+    expectAboveKeyboard(
+      tester,
+      typingField(find.byType(SettingsDialog)).last,
+      phone,
+      keyboard,
+    );
     // The page is all fields now: the help link waits for the keyboard to go.
     expect(control('How connecting works'), findsNothing);
   });
