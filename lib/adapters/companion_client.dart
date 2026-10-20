@@ -157,6 +157,9 @@ class CompanionClient {
       );
     } on http.ClientException catch (error) {
       throw ApiException('Could not reach ${_lower(name)}: ${error.message}');
+    } on Exception {
+      // Never the error's text: a header the platform refused is quoted in it, key and all.
+      throw ApiException('Could not reach ${_lower(name)}.');
     }
   }
 

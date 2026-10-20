@@ -206,5 +206,17 @@ void main() {
       expect(error.message, contains('the toolkit on host.example.ts.net'));
       expect(error.message, isNot(contains('SECRET-KEY')));
     });
+
+    test('any other failure is named without its text', () async {
+      final api = _api(
+        (request) async => throw FormatException(
+          'Invalid HTTP header field value: "${request.headers['Authorization']}"',
+        ),
+      );
+      final error = await _failure(api.json('GET', ['memory-switches']));
+      expect(error.message, contains('toolkit'));
+      expect(error.message, isNot(contains('SECRET-KEY')));
+      expect(error.message, isNot(contains('Invalid')));
+    });
   });
 }

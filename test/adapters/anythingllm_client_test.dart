@@ -151,11 +151,30 @@ void main() {
         (_) async => throw const SocketException('down'),
         (_) async => throw http.ClientException('closed'),
         (_) async => http.Response('not json', 200),
+        (_) async => throw const FormatException(
+          'Invalid HTTP header field value: "Bearer SECRET-KEY"',
+        ),
       ];
       for (final handler in handlers) {
         final error = await _failure(_api(handler).verify(_connection));
         expect(error.message, isNot(contains('SECRET-KEY')));
       }
+    });
+
+    test('a key the headers refuse fails without the key', () async {
+      const odd = Connection(
+        baseUrl: 'https://host.example.ts.net:3001',
+        apiKey: 'SECRET\u200bKEY',
+      );
+      final error = await _failure(
+        _api(
+          (request) async => throw FormatException(
+            'Invalid HTTP header field value: "${request.headers['Authorization']}"',
+          ),
+          current: odd,
+        ).verify(odd),
+      );
+      expect(error.message, isNot(contains('SECRET')));
     });
   });
 

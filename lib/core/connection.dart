@@ -13,6 +13,11 @@ class Connection {
     final baseUrl = normalizeBaseUrl(url);
     final apiKey = key.trim();
     if (apiKey.isEmpty) throw const ApiException('Enter the API key.');
+    if (!_keyText.hasMatch(apiKey)) {
+      throw const ApiException(
+        'The key holds a character a key cannot: paste it again.',
+      );
+    }
     return Connection(baseUrl: baseUrl, apiKey: apiKey);
   }
 
@@ -40,6 +45,11 @@ class Connection {
   @override
   String toString() => 'Connection($baseUrl)';
 }
+
+/// What a developer key is made of: printable ASCII with no space. Any other character, such as
+/// a zero-width space or a line break, is one an HTTP header refuses, and the refusal's text
+/// holds the whole header.
+final _keyText = RegExp(r'^[\x21-\x7e]+$');
 
 /// The connection in use, or null before one is set up. Settings changes it and the client reads
 /// it on every call, so a saved connection is used at once.

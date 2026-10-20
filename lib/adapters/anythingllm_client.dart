@@ -589,7 +589,8 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     http.ClientException(:final message) => ApiException(
       'Could not reach the server: $message',
     ),
-    _ => ApiException('Could not reach the server: $error'),
+    // Never the error's text: a header the platform refused is quoted in it, key and all.
+    _ => const ApiException('Could not reach the server.'),
   };
 
   static const _refused = 'The server refused the request.';

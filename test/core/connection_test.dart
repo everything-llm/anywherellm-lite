@@ -177,6 +177,22 @@ void main() {
       );
     });
 
+    test('a key with a character outside printable ASCII is refused', () {
+      for (final key in ['AB\u200bCD', 'AB\u00a0CD', 'AB\nCD', 'AB CD', 'ÅB']) {
+        expect(
+          () => Connection.parse('https://h:3001', key),
+          throwsA(
+            isA<ApiException>().having(
+              (e) => e.message,
+              'message',
+              allOf(contains('a key cannot'), isNot(contains('CD'))),
+            ),
+          ),
+          reason: key,
+        );
+      }
+    });
+
     test('a bad address is refused', () {
       expect(
         () => Connection.parse('nonsense', 'K1'),
