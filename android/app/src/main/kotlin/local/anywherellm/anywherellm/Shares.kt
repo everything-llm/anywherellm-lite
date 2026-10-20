@@ -73,20 +73,26 @@ class Shares(private val context: Context, messenger: BinaryMessenger) {
         reader.shutdown()
     }
 
-    /** The share [intent] holds, taken out of it so it is handed over once; null for none. */
-    private fun take(intent: Intent?): Map<String, Any?>? = when (intent?.action) {
-        Intent.ACTION_SEND -> {
-            val stream = stream(intent)
-            val text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)
-            intent.removeExtra(Intent.EXTRA_STREAM)
-            intent.removeExtra(Intent.EXTRA_TEXT)
-            stream?.let(::file) ?: text?.let { mapOf("text" to "$it") }
+    /**
+     * The share [intent] holds, taken out of it so it is handed over once; null for none, as for
+     * one that [fromHistory] brought back.
+     */
+    private fun take(intent: Intent?): Map<String, Any?>? {
+        if (intent == null || fromHistory(intent)) return null
+        return when (intent.action) {
+            Intent.ACTION_SEND -> {
+                val stream = stream(intent)
+                val text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)
+                intent.removeExtra(Intent.EXTRA_STREAM)
+                intent.removeExtra(Intent.EXTRA_TEXT)
+                stream?.let(::file) ?: text?.let { mapOf("text" to "$it") }
+            }
+            Intent.ACTION_VIEW -> intent.data
+                ?.takeIf { it.scheme == "anywherellm" }
+                ?.also { intent.data = null }
+                ?.let { mapOf("text" to "$it") }
+            else -> null
         }
-        Intent.ACTION_VIEW -> intent.data
-            ?.takeIf { it.scheme == "anywherellm" }
-            ?.also { intent.data = null }
-            ?.let { mapOf("text" to "$it") }
-        else -> null
     }
 
     private fun stream(intent: Intent): Uri? = runCatching {
@@ -104,10 +110,13 @@ class Shares(private val context: Context, messenger: BinaryMessenger) {
      */
     private fun file(uri: Uri): Map<String, Any?>? {
         if (uri.scheme != ContentResolver.SCHEME_CONTENT) return null
-        val authority = uri.authority ?: return null
+        // An authority with user info (`content://0@pkg.provider/...`) names the provider the
+        // resolver finds without it, so only a bare host is looked up, and one no provider has is
+        // refused.
+        val authority = uri.host?.takeIf { it == uri.authority } ?: return null
         @Suppress("DEPRECATION")
-        val provider = context.packageManager.resolveContentProvider(authority, 0)
-        if (provider?.packageName == context.packageName) return null
+        val provider = context.packageManager.resolveContentProvider(authority, 0) ?: return null
+        if (provider.packageName == context.packageName) return null
         var name: String? = null
         var size: Long? = null
         runCatching {
@@ -140,7 +149,15 @@ class Shares(private val context: Context, messenger: BinaryMessenger) {
         }
     }
 
-    private companion object {
-        const val CHANNEL = "anywherellm/shares"
+    companion object {
+        private const val CHANNEL = "anywherellm/shares"
+
+        /**
+         * Whether [intent] is the one the activity started with, handed back because the task was
+         * opened again from the recent apps after the process died; what it carried was used
+         * then and is not offered again.
+         */
+        fun fromHistory(intent: Intent?): Boolean =
+            intent != null && (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0
     }
 }

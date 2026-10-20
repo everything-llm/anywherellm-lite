@@ -91,7 +91,7 @@ class MainActivity : FlutterActivity() {
 
     /** The tapped notification's chat that [intent] carries, taken out so it is handed over once. */
     private fun takeTap(intent: Intent?): Map<String, String>? {
-        if (intent?.action != Notes.ACTION_TAP) return null
+        if (intent?.action != Notes.ACTION_TAP || Shares.fromHistory(intent)) return null
         val slug = intent.getStringExtra(Notes.EXTRA_SLUG) ?: return null
         val thread = intent.getStringExtra(Notes.EXTRA_THREAD) ?: return null
         intent.removeExtra(Notes.EXTRA_SLUG)
