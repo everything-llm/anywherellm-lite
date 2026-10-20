@@ -40,20 +40,21 @@ class _PageSheetState extends State<PageSheet> {
     final comment = pageCommentOf(jsonOrNull(message));
     if (comment == null) return;
     if (comment.workspace != AppScope.of(context).chat.activeSlug) {
-      return _answer(
-        'This app is in another workspace: open a chat there to comment on it.',
-      );
+      return _otherWorkspace();
     }
     if (_pending != null) return _answer('Another comment is waiting.');
     setState(() => _pending = comment);
   }
 
-  /// Sends the waiting comment in the chat on screen, and tells the page whether it went.
+  /// Sends the waiting comment in the chat on screen, and tells the page whether it went. A
+  /// comment whose workspace is no longer the open one, as when another opened while it waited,
+  /// is not sent.
   Future<void> _send() async {
     final comment = _pending;
     if (comment == null) return;
     setState(() => _pending = null);
     final scope = AppScope.of(context);
+    if (comment.workspace != scope.chat.activeSlug) return _otherWorkspace();
     final sent = await scope.chat.send(comment.message);
     await _answer(
       sent
@@ -62,6 +63,11 @@ class _PageSheetState extends State<PageSheet> {
     );
     if (sent && mounted) scope.shell.closePage();
   }
+
+  /// Tells the page its comment is on an app of another workspace.
+  Future<void> _otherWorkspace() => _answer(
+    'This app is in another workspace: open a chat there to comment on it.',
+  );
 
   /// Lets go of the waiting comment unsent.
   void _cancel() {

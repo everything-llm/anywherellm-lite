@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -37,6 +38,38 @@ void main() {
     expect(
       find.text('Shortcut · the server keeps the full prompt'),
       findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'a shortcut pasted as /name into an empty message becomes a chip',
+    (tester) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      h.chat.newChat();
+      await tester.pumpAndSettle();
+      await tester.enterText(composerField, '/translate ');
+      await tester.pump();
+      expect(find.text('Translate'), findsOneWidget);
+      expect(
+        tester.widget<EditableText>(composerField).controller.text,
+        isEmpty,
+      );
+    },
+  );
+
+  testWidgets('Edit puts a question back without the shortcut chosen before', (
+    tester,
+  ) async {
+    await pumpApp(tester, llm: planningServer());
+    await tester.enterText(composerField, '/translate ');
+    await tester.pump();
+    expect(find.text('Translate'), findsOneWidget);
+    await tester.longPress(find.text('What is the budget?'));
+    await tester.pump();
+    expect(find.text('Translate'), findsNothing);
+    expect(
+      tester.widget<EditableText>(composerField).controller.text,
+      'What is the budget?',
     );
   });
 }

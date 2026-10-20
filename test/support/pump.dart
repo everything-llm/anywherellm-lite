@@ -125,17 +125,42 @@ class FakeAppView implements AppView {
   PageChannel? channel;
   final List<String> ran = [];
 
+  /// Whether the page shown last failed to load, which draws [PageGone] over it.
+  final ValueNotifier<bool> gone = ValueNotifier(false);
+  VoidCallback? _failed;
+
+  /// Fails the page shown last as a 404 does: it draws [PageGone] and tells its sheet.
+  void fail() {
+    gone.value = true;
+    _failed?.call();
+  }
+
   @override
   Widget show(
     Uri page, {
     required void Function(Uri url) onLeave,
     VoidCallback? onClose,
+    VoidCallback? onFailed,
     PageChannel? channel,
   }) {
-    shown.add(page);
+    // A sheet that rebuilds shows the same page again, which has not loaded afresh.
+    if (shown.isEmpty || shown.last != page) {
+      shown.add(page);
+      gone.value = false;
+    }
     close = onClose;
+    _failed = onFailed;
     this.channel = channel?..runner = (script) async => ran.add(script);
-    return Center(child: Text('Web view of $page'));
+    return ValueListenableBuilder<bool>(
+      valueListenable: gone,
+      builder: (context, failed, _) => Stack(
+        fit: StackFit.expand,
+        children: [
+          Center(child: Text('Web view of $page')),
+          if (failed) PageGone(onClose: onClose),
+        ],
+      ),
+    );
   }
 }
 

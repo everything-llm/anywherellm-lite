@@ -10,8 +10,9 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'app_view.dart';
 
 /// A page an answer links to in the device's web view. The page runs its scripts and stays on
-/// its own origin; a link anywhere else goes to `onLeave`, and `window.close()`, which a web
-/// view ignores, to `onClose`. Only the page's own origin is given its channels, and only what
+/// its own origin; a link anywhere else goes to `onLeave` when the main frame follows it, and
+/// `window.close()`, which a web view ignores, to `onClose`. A page the server answers with an
+/// error, or cannot be reached, is covered by [PageGone] and tells `onFailed`. Only the page's own origin is given its channels, and only what
 /// its main frame posts is heard, so a frame it embeds cannot speak as it.
 class AppWebViews implements AppView {
   const AppWebViews();
@@ -21,12 +22,14 @@ class AppWebViews implements AppView {
     Uri page, {
     required void Function(Uri url) onLeave,
     VoidCallback? onClose,
+    VoidCallback? onFailed,
     PageChannel? channel,
   }) => _AppWebView(
     key: ValueKey(page),
     page: page,
     onLeave: onLeave,
     onClose: onClose,
+    onFailed: onFailed,
     channel: channel,
   );
 }
@@ -71,12 +74,14 @@ class _AppWebView extends StatefulWidget {
     required this.page,
     required this.onLeave,
     this.onClose,
+    this.onFailed,
     this.channel,
   });
 
   final Uri page;
   final void Function(Uri url) onLeave;
   final VoidCallback? onClose;
+  final VoidCallback? onFailed;
   final PageChannel? channel;
 
   @override
@@ -88,6 +93,9 @@ class _AppWebViewState extends State<_AppWebView> {
 
   /// Whether the page's first load has ended, as it does when it fails too.
   bool _loaded = false;
+
+  /// Whether the page itself failed to load, which [PageGone] says.
+  bool _gone = false;
 
   /// The web view's id at `PageChannels`, once its channels are asked for.
   int? _view;
@@ -110,15 +118,28 @@ class _AppWebViewState extends State<_AppWebView> {
             }
             if (mounted && !_loaded) setState(() => _loaded = true);
           },
+          onHttpError: (error) {
+            if (pageFailed(
+              page,
+              error.request?.uri,
+              error.response?.statusCode,
+            )) {
+              _fail();
+            }
+          },
+          onWebResourceError: (error) {
+            if (error.isForMainFrame ?? false) _fail();
+          },
           onNavigationRequest: (request) {
             final url = Uri.tryParse(request.url);
-            if (url != null &&
-                url.scheme == page.scheme &&
-                url.host == page.host &&
-                url.port == page.port) {
-              return NavigationDecision.navigate;
+            if (url == null) return NavigationDecision.prevent;
+            switch (offOriginMove(page, url, request.isMainFrame)) {
+              case PageMove.stay:
+                return NavigationDecision.navigate;
+              case PageMove.leave:
+                widget.onLeave(url);
+              case PageMove.block:
             }
-            if (url != null) widget.onLeave(url);
             return NavigationDecision.prevent;
           },
         ),
@@ -127,6 +148,13 @@ class _AppWebViewState extends State<_AppWebView> {
       _view = android.webViewIdentifier;
     }
     unawaited(_open());
+  }
+
+  /// Covers the page with [PageGone], once, and tells the sheet that shows it.
+  void _fail() {
+    if (!mounted || _gone) return;
+    setState(() => _gone = true);
+    widget.onFailed?.call();
   }
 
   /// Gives the page its channels, which must come before it loads to reach its first document,
@@ -177,6 +205,7 @@ class _AppWebViewState extends State<_AppWebView> {
           color: Theme.of(context).canvasColor,
           child: const Center(child: CircularProgressIndicator()),
         ),
+      if (_gone) PageGone(onClose: widget.onClose),
     ],
   );
 }

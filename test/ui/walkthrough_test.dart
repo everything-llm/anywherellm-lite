@@ -162,7 +162,10 @@ void main() {
       expect(find.text('1 of ${toolkitSteps.length}'), findsOneWidget);
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pumpAndSettle();
-      expect(find.textContaining('anywherellm-bridge.cjs install'), findsOneWidget);
+      expect(
+        find.textContaining('anywherellm-bridge.cjs install'),
+        findsOneWidget,
+      );
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(h.shell.guiding, isFalse);

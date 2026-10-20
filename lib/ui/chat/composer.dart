@@ -48,10 +48,11 @@ class Composer extends StatefulWidget {
   final FocusNode focus;
 
   @override
-  State<Composer> createState() => _ComposerState();
+  State<Composer> createState() => ComposerState();
 }
 
-class _ComposerState extends State<Composer> {
+/// What the [Composer] holds.
+class ComposerState extends State<Composer> {
   /// The files picked for the next question.
   List<Attachment> _attached = const [];
 
@@ -130,6 +131,7 @@ class _ComposerState extends State<Composer> {
         : '$draft ';
     final go = ++_go;
     _dictated = draft;
+    var heard = false;
     setState(() {
       _listening = true;
       _micProblem = null;
@@ -137,6 +139,7 @@ class _ComposerState extends State<Composer> {
     final started = await dictation.start(
       onWords: (words) {
         if (go != _go) return;
+        if (words.trim().isNotEmpty) heard = true;
         _setDraft(_dictated = '$_before$words');
       },
       onDone: (how) {
@@ -144,7 +147,9 @@ class _ComposerState extends State<Composer> {
         if (!mounted || go != _go) return;
         setState(() => _listening = false);
         final send = _scope.prefs.prefs.isOn(ChatSwitch.sendDictation);
+        // A pause that heard nothing leaves what was typed to the person, not to a send.
         if (how == DictationEnd.paused &&
+            heard &&
             send &&
             canSend(_scope.chat, widget.draft.text)) {
           _send(widget.draft.text);
@@ -159,6 +164,14 @@ class _ComposerState extends State<Composer> {
             "Allow it in Android's settings for the app.";
       });
     }
+  }
+
+  /// Puts [text] back as the message to send as a new one, without the shortcut chosen for
+  /// the one it replaces, since [text] may already be what that shortcut expanded to.
+  void edit(String text) {
+    if (_shortcut != null) setState(() => _shortcut = null);
+    _setDraft(text);
+    widget.focus.requestFocus();
   }
 
   /// Puts [text] in the message, with the cursor at its end.
@@ -217,7 +230,8 @@ class _ComposerState extends State<Composer> {
             .where((item) => item.name == match[1]!.toLowerCase())
             .firstOrNull;
         if (shortcut != null) {
-          _shortcut = shortcut;
+          // Shown even when the rest is empty, which leaves the message as it was.
+          setState(() => _shortcut = shortcut);
           _setDraft(match[2] ?? '');
           return;
         }
@@ -444,7 +458,9 @@ class _ComposerState extends State<Composer> {
     final draft = widget.draft;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      // As tall as its card, however tall the window allows.
       child: Center(
+        heightFactor: 1,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: Sizes.column),
           child: ListenableBuilder(
@@ -693,15 +709,21 @@ class _Form extends StatelessWidget {
           ],
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // The notes scroll when the window leaves no room for them and the field, as on a
+            // small phone with the keyboard up, from the end, where the shortcuts are.
             if (notes.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 12, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  spacing: 8,
-                  children: notes,
+              Flexible(
+                child: SingleChildScrollView(
+                  reverse: true,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 12, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    spacing: 8,
+                    children: notes,
+                  ),
                 ),
               ),
             // What goes with the message: the shortcut, the files and where answers come from,
@@ -816,7 +838,7 @@ class _Form extends StatelessWidget {
                       'mic',
                       tooltip: listening ? 'Stop dictating' : 'Dictate',
                       active: listening,
-                      onPressed: chat.busy ? null : onDictate,
+                      onPressed: chat.busy && !listening ? null : onDictate,
                       box: 48,
                       size: IconSize.small,
                     ),

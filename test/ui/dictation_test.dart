@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -86,4 +88,29 @@ void main() {
     await tester.pumpAndSettle();
     expect(control('Dictate'), findsOneWidget);
   });
+
+  testWidgets(
+    'the microphone still stops a go when an answer starts meanwhile',
+    (tester) async {
+      final llm = planningServer()..hold = true;
+      final h = await pumpApp(tester, llm: llm, canDictate: true);
+      await tester.tap(control('Dictate'));
+      await tester.pump();
+      h.dictation!.say('and the lease');
+      // A message that was waiting goes, and the chat answers while the go listens.
+      unawaited(h.chat.send('Something else'));
+      await tester.pump();
+      expect(h.chat.busy, isTrue);
+      await tester.tap(control('Stop dictating'));
+      await tester.pump();
+      expect(h.dictation!.stopped, 1);
+      expect(control('Dictate'), findsOneWidget);
+      // Starting a go is off while the chat answers.
+      await tester.tap(control('Dictate'));
+      await tester.pump();
+      expect(h.dictation!.listening, isFalse);
+      await llm.chat!.close();
+      await tester.pump(const Duration(seconds: 1));
+    },
+  );
 }

@@ -104,8 +104,7 @@ class _ServerPageState extends State<ServerPage> {
         FieldCard([
           NavRow(
             title: 'Open AnythingLLM\'s web page',
-            about:
-                'Change models, voice, widgets, chat exports and advanced settings there',
+            about: 'Change models, voice, widgets, chat exports and advanced settings there',
             aboutLines: 2,
             end: 'external',
             accent: true,
