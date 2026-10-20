@@ -204,7 +204,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(h.shell.scanning, isTrue);
     expect(find.text('Fake scan'), findsOneWidget);
-    expect(find.textContaining('choose Connect a phone'), findsOneWidget);
+    expect(find.textContaining('toolkit\'s pair command'), findsOneWidget);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(h.shell.scanning, isFalse);
