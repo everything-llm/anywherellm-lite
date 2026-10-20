@@ -1,5 +1,5 @@
 /// The pages of Settings. Connection, Appearance and Chat are about this device; Server says what
-/// AnythingLLM runs with and opens Privacy and data, and Memory and Allowed hosts sit beside it.
+/// AnythingLLM runs with and opens Privacy and data, and Memory and Allowed addresses sit beside it.
 enum SettingsPage {
   connection('Connection', null, needsServer: false),
   appearance('Appearance', null, needsServer: false),
@@ -10,9 +10,9 @@ enum SettingsPage {
     needsServer: false,
   ),
   memory('Memory', null),
-  allowedHosts(
-    'Allowed hosts',
-    'Hosts on your own network every skill may reach without asking, even out of a chat.',
+  allowedAddresses(
+    'Allowed addresses',
+    'Addresses on your own network every skill may reach without asking, even out of a chat.',
   ),
   server('Server', null),
   privacy('Privacy and data', 'Where your questions and files go.');

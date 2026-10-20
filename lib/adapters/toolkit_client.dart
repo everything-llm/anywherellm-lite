@@ -161,7 +161,7 @@ class HttpToolkitApi implements ToolkitApi {
         ]),
       );
 
-  // The requests and the allowed hosts are the bridge's own, not AnythingLLM's.
+  // The requests and the allowed addresses are the bridge's own, not AnythingLLM's.
   @override
   Future<Ask> ask(String id) async => _ask(await _json('GET', ['asks', id]));
 
@@ -170,11 +170,13 @@ class HttpToolkitApi implements ToolkitApi {
       _json('POST', ['asks', id], body: {'decision': decision.name});
 
   @override
-  Future<List<AllowedHost>> allowedHosts() async =>
-      allowedHostsOf(await _json('GET', ['allowed']));
+  Future<List<AllowedOrigin>> allowedOrigins() async =>
+      allowedOriginsOf(await _json('GET', ['allowed']));
 
+  // An origin holds slashes, so it goes in the query, not the path.
   @override
-  Future<void> forgetHost(String host) => _json('DELETE', ['allowed', host]);
+  Future<void> forgetOrigin(String origin) =>
+      _json('DELETE', ['allowed'], query: {'origin': origin});
 
   /// The decoded JSON of a [method] to AnythingLLM's [path] through the bridge. AnythingLLM
   /// refuses some calls with `success: false` at HTTP 200, which fails in its words, or else

@@ -91,6 +91,7 @@ class NavRow extends StatelessWidget {
     this.icon,
     this.end = 'chevron',
     this.accent = false,
+    this.mono = false,
     this.selected,
   });
 
@@ -109,6 +110,9 @@ class NavRow extends StatelessWidget {
 
   /// Whether [title] is in the accent, as a link out of the app is.
   final bool accent;
+
+  /// Whether [title] is in the mono face, as an address is.
+  final bool mono;
 
   /// What a screen reader hears, when it says more than [title] and [about].
   final String? heard;
@@ -139,11 +143,13 @@ class NavRow extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: Type.sans(
-                      17,
-                      weight: FontWeight.w500,
-                      color: accent ? t.accent : t.ink,
-                    ),
+                    style: mono
+                        ? Type.mono(15, color: accent ? t.accent : t.ink)
+                        : Type.sans(
+                            17,
+                            weight: FontWeight.w500,
+                            color: accent ? t.accent : t.ink,
+                          ),
                   ),
                   if (about case final about? when about.isNotEmpty)
                     Text(

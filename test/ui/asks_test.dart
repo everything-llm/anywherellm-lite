@@ -95,11 +95,15 @@ void main() {
     await _end(tester, llm);
   });
 
-  testWidgets('Always allow lists the host, which can be removed', (
+  testWidgets('Always allow lists the address, which can be removed', (
     tester,
   ) async {
     final toolkit = _asking();
     final (llm, h) = await _waiting(tester, toolkit);
+    expect(
+      find.textContaining('Other ports on muse-vm still ask.'),
+      findsOneWidget,
+    );
     await tester.tap(control('Always allow'));
     await tester.pump(const Duration(milliseconds: 300));
     expect(toolkit.calls, contains('decide:$_id=always'));
@@ -107,17 +111,20 @@ void main() {
 
     h.shell.openSettings();
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Allowed hosts'));
+    await tester.tap(find.text('Allowed addresses'));
     await tester.pumpAndSettle();
-    expect(h.shell.settingsPage, SettingsPage.allowedHosts);
-    expect(find.text('muse-vm'), findsOneWidget);
-    await tester.tap(find.text('muse-vm'));
+    expect(h.shell.settingsPage, SettingsPage.allowedAddresses);
+    expect(find.text('http://muse-vm:8463'), findsOneWidget);
+    await tester.tap(find.text('http://muse-vm:8463'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Stop allowing muse-vm?'), findsOneWidget);
+    expect(
+      find.textContaining('Stop allowing http://muse-vm:8463?'),
+      findsOneWidget,
+    );
     await tester.tap(control('Remove'));
     await tester.pumpAndSettle();
-    expect(toolkit.calls, contains('forgetHost:muse-vm'));
-    expect(find.text('muse-vm'), findsNothing);
+    expect(toolkit.calls, contains('forgetOrigin:http://muse-vm:8463'));
+    expect(find.text('http://muse-vm:8463'), findsNothing);
     expect(find.textContaining('None yet.'), findsOneWidget);
   });
 

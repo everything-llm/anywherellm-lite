@@ -68,14 +68,14 @@ class _AskBody extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Text(
-                      '${ask.skill} asks to reach a host on your own network, which it '
-                      'cannot without you.',
+                      '${ask.skill} asks to reach an address on your own network, which '
+                      'it cannot without you.',
                       style: Type.sans(15.5, color: t.ink, height: 1.5),
                     ),
                   ),
                   FieldCard([
                     InfoRow(
-                      'Host',
+                      'Address',
                       about: ask.origin,
                       aboutLines: 2,
                       mono: true,
@@ -89,8 +89,8 @@ class _AskBody extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: Text(
                         'It waits until ${clockText(ask.expires.toLocal())}, then goes on '
-                        'without it. Always allow lets every skill reach ${ask.host} from '
-                        'now on, even out of a chat.',
+                        'without it. Always allow lets every skill reach ${ask.origin} from '
+                        'now on, even out of a chat. Other ports on ${ask.host} still ask.',
                         style: Type.sans(13.5, color: t.muted, height: 1.5),
                       ),
                     ),

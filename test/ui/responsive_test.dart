@@ -142,7 +142,12 @@ void main() {
               ToolkitFeature.jobs,
               ToolkitFeature.asks,
             }
-            ..allowed = [AllowedHost('host-$longWord', added: DateTime(2026))],
+            ..allowed = [
+              AllowedOrigin(
+                'http://host-$longWord:8463',
+                added: DateTime(2026),
+              ),
+            ],
         );
         h.shell.openSettings();
         await tester.pumpAndSettle();

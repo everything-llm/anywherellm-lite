@@ -39,13 +39,13 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   /// Whether the toolkit lists what the agent did, which Activity shows.
   bool get activityServed => serves(ToolkitFeature.activity);
 
-  /// Whether the toolkit's skills ask the person here, which Allowed hosts goes with.
+  /// Whether the toolkit's skills ask the person here, which Allowed addresses goes with.
   bool get asksServed => serves(ToolkitFeature.asks);
 
   final _jobs = _Read<List<ScheduledJob>>();
   final _library = _Read<LibraryContents>();
   final _activity = _Read<ActivityEvents>();
-  final _allowed = _Read<List<AllowedHost>>();
+  final _allowed = _Read<List<AllowedOrigin>>();
 
   /// The jobs the server runs on a schedule, or null until read.
   List<ScheduledJob>? get jobs => _jobs.value;
@@ -71,16 +71,16 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   /// Whether events are being read.
   bool get activityLoading => _activity.pending != null;
 
-  /// The hosts skills may always reach, or null until read.
-  List<AllowedHost>? get allowed => _allowed.value;
+  /// The addresses skills may always reach, or null until read.
+  List<AllowedOrigin>? get allowed => _allowed.value;
 
-  /// Why the last read of the allowed hosts failed.
+  /// Why the last read of the allowed addresses failed.
   Notice? get allowedProblem => _allowed.problem;
 
-  /// Whether the allowed hosts are being read.
+  /// Whether the allowed addresses are being read.
   bool get allowedLoading => _allowed.pending != null;
 
-  /// Whether a change to a job or an allowed host is on its way, which keeps a second from
+  /// Whether a change to a job or an allowed address is on its way, which keeps a second from
   /// starting.
   bool busy = false;
 
@@ -136,17 +136,17 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
     _api.library,
   );
 
-  /// Reads the hosts skills may always reach, or waits for the read on its way and, [again],
+  /// Reads the addresses skills may always reach, or waits for the read on its way and, [again],
   /// reads afresh after it.
   Future<void> readAllowed({bool again = false}) => _read(
     _allowed,
     asksServed,
-    'Could not read the allowed hosts',
-    _api.allowedHosts,
+    'Could not read the allowed addresses',
+    _api.allowedOrigins,
     again: again,
   );
 
-  /// Reads the allowed hosts after the frame, when the toolkit serves them and they are not read
+  /// Reads the allowed addresses after the frame, when the toolkit serves them and they are not read
   /// yet, so a page may ask while it builds.
   void wantAllowed() {
     if (!asksServed || _allowed.asked) return;
@@ -249,10 +249,10 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   Future<bool> removeJob(String id) =>
       _change('Could not delete the task', () => _api.deleteJob(id));
 
-  /// Stops always allowing [host], then reads the allowed hosts again.
-  Future<void> forgetHost(String host) => _change(
-    'Could not remove $host',
-    () => _api.forgetHost(host),
+  /// Stops always allowing [origin], then reads the allowed addresses again.
+  Future<void> forgetOrigin(String origin) => _change(
+    'Could not remove $origin',
+    () => _api.forgetOrigin(origin),
     readAgain: () => readAllowed(again: true),
   );
 

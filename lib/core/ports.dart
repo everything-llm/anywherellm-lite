@@ -208,11 +208,11 @@ abstract interface class ToolkitApi implements CompanionApi {
   /// skill stopped waiting.
   Future<void> decide(String id, AskDecision decision);
 
-  /// The hosts skills may always reach.
-  Future<List<AllowedHost>> allowedHosts();
+  /// The addresses skills may always reach.
+  Future<List<AllowedOrigin>> allowedOrigins();
 
-  /// Stops always allowing [host].
-  Future<void> forgetHost(String host);
+  /// Stops always allowing [origin].
+  Future<void> forgetOrigin(String origin);
 }
 
 /// Where the connection is kept between runs.

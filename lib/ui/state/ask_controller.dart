@@ -127,7 +127,7 @@ class AskController extends ChangeNotifier {
       await _api.decide(ask.id, decision);
       if (asked != _epoch) return;
       _shown.remove(shown);
-      // The list of hosts always allowed has one more.
+      // The list of addresses always allowed has one more.
       if (decision == AskDecision.always) {
         unawaited(_toolkit.readAllowed(again: true));
       }

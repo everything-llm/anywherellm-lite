@@ -12,25 +12,26 @@ import '../widgets/sheet.dart';
 import '../widgets/phone_page.dart';
 import 'rows.dart';
 
-/// The Allowed hosts page's question before a host is removed, in the shell's popup, so Back
-/// closes it.
-class AllowedHostSheet {
-  const AllowedHostSheet(this.host);
+/// The Allowed addresses page's question before an address is removed, in the shell's popup,
+/// so Back closes it.
+class AllowedOriginSheet {
+  const AllowedOriginSheet(this.origin);
 
-  final String host;
+  final String origin;
 
   @override
   bool operator ==(Object other) =>
-      other is AllowedHostSheet && other.host == host;
+      other is AllowedOriginSheet && other.origin == origin;
 
   @override
-  int get hashCode => host.hashCode;
+  int get hashCode => origin.hashCode;
 }
 
-/// The hosts on the person's own network every skill may reach without asking, which Always
-/// allow adds, read from the toolkit. A row asks before it removes its host.
-class AllowedHostsPage extends StatelessWidget {
-  const AllowedHostsPage({super.key});
+/// The addresses on the person's own network every skill may reach without asking, each one
+/// origin (scheme, host and port), which Always allow adds, read from the toolkit. A row asks
+/// before it removes its address.
+class AllowedAddressesPage extends StatelessWidget {
+  const AllowedAddressesPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -42,24 +43,24 @@ class AllowedHostsPage extends StatelessWidget {
       builder: (context, _) {
         toolkit.wantAllowed();
         final open = switch (shell.popup.value) {
-          final AllowedHostSheet sheet => sheet,
+          final AllowedOriginSheet sheet => sheet,
           _ => null,
         };
-        final hosts = toolkit.allowed;
+        final origins = toolkit.allowed;
         return PopupSheet(
           open: open != null,
           onClose: shell.closePopup,
-          title: 'Allowed host',
+          title: 'Allowed address',
           sheet: (context) => SheetQuestion(
-            'Stop allowing ${open?.host}? A skill will ask again before it reaches it in a '
-            'chat, and be refused out of one.',
+            'Stop allowing ${open?.origin}? A skill will ask again before it reaches it in '
+            'a chat, and be refused out of one.',
             action: 'Remove',
             onKeep: shell.closePopup,
             onConfirm: open == null || toolkit.busy
                 ? null
                 : () {
                     shell.closePopup();
-                    unawaited(toolkit.forgetHost(open.host));
+                    unawaited(toolkit.forgetOrigin(open.origin));
                   },
           ),
           child: Column(
@@ -70,23 +71,23 @@ class AllowedHostsPage extends StatelessWidget {
                 AlertBox.notice(AlertKind.bad, problem),
                 const SizedBox(height: 20),
               ],
-              if (hosts == null) ...[
+              if (origins == null) ...[
                 if (toolkit.allowedLoading)
                   const HelpText('Loading…', status: true),
               ] else ...[
                 FieldCard([
-                  for (final host in hosts) _HostRow(host),
-                  if (hosts.isEmpty)
+                  for (final origin in origins) _OriginRow(origin),
+                  if (origins.isEmpty)
                     const CardNote(
-                      'None yet. When a skill asks in a chat, Always allow adds its host here.',
+                      'None yet. When a skill asks in a chat, Always allow adds its address here.',
                     ),
                 ]),
                 const SizedBox(height: 20),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: FieldCard.inset),
                   child: PageNote(
-                    'Hosts the server lets through itself, in FENCE_ALLOW, are allowed too '
-                    'and not listed here.',
+                    'Hosts the server lets through itself, in FENCE_ALLOW, are allowed on '
+                    'every port and not listed here.',
                   ),
                 ),
               ],
@@ -98,27 +99,28 @@ class AllowedHostsPage extends StatelessWidget {
   }
 }
 
-/// A host always allowed, with when, which a tap asks to remove.
-class _HostRow extends StatelessWidget {
-  const _HostRow(this.host);
+/// An address always allowed, with when, which a tap asks to remove.
+class _OriginRow extends StatelessWidget {
+  const _OriginRow(this.origin);
 
-  final AllowedHost host;
+  final AllowedOrigin origin;
 
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
-    final added = switch (host.added) {
+    final added = switch (origin.added) {
       final at? => 'Allowed ${whenText(at, clock.now())}',
       null => 'Allowed',
     };
     return NavRow(
-      title: host.host,
+      title: origin.origin,
       about: added,
+      mono: true,
       end: 'trash',
-      heard: '${host.host}, $added. Remove',
+      heard: '${origin.origin}, $added. Remove',
       onTap: scope.toolkit.busy
           ? null
-          : () => scope.shell.togglePopup(AllowedHostSheet(host.host)),
+          : () => scope.shell.togglePopup(AllowedOriginSheet(origin.origin)),
     );
   }
 }

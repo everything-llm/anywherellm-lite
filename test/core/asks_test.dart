@@ -53,19 +53,30 @@ void main() {
     expect(askOf({'error': 'gone'}), isNull);
   });
 
-  test('the hosts always allowed are read, an empty one left out', () {
-    final hosts = allowedHostsOf({
-      'hosts': [
-        {'host': 'muse-vm', 'added': '2026-10-20T10:01:00Z'},
-        {'host': 'nas.lan'},
-        {'host': ''},
-        'muse-vm',
+  test('the addresses always allowed are read, an empty one left out', () {
+    final origins = allowedOriginsOf({
+      'origins': [
+        {'origin': 'http://muse-vm:8463', 'added': '2026-10-20T10:01:00Z'},
+        {'origin': 'https://nas.lan'},
+        {'origin': ''},
+        'http://muse-vm:8463',
       ],
     });
-    expect([for (final h in hosts) h.host], ['muse-vm', 'nas.lan']);
-    expect(hosts.first.added, DateTime.utc(2026, 10, 20, 10, 1));
-    expect(hosts.last.added, isNull);
-    expect(allowedHostsOf(null), isEmpty);
+    expect(
+      [for (final o in origins) o.origin],
+      ['http://muse-vm:8463', 'https://nas.lan'],
+    );
+    expect(origins.first.added, DateTime.utc(2026, 10, 20, 10, 1));
+    expect(origins.last.added, isNull);
+    expect(
+      allowedOriginsOf({
+        'hosts': [
+          {'host': 'muse-vm'},
+        ],
+      }),
+      isEmpty,
+    );
+    expect(allowedOriginsOf(null), isEmpty);
   });
 
   test('a status line names the request it waits on, and shows without it', () {

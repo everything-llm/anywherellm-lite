@@ -400,20 +400,25 @@ void main() {
       },
     );
 
-    test('the hosts always allowed are listed and removed', () async {
+    test('the addresses always allowed are listed and removed', () async {
       final toolkit = _Toolkit()
         ..routes['/allowed'] = {
-          'hosts': [
-            {'host': 'muse-vm', 'added': '2026-10-20T10:01:00Z'},
-            {'host': ''},
+          'origins': [
+            {'origin': 'http://muse-vm:8463', 'added': '2026-10-20T10:01:00Z'},
+            {'origin': ''},
           ],
-        }
-        ..routes['/allowed/muse-vm'] = {'hosts': []};
+        };
       final api = toolkit.api();
-      expect([for (final h in await api.allowedHosts()) h.host], ['muse-vm']);
-      await api.forgetHost('muse-vm');
+      expect(
+        [for (final o in await api.allowedOrigins()) o.origin],
+        ['http://muse-vm:8463'],
+      );
+      await api.forgetOrigin('http://muse-vm:8463');
       expect(toolkit.seen.last.method, 'DELETE');
-      expect(toolkit.seen.last.url.path, '/allowed/muse-vm');
+      expect(toolkit.seen.last.url.path, '/allowed');
+      expect(toolkit.seen.last.url.queryParameters, {
+        'origin': 'http://muse-vm:8463',
+      });
     });
 
     test(

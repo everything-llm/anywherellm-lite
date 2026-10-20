@@ -287,8 +287,8 @@ class FakeToolkit with FakeCompanion implements ToolkitApi {
   /// The requests skills wait on, by id, as the bridge holds them.
   final Map<String, Ask> asks = {};
 
-  /// The hosts skills may always reach.
-  List<AllowedHost> allowed = [];
+  /// The addresses skills may always reach.
+  List<AllowedOrigin> allowed = [];
 
   @override
   Future<Ask> ask(String id) => run(
@@ -298,7 +298,7 @@ class FakeToolkit with FakeCompanion implements ToolkitApi {
     id,
   );
 
-  /// Decides a request once, as the bridge does, and always allows its host for [AskDecision.always].
+  /// Decides a request once, as the bridge does, and always allows its origin for [AskDecision.always].
   @override
   Future<void> decide(String id, AskDecision decision) => run('decide', () {
     final ask =
@@ -318,21 +318,21 @@ class FakeToolkit with FakeCompanion implements ToolkitApi {
     );
     asks[id] = decided;
     if (decision == AskDecision.always) {
-      allowed = [...allowed, AllowedHost(ask.host, added: DateTime.now())];
+      allowed = [...allowed, AllowedOrigin(ask.origin, added: DateTime.now())];
     }
   }, '$id=${decision.name}');
 
   @override
-  Future<List<AllowedHost>> allowedHosts() =>
-      run('allowedHosts', () => allowed);
+  Future<List<AllowedOrigin>> allowedOrigins() =>
+      run('allowedOrigins', () => allowed);
 
   @override
-  Future<void> forgetHost(String host) => run(
-    'forgetHost',
+  Future<void> forgetOrigin(String origin) => run(
+    'forgetOrigin',
     () => allowed = [
       for (final a in allowed)
-        if (a.host != host) a,
+        if (a.origin != origin) a,
     ],
-    host,
+    origin,
   );
 }

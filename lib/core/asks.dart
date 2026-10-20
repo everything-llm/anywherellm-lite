@@ -74,22 +74,23 @@ class Ask {
 /// The request a bridge answer holds under `ask`, or null.
 Ask? askOf(Object? json) => Ask.fromJson(json is Map ? json['ask'] : null);
 
-/// A host the person always allows skills to reach, and when, if the bridge said.
-class AllowedHost {
-  const AllowedHost(this.host, {this.added});
+/// An address the person always allows skills to reach: one origin, its scheme, host and port,
+/// and when, if the bridge said. Another port on the same host still asks.
+class AllowedOrigin {
+  const AllowedOrigin(this.origin, {this.added});
 
-  final String host;
+  final String origin;
   final DateTime? added;
 }
 
-/// The always-allowed hosts a bridge answer lists under `hosts`.
-List<AllowedHost> allowedHostsOf(Object? json) {
-  final hosts = json is Map ? json['hosts'] : null;
+/// The always-allowed addresses a bridge answer lists under `origins`.
+List<AllowedOrigin> allowedOriginsOf(Object? json) {
+  final origins = json is Map ? json['origins'] : null;
   return [
-    if (hosts is List)
-      for (final entry in hosts)
-        if (entry case {'host': final String host} when host.isNotEmpty)
-          AllowedHost(host, added: timeOrNull(entry['added'])),
+    if (origins is List)
+      for (final entry in origins)
+        if (entry case {'origin': final String origin} when origin.isNotEmpty)
+          AllowedOrigin(origin, added: timeOrNull(entry['added'])),
   ];
 }
 
