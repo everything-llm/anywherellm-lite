@@ -74,12 +74,7 @@ class _AskBody extends StatelessWidget {
                     ),
                   ),
                   FieldCard([
-                    InfoRow(
-                      'Address',
-                      about: ask.origin,
-                      aboutLines: 2,
-                      mono: true,
-                    ),
+                    InfoRow('Address', about: ask.origin, mono: true),
                     if (ask.why.isNotEmpty)
                       InfoRow('Why', about: ask.why, aboutLines: 4),
                     InfoRow('Workspace', about: workspace),

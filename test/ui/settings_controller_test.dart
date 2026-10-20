@@ -153,8 +153,8 @@ void main() {
       await settings.connect('https://other.example:3001', 'K1');
       expect(
         settings.addressOf(toolkitCompanion),
-        Uri.parse('https://other.example:8467'),
-        reason: 'guessed again on another server',
+        isNull,
+        reason: 'another server has none until a code names one',
       );
     });
 

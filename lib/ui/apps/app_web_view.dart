@@ -3,13 +3,16 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import 'app_view.dart';
 
 /// A page an answer links to in the device's web view. The page runs its scripts and stays on
-/// its own host and port; a link anywhere else goes to `onLeave`, and
-/// `window.close()`, which a web view ignores, to `onClose`.
+/// its own origin; a link anywhere else goes to `onLeave`, and `window.close()`, which a web
+/// view ignores, to `onClose`. Only the page's own origin is given its channels, and only what
+/// its main frame posts is heard, so a frame it embeds cannot speak as it.
 class AppWebViews implements AppView {
   const AppWebViews();
 
@@ -30,6 +33,37 @@ class AppWebViews implements AppView {
 
 /// The channel a page's `window.close()` calls to close what shows it.
 const _closeChannel = 'AnywhereLLMClose';
+
+/// How a page's channels reach the app: `PageChannels` (`android/.../PageChannels.kt`) gives a
+/// web view's frames of one origin each channel, and hands back what the main frame posts.
+final _pages = const MethodChannel('anywherellm/pages')
+  ..setMethodCallHandler((call) async {
+    if (call.arguments case {
+      'view': final int view,
+      'name': final String name,
+      'message': final String message,
+    }) {
+      _heard[(view, name)]?.call(message);
+    }
+  });
+
+/// What each web view's main frame posts to a channel goes to, by the web view and the name.
+final _heard = <(int, String), void Function(String message)>{};
+
+/// Asks `PageChannels` to give web view [view]'s frames of [page]'s origin a channel of each of
+/// [names]; false where the device's web view cannot, and the page then has none.
+Future<bool> _listen(int view, Uri page, Iterable<String> names) async {
+  try {
+    return await _pages.invokeMethod<bool>('listen', {
+          'view': view,
+          'names': [...names],
+          'origin': page.origin,
+        }) ??
+        false;
+  } on PlatformException {
+    return false;
+  }
+}
 
 class _AppWebView extends StatefulWidget {
   const _AppWebView({
@@ -55,19 +89,22 @@ class _AppWebViewState extends State<_AppWebView> {
   /// Whether the page's first load has ended, as it does when it fails too.
   bool _loaded = false;
 
+  /// The web view's id at `PageChannels`, once its channels are asked for.
+  int? _view;
+
   @override
   void initState() {
     super.initState();
-    final close = widget.onClose;
+    final page = widget.page;
     _web = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (_) {
-            if (close != null) {
+            if (widget.onClose != null) {
               unawaited(
                 _web.runJavaScript(
-                  "window.close=()=>$_closeChannel.postMessage('close')",
+                  "if(window.$_closeChannel)window.close=()=>$_closeChannel.postMessage('close')",
                 ),
               );
             }
@@ -76,8 +113,9 @@ class _AppWebViewState extends State<_AppWebView> {
           onNavigationRequest: (request) {
             final url = Uri.tryParse(request.url);
             if (url != null &&
-                url.host == widget.page.host &&
-                url.port == widget.page.port) {
+                url.scheme == page.scheme &&
+                url.host == page.host &&
+                url.port == page.port) {
               return NavigationDecision.navigate;
             }
             if (url != null) widget.onLeave(url);
@@ -85,28 +123,36 @@ class _AppWebViewState extends State<_AppWebView> {
           },
         ),
       );
-    if (close != null) {
-      unawaited(
-        _web.addJavaScriptChannel(
-          _closeChannel,
-          onMessageReceived: (_) => close(),
-        ),
-      );
+    if (_web.platform case final AndroidWebViewController android) {
+      _view = android.webViewIdentifier;
     }
-    if (widget.channel case final channel?) {
-      unawaited(
-        _web.addJavaScriptChannel(
-          channel.name,
-          onMessageReceived: (message) => channel.onMessage(message.message),
-        ),
-      );
-      channel.runner = _web.runJavaScript;
+    unawaited(_open());
+  }
+
+  /// Gives the page its channels, which must come before it loads to reach its first document,
+  /// then loads it.
+  Future<void> _open() async {
+    final page = widget.page;
+    if (_view case final view?) {
+      final heard = <String, void Function(String message)>{
+        if (widget.onClose case final close?) _closeChannel: (_) => close(),
+        if (widget.channel case final channel?) channel.name: channel.onMessage,
+      };
+      if (heard.isNotEmpty && await _listen(view, page, heard.keys)) {
+        if (!mounted) return;
+        heard.forEach((name, onMessage) => _heard[(view, name)] = onMessage);
+      }
     }
-    unawaited(_web.loadRequest(widget.page));
+    if (!mounted) return;
+    widget.channel?.runner = _web.runJavaScript;
+    await _web.loadRequest(page);
   }
 
   @override
   void dispose() {
+    if (_view case final view?) {
+      _heard.removeWhere((key, _) => key.$1 == view);
+    }
     // A web view that took its place may have set its own runner already.
     if (widget.channel case final channel?
         when channel.runner == _web.runJavaScript) {

@@ -9,10 +9,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import '../support/fake_toolkit.dart';
+
 const _connection = Connection(
   baseUrl: 'https://host.example.ts.net:3001',
   apiKey: 'SECRET-KEY',
 );
+
+/// Where a pairing code said the toolkit runs.
+final _toolkitAt = Uri.parse('https://host.example.ts.net:8467');
+
+/// The connection in use, with the toolkit where a pairing code said.
+ConnectionHolder _paired() => pairedHolder(_connection, _toolkitAt);
 
 /// The toolkit as a companion, answering through [handler].
 CompanionClient _api(
@@ -20,7 +28,7 @@ CompanionClient _api(
   ConnectionHolder? holder,
 }) => CompanionClient(
   toolkitCompanion,
-  holder: holder ?? ConnectionHolder(_connection),
+  holder: holder ?? _paired(),
   client: MockClient(handler),
   timeout: const Duration(seconds: 5),
   healthTimeout: const Duration(seconds: 5),
@@ -47,8 +55,8 @@ Future<ApiException> _failure(Future<void> call) async {
 
 void main() {
   group('health', () {
-    test('asks /health on 8467 without the key, and believes only the toolkit '
-        'server', () async {
+    test('asks /health where it was said to run without the key, and believes '
+        'only the toolkit server', () async {
       final seen = <http.Request>[];
       final api = _answering({
         'service': 'anywherellm-bridge',
@@ -97,9 +105,9 @@ void main() {
       );
     });
 
-    test('is remembered per connection, until asked again', () async {
+    test('is remembered per address, until asked again', () async {
       var asked = 0;
-      final holder = ConnectionHolder(_connection);
+      final holder = _paired();
       final api = _api((request) async {
         asked++;
         return http.Response('{"service":"anythingllm-bridge"}', 200);
@@ -109,16 +117,21 @@ void main() {
       expect(asked, 1);
       await api.health(again: true);
       expect(asked, 2);
-      holder.current = const Connection(
-        baseUrl: 'https://other.example:3001',
-        apiKey: 'K',
-      );
+      holder
+        ..current = const Connection(
+          baseUrl: 'https://other.example:3001',
+          apiKey: 'K',
+        )
+        ..companions = {
+          toolkitCompanion.code: Uri.parse('https://other.example:8467'),
+        };
       await api.health();
       expect(asked, 3);
     });
 
     test(
-      'is null with no server, or at a public http address, without asking',
+      'is null with no server, no address said, or at a public http address, '
+      'without asking',
       () async {
         var asked = 0;
         Future<http.Response> count(http.Request _) async {
@@ -127,6 +140,11 @@ void main() {
         }
 
         expect(await _api(count, holder: ConnectionHolder()).health(), isNull);
+        expect(
+          await _api(count, holder: ConnectionHolder(_connection)).health(),
+          isNull,
+          reason: 'no address is guessed beside the server',
+        );
         expect(
           await _api(
             count,

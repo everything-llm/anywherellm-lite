@@ -1,6 +1,7 @@
 import 'package:anywherellm/core/activity.dart';
 import 'package:anywherellm/core/asks.dart';
 import 'package:anywherellm/core/companion.dart';
+import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/library.dart';
 import 'package:anywherellm/core/memory.dart';
 import 'package:anywherellm/core/ports.dart';
@@ -11,6 +12,11 @@ import 'fake_companion.dart';
 
 /// The toolkit's `CLIENT_ALLOW`, which its `install` writes as `BRIDGE_ALLOW`: what the app
 /// calls.
+/// [connection] in use, with the toolkit at [toolkitAt], as a pairing code says where it runs.
+ConnectionHolder pairedHolder(Connection connection, Uri toolkitAt) =>
+    ConnectionHolder(connection)
+      ..companions = {toolkitCompanion.code: toolkitAt};
+
 const liteBridgeAllow =
     '/workspaces, /memories, GET /admin/system-preferences-for, '
     'POST /admin/system-preferences, /scheduled-jobs';

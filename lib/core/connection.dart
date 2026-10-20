@@ -48,17 +48,20 @@ class ConnectionHolder {
 
   Connection? current;
 
-  /// Where each companion runs, by [Companion.code], when the person or a pairing code said;
-  /// a companion not named here is where [Companion.base] guesses.
+  /// Where each companion runs, by [Companion.code], as a pairing code said.
   Map<String, Uri> companions = const {};
 
-  /// Where [companion] runs beside the server in use: where it was said to, or else
-  /// [Companion.base]'s guess. Null with no server.
-  Uri? addressOf(Companion companion) => switch (current) {
-    final server? => companions[companion.code] ?? companion.base(server.uri),
-    null => null,
-  };
+  /// Where [companion] runs beside the server in use, as a pairing code said. Null with no
+  /// server or where no code named it: the key never goes to an address the app guessed, where
+  /// whoever answers `/health` with the companion's name would get it.
+  Uri? addressOf(Companion companion) =>
+      current == null ? null : companions[companion.code];
 }
+
+/// A host name as a resolver takes it, lowercased as [Uri.parse] leaves it. A name with letters
+/// outside ASCII comes out of [Uri.parse] percent-escaped, which no resolver finds; its xn-- form
+/// is the one that reaches it. An IPv6 address, which holds `:`, [Uri.parse] checks itself.
+final _hostName = RegExp(r'^[a-z0-9._-]+$');
 
 /// The address as the client wants it: trimmed, https or, on a private network ([keySafe]),
 /// http, no trailing slash, no `/api`. Throws [ApiException] saying what is wrong with [raw].
@@ -72,6 +75,12 @@ String normalizeBaseUrl(String raw) {
     throw const ApiException(
       'The address must start with http:// or https:// and name a host, '
       'for example https://host.example.ts.net:3001.',
+    );
+  }
+  if (!_hostName.hasMatch(uri.host) && !uri.host.contains(':')) {
+    throw const ApiException(
+      'Write the server’s name in plain letters, digits, dots and hyphens: an international '
+      'name in its xn-- form.',
     );
   }
   if (!keySafe(uri)) throw const ApiException(plainHttpRefused);
@@ -125,6 +134,13 @@ Uri _companionAddress(String raw) => Uri.parse(normalizeBaseUrl(raw));
 const plainHttpRefused =
     'Use an https:// address. Plain http works only on a private network: at home, on '
     'Tailscale or on this device, since the key travels unencrypted.';
+
+/// What a plain http address to [host] means for the key, which the app says wherever it shows
+/// one.
+String plainHttpWarning(String host) =>
+    'The key goes unencrypted to whatever answers $host on the network this phone is on, '
+    'each time the app connects. On another Wi-Fi, or on mobile data with Tailscale off, that '
+    'can be someone else’s machine. Use an https:// address to keep the key safe anywhere.';
 
 /// Whether the key may go to [uri]: over https, or over http to a private host
 /// ([isPrivateHost]).

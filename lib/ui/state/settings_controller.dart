@@ -44,8 +44,8 @@ class SettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Where [companion] runs beside the server in use: as said, or else [Companion.base]'s
-  /// guess. Null with no server.
+  /// Where [companion] runs beside the server in use, as a pairing code said. Null with no
+  /// server or no such code.
   Uri? addressOf(Companion companion) => _holder.addressOf(companion);
 
   /// Connects as [pairing] says, once the server takes its key, keeping where its companions

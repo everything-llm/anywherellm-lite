@@ -145,10 +145,18 @@ class _KeyCardState extends State<_KeyCard> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _takePairing());
   }
 
-  /// Connects with a pairing code [ShellController.pairWith] left, as with a scanned one.
+  /// Connects with a pairing code [ShellController.pairWith] left, as with a scanned one, but a
+  /// link can come from any page or message, so one that fails leaves nothing of it in the form:
+  /// a key typed next would otherwise go to the address it named.
   void _takePairing() {
     if (!mounted) return;
-    if (_shell.takePairing() case final code?) unawaited(_scanned(code));
+    if (_shell.takePairing() case final code?) {
+      unawaited(
+        _scanned(code).then((paired) {
+          if (!paired && mounted) setState(_backToSaved);
+        }),
+      );
+    }
   }
 
   @override
@@ -192,6 +200,13 @@ class _KeyCardState extends State<_KeyCard> {
   /// Why the last scan or try failed, when it did.
   List<String> get _notes => [?_scanProblem, ?_settings.message];
 
+  /// Closes the form on the saved connection, letting go of what was typed or scanned.
+  void _backToSaved() {
+    _replacing = false;
+    _url.text = _settings.connection?.baseUrl ?? '';
+    _key.clear();
+  }
+
   /// Closes the form once a connection was saved.
   void _saved(bool saved) {
     if (mounted && saved) {
@@ -204,8 +219,8 @@ class _KeyCardState extends State<_KeyCard> {
 
   /// Uses a scanned [code] as if its address and key had been typed, and connects with them,
   /// keeping where the code says its companions run. Over a saved server the form opens, so a
-  /// key the server refuses shows there.
-  Future<void> _scanned(String code) async {
+  /// key the server refuses shows there. Whether it paired.
+  Future<bool> _scanned(String code) async {
     final Pairing pairing;
     try {
       pairing = parsePairingCode(code);
@@ -214,7 +229,7 @@ class _KeyCardState extends State<_KeyCard> {
         _shell.setScanning(false);
         _scanProblem = error.message;
       });
-      return;
+      return false;
     }
     setState(() {
       _shell.setScanning(false);
@@ -224,7 +239,9 @@ class _KeyCardState extends State<_KeyCard> {
       _url.text = pairing.connection.baseUrl;
       _key.text = pairing.connection.apiKey;
     });
-    _saved(await _settings.pair(pairing));
+    final paired = await _settings.pair(pairing);
+    _saved(paired);
+    return paired;
   }
 
   Future<void> _forget() async {
@@ -291,14 +308,13 @@ class _KeyCardState extends State<_KeyCard> {
             about: 'Stored in this phone\'s keyring and never shown',
           ),
         ]),
-        // Plain http to a private address: the key crosses that network unencrypted.
+        // Plain http to a private address: the key crosses unencrypted whatever network the
+        // phone is on, where that name or address may be another machine's.
         if (connection.plainHttp)
-          const AlertBox(
+          AlertBox(
             AlertKind.warn,
             'Plain http',
-            text:
-                'This address is not encrypted, so the key travels as plain text on this '
-                'network. Use it only on a network you trust.',
+            text: plainHttpWarning(connection.host),
           ),
         if (_scanner case final scan? when _shell.scanning) _scan(scan),
         if (_replacing && !_shell.scanning)
@@ -339,10 +355,7 @@ class _KeyCardState extends State<_KeyCard> {
             _shell.setScanning(false);
             // Cancel lets go of what was typed or scanned, so the form opens on the saved
             // connection next time.
-            if (!_replacing) {
-              _url.text = connection.baseUrl;
-              _key.clear();
-            }
+            if (!_replacing) _backToSaved();
           }),
         ),
         const SizedBox(height: 8),

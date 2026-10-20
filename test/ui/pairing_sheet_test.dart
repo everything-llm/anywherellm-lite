@@ -95,9 +95,13 @@ void main() {
     await shares.close();
   });
 
-  testWidgets('a key the server refuses shows in its field, under why', (
-    tester,
-  ) async {
+  /// The text fields that hold [text].
+  Finder holding(String text) => find.byWidgetPredicate(
+    (w) => w is EditableText && w.controller.text == text,
+  );
+
+  testWidgets('a link the server refuses says why and leaves nothing of it in '
+      'the form', (tester) async {
     final shares = StreamController<SharedItem>();
     final h = await pumpApp(tester, connection: null, shares: shares);
     h.llm.verifyError = const ApiException('The server refused this API key.');
@@ -107,18 +111,17 @@ void main() {
     expect(h.shell.settingsPage, SettingsPage.connection);
     expect(h.settings.connection, isNull);
     expect(find.text('The server refused this API key.'), findsOneWidget);
+    expect(holding('K9'), findsNothing);
     expect(
-      find.byWidgetPredicate(
-        (w) => w is EditableText && w.controller.text == 'K9',
-      ),
-      findsOneWidget,
+      holding('https://ai.example.com'),
+      findsNothing,
+      reason: 'a key typed next must not go to the address the link named',
     );
     await shares.close();
   });
 
-  testWidgets('a refused key shows in its field over a saved server too', (
-    tester,
-  ) async {
+  testWidgets('over a saved server, a refused link gives back the saved '
+      'address', (tester) async {
     final shares = StreamController<SharedItem>();
     final h = await pumpApp(tester, shares: shares);
     final saved = h.settings.connection;
@@ -128,16 +131,60 @@ void main() {
     await tester.pumpAndSettle();
     expect(h.settings.connection, saved);
     expect(find.text('The server refused this API key.'), findsOneWidget);
-    Finder holding(String text) => find.byWidgetPredicate(
-      (w) => w is EditableText && w.controller.text == text,
-    );
-    expect(holding('K9'), findsOneWidget);
-    await tester.tap(control('Cancel'));
-    await tester.pumpAndSettle();
+    expect(holding('K9'), findsNothing);
     await tester.tap(control('Edit connection'));
     await tester.pumpAndSettle();
-    expect(holding('K9'), findsNothing, reason: 'the refused key is let go');
+    expect(holding('K9'), findsNothing);
+    expect(holding('https://ai.example.com'), findsNothing);
     expect(holding(saved!.baseUrl), findsOneWidget);
+    await shares.close();
+  });
+
+  testWidgets('it warns of each address over plain http', (tester) async {
+    final shares = StreamController<SharedItem>();
+    await pumpApp(tester, shares: shares);
+    await _open(
+      tester,
+      shares,
+      Uri(
+        scheme: 'anywherellm',
+        host: 'connect',
+        queryParameters: {
+          'url': 'http://nas:3001',
+          'key': 'K9',
+          'toolkit': 'http://bridge.lan:8467',
+        },
+      ).toString(),
+    );
+    expect(_inSheet(find.text('Plain http')), findsNWidgets(2));
+    expect(
+      _inSheet(find.textContaining('whatever answers nas ')),
+      findsOneWidget,
+    );
+    expect(
+      _inSheet(find.textContaining('whatever answers bridge.lan ')),
+      findsOneWidget,
+    );
+    await shares.close();
+  });
+
+  testWidgets('it shows a long address whole', (tester) async {
+    final shares = StreamController<SharedItem>();
+    await pumpApp(tester, shares: shares);
+    const address =
+        'https://home.tail1234.ts.net.and-a-long-name-that-hides-the-end.evil.example';
+    await _open(
+      tester,
+      shares,
+      Uri(
+        scheme: 'anywherellm',
+        host: 'connect',
+        queryParameters: {'url': address, 'key': 'K9'},
+      ).toString(),
+    );
+    final shown = tester.widget<Text>(_inSheet(find.text(address)));
+    expect(shown.maxLines, isNull);
+    expect(tester.takeException(), isNull);
     await shares.close();
   });
 

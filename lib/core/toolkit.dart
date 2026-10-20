@@ -9,7 +9,6 @@ import 'companion.dart';
 const toolkitCompanion = Companion(
   service: 'anywherellm-bridge',
   formerly: ['anythingllm-bridge', 'anythingllm-toolkit'],
-  port: 8467,
   name: 'The toolkit',
   code: 'toolkit',
 );

@@ -331,7 +331,9 @@ class InfoRow extends StatelessWidget {
   final String? about;
   final InlineSpan? aboutSpan;
 
-  /// How many lines the line under the title may take before it is cut short.
+  /// How many lines the line under the title may take before it is cut short. A [mono] line is
+  /// an address and shows whole, on as many lines as it takes: cut short,
+  /// `https://home.ts.net.evil.example` would read as the person's own server.
   final int aboutLines;
   final bool mono;
 
@@ -376,8 +378,8 @@ class InfoRow extends StatelessWidget {
                 if (about != null || aboutSpan != null)
                   Text.rich(
                     aboutSpan ?? TextSpan(text: about),
-                    maxLines: aboutLines,
-                    overflow: TextOverflow.ellipsis,
+                    maxLines: mono ? null : aboutLines,
+                    overflow: mono ? null : TextOverflow.ellipsis,
                     style: mono
                         ? Type.mono(13, color: t.muted)
                         : Type.sans(13, color: t.muted),

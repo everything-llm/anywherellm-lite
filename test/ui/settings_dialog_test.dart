@@ -1,3 +1,4 @@
+import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
@@ -209,6 +210,24 @@ void main() {
     expect(h.shell.scanning, isFalse);
     expect(find.text('Fake scan'), findsNothing);
     expect(h.shell.settingsOpen, isTrue);
+  });
+
+  testWidgets('a plain http server warns that the key goes to whatever '
+      'answers its name', (tester) async {
+    final h = await pumpApp(
+      tester,
+      connection: const Connection(baseUrl: 'http://nas:3001', apiKey: 'K1'),
+    );
+    h.shell.openSettings(SettingsPage.connection);
+    await tester.pumpAndSettle();
+    expect(find.text('Plain http'), findsOneWidget);
+    expect(
+      find.textContaining('to whatever answers nas on the network'),
+      findsOneWidget,
+    );
+    await h.settings.connect('https://h:3001', 'K1');
+    await tester.pumpAndSettle();
+    expect(find.text('Plain http'), findsNothing);
   });
 
   testWidgets('Test connection says whether the key still opens the server', (

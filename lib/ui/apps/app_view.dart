@@ -2,7 +2,7 @@ import 'package:flutter/widgets.dart';
 
 /// Shows a page the app links to in the device's web view.
 abstract interface class AppView {
-  /// [page] in a web view that runs its scripts; a link off its host and port goes to
+  /// [page] in a web view that runs its scripts; a link off its origin goes to
   /// [onLeave], the page closing itself (`window.close()`) to [onClose], and what the page
   /// posts to [channel] to it.
   Widget show(

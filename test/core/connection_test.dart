@@ -117,6 +117,34 @@ void main() {
       }
     });
 
+    test('a name outside ASCII is refused, and its xn-- form taken', () {
+      // The first letter is Cyrillic, which Uri.parse percent-escapes.
+      expect(
+        () => normalizeBaseUrl('https://\u0430nything.example:3001'),
+        throwsA(
+          isA<ApiException>().having(
+            (e) => e.message,
+            'message',
+            contains('xn--'),
+          ),
+        ),
+      );
+      expect(
+        normalizeBaseUrl('https://xn--nything-3fg.example:3001'),
+        'https://xn--nything-3fg.example:3001',
+      );
+      expect(
+        () => normalizeBaseUrl("http://nas'(x):3001"),
+        throwsA(isA<ApiException>()),
+        reason:
+            'only letters, digits, dots, hyphens and underscores name a host',
+      );
+      expect(
+        normalizeBaseUrl('http://[fe80::1]:3001'),
+        'http://[fe80::1]:3001',
+      );
+    });
+
     test('a query, fragment or login is refused', () {
       for (final bad in ['https://h/?a=1', 'https://h/#x', 'https://u:p@h']) {
         expect(
@@ -229,7 +257,7 @@ void main() {
   });
 
   test(
-    'a companion runs where its code says, or is guessed beside the server',
+    'a companion runs where its code says, and nowhere a code did not say',
     () {
       final holder =
           ConnectionHolder(
@@ -245,7 +273,8 @@ void main() {
       holder.companions = const {};
       expect(
         holder.addressOf(toolkitCompanion),
-        Uri.parse('https://ai.example.com:8467'),
+        isNull,
+        reason: 'the key never goes to a guessed address',
       );
     },
   );

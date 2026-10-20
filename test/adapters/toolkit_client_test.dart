@@ -29,7 +29,10 @@ class _Toolkit {
   final seen = <http.Request>[];
 
   HttpToolkitApi api([Connection connection = _connection]) => HttpToolkitApi(
-    holder: ConnectionHolder(connection),
+    holder: pairedHolder(
+      connection,
+      Uri.parse('https://host.example.ts.net:8467'),
+    ),
     client: MockClient((request) async {
       seen.add(request);
       final body = routes[request.url.path];

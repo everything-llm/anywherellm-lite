@@ -12,8 +12,8 @@ import '../core/schedule.dart';
 import '../core/toolkit.dart';
 import 'companion_client.dart';
 
-/// [ToolkitApi] over the toolkit's bridge, on the AnythingLLM server's host at
-/// [toolkitCompanion]'s port, with the connection's developer key on every call but `/health`.
+/// [ToolkitApi] over the toolkit's bridge, at the address a pairing code gave
+/// [toolkitCompanion], with the connection's developer key on every call but `/health`.
 /// Each call is one of AnythingLLM's internal routes, without its `/api`, answered in
 /// AnythingLLM's own JSON.
 class HttpToolkitApi implements ToolkitApi {

@@ -9,7 +9,7 @@ import '../core/connection.dart';
 import '../core/ports.dart';
 
 /// The calls every [Companion] takes, over the connection [holder] has when each is made: its
-/// `/health`, asked without the key and remembered by the AnythingLLM server's address, and
+/// `/health`, asked without the key and remembered by the companion's address, and
 /// JSON calls with the developer key, over https only. An error message names the companion
 /// and never contains the key.
 class CompanionClient {
@@ -31,16 +31,15 @@ class CompanionClient {
   /// How long `/health` may take before the companion is taken to be absent.
   final Duration healthTimeout;
 
-  /// Each `/health` answer, null when the companion is not there, by the address of the
-  /// AnythingLLM server beside it.
+  /// Each `/health` answer, null when the companion is not there, by the companion's address.
   final _found = <String, Future<Object?>>{};
 
-  /// Where the companion runs beside the server in use: where it was said to
-  /// ([ConnectionHolder.companions]), or else [Companion.base]'s guess. Null with no server.
+  /// Where the companion runs beside the server in use, as a pairing code said
+  /// ([ConnectionHolder.companions]). Null with no server or no such code.
   Uri? get address => _holder.addressOf(companion);
 
-  /// The companion's `/health` at [address], or null when it is not there, or the key could not
-  /// go there ([keySafe]). Remembered by the address; [again] asks afresh. Never throws.
+  /// The companion's `/health` at [address], or null when it is not there, has no address, or
+  /// the key could not go there ([keySafe]). Remembered by the address; [again] asks afresh. Never throws.
   Future<Object?> health({bool again = false}) {
     final at = address;
     if (at == null || !keySafe(at)) return Future.value();
@@ -65,11 +64,16 @@ class CompanionClient {
     }
   }
 
-  /// The connection in use, whose key may go to [address] ([keySafe]).
-  Connection get current {
+  /// The connection in use and the companion's [address], where its key may go ([keySafe]).
+  (Connection, Uri) get _target {
     final connection = _holder.current ?? (throw const NotConfigured());
-    if (!keySafe(address!)) throw const ApiException(plainHttpRefused);
-    return connection;
+    final at =
+        address ??
+        (throw ApiException(
+          '${companion.name}\'s address is not known: connect with the pairing link it prints.',
+        ));
+    if (!keySafe(at)) throw const ApiException(plainHttpRefused);
+    return (connection, at);
   }
 
   /// The decoded JSON of a [method] to [path] with the key.
@@ -103,8 +107,8 @@ class CompanionClient {
     Map<String, Object?>? body,
     Map<String, String> headers = const {},
   }) async {
-    final connection = current;
-    final url = under(address!, path, query);
+    final (connection, at) = _target;
+    final url = under(at, path, query);
     final request = http.Request(method, url)
       ..headers.addAll(headers)
       ..headers['Authorization'] = 'Bearer ${connection.apiKey}'
