@@ -300,7 +300,7 @@ class FakeToolkit with FakeCompanion implements ToolkitApi {
 
   /// Decides a request once, as the bridge does, and always allows its host for [AskDecision.always].
   @override
-  Future<Ask> decide(String id, AskDecision decision) => run('decide', () {
+  Future<void> decide(String id, AskDecision decision) => run('decide', () {
     final ask =
         asks[id] ?? (throw const ApiException('No such request.', status: 404));
     if (ask.decision != null) {
@@ -313,7 +313,6 @@ class FakeToolkit with FakeCompanion implements ToolkitApi {
       skill: ask.skill,
       workspace: ask.workspace,
       why: ask.why,
-      asked: ask.asked,
       expires: ask.expires,
       decision: decision,
     );
@@ -321,7 +320,6 @@ class FakeToolkit with FakeCompanion implements ToolkitApi {
     if (decision == AskDecision.always) {
       allowed = [...allowed, AllowedHost(ask.host, added: DateTime.now())];
     }
-    return decided;
   }, '$id=${decision.name}');
 
   @override
@@ -329,7 +327,7 @@ class FakeToolkit with FakeCompanion implements ToolkitApi {
       run('allowedHosts', () => allowed);
 
   @override
-  Future<List<AllowedHost>> forgetHost(String host) => run(
+  Future<void> forgetHost(String host) => run(
     'forgetHost',
     () => allowed = [
       for (final a in allowed)

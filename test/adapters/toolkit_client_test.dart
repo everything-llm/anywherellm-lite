@@ -375,6 +375,8 @@ void main() {
       final toolkit = _Toolkit()
         ..routes['/health'] = {..._health, 'asks': true};
       expect(await toolkit.api().features(), {ToolkitFeature.asks});
+      final other = _Toolkit()..routes['/health'] = {..._health, 'asks': 'yes'};
+      expect(await other.api().features(), isEmpty);
     });
 
     test(
@@ -391,8 +393,7 @@ void main() {
         expect(toolkit.seen.last.method, 'GET');
         expect(toolkit.seen.last.headers['Authorization'], 'Bearer SECRET-KEY');
 
-        final decided = await api.decide(id, AskDecision.once);
-        expect(decided.decision, AskDecision.once);
+        await api.decide(id, AskDecision.once);
         expect(toolkit.seen.last.method, 'POST');
         expect(toolkit.seen.last.url.path, '/asks/$id');
         expect(jsonDecode(toolkit.seen.last.body), {'decision': 'once'});
@@ -410,8 +411,9 @@ void main() {
         ..routes['/allowed/muse-vm'] = {'hosts': []};
       final api = toolkit.api();
       expect([for (final h in await api.allowedHosts()) h.host], ['muse-vm']);
-      expect(await api.forgetHost('muse-vm'), isEmpty);
+      await api.forgetHost('muse-vm');
       expect(toolkit.seen.last.method, 'DELETE');
+      expect(toolkit.seen.last.url.path, '/allowed/muse-vm');
     });
 
     test(

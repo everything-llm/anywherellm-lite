@@ -146,7 +146,7 @@ class _SessionHostState extends State<SessionHost> {
       widget.toolkit,
       _toolkit,
       _chat,
-      background: _background,
+      keep: _keepAnswering,
     );
     // A deleted chat waiting to be undone is deleted as the app hides: Android can end a hidden
     // app without a word.

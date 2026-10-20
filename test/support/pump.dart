@@ -199,12 +199,12 @@ class Harness extends Rig {
   };
 
   /// What the toolkit's skills ask while an answer runs, shown out of sight through
-  /// [background] where there is one.
+  /// [keepAnswering] where there is one.
   late final AskController asks = AskController(
     toolkitServer,
     toolkit,
     chat,
-    background: background,
+    keep: keepAnswering,
   );
 
   late final ReadAloud? readAloud = switch (speaker) {

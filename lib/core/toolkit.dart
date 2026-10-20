@@ -40,15 +40,9 @@ abstract final class ToolkitFeature {
 
   /// Whether a skill that asks to reach a host on the person's own network waits for their
   /// answer here ([Ask]). The bridge serves it itself, and says so in its `/health` as
-  /// `asks: true` ([bridgeServes]), since no rule of its allow list names it.
+  /// `asks: true`, since no rule of its allow list names it.
   static const asks = 'asks';
 }
-
-/// The features a toolkit's `/health` answer says the bridge serves itself, beside the routes
-/// it passes to AnythingLLM.
-Set<String> bridgeServes(Object? health) => {
-  if (health is Map && health['asks'] == true) ToolkitFeature.asks,
-};
 
 const _methods = {'GET', 'POST', 'PUT', 'DELETE'};
 

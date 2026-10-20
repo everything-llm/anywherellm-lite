@@ -58,7 +58,15 @@ class _Running {
   String? nameAs;
 
   final ShortcutUse? shortcutUse;
+
+  /// The request the answer's latest status line named, or null.
+  String? ask;
 }
+
+/// A running answer in chat [thread] of workspace [slug] whose status line now names request
+/// [id] a skill waits on, or, with [id] null, no longer does: the next status line, or the
+/// answer's end.
+typedef AskHeard = ({String slug, String thread, String? id});
 
 /// A message waiting in a chat to be sent when the answer before it ends ([sendWhenDone]).
 class OnDeck {
@@ -156,12 +164,10 @@ class ChatController extends ChangeNotifier {
   /// The answers running, at most one in each chat.
   final _runs = <_Running>[];
 
-  /// Each answer running: its workspace, its chat, null while a draft's chat is being made, and
-  /// its turn.
-  List<({String slug, String? thread, Turn answer})> get running => [
-    for (final run in _runs)
-      (slug: run.slug, thread: run.thread, answer: run.answer),
-  ];
+  final _asks = StreamController<AskHeard>.broadcast();
+
+  /// Each running answer's change of the request a skill waits on.
+  Stream<AskHeard> get asks => _asks.stream;
 
   /// The messages waiting in each chat, by chat, in the order they go, with the chat's
   /// workspace. Each list is replaced, never changed, as the turns are.
@@ -298,8 +304,11 @@ class ChatController extends ChangeNotifier {
 
   static const linkNoticeFor = Duration(seconds: 6);
 
-  Workspace? get active =>
-      workspaces.where((w) => w.slug == activeSlug).firstOrNull;
+  Workspace? get active => workspaceOf(activeSlug);
+
+  /// The workspace [slug] names, or null while none does.
+  Workspace? workspaceOf(String? slug) =>
+      workspaces.where((w) => w.slug == slug).firstOrNull;
 
   List<Thread> threadsOf(String slug) => _threads[slug] ?? const [];
 
@@ -408,7 +417,9 @@ class ChatController extends ChangeNotifier {
     _settings.removeListener(_serverChanged);
     for (final running in _runs) {
       running.stream?.cancel();
+      _askHeard(running, null);
     }
+    unawaited(_asks.close());
     waits.clear();
     _link.take();
     unreachable.dispose();
@@ -424,6 +435,7 @@ class ChatController extends ChangeNotifier {
     unawaited(_prefs.useServer(_server?.baseUrl));
     for (final running in _runs) {
       running.stream?.cancel();
+      _askHeard(running, null);
     }
     _runs.clear();
     waits.clear();
@@ -894,7 +906,10 @@ class ChatController extends ChangeNotifier {
   /// Reads [events] into the answer [running] is, until it ends or fails.
   void _follow(_Running running, Stream<ChatEvent> events) {
     running.stream = events.listen(
-      running.answer.take,
+      (event) {
+        running.answer.take(event);
+        if (event is StatusChunk) _askHeard(running, event.ask);
+      },
       onError: (Object error) {
         if (error is CutOff) return _wait(running);
         _finish(
@@ -1070,11 +1085,20 @@ class ChatController extends ChangeNotifier {
     if (thread != activeThread || slug != activeSlug) _ready[thread] = slug;
   }
 
+  /// Tells [asks] that [running]'s status line names request [id], or none, when that changed.
+  void _askHeard(_Running running, String? id) {
+    final thread = running.thread;
+    if (id == running.ask || thread == null) return;
+    running.ask = id;
+    _asks.add((slug: running.slug, thread: thread, id: id));
+  }
+
   /// Ends [running], with [error] when it failed, unless it was already stopped or dropped. A
   /// [notSent] question never reached the server: it stays in the chat marked [Turn.notSent],
   /// with no answer under it.
   void _finish(_Running running, {String? error, bool notSent = false}) {
     if (!_runs.remove(running)) return;
+    _askHeard(running, null);
     if ((running.thread, running.nameAs) case (final thread?, final message?)
         when !_named.contains(thread)) {
       unawaited(_nameAfter(running.slug, thread, message));
@@ -1098,7 +1122,6 @@ class ChatController extends ChangeNotifier {
     running.answer
       ..streaming = false
       ..status = null
-      ..ask = null
       ..error = error
       ..notifyListeners();
     if (notSent) {

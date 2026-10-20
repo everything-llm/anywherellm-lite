@@ -1,3 +1,5 @@
+import 'json.dart';
+
 /// What the person answers a skill that asks to reach a host on their own network: allow it for
 /// the rest of the answer ([once]), allow it from now on ([always]), or refuse it ([deny]).
 enum AskDecision {
@@ -22,7 +24,6 @@ class Ask {
     required this.skill,
     required this.workspace,
     required this.why,
-    required this.asked,
     required this.expires,
     this.decision,
   });
@@ -35,7 +36,6 @@ class Ask {
   /// The slug of the workspace whose answer asks.
   final String workspace;
   final String why;
-  final DateTime asked;
   final DateTime expires;
 
   /// What the person decided, or null while the skill waits.
@@ -47,31 +47,24 @@ class Ask {
   /// The request as the bridge gives it, or null for anything else.
   static Ask? fromJson(Object? json) {
     if (json is! Map) return null;
-    String? text(String key) => switch (json[key]) {
-      final String value when value.trim().isNotEmpty => value.trim(),
-      _ => null,
-    };
-    final id = text('id');
-    final host = text('host');
-    final workspace = text('workspace');
-    final asked = DateTime.tryParse(text('asked') ?? '');
-    final expires = DateTime.tryParse(text('expires') ?? '');
+    final id = textOrNull(json['id']);
+    final host = textOrNull(json['host']);
+    final workspace = textOrNull(json['workspace']);
+    final expires = timeOrNull(json['expires']);
     if (id == null ||
         !_askId.hasMatch(id) ||
         host == null ||
         workspace == null ||
-        asked == null ||
         expires == null) {
       return null;
     }
     return Ask(
       id: id,
       host: host,
-      origin: text('origin') ?? host,
-      skill: text('skill') ?? 'A skill',
+      origin: textOrNull(json['origin']) ?? host,
+      skill: textOrNull(json['skill']) ?? 'A skill',
       workspace: workspace,
-      why: text('why') ?? '',
-      asked: asked,
+      why: textOrNull(json['why']) ?? '',
       expires: expires,
       decision: AskDecision.fromServer(json['decision']),
     );
@@ -95,18 +88,13 @@ List<AllowedHost> allowedHostsOf(Object? json) {
   return [
     if (hosts is List)
       for (final entry in hosts)
-        if (entry case {'host': final String host} when host.trim().isNotEmpty)
-          AllowedHost(
-            host.trim(),
-            added: DateTime.tryParse('${entry['added'] ?? ''}'),
-          ),
+        if (entry case {'host': final String host} when host.isNotEmpty)
+          AllowedHost(host, added: timeOrNull(entry['added'])),
   ];
 }
 
 final _askId = RegExp(r'^[0-9a-f]{32}$');
 
-/// The mark a skill's status line ends with while it waits for the person: ` [ask:<id>]`.
+/// The mark a skill's status line ends with while it waits for the person: ` [ask:<id>]`, the
+/// request's id in its group.
 final askMark = RegExp(r'\s*\[ask:([0-9a-f]{32})\]\s*$');
-
-/// The request an agent's status [thought] says it waits for, or null.
-String? askIdIn(String thought) => askMark.firstMatch(thought.trim())?[1];

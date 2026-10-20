@@ -26,7 +26,6 @@ FakeToolkit _asking({String workspace = 'q3'}) {
       skill: 'Library',
       workspace: workspace,
       why: 'Send a request to http://muse-vm:8463',
-      asked: now,
       expires: now.add(const Duration(minutes: 2)),
     );
 }

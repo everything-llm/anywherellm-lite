@@ -403,7 +403,7 @@ class _SavedEditorState extends State<_SavedEditor> {
             SheetQuestion(
               'Delete this memory? Chats are no longer shown it.',
               onKeep: () => setState(() => _asking = false),
-              onDelete: memory.busy
+              onConfirm: memory.busy
                   ? null
                   : () async {
                       if (await memory.delete(existing) && mounted) {

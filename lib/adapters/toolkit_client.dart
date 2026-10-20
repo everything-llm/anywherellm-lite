@@ -40,7 +40,10 @@ class HttpToolkitApi implements ToolkitApi {
   Future<Set<String>?> features({bool again = false}) async {
     final health = await _companion.health(again: again);
     if (health == null) return null;
-    return {...bridgeFeatures(bridgeRules(health)), ...bridgeServes(health)};
+    return {
+      ...bridgeFeatures(bridgeRules(health)),
+      if (health case {'asks': true}) ToolkitFeature.asks,
+    };
   }
 
   @override
@@ -163,17 +166,15 @@ class HttpToolkitApi implements ToolkitApi {
   Future<Ask> ask(String id) async => _ask(await _json('GET', ['asks', id]));
 
   @override
-  Future<Ask> decide(String id, AskDecision decision) async => _ask(
-    await _json('POST', ['asks', id], body: {'decision': decision.name}),
-  );
+  Future<void> decide(String id, AskDecision decision) =>
+      _json('POST', ['asks', id], body: {'decision': decision.name});
 
   @override
   Future<List<AllowedHost>> allowedHosts() async =>
       allowedHostsOf(await _json('GET', ['allowed']));
 
   @override
-  Future<List<AllowedHost>> forgetHost(String host) async =>
-      allowedHostsOf(await _json('DELETE', ['allowed', host]));
+  Future<void> forgetHost(String host) => _json('DELETE', ['allowed', host]);
 
   /// The decoded JSON of a [method] to AnythingLLM's [path] through the bridge. AnythingLLM
   /// refuses some calls with `success: false` at HTTP 200, which fails in its words, or else

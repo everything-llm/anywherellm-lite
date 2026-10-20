@@ -391,21 +391,21 @@ class ModalSheet extends StatelessWidget {
   );
 }
 
-/// A sheet's question before something is deleted: [question], then Keep, which calls [onKeep],
-/// and [action], Delete unless it says otherwise, which calls [onDelete] and is off while
-/// [onDelete] is null, side by side.
+/// A sheet's question before something is deleted or removed: [question], then Keep, which
+/// calls [onKeep], and [action], Delete unless it says otherwise, which calls [onConfirm] and is
+/// off while [onConfirm] is null, side by side.
 class SheetQuestion extends StatelessWidget {
   const SheetQuestion(
     this.question, {
     super.key,
     required this.onKeep,
-    required this.onDelete,
+    required this.onConfirm,
     this.action = 'Delete',
   });
 
   final String question;
   final VoidCallback onKeep;
-  final VoidCallback? onDelete;
+  final VoidCallback? onConfirm;
   final String action;
 
   @override
@@ -426,7 +426,7 @@ class SheetQuestion extends StatelessWidget {
       ),
       ActionRow(even: true, [
         AppButton('Keep', onPressed: onKeep),
-        AppButton(action, danger: true, onPressed: onDelete),
+        AppButton(action, danger: true, onPressed: onConfirm),
       ]),
     ],
   );

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../core/chat.dart';
@@ -57,13 +58,17 @@ class KeepAnswering {
     _chat.addListener(_follow);
     _tapsSeen = _work.taps.listen(_open);
     _life = AppLifecycleListener(
-      onStateChange: (state) => _front = state == AppLifecycleState.resumed,
+      onStateChange: (state) =>
+          _front.value = state == AppLifecycleState.resumed,
       onResume: () => unawaited(_chat.checkWaiting()),
     );
     _follow();
   }
 
   final BackgroundWork _work;
+
+  /// What holds the app and shows its notifications.
+  BackgroundWork get work => _work;
   final ChatController _chat;
   final ShellController _shell;
   late final AppLifecycleListener _life;
@@ -75,13 +80,15 @@ class KeepAnswering {
   /// What the ongoing notification says, or null while none shows.
   String? _held;
 
+  final _front = ValueNotifier(true);
+
   /// Whether the app is on screen. Before Android says, it is, as at start.
-  bool _front = true;
+  ValueListenable<bool> get front => _front;
 
   void _follow() {
     final slug = _chat.workingIn;
     final want = _chat.working
-        ? 'Answering in ${_workspaceName(slug) ?? 'AnythingLLM'}'
+        ? 'Answering in ${_chat.workspaceOf(slug)?.name ?? 'AnythingLLM'}'
         : null;
     if (want != _held) {
       _held = want;
@@ -91,7 +98,7 @@ class KeepAnswering {
     if (identical(finished, _seen)) return;
     _seen = finished;
     final where = _chat.finishedIn;
-    if (_front || finished == null || where == null) return;
+    if (_front.value || finished == null || where == null) return;
     final chat = _chat
         .threadsOf(where.slug)
         .where((t) => t.slug == where.thread);
@@ -106,9 +113,6 @@ class KeepAnswering {
     );
   }
 
-  String? _workspaceName(String? slug) =>
-      _chat.workspaces.where((w) => w.slug == slug).firstOrNull?.name;
-
   void _open(ChatTarget target) {
     unawaited(_chat.openTapped(target.slug, target.thread));
     _shell.openChat();
@@ -118,6 +122,7 @@ class KeepAnswering {
     unawaited(_tapsSeen.cancel());
     _chat.removeListener(_follow);
     _life.dispose();
+    _front.dispose();
     unawaited(_work.hold(null));
   }
 }

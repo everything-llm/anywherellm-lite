@@ -135,7 +135,7 @@ class _Delete extends StatelessWidget {
     return SheetQuestion(
       'Delete ${of.thread.name}? Its messages go with it.',
       onKeep: scope.shell.closePopup,
-      onDelete: () {
+      onConfirm: () {
         scope.shell.closePopup();
         unawaited(scope.chat.delete(of.thread.slug));
       },

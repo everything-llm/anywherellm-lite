@@ -264,7 +264,7 @@ class _ShortcutEditorState extends State<_ShortcutEditor> {
                 SheetQuestion(
                   'Delete ${widget.shortcut!.label}?',
                   onKeep: () => setState(() => _confirmDelete = false),
-                  onDelete: widget.onDelete,
+                  onConfirm: widget.onDelete,
                 )
               else
                 ActionRow(even: true, [

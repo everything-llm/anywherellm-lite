@@ -54,7 +54,7 @@ class AppShell extends StatelessWidget {
     /// Settings, a page goes back to its parent first.
     VoidCallback? topClose() {
       // A skill's request lies over everything; closing it refuses it.
-      if (scope.asks.current != null) return scope.asks.dismiss;
+      if (scope.asks.current.value != null) return scope.asks.dismiss;
       // The guide and the camera lie over the whole window, a share and the popups too.
       if (shell.guiding) return () => shell.showGuide(null);
       if (shell.scanning) return () => shell.setScanning(false);
@@ -78,7 +78,7 @@ class AppShell extends StatelessWidget {
     }
 
     return ListenableBuilder(
-      listenable: Listenable.merge([shell, scope.asks]),
+      listenable: shell,
       builder: (context, _) {
         final files = shell.pane == Pane.files;
         // The chat is the base screen: it shows unless the workspace's pages, a page of the
@@ -95,6 +95,7 @@ class AppShell extends StatelessWidget {
         return WindowInsets(
           child: _BackGuard(
             popup: shell.popup,
+            ask: scope.asks.current,
             open: topClose() != null,
             onBack: () => topClose()?.call(),
             onLeave: switch (scope.background) {
@@ -283,13 +284,15 @@ class _PhoneUndo extends StatelessWidget {
   }
 }
 
-/// Back closes the topmost thing open, a [popup] or what [open] counts, through [onBack], and
-/// leaves the app when nothing is, through [onLeave] where there is one. With the keyboard up it only puts the keyboard away, as
-/// Android does elsewhere. It reads the keyboard and the popup itself, so the keyboard's
-/// animation and a popup rebuild this and not [child].
+/// Back closes the topmost thing open, a skill's [ask], a [popup] or what [open] counts,
+/// through [onBack], and leaves the app when nothing is, through [onLeave] where there is one.
+/// With the keyboard up it only puts the keyboard away, as Android does elsewhere. It reads the
+/// keyboard, the request and the popup itself, so the keyboard's animation, a request and a
+/// popup rebuild this and not [child].
 class _BackGuard extends StatelessWidget {
   const _BackGuard({
     required this.popup,
+    required this.ask,
     required this.open,
     required this.onBack,
     required this.onLeave,
@@ -297,6 +300,7 @@ class _BackGuard extends StatelessWidget {
   });
 
   final ValueListenable<Object?> popup;
+  final ValueListenable<Object?> ask;
   final bool open;
   final VoidCallback onBack;
 
@@ -308,22 +312,25 @@ class _BackGuard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
-    return ValueListenableBuilder(
-      valueListenable: popup,
-      builder: (context, popup, child) => PopScope(
-        canPop: !typing && !open && popup == null && onLeave == null,
-        onPopInvokedWithResult: (didPop, _) {
-          if (didPop) return;
-          if (typing) {
-            FocusManager.instance.primaryFocus?.unfocus();
-          } else if (open || popup != null) {
-            onBack();
-          } else {
-            onLeave?.call();
-          }
-        },
-        child: child!,
-      ),
+    return ListenableBuilder(
+      listenable: Listenable.merge([popup, ask]),
+      builder: (context, child) {
+        final above = popup.value != null || ask.value != null;
+        return PopScope(
+          canPop: !typing && !open && !above && onLeave == null,
+          onPopInvokedWithResult: (didPop, _) {
+            if (didPop) return;
+            if (typing) {
+              FocusManager.instance.primaryFocus?.unfocus();
+            } else if (open || above) {
+              onBack();
+            } else {
+              onLeave?.call();
+            }
+          },
+          child: child!,
+        );
+      },
       child: child,
     );
   }

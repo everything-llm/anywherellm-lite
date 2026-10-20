@@ -1,6 +1,5 @@
 import 'package:anywherellm/core/asks.dart';
 import 'package:anywherellm/core/chat.dart';
-import 'package:anywherellm/core/toolkit.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _id = '0123456789abcdef0123456789abcdef';
@@ -35,8 +34,8 @@ void main() {
     );
   });
 
-  test('a request without its id, host, workspace or times is none', () {
-    for (final key in ['id', 'host', 'workspace', 'asked', 'expires']) {
+  test('a request without its id, host, workspace or end is none', () {
+    for (final key in ['id', 'host', 'workspace', 'expires']) {
       expect(
         askOf({
           'ask': {..._ask, key: null},
@@ -59,7 +58,7 @@ void main() {
       'hosts': [
         {'host': 'muse-vm', 'added': '2026-10-20T10:01:00Z'},
         {'host': 'nas.lan'},
-        {'host': ' '},
+        {'host': ''},
         'muse-vm',
       ],
     });
@@ -72,19 +71,14 @@ void main() {
   test('a status line names the request it waits on, and shows without it', () {
     const thought =
         'Waiting for your approval in AnywhereLLM to reach muse-vm [ask:$_id]';
-    expect(askIdIn(thought), _id);
+    final status = statusOf(thought);
+    expect(status.ask, _id);
     expect(
-      agentStatus(thought),
+      status.text,
       'Waiting for your approval in AnywhereLLM to reach muse-vm',
     );
-    expect(askIdIn('Running web-browsing'), isNull);
-    expect(askIdIn('[ask:$_id] then more'), isNull);
-    expect(askIdIn('reach x [ask:0123]'), isNull);
-  });
-
-  test('the bridge says itself that it serves the requests', () {
-    expect(bridgeServes({'asks': true}), {ToolkitFeature.asks});
-    expect(bridgeServes({'asks': 'yes'}), isEmpty);
-    expect(bridgeServes(null), isEmpty);
+    expect(statusOf('Running web-browsing').ask, isNull);
+    expect(statusOf('[ask:$_id] then more').ask, isNull);
+    expect(statusOf('reach x [ask:0123]').ask, isNull);
   });
 }

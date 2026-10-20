@@ -52,7 +52,7 @@ class StatusChunk extends ChatEvent {
   const StatusChunk(this.text, {this.ask});
   final String text;
 
-  /// The request the agent waits for the person to decide ([askIdIn]), or null.
+  /// The request the agent waits for the person to decide ([askMark]), or null.
   final String? ask;
 }
 
@@ -63,15 +63,24 @@ class WholeAnswer extends ChatEvent {
   final String text;
 }
 
+/// An agent's status [thought] as the chat shows it: in [agentStatus]'s plain words, without
+/// the [askMark] a skill that waits for the person ends it with, and with the request it names.
+StatusChunk statusOf(String thought) {
+  final trimmed = thought.trim();
+  final mark = askMark.firstMatch(trimmed);
+  return mark == null
+      ? StatusChunk(agentStatus(thought))
+      : StatusChunk(
+          agentStatus(trimmed.substring(0, mark.start)),
+          ask: mark[1],
+        );
+}
+
 /// An agent's status [thought] in plain words: `@agent: Using SearXNG…` loses its prefix, and
-/// `@agent is executing `web-browsing` tool {…}` becomes `Running web-browsing`, and a skill's
-/// [askMark] is left out.
+/// `@agent is executing `web-browsing` tool {…}` becomes `Running web-browsing`.
 String agentStatus(String thought) {
   if (toolCall(thought) case final call?) return 'Running ${call.name}';
-  final text = thought
-      .trim()
-      .replaceFirst(askMark, '')
-      .replaceFirst(_agentPrefix, '');
+  final text = thought.trim().replaceFirst(_agentPrefix, '');
   return text.split('\n').first.trim();
 }
 

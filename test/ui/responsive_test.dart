@@ -338,7 +338,6 @@ void main() {
               skill: 'skill-$longWord',
               workspace: 'w',
               why: 'Send a request to http://host-$longWord:8463/$longWord',
-              asked: now,
               expires: now.add(const Duration(hours: 1)),
             ),
         );
@@ -348,7 +347,7 @@ void main() {
         llm.chat!.add(StatusChunk('Waiting on $longWord', ask: id));
         await tester.pump(const Duration(milliseconds: 100));
         await tester.pump(const Duration(seconds: 1));
-        expect(h.asks.current, isNotNull);
+        expect(h.asks.current.value, isNotNull);
         expect(tester.takeException(), isNull);
         llm.chat!.add(const ChatDone([]));
         await llm.chat!.close();

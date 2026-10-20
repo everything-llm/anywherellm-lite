@@ -204,15 +204,15 @@ abstract interface class ToolkitApi implements CompanionApi {
   /// The request [id] a skill waits on. Fails with status 404 once it is gone.
   Future<Ask> ask(String id);
 
-  /// Answers request [id] with [decision], and gives it back decided. Fails with status 409
-  /// once it is decided or the skill stopped waiting.
-  Future<Ask> decide(String id, AskDecision decision);
+  /// Answers request [id] with [decision]. Fails with status 409 once it is decided or the
+  /// skill stopped waiting.
+  Future<void> decide(String id, AskDecision decision);
 
   /// The hosts skills may always reach.
   Future<List<AllowedHost>> allowedHosts();
 
-  /// Stops always allowing [host], and gives the hosts left.
-  Future<List<AllowedHost>> forgetHost(String host);
+  /// Stops always allowing [host].
+  Future<void> forgetHost(String host);
 }
 
 /// Where the connection is kept between runs.

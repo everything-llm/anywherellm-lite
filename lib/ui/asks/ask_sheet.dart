@@ -24,13 +24,13 @@ class AskSheet extends StatelessWidget {
     return ListenableBuilder(
       listenable: asks,
       builder: (context, _) {
-        final shown = asks.current;
+        final shown = asks.current.value;
         if (shown == null) return const SizedBox.shrink();
         return ModalSheet(
           key: ObjectKey(shown),
           title: 'Allow this?',
           onClose: asks.dismiss,
-          child: _AskBody(shown, busy: asks.busy, onDecide: asks.decide),
+          child: _AskBody(shown),
         );
       },
     );
@@ -38,26 +38,20 @@ class AskSheet extends StatelessWidget {
 }
 
 class _AskBody extends StatelessWidget {
-  const _AskBody(this.shown, {required this.busy, required this.onDecide});
+  const _AskBody(this.shown);
 
   final AskShown shown;
-  final bool busy;
-  final void Function(AskDecision decision) onDecide;
 
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
+    final asks = scope.asks;
     final t = Tokens.of(context);
     final ask = shown.ask;
-    final workspace =
-        scope.chat.workspaces
-            .where((w) => w.slug == shown.slug)
-            .firstOrNull
-            ?.name ??
-        shown.slug;
+    final workspace = scope.chat.workspaceOf(shown.slug)?.name ?? shown.slug;
     final open = ask != null && !shown.ended;
     VoidCallback? decide(AskDecision decision) =>
-        open && !busy ? () => onDecide(decision) : null;
+        open && !asks.busy ? () => asks.decide(decision) : null;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -125,7 +119,7 @@ class _AskBody extends StatelessWidget {
             ),
           ]),
         ] else
-          AppButton('Close', onPressed: scope.asks.dismiss),
+          AppButton('Close', onPressed: asks.dismiss),
       ],
     );
   }

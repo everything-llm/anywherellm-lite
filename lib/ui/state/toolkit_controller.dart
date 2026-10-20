@@ -1,8 +1,9 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../core/activity.dart';
+import '../../core/asks.dart';
 import '../../core/library.dart';
 import '../../core/ports.dart';
 import '../../core/schedule.dart';
@@ -12,8 +13,8 @@ import 'notice.dart';
 import 'settings_controller.dart';
 
 /// What the app knows of the toolkit beside the server in use: whether it is there, what its
-/// bridge lets through, and the scheduled jobs, which, where it allows, the app makes, changes,
-/// runs and deletes.
+/// bridge lets through, the scheduled jobs, which, where it allows, the app makes, changes,
+/// runs and deletes, and the hosts its skills may always reach.
 /// Another server starts it afresh, and Test connection asks again whether the toolkit is
 /// there.
 class ToolkitController extends ChangeNotifier with CompanionWatch {
@@ -44,6 +45,7 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   final _jobs = _Read<List<ScheduledJob>>();
   final _library = _Read<LibraryContents>();
   final _activity = _Read<ActivityEvents>();
+  final _allowed = _Read<List<AllowedHost>>();
 
   /// The jobs the server runs on a schedule, or null until read.
   List<ScheduledJob>? get jobs => _jobs.value;
@@ -69,10 +71,20 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   /// Whether events are being read.
   bool get activityLoading => _activity.pending != null;
 
-  /// Whether a change to a job is on its way, which keeps a second from starting.
+  /// The hosts skills may always reach, or null until read.
+  List<AllowedHost>? get allowed => _allowed.value;
+
+  /// Why the last read of the allowed hosts failed.
+  Notice? get allowedProblem => _allowed.problem;
+
+  /// Whether the allowed hosts are being read.
+  bool get allowedLoading => _allowed.pending != null;
+
+  /// Whether a change to a job or an allowed host is on its way, which keeps a second from
+  /// starting.
   bool busy = false;
 
-  /// Why the last change to a job failed, shown over the jobs until the next change.
+  /// Why the last change failed, shown over what it changed until the next change.
   Notice? changeProblem;
 
   /// The latest runs of each job read by [readRuns], by job id.
@@ -83,7 +95,7 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
 
   @override
   void serverChanged() {
-    for (final read in [_jobs, _library, _activity]) {
+    for (final read in [_jobs, _library, _activity, _allowed]) {
       read.reset();
     }
     busy = false;
@@ -123,6 +135,25 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
     'Could not read the Library',
     _api.library,
   );
+
+  /// Reads the hosts skills may always reach, or waits for the read on its way and, [again],
+  /// reads afresh after it.
+  Future<void> readAllowed({bool again = false}) => _read(
+    _allowed,
+    asksServed,
+    'Could not read the allowed hosts',
+    _api.allowedHosts,
+    again: again,
+  );
+
+  /// Reads the allowed hosts after the frame, when the toolkit serves them and they are not read
+  /// yet, so a page may ask while it builds.
+  void wantAllowed() {
+    if (!asksServed || _allowed.asked) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_allowed.asked) unawaited(readAllowed());
+    });
+  }
 
   /// Reads the newest events, in place of those read before, or waits for the read on its way.
   Future<void> readActivity() => _read(
@@ -218,6 +249,13 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   Future<bool> removeJob(String id) =>
       _change('Could not delete the task', () => _api.deleteJob(id));
 
+  /// Stops always allowing [host], then reads the allowed hosts again.
+  Future<void> forgetHost(String host) => _change(
+    'Could not remove $host',
+    () => _api.forgetHost(host),
+    readAgain: () => readAllowed(again: true),
+  );
+
   /// Starts one run of job [id] now, then reads its runs, again every few seconds while it
   /// goes. Whether it started.
   Future<bool> runNow(String id) async {
@@ -254,9 +292,13 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
     _watching?.cancel();
   }
 
-  /// Sends [call], then reads the jobs again, whether it went or not, and shows why it failed
-  /// over them. Whether it went.
-  Future<bool> _change(String title, Future<void> Function() call) async {
+  /// Sends [call], then reads what it changed again ([readAgain], else the jobs), whether it
+  /// went or not, and shows why it failed over them. Whether it went.
+  Future<bool> _change(
+    String title,
+    Future<void> Function() call, {
+    Future<void> Function()? readAgain,
+  }) async {
     if (busy) return false;
     final asked = epoch;
     busy = true;
@@ -270,7 +312,7 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
     }
     if (asked != epoch) return false;
     busy = false;
-    await readJobs(again: true);
+    await (readAgain ?? () => readJobs(again: true))();
     if (failed != null) {
       changeProblem = failed;
       notifyListeners();

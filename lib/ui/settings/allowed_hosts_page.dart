@@ -9,7 +9,7 @@ import '../app_scope.dart';
 import '../widgets/basics.dart';
 import '../widgets/fields.dart';
 import '../widgets/sheet.dart';
-import '../widgets/tappable.dart';
+import '../widgets/phone_page.dart';
 import 'rows.dart';
 
 /// The Allowed hosts page's question before a host is removed, in the shell's popup, so Back
@@ -36,16 +36,16 @@ class AllowedHostsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final shell = scope.shell;
-    final asks = scope.asks;
+    final toolkit = scope.toolkit;
     return ListenableBuilder(
-      listenable: Listenable.merge([asks, shell.popup]),
+      listenable: Listenable.merge([toolkit, shell.popup]),
       builder: (context, _) {
-        asks.wantAllowed();
+        toolkit.wantAllowed();
         final open = switch (shell.popup.value) {
           final AllowedHostSheet sheet => sheet,
           _ => null,
         };
-        final hosts = asks.allowed;
+        final hosts = toolkit.allowed;
         return PopupSheet(
           open: open != null,
           onClose: shell.closePopup,
@@ -55,22 +55,23 @@ class AllowedHostsPage extends StatelessWidget {
             'chat, and be refused out of one.',
             action: 'Remove',
             onKeep: shell.closePopup,
-            onDelete: open == null || asks.allowedBusy
+            onConfirm: open == null || toolkit.busy
                 ? null
                 : () {
                     shell.closePopup();
-                    unawaited(asks.forget(open.host));
+                    unawaited(toolkit.forgetHost(open.host));
                   },
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (asks.allowedProblem case final problem?) ...[
+              if (toolkit.allowedProblem ?? toolkit.changeProblem
+                  case final problem?) ...[
                 AlertBox.notice(AlertKind.bad, problem),
                 const SizedBox(height: 20),
               ],
               if (hosts == null) ...[
-                if (asks.allowedLoading)
+                if (toolkit.allowedLoading)
                   const HelpText('Loading…', status: true),
               ] else ...[
                 FieldCard([
@@ -110,12 +111,14 @@ class _HostRow extends StatelessWidget {
       final at? => 'Allowed ${whenText(at, clock.now())}',
       null => 'Allowed',
     };
-    return Tappable(
-      label: '${host.host}, $added. Remove',
-      onTap: scope.asks.allowedBusy
+    return NavRow(
+      title: host.host,
+      about: added,
+      end: 'trash',
+      heard: '${host.host}, $added. Remove',
+      onTap: scope.toolkit.busy
           ? null
           : () => scope.shell.togglePopup(AllowedHostSheet(host.host)),
-      child: InfoRow(host.host, about: added),
     );
   }
 }

@@ -154,7 +154,7 @@ class _TaskDetailState extends State<TaskDetail> {
                 SheetQuestion(
                   'Delete ${job.name}? Its earlier runs go with it.',
                   onKeep: () => setState(() => _asking = false),
-                  onDelete: toolkit.busy
+                  onConfirm: toolkit.busy
                       ? null
                       : () async {
                           if (await toolkit.removeJob(widget.id)) {

@@ -62,13 +62,35 @@ object Notes {
     }
 
     /** Shows that the answer in chat [thread] of workspace [slug] is ready: [title] over [body]. */
-    fun ready(context: Context, title: String, body: String, slug: String, thread: String) {
-        val id = ids.incrementAndGet()
+    fun ready(context: Context, title: String, body: String, slug: String, thread: String) =
+        chat(context, ANSWERS, "Answers ready", ids.incrementAndGet(), title, body, slug, thread)
+
+    /**
+     * Shows that a skill in chat [thread] of workspace [slug] waits for the person: [title] over
+     * [body], in place of any request shown before.
+     */
+    fun asking(context: Context, title: String, body: String, slug: String, thread: String) =
+        chat(context, APPROVALS, "Approvals", ASKING_ID, title, body, slug, thread)
+
+    /**
+     * Shows notification [id] on [channel], named [name], urgent: [title] over [body], which a
+     * tap opens chat [thread] of workspace [slug] from.
+     */
+    private fun chat(
+        context: Context,
+        channel: String,
+        name: String,
+        id: Int,
+        title: String,
+        body: String,
+        slug: String,
+        thread: String,
+    ) {
         val tap = Intent(context, MainActivity::class.java)
             .setAction(ACTION_TAP)
             .putExtra(EXTRA_SLUG, slug)
             .putExtra(EXTRA_THREAD, thread)
-        val note = builder(context, ANSWERS, "Answers ready", high = true, opens = tap, request = id)
+        val note = builder(context, channel, name, high = true, opens = tap, request = id)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(Notification.BigTextStyle().bigText(body))
@@ -76,26 +98,6 @@ object Notes {
             .build()
         // Without the permission Android drops it, as the person asked.
         context.getSystemService(NotificationManager::class.java).notify(id, note)
-    }
-
-    /**
-     * Shows that a skill in chat [thread] of workspace [slug] waits for the person: [title] over
-     * [body], in place of any request shown before.
-     */
-    fun asking(context: Context, title: String, body: String, slug: String, thread: String) {
-        val tap = Intent(context, MainActivity::class.java)
-            .setAction(ACTION_TAP)
-            .putExtra(EXTRA_SLUG, slug)
-            .putExtra(EXTRA_THREAD, thread)
-        val note = builder(
-            context, APPROVALS, "Approvals", high = true, opens = tap, request = ASKING_ID,
-        )
-            .setContentTitle(title)
-            .setContentText(body)
-            .setStyle(Notification.BigTextStyle().bigText(body))
-            .setAutoCancel(true)
-            .build()
-        context.getSystemService(NotificationManager::class.java).notify(ASKING_ID, note)
     }
 
     /** Takes back the request [asking] showed. */
