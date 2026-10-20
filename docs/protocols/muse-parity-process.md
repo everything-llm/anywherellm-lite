@@ -1,6 +1,6 @@
 # Muse parity test
 
-Sends the same prompts to a fresh scratch chat in Meta's Muse and in AnythingLLM and records what each does. The core set (13 probes) measures answers; the browser group (10 probes) measures watching, steering and handing over the agent's live browser. It ends in `docs/notes/muse-parity-<date>.md`. Any agent that can run shell commands and drive a browser over CDP can run it.
+Sends the same prompts to a fresh scratch chat in Meta's Muse and in AnythingLLM and records what each does. The core set (13 probes) measures answers; the browser group (10 probes) measures watching, steering and handing over the agent's live browser. AnythingLLM's side is its web UI, so the Lite client is not exercised. It ends in `docs/notes/muse-parity-<date>.md`. Any agent that can run shell commands and drive a browser over CDP can run it.
 
 ## Harness
 
@@ -44,7 +44,7 @@ Agree on these with the user before the first probe.
    1. `mark ... sent`, then send `probe <id>`. The `file` probe attaches `<run>/files/scratch-expenses.csv`.
    1. When the answer ends, `mark ... ended`. AnythingLLM's footer time counts only the last generation, so the marks are the wall-clock time.
    1. Save the answer to `<run>/<id>-<side>.txt`, `check` the `code` and `file` ones, and `mark ... note` what showed.
-1. `reminder-ok` goes to AnythingLLM only, and only if it asks. A stock AnythingLLM ends most agent probes in "I have no such tool"; record that as the result.
+1. `reminder-ok` goes to AnythingLLM only, and only if it asks. Record the tool each AnythingLLM answer used. On a server without the suite's skills, most agent probes end in "I have no such tool"; record that as the result.
 1. Run the browser group one side after the other, `return` last: browsing, and any page showing a live card, keeps the browser from stopping. If Muse answers "Something went wrong", "Message failed to send" or "Conversation controls unavailable", it is degraded: do AnythingLLM's side and return to Muse later, without a retry loop.
 
 Tag each finding **app** (AnywhereLLM's code; give file and function), **server** (AnythingLLM or the model) or **harness** (hidden tabs, synthetic keys, the clipboard; confirm by hand before reporting).
