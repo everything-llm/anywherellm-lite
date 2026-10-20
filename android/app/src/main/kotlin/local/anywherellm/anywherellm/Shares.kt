@@ -111,12 +111,12 @@ class Shares(private val context: Context, messenger: BinaryMessenger) {
     private fun file(uri: Uri): Map<String, Any?>? {
         if (uri.scheme != ContentResolver.SCHEME_CONTENT) return null
         // An authority with user info (`content://0@pkg.provider/...`) names the provider the
-        // resolver finds without it, so only a bare host is looked up, and one no provider has is
-        // refused.
+        // resolver finds without it, so only a bare host is looked up. The app's own providers
+        // always resolve for it; another app's may not, under package visibility, and is let in.
         val authority = uri.host?.takeIf { it == uri.authority } ?: return null
         @Suppress("DEPRECATION")
-        val provider = context.packageManager.resolveContentProvider(authority, 0) ?: return null
-        if (provider.packageName == context.packageName) return null
+        val provider = context.packageManager.resolveContentProvider(authority, 0)
+        if (provider?.packageName == context.packageName) return null
         var name: String? = null
         var size: Long? = null
         runCatching {
