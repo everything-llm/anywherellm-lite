@@ -1,3 +1,5 @@
+import 'chat.dart';
+
 /// A picture an answer shows: its [image], its [caption] (the image's description), and the
 /// [page] it came from, the link around it, when it has one.
 class Picture {
@@ -6,6 +8,11 @@ class Picture {
   final Uri image;
   final String caption;
   final Uri? page;
+
+  /// This picture with its [image] a path from the root no longer, but on [server]
+  /// ([onServer]).
+  Picture on(Uri? server) =>
+      Picture(onServer(image, server), caption: caption, page: page);
 
   /// The site the picture came from: its page's host, or else its own.
   String get site => (page ?? image).host;

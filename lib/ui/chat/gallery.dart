@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../core/errors.dart';
+import '../../core/chat.dart';
 import '../../core/gallery.dart';
 import '../app_scope.dart';
 import '../files/save_file.dart';
@@ -34,6 +34,8 @@ class Gallery extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
+    final server = scope.settings.connection?.uri;
+    final pictures = [for (final picture in this.pictures) picture.on(server)];
     final shown = pictures.take(_columns).toList();
     final more = pictures.length - shown.length;
     return LayoutBuilder(
@@ -170,7 +172,8 @@ class _Unloaded extends StatelessWidget {
 
 /// An answer's pictures one at a time, over the window: where it is in the set, the picture
 /// whole in a frame that keeps its height, Previous and Next or a swipe, its caption and site,
-/// Open page, Save and, where the device has a share sheet, Share.
+/// Open page, and for a picture on the server's own host ([loadableImage]), Save and, where the
+/// device has a share sheet, Share.
 class GalleryPage extends StatefulWidget {
   const GalleryPage(this.open, {super.key});
 
@@ -197,18 +200,8 @@ class _GalleryPageState extends State<GalleryPage> {
 
   void _close() => AppScope.of(context).shell.closePopup();
 
-  /// The picture's bytes, or null when they cannot be read.
-  Future<List<int>?> _bytes(Picture picture) async {
-    try {
-      return await AppScope.of(context).chat.bytes.image(picture.image);
-    } on ApiException {
-      return null;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
     final t = Tokens.of(context);
     final picture = _pictures[_at];
     final count = _pictures.length;
@@ -301,37 +294,7 @@ class _GalleryPageState extends State<GalleryPage> {
                             ),
                           ),
                         ]),
-                        const SizedBox(height: 8),
-                        ActionRow(even: true, [
-                          AppButton(
-                            'Save',
-                            onPressed: () => unawaited(
-                              saveFile(
-                                context,
-                                picture.fileName,
-                                () => _bytes(picture),
-                                failTitle: 'Could not save ${picture.fileName}',
-                                report: scope.chat.report,
-                              ),
-                            ),
-                          ),
-                          if (scope.share != null)
-                            AppButton(
-                              'Share',
-                              onPressed: () => unawaited(
-                                shareFile(context, picture.fileName, () async {
-                                  final bytes = await _bytes(picture);
-                                  if (bytes == null) {
-                                    scope.chat.report(
-                                      'Could not share ${picture.fileName}',
-                                      'The picture could not be read.',
-                                    );
-                                  }
-                                  return bytes;
-                                }),
-                              ),
-                            ),
-                        ]),
+                        _PictureActions(picture),
                       ],
                     ),
                   ),
@@ -412,6 +375,47 @@ class _GalleryPageState extends State<GalleryPage> {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Save and, where the device has a share sheet, Share, for a [picture] on the server's own host
+/// ([loadableImage]): only such a picture is read, as the client itself insists. A failure shows
+/// through the chat's problem.
+class _PictureActions extends StatelessWidget {
+  const _PictureActions(this.picture);
+
+  final Picture picture;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    if (!loadableImage(picture.image, scope.settings.connection?.uri)) {
+      return const SizedBox.shrink();
+    }
+    final name = picture.fileName;
+    Future<List<int>> bytes() => scope.chat.bytes.image(picture.image);
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: ActionRow(even: true, [
+        AppButton(
+          'Save',
+          onPressed: () => unawaited(
+            saveFile(
+              context,
+              name,
+              bytes,
+              failTitle: 'Could not save $name',
+              report: scope.chat.report,
+            ),
+          ),
+        ),
+        if (scope.share != null)
+          AppButton(
+            'Share',
+            onPressed: () => unawaited(shareFile(context, name, bytes)),
+          ),
+      ]),
     );
   }
 }

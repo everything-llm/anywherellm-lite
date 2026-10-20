@@ -191,6 +191,19 @@ void main() {
     expect(textFileName('Version 1.16'), 'Version 1.16.txt');
     expect(textFileName('Q&A: what/why?'), 'Q&A- what-why-.txt');
     expect(textFileName('  '), 'document.txt');
+    expect(textFileName('..'), 'document.txt');
+  });
+
+  test('a file name never leaves the folder it is written in', () {
+    expect(
+      plainFileName('../../files/prefs.json', fallback: 'file'),
+      '..-..-files-prefs.json',
+    );
+    expect(plainFileName(r'..\x.png', fallback: 'file'), '..-x.png');
+    expect(plainFileName('..', fallback: 'file'), 'file');
+    expect(plainFileName(' . ', fallback: 'file'), 'file');
+    expect(plainFileName('', fallback: 'file'), 'file');
+    expect(plainFileName('photo.png', fallback: 'file'), 'photo.png');
   });
 
   test('the pages are named plainly', () {

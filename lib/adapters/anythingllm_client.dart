@@ -259,11 +259,14 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   );
 
   /// A bare `GET` of [url], on any port of the server's host as [loadableImage] allows, read
-  /// whole, at most [maxImageBytes].
+  /// whole, at most [maxImageBytes]. Any other address is refused unread ([offServerImage]).
   @override
   Future<Uint8List> answerImage(Uri url) async {
     final connection = _current;
     if (!keySafe(url)) throw const ApiException(plainHttpRefused);
+    if (!loadableImage(url, connection.uri)) {
+      throw const ApiException(offServerImage);
+    }
     final response = await _fetch(
       connection,
       timeout,
@@ -681,6 +684,10 @@ Map<String, String> attachmentJson(Attachment attachment) {
 
 /// The most bytes one image in an answer may take.
 const maxImageBytes = 16 * 1024 * 1024;
+
+/// Why an image in an answer on any host but the server's is not read.
+const offServerImage =
+    'The image is not on your AnythingLLM server, so it was not read.';
 
 const _documentTypes = {
   '.pdf': 'application/pdf',

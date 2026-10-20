@@ -15,10 +15,11 @@ import io.flutter.plugin.common.MethodChannel
  * reads go on, and hands over each notification tapped as `{slug, thread}`:
  * `launchTap` answers the one that started the activity, once, and `tap` sends one tapped while
  * it runs. Notifications need a permission on Android 13 and later, which it asks for when an
- * answer first runs.
+ * answer first runs. What other apps share with it goes through [Shares].
  */
 class MainActivity : FlutterActivity() {
     private var channel: MethodChannel? = null
+    private var shares: Shares? = null
     private var launchTap: Map<String, String>? = null
     private var asked = false
 
@@ -26,6 +27,9 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         Notes.retire(this)
         launchTap = takeTap(intent)
+        shares = Shares(applicationContext, flutterEngine.dartExecutor.binaryMessenger).apply {
+            launch(intent)
+        }
         channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, BACKGROUND).apply {
             setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -71,9 +75,16 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        shares?.close()
+        shares = null
+        super.cleanUpFlutterEngine(flutterEngine)
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         takeTap(intent)?.let { channel?.invokeMethod("tap", it) }
+        shares?.arrived(intent)
     }
 
     /** The tapped notification's chat that [intent] carries, taken out so it is handed over once. */

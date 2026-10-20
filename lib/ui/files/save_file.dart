@@ -6,8 +6,9 @@ import '../../core/errors.dart';
 import '../../core/files.dart';
 import '../app_scope.dart';
 
-/// Saves what [bytes] gives as [suggestedName] through [AppScope.save], and returns where, or
-/// null. A failure shows as [failTitle] through [report], or in Files when it is null.
+/// Saves what [bytes] gives as [suggestedName], made a [plainFileName], through [AppScope.save],
+/// and returns where, or null. A failure shows as [failTitle] through [report], or in Files when
+/// it is null.
 Future<String?> saveFile(
   BuildContext context,
   String suggestedName,
@@ -17,15 +18,18 @@ Future<String?> saveFile(
 }) async {
   final scope = AppScope.of(context);
   try {
-    return await scope.save(suggestedName, bytes);
+    return await scope.save(
+      plainFileName(suggestedName, fallback: 'file'),
+      bytes,
+    );
   } on Exception catch (error) {
     (report ?? scope.files.report)(failTitle, plainMessage(error));
     return null;
   }
 }
 
-/// Hands what [bytes] gives, named [name], to the system's share sheet through
-/// [AppScope.share], where the device has one. [bytes] gives null, having said why, when there
+/// Hands what [bytes] gives, named [name] made a [plainFileName], to the system's share sheet
+/// through [AppScope.share], where the device has one. [bytes] gives null, having said why, when there
 /// is nothing to share; a share that fails shows through the chat's problem.
 Future<void> shareFile(
   BuildContext context,
@@ -38,7 +42,7 @@ Future<void> shareFile(
   final title = 'Could not share $name';
   try {
     final data = await bytes();
-    if (data != null) await share(name, data);
+    if (data != null) await share(plainFileName(name, fallback: 'file'), data);
   } on Exception catch (error) {
     scope.chat.report(title, plainMessage(error));
   }

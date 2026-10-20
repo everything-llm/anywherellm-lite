@@ -1,31 +1,47 @@
-import 'package:share_plus/share_plus.dart' show XFile;
-import 'package:receive_sharing_intent/receive_sharing_intent.dart';
+import 'dart:async';
 
+import 'package:flutter/services.dart';
+
+import '../../core/files.dart';
 import 'shared_item.dart';
 
+/// `MainActivity`'s share intake (`Shares.kt`).
+const _channel = MethodChannel('anywherellm/shares');
+
 /// What other apps share with AnywhereLLM on Android: what started the app, then each share
-/// that reaches it while it runs. A file is read only when it is used.
-Stream<SharedItem> androidShares() async* {
-  final intent = ReceiveSharingIntent.instance;
-  final first = await intent.getInitialMedia();
-  await intent.reset();
-  for (final media in first) {
-    yield await _itemOf(media);
+/// that reaches it while it runs. A file is read only when it is used, from the address the
+/// sharing app gave, and never written to a file.
+Stream<SharedItem> androidShares() {
+  late final StreamController<SharedItem> items;
+  void take(Object? share) {
+    if (_itemOf(share) case final item?) items.add(item);
   }
-  await for (final batch in intent.getMediaStream()) {
-    for (final media in batch) {
-      yield await _itemOf(media);
-    }
-  }
+
+  items = StreamController(
+    onListen: () async {
+      _channel.setMethodCallHandler((call) async {
+        if (call.method == 'share') take(call.arguments);
+      });
+      try {
+        take(await _channel.invokeMethod<Object?>('launchShare'));
+      } on MissingPluginException {
+        // The app runs without `MainActivity`'s channel, as in a test.
+      }
+    },
+    onCancel: () => _channel.setMethodCallHandler(null),
+  );
+  return items.stream;
 }
 
-Future<SharedItem> _itemOf(SharedMediaFile media) async {
-  switch (media.type) {
-    case SharedMediaType.text || SharedMediaType.url:
-      return sharedTextItem(media.path);
-    case SharedMediaType.image || SharedMediaType.video || SharedMediaType.file:
-      final file = XFile(media.path);
-      final name = media.path.split('/').last;
-      return SharedFile(name, await file.length(), file.readAsBytes);
-  }
-}
+/// The item [share] holds, as the activity hands it over: `{text}`, or `{file, name, size}`
+/// where `file` is the id it is read by; null for none.
+SharedItem? _itemOf(Object? share) => switch (share) {
+  {'text': final String text} => sharedTextItem(text),
+  {'file': final int id, 'size': final int size} => SharedFile(
+    // The name is the sharing app's to choose, so it is made one that names no other folder.
+    plainFileName(share['name'] as String? ?? '', fallback: 'shared file'),
+    size,
+    () async => (await _channel.invokeMethod<Uint8List>('read', {'id': id}))!,
+  ),
+  _ => null,
+};
