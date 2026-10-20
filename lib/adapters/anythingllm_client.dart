@@ -280,12 +280,16 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     }
     final bytes = BytesBuilder(copy: false);
     try {
-      await for (final chunk in response.stream) {
+      await for (final chunk in response.stream.timeout(timeout)) {
         bytes.add(chunk);
         if (bytes.length > maxImageBytes) {
           throw const ApiException('The image is too large to show.');
         }
       }
+    } on TimeoutException {
+      throw ApiException(
+        'The server did not answer within ${_duration(timeout)}.',
+      );
     } on http.ClientException catch (error) {
       throw ApiException('The image was cut off: ${error.message}');
     }

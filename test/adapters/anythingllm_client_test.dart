@@ -1610,8 +1610,10 @@ void main() {
       Stream<List<int>> body, {
       int status = 200,
       List<http.BaseRequest>? seen,
+      Duration timeout = const Duration(seconds: 15),
     }) => HttpAnythingLlmApi(
       holder: ConnectionHolder(_connection),
+      timeout: timeout,
       client: MockClient.streaming((request, _) async {
         seen?.add(request);
         return http.StreamedResponse(
@@ -1668,6 +1670,17 @@ void main() {
         error.message,
         'The image could not be read: the server answered 404.',
       );
+    });
+
+    test('a body that stalls after the headers times out', () async {
+      final stalled = StreamController<List<int>>()..add(ascii.encode('on'));
+      addTearDown(stalled.close);
+      final api = images(
+        stalled.stream,
+        timeout: const Duration(milliseconds: 50),
+      );
+      final error = await _failure(api.answerImage(picture));
+      expect(error.message, contains('did not answer within'));
     });
 
     test('an image past the limit is refused', () async {
