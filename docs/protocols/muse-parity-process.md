@@ -41,7 +41,7 @@ Agree on these with the user before the first probe.
 1. Run `chrome`, attach the driver, have the user sign in, and run `fixtures <run>/files`.
 1. Map Muse's surface without changing anything: the left rail (Chat, Search, Feed, Ideas, Goals, Library), the side panel (Activity, Approvals, Upcoming, Identity) and Settings (Connectors, Wallet, Secure store, Permissions, Messaging channels, Devices). Close Activity before the probes: it may list an earlier run. In AnythingLLM, read Settings > Agent Skills and Scheduled Jobs.
 1. For each probe in `probes` order, in a fresh chat on each side (an `after` probe continues its parent's chat):
-   1. `mark ... sent`, then send `probe <id>`. The `file` probe attaches `<run>/files/scratch-expenses.csv`.
+   1. Type `probe <id>` into the box, then run `mark ... sent` immediately before the send key: a mark written earlier inflates the time. The `file` probe attaches `<run>/files/scratch-expenses.csv`.
    1. When the answer ends, `mark ... ended`. AnythingLLM's footer time counts only the last generation, so the marks are the wall-clock time.
    1. Save the answer to `<run>/<id>-<side>.txt`, `check` the `code` and `file` ones, and `mark ... note` what showed.
 1. `reminder-ok` goes to AnythingLLM only, and only if it asks. Record the tool each AnythingLLM answer used. On a server without the suite's skills, most agent probes end in "I have no such tool"; record that as the result.
@@ -55,6 +55,7 @@ For each browser probe also note: when the browser first showed in the chat; wha
 
 | Site | Task | How |
 | --- | --- | --- |
+| Muse | Main chat | Muse opens on the person's main chat, which holds personal content. Click "New side chat" before any page text or screenshot, and read nothing from the main chat or the Activity list's earlier items. |
 | Muse | New side chat | The "New side chat" button, located by name. The message box is near the bottom centre; click, type, press Enter. |
 | Muse | Slow loads | Skeletons show for 10-15 s after a navigation. Wait. |
 | Muse | Reading replies | Page text or `document.querySelector('main').innerText`. The Activity list gives each task's outcome and time. |
