@@ -127,11 +127,18 @@ Pairing parsePairingCode(String raw) {
   if (uri == null || uri.scheme != 'anywherellm' || uri.host != 'connect') {
     throw notOurs;
   }
-  final url = uri.queryParameters['url'];
-  final key = uri.queryParameters['key'];
+  // A query that is not valid UTF-8 makes [Uri.queryParameters] throw.
+  final Map<String, String> query;
+  try {
+    query = uri.queryParameters;
+  } on FormatException {
+    throw notOurs;
+  }
+  final url = query['url'];
+  final key = query['key'];
   if (url == null || key == null) throw notOurs;
   return Pairing(Connection.parse(url, key), {
-    if (uri.queryParameters[toolkitCompanion.code] case final address?)
+    if (query[toolkitCompanion.code] case final address?)
       toolkitCompanion.code: _companionAddress(address),
   });
 }

@@ -11,6 +11,11 @@ String? signedInOf(String text) {
       link.host != 'signed-in') {
     return null;
   }
-  final service = link.queryParameters['service']?.trim();
+  final String? service;
+  try {
+    service = link.queryParameters['service']?.trim();
+  } on FormatException {
+    return null;
+  }
   return service != null && _service.hasMatch(service) ? service : null;
 }

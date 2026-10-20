@@ -251,6 +251,7 @@ void main() {
         'just words',
         'anywherellm://connect?url=https%3A%2F%2Fh',
         'anywherellm://other?url=https%3A%2F%2Fh&key=k',
+        'anywherellm://connect?url=%ff&key=a',
       ]) {
         expect(
           () => parsePairingCode(bad),

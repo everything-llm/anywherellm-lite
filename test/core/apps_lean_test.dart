@@ -28,6 +28,16 @@ void main() {
     },
   );
 
+  test('a query that is not valid UTF-8 is replaced by the theme', () {
+    final page = Uri.parse(
+      'https://owen.example.ts.net:3001/apps-lean/a.html?x=%ff',
+    );
+    expect(
+      pageInTheme(page, dark: true).toString(),
+      'https://owen.example.ts.net:3001/apps-lean/a.html?theme=dark',
+    );
+  });
+
   test('an app\'s page on the server\'s host is an apps-lean page', () {
     expect(
       page(

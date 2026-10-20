@@ -21,5 +21,6 @@ void main() {
     expect(of('anywherellm://signed-in?service=${'a' * 61}'), isNull);
     expect(of('anywherellm://signed-in?service=a%0Ab'), isNull);
     expect(of('anywherellm://signed-in?service=%3Cb%3E'), isNull);
+    expect(of('anywherellm://signed-in?service=%ff'), isNull);
   });
 }
