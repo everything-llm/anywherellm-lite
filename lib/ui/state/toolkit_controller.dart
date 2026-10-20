@@ -84,7 +84,8 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   /// starting.
   bool busy = false;
 
-  /// Why the last change failed, shown over what it changed until the next change.
+  /// Why the last change failed, shown over what it changed until the next change, or until
+  /// the jobs or the allowed addresses are read again, or [clearChangeProblem].
   Notice? changeProblem;
 
   /// The latest runs of each job read by [readRuns], by job id.
@@ -126,6 +127,7 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
     'Could not read the scheduled jobs',
     _api.scheduledJobs,
     again: again,
+    clearsChange: true,
   );
 
   /// Reads the apps and files the agent made, or waits for the read on its way.
@@ -144,14 +146,23 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
     'Could not read the allowed addresses',
     _api.allowedOrigins,
     again: again,
+    clearsChange: true,
   );
 
   /// Reads the allowed addresses after the frame, when the toolkit serves them and they are not read
-  /// yet, so a page may ask while it builds.
-  void wantAllowed() {
-    if (!asksServed || _allowed.asked) return;
+  /// yet, so a page may ask while it builds. With [retry], as when the page opens, a read that
+  /// failed is asked again; a page that builds more than once does not, or a read that keeps
+  /// failing would not stop.
+  void wantAllowed({bool retry = false}) {
+    if (!asksServed || (_allowed.asked && !retry)) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_allowed.asked) unawaited(readAllowed());
+      if (!_allowed.asked) {
+        unawaited(readAllowed());
+      } else if (retry &&
+          _allowed.problem != null &&
+          _allowed.pending == null) {
+        unawaited(readAllowed(again: true));
+      }
     });
   }
 
@@ -184,13 +195,14 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
 
   /// Reads [into] with [fetch] where the toolkit [served] it, showing why it failed as [title].
   /// While a read is on its way it waits for that one instead, and then reads afresh only
-  /// [again].
+  /// [again]. A read that succeeds takes away the [changeProblem] when it [clearsChange].
   Future<void> _read<T>(
     _Read<T> into,
     bool served,
     String title,
     Future<T> Function() fetch, {
     bool again = false,
+    bool clearsChange = false,
   }) async {
     if (!served) return;
     if (into.pending case final pending?) {
@@ -205,12 +217,17 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
         into
           ..value = read
           ..problem = null;
+        if (clearsChange) changeProblem = null;
       } on ApiException catch (error) {
         if (asked != epoch) return;
         into.problem = Notice(title, error.message);
+      } finally {
+        // Another server's read, or a failure of any kind, leaves nothing marked as on its way.
+        if (asked == epoch) {
+          into.pending = null;
+          notifyListeners();
+        }
       }
-      into.pending = null;
-      notifyListeners();
     }();
     notifyListeners();
     await reading;
@@ -256,10 +273,22 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
       'Could not remove $origin',
       () async => left = await _api.forgetOrigin(origin),
       readAgain: () async {
-        if (left case final left?) _allowed.value = left;
-        notifyListeners();
+        if (left case final left?) {
+          _allowed.value = left;
+          notifyListeners();
+        } else {
+          // A failed removal may have gone through, or the list changed elsewhere.
+          await readAllowed(again: true);
+        }
       },
     );
+  }
+
+  /// Takes away the [changeProblem], as when the sheet that shows it closes.
+  void clearChangeProblem() {
+    if (changeProblem == null) return;
+    changeProblem = null;
+    notifyListeners();
   }
 
   /// Starts one run of job [id] now, then reads its runs, again every few seconds while it
@@ -315,9 +344,14 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
       await call();
     } on ApiException catch (error) {
       failed = Notice(title, error.message);
+    } finally {
+      // A failure of any other kind leaves the toolkit free for the next change too.
+      if (asked == epoch) {
+        busy = false;
+        notifyListeners();
+      }
     }
     if (asked != epoch) return false;
-    busy = false;
     await (readAgain ?? () => readJobs(again: true))();
     if (failed != null) {
       changeProblem = failed;

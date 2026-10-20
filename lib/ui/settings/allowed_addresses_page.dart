@@ -29,9 +29,20 @@ class AllowedOriginSheet {
 
 /// The addresses on the person's own network every skill may reach without asking, each one
 /// origin (scheme, host and port), which Always allow adds, read from the toolkit. A row asks
-/// before it removes its address.
-class AllowedAddressesPage extends StatelessWidget {
+/// before it removes its address. Opening it reads the list again when the last read failed.
+class AllowedAddressesPage extends StatefulWidget {
   const AllowedAddressesPage({super.key});
+
+  @override
+  State<AllowedAddressesPage> createState() => _AllowedAddressesPageState();
+}
+
+class _AllowedAddressesPageState extends State<AllowedAddressesPage> {
+  @override
+  void initState() {
+    super.initState();
+    AppScope.of(context).toolkit.wantAllowed(retry: true);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,8 +77,11 @@ class AllowedAddressesPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (toolkit.allowedProblem ?? toolkit.changeProblem
-                  case final problem?) ...[
+              // Why a removal failed and why the list could not be read are both told.
+              for (final problem in [
+                ?toolkit.allowedProblem,
+                ?toolkit.changeProblem,
+              ]) ...[
                 AlertBox.notice(AlertKind.bad, problem),
                 const SizedBox(height: 20),
               ],
