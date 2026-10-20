@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,4 +40,20 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'a shortcut pasted as /name into an empty message becomes a chip',
+    (tester) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      h.chat.newChat();
+      await tester.pumpAndSettle();
+      await tester.enterText(composerField, '/translate ');
+      await tester.pump();
+      expect(find.text('Translate'), findsOneWidget);
+      expect(
+        tester.widget<EditableText>(composerField).controller.text,
+        isEmpty,
+      );
+    },
+  );
 }

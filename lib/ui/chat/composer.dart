@@ -217,7 +217,8 @@ class _ComposerState extends State<Composer> {
             .where((item) => item.name == match[1]!.toLowerCase())
             .firstOrNull;
         if (shortcut != null) {
-          _shortcut = shortcut;
+          // Shown even when the rest is empty, which leaves the message as it was.
+          setState(() => _shortcut = shortcut);
           _setDraft(match[2] ?? '');
           return;
         }
