@@ -38,6 +38,9 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   /// Whether the toolkit lists what the agent did, which Activity shows.
   bool get activityServed => serves(ToolkitFeature.activity);
 
+  /// Whether the toolkit's skills ask the person here, which Allowed hosts goes with.
+  bool get asksServed => serves(ToolkitFeature.asks);
+
   final _jobs = _Read<List<ScheduledJob>>();
   final _library = _Read<LibraryContents>();
   final _activity = _Read<ActivityEvents>();

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../core/asks.dart';
 import '../core/chat.dart';
 import '../core/json.dart';
 import '../core/outputs.dart';
@@ -53,7 +54,7 @@ Stream<ChatEvent> chatEventsOf(Stream<Map<String, dynamic>> chunks) async* {
         if (chunk['thought'] case final String thought
             when thought.trim().isNotEmpty) {
           afterStatus = true;
-          yield StatusChunk(agentStatus(thought));
+          yield StatusChunk(agentStatus(thought), ask: askIdIn(thought));
         }
       case 'textResponse':
         if (text is String && text.isNotEmpty) {

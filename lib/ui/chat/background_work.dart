@@ -27,6 +27,19 @@ abstract interface class BackgroundWork {
     required String thread,
   });
 
+  /// Shows that a skill in chat [thread] of workspace [slug] waits for the person to allow it
+  /// something, as one urgent notification, titled [title] over [body], that opens the chat,
+  /// in place of any it showed before.
+  Future<void> asking({
+    required String title,
+    required String body,
+    required String slug,
+    required String thread,
+  });
+
+  /// Takes back what [asking] showed, once the request is answered or no longer waits.
+  Future<void> asked();
+
   /// Puts the app out of sight without ending it, as Back does on its first screen, so an
   /// answer it holds goes on.
   Future<void> leave();

@@ -156,6 +156,13 @@ class ChatController extends ChangeNotifier {
   /// The answers running, at most one in each chat.
   final _runs = <_Running>[];
 
+  /// Each answer running: its workspace, its chat, null while a draft's chat is being made, and
+  /// its turn.
+  List<({String slug, String? thread, Turn answer})> get running => [
+    for (final run in _runs)
+      (slug: run.slug, thread: run.thread, answer: run.answer),
+  ];
+
   /// The messages waiting in each chat, by chat, in the order they go, with the chat's
   /// workspace. Each list is replaced, never changed, as the turns are.
   final _onDeck = <String, ({String slug, List<OnDeck> next})>{};
@@ -1091,6 +1098,7 @@ class ChatController extends ChangeNotifier {
     running.answer
       ..streaming = false
       ..status = null
+      ..ask = null
       ..error = error
       ..notifyListeners();
     if (notSent) {

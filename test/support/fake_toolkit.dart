@@ -1,4 +1,5 @@
 import 'package:anywherellm/core/activity.dart';
+import 'package:anywherellm/core/asks.dart';
 import 'package:anywherellm/core/companion.dart';
 import 'package:anywherellm/core/library.dart';
 import 'package:anywherellm/core/memory.dart';
@@ -282,4 +283,58 @@ class FakeToolkit with FakeCompanion implements ToolkitApi {
       ...?runRecords[id],
     ];
   }, id);
+
+  /// The requests skills wait on, by id, as the bridge holds them.
+  final Map<String, Ask> asks = {};
+
+  /// The hosts skills may always reach.
+  List<AllowedHost> allowed = [];
+
+  @override
+  Future<Ask> ask(String id) => run(
+    'ask',
+    () =>
+        asks[id] ?? (throw const ApiException('No such request.', status: 404)),
+    id,
+  );
+
+  /// Decides a request once, as the bridge does, and always allows its host for [AskDecision.always].
+  @override
+  Future<Ask> decide(String id, AskDecision decision) => run('decide', () {
+    final ask =
+        asks[id] ?? (throw const ApiException('No such request.', status: 404));
+    if (ask.decision != null) {
+      throw const ApiException('It was answered already.', status: 409);
+    }
+    final decided = Ask(
+      id: ask.id,
+      host: ask.host,
+      origin: ask.origin,
+      skill: ask.skill,
+      workspace: ask.workspace,
+      why: ask.why,
+      asked: ask.asked,
+      expires: ask.expires,
+      decision: decision,
+    );
+    asks[id] = decided;
+    if (decision == AskDecision.always) {
+      allowed = [...allowed, AllowedHost(ask.host, added: DateTime.now())];
+    }
+    return decided;
+  }, '$id=${decision.name}');
+
+  @override
+  Future<List<AllowedHost>> allowedHosts() =>
+      run('allowedHosts', () => allowed);
+
+  @override
+  Future<List<AllowedHost>> forgetHost(String host) => run(
+    'forgetHost',
+    () => allowed = [
+      for (final a in allowed)
+        if (a.host != host) a,
+    ],
+    host,
+  );
 }

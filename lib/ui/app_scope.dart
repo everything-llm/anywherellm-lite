@@ -6,6 +6,7 @@ import 'chat/dictation.dart';
 import 'chat/photo_picker.dart';
 import 'chat/speaker.dart';
 import 'share/shared_item.dart';
+import 'state/ask_controller.dart';
 import 'state/chat_controller.dart';
 import 'state/files_controller.dart';
 import 'state/memory_controller.dart';
@@ -48,6 +49,7 @@ class AppScope extends InheritedWidget {
     required this.system,
     required this.memory,
     required this.toolkit,
+    required this.asks,
     required this.launch,
     required this.save,
     this.scanner,
@@ -77,6 +79,10 @@ class AppScope extends InheritedWidget {
   /// The toolkit beside the server in use, when it is there: what it serves, and the scheduled
   /// jobs.
   final ToolkitController toolkit;
+
+  /// What the toolkit's skills ask the person while an answer runs, and the hosts always
+  /// allowed.
+  final AskController asks;
   final LinkOpener launch;
   final FileSaver save;
 

@@ -1037,6 +1037,24 @@ void main() {
       );
     });
 
+    test('a skill waiting on the person names its request apart', () async {
+      const id = '0123456789abcdef0123456789abcdef';
+      final events = await streaming([
+        data({
+          'type': 'agentThought',
+          'thought':
+              'Waiting for your approval in AnywhereLLM to reach muse-vm [ask:$id]',
+        }),
+        data({'type': 'finalizeResponseStream', 'close': true}),
+      ]).streamChat('w', 't', 'Fetch it').toList();
+      final status = events.whereType<StatusChunk>().single;
+      expect(
+        status.text,
+        'Waiting for your approval in AnywhereLLM to reach muse-vm',
+      );
+      expect(status.ask, id);
+    });
+
     test('text after a tool starts a new paragraph, unless spaced', () async {
       Map<String, Object?> piece(String text) => {
         'type': 'textResponseChunk',

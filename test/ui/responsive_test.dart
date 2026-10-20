@@ -1,5 +1,6 @@
 import 'dart:ui' show Offset, Size;
 
+import 'package:anywherellm/core/asks.dart';
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/files.dart';
@@ -135,7 +136,13 @@ void main() {
           size: size,
           canDictate: true,
           canSpeak: true,
-          toolkitServer: FakeToolkit(),
+          toolkitServer: FakeToolkit()
+            ..served = {
+              ToolkitFeature.memories,
+              ToolkitFeature.jobs,
+              ToolkitFeature.asks,
+            }
+            ..allowed = [AllowedHost('host-$longWord', added: DateTime(2026))],
         );
         h.shell.openSettings();
         await tester.pumpAndSettle();
@@ -312,6 +319,40 @@ void main() {
           expect(control('Keep'), findsOneWidget);
           expect(tester.takeException(), isNull);
         }
+      });
+
+      testWidgets('a skill\'s request fits', (tester) async {
+        const id = '0123456789abcdef0123456789abcdef';
+        final now = DateTime.now().toUtc();
+        final llm = awkward()..hold = true;
+        final h = await pumpApp(
+          tester,
+          llm: llm,
+          size: size,
+          toolkitServer: FakeToolkit()
+            ..served = {ToolkitFeature.asks}
+            ..asks[id] = Ask(
+              id: id,
+              host: 'host-$longWord',
+              origin: 'http://host-$longWord:8463',
+              skill: 'skill-$longWord',
+              workspace: 'w',
+              why: 'Send a request to http://host-$longWord:8463/$longWord',
+              asked: now,
+              expires: now.add(const Duration(hours: 1)),
+            ),
+        );
+        h.chat.newChat();
+        await tester.pumpAndSettle();
+        await h.chat.send('fetch');
+        llm.chat!.add(StatusChunk('Waiting on $longWord', ask: id));
+        await tester.pump(const Duration(milliseconds: 100));
+        await tester.pump(const Duration(seconds: 1));
+        expect(h.asks.current, isNotNull);
+        expect(tester.takeException(), isNull);
+        llm.chat!.add(const ChatDone([]));
+        await llm.chat!.close();
+        await tester.pumpAndSettle();
       });
 
       testWidgets('an agent answer fits', (tester) async {

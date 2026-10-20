@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:anywherellm/adapters/toolkit_client.dart';
+import 'package:anywherellm/core/asks.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/schedule.dart';
@@ -354,5 +355,79 @@ void main() {
     final jobs = await toolkit.api().scheduledJobs();
     expect(jobs.single.name, 'Morning brief');
     expect(jobs.single.nextRun, DateTime.utc(2026, 10, 9, 7));
+  });
+
+  group('the requests skills wait on', () {
+    const ask = {
+      'id': '0123456789abcdef0123456789abcdef',
+      'host': 'muse-vm',
+      'origin': 'http://muse-vm:8463',
+      'skill': 'Library',
+      'workspace': 'home',
+      'why': 'Send a request to http://muse-vm:8463',
+      'asked': '2026-10-20T10:00:00Z',
+      'expires': '2026-10-20T10:02:00Z',
+      'decision': null,
+    };
+    const id = '0123456789abcdef0123456789abcdef';
+
+    test('the bridge says it serves them in its /health', () async {
+      final toolkit = _Toolkit()
+        ..routes['/health'] = {..._health, 'asks': true};
+      expect(await toolkit.api().features(), {ToolkitFeature.asks});
+    });
+
+    test(
+      'one is read and decided at the bridge itself, with the key',
+      () async {
+        final toolkit = _Toolkit()
+          ..routes['/asks/$id'] = {
+            'ask': {...ask, 'decision': 'once'},
+          };
+        final api = toolkit.api();
+        final read = await api.ask(id);
+        expect(read.host, 'muse-vm');
+        expect(read.workspace, 'home');
+        expect(toolkit.seen.last.method, 'GET');
+        expect(toolkit.seen.last.headers['Authorization'], 'Bearer SECRET-KEY');
+
+        final decided = await api.decide(id, AskDecision.once);
+        expect(decided.decision, AskDecision.once);
+        expect(toolkit.seen.last.method, 'POST');
+        expect(toolkit.seen.last.url.path, '/asks/$id');
+        expect(jsonDecode(toolkit.seen.last.body), {'decision': 'once'});
+      },
+    );
+
+    test('the hosts always allowed are listed and removed', () async {
+      final toolkit = _Toolkit()
+        ..routes['/allowed'] = {
+          'hosts': [
+            {'host': 'muse-vm', 'added': '2026-10-20T10:01:00Z'},
+            {'host': ''},
+          ],
+        }
+        ..routes['/allowed/muse-vm'] = {'hosts': []};
+      final api = toolkit.api();
+      expect([for (final h in await api.allowedHosts()) h.host], ['muse-vm']);
+      expect(await api.forgetHost('muse-vm'), isEmpty);
+      expect(toolkit.seen.last.method, 'DELETE');
+    });
+
+    test(
+      'a key the bridge does not take for them fails in its words',
+      () async {
+        final toolkit = _Toolkit()
+          ..routes['/asks/$id'] = http.Response(
+            jsonEncode({
+              'error': "only AnywhereLLM's key can answer a request",
+            }),
+            403,
+          );
+        final error = await _failure(toolkit.api().ask(id));
+        expect(error.message, "Only AnywhereLLM's key can answer a request.");
+        expect(error.status, 403);
+      },
+    );
   });
 }

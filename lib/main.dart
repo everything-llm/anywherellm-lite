@@ -31,6 +31,7 @@ import 'ui/share/android_shares.dart';
 import 'ui/share/shared_item.dart';
 import 'ui/settings/settings_pages.dart';
 import 'ui/shell.dart';
+import 'ui/state/ask_controller.dart';
 import 'ui/state/memory_controller.dart';
 import 'ui/state/chat_controller.dart';
 import 'ui/state/files_controller.dart';
@@ -110,6 +111,7 @@ class _SessionHostState extends State<SessionHost> {
   late final SystemController _system;
   late final MemoryController _memory;
   late final ToolkitController _toolkit;
+  late final AskController _asks;
 
   /// Keeps an answer going while the app is out of sight.
   final BackgroundWork _background = AndroidBackground();
@@ -140,6 +142,12 @@ class _SessionHostState extends State<SessionHost> {
     _toolkit = ToolkitController(widget.toolkit, widget.settings);
     _readAloud = ReadAloud(DeviceSpeaker(), _chat, widget.prefs);
     _keepAnswering = KeepAnswering(_background, _chat, widget.shell);
+    _asks = AskController(
+      widget.toolkit,
+      _toolkit,
+      _chat,
+      background: _background,
+    );
     // A deleted chat waiting to be undone is deleted as the app hides: Android can end a hidden
     // app without a word.
     _lifecycle = AppLifecycleListener(
@@ -154,6 +162,7 @@ class _SessionHostState extends State<SessionHost> {
   void dispose() {
     _lifecycle.dispose();
     _readAloud.dispose();
+    _asks.dispose();
     _keepAnswering.dispose();
     _toolkit.dispose();
     _memory.dispose();
@@ -197,6 +206,7 @@ class _SessionHostState extends State<SessionHost> {
         system: _system,
         memory: _memory,
         toolkit: _toolkit,
+        asks: _asks,
         launch: widget.launch,
         save: saveWithPicker,
         scanner: cameraScanner,

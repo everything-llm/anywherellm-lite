@@ -10,6 +10,7 @@ import 'package:anywherellm/ui/chat/photo_picker.dart';
 import 'package:anywherellm/ui/chat/speaker.dart';
 import 'package:anywherellm/ui/share/shared_item.dart';
 import 'package:anywherellm/ui/shell.dart';
+import 'package:anywherellm/ui/state/ask_controller.dart';
 import 'package:anywherellm/ui/state/memory_controller.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
@@ -197,6 +198,15 @@ class Harness extends Rig {
     null => null,
   };
 
+  /// What the toolkit's skills ask while an answer runs, shown out of sight through
+  /// [background] where there is one.
+  late final AskController asks = AskController(
+    toolkitServer,
+    toolkit,
+    chat,
+    background: background,
+  );
+
   late final ReadAloud? readAloud = switch (speaker) {
     final speaker? => ReadAloud(speaker, chat, prefs),
     null => null,
@@ -204,6 +214,7 @@ class Harness extends Rig {
 
   @override
   void dispose() {
+    asks.dispose();
     memory.dispose();
     keepAnswering?.dispose();
     readAloud?.dispose();
@@ -256,6 +267,7 @@ class Harness extends Rig {
       system: system,
       memory: memory,
       toolkit: toolkit,
+      asks: asks,
       appView: appView,
       launch: (url) async {
         opened.add(url);

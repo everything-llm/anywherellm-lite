@@ -77,6 +77,10 @@ class Turn extends ChangeNotifier {
   /// What an agent is doing while the answer runs, such as a tool it runs, or null.
   String? status;
 
+  /// The request the agent waits for the person to decide, as its latest status line named it,
+  /// or null.
+  String? ask;
+
   /// Ends the wait for a [waiting] answer, showing whatever was set on it meanwhile.
   void stopWaiting() {
     waiting = false;
@@ -89,8 +93,9 @@ class Turn extends ChangeNotifier {
     switch (event) {
       case TextChunk(:final text):
         this.text += text;
-      case StatusChunk(:final text):
+      case StatusChunk(:final text, :final ask):
         status = text;
+        this.ask = ask;
       case WholeAnswer(:final text):
         this.text = text;
       case ChatDone(

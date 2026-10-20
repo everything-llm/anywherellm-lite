@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'background_work.dart';
 
 /// [BackgroundWork] over `MainActivity`'s `anywherellm/background` channel: `AnswerService`, a
-/// foreground service, holds the app, and `Notes` draws a ready answer. `MainActivity` hands
+/// foreground service, holds the app, and `Notes` draws a ready answer and a skill's request. `MainActivity` hands
 /// over each notification tapped as `{slug, thread}`: `launchTap` answers the one that started
 /// the activity, once, and `tap` sends one tapped while it runs.
 class AndroidBackground implements BackgroundWork {
@@ -53,6 +53,22 @@ class AndroidBackground implements BackgroundWork {
     'slug': slug,
     'thread': thread,
   });
+
+  @override
+  Future<void> asking({
+    required String title,
+    required String body,
+    required String slug,
+    required String thread,
+  }) => _native.invokeMethod('asking', {
+    'title': title,
+    'body': body,
+    'slug': slug,
+    'thread': thread,
+  });
+
+  @override
+  Future<void> asked() => _native.invokeMethod('asked');
 
   @override
   Future<void> leave() => _native.invokeMethod('leave');

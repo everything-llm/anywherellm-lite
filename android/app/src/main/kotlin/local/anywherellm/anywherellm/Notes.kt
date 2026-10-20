@@ -10,8 +10,9 @@ import android.os.Build
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * The app's notifications: [ongoing], which is [AnswerService]'s, and [ready], the app's own
- * word that an answer is ready. Tapping the second opens [MainActivity] with the chat's slug and
+ * The app's notifications: [ongoing], which is [AnswerService]'s, [ready], the app's own word
+ * that an answer is ready, and [asking], that a skill waits for the person to allow it
+ * something. Tapping either of the last two opens [MainActivity] with the chat's slug and
  * thread, which the Dart side opens.
  */
 object Notes {
@@ -35,7 +36,13 @@ object Notes {
     /** The channel of an answer that is ready. */
     private const val ANSWERS = "answers"
 
+    /** The channel of a skill's request that waits for the person. */
+    private const val APPROVALS = "approvals"
+
     const val ONGOING_ID = 1
+
+    /** The one request [asking] shows at a time, which [asked] takes back. */
+    private const val ASKING_ID = 2
 
     /** The channels made in this process; Android keeps them, so once each is enough. */
     private val made = mutableSetOf<String>()
@@ -69,6 +76,31 @@ object Notes {
             .build()
         // Without the permission Android drops it, as the person asked.
         context.getSystemService(NotificationManager::class.java).notify(id, note)
+    }
+
+    /**
+     * Shows that a skill in chat [thread] of workspace [slug] waits for the person: [title] over
+     * [body], in place of any request shown before.
+     */
+    fun asking(context: Context, title: String, body: String, slug: String, thread: String) {
+        val tap = Intent(context, MainActivity::class.java)
+            .setAction(ACTION_TAP)
+            .putExtra(EXTRA_SLUG, slug)
+            .putExtra(EXTRA_THREAD, thread)
+        val note = builder(
+            context, APPROVALS, "Approvals", high = true, opens = tap, request = ASKING_ID,
+        )
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(Notification.BigTextStyle().bigText(body))
+            .setAutoCancel(true)
+            .build()
+        context.getSystemService(NotificationManager::class.java).notify(ASKING_ID, note)
+    }
+
+    /** Takes back the request [asking] showed. */
+    fun asked(context: Context) {
+        context.getSystemService(NotificationManager::class.java).cancel(ASKING_ID)
     }
 
     /**

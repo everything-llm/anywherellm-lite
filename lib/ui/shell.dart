@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app_scope.dart';
+import 'asks/ask_sheet.dart';
 import 'chat/browser_sheet.dart';
 import 'chat/chat_view.dart';
 import 'chat/cited_sources.dart';
@@ -34,8 +35,9 @@ import 'widgets/window_insets.dart';
 /// The window: the chat, which is the base screen; the chats as a shelf over it, with Settings
 /// at its foot; the workspace's pages or Upcoming over those; Settings, its list or a page, over
 /// them all; and the sheets and popups over the whole window. Esc and Back close the topmost
-/// thing open: the popup, Settings' page, the shelf, the sheet, Upcoming, the workspace's pages a
-/// step at a time; with nothing open Back puts the app out of sight.
+/// thing open: a skill's request, which closing refuses, the popup, Settings' page, the shelf,
+/// the sheet, Upcoming, the workspace's pages a step at a time; with nothing open Back puts the
+/// app out of sight.
 class AppShell extends StatelessWidget {
   const AppShell({super.key});
 
@@ -51,6 +53,8 @@ class AppShell extends StatelessWidget {
     /// What closes the thing on top, or null when nothing is open that Esc or Back closes: in
     /// Settings, a page goes back to its parent first.
     VoidCallback? topClose() {
+      // A skill's request lies over everything; closing it refuses it.
+      if (scope.asks.current != null) return scope.asks.dismiss;
       // The guide and the camera lie over the whole window, a share and the popups too.
       if (shell.guiding) return () => shell.showGuide(null);
       if (shell.scanning) return () => shell.setScanning(false);
@@ -74,7 +78,7 @@ class AppShell extends StatelessWidget {
     }
 
     return ListenableBuilder(
-      listenable: shell,
+      listenable: Listenable.merge([shell, scope.asks]),
       builder: (context, _) {
         final files = shell.pane == Pane.files;
         // The chat is the base screen: it shows unless the workspace's pages, a page of the
@@ -237,6 +241,9 @@ class AppShell extends StatelessWidget {
                             ),
                           ),
                         ),
+                        // A skill's request, over the popups, so it never takes the place of
+                        // the browser sheet the person watches the agent in.
+                        const Positioned.fill(child: AskSheet()),
                       ],
                     ),
                   ),
