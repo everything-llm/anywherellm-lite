@@ -145,18 +145,10 @@ class _KeyCardState extends State<_KeyCard> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _takePairing());
   }
 
-  /// Connects with a pairing code [ShellController.pairWith] left, as with a scanned one, but a
-  /// link can come from any page or message, so one that fails leaves nothing of it in the form:
-  /// a key typed next would otherwise go to the address it named.
+  /// Connects with a pairing code [ShellController.pairWith] left, as with a scanned one.
   void _takePairing() {
     if (!mounted) return;
-    if (_shell.takePairing() case final code?) {
-      unawaited(
-        _scanned(code).then((paired) {
-          if (!paired && mounted) setState(_backToSaved);
-        }),
-      );
-    }
+    if (_shell.takePairing() case final code?) unawaited(_scanned(code));
   }
 
   @override
@@ -169,8 +161,12 @@ class _KeyCardState extends State<_KeyCard> {
     super.dispose();
   }
 
-  Future<void> _save() async =>
-      _saved(await _settings.connect(_url.text, _key.text));
+  /// Saves the typed address and key once they open the server, and closes the form.
+  Future<void> _save() async {
+    if (await _settings.connect(_url.text, _key.text) && mounted) {
+      setState(_backToSaved);
+    }
+  }
 
   /// Tests the saved connection.
   void _test() {
@@ -200,48 +196,29 @@ class _KeyCardState extends State<_KeyCard> {
   /// Why the last scan or try failed, when it did.
   List<String> get _notes => [?_scanProblem, ?_settings.message];
 
-  /// Closes the form on the saved connection, letting go of what was typed or scanned.
+  /// Closes the form on the saved connection, letting go of what was typed.
   void _backToSaved() {
     _replacing = false;
     _url.text = _settings.connection?.baseUrl ?? '';
     _key.clear();
   }
 
-  /// Closes the form once a connection was saved.
-  void _saved(bool saved) {
-    if (mounted && saved) {
-      setState(() {
-        _key.clear();
-        _replacing = false;
-      });
-    }
-  }
-
-  /// Uses a scanned [code] as if its address and key had been typed, and connects with them,
-  /// keeping where the code says its companions run. Over a saved server the form opens, so a
-  /// key the server refuses shows there. Whether it paired.
-  Future<bool> _scanned(String code) async {
+  /// Connects with the address and key a scanned or tapped [code] holds, keeping where it says
+  /// its companions run, and says why when it cannot. Nothing of the code is put in the form,
+  /// which goes back to the saved connection whether it paired or not: a code can come from a
+  /// sticker or any message, and a key typed after a failed one would go to the address it named.
+  Future<void> _scanned(String code) async {
+    _shell.setScanning(false);
     final Pairing pairing;
     try {
       pairing = parsePairingCode(code);
     } on ApiException catch (error) {
-      setState(() {
-        _shell.setScanning(false);
-        _scanProblem = error.message;
-      });
-      return false;
+      setState(() => _scanProblem = error.message);
+      return;
     }
-    setState(() {
-      _shell.setScanning(false);
-      _scanProblem = null;
-      // A key the server refuses then shows in its field, under why.
-      if (_settings.connection != null) _replacing = true;
-      _url.text = pairing.connection.baseUrl;
-      _key.text = pairing.connection.apiKey;
-    });
-    final paired = await _settings.pair(pairing);
-    _saved(paired);
-    return paired;
+    setState(() => _scanProblem = null);
+    await _settings.pair(pairing);
+    if (mounted) setState(_backToSaved);
   }
 
   Future<void> _forget() async {
@@ -353,8 +330,6 @@ class _KeyCardState extends State<_KeyCard> {
           onPressed: () => setState(() {
             _replacing = !_replacing;
             _shell.setScanning(false);
-            // Cancel lets go of what was typed or scanned, so the form opens on the saved
-            // connection next time.
             if (!_replacing) _backToSaved();
           }),
         ),

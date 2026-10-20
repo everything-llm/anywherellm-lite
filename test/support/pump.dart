@@ -367,6 +367,11 @@ Finder typingField([Finder? of]) {
   return of == null ? field : find.descendant(of: of, matching: field);
 }
 
+/// The text fields that hold [text].
+Finder holding(String text) => find.byWidgetPredicate(
+  (w) => w is EditableText && w.controller.text == text,
+);
+
 /// The composer's field, apart from the drawer's search and every other field on screen.
 Finder get composerField => typingField(find.byType(Composer));
 

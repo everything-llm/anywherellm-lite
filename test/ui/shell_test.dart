@@ -621,9 +621,8 @@ void main() {
       expect(inHome('Q3 planning'), findsOneWidget);
     });
 
-    testWidgets('a scanned key the server refuses shows in the key field', (
-      tester,
-    ) async {
+    testWidgets('a scanned code the server refuses says why and leaves nothing '
+        'of it in the form', (tester) async {
       final llm = planningServer()
         ..verifyError = const ApiException(
           'The server did not accept the key.',
@@ -640,7 +639,34 @@ void main() {
       expect(h.store.saved, isNull);
       expect(find.text('The server did not accept the key.'), findsOneWidget);
       expect(control('Connect'), findsOneWidget);
-      expect(find.text('K9'), findsOneWidget);
+      // A key typed next must not go to the address the code named.
+      expect(holding('K9'), findsNothing);
+      expect(holding('https://owen.example.ts.net'), findsNothing);
+    });
+
+    testWidgets('over a saved server, a refused scan gives back the saved '
+        'connection', (tester) async {
+      final llm = planningServer();
+      final h = await pumpApp(tester, llm: llm, canScan: true)
+        ..scanCode =
+            'anywherellm://connect?url=https%3A%2F%2Fowen.example.ts.net&key=K9';
+      h.shell.openSettings(SettingsPage.connection);
+      await tester.pumpAndSettle();
+      await tapVisible(tester, control('Edit connection'));
+      await tester.pumpAndSettle();
+      llm.verifyError = const ApiException(
+        'The server did not accept the key.',
+      );
+      await tapVisible(tester, control('Scan QR code'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Fake scan'));
+      await tester.pumpAndSettle();
+      expect(h.settings.connection, sampleConnection);
+      expect(find.text('The server did not accept the key.'), findsOneWidget);
+      await tapVisible(tester, control('Edit connection'));
+      await tester.pumpAndSettle();
+      expect(holding('K9'), findsNothing);
+      expect(holding(sampleConnection.baseUrl), findsOneWidget);
     });
 
     testWidgets('a code that is not a connection saves nothing', (

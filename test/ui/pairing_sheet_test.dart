@@ -95,11 +95,6 @@ void main() {
     await shares.close();
   });
 
-  /// The text fields that hold [text].
-  Finder holding(String text) => find.byWidgetPredicate(
-    (w) => w is EditableText && w.controller.text == text,
-  );
-
   testWidgets('a link the server refuses says why and leaves nothing of it in '
       'the form', (tester) async {
     final shares = StreamController<SharedItem>();
