@@ -30,6 +30,19 @@ Future<List<int>> _readShared(Future<List<int>> Function() read) async {
   }
 }
 
+/// [_readShared] for a message, which takes [maxAttachmentBytes] at most by the bytes read, since
+/// the size a sharing app claims may be 0 or wrong.
+Future<List<int>> _readWithin(
+  String name,
+  Future<List<int>> Function() read,
+) async {
+  final bytes = await _readShared(read);
+  if (attachmentProblem(name, bytes.length) case final problem?) {
+    throw UnreadableFile(problem);
+  }
+  return bytes;
+}
+
 /// What to do with a shared item.
 enum _Use { add, ask }
 
@@ -121,6 +134,8 @@ class _ShareSheetState extends State<ShareSheet> {
                 UploadFile(name: name, read: () => _readShared(read)),
               ]);
           }
+          // The sheet was put away, or another share shown, while the upload ran.
+          if (!mounted) return;
           shell
             ..closeShared()
             ..openSources();
@@ -133,9 +148,11 @@ class _ShareSheetState extends State<ShareSheet> {
             ),
             SharedFile(:final name, :final read) => (
               '',
-              [Attachment.of(name, bytesOf(await _readShared(read)))],
+              [Attachment.of(name, bytesOf(await _readWithin(name, read)))],
             ),
           };
+          // The sheet was put away while the file was read.
+          if (!mounted) return;
           chat.newChat();
           shell.closeShared();
           chat.putInComposer(message, attachments);

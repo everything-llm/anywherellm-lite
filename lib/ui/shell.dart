@@ -242,8 +242,10 @@ class AppShell extends StatelessWidget {
                             ),
                           ),
                         ),
-                        // A skill's request, over the popups, so it never takes the place of
-                        // the browser sheet the person watches the agent in.
+                        // A skill's request, drawn in the window's overlay with the popups
+                        // that lie over this stack, so it shows over one already open and
+                        // never takes the place of the browser sheet the person watches the
+                        // agent in.
                         const Positioned.fill(child: AskSheet()),
                       ],
                     ),

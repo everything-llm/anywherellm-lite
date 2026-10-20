@@ -3,6 +3,7 @@ import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/core/toolkit.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
+import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -81,6 +82,29 @@ void main() {
     await tester.tap(control('Allow once'));
     await tester.pump(const Duration(milliseconds: 300));
     expect(toolkit.calls, contains('decide:$_id=once'));
+    expect(find.text('Allow this?'), findsNothing);
+    await _end(tester, llm);
+  });
+
+  testWidgets('a request lies over a popup already open', (
+    tester,
+  ) async {
+    final toolkit = _asking();
+    final llm = planningServer()..hold = true;
+    final h = await pumpApp(tester, llm: llm, toolkitServer: toolkit);
+    await typeAndEnter(tester, 'Fetch the ntfy health page');
+    h.shell.togglePopup(Popup.attach);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Add to your message'), findsOneWidget);
+    llm.chat!.add(const StatusChunk('Waiting for your approval', ask: _id));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('Allow this?'), findsOneWidget);
+    // Hit-testable: Deny sits on top of the popup, not under it.
+    expect(find.text('Deny').hitTestable(), findsOneWidget);
+    await tester.tap(find.text('Deny'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(toolkit.calls, contains('decide:$_id=deny'));
     expect(find.text('Allow this?'), findsNothing);
     await _end(tester, llm);
   });

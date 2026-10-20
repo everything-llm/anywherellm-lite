@@ -74,6 +74,12 @@ class _ActivityPageState extends State<ActivityPage> {
         final event = toolkit.activity
             ?.where((e) => e.key == open?.key)
             .firstOrNull;
+        // An event gone from a read leaves no sheet to close, so the popup goes too.
+        if (open != null && event == null && toolkit.activity != null) {
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => shell.closePopup(open),
+          );
+        }
         return PopupSheet(
           open: event != null,
           onClose: shell.closePopup,

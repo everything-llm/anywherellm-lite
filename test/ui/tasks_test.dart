@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/core/toolkit.dart';
@@ -60,6 +62,17 @@ String _daily(int hour, int minute) {
   final now = DateTime.now();
   final utc = DateTime(now.year, now.month, now.day, hour, minute).toUtc();
   return '${utc.minute} ${utc.hour} * * *';
+}
+
+/// A toolkit whose delete waits for [gate].
+class _SlowDelete extends FakeToolkit {
+  final gate = Completer<void>();
+
+  @override
+  Future<void> deleteJob(String id) async {
+    await gate.future;
+    await super.deleteJob(id);
+  }
 }
 
 void main() {
@@ -197,6 +210,68 @@ void main() {
     await tester.tap(find.text('Run now'));
     await tester.pump();
     await tester.pump();
+    expect(find.text('Running…'), findsWidgets);
+    // It ends on the toolkit, and the sheet finds out on its next read.
+    toolkit.runRecords['1'] = [
+      JobRun(startedAt: DateTime.now().toUtc(), status: 'completed'),
+    ];
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+    expect(find.text('Run now'), findsOneWidget);
+  });
+
+  testWidgets('a task deleted from another place closes its sheet', (
+    tester,
+  ) async {
+    final toolkit = _writable();
+    final h = await _open(tester, toolkit);
+    await tester.tap(find.text('Morning brief'));
+    await tester.pumpAndSettle();
+    expect(h.shell.popup.value, isA<TaskSheet>());
+    toolkit.jobs = [toolkit.jobs.last];
+    await h.toolkit.readJobs(again: true);
+    await tester.pumpAndSettle();
+    expect(h.shell.popup.value, isNull);
+  });
+
+  testWidgets('a delete that ends after another popup opened leaves it open', (
+    tester,
+  ) async {
+    final toolkit = _SlowDelete()
+      ..served = {
+        ToolkitFeature.memories,
+        ToolkitFeature.jobs,
+        ToolkitFeature.jobsWrite,
+      }
+      ..jobs = _writable().jobs;
+    final h = await _open(tester, toolkit);
+    await tester.tap(find.text('Morning brief'));
+    await tester.pumpAndSettle();
+    await tester.tap(control('Delete task'));
+    await tester.pumpAndSettle();
+    await tester.tap(control('Delete'));
+    await tester.pump();
+    h.shell.togglePopup(Popup.workspaces);
+    toolkit.gate.complete();
+    await tester.pumpAndSettle();
+    expect(toolkit.calls, contains('deleteJob:1'));
+    expect(h.shell.popup.value, Popup.workspaces);
+  });
+
+  testWidgets('a run still going is followed again after Edit and Cancel', (
+    tester,
+  ) async {
+    final toolkit = _writable()..runStatus = 'running';
+    await _open(tester, toolkit);
+    await tester.tap(find.text('Morning brief'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Run now'));
+    await tester.pump();
+    await tester.pump();
+    await tester.tap(control('Edit'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(control('Cancel'));
+    await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Running…'), findsWidgets);
     // It ends on the toolkit, and the sheet finds out on its next read.
     toolkit.runRecords['1'] = [

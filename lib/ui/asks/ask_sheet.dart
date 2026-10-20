@@ -25,12 +25,19 @@ class AskSheet extends StatelessWidget {
       listenable: asks,
       builder: (context, _) {
         final shown = asks.current.value;
-        if (shown == null) return const SizedBox.shrink();
-        return ModalSheet(
-          key: ObjectKey(shown),
-          title: 'Allow this?',
-          onClose: asks.dismiss,
-          child: _AskBody(shown),
+        // In the window's overlay, where every popup lies, so a request that comes while one
+        // is open shows over it.
+        return OverlayWhile(
+          open: shown != null,
+          overlay: (context) => shown == null
+              ? const SizedBox.shrink()
+              : ModalSheet(
+                  key: ObjectKey(shown),
+                  title: 'Allow this?',
+                  onClose: asks.dismiss,
+                  child: _AskBody(shown),
+                ),
+          child: const SizedBox.shrink(),
         );
       },
     );

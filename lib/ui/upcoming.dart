@@ -54,6 +54,15 @@ class UpcomingPage extends StatelessWidget {
           _ => null,
         };
         final job = jobById(toolkit.jobs, open?.id);
+        // A task gone from a read leaves no sheet to close, so the popup goes too.
+        if (open != null &&
+            open.id != null &&
+            job == null &&
+            toolkit.jobs != null) {
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => shell.closePopup(open),
+          );
+        }
         return PopupSheet(
           open: open != null && (open.id == null || job != null),
           onClose: shell.closePopup,

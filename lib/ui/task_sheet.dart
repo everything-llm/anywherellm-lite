@@ -53,19 +53,41 @@ class TaskDetail extends StatefulWidget {
 class _TaskDetailState extends State<TaskDetail> {
   bool _asking = false;
   late final _toolkit = AppScope.of(context).toolkit;
+  Timer? _following;
 
   @override
   void initState() {
     super.initState();
-    final toolkit = _toolkit;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(toolkit.readRuns(widget.id));
+      if (mounted) unawaited(_follow(40));
     });
+  }
+
+  /// Reads the runs, and again in 3 seconds while the latest is still going, up to [tries]
+  /// reads, so a run that began before this sheet opened, or while the form over it was open,
+  /// is followed to its end; the jobs are read again once it ends. [ToolkitController.runNow]
+  /// follows the run it starts itself.
+  Future<void> _follow(int tries) async {
+    final toolkit = _toolkit;
+    await toolkit.readRuns(widget.id);
+    if (!mounted) return;
+    if (toolkit.runs[widget.id]?.firstOrNull?.running ?? false) {
+      if (tries > 1) {
+        _following = Timer(
+          const Duration(seconds: 3),
+          () => unawaited(_follow(tries - 1)),
+        );
+      }
+    } else if (tries < 40) {
+      // It ended: its last run and next time have changed.
+      await toolkit.readJobs(again: true);
+    }
   }
 
   @override
   void dispose() {
     // A run's progress shows only here.
+    _following?.cancel();
     _toolkit.stopFollowing();
     super.dispose();
   }
@@ -157,8 +179,11 @@ class _TaskDetailState extends State<TaskDetail> {
                   onConfirm: toolkit.busy
                       ? null
                       : () async {
-                          if (await toolkit.removeJob(widget.id)) {
-                            shell.closePopup();
+                          // Only this sheet closes, not a popup opened while it waited.
+                          final sheet = shell.popup.value;
+                          if (await toolkit.removeJob(widget.id) &&
+                              sheet != null) {
+                            shell.closePopup(sheet);
                           }
                         },
                 )
@@ -269,11 +294,13 @@ class _TaskFormState extends State<TaskForm> {
         : _spec.problem();
     setState(() => _problem = problem);
     if (problem != null || cron == null) return;
+    // Only this sheet closes, not a popup opened while it saved.
+    final sheet = scope.shell.popup.value;
     final done = await scope.toolkit.saveJob(
       existing,
       JobDraft(name: name, prompt: prompt, cron: cron),
     );
-    if (done && mounted) scope.shell.closePopup();
+    if (done && sheet != null) scope.shell.closePopup(sheet);
   }
 
   void _cancel() {
