@@ -42,7 +42,7 @@ class UpcomingPage extends StatelessWidget {
               ? IconBtn.header(
                   'plus',
                   tooltip: 'New task',
-                  onPressed: () => shell.togglePopup(const TaskSheet()),
+                  onPressed: () => openTask(scope, const TaskSheet()),
                 )
               : null,
           body: _body(context, toolkit),
@@ -110,7 +110,7 @@ class UpcomingPage extends StatelessWidget {
                 job,
                 now: now,
                 onTap: writable && job.id != null
-                    ? () => scope.shell.togglePopup(TaskSheet(id: job.id))
+                    ? () => openTask(scope, TaskSheet(id: job.id))
                     : null,
               ),
           ]),
@@ -199,7 +199,7 @@ class _NoTasks extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final shell = AppScope.of(context).shell;
+    final scope = AppScope.of(context);
     return Padding(
       padding: const EdgeInsets.only(top: 32),
       child: Column(
@@ -239,11 +239,18 @@ class _NoTasks extends StatelessWidget {
               'New task',
               primary: true,
               leading: 'plus',
-              onPressed: () => shell.togglePopup(const TaskSheet()),
+              onPressed: () => openTask(scope, const TaskSheet()),
             ),
           ],
         ],
       ),
     );
   }
+}
+
+/// Opens [sheet] over Upcoming, taking away why an earlier change failed, which belonged to the
+/// task it was about.
+void openTask(AppScope scope, TaskSheet sheet) {
+  scope.toolkit.clearChangeProblem();
+  scope.shell.togglePopup(sheet);
 }

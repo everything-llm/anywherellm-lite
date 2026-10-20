@@ -337,6 +337,29 @@ void main() {
     expect(find.byType(TaskDetail), findsOneWidget);
   });
 
+  testWidgets('why a change failed goes once another task sheet opens', (
+    tester,
+  ) async {
+    final toolkit = _writable()
+      ..errors['deleteJob'] = const ApiException(
+        'The toolkit would not delete it.',
+      );
+    final h = await _open(tester, toolkit);
+    await tester.tap(find.text('Morning brief'));
+    await tester.pumpAndSettle();
+    await tester.tap(control('Delete task'));
+    await tester.pumpAndSettle();
+    await tester.tap(control('Delete'));
+    await tester.pumpAndSettle();
+    expect(find.text('Could not delete the task'), findsWidgets);
+    h.shell.closePopup();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Morning brief'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TaskDetail), findsOneWidget);
+    expect(find.text('Could not delete the task'), findsNothing);
+  });
+
   testWidgets('Edit opens the task as a form and saves it', (tester) async {
     final toolkit = _writable();
     await _open(tester, toolkit);
