@@ -124,6 +124,7 @@ void main() {
     await tester.tap(control('Remove'));
     await tester.pumpAndSettle();
     expect(toolkit.calls, contains('forgetOrigin:http://muse-vm:8463'));
+    expect(toolkit.calls.where((c) => c == 'allowedOrigins'), hasLength(1));
     expect(find.text('http://muse-vm:8463'), findsNothing);
     expect(find.textContaining('None yet.'), findsOneWidget);
   });
@@ -208,7 +209,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       final thread = h.chat.activeThread;
       expect(background.asks, [
-        'Approval needed in Q3 planning: Library asks to reach muse-vm. @ q3/$thread',
+        'Approval needed in Q3 planning: Library asks to reach http://muse-vm:8463. @ q3/$thread',
       ]);
 
       tester.binding

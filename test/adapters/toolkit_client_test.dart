@@ -413,7 +413,8 @@ void main() {
         [for (final o in await api.allowedOrigins()) o.origin],
         ['http://muse-vm:8463'],
       );
-      await api.forgetOrigin('http://muse-vm:8463');
+      toolkit.routes['/allowed'] = {'origins': <Object>[]};
+      expect(await api.forgetOrigin('http://muse-vm:8463'), isEmpty);
       expect(toolkit.seen.last.method, 'DELETE');
       expect(toolkit.seen.last.url.path, '/allowed');
       expect(toolkit.seen.last.url.queryParameters, {

@@ -211,8 +211,8 @@ abstract interface class ToolkitApi implements CompanionApi {
   /// The addresses skills may always reach.
   Future<List<AllowedOrigin>> allowedOrigins();
 
-  /// Stops always allowing [origin].
-  Future<void> forgetOrigin(String origin);
+  /// Stops always allowing [origin]; the addresses still allowed.
+  Future<List<AllowedOrigin>> forgetOrigin(String origin);
 }
 
 /// Where the connection is kept between runs.

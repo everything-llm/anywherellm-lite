@@ -123,6 +123,7 @@ class NavRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    final ink = accent ? t.accent : t.ink;
     return Tappable(
       label: heard ?? [title, ?about].join(', '),
       selected: selected,
@@ -144,12 +145,8 @@ class NavRow extends StatelessWidget {
                   Text(
                     title,
                     style: mono
-                        ? Type.mono(15, color: accent ? t.accent : t.ink)
-                        : Type.sans(
-                            17,
-                            weight: FontWeight.w500,
-                            color: accent ? t.accent : t.ink,
-                          ),
+                        ? Type.mono(14, color: ink)
+                        : Type.sans(17, weight: FontWeight.w500, color: ink),
                   ),
                   if (about case final about? when about.isNotEmpty)
                     Text(

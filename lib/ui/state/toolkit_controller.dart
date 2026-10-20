@@ -249,12 +249,18 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   Future<bool> removeJob(String id) =>
       _change('Could not delete the task', () => _api.deleteJob(id));
 
-  /// Stops always allowing [origin], then reads the allowed addresses again.
-  Future<void> forgetOrigin(String origin) => _change(
-    'Could not remove $origin',
-    () => _api.forgetOrigin(origin),
-    readAgain: () => readAllowed(again: true),
-  );
+  /// Stops always allowing [origin], and shows the addresses the bridge says are still allowed.
+  Future<void> forgetOrigin(String origin) {
+    List<AllowedOrigin>? left;
+    return _change(
+      'Could not remove $origin',
+      () async => left = await _api.forgetOrigin(origin),
+      readAgain: () async {
+        if (left case final left?) _allowed.value = left;
+        notifyListeners();
+      },
+    );
+  }
 
   /// Starts one run of job [id] now, then reads its runs, again every few seconds while it
   /// goes. Whether it started.

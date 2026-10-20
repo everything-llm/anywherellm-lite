@@ -49,11 +49,13 @@ class Ask {
     if (json is! Map) return null;
     final id = textOrNull(json['id']);
     final host = textOrNull(json['host']);
+    final origin = textOrNull(json['origin']);
     final workspace = textOrNull(json['workspace']);
     final expires = timeOrNull(json['expires']);
     if (id == null ||
         !_askId.hasMatch(id) ||
         host == null ||
+        origin == null ||
         workspace == null ||
         expires == null) {
       return null;
@@ -61,7 +63,7 @@ class Ask {
     return Ask(
       id: id,
       host: host,
-      origin: textOrNull(json['origin']) ?? host,
+      origin: origin,
       skill: textOrNull(json['skill']) ?? 'A skill',
       workspace: workspace,
       why: textOrNull(json['why']) ?? '',

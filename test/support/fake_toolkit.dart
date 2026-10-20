@@ -327,7 +327,7 @@ class FakeToolkit with FakeCompanion implements ToolkitApi {
       run('allowedOrigins', () => allowed);
 
   @override
-  Future<void> forgetOrigin(String origin) => run(
+  Future<List<AllowedOrigin>> forgetOrigin(String origin) => run(
     'forgetOrigin',
     () => allowed = [
       for (final a in allowed)

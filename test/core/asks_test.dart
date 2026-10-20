@@ -34,8 +34,8 @@ void main() {
     );
   });
 
-  test('a request without its id, host, workspace or end is none', () {
-    for (final key in ['id', 'host', 'workspace', 'expires']) {
+  test('a request without its id, host, origin, workspace or end is none', () {
+    for (final key in ['id', 'host', 'origin', 'workspace', 'expires']) {
       expect(
         askOf({
           'ask': {..._ask, key: null},

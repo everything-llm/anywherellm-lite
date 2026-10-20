@@ -175,8 +175,10 @@ class HttpToolkitApi implements ToolkitApi {
 
   // An origin holds slashes, so it goes in the query, not the path.
   @override
-  Future<void> forgetOrigin(String origin) =>
-      _json('DELETE', ['allowed'], query: {'origin': origin});
+  Future<List<AllowedOrigin>> forgetOrigin(String origin) async =>
+      allowedOriginsOf(
+        await _json('DELETE', ['allowed'], query: {'origin': origin}),
+      );
 
   /// The decoded JSON of a [method] to AnythingLLM's [path] through the bridge. AnythingLLM
   /// refuses some calls with `success: false` at HTTP 200, which fails in its words, or else

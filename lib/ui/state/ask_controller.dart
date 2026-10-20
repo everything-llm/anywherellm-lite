@@ -199,7 +199,7 @@ class AskController extends ChangeNotifier {
     unawaited(
       keep.work.asking(
         title: 'Approval needed in ${workspace ?? 'AnythingLLM'}',
-        body: '${ask.skill} asks to reach ${ask.host}.',
+        body: '${ask.skill} asks to reach ${ask.origin}.',
         slug: want.slug,
         thread: want.thread,
       ),
