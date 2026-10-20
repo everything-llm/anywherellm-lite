@@ -1,10 +1,16 @@
 import 'chat.dart';
 
 /// Whether [link] is the page `/<folder>/<token>.html` of an agent skill that publishes into
-/// AnythingLLM's web folder, which AnythingLLM serves without a sign-in, on [server]'s host as an
-/// answer's image may be ([loadableImage]).
+/// AnythingLLM's web folder, which AnythingLLM serves without a sign-in, on [server]'s own origin:
+/// its scheme, host and port, not only its host as an answer's image may be ([loadableImage]),
+/// since another port or scheme on that host is another service. A path from the root is for the
+/// caller to resolve first ([onServer]).
 bool isSkillPage(Uri link, Uri? server, String folder) =>
-    loadableImage(link, server) && _page.firstMatch(link.path)?[1] == folder;
+    server != null &&
+    link.scheme == server.scheme &&
+    link.port == server.port &&
+    loadableImage(link, server) &&
+    _page.firstMatch(link.path)?[1] == folder;
 
 /// A page's path, `/<folder>/<token>.html`, with the folder in its one group.
 final _page = RegExp(r'^/([^/]+)/[A-Za-z0-9_-]+\.html$');

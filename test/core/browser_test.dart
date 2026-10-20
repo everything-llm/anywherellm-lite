@@ -1,3 +1,4 @@
+import 'package:anywherellm/core/apps_lean.dart';
 import 'package:anywherellm/core/browser.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -47,6 +48,48 @@ void main() {
       );
     },
   );
+
+  test('never the server\'s host on another scheme or port', () {
+    final named = Uri.parse('https://nas.ts.net');
+    for (final link in [
+      'http://nas.ts.net:8080/vault-lean/x.html',
+      'http://nas.ts.net/vault-lean/x.html',
+      'https://nas.ts.net:8443/vault-lean/x.html',
+    ]) {
+      final url = Uri.parse(link);
+      expect(isVaultPage(url, named), isFalse, reason: link);
+      expect(
+        isBrowserTab(Uri.parse(link.replaceAll('vault', 'browser')), named),
+        isFalse,
+        reason: link,
+      );
+      expect(
+        isLibraryPage(Uri.parse(link.replaceAll('vault', 'library')), named),
+        isFalse,
+        reason: link,
+      );
+      expect(
+        isAppsLeanPage(Uri.parse(link.replaceAll('vault', 'apps')), named),
+        isFalse,
+        reason: link,
+      );
+    }
+    expect(
+      isVaultPage(Uri.parse('https://nas.ts.net:443/vault-lean/x.html'), named),
+      isTrue,
+    );
+    expect(
+      isVaultPage(Uri.parse('https://nas.ts.net/vault-lean/x.html'), named),
+      isTrue,
+    );
+    expect(
+      isVaultPage(
+        Uri.parse('https://nas.ts.net:3001/vault-lean/x.html'),
+        Uri.parse('https://nas.ts.net:3001'),
+      ),
+      isTrue,
+    );
+  });
 
   test('the Vault is its page on the server\'s host', () {
     bool vault(String link) => isVaultPage(Uri.parse(link), server);
