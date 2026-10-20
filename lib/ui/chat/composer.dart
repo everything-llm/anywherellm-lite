@@ -131,6 +131,7 @@ class ComposerState extends State<Composer> {
         : '$draft ';
     final go = ++_go;
     _dictated = draft;
+    var heard = false;
     setState(() {
       _listening = true;
       _micProblem = null;
@@ -138,6 +139,7 @@ class ComposerState extends State<Composer> {
     final started = await dictation.start(
       onWords: (words) {
         if (go != _go) return;
+        if (words.trim().isNotEmpty) heard = true;
         _setDraft(_dictated = '$_before$words');
       },
       onDone: (how) {
@@ -145,7 +147,9 @@ class ComposerState extends State<Composer> {
         if (!mounted || go != _go) return;
         setState(() => _listening = false);
         final send = _scope.prefs.prefs.isOn(ChatSwitch.sendDictation);
+        // A pause that heard nothing leaves what was typed to the person, not to a send.
         if (how == DictationEnd.paused &&
+            heard &&
             send &&
             canSend(_scope.chat, widget.draft.text)) {
           _send(widget.draft.text);
@@ -826,7 +830,7 @@ class _Form extends StatelessWidget {
                       'mic',
                       tooltip: listening ? 'Stop dictating' : 'Dictate',
                       active: listening,
-                      onPressed: chat.busy ? null : onDictate,
+                      onPressed: chat.busy && !listening ? null : onDictate,
                       box: 48,
                       size: IconSize.small,
                     ),

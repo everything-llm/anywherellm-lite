@@ -67,6 +67,24 @@ void main() {
     expect(composerText(tester), isEmpty);
   });
 
+  testWidgets('with send dictation on, a pause that heard nothing sends '
+      'nothing, so typed text stays', (tester) async {
+    final llm = planningServer();
+    final h = await pumpApp(
+      tester,
+      llm: llm,
+      canDictate: true,
+      prefsStore: withSwitch(ChatSwitch.sendDictation, true),
+    );
+    await tester.enterText(composerField, 'Typed before');
+    await tester.tap(control('Dictate'));
+    await tester.pump();
+    h.dictation!.finish();
+    await tester.pumpAndSettle();
+    expect(llm.calls, isNot(contains(startsWith('streamChat:'))));
+    expect(composerText(tester), 'Typed before');
+  });
+
   testWidgets('stopping dictation by hand leaves the message to send', (
     tester,
   ) async {
