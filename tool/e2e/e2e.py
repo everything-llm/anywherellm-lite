@@ -11,7 +11,7 @@ it, runs `contract.dart` against the server and walks `steps.toml` on the emulat
 app, paired by its link. A failed phone step leaves its screenshot, the screen's dump and the
 log in `build/e2e/`.
 
-The bridge has no public repository, so the checkout is `--bridge`, else `$ANYWHERELLM_BRIDGE`.
+The checkout of github.com/BinaryBand/anywherellm-bridge is `--bridge`, else `$ANYWHERELLM_BRIDGE`.
 
     uv run tool/e2e/e2e.py --bridge ~/bridge                    # the contract, then the phone
     uv run tool/e2e/e2e.py --bridge ~/bridge --only contract    # the adapters alone, no emulator
@@ -72,7 +72,7 @@ def bridge_of(args: argparse.Namespace) -> Path:
     """The bridge checkout to run, from --bridge or $ANYWHERELLM_BRIDGE."""
     given = args.bridge or os.environ.get("ANYWHERELLM_BRIDGE")
     if not given:
-        sys.exit("e2e.py: pass --bridge PATH (or set ANYWHERELLM_BRIDGE): anywherellm-bridge has no public repository to fetch")
+        sys.exit("e2e.py: pass --bridge PATH (or set ANYWHERELLM_BRIDGE): clone github.com/BinaryBand/anywherellm-bridge and point at it")
     bridge = Path(given).expanduser().resolve()
     if not os.access(bridge / "tools/e2e", os.X_OK):
         sys.exit(f"e2e.py: no anywherellm-bridge checkout at {bridge}")
