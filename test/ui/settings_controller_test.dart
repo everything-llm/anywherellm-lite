@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:anywherellm/core/toolkit.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
@@ -165,6 +167,51 @@ void main() {
       );
       expect(settings.addressOf(toolkitCompanion), toolkit);
       expect(store.savedCompanions, {toolkitCompanion.code: toolkit});
+    });
+  });
+
+  group('a test that comes back late', () {
+    const other = Connection(baseUrl: 'https://other:3001', apiKey: 'K2');
+
+    test('says nothing once the saved connection is forgotten', () async {
+      store.saved = _saved;
+      await settings.load();
+      final gate = llm.gates['verify'] = Completer<void>();
+      final testing = settings.testSaved();
+      await pumpEventQueue();
+      await settings.clear();
+      gate.complete();
+      await testing;
+      expect(settings.check, ConnectionCheck.idle);
+      expect(settings.message, 'The saved key was deleted.');
+    });
+
+    test('says nothing once another server is paired', () async {
+      store.saved = _saved;
+      await settings.load();
+      final gate = llm.gates['verify'] = Completer<void>();
+      final testing = settings.testSaved();
+      await pumpEventQueue();
+      llm.gates.remove('verify');
+      await settings.pair(Pairing(other, const {}));
+      gate.complete();
+      await testing;
+      expect(settings.connection, other);
+      expect(settings.check, ConnectionCheck.idle);
+      expect(settings.message, isNot(contains('Connected to h')));
+    });
+
+    test('does not let an older test speak after a newer one', () async {
+      final slow = llm.gates['verify'] = Completer<void>();
+      final first = settings.test('https://h:3001', 'K1');
+      await pumpEventQueue();
+      llm.gates.remove('verify');
+      await settings.test('https://h:3001', 'K1');
+      llm.verifyError = const ApiException('The server rejected the key.');
+      slow.complete();
+      await first;
+      expect(settings.check, ConnectionCheck.ok);
+      expect(settings.message, 'Connected to h.');
     });
   });
 }

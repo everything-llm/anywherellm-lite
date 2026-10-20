@@ -46,6 +46,22 @@ void main() {
       expect(llm.spaces.first.prompt, isNull);
     });
 
+    test(
+      'settings the server did not send are a problem, not a crash',
+      () async {
+        final llm = planningServer()..noSettings.add('q3');
+        final rig = await started(llm);
+        await rig.files.ensureLoaded();
+        await rig.files.openSection(FilesSection.answers);
+        expect(await rig.files.save('{}'), isFalse);
+        expect(rig.files.problems.single.text, contains('settings'));
+        expect(
+          llm.calls.where((c) => c.startsWith('updateWorkspace')),
+          isEmpty,
+        );
+      },
+    );
+
     test('settings write only what changed', () async {
       final llm = planningServer();
       final rig = await started(llm);

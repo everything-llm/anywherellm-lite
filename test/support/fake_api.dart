@@ -61,6 +61,9 @@ class FakeAnythingLlm implements AnythingLlmApi {
   int nextChatId = 100;
 
   List<FakeWorkspace> spaces = [];
+
+  /// The workspaces whose read leaves out their settings, as a server may.
+  final Set<String> noSettings = {};
   final Map<String, List<ChatMessage>> histories = {};
 
   /// Adds [question] and its [answer] to [thread]'s history as exchange [chatId], as the server
@@ -152,6 +155,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
   @override
   Future<void> verify(Connection connection) async {
     verified.add(connection);
+    await gates['verify']?.future;
     if (verifyError != null) throw verifyError!;
   }
 
@@ -172,7 +176,9 @@ class FakeAnythingLlm implements AnythingLlmApi {
       name: w.name,
       documents: [...w.docs],
       prompt: w.prompt,
-      settings: WorkspaceSettings({...w.settings}),
+      settings: noSettings.contains(slug)
+          ? null
+          : WorkspaceSettings({...w.settings}),
     );
   }, slug);
 
