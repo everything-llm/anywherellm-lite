@@ -55,7 +55,7 @@ For each browser probe also note: when the browser first showed in the chat; wha
 
 | Site | Task | How |
 | --- | --- | --- |
-| Muse | Main chat | Muse opens on the person's main chat, which holds personal content. Click "New side chat" before any page text or screenshot, and read nothing from the main chat or the Activity list's earlier items. |
+| Muse | Main chat | Muse opens on the person's main chat, which holds personal content. Open a fresh draft at `https://muse.ai/thread/new` or click "New side chat" before any page text or screenshot, and read nothing from the main chat or the Activity list's earlier items. Open a chat by its URL: a click on a list row can land on another chat when the list shifts. |
 | Muse | New side chat | The "New side chat" button, located by name. The message box is near the bottom centre; click, type, press Enter. |
 | Muse | Slow loads | Skeletons show for 10-15 s after a navigation. Wait. |
 | Muse | Reading replies | Page text or `document.querySelector('main').innerText`. The Activity list gives each task's outcome and time. |
