@@ -75,6 +75,13 @@ void main() {
         '127.1',
         '+10.0.0.1',
         '10.0.0.256',
+        'fc::1',
+        'fd0::1',
+        'fe8::1',
+        'fea::1',
+        '[fd0::1]',
+        '.',
+        '',
       ]) {
         expect(isPrivateHost(public), isFalse, reason: public);
       }
@@ -86,6 +93,10 @@ void main() {
         'nas',
         'nas.local',
         'fd00::1',
+        'fc00::1',
+        'fe80::1',
+        'febf::1',
+        '[fd12:3456::1]',
       ]) {
         expect(isPrivateHost(home), isTrue, reason: home);
       }

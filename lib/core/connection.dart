@@ -166,18 +166,19 @@ bool keySafe(Uri uri) =>
 
 final _trailingDot = RegExp(r'\.$');
 final _v6Brackets = RegExp(r'^\[|\]$');
-final _v6UniqueLocal = RegExp(r'^f[cd][0-9a-f]{0,2}:');
-final _v6LinkLocal = RegExp(r'^fe[89ab][0-9a-f]?:');
+final _v6UniqueLocal = RegExp(r'^f[cd][0-9a-f]{2}:');
+final _v6LinkLocal = RegExp(r'^fe[89ab][0-9a-f]:');
 
 /// Whether [host] is on a private network: this device, a home network or Tailscale. That is
 /// `localhost`, a name with no dot (a home network's, such as `nas`), a name under `.local`,
 /// `.lan`, `.home.arpa` or `.ts.net`, an IPv4 address in `127/8`, `10/8`, `172.16/12`,
 /// `192.168/16`, `169.254/16` or `100.64/10` (Tailscale's), or an IPv6 address that is `::1`,
-/// unique-local (`fc00::/7`) or link-local (`fe80::/10`). An IPv4 address counts only as four
+/// unique-local (`fc00::/7`) or link-local (`fe80::/10`), whose first group is written in full. An IPv4 address counts only as four
 /// plain decimal parts: a name a resolver may read as another address, such as `134744072`,
 /// `010.0.0.1` or `10.1`, is not private.
 bool isPrivateHost(String host) {
   final name = host.toLowerCase().replaceFirst(_trailingDot, '');
+  if (name.isEmpty) return false;
   if (isLoopback(name)) return true;
   if (name.contains(':')) {
     final v6 = name.replaceAll(_v6Brackets, '');
