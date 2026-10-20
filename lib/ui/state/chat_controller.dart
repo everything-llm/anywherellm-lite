@@ -445,6 +445,7 @@ class ChatController extends ChangeNotifier {
     _threads.clear();
     _turns.clear();
     _newest.clear();
+    _madeAt.clear();
     _clearing.clear();
     _ready.clear();
     _draft = [];
@@ -470,16 +471,29 @@ class ChatController extends ChangeNotifier {
     loading = true;
     notifyListeners();
     var failed = true;
+    final asked = _made;
     await _try(_readFailed, () async {
       final read = await _api.workspaces();
       if (_server != server) return;
       failed = false;
       workspaces = read;
+      final before = {..._threads};
       _threads
         ..clear()
         ..addAll({
           for (final w in workspaces) w.slug: [...w.threads],
         });
+      // A chat made, or answering, while the read was away may be missing from it.
+      for (final MapEntry(key: slug, value: list) in before.entries) {
+        if (_threads[slug] case final now?) {
+          for (final t in list) {
+            if (now.any((n) => n.slug == t.slug)) continue;
+            if (isAnswering(t.slug) || (_madeAt[t.slug] ?? 0) > asked) {
+              now.add(t);
+            }
+          }
+        }
+      }
       // A chat deleted in the list but not yet on the server is still in the server's list.
       if (_deleted.value case final deleted?
           when _threads.containsKey(deleted.slug)) {
@@ -509,6 +523,11 @@ class ChatController extends ChangeNotifier {
     }
     unawaited(_countDocs());
   }
+
+  /// How many chats this controller has made on the server, and by chat when each was made, so a
+  /// [load] that began earlier does not forget one.
+  int _made = 0;
+  final _madeAt = <String, int>{};
 
   /// The chat a tapped notification asked for before the workspaces were read, which [load]
   /// opens in place of the last chat.
@@ -610,9 +629,16 @@ class ChatController extends ChangeNotifier {
       return;
     }
     final server = _server;
+    final shown = known;
+    final newest = _newest[threadSlug];
     await _try('Could not read the chat', () async {
       final history = await _api.history(slug, threadSlug);
       if (_server != server) return;
+      // A message sent or an answer settled while the read was away says more than it does.
+      if (!identical(_turns[threadSlug], shown) ||
+          _newest[threadSlug] != newest) {
+        return;
+      }
       _learnFrom(threadSlug, history.map((m) => m.chatId));
       if (isAnswering(threadSlug)) return;
       // An answer the server is still writing is saved only once it ends; until then the chat
@@ -706,6 +732,8 @@ class ChatController extends ChangeNotifier {
     await _try('Could not delete the workspace', () async {
       await _api.deleteWorkspace(slug);
       if (_server != server) return;
+      // A chat waiting to be deleted goes with its workspace: its delete would find none.
+      if (_deleted.value?.slug == slug) _deleted.take();
       for (final t in threadsOf(slug)) {
         _turns.remove(t.slug);
         _newest.remove(t.slug);
@@ -867,6 +895,7 @@ class ChatController extends ChangeNotifier {
         // A new server has started afresh: the chat belongs to the old one.
         if (_server != server) return true;
         threadSlug = made.slug;
+        _madeAt[made.slug] = ++_made;
         _newest[made.slug] = -1;
         _threads[slug] = [...threadsOf(slug), made];
         _turns[made.slug] = turns;
@@ -883,8 +912,12 @@ class ChatController extends ChangeNotifier {
         _finish(running, error: error.message, notSent: true);
         return true;
       }
-      // Stopped while the thread was being made: the chat stays, the answer does not run.
+      // Stopped while the thread was being made: the chat stays and is named, the answer does
+      // not run.
       if (!_runs.contains(running)) {
+        final made = running.thread!;
+        if (!_named.contains(made)) unawaited(_nameAfter(slug, made, text));
+        unawaited(_prefs.useChat(slug, made));
         notifyListeners();
         return true;
       }
@@ -978,7 +1011,7 @@ class ChatController extends ChangeNotifier {
     final turns = this.turns;
     final question = turns[turns.length - 2];
     _setTurns(turns.sublist(0, turns.length - 2));
-    await send(question.text);
+    await send(question.text, shortcutUse: question.shortcutUse);
   }
 
   /// Clears the history of the chat on screen, on the server and here, so the model starts the
@@ -1038,8 +1071,11 @@ class ChatController extends ChangeNotifier {
   final _learning = <String, Object>{};
 
   /// Learns chat [thread]'s newest exchange from the [ids] the server gave its history.
-  void _learnFrom(String thread, Iterable<int?> ids) =>
-      _newest[thread] = ids.map((id) => id ?? -1).fold(-1, max);
+  /// It never moves back: a read that is older than what the chat knows keeps what it knows.
+  void _learnFrom(String thread, Iterable<int?> ids) => _newest[thread] = max(
+    _newest[thread] ?? -1,
+    ids.map((id) => id ?? -1).fold(-1, max),
+  );
 
   /// Keeps chat [thread]'s newest exchange as [running]'s answer leaves it. An answer whose
   /// closing chunk named its exchange is the newest. One that ran to its end without, as an
@@ -1056,12 +1092,18 @@ class ChatController extends ChangeNotifier {
     }
     _newest.remove(thread);
     if (error == null && !answer.stopped) {
-      unawaited(_learnNewest(running.slug, thread));
+      unawaited(_learnNewest(running.slug, thread, running.shortcutUse));
     }
   }
 
   /// Reads chat [thread]'s history for its newest exchange alone, leaving its turns as they are.
-  Future<void> _learnNewest(String slug, String thread) async {
+  /// That exchange is the answer's, which an agent's closing chunk does not name, so the
+  /// [use] of a shortcut its question was sent with is remembered under it.
+  Future<void> _learnNewest(
+    String slug,
+    String thread,
+    ShortcutUse? use,
+  ) async {
     final server = _server;
     final go = _learning[thread] = Object();
     try {
@@ -1070,6 +1112,11 @@ class ChatController extends ChangeNotifier {
       // sent since, settled the chat afresh.
       if (_server == server && identical(_learning[thread], go)) {
         _learnFrom(thread, history.map((m) => m.chatId));
+        if (use != null && (_newest[thread] ?? -1) >= 0) {
+          unawaited(
+            _prefs.rememberShortcutUse(slug, thread, _newest[thread]!, use),
+          );
+        }
       }
     } on ApiException {
       // Still unknown: a dropped answer then falls back to reading its question.
