@@ -72,20 +72,31 @@ class SettingsController extends ChangeNotifier {
     await _check(server);
   }
 
-  /// Asks the server whether [candidate] opens it, into [check] and [message].
-  Future<void> _check(Connection candidate) async {
+  /// Counts the tests started and the connections put in use or forgotten, so the answer to a
+  /// test that is no longer the latest is dropped.
+  int _checks = 0;
+
+  /// Asks the server whether [candidate] opens it, into [check] and [message]. True when it did
+  /// and said so; an answer that comes after another test began, or the connection in use changed,
+  /// says nothing and is false.
+  Future<bool> _check(Connection candidate) async {
+    final go = ++_checks;
     check = ConnectionCheck.testing;
     message = null;
     notifyListeners();
+    var opens = false;
+    String? why;
     try {
       await _api.verify(candidate);
-      check = ConnectionCheck.ok;
-      message = 'Connected to ${candidate.host}.';
+      opens = true;
     } on ApiException catch (error) {
-      check = ConnectionCheck.failed;
-      message = error.message;
+      why = error.message;
     }
+    if (go != _checks) return false;
+    check = opens ? ConnectionCheck.ok : ConnectionCheck.failed;
+    message = opens ? 'Connected to ${candidate.host}.' : why;
     notifyListeners();
+    return opens;
   }
 
   /// Saves [url] and [key] only once the server accepts them. True when it did.
@@ -99,8 +110,7 @@ class SettingsController extends ChangeNotifier {
     Connection candidate,
     Map<String, Uri>? companions,
   ) async {
-    await _check(candidate);
-    if (check != ConnectionCheck.ok) return false;
+    if (!await _check(candidate)) return false;
     await _use(candidate, 'The key was saved.', companions: companions);
     return true;
   }
@@ -128,6 +138,7 @@ class SettingsController extends ChangeNotifier {
     _holder
       ..current = candidate
       ..companions = {...kept, ...?companions};
+    _checks++;
     check = ConnectionCheck.idle;
     notifyListeners();
     await _keyring(
@@ -143,6 +154,7 @@ class SettingsController extends ChangeNotifier {
     _holder
       ..current = null
       ..companions = const {};
+    _checks++;
     check = ConnectionCheck.idle;
     notifyListeners();
     await _keyring(

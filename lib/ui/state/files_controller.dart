@@ -195,7 +195,14 @@ class FilesController extends ChangeNotifier {
       fields = prompt
           // An empty prompt is no prompt, so the default applies again.
           ? {'openAiPrompt': draft.trim().isEmpty ? null : draft}
-          : parseSettings(draft, detail.settings!);
+          : parseSettings(
+              draft,
+              detail.settings ??
+                  (throw const ApiException(
+                    'The server did not send this workspace\'s settings, so they cannot be '
+                    'saved.',
+                  )),
+            );
     } on ApiException catch (error) {
       problems = [Notice(title, error.message)];
       notifyListeners();

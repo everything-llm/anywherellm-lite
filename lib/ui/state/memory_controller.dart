@@ -110,9 +110,13 @@ class MemoryController extends ChangeNotifier {
     } on ApiException catch (error) {
       if (number != _reads) return;
       savedProblem = Notice('Could not read the saved memories', error.message);
+    } finally {
+      // A failure of any kind ends the read; a newer read or a reset has the flag by then.
+      if (number == _reads) {
+        loading = false;
+        notifyListeners();
+      }
     }
-    loading = false;
-    notifyListeners();
   }
 
   /// Turns saved memories, or saving them from chats, on or off.
@@ -157,9 +161,14 @@ class MemoryController extends ChangeNotifier {
       await call(slug);
     } on ApiException catch (error) {
       failed = Notice(title, error.message);
+    } finally {
+      // A failure of any kind leaves the page free for the next change too.
+      if (server == _server && slug == this.slug) {
+        busy = false;
+        notifyListeners();
+      }
     }
     if (server != _server || slug != this.slug) return false;
-    busy = false;
     await read();
     if (failed != null) {
       savedProblem = failed;

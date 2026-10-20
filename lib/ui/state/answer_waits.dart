@@ -60,6 +60,10 @@ class AnswerWaits {
   static const waitReads = 24 + 84;
   static const _quickReads = 24;
 
+  static const _movedOn =
+      'The connection dropped before this answer came. Pull down to read what the server '
+      'saved.';
+
   final _waits = <String, _Waiting>{};
 
   /// Whether any answer is waited for.
@@ -78,6 +82,14 @@ class AnswerWaits {
     final at = turns.indexOf(answer);
     final question = at > 0 ? turns[at - 1].text.trim() : '';
     final waiting = _Waiting(answer, slug, thread, question)..floor = after;
+    // An answer already waited for in this chat is let go of, as when the chat moves on.
+    if (_waits[thread] case final old?) {
+      old.cancel();
+      if (!identical(old.answer, answer)) {
+        old.answer.error = _movedOn;
+        old.answer.stopWaiting();
+      }
+    }
     _waits[thread] = waiting;
     answer.waiting = true;
     _checkLater(waiting);
@@ -129,15 +141,13 @@ class AnswerWaits {
     List<ChatMessage>? history;
     try {
       history = await _api.history(slug, thread);
-    } on ApiException {
-      // Out of reach for now: read again next time.
+    } on Object {
+      // Out of reach for now, or a read that failed some other way: read again next time.
     }
     if (!identical(_waits[thread], waiting)) return;
     final turns = turnsOf(thread);
     if (turns == null || !identical(turns.lastOrNull, answer)) {
-      answer.error =
-          'The connection dropped before this answer came. Pull down to read what the server '
-          'saved.';
+      answer.error = _movedOn;
       return _end(waiting);
     }
     if (history != null) {
