@@ -33,6 +33,28 @@ void main() {
     ]);
   });
 
+  test('a picture on the server has its page on the server too', () {
+    final server = Uri.parse('https://h.example:3001');
+    final picture = Picture(
+      Uri.parse('/pics/a.png'),
+      page: Uri.parse('/browser-lean/t.html'),
+    ).on(server);
+    expect(picture.image, Uri.parse('https://h.example:3001/pics/a.png'));
+    expect(
+      picture.page,
+      Uri.parse('https://h.example:3001/browser-lean/t.html'),
+    );
+    expect(picture.site, 'h.example');
+    expect(
+      Picture(
+        Uri.parse('/pics/a.png'),
+        page: Uri.parse('https://one.example/a'),
+      ).on(server).page,
+      Uri.parse('https://one.example/a'),
+    );
+    expect(Picture(Uri.parse('/a.png')).on(server).page, isNull);
+  });
+
   test('one picture, a picture in a sentence or in code stays text', () {
     for (final text in [a, 'See $a and $b', '```\n$a\n$b\n```']) {
       expect(answerParts(text), [isA<TextPart>()], reason: text);

@@ -9,10 +9,13 @@ class Picture {
   final String caption;
   final Uri? page;
 
-  /// This picture with its [image] a path from the root no longer, but on [server]
+  /// This picture with its [image] and [page] a path from the root no longer, but on [server]
   /// ([onServer]).
-  Picture on(Uri? server) =>
-      Picture(onServer(image, server), caption: caption, page: page);
+  Picture on(Uri? server) => Picture(
+    onServer(image, server),
+    caption: caption,
+    page: page == null ? null : onServer(page!, server),
+  );
 
   /// The site the picture came from: its page's host, or else its own.
   String get site => (page ?? image).host;
