@@ -125,6 +125,40 @@ void main() {
     },
   );
 
+  testWidgets('a file that claims no size is held to 20 MB by its bytes', (
+    tester,
+  ) async {
+    final shares = StreamController<SharedItem>();
+    await pumpApp(tester, llm: planningServer(), shares: shares);
+    await share(
+      tester,
+      shares,
+      SharedFile('huge.pdf', 0, () async => List.filled(21 * 1024 * 1024, 1)),
+    );
+    await tester.tap(inSheet(control('Ask about it')));
+    await tester.pumpAndSettle();
+    expect(inSheet(find.textContaining('20 MB at most')), findsOneWidget);
+    expect(control('1 file attached. Review'), findsNothing);
+    await shares.close();
+  });
+
+  testWidgets('a sheet dismissed while its file is read opens no chat', (
+    tester,
+  ) async {
+    final shares = StreamController<SharedItem>();
+    final read = Completer<List<int>>();
+    final h = await pumpApp(tester, llm: planningServer(), shares: shares);
+    await share(tester, shares, SharedFile('quote.pdf', 4, () => read.future));
+    await tester.tap(inSheet(control('Ask about it')));
+    await tester.pump();
+    h.shell.closeShared();
+    await tester.pumpAndSettle();
+    read.complete([1, 2, 3, 4]);
+    await tester.pumpAndSettle();
+    expect(control('1 file attached. Review'), findsNothing);
+    await shares.close();
+  });
+
   testWidgets('a shared file goes with the message, but not past 20 MB', (
     tester,
   ) async {
