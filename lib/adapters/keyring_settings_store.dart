@@ -35,7 +35,8 @@ class KeyringSettingsStore implements SettingsStore {
       companions = {
         if (named is Map)
           for (final MapEntry(:key, :value) in named.entries)
-            if (key is String && value is String)
+            // An address that cannot be read leaves that companion out, not the connection.
+            if (key is String && value is String && Uri.tryParse(value) != null)
               companionKey(key): Uri.parse(value),
       };
       outdated =

@@ -17,6 +17,20 @@ void main() {
     expect(prefs.switchedOff, isEmpty);
   });
 
+  test('a file that is not JSON, or not UTF-8, gives the defaults', () async {
+    final file = File('${dir.path}/prefs.json');
+    for (final bytes in [
+      '{"theme": "dark"'.codeUnits,
+      '[1, 2'.codeUnits,
+      [0x7b, 0xff, 0xfe, 0x7d],
+    ]) {
+      await file.writeAsBytes(bytes);
+      final prefs = await JsonPrefsStore(file).load();
+      expect(prefs.theme, ThemePref.system);
+      expect(prefs.switchedOff, isEmpty);
+    }
+  });
+
   test('saves, making the folder, and loads what it saved', () async {
     final file = File('${dir.path}/anywherellm/prefs.json');
     await JsonPrefsStore(file).save(

@@ -63,6 +63,25 @@ void main() {
     expect(stored, isNot(contains('anythingllm-toolkit')));
   });
 
+  test(
+    'a companion address that cannot be read is skipped, not the connection',
+    () async {
+      FlutterSecureStorage.setMockInitialValues({
+        'anythingllm-connection':
+            '{"baseUrl":"https://h:3001","apiKey":"K",'
+            '"companions":{"toolkit":"http://[::1","other":"https://other.example.com"}}',
+      });
+      final loaded = await KeyringSettingsStore().load();
+      expect(
+        loaded?.connection,
+        const Connection(baseUrl: 'https://h:3001', apiKey: 'K'),
+      );
+      expect(loaded?.companions, {
+        'other': Uri.parse('https://other.example.com'),
+      });
+    },
+  );
+
   test('clear removes it', () async {
     FlutterSecureStorage.setMockInitialValues({});
     final store = KeyringSettingsStore();
