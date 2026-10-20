@@ -155,13 +155,28 @@ String chatModelPrivacy(Map<String, Object?> values) {
   final provider = settingText(values, 'LLMProvider');
   final label = chatProviders.labelOf(provider);
   final address = chatProviders.named(provider)?.address;
-  final host = Uri.tryParse(settingText(values, address ?? '')) ?? Uri();
-  final where = host.host.isEmpty ? label : '$label at ${host.authority}';
+  final host = _addressOf(settingText(values, address ?? ''));
+  final where = host.host.isEmpty ? label : '$label at ${_hostPort(host)}';
   return switch (_reach(host.host)) {
     _Reach.server => '$where. Runs on the server.',
     _Reach.network => '$where. Questions go to that machine.',
     _Reach.service => '$where. Shared under that service\'s terms.',
   };
+}
+
+/// [text], a provider's address, parsed; one written without its scheme, such as
+/// `192.168.1.5:11434` or `localhost:11434/v1`, is read as http.
+Uri _addressOf(String text) {
+  final trimmed = text.trim();
+  if (trimmed.isEmpty) return Uri();
+  return Uri.tryParse(trimmed.contains('://') ? trimmed : 'http://$trimmed') ??
+      Uri();
+}
+
+/// [address]'s host and, when it names one, its port, never the login its authority may hold.
+String _hostPort(Uri address) {
+  final host = address.host.contains(':') ? '[${address.host}]' : address.host;
+  return address.hasPort ? '$host:${address.port}' : host;
 }
 
 /// What Privacy and data says of the server's document search model in [values].

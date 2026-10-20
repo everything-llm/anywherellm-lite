@@ -58,6 +58,44 @@ void main() {
     );
   });
 
+  test('privacy shows the host and port of an address, never a login', () {
+    String at(String address) => chatModelPrivacy({
+      'LLMProvider': 'ollama',
+      'OllamaLLMBasePath': address,
+    });
+    expect(
+      at('http://user:pass@192.168.1.5:11434/v1'),
+      'Ollama at 192.168.1.5:11434. Questions go to that machine.',
+    );
+    expect(
+      at('https://u:p@api.example.com/v1'),
+      'Ollama at api.example.com. Shared under that service\'s terms.',
+    );
+    expect(
+      at('http://[fd00::5]:11434'),
+      'Ollama at [fd00::5]:11434. Questions go to that machine.',
+    );
+  });
+
+  test('privacy reads an address written without its scheme', () {
+    String at(String address) => chatModelPrivacy({
+      'LLMProvider': 'ollama',
+      'OllamaLLMBasePath': address,
+    });
+    expect(
+      at('192.168.1.5:11434'),
+      'Ollama at 192.168.1.5:11434. Questions go to that machine.',
+    );
+    expect(
+      at('localhost:11434/v1'),
+      'Ollama at localhost:11434. Runs on the server.',
+    );
+    expect(
+      at('api.example.com/v1'),
+      'Ollama at api.example.com. Shared under that service\'s terms.',
+    );
+  });
+
   test('privacy reads a private address by the rule the key follows', () {
     String at(String host) => chatModelPrivacy({
       'LLMProvider': 'ollama',
