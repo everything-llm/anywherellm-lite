@@ -1,13 +1,13 @@
-// The app's own adapters against a real AnythingLLM and the suite's bridge, which the suite's
+// The app's own adapters against a real AnythingLLM and anywherellm-bridge, which the bridge's
 // `tools/e2e` starts and `tool/e2e/e2e.py inside` points at the model stub:
 //
 //   flutter test tool/e2e/contract.dart
 //
 // It reads E2E_ALLM_URL, E2E_KEY, E2E_BRIDGE_URL and E2E_WORKSPACE, and E2E_PAGE, a page the
 // server's collector can read, and skips every check without them. It sits outside `test/`, so
-// the suite does not run it. Each check is a plain `test`: a `testWidgets` binding answers every
-// HTTP request with 400. The checks run in order on one server, and each leaves it as later ones
-// expect.
+// `flutter test` alone does not run it. Each check is a plain `test`: a `testWidgets` binding
+// answers every HTTP request with 400. The checks run in order on one server, and each leaves it
+// as later ones expect.
 import 'dart:io';
 
 import 'package:anywherellm/adapters/anythingllm_client.dart';

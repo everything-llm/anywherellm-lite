@@ -2,23 +2,23 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Runs AnywhereLLM Lite against a real AnythingLLM and the suite's bridge, from the suite's head.
+"""Runs AnywhereLLM Lite against a real AnythingLLM and anywherellm-bridge.
 
-It fetches anywherellm-suite's `main` from GitHub into `build/e2e/suite`, with no pin, so a suite
-change that breaks the app fails here, and runs the suite's `tools/e2e` with this script's
-`inside` as its command. `tools/e2e` starts a throwaway AnythingLLM in a container, installs the
-bridge beside it, and removes both afterwards; `inside` starts the model stub in that container,
-points AnythingLLM at it, runs `contract.dart` against the server and walks `steps.toml` on the
-emulator with the real app, paired by its link. A failed phone step leaves its screenshot, the
-screen's dump and the log in `build/e2e/`.
+It runs the bridge checkout's own `tools/e2e` with this script's `inside` as its command:
+`tools/e2e` starts a throwaway AnythingLLM in a container with the bridge served beside it, and
+removes both afterwards; `inside` starts the model stub in that container, points AnythingLLM at
+it, runs `contract.dart` against the server and walks `steps.toml` on the emulator with the real
+app, paired by its link. A failed phone step leaves its screenshot, the screen's dump and the
+log in `build/e2e/`.
 
-    uv run tool/e2e/e2e.py                    # the contract, then the phone
-    uv run tool/e2e/e2e.py --only contract    # the adapters alone, no emulator
-    uv run tool/e2e/e2e.py --suite ~/suite    # a local checkout in place of GitHub's head
+The bridge has no public repository, so the checkout is `--bridge`, else `$ANYWHERELLM_BRIDGE`.
+
+    uv run tool/e2e/e2e.py --bridge ~/bridge                    # the contract, then the phone
+    uv run tool/e2e/e2e.py --bridge ~/bridge --only contract    # the adapters alone, no emulator
 
 The phone half runs on an emulator of its own, `lite_e2e` on port 5580, made the first time
 and wiped at each boot, so it never touches an emulator in other use. It needs podman or docker,
-curl, Node 22.18 or later, git, Flutter, and the Android SDK's android-36 google_apis image.
+curl, Node 22.18 or later, npm, Flutter, and the Android SDK's android-36 google_apis image.
 """
 
 import argparse
@@ -49,7 +49,6 @@ from device import (
     tool,
 )
 
-SUITE = "https://github.com/BinaryBand/anywherellm-suite.git"
 OUT = ROOT / "build/e2e"
 APK = ROOT / "build/app/outputs/flutter-apk/app-debug.apk"
 STUB_PORT = 8901
@@ -66,43 +65,41 @@ def run(command: list[str], **kwargs) -> subprocess.CompletedProcess:
     return subprocess.run(command, check=True, **kwargs)
 
 
-# --- Outside: the suite, then its tools/e2e with `inside` as the command ---------------------
+# --- Outside: the bridge's tools/e2e with `inside` as the command ---------------------------
 
 
-def fetch_suite() -> Path:
-    """GitHub's head of the suite in build/e2e/suite, cloned or brought up to it."""
-    suite = OUT / "suite"
-    if (suite / ".git").exists():
-        run(["git", "-C", str(suite), "fetch", "-q", "origin", "main"])
-        run(["git", "-C", str(suite), "reset", "-q", "--hard", "origin/main"])
-        run(["git", "-C", str(suite), "clean", "-q", "-fd"])
-    else:
-        OUT.mkdir(parents=True, exist_ok=True)
-        run(["git", "clone", "-q", SUITE, str(suite)])
-    return suite
+def bridge_of(args: argparse.Namespace) -> Path:
+    """The bridge checkout to run, from --bridge or $ANYWHERELLM_BRIDGE."""
+    given = args.bridge or os.environ.get("ANYWHERELLM_BRIDGE")
+    if not given:
+        sys.exit("e2e.py: pass --bridge PATH (or set ANYWHERELLM_BRIDGE): anywherellm-bridge has no public repository to fetch")
+    bridge = Path(given).expanduser().resolve()
+    if not os.access(bridge / "tools/e2e", os.X_OK):
+        sys.exit(f"e2e.py: no anywherellm-bridge checkout at {bridge}")
+    return bridge
 
 
-def npm_ready(suite: Path) -> None:
-    """`npm ci` in the suite's packages when its lock changed since the last run."""
-    lock = suite / "packages/package-lock.json"
-    stamp = suite / "packages/node_modules/.e2e-lock.sha256"
+def npm_ready(folder: Path) -> None:
+    """`npm ci` in [folder] when its lock changed since the last run."""
+    lock = folder / "package-lock.json"
+    stamp = folder / "node_modules/.e2e-lock.sha256"
     digest = hashlib.sha256(lock.read_bytes()).hexdigest()
     if stamp.exists() and stamp.read_text() == digest:
         return
-    print("[e2e] npm ci in the suite's packages")
-    run(["npm", "ci", "--silent"], cwd=suite / "packages")
+    print(f"[e2e] npm ci in {folder}")
+    run(["npm", "ci", "--silent"], cwd=folder)
     stamp.write_text(digest)
 
 
 def outside(args: argparse.Namespace) -> int:
-    suite = Path(args.suite).expanduser().resolve() if args.suite else fetch_suite()
-    commit = subprocess.run(["git", "-C", str(suite), "log", "-1", "--format=%h %s"],
+    bridge = bridge_of(args)
+    commit = subprocess.run(["git", "-C", str(bridge), "log", "-1", "--format=%h %s"],
                             capture_output=True, text=True).stdout.strip()
-    print(f"[e2e] the suite at {commit or suite}")
-    npm_ready(suite)
+    print(f"[e2e] the bridge at {commit or bridge}")
+    npm_ready(bridge)
     inner = ["uv", "run", "--quiet", str(Path(__file__).resolve()), "inside", "--only", args.only]
     inner += ["--headless"] * args.headless + ["--keep-emulator"] * args.keep_emulator
-    return subprocess.run([str(suite / "tools/e2e"), *inner], cwd=ROOT).returncode
+    return subprocess.run([str(bridge / "tools/e2e"), *inner], cwd=ROOT).returncode
 
 
 # --- Inside: the stub, the server's settings, the contract and the phone ---------------------
@@ -111,7 +108,7 @@ def outside(args: argparse.Namespace) -> int:
 def env(name: str) -> str:
     value = os.environ.get(name)
     if not value:
-        sys.exit(f"{name} is not set: run `uv run tool/e2e/e2e.py`, which runs this inside the suite's tools/e2e")
+        sys.exit(f"{name} is not set: run `uv run tool/e2e/e2e.py`, which runs this inside the bridge's tools/e2e")
     return value
 
 
@@ -240,7 +237,7 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("stage", nargs="?", choices=["inside"], help=argparse.SUPPRESS)
     p.add_argument("--only", choices=["all", "contract", "phone"], default="all", help="run one half")
-    p.add_argument("--suite", help="a local checkout of anywherellm-suite in place of GitHub's head")
+    p.add_argument("--bridge", help="a checkout of anywherellm-bridge (else $ANYWHERELLM_BRIDGE)")
     p.add_argument("--headless", action="store_true", help="boot without a window")
     p.add_argument("--keep-emulator", action="store_true",
                    help=f"leave {AVD} running, for the next run to use as it is")
