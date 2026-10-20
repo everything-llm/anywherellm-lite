@@ -66,8 +66,12 @@ class AskController extends ChangeNotifier {
   /// Whether an answer to [current] is on its way.
   bool busy = false;
 
-  /// The requests read on this server, so each is asked about once.
+  /// The requests read on this server, or found gone, so each is asked about once. One whose
+  /// read failed some other way is asked about again when a status line names it again.
   final _seen = <String>{};
+
+  /// The requests being read, so a status line that names one again does not read it twice.
+  final _reading = <String>{};
 
   /// The request each running answer's latest status line names, by chat.
   final _waiting = <String, String>{};
@@ -89,7 +93,17 @@ class AskController extends ChangeNotifier {
     final before = _shown.length;
     _shown.removeWhere((s) => s.thread == thread && s.id != id);
     if (_shown.length != before) _changed();
-    if (id == null || !_toolkit.asksServed || !_seen.add(id)) return;
+    if (id == null ||
+        !_toolkit.asksServed ||
+        _seen.contains(id) ||
+        !_reading.add(id)) {
+      return;
+    }
+    // One already on screen, as with why it could not be read, is not shown twice.
+    if (_shown.any((s) => s.id == id)) {
+      _reading.remove(id);
+      return;
+    }
     unawaited(_read(id, slug, thread));
   }
 
@@ -98,10 +112,16 @@ class AskController extends ChangeNotifier {
     final shown = AskShown(id, slug, thread);
     try {
       shown.ask = await _api.ask(id);
+      if (asked == _epoch) _seen.add(id);
     } on ApiException catch (error) {
       // A request that is gone no longer waits.
-      if (error.status == 404) return;
+      if (error.status == 404) {
+        if (asked == _epoch) _seen.add(id);
+        return;
+      }
       shown.problem = Notice('Could not read the request', error.message);
+    } finally {
+      _reading.remove(id);
     }
     if (asked != _epoch || _waiting[thread] != id) return;
     if (shown.ask case final ask?
@@ -212,6 +232,7 @@ class AskController extends ChangeNotifier {
     if (_toolkit.epoch != _epoch) {
       _epoch = _toolkit.epoch;
       _seen.clear();
+      _reading.clear();
     }
     _shown.clear();
     busy = false;

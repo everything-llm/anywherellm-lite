@@ -170,6 +170,28 @@ void main() {
     await _end(tester, llm);
   });
 
+  testWidgets('a request that could not be read is read when named again', (
+    tester,
+  ) async {
+    final toolkit = _asking()
+      ..errors['ask'] = const ApiException('Try later.', status: 503);
+    final (llm, _) = await _waiting(tester, toolkit);
+    expect(find.text('Could not read the request'), findsOneWidget);
+    await tester.tap(control('Close').first);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Allow this?'), findsNothing);
+
+    toolkit.errors.remove('ask');
+    llm.chat!.add(const StatusChunk('Running web-browsing'));
+    await tester.pump(const Duration(milliseconds: 300));
+    llm.chat!.add(const StatusChunk('Waiting for your approval', ask: _id));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('Allow this?'), findsOneWidget);
+    expect(toolkit.calls.where((c) => c == 'ask:$_id'), hasLength(2));
+    await _end(tester, llm);
+  });
+
   testWidgets('a request the key may not read says why', (tester) async {
     final toolkit = _asking()
       ..errors['ask'] = const ApiException(
