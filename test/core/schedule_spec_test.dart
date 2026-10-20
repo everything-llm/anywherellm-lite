@@ -66,6 +66,10 @@ void main() {
       expect(cronProblem('0,59 5,7 * * *'), isNull);
       expect(cronProblem('nonsense'), contains('five fields'));
       expect(cronProblem('0 6 * * mon'), contains('five fields'));
+      expect(cronProblem('0 99999999999999999999 * * *'), contains('range'));
+      expect(cronProblem('*/99999999999999999999 * * * *'), contains('range'));
+      expect(cronProblem('0 25 * * *'), contains('range'));
+      expect(cronProblem('0 6 * * 99999999999999999999'), isNull);
       expect(
         const ScheduleSpec(
           repeat: Repeat.custom,

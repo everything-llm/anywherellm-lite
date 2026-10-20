@@ -23,6 +23,47 @@ void main() {
     expect(describeSchedule('', now), 'No schedule');
   });
 
+  test('a weekly schedule names its days, moved by the time zone', () {
+    // The weekdays of 14:00 UTC on `now`'s date, as local time moves them.
+    String days(String cron) => describeSchedule(cron, now);
+    final at = DateTime.utc(2026, 10, 8, 14).toLocal();
+    final shift = at.day - 8;
+    const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    String named(List<int> monday1) {
+      final picked = {for (final d in monday1) (d - 1 + shift) % 7}.toList()
+        ..sort();
+      final shown = [for (final i in picked) names[i]];
+      return shown.length < 2
+          ? shown.join()
+          : '${shown.take(shown.length - 1).join(', ')} and ${shown.last}';
+    }
+
+    final time = local(14, 0);
+    expect(days('0 14 * * 1'), 'Every ${named([1])} at $time');
+    expect(days('0 14 * * 0'), 'Every ${named([7])} at $time');
+    expect(days('0 14 * * 7'), 'Every ${named([7])} at $time');
+    expect(days('0 14 * * 1,3,5'), 'Every ${named([1, 3, 5])} at $time');
+    expect(
+      days('0 14 * * 1-5'),
+      shift == 0
+          ? 'Weekdays at $time'
+          : 'Every ${named([1, 2, 3, 4, 5])} at $time',
+    );
+    expect(days('0 14 * * 1,x'), '0 14 * * 1,x (UTC)');
+    expect(days('0 14 * * 1,9'), '0 14 * * 1,9 (UTC)');
+  });
+
+  test('a number too large for a cron field is not read', () {
+    expect(
+      describeSchedule('0 99999999999999999999 * * *', now),
+      '0 99999999999999999999 * * * (UTC)',
+    );
+    expect(
+      describeSchedule('*/99999999999999999999 * * * *', now),
+      '*/99999999999999999999 * * * * (UTC)',
+    );
+  });
+
   test('a job reads from the server\'s list', () {
     final jobs = scheduledJobsOf({
       'jobs': [

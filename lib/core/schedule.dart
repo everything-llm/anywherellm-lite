@@ -159,7 +159,7 @@ List<String> cronFields(String cron) => cron.trim().split(_whitespace);
 
 /// The N of a `*/N` cron field, which runs every N minutes or hours, or null for another field.
 int? _cronStep(String field) => switch (_cronEvery.firstMatch(field)) {
-  final every? => int.parse(every.group(1)!),
+  final every? => int.tryParse(every.group(1)!),
   null => null,
 };
 
@@ -198,17 +198,33 @@ String describeSchedule(String cron, DateTime now) {
   final local = at.toLocal();
   final shift = calendarDays(local, at);
   final time = clockText(local);
-  switch (weekday) {
-    case '*':
-      return 'Every day at $time';
-    case '1-5' when shift == 0:
-      return 'Weekdays at $time';
+  if (weekday == '*') return 'Every day at $time';
+  final listed = _cronDays(weekday);
+  if (listed == null) return '$cron (UTC)';
+  // The days in local time, Monday 0.
+  final days = {for (final d in listed) (d + shift) % 7}.toList()..sort();
+  if (days.length == 7) return 'Every day at $time';
+  if (days.join() == '01234') return 'Weekdays at $time';
+  return 'Every ${andList([for (final d in days) _shortDay(d)])} at $time';
+}
+
+final _cronDay = RegExp(r'^(\d)(?:-(\d))?$');
+
+/// The days of the week the cron field [field] lists, Monday 0: numbers and `A-B` ranges joined
+/// by commas, where cron counts Sunday as 0 or 7. Null for any other field, or a day past 7.
+Set<int>? _cronDays(String field) {
+  final days = <int>{};
+  for (final item in field.split(',')) {
+    final match = _cronDay.firstMatch(item);
+    if (match == null) return null;
+    final from = int.parse(match[1]!);
+    final to = int.parse(match[2] ?? match[1]!);
+    if (from > to || to > 7) return null;
+    for (var d = from; d <= to; d++) {
+      days.add((d + 6) % 7);
+    }
   }
-  final d = int.tryParse(weekday);
-  if (d == null || d > 7) return '$cron (UTC)';
-  // Cron counts Sunday as 0 or 7; the list starts on Monday.
-  final monday0 = (d + 6) % 7;
-  return 'Every ${_shortDay((monday0 + shift) % 7)} at $time';
+  return days;
 }
 
 /// The calendar days from [from]'s date to [local]'s, compared as UTC dates so a clock change

@@ -16,6 +16,9 @@ String? cronProblem(String text) {
   if (parts.length != 5 || !parts.every(_field.hasMatch)) {
     return 'A schedule is five fields, such as 0 */6 * * *.';
   }
+  if (_values(parts[0], 59) == null || _values(parts[1], 23) == null) {
+    return 'The minute or the hour in that schedule is out of range.';
+  }
   final gap = _minuteGap(parts[0], parts[1]);
   if (gap != null && gap < minJobGap) {
     return 'That runs more often than every $minJobGap minutes. Leave more time between runs.';
@@ -26,18 +29,20 @@ String? cronProblem(String text) {
 final _item = RegExp(r'^(?:\*|(\d+)(?:-(\d+))?)(?:/(\d+))?$');
 
 /// The values the cron [field] allows, from 0 to [last]: `*`, `*/N`, `A-B`, `A-B/N`, `A/N` and
-/// numbers, joined by commas. Null for a field this does not read; empty for a step of 0.
+/// numbers, joined by commas. Null for a field this does not read, including a number too large
+/// for an integer; empty for a step of 0.
 Set<int>? _values(String field, int last) {
   final values = <int>{};
   for (final item in field.split(',')) {
     final match = _item.firstMatch(item);
     if (match == null) return null;
     final star = item.startsWith('*');
-    final step = int.parse(match[3] ?? '1');
-    final from = star ? 0 : int.parse(match[1]!);
+    final step = int.tryParse(match[3] ?? '1');
+    final from = star ? 0 : int.tryParse(match[1]!);
     final to = star || (match[2] == null && match[3] != null)
         ? last
-        : int.parse(match[2] ?? match[1]!);
+        : int.tryParse(match[2] ?? match[1]!);
+    if (step == null || from == null || to == null) return null;
     if (step < 1) return {};
     if (from > to || to > last) return null;
     for (var at = from; at <= to; at += step) {
@@ -180,7 +185,7 @@ class ScheduleSpec {
     final base = switch (repeat) {
       Repeat.daily => 'Runs every day at $time your time.',
       Repeat.weekly =>
-        'Runs on ${_andList([for (final d in (days.toList()..sort())) '${weekdayNames[d - 1]}s'])} at $time your time.',
+        'Runs on ${andList([for (final d in (days.toList()..sort())) '${weekdayNames[d - 1]}s'])} at $time your time.',
       Repeat.custom =>
         '${describeSchedule(cron.trim(), now)}. Custom schedules run in UTC.',
     };
@@ -196,7 +201,3 @@ class ScheduleSpec {
       DateTime(now.year, now.month + months, 1).timeZoneOffset,
   ].any((offset) => offset != now.timeZoneOffset);
 }
-
-String _andList(List<String> items) => items.length < 2
-    ? items.join()
-    : '${items.take(items.length - 1).join(', ')} and ${items.last}';

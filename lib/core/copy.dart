@@ -26,6 +26,11 @@ const weekdayNames = [
   'Friday', 'Saturday', 'Sunday',
 ];
 
+/// [items] as a sentence's list: `Mon`, `Mon and Wed`, `Mon, Wed and Fri`.
+String andList(List<String> items) => items.length < 2
+    ? items.join()
+    : '${items.take(items.length - 1).join(', ')} and ${items.last}';
+
 /// [at]'s time of day on a 24-hour clock: `07:05`.
 String clockText(DateTime at) =>
     '${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}';
