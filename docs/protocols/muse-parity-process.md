@@ -15,6 +15,7 @@ Sends the same prompts to a fresh scratch chat in Meta's Muse and in AnythingLLM
 | `chrome` | Starts Chrome with a debugging port on its own profile and prints the endpoint. |
 | `mark <run> <probe> <side> sent\|ended\|note [text]` | Logs a timestamp or a note. `side` is `muse` or `allm`. `<probe>` may be `run` for a note on the whole run, such as Muse's weekly quota. |
 | `table <run>` | Prints the probe table: every core probe, and a browser probe once logged. |
+| `archive <run> [--to DIR]` | Copies the run's text files (log, answers, whole chats, cleanup list) to `docs/notes/parity-runs/<date>`, never over an existing archive, and prints each line that looks like an email address, a key or an IP address. Images and fixtures stay out. |
 
 `<run>` is `build/parity/<date>`, which git ignores.
 
@@ -43,7 +44,7 @@ Agree on these with the user before the first probe.
 1. For each probe in `probes` order, in a fresh chat on each side (an `after` probe continues its parent's chat):
    1. Type `probe <id>` into the box, then run `mark ... sent` immediately before the send key: a mark written earlier inflates the time. The `file` probe attaches `<run>/files/scratch-expenses.csv`.
    1. When the answer ends, `mark ... ended`. AnythingLLM's footer time counts only the last generation, so the marks are the wall-clock time.
-   1. Save the answer to `<run>/<id>-<side>.txt`, `check` the `code` and `file` ones, and `mark ... note` what showed.
+   1. Save the answer to `<run>/<id>-<side>.txt`, `check` the `code` and `file` ones, and `mark ... note` what showed. Also save the whole chat to `<run>/<id>-<side>.chat.txt`: the prompt, each status line and card label seen, with the time, then the answer as it stood. `check` reads only the first file.
 1. `reminder-ok` goes to AnythingLLM only, and only if it asks. Record the tool each AnythingLLM answer used. On a server without the suite's skills, most agent probes end in "I have no such tool"; record that as the result.
 1. Run the browser group one side after the other, `return` last: browsing, and any page showing a live card, keeps the browser from stopping. If Muse answers "Something went wrong", "Message failed to send" or "Conversation controls unavailable", it is degraded: do AnythingLLM's side and return to Muse later, without a retry loop.
 
@@ -79,6 +80,10 @@ Optional and read-only, on the AnythingLLM host.
 | Container time zone | `podman exec systemd-anythingllm date` (UTC) |
 
 `system_settings` holds connector API keys. Read them only inside a script that uses them; never print them.
+
+## Archive
+
+Keep every run in full. Before anything is listed for deletion, run `archive <run>`, read each file it flags and the files it does not (a tool list can name the person's own accounts), take out personal data, and commit the archive. Then export the AnythingLLM workspace's chats from Settings > Workspace Chats, if it offers an export, read the export the same way, and keep it in the archive. Muse offers no export that this protocol has used, so its whole chats exist only in the `.chat.txt` files.
 
 ## Cleanup
 

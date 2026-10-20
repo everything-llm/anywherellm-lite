@@ -14,6 +14,7 @@ import csv
 import json
 import random
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -25,6 +26,13 @@ from pathlib import Path
 HERE = Path(__file__).parent
 PROFILE = Path.home() / ".cache" / "parity-chrome"
 SIDES = ("muse", "allm")
+ARCHIVE = HERE.parent.parent / "docs" / "notes" / "parity-runs"
+ARCHIVED = (".txt", ".jsonl", ".md")
+PERSONAL = {
+    "an email address": re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+"),
+    "a key or token": re.compile(r"\bsk-[\w-]{12,}|\bBearer\s+\S{12,}"),
+    "an IP address": re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b"),
+}
 SIDE_NAMES = {"muse": "Muse", "allm": "AnythingLLM"}
 CATEGORIES = {"groceries": (80, 450), "restaurants": (120, 600), "utilities": (300, 1200), "transport": (30, 400)}
 
@@ -190,6 +198,27 @@ def cmd_table(a: argparse.Namespace) -> None:
         print(f"| {p['name']} | {cells[0]} | {cells[1]} |")
 
 
+def cmd_archive(a: argparse.Namespace) -> None:
+    """Copies a run's text (log, answers, whole chats, cleanup list) to a tracked folder."""
+    run = Path(a.run)
+    if not log_path(a.run).exists():
+        sys.exit(f"no log in {a.run}: nothing to archive")
+    dest = Path(a.to) / run.name
+    if dest.exists():
+        sys.exit(f"{dest} exists: an archive is never overwritten")
+    dest.mkdir(parents=True)
+    kept = [p for p in sorted(run.iterdir()) if p.is_file() and p.suffix in ARCHIVED]
+    for p in kept:
+        shutil.copy2(p, dest / p.name)
+    print(f"copied {len(kept)} files to {dest}; images and fixtures stay out")
+    for p in kept:
+        for n, line in enumerate((dest / p.name).read_text().splitlines(), 1):
+            for what, pattern in PERSONAL.items():
+                if pattern.search(line):
+                    print(f"check {p.name}:{n}: {what}")
+    print("read what was copied for personal data before committing it")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     sub = ap.add_subparsers(required=True)
@@ -218,6 +247,10 @@ def main() -> None:
     s = sub.add_parser("table", help="print the probe table from a run's log (grouped probes only once logged)")
     s.add_argument("run")
     s.set_defaults(fn=cmd_table)
+    s = sub.add_parser("archive", help="copy a run's text files to docs/notes/parity-runs, flagging what looks personal")
+    s.add_argument("run")
+    s.add_argument("--to", default=str(ARCHIVE), help="the archive folder, default docs/notes/parity-runs")
+    s.set_defaults(fn=cmd_archive)
     a = ap.parse_args()
     a.fn(a)
 
