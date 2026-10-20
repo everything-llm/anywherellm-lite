@@ -166,6 +166,8 @@ class CompanionClient {
   static String _lower(String name) =>
       name.startsWith('The ') ? 'the ${name.substring(4)}' : name;
 
+  static final _endsSentence = RegExp(r'[.?!]$');
+
   /// The `error` the companion put in a failed answer, with its first letter raised.
   static String? _said(http.Response response) {
     try {
@@ -173,10 +175,8 @@ class CompanionClient {
       final said = body is Map ? body['error'] : null;
       if (said is! String || said.trim().isEmpty) return null;
       final text = said.trim();
-      return '${text[0].toUpperCase()}${text.substring(1)}.'.replaceAll(
-        RegExp(r'\.\.$'),
-        '.',
-      );
+      final raised = '${text[0].toUpperCase()}${text.substring(1)}';
+      return _endsSentence.hasMatch(raised) ? raised : '$raised.';
     } on FormatException {
       return null;
     }

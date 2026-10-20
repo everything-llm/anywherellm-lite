@@ -192,6 +192,23 @@ void main() {
       },
     );
 
+    test(
+      'a failure ends with one full stop, or the mark it ended with',
+      () async {
+        for (final (said, shown) in [
+          ('not allowed', 'Not allowed.'),
+          ('Not allowed.', 'Not allowed.'),
+          ('is it on?', 'Is it on?'),
+          ('stop it!', 'Stop it!'),
+        ]) {
+          final error = await _failure(
+            _answering({'error': said}, status: 400).json('GET', ['x']),
+          );
+          expect(error.message, shown);
+        }
+      },
+    );
+
     test('a bare 404 is a route the companion lacks', () async {
       final api = _api((_) async => http.Response('Not Found', 404));
       expect(
