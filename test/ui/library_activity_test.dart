@@ -260,6 +260,22 @@ void main() {
       expect(toolkit.calls, contains('activity:b'));
     });
 
+    testWidgets('an event that leaves the list closes its sheet', (
+      tester,
+    ) async {
+      final toolkit = activity([_event('Morning brief', id: 'a')]);
+      final h = await _open(tester, toolkit);
+      await tester.tap(find.text('Activity'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Morning brief'));
+      await tester.pumpAndSettle();
+      expect(h.shell.popup.value, isA<ActivityOpen>());
+      toolkit.activityEvents = [_event('Evening brief', id: 'b')];
+      await h.toolkit.readActivity();
+      await tester.pumpAndSettle();
+      expect(h.shell.popup.value, isNull);
+    });
+
     testWidgets('an event opens in a sheet that leads to its chat', (
       tester,
     ) async {
