@@ -152,6 +152,22 @@ void main() {
     expect(find.text('Reports go to Maja.'), findsNothing);
   });
 
+  testWidgets('a memory deleted elsewhere closes its sheet', (tester) async {
+    final llm = _remembering();
+    final h = await _openMemory(tester, llm);
+    await tapVisible(
+      tester,
+      control('Reports go to Maja on Fridays. Change or delete'),
+    );
+    await tester.pumpAndSettle();
+    expect(h.shell.popup.value, isA<MemorySheet>());
+    llm.workspaceMemories['q3'] = [];
+    await h.memory.read();
+    await tester.pumpAndSettle();
+    expect(h.shell.popup.value, isNull);
+    expect(find.text('New memory'), findsNothing);
+  });
+
   testWidgets('saved memories switched off are not listed', (tester) async {
     final llm = _remembering();
     await _openMemory(tester, llm);

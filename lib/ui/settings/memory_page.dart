@@ -58,6 +58,16 @@ class MemoryPage extends StatelessWidget {
           final MemorySheet sheet => sheet,
           _ => null,
         };
+        // A memory gone from a read leaves nothing to change, so its sheet closes rather than
+        // turn into a new memory that keeps its text.
+        if (open != null &&
+            open.id != null &&
+            memory.saved != null &&
+            _memoryOf(memory, open) == null) {
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => shell.closePopup(open),
+          );
+        }
         return PopupSheet(
           open: open != null,
           onClose: shell.closePopup,
