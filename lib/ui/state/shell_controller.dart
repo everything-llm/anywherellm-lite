@@ -60,9 +60,21 @@ class ChatSheetFor {
 enum WorkspaceSheet { create, rename, delete }
 
 /// A popup over the window, at most one open at a time: the workspace menu, the composer's Answer
-/// from sheet, the Attach sheet, or the Memory page's choice of workspace. An answer's More sheet
+/// from sheet, the Attach sheet, the Memory page's choice of workspace, or a question before
+/// forgetting the server or removing a document. An answer's More sheet
 /// is keyed by its [Turn] instead.
-enum Popup { workspaces, answerFrom, attach, memoryWorkspace }
+enum Popup {
+  workspaces,
+  answerFrom,
+  attach,
+  memoryWorkspace,
+
+  /// Forget this server?, on the Connection page.
+  forgetServer,
+
+  /// Remove from workspace?, under a document's text.
+  removeDoc,
+}
 
 /// What is open over the chat, which is the base screen: the chats as a shelf,
 /// the sheet over the chat ([Beside]: the Documents panel, Sources in the code, or an answer's
@@ -169,11 +181,11 @@ class ShellController extends ChangeNotifier {
 
   SharedItem? _shared;
 
-  /// What another app shared with AnywhereLLM, which the shell offers to add or ask about, or
-  /// null.
+  /// What the shell offers over the window, or null: what another app shared, to add or ask
+  /// about, or a pairing code another app opened or the camera read, to connect with.
   SharedItem? get shared => _shared;
 
-  /// Offers [item], shared from another app, over whatever shows.
+  /// Offers [item], shared from another app or scanned, over whatever shows.
   void showShared(SharedItem item) {
     _shared = item;
     _popup.value = null;

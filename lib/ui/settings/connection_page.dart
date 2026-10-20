@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart';
 import '../../core/connection.dart';
 import '../../core/ports.dart';
 import '../app_scope.dart';
+import '../share/shared_item.dart';
 import '../state/settings_controller.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';
@@ -116,7 +117,6 @@ class _KeyCardState extends State<_KeyCard> {
   final _url = TextEditingController();
   final _key = TextEditingController();
   bool _replacing = false;
-  bool _confirmForget = false;
 
   /// Whether Test connection was asked on this page, so a pass reads Connected.
   bool _tested = false;
@@ -132,7 +132,6 @@ class _KeyCardState extends State<_KeyCard> {
   final _scroll = ScrollController();
   bool _wasTyping = false;
   bool _pinned = false;
-  Timer? _forgetTimer;
 
   /// The address the field shows as an example.
   static const _example = 'https://host.example.ts.net:3001';
@@ -145,16 +144,16 @@ class _KeyCardState extends State<_KeyCard> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _takePairing());
   }
 
-  /// Connects with a pairing code [ShellController.pairWith] left, as with a scanned one.
+  /// Connects with the pairing code [ShellController.pairWith] left once Connect to this server?
+  /// was answered, for a code scanned here or a link another app opened.
   void _takePairing() {
     if (!mounted) return;
-    if (_shell.takePairing() case final code?) unawaited(_scanned(code));
+    if (_shell.takePairing() case final code?) unawaited(_pair(code));
   }
 
   @override
   void dispose() {
     _shell.removeListener(_takePairing);
-    _forgetTimer?.cancel();
     _scroll.dispose();
     _url.dispose();
     _key.dispose();
@@ -203,12 +202,20 @@ class _KeyCardState extends State<_KeyCard> {
     _key.clear();
   }
 
-  /// Connects with the address and key a scanned or tapped [code] holds, keeping where it says
-  /// its companions run, and says why when it cannot. Nothing of the code is put in the form,
-  /// which goes back to the saved connection whether it paired or not: a code can come from a
-  /// sticker or any message, and a key typed after a failed one would go to the address it named.
-  Future<void> _scanned(String code) async {
-    _shell.setScanning(false);
+  /// Offers a scanned [code] in Connect to this server?, as a tapped link is, which says why when
+  /// it is not a pairing code: a code on a sticker can name any server, so none replaces the
+  /// saved one unasked.
+  void _offer(String code) {
+    _shell
+      ..setScanning(false)
+      ..showShared(SharedPairing(code));
+  }
+
+  /// Connects with the address and key [code] holds, keeping where it says its companions run,
+  /// and says why when it cannot. Nothing of the code is put in the form, which goes back to the
+  /// saved connection whether it paired or not: a key typed after a failed code would go to the
+  /// address it named.
+  Future<void> _pair(String code) async {
     final Pairing pairing;
     try {
       pairing = parsePairingCode(code);
@@ -219,19 +226,6 @@ class _KeyCardState extends State<_KeyCard> {
     setState(() => _scanProblem = null);
     await _settings.pair(pairing);
     if (mounted) setState(_backToSaved);
-  }
-
-  Future<void> _forget() async {
-    if (!_confirmForget) {
-      setState(() => _confirmForget = true);
-      _forgetTimer = Timer(const Duration(seconds: 4), () {
-        if (mounted) setState(() => _confirmForget = false);
-      });
-      return;
-    }
-    _forgetTimer?.cancel();
-    await _settings.clear();
-    if (mounted) setState(() => _confirmForget = false);
   }
 
   @override
@@ -257,14 +251,14 @@ class _KeyCardState extends State<_KeyCard> {
   }
 
   /// The saved connection's card, then, while Edit connection has it open, the fields; then
-  /// Test connection, Edit connection and Forget this server.
+  /// Test connection, Edit connection and Forget this server, which asks first.
   Widget _connected(
     BuildContext context,
     Connection connection,
     bool saving,
     VoidCallback startScan,
   ) {
-    return Column(
+    final card = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       spacing: 20,
       children: [
@@ -335,12 +329,32 @@ class _KeyCardState extends State<_KeyCard> {
         ),
         const SizedBox(height: 8),
         AppButton(
-          _confirmForget ? 'Really forget it?' : 'Forget this server',
+          'Forget this server',
           danger: true,
           quiet: true,
-          onPressed: _forget,
+          onPressed: () => _shell.togglePopup(Popup.forgetServer),
         ),
       ],
+    );
+    return ValueListenableBuilder(
+      valueListenable: _shell.popup,
+      builder: (context, popup, card) => PopupSheet(
+        open: popup == Popup.forgetServer,
+        onClose: _shell.closePopup,
+        title: 'Forget this server',
+        sheet: (context) => SheetQuestion(
+          'Forget ${connection.host}? Its key leaves this phone, and connecting again takes the '
+          'key or a pairing code.',
+          action: 'Forget',
+          onKeep: _shell.closePopup,
+          onConfirm: () {
+            _shell.closePopup();
+            unawaited(_settings.clear());
+          },
+        ),
+        child: card!,
+      ),
+      child: card,
     );
   }
 
@@ -349,7 +363,7 @@ class _KeyCardState extends State<_KeyCard> {
       OverlayWhile(
         open: _shell.scanning,
         overlay: (context) => ScanView(
-          camera: scan(_scanned),
+          camera: scan(_offer),
           onCancel: () => _shell.setScanning(false),
           onHelp: () => _shell.showGuide(Guide.connect),
         ),

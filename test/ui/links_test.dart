@@ -7,6 +7,7 @@ import 'package:anywherellm/ui/chat/page_sheet.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/state/notice.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
@@ -241,11 +242,27 @@ void main() {
       return h;
     }
 
-    testWidgets('goes in the chat as the person\'s message, and the page '
-        'closes so the answer shows', (tester) async {
+    /// The comment's question over the page.
+    Finder asking() => find.textContaining('Send this to the chat?');
+
+    testWidgets('asks first, then goes in the chat as the person\'s message, '
+        'and the page closes so the answer shows', (tester) async {
       final llm = answering('Made it: [Groceries](/apps-lean/q9Zx_-1aB2.html)');
       final h = await opened(tester, llm);
       h.appView!.channel!.onMessage(comment('q3'));
+      await tester.pumpAndSettle();
+      expect(asking(), findsOneWidget);
+      expect(
+        find.textContaining('About my Groceries page: bigger buttons?'),
+        findsOneWidget,
+      );
+      expect(
+        llm.calls.where((c) => c.startsWith('streamChat')),
+        isEmpty,
+        reason: 'a page can post without the person, so nothing goes unasked',
+      );
+      expect(h.appView!.ran, isEmpty);
+      await tester.tap(asked('Send'));
       await tester.pumpAndSettle();
       expect(
         llm.calls.last,
@@ -253,6 +270,45 @@ void main() {
       );
       expect(h.appView!.ran.single, contains('{"ok":true}'));
       expect(find.byType(PageSheet), findsNothing);
+    });
+
+    testWidgets('Cancel sends nothing and tells the page', (tester) async {
+      final llm = answering('Made it: [Groceries](/apps-lean/q9Zx_-1aB2.html)');
+      final h = await opened(tester, llm);
+      h.appView!.channel!.onMessage(comment('q3'));
+      await tester.pumpAndSettle();
+      await tester.tap(asked('Cancel'));
+      await tester.pumpAndSettle();
+      expect(asking(), findsNothing);
+      expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
+      expect(h.appView!.ran.single, contains('"ok":false'));
+      expect(h.appView!.ran.single, contains('Not sent.'));
+      expect(find.byType(PageSheet), findsOneWidget);
+    });
+
+    testWidgets('Esc closes the page, and the comment goes unsent', (
+      tester,
+    ) async {
+      final llm = answering('Made it: [Groceries](/apps-lean/q9Zx_-1aB2.html)');
+      final h = await opened(tester, llm);
+      h.appView!.channel!.onMessage(comment('q3'));
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(asking(), findsNothing);
+      expect(find.byType(PageSheet), findsNothing);
+      expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
+    });
+
+    testWidgets('one posted while another waits is refused', (tester) async {
+      final llm = answering('Made it: [Groceries](/apps-lean/q9Zx_-1aB2.html)');
+      final h = await opened(tester, llm);
+      h.appView!.channel!.onMessage(comment('q3'));
+      await tester.pumpAndSettle();
+      h.appView!.channel!.onMessage(comment('q3'));
+      await tester.pumpAndSettle();
+      expect(asking(), findsOneWidget);
+      expect(h.appView!.ran.single, contains('Another comment is waiting.'));
     });
 
     testWidgets('on an app of another workspace stays on the page, which '
@@ -275,6 +331,10 @@ void main() {
       await h.chat.send('Anything else?');
       await tester.pump();
       h.appView!.channel!.onMessage(comment('q3'));
+      // The answer's caret never settles, so the question is given time to rise.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(asked('Send'));
       await tester.pump();
       await tester.pump();
       expect(h.appView!.ran.single, contains('try again once it’s free'));

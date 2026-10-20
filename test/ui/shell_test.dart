@@ -11,6 +11,7 @@ import 'package:anywherellm/ui/home.dart';
 import 'package:anywherellm/ui/shelf.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
+import 'package:anywherellm/ui/settings/pairing_sheet.dart';
 import 'package:anywherellm/ui/widgets/controls.dart';
 import 'package:anywherellm/ui/widgets/sheet.dart';
 import 'package:anywherellm/core/server_models.dart';
@@ -30,6 +31,10 @@ Finder inSources(Finder finder) =>
 
 Finder inChat(Finder finder) =>
     find.descendant(of: find.byType(ChatView), matching: finder);
+
+/// [finder] in Connect to this server?, apart from the Connection page under it.
+Finder inPairing(Finder finder) =>
+    find.descendant(of: find.byType(PairingSheet), matching: finder);
 
 Finder get message => find.bySemanticsLabel('Message');
 
@@ -405,6 +410,9 @@ void main() {
         expect(h.files.reading?.title, 'Q3 roadmap.pdf');
         await tapVisible(tester, control('Remove from workspace'));
         await tester.pumpAndSettle();
+        expect(h.sources.files.where((f) => f.on), hasLength(2));
+        await tester.tap(asked('Remove'));
+        await tester.pumpAndSettle();
         // Its undo is in the sheet, which comes back over what showed under it.
         expect(h.shell.sourcesOpen, isTrue);
         expect(h.shell.pane, Pane.chats);
@@ -552,14 +560,19 @@ void main() {
       expect(control('Edit connection'), findsOneWidget);
     });
 
-    testWidgets('Forget asks once more, then deletes the key', (tester) async {
+    testWidgets('Forget asks in a sheet, then deletes the key', (tester) async {
       final h = await pumpApp(tester, llm: planningServer());
       h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
       await tapVisible(tester, control('Forget this server'));
       await tester.pumpAndSettle();
-      expect(control('Really forget it?'), findsOneWidget);
-      await tapVisible(tester, control('Really forget it?'));
+      expect(find.textContaining('Forget h?'), findsOneWidget);
+      await tester.tap(asked('Keep'));
+      await tester.pumpAndSettle();
+      expect(h.settings.connection, sampleConnection);
+      await tapVisible(tester, control('Forget this server'));
+      await tester.pumpAndSettle();
+      await tester.tap(asked('Forget'));
       await tester.pumpAndSettle();
       expect(h.settings.configured, isFalse);
       expect(find.text('The saved key was deleted.'), findsOneWidget);
@@ -611,6 +624,11 @@ void main() {
       await tester.tap(find.text('Fake scan'));
       await tester.pumpAndSettle();
       expect(find.text('Fake scan'), findsNothing);
+      // A code can name any server, so it asks first, as a tapped link does.
+      expect(find.text('Connect to this server?'), findsOneWidget);
+      expect(h.store.saved, isNull);
+      await tester.tap(inPairing(control('Connect')));
+      await tester.pumpAndSettle();
       expect(h.store.saved?.baseUrl, 'https://owen.example.ts.net');
       expect(h.store.saved?.apiKey, 'K9');
       expect(find.text('The key was saved.'), findsOneWidget);
@@ -635,6 +653,8 @@ void main() {
       await tapVisible(tester, control('Scan QR code'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Fake scan'));
+      await tester.pumpAndSettle();
+      await tester.tap(inPairing(control('Connect')));
       await tester.pumpAndSettle();
       expect(h.store.saved, isNull);
       expect(find.text('The server did not accept the key.'), findsOneWidget);
@@ -661,12 +681,39 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Fake scan'));
       await tester.pumpAndSettle();
+      await tester.tap(inPairing(control('Connect')));
+      await tester.pumpAndSettle();
       expect(h.settings.connection, sampleConnection);
       expect(find.text('The server did not accept the key.'), findsOneWidget);
       await tapVisible(tester, control('Edit connection'));
       await tester.pumpAndSettle();
       expect(holding('K9'), findsNothing);
       expect(holding(sampleConnection.baseUrl), findsOneWidget);
+    });
+
+    testWidgets('Cancel on a scanned code keeps the saved server', (
+      tester,
+    ) async {
+      final h = await pumpApp(tester, llm: planningServer(), canScan: true)
+        ..scanCode =
+            'anywherellm://connect?url=https%3A%2F%2Fowen.example.ts.net&key=K9';
+      h.shell.openSettings(SettingsPage.connection);
+      await tester.pumpAndSettle();
+      await tapVisible(tester, control('Edit connection'));
+      await tester.pumpAndSettle();
+      await tapVisible(tester, control('Scan QR code'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Fake scan'));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('It replaces ${sampleConnection.host}.'),
+        findsOneWidget,
+      );
+      await tester.tap(inPairing(control('Cancel')));
+      await tester.pumpAndSettle();
+      expect(find.byType(PairingSheet), findsNothing);
+      expect(h.settings.connection, sampleConnection);
+      expect(h.llm.verified, isEmpty, reason: 'nothing was sent to the code');
     });
 
     testWidgets('a code that is not a connection saves nothing', (

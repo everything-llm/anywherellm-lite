@@ -13,6 +13,7 @@ import 'package:anywherellm/ui/shell.dart';
 import 'package:anywherellm/ui/state/ask_controller.dart';
 import 'package:anywherellm/ui/state/memory_controller.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
+import 'package:anywherellm/ui/widgets/sheet.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 
 import 'dart:async';
@@ -366,6 +367,10 @@ Finder typingField([Finder? of]) {
   final field = find.byWidgetPredicate((w) => w is EditableText && !w.readOnly);
   return of == null ? field : find.descendant(of: of, matching: field);
 }
+
+/// The [label] button of the question a sheet asks, apart from any other control so named.
+Finder asked(String label) =>
+    find.descendant(of: find.byType(SheetQuestion), matching: control(label));
 
 /// The text fields that hold [text].
 Finder holding(String text) => find.byWidgetPredicate(

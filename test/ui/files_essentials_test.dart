@@ -99,6 +99,18 @@ void main() {
     expect(h.saved.keys, contains('Q3 roadmap.pdf.txt'));
     await tapVisible(tester, control('Remove from workspace'));
     await tester.pumpAndSettle();
+    await tester.tap(asked('Keep'));
+    await tester.pumpAndSettle();
+    expect(h.files.reading?.title, 'Q3 roadmap.pdf');
+    expect(
+      h.llm.calls.where((c) => c.startsWith('updateEmbeddings')),
+      isEmpty,
+      reason: 'Keep leaves it in the workspace',
+    );
+    await tapVisible(tester, control('Remove from workspace'));
+    await tester.pumpAndSettle();
+    await tester.tap(asked('Remove'));
+    await tester.pumpAndSettle();
     expect(h.files.reading, isNull);
     // The sheet the text was opened from comes back, with the undo.
     expect(h.shell.sourcesOpen, isTrue);
