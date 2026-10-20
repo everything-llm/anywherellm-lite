@@ -114,44 +114,46 @@ void main() {
     );
   });
 
-  testWidgets('a picture off the server offers no Save or Share and is never read', (
-    tester,
-  ) async {
-    final llm = answering(
-      '![a](https://evil.example/a.png)\n\n![b](https://h:3001/p/1.jpg)',
-    )..images[Uri.parse('https://h:3001/p/1.jpg')] = pixel;
-    await pumpApp(tester, llm: llm, canShare: true);
-    await tester.tap(control('Picture 1: a, from evil.example'));
-    await tester.pumpAndSettle();
-    expect(find.byType(GalleryPage), findsOneWidget);
-    expect(control('Open page'), findsOneWidget);
-    expect(control('Save'), findsNothing);
-    expect(control('Share'), findsNothing);
-    expect(
-      llm.calls.where((c) => c.startsWith('answerImage:https://evil')),
-      isEmpty,
-    );
-  });
+  testWidgets(
+    'a picture off the server offers no Save or Share and is never read',
+    (tester) async {
+      final llm = answering(
+        '![a](https://evil.example/a.png)\n\n![b](https://h:3001/p/1.jpg)',
+      )..images[Uri.parse('https://h:3001/p/1.jpg')] = pixel;
+      await pumpApp(tester, llm: llm, canShare: true);
+      await tester.tap(control('Picture 1: a, from evil.example'));
+      await tester.pumpAndSettle();
+      expect(find.byType(GalleryPage), findsOneWidget);
+      expect(control('Open page'), findsOneWidget);
+      expect(control('Save'), findsNothing);
+      expect(control('Share'), findsNothing);
+      expect(
+        llm.calls.where((c) => c.startsWith('answerImage:https://evil')),
+        isEmpty,
+      );
+    },
+  );
 
-  testWidgets('a picture saves and shares under a name that stays in its folder', (
-    tester,
-  ) async {
-    final traversing = Uri.parse(
-      'https://h:3001/x/..%2F..%2Ffiles%2Fprefs.json',
-    );
-    final llm = answering('![a]($traversing)\n\n![b](https://h:3001/p/1.jpg)')
-      ..images[traversing] = pixel
-      ..images[Uri.parse('https://h:3001/p/1.jpg')] = pixel;
-    final h = await pumpApp(tester, llm: llm, canShare: true);
-    await tester.tap(control('Picture 1: a, from h'));
-    await tester.pumpAndSettle();
-    await tester.tap(control('Save'));
-    await tester.pumpAndSettle();
-    await tester.tap(control('Share'));
-    await tester.pumpAndSettle();
-    expect(h.saved.keys, ['..-..-files-prefs.json']);
-    expect(h.shared.keys, ['..-..-files-prefs.json']);
-  });
+  testWidgets(
+    'a picture saves and shares under a name that stays in its folder',
+    (tester) async {
+      final traversing = Uri.parse(
+        'https://h:3001/x/..%2F..%2Ffiles%2Fprefs.json',
+      );
+      final llm = answering('![a]($traversing)\n\n![b](https://h:3001/p/1.jpg)')
+        ..images[traversing] = pixel
+        ..images[Uri.parse('https://h:3001/p/1.jpg')] = pixel;
+      final h = await pumpApp(tester, llm: llm, canShare: true);
+      await tester.tap(control('Picture 1: a, from h'));
+      await tester.pumpAndSettle();
+      await tester.tap(control('Save'));
+      await tester.pumpAndSettle();
+      await tester.tap(control('Share'));
+      await tester.pumpAndSettle();
+      expect(h.saved.keys, ['..-..-files-prefs.json']);
+      expect(h.shared.keys, ['..-..-files-prefs.json']);
+    },
+  );
 
   testWidgets('a picture by a path from the server\'s root saves', (
     tester,

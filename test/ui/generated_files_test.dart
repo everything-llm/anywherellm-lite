@@ -106,36 +106,37 @@ void main() {
     expect(find.byType(ImageViewer), findsNothing);
   });
 
-  testWidgets('a made file saves and shares under a name that stays in its folder', (
-    tester,
-  ) async {
-    final llm = planningServer()
-      ..made = const [
-        GeneratedFile(
-          type: 'PdfFileDownload',
-          name: '../../files/prefs.json',
-          storageName: 'pdf-1.pdf',
-        ),
-        GeneratedFile(
-          type: 'imageGenerationCard',
-          name: '../cat.png',
-          storageName: 'img-1.png',
-        ),
-      ]
-      ..generated['pdf-1.pdf'] = [37, 80, 68, 70]
-      ..generated['img-1.png'] = pixel;
-    final h = await pumpApp(tester, llm: llm, canShare: true);
-    await ask(tester, 'Make me a report and a cat');
-    await tester.tap(control('Save ../../files/prefs.json'));
-    await tester.pumpAndSettle();
-    expect(h.saved.keys, ['..-..-files-prefs.json']);
-    tester.widget<Tappable>(control('Open ../cat.png')).onTap!();
-    await tester.pumpAndSettle();
-    final viewer = find.byType(ImageViewer);
-    await tester.tap(find.descendant(of: viewer, matching: control('Share')));
-    await tester.pumpAndSettle();
-    expect(h.shared.keys, ['..-cat.png']);
-  });
+  testWidgets(
+    'a made file saves and shares under a name that stays in its folder',
+    (tester) async {
+      final llm = planningServer()
+        ..made = const [
+          GeneratedFile(
+            type: 'PdfFileDownload',
+            name: '../../files/prefs.json',
+            storageName: 'pdf-1.pdf',
+          ),
+          GeneratedFile(
+            type: 'imageGenerationCard',
+            name: '../cat.png',
+            storageName: 'img-1.png',
+          ),
+        ]
+        ..generated['pdf-1.pdf'] = [37, 80, 68, 70]
+        ..generated['img-1.png'] = pixel;
+      final h = await pumpApp(tester, llm: llm, canShare: true);
+      await ask(tester, 'Make me a report and a cat');
+      await tester.tap(control('Save ../../files/prefs.json'));
+      await tester.pumpAndSettle();
+      expect(h.saved.keys, ['..-..-files-prefs.json']);
+      tester.widget<Tappable>(control('Open ../cat.png')).onTap!();
+      await tester.pumpAndSettle();
+      final viewer = find.byType(ImageViewer);
+      await tester.tap(find.descendant(of: viewer, matching: control('Share')));
+      await tester.pumpAndSettle();
+      expect(h.shared.keys, ['..-cat.png']);
+    },
+  );
 
   testWidgets('without a share sheet there is no Share', (tester) async {
     final llm = planningServer()

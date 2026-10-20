@@ -246,10 +246,7 @@ $$\frac{a}{b}$$
     expect(find.text('The model did not answer'), findsNothing);
     await tester.tap(find.text('Change the model'));
     await tester.pumpAndSettle();
-    expect(
-      find.text('Applies to every chat in Q3 planning.'),
-      findsOneWidget,
-    );
+    expect(find.text('Applies to every chat in Q3 planning.'), findsOneWidget);
   });
 
   testWidgets('a streaming answer has no Copy until it ends', (tester) async {

@@ -323,6 +323,21 @@ void main() {
       expect(find.byType(PageSheet), findsOneWidget);
     });
 
+    testWidgets('waiting while another workspace opens is not sent there, and '
+        'the page says why', (tester) async {
+      final llm = answering('Made it: [Groceries](/apps-lean/q9Zx_-1aB2.html)');
+      final h = await opened(tester, llm);
+      h.appView!.channel!.onMessage(comment('q3'));
+      await tester.pumpAndSettle();
+      await h.chat.select('household');
+      await tester.pumpAndSettle();
+      await tester.tap(asked('Send'));
+      await tester.pumpAndSettle();
+      expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
+      expect(h.appView!.ran.single, contains('another workspace'));
+      expect(h.appView!.ran.single, contains('"ok":false'));
+    });
+
     testWidgets('while the chat answers stays on the page, which says why', (
       tester,
     ) async {
@@ -519,6 +534,26 @@ void main() {
       expect(find.text('You: Book Tuesday'), findsNothing);
     },
   );
+
+  testWidgets('a hand back posted twice, or unasked, is heard once', (
+    tester,
+  ) async {
+    final llm = answering('Done: [the tab](/browser-lean/3kQ.html)');
+    final h = await pumpApp(tester, llm: llm, canViewApps: true);
+    await tapLink(tester, 'the tab');
+    await tester.pumpAndSettle();
+    final page = h.appView!.channel!;
+    // A page that posts it before any was asked for.
+    page.onMessage('{"gave":true}');
+    page.onMessage('{"who":"user"}');
+    await tester.pumpAndSettle();
+    await tester.tap(control('Hand back to the agent'));
+    await tester.pump();
+    page.onMessage('{"gave":true}');
+    page.onMessage('{"gave":true}');
+    await tester.pumpAndSettle();
+    expect(find.text('Hand back'), findsNothing);
+  });
 
   testWidgets('a message the bar cannot send after the hand back stays typed', (
     tester,

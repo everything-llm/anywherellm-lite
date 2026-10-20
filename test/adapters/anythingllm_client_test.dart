@@ -1629,15 +1629,18 @@ void main() {
       expect(seen, isEmpty);
     });
 
-    test('refuses an address off the server\'s host, sending nothing', () async {
-      final seen = <http.BaseRequest>[];
-      final api = images(const Stream.empty(), seen: seen);
-      final error = await _failure(
-        api.answerImage(Uri.parse('https://evil.example/a.png')),
-      );
-      expect(error.message, offServerImage);
-      expect(seen, isEmpty);
-    });
+    test(
+      'refuses an address off the server\'s host, sending nothing',
+      () async {
+        final seen = <http.BaseRequest>[];
+        final api = images(const Stream.empty(), seen: seen);
+        final error = await _failure(
+          api.answerImage(Uri.parse('https://evil.example/a.png')),
+        );
+        expect(error.message, offServerImage);
+        expect(seen, isEmpty);
+      },
+    );
 
     test('a missing image fails in plain words', () async {
       final api = images(
