@@ -48,10 +48,11 @@ class Composer extends StatefulWidget {
   final FocusNode focus;
 
   @override
-  State<Composer> createState() => _ComposerState();
+  State<Composer> createState() => ComposerState();
 }
 
-class _ComposerState extends State<Composer> {
+/// What the [Composer] holds.
+class ComposerState extends State<Composer> {
   /// The files picked for the next question.
   List<Attachment> _attached = const [];
 
@@ -159,6 +160,14 @@ class _ComposerState extends State<Composer> {
             "Allow it in Android's settings for the app.";
       });
     }
+  }
+
+  /// Puts [text] back as the message to send as a new one, without the shortcut chosen for
+  /// the one it replaces, since [text] may already be what that shortcut expanded to.
+  void edit(String text) {
+    if (_shortcut != null) setState(() => _shortcut = null);
+    _setDraft(text);
+    widget.focus.requestFocus();
   }
 
   /// Puts [text] in the message, with the cursor at its end.

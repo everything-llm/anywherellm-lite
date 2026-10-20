@@ -30,6 +30,7 @@ class ChatView extends StatefulWidget {
 class _ChatViewState extends State<ChatView> {
   final _draft = TextEditingController();
   final _focus = FocusNode();
+  final _composer = GlobalKey<ComposerState>();
 
   @override
   void dispose() {
@@ -38,10 +39,7 @@ class _ChatViewState extends State<ChatView> {
     super.dispose();
   }
 
-  void _edit(String text) {
-    _draft.text = text;
-    _focus.requestFocus();
-  }
+  void _edit(String text) => _composer.currentState?.edit(text);
 
   @override
   Widget build(BuildContext context) {
@@ -104,7 +102,7 @@ class _ChatViewState extends State<ChatView> {
           // Last, so it paints over the header when there is no room for both.
           LayoutId(
             id: _Slot.composer,
-            child: Composer(draft: _draft, focus: _focus),
+            child: Composer(key: _composer, draft: _draft, focus: _focus),
           ),
         ],
       ),

@@ -56,4 +56,20 @@ void main() {
       );
     },
   );
+
+  testWidgets('Edit puts a question back without the shortcut chosen before', (
+    tester,
+  ) async {
+    await pumpApp(tester, llm: planningServer());
+    await tester.enterText(composerField, '/translate ');
+    await tester.pump();
+    expect(find.text('Translate'), findsOneWidget);
+    await tester.longPress(find.text('What is the budget?'));
+    await tester.pump();
+    expect(find.text('Translate'), findsNothing);
+    expect(
+      tester.widget<EditableText>(composerField).controller.text,
+      'What is the budget?',
+    );
+  });
 }
