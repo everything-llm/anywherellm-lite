@@ -159,7 +159,8 @@ def log_path(run: str) -> Path:
 
 
 def cmd_mark(a: argparse.Namespace) -> None:
-    probe_of(a.probe)
+    if a.probe != "run":
+        probe_of(a.probe)
     Path(a.run).mkdir(parents=True, exist_ok=True)
     event = {"t": datetime.now(timezone.utc).isoformat(timespec="seconds"), "probe": a.probe,
              "side": a.side, "kind": a.kind, "text": " ".join(a.text)}
@@ -169,6 +170,8 @@ def cmd_mark(a: argparse.Namespace) -> None:
 
 
 def cmd_table(a: argparse.Namespace) -> None:
+    if not log_path(a.run).exists():
+        sys.exit(f"no log in {a.run}: mark a probe first")
     events = [json.loads(line) for line in log_path(a.run).read_text().splitlines()]
     print("| Probe | Muse | AnythingLLM |\n| --- | --- | --- |")
     for p in probes():

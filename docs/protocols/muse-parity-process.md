@@ -13,7 +13,7 @@ Sends the same prompts to a fresh scratch chat in Meta's Muse and in AnythingLLM
 | `fixtures <dir>` | Writes `scratch-expenses.csv` and prints the right totals. |
 | `check <id> <file>` | Checks an answer saved as text: `file` against the totals, `code` against the dice counts. Exit 0 passes. |
 | `chrome` | Starts Chrome with a debugging port on its own profile and prints the endpoint. |
-| `mark <run> <probe> <side> sent\|ended\|note [text]` | Logs a timestamp or a note. `side` is `muse` or `allm`. |
+| `mark <run> <probe> <side> sent\|ended\|note [text]` | Logs a timestamp or a note. `side` is `muse` or `allm`. `<probe>` may be `run` for a note on the whole run, such as Muse's weekly quota. |
 | `table <run>` | Prints the probe table: every core probe, and a browser probe once logged. |
 
 `<run>` is `build/parity/<date>`, which git ignores.
