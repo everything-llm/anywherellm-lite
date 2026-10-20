@@ -458,7 +458,9 @@ class ComposerState extends State<Composer> {
     final draft = widget.draft;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      // As tall as its card, however tall the window allows.
       child: Center(
+        heightFactor: 1,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: Sizes.column),
           child: ListenableBuilder(
@@ -707,15 +709,21 @@ class _Form extends StatelessWidget {
           ],
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // The notes scroll when the window leaves no room for them and the field, as on a
+            // small phone with the keyboard up, from the end, where the shortcuts are.
             if (notes.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 12, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  spacing: 8,
-                  children: notes,
+              Flexible(
+                child: SingleChildScrollView(
+                  reverse: true,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 12, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    spacing: 8,
+                    children: notes,
+                  ),
                 ),
               ),
             // What goes with the message: the shortcut, the files and where answers come from,

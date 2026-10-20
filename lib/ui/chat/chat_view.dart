@@ -237,7 +237,15 @@ class _ChatLayout extends MultiChildLayoutDelegate {
   @override
   void performLayout(Size size) {
     final width = BoxConstraints.tightFor(width: size.width);
-    final composer = layoutChild(_Slot.composer, width);
+    // The composer is no taller than the window; what it holds above the field scrolls.
+    final composer = layoutChild(
+      _Slot.composer,
+      BoxConstraints(
+        minWidth: size.width,
+        maxWidth: size.width,
+        maxHeight: size.height,
+      ),
+    );
     final top = layoutChild(_Slot.top, width);
     final body = math.max(0.0, size.height - top.height - composer.height);
     layoutChild(

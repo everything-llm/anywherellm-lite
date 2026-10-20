@@ -17,6 +17,10 @@ import '../support/pump.dart';
 const phone = Size(360, 640);
 const keyboard = 300.0;
 
+/// A small phone with the keyboard up, which leaves 200 of its 480 pixels.
+const tight = Size(360, 480);
+const tightKeyboard = 280.0;
+
 /// A phone on its side, and the keyboard's height on it: 160 of its 360 pixels are left.
 const side = Size(640, 360);
 const sideKeyboard = 200.0;
@@ -235,5 +239,29 @@ void main() {
       tester.getRect(find.byType(Composer)).bottom,
       greaterThan(phone.height - keyboard),
     );
+  });
+
+  testWidgets('the notes over the field fit above a small phone\'s keyboard', (
+    tester,
+  ) async {
+    final llm = planningServer()..hold = true;
+    final h = await pumpApp(tester, llm: llm, size: tight);
+    await h.chat.send('First question');
+    await tester.pump();
+    for (final m in ['And the second one?', 'And a third one?', 'A fourth?']) {
+      expect(h.chat.sendWhenDone(m), isTrue);
+    }
+    await tester.tap(composerField);
+    raiseKeyboard(tester, tightKeyboard);
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.enterText(composerField, '/');
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(tester.takeException(), isNull);
+    // The notes scroll, so the composer is no taller than what the keyboard leaves and its
+    // field, with the Send button, stays in view.
+    expectAboveKeyboard(tester, find.byType(Composer), tight, tightKeyboard);
+    expectAboveKeyboard(tester, composerField, tight, tightKeyboard);
+    await llm.chat!.close();
+    await tester.pump(const Duration(seconds: 1));
   });
 }
