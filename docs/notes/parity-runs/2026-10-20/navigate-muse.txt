@@ -1,0 +1,11 @@
+On it — running the read-only Wikipedia check in the live browser now. I'll report back with the opening year and the page list once it's done.
+
+1950 — the Stockholm Metro article notes its first line opened in 1950, with the first section (Slussen to Hökarängen) opening on 1 October 1950.
+
+Pages visited, in order:
+
+https://en.wikipedia.org/ — Wikipedia homepage
+Wikipedia on-site search for "Stockholm Metro"
+https://en.wikipedia.org/wiki/Stockholm_Metro — Stockholm Metro article
+
+Read only — nothing edited or signed in.

@@ -1,0 +1,5 @@
+It's yours — I just opened a fresh live browser window on https://httpbin.org/forms/post for you to check yourself.
+
+The earlier submitted result is still in the other window at https://httpbin.org/post if you want to compare.
+
+Take your time, tell me when you're done and I'll pick it back up.

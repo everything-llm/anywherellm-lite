@@ -1,0 +1,21 @@
+Got it — I've opened httpbin's test form in the live browser and I'm filling it with exactly those values (Scratch Test / 000 / scratch@example.com / Medium / Cheese / "scratch test") and submitting it. I'll tell you what the result page shows as soon as it comes back.
+
+Submitted it — it worked.
+
+Final page: https://httpbin.org/post — httpbin's JSON echo of a successful POST.
+
+The echoed form was exactly what you gave me:
+
+{
+"custname": "Scratch Test",
+"custtel": "000",
+"custemail": "scratch@example.com",
+"size": "medium",
+"topping": "cheese",
+"comments": "scratch test",
+"delivery": ""
+}
+
+A couple of form quirks: "Cheese" is labeled "Extra Cheese" on that page (still submits as topping: cheese), and the comments box is the "Delivery instructions" textarea. The preferred delivery time was left blank, so delivery came back empty.
+
+The rest of the page was the usual httpbin wrapper — empty args, data, and files, json: null, url: "https://httpbin.org/post", and request headers showing it came from https://httpbin.org/forms/post.

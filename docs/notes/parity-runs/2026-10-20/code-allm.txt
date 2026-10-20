@@ -1,0 +1,1 @@
+NO ANSWER SAVED. The stream stalled after the line 'I'll simulate this with the code-execution API since the built-in sandbox isn't available in this chat - running the seeded simulation now:' (thinking 2m 27s, no footer after about 10 min). The page was reloaded; the thread 693dcbc7 then showed no exchange (empty 'How can I help you today?').

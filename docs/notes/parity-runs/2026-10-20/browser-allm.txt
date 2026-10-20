@@ -1,0 +1,7 @@
+The current #1 is "DeepSeek just open-sourced its inference engine" (1,416 points, 495 comments). Opening its comments page now.
+
+Done — opened news.ycombinator.com in the live browser, then the #1 story's comments page. Read-only; I clicked nothing that changes anything (no login, vote, or post).
+
+Title: "DeepSeek just open-sourced its inference engine" (links to github.com/deepseek-ai/DeepInfer)
+Points: 1,416 on the front page, 1,418 by the time the comments page loaded — 495 comments, posted 6 hours ago by ggcr
+Top comment (schneehertz, 5h ago): calls the release "a nuclear bomb" and quotes DeepSeek's own Zhihu post with hard numbers — the engine serves DeepSeek V4.1 Flash at 155 trillion tokens/day across a single cluster, pulling in about $38 per GPU per hour in revenue at off-peak pricing. The gist: unusually concrete unit economics proving large-scale inference is genuinely profitable, which set off a long thread about whether that kills the "AI is unprofitable" argument or just means inference is becoming a commodity (training costs being where providers bleed).

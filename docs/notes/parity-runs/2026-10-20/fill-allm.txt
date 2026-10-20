@@ -1,0 +1,24 @@
+I'll walk through this with the browser. First, a quick check of the browser guide since this is the first browser task in this chat:
+
+The form is open. Filling it in — note the form's topping options are Bacon, Extra Cheese, Onion and Mushroom; there's no plain "Cheese", so I'll use Extra Cheese as the closest match. Submitting now, as you asked.
+
+Done — the form was filled and submitted. The result page (https://httpbin.org/post) is httpbin's standard echo of the POST request, showing the submitted values as JSON:
+
+{
+"args": {},
+"data": "",
+"files": {},
+"form": {
+"comments": "scratch test",
+"custemail": "scratch@example.com",
+"custname": "Scratch Test",
+"custtel": "000",
+"delivery": "",
+"size": "medium",
+"topping": "cheese"
+},
+"json": null,
+"url": "https://httpbin.org/post"
+}
+
+Everything came through as expected: the name, telephone, email, size: medium, topping: cheese (the checkbox's underlying value), and the comments. The only empty field is delivery, since I left the delivery time unset — the request was a application/x-www-form-urlencoded POST from the tab's headless Chromium.

@@ -1,0 +1,8 @@
+Scratch test done — the page is open in this chat's tab and I entered nothing.
+
+What I found at https://news.ycombinator.com/login:
+
+A login form: username field, password field, a "login" button, and a "Forgot your password?" link
+Below it, a separate "Create Account" form (username + password + create account button)
+
+On the login part: yes, signing in there would need a Hacker News account, and I have no saved login for news.ycombinator.com. The safe way your tools provide is exactly what you guessed — I never type a password or code myself, and none is ever asked for or visible in this chat. Instead, you'd take the tab over via the card below and enter your credentials directly on the tab's page, where only the site sees them. Per your instruction I did not start any sign-in; the form sits untouched.

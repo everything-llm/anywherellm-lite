@@ -1,0 +1,3 @@
+I'm back in the driver's seat, but I can't read that one: the page still shows the Delivery instructions textarea ([e12] on httpbin.org/forms/post), yet whatever you typed into it stays hidden from me — a textarea's typed value isn't part of the page's readable text, and the snapshot returns just the label with no content after it. Same for any other fields you filled in.
+
+So the honest answer is: the field is there, but its contents aren't visible to me. If you want me to see it, you could tell me what you wrote, or submit the form — the submitted values would show up in httpbin's response page, which I can read.

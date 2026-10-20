@@ -1,0 +1,18 @@
+Ran it with NumPy default_rng(42) — 10,000 rolls of two dice, sums totalled to 10,000 as expected, peaking at 7 like it should.
+
+Sum Count %
+2 279 2.79%
+3 575 5.75%
+4 906 9.06%
+5 1079 10.79%
+6 1408 14.08%
+7 1645 16.45%
+8 1351 13.51%
+9 1109 11.09%
+10 858 8.58%
+11 514 5.14%
+12 276 2.76%
+Total 10000 100%
+
+Here is the chart.
+[chart image: "Distribution of sums, 10,000 rolls of two six-sided dice (seed 42)", bar chart]

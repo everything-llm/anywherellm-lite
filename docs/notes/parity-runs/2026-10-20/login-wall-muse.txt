@@ -1,0 +1,10 @@
+Done — https://news.ycombinator.com/login loaded cleanly in the live browser.
+
+What's on it:
+
+Login form — username field, password field, login button, and a "Forgot your password?" link
+Create Account form — username field, password field, and a create account button
+
+No CAPTCHA, bot challenge, or interstitial appeared. Nothing was filled in and no buttons were clicked, so no sign-in was needed just to view the page.
+
+If you do want me to sign in at some point, I'll ask you to enter it through the Secure Vault form — never in chat.

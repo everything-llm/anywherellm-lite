@@ -1,0 +1,5 @@
+Done, read-only — no login, voting, or posting.
+
+#1 story: "DeepSeek just open-sourced its inference engine"
+Points: 1,416 on the front page, 1,418 on the comments page moments later (live voting in between)
+Top comment gist: By schneehertz, calling it "a nuclear bomb" — they quote DeepSeek's figures of 155 trillion tokens/day per cluster and ~$38/hr revenue per card at off-peak pricing, arguing that proves large-scale inference can be highly profitable and threatens closed labs' cost advantage.

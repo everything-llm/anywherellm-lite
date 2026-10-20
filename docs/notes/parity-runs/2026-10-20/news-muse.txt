@@ -1,0 +1,13 @@
+Here are the three biggest from the last 48 hours (Oct 18-20), based on scale and cross-source coverage:
+
+1. Google Cloud London outage knocks UK banks offline
+A power failure in Google Cloud's europe-west2-b zone on Tuesday, Oct 20, 2026 knocked Revolut offline across Europe and disrupted HSBC, Lloyds, Halifax, Royal Mail, DPD, Rightmove and others through the UK morning. Google said 38 cloud products were affected.
+Source: The Register — Published/updated Oct 20, 2026
+
+2. Nscale and Anthropic in talks for another $45 billion compute deal
+Nscale is in talks to sell computing power to Anthropic in a deal that could be worth about $45 billion, for a second facility at its Monarch campus in West Virginia.
+Source: Reuters — Published Oct 19, 2026
+
+3. One hacker used AI agents to break into 100+ company sites
+Reuters reported a Chinese-speaking hacker broke into websites belonging to more than 100 companies, including Deere, SharkNinja and Cummins, by outsourcing the work almost entirely to AI agents that autonomously probed and broke into targets.
+Source: Reuters — Published Oct 19, 2026

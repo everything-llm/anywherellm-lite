@@ -1,0 +1,13 @@
+Done — the form filled and submitted cleanly. The result page (https://httpbin.org/post) is httpbin's standard JSON echo of the POST, and it received exactly the made-up values:
+
+"form": {
+"comments": "scratch test",
+"custemail": "scratch@example.com",
+"custname": "Scratch Test",
+"custtel": "000",
+"delivery": "",
+"size": "medium",
+"topping": "cheese"
+}
+
+A few details from the rest of the response: content type was application/x-www-form-urlencoded, the request carried a Referer of the form page, and the server saw the request coming from origin IP <IP redacted by driver> (your connection's public IP) plus an Amazon trace ID (X-Amzn-Trace-Id), since httpbin runs behind AWS.

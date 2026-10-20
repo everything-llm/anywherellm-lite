@@ -1,0 +1,7 @@
+On it — opening that Gothenburg tram article in the live browser now, read-only. I'll report the line count once it's done.
+
+12 regular lines.
+
+That link redirected to the "Gothenburg Tramway" article at https://en.wikipedia.org/wiki/Gothenburg_Tramway — both its infobox and lead say 12 regular lines in service (132 stops).
+
+Read only, nothing edited.

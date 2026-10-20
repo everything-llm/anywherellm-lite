@@ -1,0 +1,5 @@
+Taking it back now — I'll read the Delivery instructions field in that window and report exactly what's there, without changing or submitting anything.
+
+Took it back and checked — the Delivery instructions field is empty.
+
+That window was a fresh copy of the form, so everything else is blank too: no name / telephone / email, no size selected, no toppings checked, and preferred delivery time unset. I didn't change or submit anything.

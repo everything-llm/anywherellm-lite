@@ -1,0 +1,9 @@
+Here are the three biggest tech stories from the past 48 hours (Oct 18–20):
+
+Tech stocks rebounded after their worst week since the April 2025 tariff turmoil, with the Nasdaq climbing Monday as investors bought the dip ahead of a heavy earnings week (Meta, Tesla, Netflix all report this week). — CNBC, published Oct 19, 2026, 4:57 PM EDT: https://www.cnbc.com/2026/10/19/tech-stocks-rebound-meta-tesla-earnings.html
+
+Washington imposed new restrictions on China’s DeepSeek, and the news rattled Asian semiconductor stocks — Korean chipmakers fell again Monday as DeepSeek model and funding worries spread. — Bloomberg, published Oct 19, 2026, 12:17 AM UTC: https://www.bloomberg.com/news/articles/2026-10-19/korean-stocks-fall-as-deepseek-model-funding-worry-rattle-chips
+
+Nscale and Anthropic are reportedly in talks for another $45 billion compute deal, adding to the string of multibillion-dollar AI infrastructure agreements. — TechCrunch, published Oct 19, 2026, 4:39 PM PDT: https://techcrunch.com/2026/10/19/nscale-and-anthropic-are-reportedly-in-talks-for-yet-another-45-billion-compute-deal/
+
+Honorable mention: Nvidia launched new open models for running AI agents in enterprises and on PCs (TechCrunch, Oct 19, 2026).

@@ -1,0 +1,2 @@
+2026-10-20T16:03:16+02:00 muse quota before batch 1: Power plan, 17% used (412M tokens left), weekly limit resets Oct 24
+2026-10-20T16:22:41+02:00 muse quota after batch 1 (file probe done): Power plan, 17% used (411M tokens left), weekly limit resets Oct 24

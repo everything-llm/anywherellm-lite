@@ -1,0 +1,5 @@
+Done — scratch test reminder scheduled.
+When: Wednesday, Oct 21 at 09:00 CEST (Europe/Stockholm) — in about 16h
+Text: 'scratch test reminder - delete me'
+ID: scratch-test-reminder
+It's a one-off, enabled and set to deliver here. Just say the word and I'll delete it.

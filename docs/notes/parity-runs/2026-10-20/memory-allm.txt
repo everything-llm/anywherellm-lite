@@ -1,0 +1,4 @@
+Checked, nothing written — I only read.
+Three stores: a pinned set shown at the top of every chat (5 facts); a notebook of cross-chat notes (25 notes); workspace documents (0 files).
+Notebook buckets and counts: 6 buckets. Counts 13, 2, 3, 5, 1, 1 (sum 25, matching the notebook count).
+Category names and the pinned facts are withheld: the reply lists the user's personal facts (the pinned set and bucket items), which are NOT saved here. Only the counts above are kept.

@@ -1,0 +1,11 @@
+Started that in the live browser — opening Special:Random five times in sequence, read-only. I'll report the five titles in order as soon as it finishes.
+
+Here are the five, in order:
+
+Kalatiku Paembonan
+Chile women's national field hockey team
+Pia Mancini
+Casanova (1918 film)
+Modrolas
+
+Read-only, nothing edited.

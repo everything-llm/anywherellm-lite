@@ -1,0 +1,14 @@
+File tools denied access to the attachment path, so I summed the 45 rows directly from the pasted CSV — the data was all there, no problem.
+
+September 2026 spending (test data)
+CATEGORY TOTAL (SEK) SHARE
+Rent 9,800.00 37.0%
+Utilities 8,059.08 30.4%
+Restaurants 3,196.05 12.1%
+Groceries 2,895.07 10.9%
+Transport 2,523.36 9.5%
+Total 26,473.56
+
+Biggest single expense: rent, 9,800.00 kr on 2026-09-01. Flagging the obvious — among discretionary spending, the largest was a 494.32 kr restaurant charge on 2026-09-23.
+
+One budget cut to suggest: restaurants. It’s the largest flexible category — 10 visits averaging ~320 kr each. Skipping two of those a month saves ~640 kr (~2,300 kr/quarter), with no impact on fixed costs. Rent and utilities (which together are ~67% and include some oddly lumpy utility charges of 900–1,100 kr) aren’t realistically cuttable month-to-month.

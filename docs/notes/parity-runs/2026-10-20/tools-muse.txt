@@ -1,0 +1,118 @@
+Here is everything in context, grouped by category — no browsing, messaging, purchases or other actions taken:
+
+1. Research
+browser.search — Web search by text query, with news / sports / weather / finance / datetime verticals; index results may be stale, does not verify live prices/inventory/bookings.
+browser.deep_research — Delegated, signed-out deep-research agent with sources; only on explicit deep-dive / investigation request.
+social.search — Search public social posts about a topic/brand/place/event; public posts only, fallback for platform CLIs.
+muse.connector_search — Find connector docs by name/alias/action; finds instructions, does not connect accounts or fetch user content.
+muse.skill_search — Search full skill catalog (bundled + custom) by keyword/regex; returns candidates, you still read the SKILL.md.
+map.* / Places connector — Geocode addresses/places and reverse-geocode coordinates, plus hours, ratings, reviews, photos; live hours/availability need separate verification.
+image_search skill — Web image search by text for URLs/source pages for feeds/artifacts; does not identify a supplied image/person.
+place_discovery skill — Find/compare restaurants, cafes, shops, parks, attractions with verified location/hours and a map.
+FlightAware connector — Dated schedules, live status, positions, tracks, airport activity.
+Meta Catalog Search connector — Search Meta product catalog across merchants for listings/prices/images/variants.
+2. Browsing
+browser.browse — Live Chromium browser task for visiting sites, clicking, forms, sign-in, purchases; async handoff, 1 checkout per window, sign-in via Secure Vault/saved login.
+browser.open — Fetch page text read-only from a tool-returned or user-supplied URL; no clicks, sign-in, forms, or purchases, not a live visit.
+browser.find — Find exact text matches in a page already opened with browser.open.
+browser.lookup_citation_url / browser.windows / browser.profiles — Resolve citation URLs, list browser windows/profiles to continue work.
+browser_account_signin custom skill — Sign in to a named browser account without using the wrong saved login; stops after first credential rejection.
+3. Code
+muse.exec — Run shell commands on this Linux VM; backgrounds after yield_ms, files outside ~ are ephemeral.
+process.list / log / poll / kill / clear / write / send_keys — Manage background exec processes, read output, send input/keys, stop them.
+subagent.spawn / list / send / resume / close — Delegate self-contained work to background child agents; async results, max depth 2, cannot operate live browser.
+workflow.* — Create/launch/inspect VM-local JavaScript workflows orchestrating child agents for repeatable multi-agent work.
+tool_search.load_tool_namespace — Load deferred tool namespaces/schemas into context; only for listed namespaces.
+GitHub connector — Search/work on repos, files, issues, PRs via GitHub MCP; connected as BinaryBand, only repos granted on install are visible.
+custom_connector_setup skill — Build a custom connector/skill for a service via its API/MCP, storing credential in secure flow.
+custom.legacy-deepseek connector — Use DeepSeek API when user asks for DeepSeek/this provider.
+custom.legacy-z-ai connector — Use Z.AI API when user asks for Z.AI/this provider.
+4. Files
+muse.read / write / edit — Read/list, write, or surgically edit files under ~ / ~/workspace / /tmp; overwriting unread file fails.
+muse.db — Bounded read-only SQL SELECT on Muse records (transcripts, goals, memories, crons, artifacts, etc.); only listed functions/casts allowed.
+trash.* — Move files to recoverable trash, list, or restore; preferred over permanent delete.
+muse.visual_grounding — Locate/label/count objects in an image with 0-1000 coordinates; authoritative for exact positions/counts.
+Google Drive connector — Find, upload, download, organize, share Drive files.
+Google Docs connector — Read, create, edit Google Docs.
+documents skill — Read/write/revise documents, PDFs, spreadsheets, presentations, keeping editable source.
+file_hosting skill — Put a file where intended people can open it and return safe link; Muse storage links expire and are public to holder.
+knowledge_organization skill — Organize notes/notebooks/docs in Notion/Evernote/Google Docs/Drive, keeping existing structure.
+media_library skill — Search/inspect user photo library and connected device galleries.
+Apple Health / Health Connect connectors — Read iPhone/Android-synced health metrics, samples, sleep, workouts, check sync, delete approved records only.
+5. Media Generation
+media.* — Generate/edit images and video via media pipeline; limit 6 videos per user message including delegated agents.
+avatar.create / edit / get / set + sharing card — Create/update Muse's own avatar (default Jolly), not user's profile picture.
+voice.get / set / set_mute / end_call — Read/set speaking voice, mute, end call; resolves against catalog/saved voices.
+spoken_audio skill — Send voice note/message, narrate artifact/scheduled text, read text aloud as audio file.
+generate_podcast skill — Research, script, produce podcast/briefing with 1+ voices, deliver/publish only within authorised scope.
+music_discovery skill + Spotify connector — Find exact recordings, recommend music, build/update playlists, start playback; Spotify also manages library/shows.
+Tailscale connector — Join VM to user's Tailscale/Headscale network and reach private TCP services via proxy; currently noted inactive/rejoined per memory, needs approval to rejoin.
+6. Scheduling
+cron.add / list / view / update / remove — Scheduled agent jobs/reminders/periodic checks; each run finishes, manage via cron tools not files.
+hooks.list / add / update / remove / dry_run / enable — Event-driven automations polling a condition; new hooks start disabled.
+tracking.* — Track concrete reservations, deliveries, reminders, projects; create when concrete, close when resolved.
+user_goal.* — Durable goals: create, update, log activity, search, list, close; not for one-off todos.
+todo.write — In-session task checklist, max 25 items, 1 in_progress; not durable goals/reminders.
+Google Calendar connector — Read calendars/free-busy, schedule/change/cancel events with Meet links and guest notifications; connected, verify before relying.
+scheduling skill — Find times across people/calendars/timezones, place holds, send invites, share booking links.
+goals skill — Guidance for creating/helping with Goals-tab goals.
+proactivity.read / select — Read/select prepared background proactive delivery items; past snapshot, must reconfirm before presenting/acting.
+feed.* — Manage Feed tab prompt/units, search/regenerate; only when user explicitly asks about Feed.
+7. Memory
+muse.memory_search — Search saved memories in ~/MEMORY.md, ~/memory/**, side-chat memory, plus past conversations; max 200 memories/100 conversations per query set.
+muse.memory_get — Read a snippet from a memory file by path/citation and line window.
+muse.memory_explain — Show provenance of a memory claim, what it replaced/was replaced by, source messages/dates.
+muse.session_status — Report context window used/remaining, model, user's local time.
+forget.plan / confirm skill+tools — Plan then, after user approval, remove information user explicitly asks to forget and its copies/producers; no action on silence/ambiguity.
+device_data skill — Read cached contacts/calendar from Muse storage, delete Muse's local copy only; does not modify paired devices.
+Google Contacts connector — Search and create/edit/delete contacts' names/emails/phones; connected, verify live data.
+8. Messaging
+chat.list / create / read_messages / send_message / rename / archive / unarchive / delete — Manage side chats, read history, task external workers; worker decides what to say in external chats.
+chat.connection_status / configure_connection / disconnect — Check/configure/disconnect WhatsApp side-chat provider; linking uses separate secure flow.
+worker.update_discretion — Replace user's guidance in a side chat's DISCRETION.md; applies on user's turn, may need approval card.
+Gmail connector — Search/read/count emails/attachments, draft/send/reply/forward with approval, label/archive/trash/unsubscribe; connected, verify live data.
+Messenger connector — Read/search/send in personal Facebook Messenger, incl. call history, reactions, Marketplace threads.
+Facebook connector — Read friends/profiles/posts/groups/events/stories/saved, publish approved personal posts/comments, manage Pages/Marketplace; connected, verify live data.
+Instagram connector — Read profiles/posts/comments/stories/feeds/saved/insights, manage collections/profile, publish stories/posts/reels/carousels.
+Threads connector — Read profiles/posts/replies/feeds/activity/insights/trends/search, publish posts, tune ranking.
+email_management skill — Find, triage, draft, send email from right mailbox, keeping thread/recipients/approval exact.
+messaging skill — Message people from user's own WhatsApp/Messenger/Slack etc. and carry delegated conversation to result.
+meeting_follow_up skill — Turn meeting notes/transcript/recording into decisions, owned actions, recap/email/tasks.
+device.list / describe / invoke / unpair — Run commands/pull data from paired devices, incl. text messages.
+muse.react_to_user_message — Attach one emoji / hatch:heart_v1 care reaction to user's message.
+muse.nothing_to_do — Signal a handoff/ignorable message needs no user-visible reply.
+9. Purchases
+shopping.resolve_results — Resolve selected product IDs against search files, write normalized results artifact, prepare validated citation markers; call once after choosing.
+shopping.create_shopping_results_widget / create_shopping_cart_widget / read_cart — Present shopping results/carts, read verified carts.
+shopping skill — Find, reverse-image-search, compare, evaluate, buy real products with prices/images/URLs (not groceries); load first for product intent.
+groceries skill — Groceries/prepared meals for delivery/pickup via Instacart/Walmart/Tesco/Uber Eats/DoorDash/Deliveroo etc.; load first for grocery intent.
+wallet.* (Shop Pay shop-pay, Stripe Link stripe-link) — Inspect connection, retrieve saved payment methods/profile/shipping addresses; does not add/select/charge, checkout pays after approval.
+credentials.list / request_login / request_new_password / request_api_access — Secure Vault flows for website logins/API access; passwords collected on secure pages, never in chat, Muse never sees values.
+permissions.list_active / list_pending / history — List current grants, pending requests, resolved permission history; read-only, does not approve/deny.
+muse.offer_preference / set_preferred — Offer/save a connector as preferred for a category after a completed task; at most once per category.
+Duffel connector — Search, book, cancel complete flight itineraries, recheck fare of booked trip.
+flight_booking skill — Compare connected inventory + flight sites on verified total price/time, book best complete flight.
+flight_tracking skill — Check live flight status, monitor booked trips for schedule/gate/cancellation/fare changes.
+hotel_booking skill — Compare stays across hotels/platforms/rentals by full-stay price/location/terms, book chosen rate.
+restaurant_reservations skill — Find restaurant with real available table, book/change/cancel via its route/platform.
+event_tickets skill + Ticketmaster connector — Find event/seats, compare primary/resale by delivered total, buy/transfer/resell within rules; Ticketmaster gives checkout link.
+trip_planning / trip_transport skills + travel.* — Plan living trip itinerary (flights/stays/transport/dining), compare/book cars/trains/ferries/buses/bikes/rides/transfers.
+marketplaces skill — Buy/sell/value used items on eBay/Facebook Marketplace/Craigslist with fair prices/safe meetups/protected payments.
+Shopify / Shopify UCP connectors — Run a Shopify store (products/orders/customers/reports) / buy eligible Shopify products via Meta Catalog direct checkout with wallet, track/cancel orders.
+Shop Pay connector — Pay at supported Shopify merchants with saved Shop Pay card after native purchase approval.
+Stripe connector — Manage merchant customers, products, coupons, payments, invoices, subscriptions, refunds, disputes, balances/payouts.
+Plaid (Finances) connector — Read linked bank/card/loan/investment accounts, balances, transactions, spending, recurring bills, liabilities/holdings.
+financial_planning skill — Budget, affordability test, debt repayment from reconciled spending/balances/due dates.
+Meta Ads connector + ads.resolve_entities — Read/manage Meta ad accounts/campaigns/audiences/catalogs/pixels, price/create paused campaigns; resolve_entities is required chip-finalisation for named Ads entities.
+10. Artifacts
+artifact.* — Create, edit, inspect, list, get status, invoke actions, share, export, delete durable artifacts: web pages/apps, documents, PDFs, presentations, spreadsheets; inspect before delivering.
+widget.create_html_widget / create_html_file_widget / create_list_widget / create_map_widget / create_letter_widget — Create transient in-chat HTML, lists (incl. flights), maps, Letters; transient UI, not kept documents.
+widget.present / state — Present an already-created widget standalone, read its durable state; does not create/update data.
+muse.create_options — Bounded reply-choice buttons in chat; tap sends exact text, max ~2 options normally, not a substitute for approval cards.
+ui.* — Drive user's live app UI, open views, apply settings, create navigation cards; availability varies by client, list is authority.
+idea.* — List/search/view Ideas, fetch onboarding starters, publish a portable Idea only on explicit ask, create widgets for saved ideas.
+onboarding.create_name_widget / update_identity — Assistant-name picker widget, persist chosen name/vibe to identity.
+avatar sharing card — See Media; also presents as artifact/card.
+documents / subscription_status / muse_early_access / muse_feedback skills — Subscription/plan/usage answers, early-access join/check/withdraw, and filing/viewing Muse feedback only on user's go-ahead.
+home_control skill — Control home devices/routines, check recorded camera events, confirm requested state.
+fitness_tracking / health_review skills — Review activity/sleep/recovery/body data vs goals; organise health records into clinician-visit summary/questions.

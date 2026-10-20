@@ -1,0 +1,15 @@
+Fake test data — September 2026, 45 transactions:
+
+Total: 26,473.56 kr
+
+By category:
+
+Rent: 9,800.00 kr — 37.0% (1 payment)
+Utilities: 8,059.08 kr — 30.4% (9)
+Restaurants: 3,196.05 kr — 12.1% (10)
+Groceries: 2,895.07 kr — 10.9% (12)
+Transport: 2,523.36 kr — 9.5% (13)
+
+Biggest single expense: Rent — 9,800 kr on 2026-09-01. That's more than the next category total for any single day.
+
+One budget cut: Halve restaurant spending. At 3,196 kr across 10 visits (~320 kr average), cutting to ~5 visits would save about 1,598 kr/month — the easiest discretionary saving here without touching rent or utilities.

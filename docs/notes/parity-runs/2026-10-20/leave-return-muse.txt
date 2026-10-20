@@ -1,0 +1,17 @@
+Done — submitted successfully.
+
+Result page: https://httpbin.org/post — httpbin's JSON echo of the POST.
+
+The echoed form was exactly what you specified:
+
+{
+"custname": "Scratch Test",
+"custtel": "000",
+"custemail": "scratch@example.com",
+"size": "medium",
+"topping": "cheese",
+"delivery": "",
+"comments": "scratch test"
+}
+
+All values match — Medium posted as medium, Cheese as cheese (that checkbox is labeled "Extra Cheese" on the form), and delivery was left blank as an empty string. The page also echoed "url": "https://httpbin.org/post" and "origin": "<IP redacted by driver>".

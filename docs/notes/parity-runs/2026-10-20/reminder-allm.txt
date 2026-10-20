@@ -1,0 +1,2 @@
+Done. Job #28 "scratch test reminder" is scheduled for tomorrow at 09:00 Stockholm time (07:00 UTC, Oct 21), with the text "scratch test reminder - delete me".
+Just say the word when you want it deleted.

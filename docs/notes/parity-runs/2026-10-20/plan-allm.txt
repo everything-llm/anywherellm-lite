@@ -1,0 +1,5 @@
+[sanitised: event titles, places and people replaced with [event] / [place]; see the note in the log]
+Weather, Saturday 24 Oct: dry all day, cool; source named in the reply: Yr.
+Calendar conflicts: NOT checked. The reply says it cannot see the user's calendar (none connected to this workspace) and that the Gmail toolkit sign-in has gone stale. [event] mentioned from the calendar: 0. Conflict reported: no (conflict-blind, stated by the reply).
+Two picks: [event] (outdoor, afternoon) and [event] (indoor, evening). Listings named from AllEvents and Visit Stockholm.
+Timed itinerary: 10 timed rows from 09:30 to about 22:30 with transit legs, one lunch, one fika, and a closing transit leg. Structure only.

@@ -1,0 +1,4 @@
+No save made for this test — I only read and counted.
+How it's organised: curated long-term memory (one file, bullet entries under 4 categories, loaded into context); dated logs (15 daily files); a distilled bank (4 runtime-managed files, read only); relationships (person and group pages with one index each); auxiliary files (shopping profile and standing context files).
+Category counts in the curated memory: 39 entries total. Facts 20; Preferences 11; Commitments 2; Podcast pipeline rules 6.
+How it decides what to save: durable things (facts, preferences, relationships as stated, decisions, commitments, verified outcomes). Not routine progress or one-off logs. Never credentials or ID numbers.

@@ -1,0 +1,2 @@
+Pomodoro 25/5 · focus · 0 sessions
+A 25/5 Pomodoro with start, pause and reset — it auto-switches to a 5-minute break when a focus round ends (with a chime), keeps a log of finished sessions, and it lives only on your home server, unpublished and private.

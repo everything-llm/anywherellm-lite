@@ -1,0 +1,11 @@
+Done — read-only, as asked. The answer is on the page now, and per the article's lead: the Stockholm Metro's first line opened in 1950 (specifically 1 October 1950 as a metro; the infobox also notes 30 September 1933, when an earlier tram tunnel, the Södertunneln, began running as a premetro).
+
+Pages I went through, in order:
+
+https://en.wikipedia.org — the Main Page (opened directly)
+Search box on the same Main Page — I clicked "Search Wikipedia", which expanded the search field without loading a new page; no separate search-results page was visited
+https://en.wikipedia.org/wiki/Stockholm_Metro — the article, reached straight from clicking Search
+
+So: two actual pages loaded (Main Page → Stockholm Metro article), with the search done from the Main Page's own search box.
+
+Stockholm Metro - Wikipedia · en.wikipedia.org
