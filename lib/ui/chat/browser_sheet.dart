@@ -41,6 +41,9 @@ class _BrowserSheetState extends State<BrowserSheet> {
   /// Whether the person has the tab, as the page last said.
   bool _mine = false;
 
+  /// Whether the tab's page failed to load, which leaves nobody to message.
+  bool _gone = false;
+
   /// The hand back asked for, which completes once the page has posted it.
   Completer<void>? _giving;
 
@@ -82,10 +85,11 @@ class _BrowserSheetState extends State<BrowserSheet> {
                     widget.tab,
                     onLeave: (url) => openLink(context, url.toString()),
                     onClose: scope.shell.closeBrowser,
+                    onFailed: () => setState(() => _gone = true),
                     channel: _channel,
                   ),
                 ),
-                AgentBar(mine: _mine, onGive: _give),
+                if (!_gone) AgentBar(mine: _mine, onGive: _give),
               ],
             ),
     );

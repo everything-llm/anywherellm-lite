@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/server_models.dart';
+import 'package:anywherellm/ui/apps/app_view.dart';
 import 'package:anywherellm/ui/chat/browser_sheet.dart';
 import 'package:anywherellm/ui/chat/page_sheet.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
@@ -546,5 +547,105 @@ void main() {
     expect(tester.widget<EditableText>(bar).controller.text, 'Book Tuesday');
     await llm.chat!.close();
     await tester.pump(const Duration(seconds: 1));
+  });
+
+  group('a page that no longer loads', () {
+    testWidgets('says it is gone over the page, and Close closes the sheet', (
+      tester,
+    ) async {
+      final h = await pumpApp(
+        tester,
+        llm: answering('Made it: [Groceries](/apps-lean/q9Zx_-1aB2.html)'),
+        canViewApps: true,
+      );
+      await tapLink(tester, 'Groceries');
+      await tester.pumpAndSettle();
+      expect(find.text('This page is gone'), findsNothing);
+      h.appView!.fail();
+      await tester.pumpAndSettle();
+      expect(find.text('This page is gone'), findsOneWidget);
+      expect(find.textContaining('Links in older answers'), findsOneWidget);
+      await tester.tap(
+        find.descendant(of: find.byType(PageGone), matching: control('Close')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(PageSheet), findsNothing);
+    });
+
+    testWidgets('takes the message bar from the agent\'s browser', (
+      tester,
+    ) async {
+      final h = await pumpApp(
+        tester,
+        llm: answering('Done: [the tab](/browser-lean/3kQ.html)'),
+        canViewApps: true,
+      );
+      await tapLink(tester, 'the tab');
+      await tester.pumpAndSettle();
+      expect(find.byType(AgentBar), findsOneWidget);
+      h.appView!.fail();
+      await tester.pumpAndSettle();
+      expect(find.text('This page is gone'), findsOneWidget);
+      expect(find.byType(AgentBar), findsNothing);
+    });
+
+    test('is the page\'s own address answering with an error', () {
+      final page = Uri.parse('https://h:3001/apps-lean/q9Zx.html?theme=dark');
+      Uri at(String url) => Uri.parse(url);
+      expect(
+        pageFailed(page, at('https://h:3001/apps-lean/q9Zx.html'), 404),
+        true,
+      );
+      expect(
+        pageFailed(
+          page,
+          at('https://h:3001/apps-lean/q9Zx.html?theme=dark'),
+          500,
+        ),
+        true,
+      );
+      expect(
+        pageFailed(page, at('https://h:3001/apps-lean/q9Zx.html'), 200),
+        false,
+      );
+      // A picture or script of the page that 404s leaves the page alone.
+      expect(
+        pageFailed(page, at('https://h:3001/apps-lean/app.js'), 404),
+        false,
+      );
+      expect(
+        pageFailed(page, at('https://x:3001/apps-lean/q9Zx.html'), 404),
+        false,
+      );
+      expect(pageFailed(page, null, 404), false);
+      expect(
+        pageFailed(page, at('https://h:3001/apps-lean/q9Zx.html'), null),
+        false,
+      );
+    });
+  });
+
+  test('only the main frame leaves the page for the browser', () {
+    final page = Uri.parse('https://h:3001/apps-lean/q9Zx.html');
+    expect(
+      offOriginMove(page, Uri.parse('https://h:3001/x'), true),
+      PageMove.stay,
+    );
+    expect(
+      offOriginMove(page, Uri.parse('https://h:3001/x'), false),
+      PageMove.stay,
+    );
+    expect(
+      offOriginMove(page, Uri.parse('https://evil.example/'), true),
+      PageMove.leave,
+    );
+    expect(
+      offOriginMove(page, Uri.parse('https://evil.example/'), false),
+      PageMove.block,
+    );
+    expect(
+      offOriginMove(page, Uri.parse('http://h:3001/x'), true),
+      PageMove.leave,
+    );
   });
 }
