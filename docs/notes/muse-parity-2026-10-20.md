@@ -61,6 +61,7 @@ Each is tagged with its owner. Items marked unresolved have no confirmed cause.
 1. Batch 1 read Muse's main chat, which holds personal content, and two screenshots of it were deleted from `/tmp`. Batch 4 opened another personal chat by a mis-click on a list row that had shifted; its text was not read or recorded. The protocol now says to open a Muse chat by its URL.
 1. `parity.py mark` now accepts `run` as the probe for a note on the whole run, and `table` says when there is no log. Both are in commit `cfb333a`.
 1. The protocol's server-evidence commands were checked read-only on owen and are all still correct: the user unit `anythingllm`, the database at `/srv/anythingllm/storage/anythingllm.db` with its four tables, and the container `systemd-anythingllm`, on UTC.
+1. The run's text is archived in `docs/notes/parity-runs/2026-10-20/`, but only as final answers and notes: the whole chats were not saved. After the user deleted the Muse side chats, Muse's archived view listed none of them, and Muse itself, asked read-only, reported all 15 as gone with no messages. The AnythingLLM threads were not exported.
 1. Muse's weekly quota went from 17% used (412M tokens left) to 18% (409M left).
 
 ## Left on the servers

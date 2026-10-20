@@ -83,7 +83,7 @@ Optional and read-only, on the AnythingLLM host.
 
 ## Archive
 
-Keep every run in full. Before anything is listed for deletion, run `archive <run>`, read each file it flags and the files it does not (a tool list can name the person's own accounts), take out personal data, and commit the archive. Then export the AnythingLLM workspace's chats from Settings > Workspace Chats, if it offers an export, read the export the same way, and keep it in the archive. Muse offers no export that this protocol has used, so its whole chats exist only in the `.chat.txt` files.
+Keep every run in full. Before anything is listed for deletion, run `archive <run>`, read each file it flags and the files it does not (a tool list can name the person's own accounts), take out personal data, and commit the archive. Then export the AnythingLLM workspace's chats from Settings > Workspace Chats, if it offers an export, read the export the same way, and keep it in the archive. Muse offers no export that this protocol has used, and a deleted side chat is gone for good: its archived view lists none, and its own database reported all 15 scratch chats of the 2026-10-20 run as gone with no messages. Its whole chats therefore exist only in the `.chat.txt` files.
 
 ## Cleanup
 
