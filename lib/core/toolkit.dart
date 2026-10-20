@@ -1,7 +1,7 @@
 import 'asks.dart';
 import 'companion.dart';
 
-/// The toolkit, anywherellm-suite's bridge, as a [Companion]: it passes the routes of
+/// The toolkit, the anywherellm-bridge, as a [Companion]: it passes the routes of
 /// AnythingLLM's internal API (`/api`) its owner allows, for the developer key. The app uses it
 /// for what AnythingLLM keeps behind its web login: the saved memories and the scheduled jobs.
 /// Before the rename it was anythingllm-bridge, and before the suite anythingllm-toolkit; the

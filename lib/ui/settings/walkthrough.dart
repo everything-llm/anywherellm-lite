@@ -73,7 +73,7 @@ const connectSteps = [
   ),
 ];
 
-/// Add the toolkit: what it adds, then installing anywherellm-suite's bridge, printing its
+/// Add the toolkit: what it adds, then installing the bridge from its own repository, printing its
 /// pairing link, and opening or scanning that link here.
 const toolkitSteps = [
   GuideStep(
@@ -89,9 +89,10 @@ const toolkitSteps = [
     'Step 1 · Install',
     'On the computer AnythingLLM runs on, with Node 20.3 or later, run this.',
     code: [
-      '\$ git clone https://github.com/BinaryBand/anywherellm-suite',
-      '\$ cd anywherellm-suite',
-      '\$ tools/install --bridge',
+      '\$ git clone https://github.com/BinaryBand/anywherellm-bridge',
+      '\$ cd anywherellm-bridge',
+      '\$ npm install && npm run build',
+      '\$ node dist/anywherellm-bridge.cjs install',
       '# Docker: add --storage and the folder',
       '# mounted at /app/server/storage',
     ],
@@ -103,7 +104,7 @@ const toolkitSteps = [
         'Your phone must reach AnythingLLM and the toolkit first; the bridge\'s README says '
         'how.',
     code: [
-      '\$ node packages/bridge/dist/anywherellm-suite.cjs pair',
+      '\$ node dist/anywherellm-bridge.cjs pair',
       '~  [anywherellm://connect?url=…&key=…&toolkit=…]',
     ],
   ),
