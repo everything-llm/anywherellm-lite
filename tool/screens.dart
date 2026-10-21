@@ -152,16 +152,6 @@ final _screens = <String, _Setup>{
     h.shell.togglePopup(const TaskSheet());
     await _settle(tester);
   },
-  'library': (tester, h) async {
-    h.shell.openToolkitPage(ToolkitPage.library);
-    await _settle(tester);
-  },
-  'libraryfiles': (tester, h) async {
-    h.shell.openToolkitPage(ToolkitPage.library);
-    await _settle(tester);
-    await tester.tap(find.textContaining('Files ·'));
-    await _settle(tester);
-  },
   'activity': (tester, h) async {
     h.shell.openToolkitPage(ToolkitPage.activity);
     await _settle(tester);

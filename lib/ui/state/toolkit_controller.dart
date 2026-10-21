@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 
 import '../../core/activity.dart';
-import '../../core/library.dart';
 import '../../core/ports.dart';
 import '../../core/schedule.dart';
 import '../../core/toolkit.dart';
@@ -32,14 +31,10 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   /// Whether the toolkit lets jobs be made, changed, run and deleted, not only listed.
   bool get jobsWritable => serves(ToolkitFeature.jobsWrite);
 
-  /// Whether the toolkit lists the apps and files the agent made, which Library shows.
-  bool get libraryServed => serves(ToolkitFeature.library);
-
   /// Whether the toolkit lists what the agent did, which Activity shows.
   bool get activityServed => serves(ToolkitFeature.activity);
 
   final _jobs = _Read<List<ScheduledJob>>();
-  final _library = _Read<LibraryContents>();
   final _activity = _Read<ActivityEvents>();
 
   /// The jobs the server runs on a schedule, or null until read.
@@ -47,12 +42,6 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
 
   /// Why the last read of the jobs failed.
   Notice? get jobsProblem => _jobs.problem;
-
-  /// The apps and files the agent made, or null until read.
-  LibraryContents? get library => _library.value;
-
-  /// Why the last read of the Library failed.
-  Notice? get libraryProblem => _library.problem;
 
   /// What the agent did, newest first, or null until read.
   List<ActivityEvent>? get activity => _activity.value?.events;
@@ -81,7 +70,7 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
 
   @override
   void serverChanged() {
-    for (final read in [_jobs, _library, _activity]) {
+    for (final read in [_jobs, _activity]) {
       read.reset();
     }
     busy = false;
@@ -92,15 +81,12 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
 
   /// Whether a feature the toolkit serves has not been read on this server, nor is being read.
   bool get wants =>
-      jobsServed && !_jobs.asked ||
-      libraryServed && !_library.asked ||
-      activityServed && !_activity.asked;
+      jobsServed && !_jobs.asked || activityServed && !_activity.asked;
 
   /// Reads each feature the toolkit serves that has not been read on this server, nor is being
   /// read.
   void want() {
     if (jobsServed && !_jobs.asked) unawaited(readJobs());
-    if (libraryServed && !_library.asked) unawaited(readLibrary());
     if (activityServed && !_activity.asked) unawaited(readActivity());
   }
 
@@ -113,14 +99,6 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
     _api.scheduledJobs,
     again: again,
     clearsChange: true,
-  );
-
-  /// Reads the apps and files the agent made, or waits for the read on its way.
-  Future<void> readLibrary() => _read(
-    _library,
-    libraryServed,
-    'Could not read the Library',
-    _api.library,
   );
 
   /// Reads the newest events, in place of those read before, or waits for the read on its way.

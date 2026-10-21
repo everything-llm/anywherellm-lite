@@ -10,7 +10,7 @@ import 'state/toolkit_controller.dart';
 import 'widgets/phone_page.dart';
 
 /// What the toolkit adds to the shelf, a card under a 20 px gap with a row for each thing it
-/// serves: Library, Activity and Upcoming, each with a line of what is in it once read, which a
+/// serves: Activity and Upcoming, each with a line of what is in it once read, which a
 /// tap opens as a page over the chat. It reads each the first time it shows on a server, and shows
 /// nothing while the toolkit serves none.
 class ToolkitCard extends StatefulWidget {
@@ -35,13 +35,6 @@ class _ToolkitCardState extends State<ToolkitCard> {
           });
         }
         final rows = [
-          if (toolkit.libraryServed)
-            NavRow(
-              icon: 'grid',
-              title: 'Library',
-              about: _library(toolkit, scope.chat.activeSlug),
-              onTap: () => scope.shell.openToolkitPage(ToolkitPage.library),
-            ),
           if (toolkit.activityServed)
             NavRow(
               icon: 'pulse',
@@ -64,17 +57,6 @@ class _ToolkitCardState extends State<ToolkitCard> {
         );
       },
     );
-  }
-
-  /// How many apps and files the open workspace has, or null until read.
-  static String? _library(ToolkitController toolkit, String? slug) {
-    final contents = toolkit.library;
-    if (contents == null) return null;
-    final apps = contents.apps.where((a) => a.isIn(slug)).length;
-    final files = contents.files.where((f) => f.isIn(slug)).length;
-    return apps + files == 0
-        ? 'Nothing yet'
-        : '${plural(apps, 'app', 'apps')} · ${plural(files, 'file', 'files')}';
   }
 
   /// What went wrong or what happened today, or null until read.

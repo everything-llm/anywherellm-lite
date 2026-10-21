@@ -188,17 +188,9 @@ void main() {
     });
   });
 
-  group('the Library and the Activity', () {
-    test('the Library is read whole, and an activity by pages', () async {
+  group('the Activity', () {
+    test('an activity is read by pages', () async {
       final toolkit = _Toolkit()
-        ..routes['/library'] = {
-          'apps': [
-            {'title': 'Groceries', 'page': '/apps-lean/g1.html'},
-          ],
-          'files': [
-            {'storageFilename': 'pdf-1.pdf', 'name': 'Quote.pdf'},
-          ],
-        }
         ..routes['/activity'] = {
           'events': [
             {
@@ -212,14 +204,10 @@ void main() {
           'more': true,
         };
       final api = toolkit.api();
-      final library = await api.library();
-      expect(library.apps.single.title, 'Groceries');
-      expect(library.files.single.file.name, 'Quote.pdf');
-      expect(toolkit.seen.last.url.path, '/library');
-      expect(toolkit.seen.last.headers['Authorization'], 'Bearer SECRET-KEY');
-
       final first = await api.activity();
       expect(first.events.single.title, 'Price watch');
+      expect(toolkit.seen.last.url.path, '/activity');
+      expect(toolkit.seen.last.headers['Authorization'], 'Bearer SECRET-KEY');
       expect(first.more, isTrue);
       expect(toolkit.seen.last.url.queryParameters, {'limit': '50'});
       await api.activity(before: 'e2', limit: 10);

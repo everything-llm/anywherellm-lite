@@ -1,7 +1,6 @@
 import 'package:anywherellm/core/activity.dart';
 import 'package:anywherellm/core/companion.dart';
 import 'package:anywherellm/core/connection.dart';
-import 'package:anywherellm/core/library.dart';
 import 'package:anywherellm/core/memory.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/schedule.dart';
@@ -163,16 +162,10 @@ class FakeToolkit with FakeCompanion implements ToolkitApi {
   /// What [scheduledJobs] answers.
   List<ScheduledJob> jobs = const [];
 
-  /// What [library] answers.
-  LibraryContents libraryContents = const LibraryContents();
-
   /// What [activity] answers, newest first, paged [activityPageSize] at a time from the event
   /// whose id is `before`.
   List<ActivityEvent> activityEvents = const [];
   int activityPageSize = 50;
-
-  @override
-  Future<LibraryContents> library() => run('library', () => libraryContents);
 
   @override
   Future<ActivityEvents> activity({String? before, int limit = 50}) =>

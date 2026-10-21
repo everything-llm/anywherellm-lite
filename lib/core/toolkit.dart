@@ -30,9 +30,6 @@ abstract final class ToolkitFeature {
   /// Whether the scheduled jobs can be made, changed, run and deleted, not only listed.
   static const jobsWrite = 'jobs-write';
 
-  /// Whether the apps and files the agent made are listed. No route serves it yet.
-  static const library = 'library';
-
   /// Whether what the agent did is listed. No route serves it yet.
   static const activity = 'activity';
 }

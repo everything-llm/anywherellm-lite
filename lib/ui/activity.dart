@@ -10,7 +10,6 @@ import 'icons.dart';
 import 'layout.dart';
 import 'links.dart';
 import 'settings/rows.dart';
-import 'state/shell_controller.dart';
 import 'state/toolkit_controller.dart';
 import 'toolkit_page.dart';
 import 'tokens.dart';
@@ -240,7 +239,7 @@ class _EventSheet extends StatelessWidget {
     ].join(' · ');
     final tag = _tagOf(event.outcome);
     final link = event.link;
-    // Where the event leads, when it has a place: its chat, its page, or the Library for a file.
+    // Where the event leads, when it has a place: its chat or its page.
     Widget? lead;
     if (link is ChatLink) {
       lead = AppButton(
@@ -259,12 +258,6 @@ class _EventSheet extends StatelessWidget {
           shell.closePopup();
           unawaited(openAnswerLink(context, link.path));
         },
-      );
-    } else if (event.kind == ActivityKind.file && scope.toolkit.libraryServed) {
-      lead = AppButton(
-        'Show in Library',
-        primary: true,
-        onPressed: () => shell.openToolkitPage(ToolkitPage.library),
       );
     }
     // It scrolls where large text leaves the sheet too short for what it holds.

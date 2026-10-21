@@ -1,10 +1,9 @@
 // The design prototype's sample server, which `tool/screens.dart` draws the screens over and
 // `tool/audit_app.dart` runs the app over: Household and Q3 planning, their documents and chats,
-// the saved memories, the scheduled jobs, the Library and the Activity.
+// the saved memories, the scheduled jobs and the Activity.
 
 import 'package:anywherellm/core/activity.dart';
 import 'package:anywherellm/core/connection.dart';
-import 'package:anywherellm/core/library.dart';
 import 'package:anywherellm/core/memory.dart';
 import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/schedule.dart';
@@ -44,7 +43,7 @@ const _metrics = AnswerMetrics(
 );
 
 /// The prototype's server: Household and Q3 planning, their documents and chats, the saved
-/// memories, the scheduled jobs, the Library and the Activity.
+/// memories, the scheduled jobs and the Activity.
 (FakeAnythingLlm, FakeToolkit) sampleServer() {
   final toolkit = FakeToolkit();
   final llm = FakeAnythingLlm()
@@ -203,7 +202,6 @@ const _metrics = AnswerMetrics(
     ToolkitFeature.memories,
     ToolkitFeature.jobs,
     ToolkitFeature.jobsWrite,
-    ToolkitFeature.library,
     ToolkitFeature.activity,
   };
   final at16 = DateTime(now.year, now.month, now.day, 16).toUtc();
@@ -243,73 +241,6 @@ const _metrics = AnswerMetrics(
         result: 'Done. The answer is in the chat.',
       ),
   ];
-  toolkit.libraryContents = LibraryContents(
-    apps: [
-      LibraryApp(
-        title: 'Groceries',
-        workspaceSlug: 'household',
-        page: '/apps-lean/g1.html',
-        change: 'Added Eggs, Oat milk and Coffee',
-        changed: at16.subtract(const Duration(days: 1)),
-      ),
-      LibraryApp(
-        title: 'Habits',
-        workspaceSlug: 'household',
-        page: '/apps-lean/h1.html',
-        change: 'Marked Evening walk on Monday and Tuesday',
-        changed: at16.subtract(const Duration(hours: 10)),
-      ),
-      LibraryApp(
-        title: 'Swedish words',
-        workspaceSlug: 'household',
-        page: '/apps-lean/s1.html',
-        change: 'Added 5 cards',
-        changed: at16.subtract(const Duration(days: 1)),
-      ),
-    ],
-    files: [
-      LibraryFile(
-        workspaceSlug: 'household',
-        file: const GeneratedFile(
-          type: 'PdfFileDownload',
-          name: 'Boiler service quote.pdf',
-          storageName: 'quote.pdf',
-          size: 86016,
-        ),
-        created: at16.subtract(const Duration(days: 1)),
-      ),
-      LibraryFile(
-        workspaceSlug: 'household',
-        file: const GeneratedFile(
-          type: 'PdfFileDownload',
-          name: 'Household budget.csv',
-          storageName: 'budget.csv',
-          size: 12288,
-        ),
-        created: at16.subtract(const Duration(days: 2)),
-      ),
-      LibraryFile(
-        workspaceSlug: 'household',
-        file: const GeneratedFile(
-          type: 'imageGenerationCard',
-          name: 'Waste calendar.png',
-          storageName: 'waste.png',
-          size: 215040,
-        ),
-        created: at16.subtract(const Duration(days: 3)),
-      ),
-      LibraryFile(
-        workspaceSlug: 'q3',
-        file: const GeneratedFile(
-          type: 'PdfFileDownload',
-          name: 'Q3 roadmap summary.pdf',
-          storageName: 'q3.pdf',
-          size: 146432,
-        ),
-        created: at16,
-      ),
-    ],
-  );
   ActivityEvent event(
     int hoursAgo,
     String title,

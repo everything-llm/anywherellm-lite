@@ -1,67 +1,18 @@
 import 'package:anywherellm/core/activity.dart';
 import 'package:anywherellm/core/errors.dart';
-import 'package:anywherellm/core/library.dart';
-import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/toolkit.dart';
 import 'package:anywherellm/ui/activity.dart';
-import 'package:anywherellm/ui/chat/generated_files.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
 import '../support/fake_toolkit.dart';
-import '../support/pixels.dart';
 import '../support/pump.dart';
 
 FakeToolkit _serving(Set<String> features) =>
     FakeToolkit()
       ..served = {ToolkitFeature.memories, ToolkitFeature.jobs, ...features};
-
-/// A Library with an app and two files in the open workspace, q3, and an app and a picture in
-/// Household.
-FakeToolkit _library() =>
-    _serving({ToolkitFeature.library})
-      ..libraryContents = LibraryContents(
-        apps: [
-          LibraryApp(
-            title: 'Budget',
-            page: '/apps-lean/b1.html',
-            workspace: 'Q3 planning',
-            workspaceSlug: 'q3',
-            change: 'Added Rent',
-            changed: DateTime.now().toUtc(),
-          ),
-          const LibraryApp(
-            title: 'Groceries',
-            page: '/apps-lean/g1.html',
-            workspace: 'Household',
-            workspaceSlug: 'household',
-            change: 'Added Eggs',
-          ),
-        ],
-        files: const [
-          LibraryFile(
-            file: GeneratedFile(
-              type: 'PdfFileDownload',
-              name: 'quote.pdf',
-              storageName: 'pdf-1.pdf',
-              size: 2048,
-            ),
-            workspace: 'Q3 planning',
-            workspaceSlug: 'q3',
-          ),
-          LibraryFile(
-            file: GeneratedFile(
-              type: 'imageGenerationCard',
-              name: 'cat.png',
-              storageName: 'img-1.png',
-            ),
-            workspace: 'Household',
-            workspaceSlug: 'household',
-          ),
-        ],
-      );
 
 Future<Harness> _open(
   WidgetTester tester,
@@ -99,112 +50,9 @@ ActivityEvent _event(
 );
 
 void main() {
-  group('Library', () {
-    testWidgets('a toolkit without it has no Library row', (tester) async {
-      await _open(tester, FakeToolkit());
-      expect(find.text('Library'), findsNothing);
-      expect(find.text('Upcoming'), findsOneWidget);
-    });
-
-    testWidgets('the card counts what the open workspace has', (tester) async {
-      await _open(tester, _library());
-      expect(find.text('Library'), findsOneWidget);
-      expect(find.text('1 app · 1 file'), findsOneWidget);
-    });
-
-    testWidgets('it shows the open workspace\'s, or every workspace\'s', (
-      tester,
-    ) async {
-      final h = await _open(tester, _library());
-      await tester.tap(find.text('Library'));
-      await tester.pumpAndSettle();
-      expect(h.shell.toolkitPage, isNotNull);
-      expect(find.text('Budget'), findsOneWidget);
-      expect(find.text('Groceries'), findsNothing);
-      expect(find.textContaining('Added Rent'), findsOneWidget);
-      expect(find.text('Apps · 1'), findsOneWidget);
-      await tester.tap(control('All workspaces'));
-      await tester.pumpAndSettle();
-      expect(find.text('Groceries'), findsOneWidget);
-      expect(find.text('Apps · 2'), findsOneWidget);
-      expect(find.text('Files · 2'), findsOneWidget);
-      await tester.tap(find.text('Files · 2'));
-      await tester.pumpAndSettle();
-      expect(find.text('quote.pdf'), findsOneWidget);
-      expect(find.text('cat.png'), findsOneWidget);
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(h.shell.toolkitPage, isNull);
-    });
-
-    testWidgets('an app opens in its sheet, as an answer\'s link does', (
-      tester,
-    ) async {
-      final h = await _open(tester, _library(), canViewApps: true);
-      await tester.tap(find.text('Library'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Budget'));
-      await tester.pumpAndSettle();
-      expect(
-        find.text('Web view of https://h:3001/apps-lean/b1.html?theme=light'),
-        findsOneWidget,
-      );
-      expect(h.opened, isEmpty);
-    });
-
-    testWidgets('a file saves, and a picture opens over the window', (
-      tester,
-    ) async {
-      final llm = planningServer()
-        ..generated['pdf-1.pdf'] = [37, 80, 68, 70]
-        ..generated['img-1.png'] = pixel;
-      final h = await _open(tester, _library(), llm: llm, canShare: true);
-      await tester.tap(find.text('Library'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Files · 1'));
-      await tester.pumpAndSettle();
-      await tester.tap(control('Save quote.pdf'));
-      await tester.pumpAndSettle();
-      expect(h.saved['quote.pdf'], [37, 80, 68, 70]);
-      // Its PDF has no preview; a picture in another workspace opens.
-      await tester.tap(control('All workspaces'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('cat.png'));
-      await tester.pumpAndSettle();
-      expect(find.byType(ImageViewer), findsOneWidget);
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(find.byType(ImageViewer), findsNothing);
-    });
-
-    testWidgets('a read the toolkit refuses says why', (tester) async {
-      final toolkit = _library()
-        ..errors['library'] = const ApiException(
-          'The toolkit did not accept the key.',
-          status: 401,
-        );
-      final h = await _open(tester, toolkit);
-      h.shell.openToolkitPage(ToolkitPage.library);
-      await tester.pumpAndSettle();
-      expect(find.text('Could not read the Library'), findsOneWidget);
-      expect(find.textContaining('did not accept the key'), findsOneWidget);
-      expect(control('Open Connection'), findsOneWidget);
-    });
-
-    testWidgets('a workspace with nothing says so', (tester) async {
-      final toolkit = _serving({ToolkitFeature.library});
-      await _open(tester, toolkit);
-      expect(find.text('Nothing yet'), findsOneWidget);
-      await tester.tap(find.text('Library'));
-      await tester.pumpAndSettle();
-      expect(find.textContaining('Nothing here yet.'), findsOneWidget);
-    });
-  });
-
   group('Activity', () {
     FakeToolkit activity(List<ActivityEvent> events) =>
-        _serving({ToolkitFeature.activity, ToolkitFeature.library})
-          ..activityEvents = events;
+        _serving({ToolkitFeature.activity})..activityEvents = events;
 
     testWidgets('the card says what failed today', (tester) async {
       await _open(
@@ -302,7 +150,7 @@ void main() {
     });
 
     testWidgets(
-      'an event with a page opens it, and a file leads to the Library',
+      'an event with a page opens it, and a file only says what it was',
       (tester) async {
         final h = await _open(
           tester,
@@ -334,9 +182,8 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.text('Quote.pdf'));
         await tester.pumpAndSettle();
-        await tester.tap(control('Show in Library'));
-        await tester.pumpAndSettle();
-        expect(h.shell.toolkitPage, ToolkitPage.library);
+        expect(find.text('An 84 KB PDF.'), findsOneWidget);
+        expect(control('Open it'), findsNothing);
       },
     );
 

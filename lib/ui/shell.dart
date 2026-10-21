@@ -21,7 +21,6 @@ import 'share/shared_item.dart';
 import 'workspace_sheets.dart';
 import 'sources/sources_panel.dart';
 import 'activity.dart';
-import 'library.dart';
 import 'upcoming.dart';
 import 'workspace_switcher.dart';
 import 'state/shell_controller.dart';
@@ -149,7 +148,6 @@ class AppShell extends StatelessWidget {
                               bottom: false,
                               child: switch (page) {
                                 ToolkitPage.upcoming => const UpcomingPage(),
-                                ToolkitPage.library => const LibraryPage(),
                                 ToolkitPage.activity => const ActivityPage(),
                               },
                             ),

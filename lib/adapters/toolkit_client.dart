@@ -4,7 +4,6 @@ import '../core/activity.dart';
 import '../core/companion.dart';
 import '../core/connection.dart';
 import '../core/json.dart';
-import '../core/library.dart';
 import '../core/memory.dart';
 import '../core/ports.dart';
 import '../core/schedule.dart';
@@ -45,10 +44,6 @@ class HttpToolkitApi implements ToolkitApi {
   @override
   Future<List<ScheduledJob>> scheduledJobs() async =>
       scheduledJobsOf(await _json('GET', ['scheduled-jobs']));
-
-  @override
-  Future<LibraryContents> library() async =>
-      libraryOf(await _json('GET', ['library']));
 
   @override
   Future<ActivityEvents> activity({String? before, int limit = 50}) async =>

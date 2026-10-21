@@ -11,7 +11,7 @@ import 'turn.dart';
 enum Pane { chats, files }
 
 /// A page of what the toolkit adds that lies over the chat, opened from its card in the shelf.
-enum ToolkitPage { upcoming, library, activity }
+enum ToolkitPage { upcoming, activity }
 
 /// What the sheet over the chat shows: Sources, the passages an answer read from one
 /// file, or all of an answer's sources ([cited]).

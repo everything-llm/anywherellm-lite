@@ -106,11 +106,8 @@ void main() {
       );
     });
 
-    test('the Library and the Activity have no route yet', () {
-      final all = bridgeFeatures(
-        _rules(['/library', '/activity', '/workspaces']),
-      );
-      expect(all, isNot(contains(ToolkitFeature.library)));
+    test('the Activity has no route yet', () {
+      final all = bridgeFeatures(_rules(['/activity', '/workspaces']));
       expect(all, isNot(contains(ToolkitFeature.activity)));
     });
   });

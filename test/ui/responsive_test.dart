@@ -5,7 +5,6 @@ import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/activity.dart';
-import 'package:anywherellm/core/library.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/core/toolkit.dart';
@@ -453,39 +452,13 @@ void main() {
         expect(tester.takeException(), isNull, reason: 'the new task');
       });
 
-      testWidgets('Library and Activity fit, with long names', (tester) async {
+      testWidgets('Activity fits, with long names', (tester) async {
         final toolkit = FakeToolkit()
           ..served = {
             ToolkitFeature.memories,
             ToolkitFeature.jobs,
-            ToolkitFeature.library,
             ToolkitFeature.activity,
           }
-          ..libraryContents = LibraryContents(
-            apps: [
-              LibraryApp(
-                title: 'app-$longWord',
-                page: '/apps-lean/x.html',
-                workspace: 'name-$longWord',
-                workspaceSlug: 'w',
-                change: 'change-$longWord',
-                changed: DateTime.now().toUtc(),
-              ),
-            ],
-            files: [
-              LibraryFile(
-                file: GeneratedFile(
-                  type: 'PdfFileDownload',
-                  name: 'file-$longWord.pdf',
-                  storageName: 'pdf-1.pdf',
-                  size: 123456,
-                ),
-                workspace: 'name-$longWord',
-                workspaceSlug: 'w',
-                created: DateTime.now().toUtc(),
-              ),
-            ],
-          )
           ..activityEvents = [
             ActivityEvent(
               at: DateTime.now().toUtc(),
@@ -504,12 +477,6 @@ void main() {
           shelf: true,
         );
         expect(tester.takeException(), isNull, reason: 'the card');
-        h.shell.openToolkitPage(ToolkitPage.library);
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull, reason: 'the apps');
-        await tapVisible(tester, find.textContaining('Files ·'));
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull, reason: 'the files');
         h.shell.openToolkitPage(ToolkitPage.activity);
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull, reason: 'the activity');
