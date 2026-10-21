@@ -53,7 +53,7 @@ Stream<ChatEvent> chatEventsOf(Stream<Map<String, dynamic>> chunks) async* {
         if (chunk['thought'] case final String thought
             when thought.trim().isNotEmpty) {
           afterStatus = true;
-          yield statusOf(thought);
+          yield StatusChunk(agentStatus(thought));
         }
       case 'textResponse':
         if (text is String && text.isNotEmpty) {

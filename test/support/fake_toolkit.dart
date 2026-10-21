@@ -1,5 +1,4 @@
 import 'package:anywherellm/core/activity.dart';
-import 'package:anywherellm/core/asks.dart';
 import 'package:anywherellm/core/companion.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/library.dart';
@@ -289,56 +288,4 @@ class FakeToolkit with FakeCompanion implements ToolkitApi {
       ...?runRecords[id],
     ];
   }, id);
-
-  /// The requests skills wait on, by id, as the bridge holds them.
-  final Map<String, Ask> asks = {};
-
-  /// The addresses skills may always reach.
-  List<AllowedOrigin> allowed = [];
-
-  @override
-  Future<Ask> ask(String id) => run(
-    'ask',
-    () =>
-        asks[id] ?? (throw const ApiException('No such request.', status: 404)),
-    id,
-  );
-
-  /// Decides a request once, as the bridge does, and always allows its origin for [AskDecision.always].
-  @override
-  Future<void> decide(String id, AskDecision decision) => run('decide', () {
-    final ask =
-        asks[id] ?? (throw const ApiException('No such request.', status: 404));
-    if (ask.decision != null) {
-      throw const ApiException('It was answered already.', status: 409);
-    }
-    final decided = Ask(
-      id: ask.id,
-      host: ask.host,
-      origin: ask.origin,
-      skill: ask.skill,
-      workspace: ask.workspace,
-      why: ask.why,
-      expires: ask.expires,
-      decision: decision,
-    );
-    asks[id] = decided;
-    if (decision == AskDecision.always) {
-      allowed = [...allowed, AllowedOrigin(ask.origin, added: DateTime.now())];
-    }
-  }, '$id=${decision.name}');
-
-  @override
-  Future<List<AllowedOrigin>> allowedOrigins() =>
-      run('allowedOrigins', () => allowed);
-
-  @override
-  Future<List<AllowedOrigin>> forgetOrigin(String origin) => run(
-    'forgetOrigin',
-    () => allowed = [
-      for (final a in allowed)
-        if (a.origin != origin) a,
-    ],
-    origin,
-  );
 }

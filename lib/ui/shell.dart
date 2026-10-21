@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app_scope.dart';
-import 'asks/ask_sheet.dart';
 import 'chat/browser_sheet.dart';
 import 'chat/chat_view.dart';
 import 'chat/cited_sources.dart';
@@ -53,8 +52,6 @@ class AppShell extends StatelessWidget {
     /// What closes the thing on top, or null when nothing is open that Esc or Back closes: in
     /// Settings, a page goes back to its parent first.
     VoidCallback? topClose() {
-      // A skill's request lies over everything; closing it refuses it.
-      if (scope.asks.current.value != null) return scope.asks.dismiss;
       // The guide and the camera lie over the whole window, a share and the popups too.
       if (shell.guiding) return () => shell.showGuide(null);
       if (shell.scanning) return () => shell.setScanning(false);
@@ -95,7 +92,6 @@ class AppShell extends StatelessWidget {
         return WindowInsets(
           child: _BackGuard(
             popup: shell.popup,
-            ask: scope.asks.current,
             open: topClose() != null,
             onBack: () => topClose()?.call(),
             onLeave: switch (scope.background) {
@@ -242,11 +238,6 @@ class AppShell extends StatelessWidget {
                             ),
                           ),
                         ),
-                        // A skill's request, drawn in the window's overlay with the popups
-                        // that lie over this stack, so it shows over one already open and
-                        // never takes the place of the browser sheet the person watches the
-                        // agent in.
-                        const Positioned.fill(child: AskSheet()),
                       ],
                     ),
                   ),
@@ -286,15 +277,13 @@ class _PhoneUndo extends StatelessWidget {
   }
 }
 
-/// Back closes the topmost thing open, a skill's [ask], a [popup] or what [open] counts,
-/// through [onBack], and leaves the app when nothing is, through [onLeave] where there is one.
-/// With the keyboard up it only puts the keyboard away, as Android does elsewhere. It reads the
-/// keyboard, the request and the popup itself, so the keyboard's animation, a request and a
-/// popup rebuild this and not [child].
+/// Back closes the topmost thing open, a [popup] or what [open] counts, through [onBack], and
+/// leaves the app when nothing is, through [onLeave] where there is one. With the keyboard up it
+/// only puts the keyboard away, as Android does elsewhere. It reads the keyboard and the popup
+/// itself, so the keyboard's animation and a popup rebuild this and not [child].
 class _BackGuard extends StatelessWidget {
   const _BackGuard({
     required this.popup,
-    required this.ask,
     required this.open,
     required this.onBack,
     required this.onLeave,
@@ -302,7 +291,6 @@ class _BackGuard extends StatelessWidget {
   });
 
   final ValueListenable<Object?> popup;
-  final ValueListenable<Object?> ask;
   final bool open;
   final VoidCallback onBack;
 
@@ -315,9 +303,9 @@ class _BackGuard extends StatelessWidget {
   Widget build(BuildContext context) {
     final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
     return ListenableBuilder(
-      listenable: Listenable.merge([popup, ask]),
+      listenable: popup,
       builder: (context, child) {
-        final above = popup.value != null || ask.value != null;
+        final above = popup.value != null;
         return PopScope(
           canPop: !typing && !open && !above && onLeave == null,
           onPopInvokedWithResult: (didPop, _) {

@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 
 import 'activity.dart';
-import 'asks.dart';
 import 'chat.dart';
 import 'companion.dart';
 import 'connection.dart';
@@ -200,19 +199,6 @@ abstract interface class ToolkitApi implements CompanionApi {
   /// Shows memory [id] in every workspace's chats, or, given [toWorkspace], in that workspace's
   /// only.
   Future<SavedMemory> moveMemory(int id, {String? toWorkspace});
-
-  /// The request [id] a skill waits on. Fails with status 404 once it is gone.
-  Future<Ask> ask(String id);
-
-  /// Answers request [id] with [decision]. Fails with status 409 once it is decided or the
-  /// skill stopped waiting.
-  Future<void> decide(String id, AskDecision decision);
-
-  /// The addresses skills may always reach.
-  Future<List<AllowedOrigin>> allowedOrigins();
-
-  /// Stops always allowing [origin]; the addresses still allowed.
-  Future<List<AllowedOrigin>> forgetOrigin(String origin);
 }
 
 /// Where the connection is kept between runs.

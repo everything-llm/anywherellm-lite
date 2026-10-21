@@ -1,7 +1,6 @@
 import 'package:http/http.dart' as http;
 
 import '../core/activity.dart';
-import '../core/asks.dart';
 import '../core/companion.dart';
 import '../core/connection.dart';
 import '../core/json.dart';
@@ -35,15 +34,12 @@ class HttpToolkitApi implements ToolkitApi {
   @override
   Companion get companion => _companion.companion;
 
-  /// The features the routes the bridge allows let through, and those it serves itself.
+  /// The features the routes the bridge allows let through.
   @override
   Future<Set<String>?> features({bool again = false}) async {
     final health = await _companion.health(again: again);
     if (health == null) return null;
-    return {
-      ...bridgeFeatures(bridgeRules(health)),
-      if (health case {'asks': true}) ToolkitFeature.asks,
-    };
+    return bridgeFeatures(bridgeRules(health));
   }
 
   @override
@@ -161,25 +157,6 @@ class HttpToolkitApi implements ToolkitApi {
         ]),
       );
 
-  // The requests and the allowed addresses are the bridge's own, not AnythingLLM's.
-  @override
-  Future<Ask> ask(String id) async => _ask(await _json('GET', ['asks', id]));
-
-  @override
-  Future<void> decide(String id, AskDecision decision) =>
-      _json('POST', ['asks', id], body: {'decision': decision.name});
-
-  @override
-  Future<List<AllowedOrigin>> allowedOrigins() async =>
-      allowedOriginsOf(await _json('GET', ['allowed']));
-
-  // An origin holds slashes, so it goes in the query, not the path.
-  @override
-  Future<List<AllowedOrigin>> forgetOrigin(String origin) async =>
-      allowedOriginsOf(
-        await _json('DELETE', ['allowed'], query: {'origin': origin}),
-      );
-
   /// The decoded JSON of a [method] to AnythingLLM's [path] through the bridge. AnythingLLM
   /// refuses some calls with `success: false` at HTTP 200, which fails in its words, or else
   /// [refused].
@@ -201,13 +178,6 @@ class HttpToolkitApi implements ToolkitApi {
     }
     return answer;
   }
-
-  /// The request an answer holds under `ask`.
-  static Ask _ask(Object? body) =>
-      askOf(body) ??
-      (throw const ApiException(
-        'The toolkit did not answer with the request.',
-      ));
 
   /// The memory an answer holds under `memory`.
   static SavedMemory _memory(Object? body) =>

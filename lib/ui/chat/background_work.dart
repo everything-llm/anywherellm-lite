@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../core/chat.dart';
@@ -28,19 +27,6 @@ abstract interface class BackgroundWork {
     required String thread,
   });
 
-  /// Shows that a skill in chat [thread] of workspace [slug] waits for the person to allow it
-  /// something, as one urgent notification, titled [title] over [body], that opens the chat,
-  /// in place of any it showed before.
-  Future<void> asking({
-    required String title,
-    required String body,
-    required String slug,
-    required String thread,
-  });
-
-  /// Takes back what [asking] showed, once the request is answered or no longer waits.
-  Future<void> asked();
-
   /// Puts the app out of sight without ending it, as Back does on its first screen, so an
   /// answer it holds goes on.
   Future<void> leave();
@@ -58,17 +44,13 @@ class KeepAnswering {
     _chat.addListener(_follow);
     _tapsSeen = _work.taps.listen(_open);
     _life = AppLifecycleListener(
-      onStateChange: (state) =>
-          _front.value = state == AppLifecycleState.resumed,
+      onStateChange: (state) => _front = state == AppLifecycleState.resumed,
       onResume: () => unawaited(_chat.checkWaiting()),
     );
     _follow();
   }
 
   final BackgroundWork _work;
-
-  /// What holds the app and shows its notifications.
-  BackgroundWork get work => _work;
   final ChatController _chat;
   final ShellController _shell;
   late final AppLifecycleListener _life;
@@ -80,10 +62,8 @@ class KeepAnswering {
   /// What the ongoing notification says, or null while none shows.
   String? _held;
 
-  final _front = ValueNotifier(true);
-
   /// Whether the app is on screen. Before Android says, it is, as at start.
-  ValueListenable<bool> get front => _front;
+  bool _front = true;
 
   void _follow() {
     final slug = _chat.workingIn;
@@ -98,7 +78,7 @@ class KeepAnswering {
     if (identical(finished, _seen)) return;
     _seen = finished;
     final where = _chat.finishedIn;
-    if (_front.value || finished == null || where == null) return;
+    if (_front || finished == null || where == null) return;
     final chat = _chat
         .threadsOf(where.slug)
         .where((t) => t.slug == where.thread);
@@ -122,7 +102,6 @@ class KeepAnswering {
     unawaited(_tapsSeen.cancel());
     _chat.removeListener(_follow);
     _life.dispose();
-    _front.dispose();
     unawaited(_work.hold(null));
   }
 }

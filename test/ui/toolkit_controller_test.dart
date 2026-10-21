@@ -1,4 +1,3 @@
-import 'package:anywherellm/core/asks.dart';
 import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/core/toolkit.dart';
@@ -13,7 +12,7 @@ const _odd = FormatException('odd');
 const _down = ApiException('The bridge is down.');
 
 /// A rig over a toolkit serving [served], with its features read.
-Future<Rig> _rig(FakeToolkit toolkit, {WidgetTester? tester}) async {
+Future<Rig> _rig(FakeToolkit toolkit) async {
   final rig = Rig(
     llm: planningServer(),
     toolkitServer: toolkit,
@@ -21,7 +20,7 @@ Future<Rig> _rig(FakeToolkit toolkit, {WidgetTester? tester}) async {
   );
   addTearDown(rig.dispose);
   await rig.start();
-  await (tester?.pump() ?? pumpEventQueue());
+  await pumpEventQueue();
   return rig;
 }
 
@@ -29,70 +28,13 @@ FakeToolkit _toolkit() => FakeToolkit()
   ..served = {
     ToolkitFeature.jobs,
     ToolkitFeature.jobsWrite,
-    ToolkitFeature.asks,
     ToolkitFeature.memories,
   }
   ..jobs = const [
     ScheduledJob(id: '1', name: 'Digest', prompt: 'p', cron: '0 6 * * *'),
-  ]
-  ..allowed = [
-    const AllowedOrigin('http://a:1'),
-    const AllowedOrigin('http://b:2'),
   ];
 
-int _reads(FakeToolkit toolkit) =>
-    toolkit.calls.where((c) => c == 'allowedOrigins').length;
-
 void main() {
-  group('forgetting an allowed address', () {
-    test('that fails reads the list again', () async {
-      final server = _toolkit();
-      final rig = await _rig(server);
-      await rig.toolkit.readAllowed();
-      server.errors['forgetOrigin'] = _down;
-      // Another device removed one meanwhile.
-      server.allowed = [const AllowedOrigin('http://b:2')];
-      await rig.toolkit.forgetOrigin('http://b:2');
-      expect(_reads(server), 2);
-      expect(rig.toolkit.allowed!.map((o) => o.origin), ['http://b:2']);
-      expect(rig.toolkit.changeProblem?.text, _down.message);
-    });
-
-    test('shows the list it could not read again as well as why', () async {
-      final server = _toolkit();
-      final rig = await _rig(server);
-      await rig.toolkit.readAllowed();
-      server.errors['forgetOrigin'] = _down;
-      server.errors['allowedOrigins'] = const ApiException('Refused.');
-      await rig.toolkit.forgetOrigin('http://b:2');
-      expect(rig.toolkit.allowedProblem?.text, 'Refused.');
-      expect(rig.toolkit.changeProblem?.text, _down.message);
-    });
-  });
-
-  group('the allowed addresses', () {
-    testWidgets('are read again once asked for after a failed read', (
-      tester,
-    ) async {
-      final server = _toolkit()..errors['allowedOrigins'] = _down;
-      final rig = await _rig(server, tester: tester);
-      await rig.toolkit.readAllowed();
-      expect(rig.toolkit.allowedProblem, isNotNull);
-      server.errors.remove('allowedOrigins');
-      // A page that builds again does not ask again, or a failing read would never stop.
-      rig.toolkit.wantAllowed();
-      TestWidgetsFlutterBinding.instance.scheduleFrame();
-      await tester.pump();
-      expect(rig.toolkit.allowedProblem, isNotNull);
-      rig.toolkit.wantAllowed(retry: true);
-      TestWidgetsFlutterBinding.instance.scheduleFrame();
-      await tester.pump();
-      await tester.pump();
-      expect(rig.toolkit.allowed, hasLength(2));
-      expect(rig.toolkit.allowedProblem, isNull);
-    });
-  });
-
   group('a change that fails oddly', () {
     test('leaves the toolkit free for the next', () async {
       final server = _toolkit()..errors['setJobEnabled'] = _odd;

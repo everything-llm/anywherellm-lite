@@ -12,7 +12,6 @@ import '../widgets/phone_page.dart';
 import '../widgets/sheet.dart';
 import 'connection_page.dart';
 import 'device_pages.dart';
-import 'allowed_addresses_page.dart';
 import 'memory_page.dart';
 import 'privacy_page.dart';
 import 'shortcuts_page.dart';
@@ -107,7 +106,7 @@ class _Frame extends StatelessWidget {
 }
 
 /// The list of Settings: once a server is saved, a card with it, whether it answers and Test
-/// connection; This app's pages; then AnythingLLM's Server, Memory and Allowed addresses rows; and,
+/// connection; This app's pages; then AnythingLLM's Server and Memory rows; and,
 /// while no toolkit answers beside the server, a card that opens Add the toolkit over the list.
 class _Nav extends StatelessWidget {
   const _Nav();
@@ -152,13 +151,6 @@ class _Nav extends StatelessWidget {
                     icon: 'memory',
                     title: SettingsPage.memory.label,
                     onTap: () => shell.showSettingsPage(SettingsPage.memory),
-                  ),
-                if (scope.toolkit.asksServed)
-                  NavRow(
-                    icon: 'shield',
-                    title: SettingsPage.allowedAddresses.label,
-                    onTap: () =>
-                        shell.showSettingsPage(SettingsPage.allowedAddresses),
                   ),
               ]),
               if (scope.toolkit.servesNothing) ...[
@@ -319,7 +311,6 @@ class _PageView extends StatelessWidget {
     SettingsPage.connection => const ConnectionPage(),
     SettingsPage.server => const ServerPage(),
     SettingsPage.memory => const MemoryPage(),
-    SettingsPage.allowedAddresses => const AllowedAddressesPage(),
     SettingsPage.appearance => const AppearancePage(),
     SettingsPage.chat => const ChatPage(),
     SettingsPage.shortcuts => const ShortcutsPage(),

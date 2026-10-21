@@ -10,9 +10,8 @@ import io.flutter.plugin.common.MethodChannel
 
 /**
  * The app. Over the `anywherellm/background` channel it holds the app while an answer runs
- * ([AnswerService]), says an answer is ready or that a skill waits for the person (`asking`,
- * taken back by `asked`), leaves without finishing, so the Flutter engine and an answer it
- * reads go on, and hands over each notification tapped as `{slug, thread}`:
+ * ([AnswerService]), says an answer is ready, leaves without finishing, so the Flutter engine
+ * and an answer it reads go on, and hands over each notification tapped as `{slug, thread}`:
  * `launchTap` answers the one that started the activity, once, and `tap` sends one tapped while
  * it runs. Notifications need a permission on Android 13 and later, which it asks for when an
  * answer first runs. What other apps share with it goes through [Shares], and what a page in
@@ -50,21 +49,6 @@ class MainActivity : FlutterActivity() {
                             note["slug"] as String,
                             note["thread"] as String,
                         )
-                        result.success(null)
-                    }
-                    "asking" -> {
-                        val note = call.arguments as Map<*, *>
-                        Notes.asking(
-                            applicationContext,
-                            note["title"] as String,
-                            note["body"] as String,
-                            note["slug"] as String,
-                            note["thread"] as String,
-                        )
-                        result.success(null)
-                    }
-                    "asked" -> {
-                        Notes.asked(applicationContext)
                         result.success(null)
                     }
                     "leave" -> {

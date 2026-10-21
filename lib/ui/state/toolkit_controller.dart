@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 
 import '../../core/activity.dart';
-import '../../core/asks.dart';
 import '../../core/library.dart';
 import '../../core/ports.dart';
 import '../../core/schedule.dart';
@@ -14,7 +13,7 @@ import 'settings_controller.dart';
 
 /// What the app knows of the toolkit beside the server in use: whether it is there, what its
 /// bridge lets through, the scheduled jobs, which, where it allows, the app makes, changes,
-/// runs and deletes, and the hosts its skills may always reach.
+/// runs and deletes.
 /// Another server starts it afresh, and Test connection asks again whether the toolkit is
 /// there.
 class ToolkitController extends ChangeNotifier with CompanionWatch {
@@ -39,13 +38,9 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   /// Whether the toolkit lists what the agent did, which Activity shows.
   bool get activityServed => serves(ToolkitFeature.activity);
 
-  /// Whether the toolkit's skills ask the person here, which Allowed addresses goes with.
-  bool get asksServed => serves(ToolkitFeature.asks);
-
   final _jobs = _Read<List<ScheduledJob>>();
   final _library = _Read<LibraryContents>();
   final _activity = _Read<ActivityEvents>();
-  final _allowed = _Read<List<AllowedOrigin>>();
 
   /// The jobs the server runs on a schedule, or null until read.
   List<ScheduledJob>? get jobs => _jobs.value;
@@ -71,21 +66,11 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   /// Whether events are being read.
   bool get activityLoading => _activity.pending != null;
 
-  /// The addresses skills may always reach, or null until read.
-  List<AllowedOrigin>? get allowed => _allowed.value;
-
-  /// Why the last read of the allowed addresses failed.
-  Notice? get allowedProblem => _allowed.problem;
-
-  /// Whether the allowed addresses are being read.
-  bool get allowedLoading => _allowed.pending != null;
-
-  /// Whether a change to a job or an allowed address is on its way, which keeps a second from
-  /// starting.
+  /// Whether a change to a job is on its way, which keeps a second from starting.
   bool busy = false;
 
   /// Why the last change failed, shown over what it changed until the next change, or until
-  /// the jobs or the allowed addresses are read again, or [clearChangeProblem].
+  /// the jobs are read again, or [clearChangeProblem].
   Notice? changeProblem;
 
   /// The latest runs of each job read by [readRuns], by job id.
@@ -96,7 +81,7 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
 
   @override
   void serverChanged() {
-    for (final read in [_jobs, _library, _activity, _allowed]) {
+    for (final read in [_jobs, _library, _activity]) {
       read.reset();
     }
     busy = false;
@@ -137,34 +122,6 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
     'Could not read the Library',
     _api.library,
   );
-
-  /// Reads the addresses skills may always reach, or waits for the read on its way and, [again],
-  /// reads afresh after it.
-  Future<void> readAllowed({bool again = false}) => _read(
-    _allowed,
-    asksServed,
-    'Could not read the allowed addresses',
-    _api.allowedOrigins,
-    again: again,
-    clearsChange: true,
-  );
-
-  /// Reads the allowed addresses after the frame, when the toolkit serves them and they are not read
-  /// yet, so a page may ask while it builds. With [retry], as when the page opens, a read that
-  /// failed is asked again; a page that builds more than once does not, or a read that keeps
-  /// failing would not stop.
-  void wantAllowed({bool retry = false}) {
-    if (!asksServed || (_allowed.asked && !retry)) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_allowed.asked) {
-        unawaited(readAllowed());
-      } else if (retry &&
-          _allowed.problem != null &&
-          _allowed.pending == null) {
-        unawaited(readAllowed(again: true));
-      }
-    });
-  }
 
   /// Reads the newest events, in place of those read before, or waits for the read on its way.
   Future<void> readActivity() => _read(
@@ -266,24 +223,6 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   Future<bool> removeJob(String id) =>
       _change('Could not delete the task', () => _api.deleteJob(id));
 
-  /// Stops always allowing [origin], and shows the addresses the bridge says are still allowed.
-  Future<void> forgetOrigin(String origin) {
-    List<AllowedOrigin>? left;
-    return _change(
-      'Could not remove $origin',
-      () async => left = await _api.forgetOrigin(origin),
-      readAgain: () async {
-        if (left case final left?) {
-          _allowed.value = left;
-          notifyListeners();
-        } else {
-          // A failed removal may have gone through, or the list changed elsewhere.
-          await readAllowed(again: true);
-        }
-      },
-    );
-  }
-
   /// Takes away the [changeProblem], as when the sheet that shows it closes.
   void clearChangeProblem() {
     if (changeProblem == null) return;
@@ -327,13 +266,9 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
     _watching?.cancel();
   }
 
-  /// Sends [call], then reads what it changed again ([readAgain], else the jobs), whether it
-  /// went or not, and shows why it failed over them. Whether it went.
-  Future<bool> _change(
-    String title,
-    Future<void> Function() call, {
-    Future<void> Function()? readAgain,
-  }) async {
+  /// Sends [call], then reads the jobs again, whether it went or not, and shows why it failed
+  /// over them. Whether it went.
+  Future<bool> _change(String title, Future<void> Function() call) async {
     if (busy) return false;
     final asked = epoch;
     busy = true;
@@ -352,7 +287,7 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
       }
     }
     if (asked != epoch) return false;
-    await (readAgain ?? () => readJobs(again: true))();
+    await readJobs(again: true);
     if (failed != null) {
       changeProblem = failed;
       notifyListeners();

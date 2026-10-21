@@ -4,7 +4,6 @@ import 'dart:typed_data';
 
 import 'package:characters/characters.dart';
 
-import 'asks.dart';
 import 'connection.dart';
 import 'outputs.dart';
 import 'server_models.dart';
@@ -49,11 +48,8 @@ class TextChunk extends ChatEvent {
 
 /// What the agent is doing now, such as running a tool. It is not part of the answer.
 class StatusChunk extends ChatEvent {
-  const StatusChunk(this.text, {this.ask});
+  const StatusChunk(this.text);
   final String text;
-
-  /// The request the agent waits for the person to decide ([askMark]), or null.
-  final String? ask;
 }
 
 /// The whole answer, which takes the place of the text streamed so far. An agent streams what it
@@ -61,19 +57,6 @@ class StatusChunk extends ChatEvent {
 class WholeAnswer extends ChatEvent {
   const WholeAnswer(this.text);
   final String text;
-}
-
-/// An agent's status [thought] as the chat shows it: in [agentStatus]'s plain words, without
-/// the [askMark] a skill that waits for the person ends it with, and with the request it names.
-StatusChunk statusOf(String thought) {
-  final trimmed = thought.trim();
-  final mark = askMark.firstMatch(trimmed);
-  return mark == null
-      ? StatusChunk(agentStatus(thought))
-      : StatusChunk(
-          agentStatus(trimmed.substring(0, mark.start)),
-          ask: mark[1],
-        );
 }
 
 /// An agent's status [thought] in plain words: `@agent: Using SearXNG…` loses its prefix, and

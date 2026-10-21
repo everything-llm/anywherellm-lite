@@ -1,4 +1,3 @@
-import 'asks.dart';
 import 'companion.dart';
 
 /// The toolkit, the anywherellm-bridge, as a [Companion]: it passes the routes of
@@ -36,11 +35,6 @@ abstract final class ToolkitFeature {
 
   /// Whether what the agent did is listed. No route serves it yet.
   static const activity = 'activity';
-
-  /// Whether a skill that asks to reach a host on the person's own network waits for their
-  /// answer here ([Ask]). The bridge serves it itself, and says so in its `/health` as
-  /// `asks: true`, since no rule of its allow list names it.
-  static const asks = 'asks';
 }
 
 const _methods = {'GET', 'POST', 'PUT', 'DELETE'};
