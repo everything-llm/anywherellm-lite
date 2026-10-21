@@ -809,8 +809,7 @@ class _NoPictures extends StatelessWidget {
     return ListenableBuilder(
       listenable: scope.chat,
       builder: (context, _) {
-        final slug = scope.chat.activeSlug;
-        final open = slug != null && !scope.chat.answeringIn(slug);
+        final open = scope.chat.activeIdle;
         return AlertBox(
           AlertKind.bad,
           'This model cannot see pictures',

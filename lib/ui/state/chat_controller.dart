@@ -392,6 +392,14 @@ class ChatController extends ChangeNotifier {
   /// Whether a chat of workspace [slug] is answering, a draft whose chat is being made included.
   bool answeringIn(String slug) => _runs.any((r) => r.slug == slug);
 
+  /// Whether a workspace is open and no chat of it is answering ([answeringIn]).
+  bool get activeIdle => activeSlug != null && !answeringIn(activeSlug!);
+
+  /// Whether [text] can be sent in the chat on screen: a workspace is open, nothing holds the
+  /// chat ([busy]), it is [ready], and there is something to send.
+  bool canSend(String text) =>
+      active != null && !busy && ready && text.trim().isNotEmpty;
+
   @override
   void dispose() {
     // The last chance to send a delete still waiting to be undone.
@@ -547,9 +555,12 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// [workspaces] in the order the person arranged, new ones after in the server's order.
+  List<Workspace> get orderedWorkspaces =>
+      _prefs.prefs.inOrder(workspaces, (w) => w.slug);
+
   /// The first workspace in the order the person arranged, or null when there is none.
-  String? get _firstSlug =>
-      _prefs.prefs.inOrder(workspaces, (w) => w.slug).firstOrNull?.slug;
+  String? get _firstSlug => orderedWorkspaces.firstOrNull?.slug;
 
   /// The workspace and chat to open first: the last on screen while the workspace exists, on
   /// its newest chat when that chat is gone; otherwise [_firstSlug] on its newest chat.
@@ -845,9 +856,9 @@ class ChatController extends ChangeNotifier {
     ShortcutUse? shortcutUse,
     ChatMode? mode,
   }) async {
-    final slug = activeSlug;
+    if (!canSend(message)) return false;
+    final slug = activeSlug!;
     final text = message.trim();
-    if (slug == null || text.isEmpty || busy || !ready) return false;
     _link.take();
     final user = Turn.user(
       text,

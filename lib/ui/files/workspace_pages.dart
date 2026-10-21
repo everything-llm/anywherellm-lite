@@ -222,9 +222,9 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                 icon: 'trash',
                 tone: RowTone.danger,
                 large: true,
-                onTap: chat.answeringIn(slug)
-                    ? null
-                    : () => shell.togglePopup(WorkspaceSheet.delete),
+                onTap: chat.activeIdle
+                    ? () => shell.togglePopup(WorkspaceSheet.delete)
+                    : null,
               ),
             ]),
           ],

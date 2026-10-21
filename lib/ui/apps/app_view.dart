@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/browser.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';
@@ -13,7 +14,7 @@ abstract interface class AppView {
   Widget show(
     Uri page, {
     required void Function(Uri url) onLeave,
-    VoidCallback? onClose,
+    required VoidCallback onClose,
     VoidCallback? onFailed,
     PageChannel? channel,
   });
@@ -42,9 +43,7 @@ bool pageFailed(Uri page, Uri? url, int? status) =>
     url != null &&
     status != null &&
     status >= 400 &&
-    url.scheme == page.scheme &&
-    url.host == page.host &&
-    url.port == page.port &&
+    sameOrigin(url, page) &&
     url.path == page.path;
 
 /// What a web view does with a move to an address: [stay] on the page's origin, [leave] it for
@@ -55,11 +54,7 @@ enum PageMove { stay, leave, block }
 /// false, by a frame in it. Only the main frame reaches the browser, since a frame or a script
 /// can move with no tap.
 PageMove offOriginMove(Uri page, Uri url, bool mainFrame) {
-  if (url.scheme == page.scheme &&
-      url.host == page.host &&
-      url.port == page.port) {
-    return PageMove.stay;
-  }
+  if (sameOrigin(url, page)) return PageMove.stay;
   return mainFrame ? PageMove.leave : PageMove.block;
 }
 
@@ -69,7 +64,7 @@ PageMove offOriginMove(Uri page, Uri url, bool mainFrame) {
 class PageGone extends StatelessWidget {
   const PageGone({super.key, required this.onClose});
 
-  final VoidCallback? onClose;
+  final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -94,10 +89,8 @@ class PageGone extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: Type.sans(15, color: t.muted, height: 1.45),
               ),
-              if (onClose != null) ...[
-                const SizedBox(height: 8),
-                AppButton('Close', onPressed: onClose),
-              ],
+              const SizedBox(height: 8),
+              AppButton('Close', onPressed: onClose),
             ],
           ),
         ),

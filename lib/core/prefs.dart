@@ -27,12 +27,11 @@ class OffDoc {
 
   static OffDoc? fromJson(Object? json) {
     if (json is! Map) return null;
-    final path = json['path'];
-    final title = json['title'];
-    if (path is! String || path.isEmpty) return null;
+    final path = textOrNull(json['path']);
+    if (path == null) return null;
     return OffDoc(
       path: path,
-      title: title is String && title.isNotEmpty ? title : path,
+      title: textOrNull(json['title']) ?? path,
       words: json['words'] is int ? json['words'] as int : null,
       web: json['web'] is bool ? json['web'] as bool : null,
     );
@@ -70,14 +69,12 @@ class LastChat {
 
   static LastChat? fromJson(Object? json) {
     if (json is! Map) return null;
-    final slug = json['slug'];
-    final thread = json['thread'];
-    final server = json['server'];
-    if (slug is! String || slug.isEmpty) return null;
+    final slug = textOrNull(json['slug']);
+    if (slug == null) return null;
     return LastChat(
       slug,
-      thread is String && thread.isNotEmpty ? thread : null,
-      server is String && server.isNotEmpty ? server : null,
+      textOrNull(json['thread']),
+      textOrNull(json['server']),
     );
   }
 }
@@ -315,11 +312,6 @@ class Prefs {
       pinnedIn(server, slug).contains(thread) ||
       recentIn(server, slug).contains(thread);
 
-  /// Whether workspace [slug] on [server] has a pinned or recent chat.
-  bool keepsChatsOf(String server, String slug) =>
-      pinned.containsKey(offKey(server, slug)) ||
-      recent.containsKey(offKey(server, slug));
-
   /// These prefs with the switched-off documents of [slug] on [server] set to [docs].
   Prefs withOff(String server, String slug, List<OffDoc> docs) =>
       _copy(switchedOff: _with(switchedOff, offKey(server, slug), docs));
@@ -337,8 +329,9 @@ class Prefs {
   bool lastChatIn(String server, String slug) =>
       lastChat?.slug == slug && lastChat?.server == server;
 
-  /// These prefs with the order, switched-off documents and last chat of workspace [from] on
-  /// [server] moved to [to], as when a workspace's slug changes.
+  /// These prefs with what is kept of workspace [from] on [server], its order, switched-off
+  /// documents, last chat, pins, recent chats, shortcuts and their uses, moved to [to], as when a
+  /// workspace's slug changes.
   Prefs withRenamedWorkspace(String server, String from, String to) {
     if (from == to) return this;
     final fromKey = offKey(server, from);

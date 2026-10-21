@@ -140,11 +140,11 @@ class _AgentBarState extends State<AgentBar> {
   Future<void> _send() async {
     final chat = AppScope.of(context).chat;
     final text = _draft.text.trim();
-    if (!canSend(chat, text)) return;
+    if (!chat.canSend(text)) return;
     _draft.clear();
     await widget.onGive();
     if (!mounted) return;
-    if (!canSend(chat, text)) {
+    if (!chat.canSend(text)) {
       // Not sent, so it stays to send again, unless something was typed meanwhile.
       if (_draft.text.isEmpty) _draft.text = text;
       return;
@@ -247,7 +247,7 @@ class _AgentBarState extends State<AgentBar> {
         ),
       );
     }
-    final sendable = canSend(chat, _draft.text);
+    final sendable = chat.canSend(_draft.text);
     return RoundButton(
       label: 'Send to the agent',
       color: sendable ? t.accent : t.off,

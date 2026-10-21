@@ -243,9 +243,10 @@ class ShellController extends ChangeNotifier {
   /// What the sheet over the chat shows.
   Beside _beside = Beside.sources;
 
-  /// What the panel showed before passages or sources took it, to be put back when that closes:
-  /// what it took over from, if not Sources, and whether Sources was open before either did.
-  ({Beside? under, bool sources}) _before = (under: null, sources: false);
+  /// What the panel showed before passages or sources took it, bottom first, put back as each
+  /// closes: Sources when it was open before either did, then what the one showing took over
+  /// from, if not Sources.
+  final List<Beside> _under = [];
 
   Citation? _passages;
 
@@ -359,22 +360,21 @@ class ShellController extends ChangeNotifier {
   /// Opens the panel on [next], remembering what it showed.
   void _take(Beside next) {
     if (rightOpen && _beside == next) return;
-    _before = !rightOpen
-        ? (under: null, sources: false)
-        : _beside == Beside.sources
-        ? (under: null, sources: true)
-        : (under: _beside, sources: _before.sources);
+    if (!rightOpen || _beside == Beside.sources) {
+      _under.clear();
+    } else {
+      // What the one showing took over from is let go: only Sources stays under it.
+      _under.removeWhere((shown) => shown != Beside.sources);
+    }
+    if (rightOpen) _under.add(_beside);
     _setRight(open: true, beside: next);
   }
 
   /// Takes [shown] out of the panel, if it is there, and puts back what it took over from.
   void _giveBack(Beside shown) {
     if (_beside != shown) return;
-    final (:under, :sources) = _before;
-    _before = (under: null, sources: sources);
-    under == null
-        ? _setRight(open: sources, beside: Beside.sources)
-        : _setRight(open: true, beside: under);
+    final under = _under.isEmpty ? null : _under.removeLast();
+    _setRight(open: under != null, beside: under ?? Beside.sources);
   }
 
   /// Opens Settings on [page], over what shows, so that Back from it gives that back; or on its

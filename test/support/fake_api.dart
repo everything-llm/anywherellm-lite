@@ -7,6 +7,8 @@ import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
 
+import 'fake_calls.dart';
+
 /// A connection for tests that need a server set up.
 const sampleConnection = Connection(baseUrl: 'https://h:3001', apiKey: 'K1');
 
@@ -47,13 +49,13 @@ class FakeWorkspace {
   };
 }
 
-/// An [AnythingLlmApi] for widget tests that keeps its workspaces in memory. Put an error in
-/// [errors] under a method's name to make it fail, or a completer in [gates] to hold it until the
-/// test completes it. Every call but [verify] is recorded in [calls] as `name` or `name:arg`.
+/// An [AnythingLlmApi] for widget tests that keeps its workspaces in memory. It records and
+/// steers its calls as [FakeCalls] does, but for [verify], which goes in [verified] and fails
+/// with [verifyError].
 ///
 /// [streamChat] answers with [answer] and [cited], or, when [hold] is set, with whatever the
 /// test adds to the controller [chat] makes, which [chats] also keeps by thread.
-class FakeAnythingLlm implements AnythingLlmApi {
+class FakeAnythingLlm with FakeCalls implements AnythingLlmApi {
   final List<Connection> verified = [];
   Object? verifyError;
 
@@ -132,18 +134,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
   /// The slug [renameWorkspace] gives the workspace, when set. The server keeps it otherwise.
   String? renamedSlug;
 
-  final List<String> calls = [];
-  final Map<String, Object> errors = {};
-  final Map<String, Completer<void>> gates = {};
   var _made = 0;
-
-  Future<T> _run<T>(String name, T Function() value, [String? arg]) async {
-    calls.add(arg == null ? name : '$name:$arg');
-    await gates[name]?.future;
-    final error = errors[name];
-    if (error != null) throw error;
-    return value();
-  }
 
   FakeWorkspace _space(String slug) => spaces.firstWhere(
     (w) => w.slug == slug,
@@ -159,7 +150,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
   }
 
   @override
-  Future<List<Workspace>> workspaces() => _run(
+  Future<List<Workspace>> workspaces() => record(
     'workspaces',
     () => [
       for (final w in spaces)
@@ -168,7 +159,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
   );
 
   @override
-  Future<Workspace> workspace(String slug) => _run('workspace', () {
+  Future<Workspace> workspace(String slug) => record('workspace', () {
     final w = _space(slug);
     return Workspace(
       slug: w.slug,
@@ -183,7 +174,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
 
   @override
   Future<Workspace> createWorkspace(String name, {String? prompt}) =>
-      _run('createWorkspace', () {
+      record('createWorkspace', () {
         final made = FakeWorkspace(
           name.toLowerCase().replaceAll(' ', '-'),
           name,
@@ -195,7 +186,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
 
   @override
   Future<Workspace> renameWorkspace(String slug, String name) =>
-      _run('renameWorkspace', () {
+      record('renameWorkspace', () {
         final w = _space(slug)
           ..name = name
           ..slug = renamedSlug ?? slug;
@@ -203,13 +194,13 @@ class FakeAnythingLlm implements AnythingLlmApi {
       }, '$slug:$name');
 
   @override
-  Future<void> deleteWorkspace(String slug) => _run('deleteWorkspace', () {
+  Future<void> deleteWorkspace(String slug) => record('deleteWorkspace', () {
     _space(slug);
     spaces.removeWhere((w) => w.slug == slug);
   }, slug);
 
   @override
-  Future<Thread> createThread(String slug) => _run('createThread', () {
+  Future<Thread> createThread(String slug) => record('createThread', () {
     final made = Thread(slug: 'th-${++_made}', name: newChatName);
     _space(slug).threads.add(made);
     return made;
@@ -217,7 +208,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
 
   @override
   Future<void> renameThread(String slug, String thread, String name) =>
-      _run('renameThread', () {
+      record('renameThread', () {
         final list = _space(slug).threads;
         final at = list.indexWhere((t) => t.slug == thread);
         list[at] = Thread(slug: thread, name: name);
@@ -228,18 +219,18 @@ class FakeAnythingLlm implements AnythingLlmApi {
 
   @override
   Future<void> deleteThread(String slug, String thread, {Connection? on}) =>
-      _run('deleteThread', () {
+      record('deleteThread', () {
         if (on != null) deletedOn[thread] = on;
         _space(slug).threads.removeWhere((t) => t.slug == thread);
       }, thread);
 
   @override
   Future<void> resetChat(String slug, String thread) =>
-      _run('resetChat', () => histories.remove(thread), thread);
+      record('resetChat', () => histories.remove(thread), thread);
 
   @override
   Future<List<ChatMessage>> history(String slug, String thread) =>
-      _run('history', () => histories[thread] ?? const [], thread);
+      record('history', () => histories[thread] ?? const [], thread);
 
   @override
   Stream<ChatEvent> streamChat(
@@ -276,7 +267,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
     String slug, {
     List<String> adds = const [],
     List<String> deletes = const [],
-  }) => _run('updateEmbeddings', () {
+  }) => record('updateEmbeddings', () {
     final docs = _space(slug).docs;
     docs.removeWhere((d) => deletes.contains(d.path));
     for (final path in adds) {
@@ -286,7 +277,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
 
   @override
   Future<Set<String>> acceptedExtensions() =>
-      _run('acceptedExtensions', () => {'.md', '.txt', '.pdf'});
+      record('acceptedExtensions', () => {'.md', '.txt', '.pdf'});
 
   /// Files the server reads in as `<folder>/<name>.json`, `custom-documents` by default.
   @override
@@ -294,7 +285,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
     String name,
     List<int> bytes, {
     DocMeta meta = const DocMeta(),
-  }) => _run('upload', () {
+  }) => record('upload', () {
     final doc = DocEntry(folder: 'custom-documents', name: '$name.json');
     _keep(doc, name, meta, words: bytes.length, web: false);
     return [doc];
@@ -305,7 +296,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
   Future<List<DocEntry>> uploadLink(
     String url, {
     DocMeta meta = const DocMeta(),
-  }) => _run('uploadLink', () {
+  }) => record('uploadLink', () {
     final host = Uri.parse(url).host;
     final doc = DocEntry(folder: 'custom-documents', name: 'url-$host.json');
     _keep(doc, host, meta, words: 1, web: true);
@@ -318,7 +309,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
     String title,
     String text, {
     DocMeta meta = const DocMeta(),
-  }) => _run('uploadText', () {
+  }) => record('uploadText', () {
     final doc = DocEntry(folder: 'custom-documents', name: 'raw-$title.json');
     _keep(
       doc,
@@ -355,7 +346,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
 
   @override
   Future<void> updateWorkspace(String slug, Map<String, Object?> fields) =>
-      _run('updateWorkspace', () {
+      record('updateWorkspace', () {
         final w = _space(slug);
         for (final MapEntry(:key, :value) in fields.entries) {
           if (key == 'openAiPrompt') {
@@ -367,7 +358,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
       }, slug);
 
   @override
-  Future<DocBody> document(String path) => _run('document', () {
+  Future<DocBody> document(String path) => record('document', () {
     final doc = library[path];
     if (doc == null) throw ApiException('There is no document $path.');
     return DocBody(
@@ -377,7 +368,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
   }, path);
 
   @override
-  Future<List<SearchHit>> searchDocs(String slug, String query) => _run(
+  Future<List<SearchHit>> searchDocs(String slug, String query) => record(
     'searchDocs',
     () {
       final words = query.toLowerCase().split(' ').toSet();
@@ -398,7 +389,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
   /// true.
   @override
   Future<void> updateSystem(Map<String, String> changes) =>
-      _run('updateSystem', () {
+      record('updateSystem', () {
         system = {
           ...system,
           for (final MapEntry(:key, :value) in changes.entries)
@@ -407,10 +398,10 @@ class FakeAnythingLlm implements AnythingLlmApi {
       }, changes.keys.join(','));
 
   @override
-  Future<int> vectorCount() => _run('vectorCount', () => vectors);
+  Future<int> vectorCount() => record('vectorCount', () => vectors);
 
   @override
-  Future<Uint8List> answerImage(Uri url) => _run('answerImage', () {
+  Future<Uint8List> answerImage(Uri url) => record('answerImage', () {
     final bytes = images[url];
     if (bytes == null) {
       throw const ApiException(
@@ -422,7 +413,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
 
   @override
   Future<List<int>> generatedFile(String storageName) =>
-      _run('generatedFile', () {
+      record('generatedFile', () {
         final bytes = generated[storageName];
         if (bytes == null) throw const ApiException('File not found');
         return bytes;
@@ -430,7 +421,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
 
   @override
   Future<Map<String, Object?>> systemSettings() =>
-      _run('systemSettings', () => system);
+      record('systemSettings', () => system);
 }
 
 /// A document in the server's library, ready to embed or put in a workspace.

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -12,6 +11,7 @@ import '../core/ports.dart';
 import '../core/schedule.dart';
 import '../core/skill_pages.dart';
 import '../core/toolkit.dart';
+import 'unreachable.dart';
 
 /// [ToolkitApi] over the toolkit's bridge, at the address a pairing code gave
 /// [toolkitCompanion], over the connection the holder has when each call is made: its `/health`,
@@ -246,25 +246,16 @@ class HttpToolkitApi implements ToolkitApi {
 
   /// What [send] gets within [timeout], or an [ApiException] in plain words.
   Future<T> _fetch<T>(Future<T> Function() send) async {
-    final name = toolkitCompanion.name;
-    final lower = name.toLowerCase();
     try {
       return await send().timeout(timeout);
-    } on TimeoutException {
-      throw ApiException(
-        '$name did not answer within ${timeout.inSeconds} seconds.',
+    } on Exception catch (error) {
+      final name = toolkitCompanion.name;
+      throw unreachable(
+        error,
+        name: name,
+        where: '${name.toLowerCase()} on ${_address?.host}',
+        limit: timeout,
       );
-    } on HandshakeException {
-      throw ApiException('$name\'s certificate could not be verified.');
-    } on SocketException catch (error) {
-      throw ApiException(
-        'Could not reach $lower on ${_address?.host}: ${error.message}',
-      );
-    } on http.ClientException catch (error) {
-      throw ApiException('Could not reach $lower: ${error.message}');
-    } on Exception {
-      // Never the error's text: a header the platform refused is quoted in it, key and all.
-      throw ApiException('Could not reach $lower.');
     }
   }
 

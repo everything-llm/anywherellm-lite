@@ -138,7 +138,7 @@ class FakeAppView implements AppView {
   Widget show(
     Uri page, {
     required void Function(Uri url) onLeave,
-    VoidCallback? onClose,
+    required VoidCallback onClose,
     VoidCallback? onFailed,
     PageChannel? channel,
   }) {

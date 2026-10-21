@@ -74,6 +74,19 @@ class ScheduledJob {
   /// Whether the latest run went well: true for one the server calls completed, false for one
   /// it calls failed, and null for any other word, such as one still running, or none.
   bool? get lastWentWell => _wentWell(lastStatus);
+
+  /// `Last run failed` and when it ran, as seen from [now] ([whenText]).
+  String lastFailedText(DateTime now) => [
+    'Last run failed',
+    if (lastRun case final last?) whenText(last, now),
+  ].join(' ');
+
+  /// `Next:` and when it runs next, as seen from [now] ([whenText]), or null when the server did
+  /// not say.
+  String? nextText(DateTime now) => switch (nextRun) {
+    final next? => 'Next: ${whenText(next, now)}',
+    null => null,
+  };
 }
 
 /// One run of a [ScheduledJob]: when it started, the server's word for how it [status] ended and

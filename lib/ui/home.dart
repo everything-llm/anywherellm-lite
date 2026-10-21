@@ -187,8 +187,7 @@ class _ChatsListState extends State<ChatsList> {
   List<Widget> _found(BuildContext context, String query) {
     final scope = AppScope.of(context);
     final chat = scope.chat;
-    final ordered = scope.prefs.prefs.inOrder(chat.workspaces, (w) => w.slug);
-    final found = findChats(query, ordered, chat.threadsOf);
+    final found = findChats(query, chat.orderedWorkspaces, chat.threadsOf);
     if (found.isEmpty) {
       return [
         const SizedBox(height: 20),

@@ -1,3 +1,4 @@
+import '../../core/chat.dart';
 import '../../core/signed_in.dart';
 
 /// Something another app shared with AnywhereLLM through the system's share sheet, or a link
@@ -71,11 +72,7 @@ SharedItem sharedTextItem(String text) {
   ];
   if (lines.isEmpty || lines.length > 2) return SharedText(trimmed);
   final url = Uri.tryParse(lines.last);
-  final web =
-      url != null &&
-      (url.scheme == 'http' || url.scheme == 'https') &&
-      url.host.isNotEmpty &&
-      !lines.last.contains(' ');
+  final web = url != null && isWebAddress(url) && !lines.last.contains(' ');
   if (!web) return SharedText(trimmed);
   return SharedLink(url, title: lines.length == 2 ? lines.first : null);
 }

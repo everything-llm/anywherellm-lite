@@ -115,12 +115,13 @@ Uri? openableLink(String href, {Uri? server}) {
   final parsed = Uri.tryParse(href.trim());
   if (parsed == null) return null;
   final uri = onServer(parsed, server);
-  return switch (uri.scheme) {
-    'http' || 'https' when uri.host.isNotEmpty => uri,
-    'mailto' when uri.path.contains('@') => uri,
-    _ => null,
-  };
+  if (isWebAddress(uri)) return uri;
+  return uri.scheme == 'mailto' && uri.path.contains('@') ? uri : null;
 }
+
+/// Whether [uri] is a web page's address: http or https, with a host.
+bool isWebAddress(Uri uri) =>
+    (uri.scheme == 'http' || uri.scheme == 'https') && uri.host.isNotEmpty;
 
 /// Whether an image at [uri] in an answer may load: only from [server]'s own host, on any port,
 /// over https, or over http on a private network ([keySafe]). So an answer cannot make the app
@@ -228,7 +229,7 @@ String? pastedImageName(String mime, Iterable<String> taken) {
 
 /// Why [name], of [size] bytes, cannot go with a message, or null.
 String? attachmentProblem(String name, int size) => size > maxAttachmentBytes
-    ? '$name is ${(size / (1024 * 1024)).toStringAsFixed(1)} MB; a message takes '
+    ? '$name is ${sizeText(size)}; a message takes '
           '${maxAttachmentBytes ~/ (1024 * 1024)} MB at most. Add it in Documents instead.'
     : null;
 

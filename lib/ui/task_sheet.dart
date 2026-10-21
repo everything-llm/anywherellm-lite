@@ -53,41 +53,20 @@ class TaskDetail extends StatefulWidget {
 class _TaskDetailState extends State<TaskDetail> {
   bool _asking = false;
   late final _toolkit = AppScope.of(context).toolkit;
-  Timer? _following;
 
   @override
   void initState() {
     super.initState();
+    // Reads the runs, so a run that began before this sheet opened, or while the form over it
+    // was open, is followed to its end. [ToolkitController.runNow] follows the run it starts.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(_follow(40));
+      if (mounted) unawaited(_toolkit.follow(widget.id));
     });
-  }
-
-  /// Reads the runs, and again in 3 seconds while the latest is still going, up to [tries]
-  /// reads, so a run that began before this sheet opened, or while the form over it was open,
-  /// is followed to its end; the jobs are read again once it ends. [ToolkitController.runNow]
-  /// follows the run it starts itself.
-  Future<void> _follow(int tries) async {
-    final toolkit = _toolkit;
-    await toolkit.readRuns(widget.id);
-    if (!mounted) return;
-    if (toolkit.runs[widget.id]?.firstOrNull?.running ?? false) {
-      if (tries > 1) {
-        _following = Timer(
-          const Duration(seconds: 3),
-          () => unawaited(_follow(tries - 1)),
-        );
-      }
-    } else if (tries < 40) {
-      // It ended: its last run and next time have changed.
-      await toolkit.readJobs(again: true);
-    }
   }
 
   @override
   void dispose() {
     // A run's progress shows only here.
-    _following?.cancel();
     _toolkit.stopFollowing();
     super.dispose();
   }
@@ -106,17 +85,11 @@ class _TaskDetailState extends State<TaskDetail> {
         final runs = toolkit.runs[widget.id];
         final running = runs?.firstOrNull?.running ?? false;
         final failed = job.enabled && job.lastWentWell == false;
-        final next = job.nextRun;
         final when = !job.enabled
             ? 'Off: nothing runs it until you turn it on.'
             : failed
-            ? [
-                'Last run failed',
-                if (job.lastRun case final last?) whenText(last, now),
-              ].join(' ')
-            : next != null
-            ? 'Next: ${whenText(next, now)}'
-            : '';
+            ? job.lastFailedText(now)
+            : job.nextText(now) ?? '';
         // It scrolls where large text leaves the sheet too short for what it holds.
         return SingleChildScrollView(
           child: Column(

@@ -128,14 +128,22 @@ class ToolkitController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The read of each feature the toolkit serves that has not been read on this server, nor is
+  /// being read.
+  List<void Function()> get _unasked => [
+    if (jobsServed && !_jobs.asked) () => unawaited(readJobs()),
+    if (pagesServed && !_pages.asked) wantPages,
+  ];
+
   /// Whether a feature the toolkit serves has not been read on this server, nor is being read.
-  bool get wants => jobsServed && !_jobs.asked || pagesServed && !_pages.asked;
+  bool get wants => _unasked.isNotEmpty;
 
   /// Reads each feature the toolkit serves that has not been read on this server, nor is being
   /// read.
   void want() {
-    if (jobsServed && !_jobs.asked) unawaited(readJobs());
-    if (pagesServed && !_pages.asked) wantPages();
+    for (final read in _unasked) {
+      read();
+    }
   }
 
   /// Reads which pages are set up afresh, unless that read is on its way. A refusal or any other
@@ -273,25 +281,37 @@ class ToolkitController extends ChangeNotifier {
       'Could not start the task',
       () => _api.runJob(id),
     );
-    if (started) await _follow(id, tries: 40);
+    if (started) await follow(id, started: true);
     return started;
   }
 
-  /// Reads [id]'s runs, and again in 3 seconds while its latest is still going, up to [tries]
-  /// reads.
-  Future<void> _follow(String id, {required int tries}) async {
+  /// Reads job [id]'s runs, and again every 3 seconds while its latest is still going, up to 40
+  /// reads, so a run is followed to its end; the jobs are read again once it ends, since its
+  /// last run and next time have changed. A run the first read finds ended already changed them
+  /// only when it was just [started]. Following another run, or [stopFollowing], ends it.
+  Future<void> follow(String id, {bool started = false}) =>
+      _follow(id, tries: 40, first: !started);
+
+  /// One read of [follow], with [tries] reads left; the [first] read of a run not just started
+  /// leaves the jobs as they are.
+  Future<void> _follow(
+    String id, {
+    required int tries,
+    bool first = false,
+  }) async {
     final asked = _epoch;
     stopFollowing();
-    final follow = _follows;
+    final following = _follows;
     await readRuns(id);
     // A stop while the runs were being read ends the following too.
-    if (asked != _epoch || follow != _follows || tries <= 1) return;
+    if (asked != _epoch || following != _follows) return;
     if (runs[id]?.firstOrNull?.running ?? false) {
-      _watching = Timer(const Duration(seconds: 3), () {
-        unawaited(_follow(id, tries: tries - 1));
-      });
-    } else {
-      // It ended: its last run and next time have changed.
+      if (tries > 1) {
+        _watching = Timer(const Duration(seconds: 3), () {
+          unawaited(_follow(id, tries: tries - 1));
+        });
+      }
+    } else if (!first) {
       await readJobs(again: true);
     }
   }

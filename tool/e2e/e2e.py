@@ -39,8 +39,10 @@ HERE = Path(__file__).parent
 ROOT = HERE.parent.parent
 sys.path.insert(0, str(ROOT / "tool"))
 from device import (
+    APK,
     Driver,
     StepError,
+    build_apk,
     close_device,
     install,
     own_device,
@@ -50,7 +52,6 @@ from device import (
 )
 
 OUT = ROOT / "build/e2e"
-APK = ROOT / "build/app/outputs/flutter-apk/app-debug.apk"
 STUB_PORT = 8901
 MODEL = "e2e-model"
 # The emulator's address for the machine it runs on.
@@ -175,10 +176,7 @@ def make_avd() -> None:
 
 def phone(args: argparse.Namespace) -> bool:
     print("[e2e] building the app")
-    built = subprocess.run(["flutter", "build", "apk", "--debug", "--target-platform", "android-x64"],
-                           cwd=ROOT, capture_output=True, text=True)
-    if built.returncode != 0:
-        print(built.stdout[-3000:] + built.stderr[-3000:])
+    if not build_apk([]):
         return False
     # A task for Upcoming to list, through the bridge as the app reaches it.
     api("/scheduled-jobs/new", {"name": "Morning check", "prompt": "Say good morning.", "tools": None,
@@ -206,11 +204,8 @@ def phone(args: argparse.Namespace) -> bool:
                     walk.do(action)
             except (StepError, subprocess.TimeoutExpired) as error:
                 print(f"failed: {error}")
-                try:
-                    walk.shoot(f"{step['name']}-FAILED")
-                except StepError:
-                    pass
-                (folder / "logcat.txt").write_text(device.shell("logcat -d -v time", check=False))
+                walk.shoot_failed(step["name"])
+                (folder / "logcat.txt").write_text(walk.logcat())
                 ok = False
                 break
             print("ok")

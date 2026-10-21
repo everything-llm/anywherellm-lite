@@ -5,6 +5,8 @@ import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/core/skill_pages.dart';
 import 'package:anywherellm/core/toolkit.dart';
 
+import 'fake_calls.dart';
+
 /// [connection] in use, with the toolkit at [toolkitAt], as a pairing code says where it runs.
 ConnectionHolder pairedHolder(Connection connection, Uri toolkitAt) =>
     ConnectionHolder(connection)
@@ -20,9 +22,8 @@ const liteBridgeAllow =
 /// memory. It is [present] unless a test makes it absent, as beside a stock AnythingLLM, and
 /// serves every feature in [served]: by default the memories and the jobs, to read only; add
 /// [ToolkitFeature.jobsWrite] to let them be changed. What [features] answers is remembered until
-/// asked `again`. Every call is recorded in [calls] as `name` or `name:arg`, and an error in
-/// [errors] under a method's name makes it fail.
-class FakeToolkit implements ToolkitApi {
+/// asked `again`. It records and steers its calls as [FakeCalls] does.
+class FakeToolkit with FakeCalls implements ToolkitApi {
   FakeToolkit({this.present = true});
 
   /// Whether `/health` names the toolkit.
@@ -30,9 +31,6 @@ class FakeToolkit implements ToolkitApi {
 
   /// The features `/health` names while [present].
   Set<String> served = {ToolkitFeature.memories, ToolkitFeature.jobs};
-
-  final List<String> calls = [];
-  final Map<String, Exception> errors = {};
 
   Set<String>? _remembered;
   bool _known = false;
@@ -47,22 +45,15 @@ class FakeToolkit implements ToolkitApi {
     return _remembered;
   }
 
-  /// Records [name] with [arg], fails it with its error in [errors], else answers [value].
-  Future<T> _run<T>(String name, T Function() value, [String? arg]) async {
-    calls.add(arg == null ? name : '$name:$arg');
-    if (errors[name] case final error?) throw error;
-    return value();
-  }
-
   /// What [pages] answers: where the Library and the Vault are.
   SkillPages skillPages = const {};
 
   @override
-  Future<SkillPages> pages() => _run('pages', () => skillPages);
+  Future<SkillPages> pages() => record('pages', () => skillPages);
 
   @override
   Future<List<ScheduledJob>> scheduledJobs() =>
-      _run('scheduledJobs', () => jobs);
+      record('scheduledJobs', () => jobs);
 
   /// What [memorySwitches] answers, and [setMemorySwitches] changes.
   MemorySwitches switches = const MemorySwitches(enabled: true, learn: true);
@@ -84,10 +75,10 @@ class FakeToolkit implements ToolkitApi {
 
   @override
   Future<MemorySwitches> memorySwitches() =>
-      _run('memorySwitches', () => switches);
+      record('memorySwitches', () => switches);
 
   @override
-  Future<void> setMemorySwitches({bool? enabled, bool? learn}) => _run(
+  Future<void> setMemorySwitches({bool? enabled, bool? learn}) => record(
     'setMemorySwitches',
     () => switches = MemorySwitches(
       enabled: enabled ?? switches.enabled,
@@ -135,20 +126,21 @@ class FakeToolkit implements ToolkitApi {
       (throw const ApiException('Memory not found.', status: 404));
 
   @override
-  Future<SavedMemories> savedMemories(String slug) => _run('savedMemories', () {
-    _memoriesOn();
-    return SavedMemories(
-      global: [...globalMemories],
-      workspace: [...?workspaceMemories[slug]],
-    );
-  }, slug);
+  Future<SavedMemories> savedMemories(String slug) =>
+      record('savedMemories', () {
+        _memoriesOn();
+        return SavedMemories(
+          global: [...globalMemories],
+          workspace: [...?workspaceMemories[slug]],
+        );
+      }, slug);
 
   @override
   Future<SavedMemory> addMemory(
     String slug,
     String text, {
     required bool global,
-  }) => _run('addMemory', () {
+  }) => record('addMemory', () {
     _memoriesOn();
     return _keepMemory(
       SavedMemory(id: _nextMemory, text: text, global: global),
@@ -157,22 +149,27 @@ class FakeToolkit implements ToolkitApi {
   }, text);
 
   @override
-  Future<SavedMemory> editMemory(int id, String text) => _run('editMemory', () {
-    _memoriesOn();
-    final list = _holding(id);
-    final at = list.indexWhere((m) => m.id == id);
-    return list[at] = SavedMemory(id: id, text: text, global: list[at].global);
-  }, '$id');
+  Future<SavedMemory> editMemory(int id, String text) =>
+      record('editMemory', () {
+        _memoriesOn();
+        final list = _holding(id);
+        final at = list.indexWhere((m) => m.id == id);
+        return list[at] = SavedMemory(
+          id: id,
+          text: text,
+          global: list[at].global,
+        );
+      }, '$id');
 
   @override
-  Future<void> deleteMemory(int id) => _run('deleteMemory', () {
+  Future<void> deleteMemory(int id) => record('deleteMemory', () {
     _memoriesOn();
     _holding(id).removeWhere((m) => m.id == id);
   }, '$id');
 
   @override
   Future<SavedMemory> moveMemory(int id, {String? toWorkspace}) =>
-      _run('moveMemory', () {
+      record('moveMemory', () {
         _memoriesOn();
         final list = _holding(id);
         final memory = list.firstWhere((m) => m.id == id);
@@ -214,10 +211,10 @@ class FakeToolkit implements ToolkitApi {
 
   @override
   Future<List<JobRun>> jobRuns(String id) =>
-      _run('jobRuns', () => [...?runRecords[id]].take(runsRead).toList(), id);
+      record('jobRuns', () => [...?runRecords[id]].take(runsRead).toList(), id);
 
   @override
-  Future<void> createJob(JobDraft draft) => _run('createJob', () {
+  Future<void> createJob(JobDraft draft) => record('createJob', () {
     _checkCron(draft.cron);
     jobs = [
       ...jobs,
@@ -231,7 +228,7 @@ class FakeToolkit implements ToolkitApi {
   }, '${draft.name}|${draft.cron}');
 
   @override
-  Future<void> updateJob(String id, JobDraft draft) => _run('updateJob', () {
+  Future<void> updateJob(String id, JobDraft draft) => record('updateJob', () {
     _checkCron(draft.cron);
     _replace(
       id,
@@ -240,7 +237,7 @@ class FakeToolkit implements ToolkitApi {
   }, '$id|${draft.name}|${draft.cron}');
 
   @override
-  Future<void> setJobEnabled(String id, bool enabled) => _run(
+  Future<void> setJobEnabled(String id, bool enabled) => record(
     'setJobEnabled',
     () => _replace(id, (j) => _with(j, enabled: enabled)),
     '$id=$enabled',
@@ -266,7 +263,7 @@ class FakeToolkit implements ToolkitApi {
   );
 
   @override
-  Future<void> deleteJob(String id) => _run('deleteJob', () {
+  Future<void> deleteJob(String id) => record('deleteJob', () {
     _job(id);
     jobs = [
       for (final j in jobs)
@@ -277,7 +274,7 @@ class FakeToolkit implements ToolkitApi {
 
   /// Starts a run with [runStatus], or, as AnythingLLM skips one while another runs, fails.
   @override
-  Future<void> runJob(String id) => _run('runJob', () {
+  Future<void> runJob(String id) => record('runJob', () {
     _job(id);
     if (runRecords[id]?.firstOrNull?.running ?? false) {
       throw const ApiException('It is already running.');

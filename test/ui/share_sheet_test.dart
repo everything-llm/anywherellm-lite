@@ -111,9 +111,7 @@ void main() {
       // As at a cold start, when the sheet is built before a workspace opens.
       await h.chat.select(null);
       await share(tester, shares, const SharedText('Service due in May.'));
-      final first = h.prefs.prefs
-          .inOrder(h.chat.workspaces, (w) => w.slug)
-          .first;
+      final first = h.chat.orderedWorkspaces.first;
       await tester.tap(inSheet(control('Ask about it')));
       await tester.pumpAndSettle();
       expect(find.byType(ShareSheet), findsNothing);

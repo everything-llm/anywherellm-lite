@@ -7,7 +7,6 @@ import '../../core/server_models.dart';
 import '../../core/upload.dart';
 import '../sources/sources_panel.dart';
 import '../app_scope.dart';
-import '../icons.dart';
 import '../settings/rows.dart';
 import '../settings/settings_pages.dart';
 import '../layout.dart';
@@ -17,7 +16,6 @@ import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/fields.dart';
 import '../widgets/sheet.dart';
-import '../widgets/tappable.dart';
 import 'shared_item.dart';
 
 /// The bytes of a shared file, or [UnreadableFile] when it cannot be read, as a revoked
@@ -81,10 +79,7 @@ class _ShareSheetState extends State<ShareSheet> {
 
   /// The workspaces in the person's order, the open one first.
   List<Workspace> _workspaces(AppScope scope) {
-    final ordered = scope.prefs.prefs.inOrder(
-      scope.chat.workspaces,
-      (w) => w.slug,
-    );
+    final ordered = scope.chat.orderedWorkspaces;
     final active = scope.chat.activeSlug;
     return [
       ...ordered.where((w) => w.slug == active),
@@ -245,10 +240,15 @@ class _ShareSheetState extends State<ShareSheet> {
                       ),
                       FieldCard([
                         for (final w in workspaces)
-                          _WorkspaceRow(
-                            w.name,
-                            chosen: w == chosen,
-                            onTap: () => setState(() => _slug = w.slug),
+                          Semantics(
+                            inMutuallyExclusiveGroup: true,
+                            checked: w == chosen,
+                            child: CardRow(
+                              w.name,
+                              checked: w == chosen,
+                              maxLines: 1,
+                              onTap: () => setState(() => _slug = w.slug),
+                            ),
                           ),
                       ]),
                     ],
@@ -274,57 +274,6 @@ class _ShareSheetState extends State<ShareSheet> {
               ],
             );
           },
-        ),
-      ),
-    );
-  }
-}
-
-/// A workspace that can take the item, checked while [chosen].
-class _WorkspaceRow extends StatelessWidget {
-  const _WorkspaceRow(this.name, {required this.chosen, required this.onTap});
-
-  final String name;
-  final bool chosen;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Semantics(
-      inMutuallyExclusiveGroup: true,
-      checked: chosen,
-      child: Tappable(
-        label: name,
-        selected: chosen,
-        onTap: onTap,
-        excludeSemantics: false,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: Sizes.cardRow),
-          padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
-          child: Row(
-            spacing: 14,
-            children: [
-              SizedBox.square(
-                dimension: IconSize.row.px,
-                child: chosen
-                    ? AppIcon('check', size: IconSize.row, color: t.ink)
-                    : null,
-              ),
-              Expanded(
-                child: Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Type.sans(
-                    17,
-                    weight: chosen ? FontWeight.w600 : FontWeight.w400,
-                    color: t.ink,
-                  ),
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

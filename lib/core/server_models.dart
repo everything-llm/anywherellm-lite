@@ -3,6 +3,7 @@
 
 import 'dart:typed_data';
 
+import 'chat.dart';
 import 'json.dart';
 import 'outputs.dart';
 
@@ -309,9 +310,7 @@ List<Citation> citationsOf(Object? sources) {
     if (title == null) continue;
     final link = _linkOf(source['chunkSource']);
     final page = link == null ? null : Uri.tryParse(link);
-    if (page != null &&
-        page.host.isNotEmpty &&
-        (page.scheme == 'http' || page.scheme == 'https')) {
+    if (page != null && isWebAddress(page)) {
       if (pages.add(page)) {
         pageTitles.add(title);
         cited.add((title, page, const []));

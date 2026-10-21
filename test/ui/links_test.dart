@@ -481,6 +481,32 @@ void main() {
     expect(h.opened, isEmpty);
   });
 
+  testWidgets('only an apps-lean page is given the comment channel', (
+    tester,
+  ) async {
+    final h = await pumpApp(
+      tester,
+      llm: answering(
+        'See [Groceries](/apps-lean/q9Zx_-1aB2.html), [the Vault](/vault-lean/aB3_-x9.html) '
+        'and [the Library](/library-lean/aB3_-x9.html)',
+      ),
+      canViewApps: true,
+    );
+    await tapLink(tester, 'Groceries');
+    await tester.pumpAndSettle();
+    expect(h.appView!.channel?.name, appsChannel);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    for (final page in ['the Vault', 'the Library']) {
+      await tapLink(tester, page);
+      await tester.pumpAndSettle();
+      expect(h.appView!.shown.last.path, isNot(contains('apps-lean')));
+      expect(h.appView!.channel, isNull, reason: page);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+    }
+  });
+
   testWidgets('without a web view an apps-lean page opens in the browser', (
     tester,
   ) async {

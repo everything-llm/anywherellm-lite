@@ -32,10 +32,12 @@ HERE = Path(__file__).parent
 ROOT = HERE.parent.parent
 sys.path.insert(0, str(ROOT / "tool"))
 from device import (
+    APK,
     PACKAGE,
     Device,
     Driver,
     StepError,
+    build_apk,
     close_device,
     install,
     open_device,
@@ -45,7 +47,6 @@ from device import (
 )
 
 ENTRYPOINT = "tool/audit_app.dart"
-APK = ROOT / "build/app/outputs/flutter-apk/app-debug.apk"
 # Lines in the log that an audit reader wants to see.
 FINDINGS = {
     "overflow": re.compile(r"RenderFlex overflowed|overflowed by"),
@@ -81,9 +82,9 @@ class Walk(Driver):
         if self.themes:
             self.use_theme(self.themes[0])
 
-    def shoot(self, suffix: str = "", failed: bool = False) -> None:
+    def shoot(self, suffix: str = "") -> None:
         """A screenshot in each theme, starting in the device's own, and the screen's dump."""
-        stem = self.stem() + (f"-{suffix}" if suffix else "") + ("-FAILED" if failed else "")
+        stem = self.stem() + (f"-{suffix}" if suffix else "")
         # What a screen reader reaches is the same in every theme, so one dump serves them all.
         nodes = self.nodes()
         labels = [n["label"] for n in nodes if n["label"]]
@@ -115,11 +116,8 @@ class Walk(Driver):
         except (StepError, subprocess.TimeoutExpired) as error:
             record["status"] = "failed"
             record["error"] = str(error)
-            try:
-                self.shoot(failed=True)
-            except StepError:
-                pass
-        log = self.d.shell("logcat -d -v time", check=False)
+            self.shoot_failed()
+        log = self.logcat()
         for name, pattern in FINDINGS.items():
             count = sum(1 for line in log.splitlines() if pattern.search(line))
             if count:
@@ -140,15 +138,14 @@ def variant(step: dict) -> tuple[bool, str]:
 
 
 def build(signed_out: bool, state: str, target: Path) -> None:
-    command = ["flutter", "build", "apk", "--debug", "-t", ENTRYPOINT, "--target-platform", "android-x64"]
+    extra = ["-t", ENTRYPOINT]
     if signed_out:
-        command.append("--dart-define=AUDIT_SIGNED_OUT=true")
+        extra.append("--dart-define=AUDIT_SIGNED_OUT=true")
     if state:
-        command.append(f"--dart-define=AUDIT_STATE={state}")
-    print("building:", " ".join(command))
-    done = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
-    if done.returncode != 0:
-        sys.exit(done.stdout[-3000:] + done.stderr[-3000:])
+        extra.append(f"--dart-define=AUDIT_STATE={state}")
+    print("building:", " ".join(extra))
+    if not build_apk(extra):
+        sys.exit(1)
     shutil.copy(APK, target)
 
 

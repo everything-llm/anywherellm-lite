@@ -178,60 +178,43 @@ class AppShell extends StatelessWidget {
                         Positioned.fill(
                           child: ValueListenableBuilder(
                             valueListenable: shell.popup,
-                            builder: (context, popup, _) => Stack(
-                              children: [
-                                if (popup == Popup.workspaces)
-                                  Positioned.fill(
-                                    child: ModalSheet(
-                                      title: 'Workspaces',
-                                      onClose: () =>
-                                          shell.closePopup(Popup.workspaces),
-                                      child: SingleChildScrollView(
-                                        child: WorkspaceMenu(
-                                          onCreate: () => shell.togglePopup(
-                                            WorkspaceSheet.create,
-                                          ),
-                                        ),
-                                      ),
+                            // The popups drawn over the whole window; the rest draw where
+                            // they open.
+                            builder: (context, popup, _) => switch (popup) {
+                              Popup.workspaces => ModalSheet(
+                                title: 'Workspaces',
+                                onClose: () =>
+                                    shell.closePopup(Popup.workspaces),
+                                child: SingleChildScrollView(
+                                  child: WorkspaceMenu(
+                                    onCreate: () => shell.togglePopup(
+                                      WorkspaceSheet.create,
                                     ),
                                   ),
-                                if (popup case final GalleryOpen open)
-                                  Positioned.fill(
-                                    child: GalleryPage(
-                                      open,
-                                      key: ObjectKey(open),
-                                    ),
-                                  ),
-                                if (popup case final WorkspaceSheet kind)
-                                  Positioned.fill(
-                                    child: WorkspaceSheetView(
-                                      kind,
-                                      key: ValueKey(kind),
-                                    ),
-                                  ),
-                                if (popup case BrowserOpen(:final tab))
-                                  Positioned.fill(
-                                    child: BrowserSheet(
-                                      tab,
-                                      key: ValueKey(tab),
-                                    ),
-                                  ),
-                                if (popup case PageOpen(:final page))
-                                  Positioned.fill(
-                                    child: PageSheet(page, key: ValueKey(page)),
-                                  ),
-                                if (popup case final ChatSheetFor of)
-                                  Positioned.fill(
-                                    child: ChatSheet(
-                                      of,
-                                      key: ValueKey((
-                                        of.thread.slug,
-                                        of.deleting,
-                                      )),
-                                    ),
-                                  ),
-                              ],
-                            ),
+                                ),
+                              ),
+                              final GalleryOpen open => GalleryPage(
+                                open,
+                                key: ObjectKey(open),
+                              ),
+                              final WorkspaceSheet kind => WorkspaceSheetView(
+                                kind,
+                                key: ValueKey(kind),
+                              ),
+                              BrowserOpen(:final tab) => BrowserSheet(
+                                tab,
+                                key: ValueKey(tab),
+                              ),
+                              PageOpen(:final page) => PageSheet(
+                                page,
+                                key: ValueKey(page),
+                              ),
+                              final ChatSheetFor of => ChatSheet(
+                                of,
+                                key: ValueKey((of.thread.slug, of.deleting)),
+                              ),
+                              _ => const SizedBox.shrink(),
+                            },
                           ),
                         ),
                       ],

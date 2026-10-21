@@ -86,10 +86,7 @@ class WorkspaceMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
-    final ordered = scope.prefs.prefs.inOrder(
-      scope.chat.workspaces,
-      (w) => w.slug,
-    );
+    final ordered = scope.chat.orderedWorkspaces;
     final list = ConstrainedBox(
       constraints: const BoxConstraints(maxHeight: 400),
       // A card in a sheet is the page's own ground, which the fades blend into.

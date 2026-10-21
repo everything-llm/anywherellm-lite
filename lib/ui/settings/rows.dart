@@ -438,9 +438,14 @@ class CardRow extends StatelessWidget {
     this.large = false,
     this.checked,
     this.heard,
+    this.maxLines,
   });
 
   final String label;
+
+  /// The most lines [label] may take, ending in an ellipsis past them, or null for as many as it
+  /// needs.
+  final int? maxLines;
 
   /// What a screen reader hears in place of [label], when it says more.
   final String? heard;
@@ -496,6 +501,8 @@ class CardRow extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
+                maxLines: maxLines,
+                overflow: maxLines == null ? null : TextOverflow.ellipsis,
                 style: Type.sans(
                   17,
                   weight: strong || checked == true

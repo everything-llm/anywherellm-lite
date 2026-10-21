@@ -32,11 +32,6 @@ import 'dictation.dart';
 import 'model_picker.dart';
 import 'shortcut_chip.dart';
 
-/// Whether [text] can be sent in the chat on screen: nothing runs, the chat is ready, a workspace
-/// is open and there is something to send.
-bool canSend(ChatController chat, String text) =>
-    !chat.busy && chat.ready && chat.active != null && text.trim().isNotEmpty;
-
 /// Where a question is written. On a desktop ([AppScope.enterSends]) Enter sends it and
 /// Shift+Enter starts a new line; on a phone Enter starts a new line and Send sends. While this
 /// chat answers, Send becomes Stop; while another chat answers, nothing can be sent. Files
@@ -151,7 +146,7 @@ class ComposerState extends State<Composer> {
         if (how == DictationEnd.paused &&
             heard &&
             send &&
-            canSend(_scope.chat, widget.draft.text)) {
+            _scope.chat.canSend(widget.draft.text)) {
           _send(widget.draft.text);
         }
       },
@@ -607,7 +602,7 @@ class _Form extends StatelessWidget {
     final filled = shortcut == null
         ? draft.text.trim().isNotEmpty
         : !(shortcut!.requiresDetail && draft.text.trim().isEmpty);
-    final sendable = filled && canSend(chat, shortcut?.prompt ?? draft.text);
+    final sendable = filled && chat.canSend(shortcut?.prompt ?? draft.text);
 
     void send() {
       if (sendable) onSend(draft.text);

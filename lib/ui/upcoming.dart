@@ -144,16 +144,12 @@ class _JobRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final next = job.nextRun;
-    final last = job.lastRun;
     final failed = job.lastWentWell == false;
     final when = failed
-        ? ['Last run failed', if (last != null) whenText(last, now)].join(' ')
+        ? job.lastFailedText(now)
         : !job.enabled
         ? 'Off'
-        : next != null
-        ? 'Next: ${whenText(next, now)}'
-        : null;
+        : job.nextText(now);
     final about = describeSchedule(job.cron, now);
     final row = InfoRow(
       job.name,

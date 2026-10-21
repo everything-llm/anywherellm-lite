@@ -16,12 +16,8 @@ import 'model_picker.dart';
 
 /// Whether the open workspace's chat mode can be changed now: it has been read, and no answer
 /// runs in it.
-bool _canChoose(AppScope scope) {
-  final slug = scope.chat.activeSlug;
-  return slug != null &&
-      scope.sources.read != null &&
-      !scope.chat.answeringIn(slug);
-}
+bool _canChoose(AppScope scope) =>
+    scope.chat.activeIdle && scope.sources.read != null;
 
 /// The open workspace's chat mode in the composer, in plain words: what answers draw on. Tapped,
 /// it opens the Answer from sheet ([AnswerFromAnchor]). Files only tints it,

@@ -132,7 +132,7 @@ class _WorkspaceSheetViewState extends State<WorkspaceSheetView> {
     return SheetQuestion(
       'Delete ${active?.name} and its $chats? Its documents stay in the library.',
       onKeep: _close,
-      onConfirm: active == null || chat.answeringIn(active.slug)
+      onConfirm: active == null || !chat.activeIdle
           ? null
           : () {
               _close();

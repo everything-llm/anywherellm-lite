@@ -25,7 +25,7 @@ class AppWebViews implements AppView {
   Widget show(
     Uri page, {
     required void Function(Uri url) onLeave,
-    VoidCallback? onClose,
+    required VoidCallback onClose,
     VoidCallback? onFailed,
     PageChannel? channel,
   }) => _AppWebView(
@@ -88,14 +88,14 @@ class _AppWebView extends StatefulWidget {
     super.key,
     required this.page,
     required this.onLeave,
-    this.onClose,
+    required this.onClose,
     this.onFailed,
     this.channel,
   });
 
   final Uri page;
   final void Function(Uri url) onLeave;
-  final VoidCallback? onClose;
+  final VoidCallback onClose;
   final VoidCallback? onFailed;
   final PageChannel? channel;
 
@@ -128,13 +128,11 @@ class _AppWebViewState extends State<_AppWebView> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (_) {
-            if (widget.onClose != null) {
-              unawaited(
-                _web.runJavaScript(
-                  "if(window.$_closeChannel)window.close=()=>$_closeChannel.postMessage('close')",
-                ),
-              );
-            }
+            unawaited(
+              _web.runJavaScript(
+                "if(window.$_closeChannel)window.close=()=>$_closeChannel.postMessage('close')",
+              ),
+            );
             if (mounted && !_loaded) setState(() => _loaded = true);
           },
           onHttpError: (error) {
@@ -183,10 +181,10 @@ class _AppWebViewState extends State<_AppWebView> {
     final page = widget.page;
     if (_view case final view?) {
       final heard = <String, void Function(String message)>{
-        if (widget.onClose case final close?) _closeChannel: (_) => close(),
+        _closeChannel: (_) => widget.onClose(),
         if (widget.channel case final channel?) channel.name: channel.onMessage,
       };
-      if (heard.isNotEmpty && await _listen(view, page, heard.keys)) {
+      if (await _listen(view, page, heard.keys)) {
         if (!mounted) return;
         heard.forEach((name, onMessage) => _heard[(view, name)] = onMessage);
       }

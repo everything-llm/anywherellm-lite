@@ -1,15 +1,20 @@
 import 'chat.dart';
+import 'connection.dart';
+
+/// Whether [a] and [b] are on one origin: the same scheme, host and port. It is written out,
+/// since [Uri.origin] throws for a scheme other than http and https.
+bool sameOrigin(Uri a, Uri b) =>
+    a.scheme == b.scheme && a.host == b.host && a.port == b.port;
 
 /// Whether [link] is the page `/<folder>/<token>.html` of an agent skill that publishes into
-/// AnythingLLM's web folder, which AnythingLLM serves without a sign-in, on [server]'s own origin:
-/// its scheme, host and port, not only its host as an answer's image may be ([loadableImage]),
-/// since another port or scheme on that host is another service. A path from the root is for the
-/// caller to resolve first ([onServer]).
+/// AnythingLLM's web folder, which AnythingLLM serves without a sign-in, on [server]'s own origin
+/// ([sameOrigin]) over https or over http on a private network ([keySafe]): not only its host, as
+/// an answer's image may be ([loadableImage]), since another port or scheme on that host is
+/// another service. A path from the root is for the caller to resolve first ([onServer]).
 bool isSkillPage(Uri link, Uri? server, String folder) =>
     server != null &&
-    link.scheme == server.scheme &&
-    link.port == server.port &&
-    loadableImage(link, server) &&
+    sameOrigin(link, server) &&
+    keySafe(link) &&
     isSkillPath(link.path, folder);
 
 /// A page's path, `/<folder>/<token>.html`, with the folder in its one group.

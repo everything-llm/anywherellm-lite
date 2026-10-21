@@ -13,6 +13,7 @@ import '../core/ports.dart';
 import '../core/server_models.dart';
 import '../core/upload.dart';
 import 'anythingllm_stream.dart';
+import 'unreachable.dart';
 
 /// [AnythingLlmApi] over the server's HTTP API, with the bearer key on every request.
 ///
@@ -288,7 +289,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       }
     } on TimeoutException {
       throw ApiException(
-        'The server did not answer within ${_duration(timeout)}.',
+        'The server did not answer within ${durationText(timeout)}.',
       );
     } on http.ClientException catch (error) {
       throw ApiException('The image was cut off: ${error.message}');
@@ -451,7 +452,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
           throw switch (error) {
             // Connecting takes less than [limit], so the request went out.
             TimeoutException() => CutOff(
-              'The server took the question but sent nothing within ${_duration(limit)}. It may '
+              'The server took the question but sent nothing within ${durationText(limit)}. It may '
               'still be answering.',
             ),
             // An [HttpException]: the server closed the connection after the request went out.
@@ -575,27 +576,17 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     }
   }
 
-  /// [error], from sending a request, in plain words.
-  ApiException _unreachable(
+  /// [error], from sending a request to [connection] that may take [limit], in plain words.
+  static ApiException _unreachable(
     Connection connection,
     Exception error,
     Duration limit,
-  ) => switch (error) {
-    TimeoutException() => ApiException(
-      'The server did not answer within ${_duration(limit)}.',
-    ),
-    HandshakeException() => const ApiException(
-      'The server\'s certificate could not be verified.',
-    ),
-    SocketException(:final message) => ApiException(
-      'Could not reach ${connection.host}: $message',
-    ),
-    http.ClientException(:final message) => ApiException(
-      'Could not reach the server: $message',
-    ),
-    // Never the error's text: a header the platform refused is quoted in it, key and all.
-    _ => const ApiException('Could not reach the server.'),
-  };
+  ) => unreachable(
+    error,
+    name: 'The server',
+    where: connection.host,
+    limit: limit,
+  );
 
   static const _refused = 'The server refused the request.';
 
@@ -666,10 +657,6 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       throw ApiException(error.trim());
     }
   }
-
-  static String _duration(Duration limit) => limit.inSeconds < 120
-      ? '${limit.inSeconds} seconds'
-      : '${limit.inMinutes} minutes';
 }
 
 /// [attachment] as the server takes it: the file as a base64 data URL. A document's URL carries

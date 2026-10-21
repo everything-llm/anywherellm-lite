@@ -18,6 +18,9 @@ from xml.etree import ElementTree
 
 PACKAGE = "local.anywherellm.lite"
 SCALES = ("window_animation_scale", "transition_animation_scale", "animator_duration_scale")
+ROOT = Path(__file__).resolve().parent.parent
+# Where `flutter build apk --debug` puts the APK.
+APK = ROOT / "build/app/outputs/flutter-apk/app-debug.apk"
 
 
 class StepError(Exception):
@@ -227,6 +230,18 @@ class Driver:
         (self.out / f"{name}.xml").write_text(self.d.xml)
         self.d.screenshot(self.out / f"{name}.png")
 
+    def shoot_failed(self, name: str = "") -> None:
+        """A failed step's screenshot, named `[name]-FAILED`, or `FAILED` alone, when the device
+        can still take one."""
+        try:
+            self.shoot(f"{name}-FAILED" if name else "FAILED")
+        except StepError:
+            pass
+
+    def logcat(self) -> str:
+        """The device's log since it was last cleared, with times."""
+        return self.d.shell("logcat -d -v time", check=False)
+
 
 def running_emulators() -> list[str]:
     out = subprocess.run([tool("adb", "platform-tools"), "devices"], capture_output=True, text=True).stdout
@@ -305,6 +320,16 @@ def close_device(device: Device, booted: subprocess.Popen | None, keep: bool) ->
     if booted and not keep:
         device.run("emu", "kill", check=False)
         booted.wait(timeout=60)
+
+
+def build_apk(extra_args: list[str]) -> bool:
+    """Builds the debug APK for an x86_64 emulator into [APK], with [extra_args] after the build's
+    own, and says whether it built. A failed build prints the end of what it said."""
+    command = ["flutter", "build", "apk", "--debug", "--target-platform", "android-x64", *extra_args]
+    done = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
+    if done.returncode != 0:
+        print(done.stdout[-3000:] + done.stderr[-3000:])
+    return done.returncode == 0
 
 
 def install(device: Device, apk: Path) -> None:

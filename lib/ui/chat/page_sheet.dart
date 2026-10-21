@@ -17,8 +17,9 @@ const appsChannel = 'AnywhereLLMApps';
 /// a tall sheet over the chat: the page edge to edge under the drag handle, drawing its own
 /// controls. A comment the page posts to [appsChannel] asks Send this to the chat? over the page,
 /// and once sent goes in the chat under the sheet as the person's message, and the sheet closes
-/// so its answer shows. Esc, Back on the device, the
-/// scrim and a drag down close it, and so does the page's own `window.close()`.
+/// so its answer shows. Only an apps-lean page on the connected server ([isAppsLeanPage]) is given
+/// that channel; the Vault and the Library page have none. Esc, Back on the device, the scrim and
+/// a drag down close it, and so does the page's own `window.close()`.
 class PageSheet extends StatefulWidget {
   const PageSheet(this.page, {super.key});
 
@@ -87,6 +88,10 @@ class _PageSheetState extends State<PageSheet> {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final view = scope.appView;
+    final comments = isAppsLeanPage(
+      widget.page,
+      scope.settings.connection?.uri,
+    );
     return SheetFrame(
       title: 'The app’s page',
       bare: true,
@@ -114,7 +119,7 @@ class _PageSheetState extends State<PageSheet> {
                 widget.page,
                 onLeave: (url) => openLink(context, url.toString()),
                 onClose: scope.shell.closePage,
-                channel: _channel,
+                channel: comments ? _channel : null,
               ),
             ),
     );
