@@ -1,31 +1,26 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/scheduler.dart';
 
-import '../../core/connection.dart';
 import '../../core/memory.dart';
 import '../../core/ports.dart';
 import 'chat_controller.dart';
+import 'follows_server.dart';
 import 'notice.dart';
+import 'read.dart';
 import 'settings_controller.dart';
 
 /// What the Memory page shows and changes for one workspace, [slug]: AnythingLLM's saved
 /// memories, which every chat is shown, through the toolkit. Another server starts it afresh.
-class MemoryController extends ChangeNotifier {
-  MemoryController(this._api, this._settings, this._chat) {
-    _settings.addListener(_changed);
+class MemoryController extends ChangeNotifier with FollowsServer {
+  MemoryController(this._api, SettingsController settings, this._chat) {
+    followServer(settings);
     _chat.addListener(_followed);
-    _server = _settings.connection;
     _shown = slug;
   }
 
   final ToolkitApi _api;
-  final SettingsController _settings;
   final ChatController _chat;
-
-  /// The server read.
-  Connection? _server;
 
   /// The workspace picked on the page, or null for the open one.
   String? _picked;
@@ -36,25 +31,26 @@ class MemoryController extends ChangeNotifier {
   /// The workspace shown: the one picked, else the open one.
   String? get slug => _picked ?? _chat.activeSlug;
 
+  /// The switches and the saved memories as last read, and why a read or a change failed.
+  late final _memory = ReadSlot<(MemorySwitches, SavedMemories?)>(
+    notifyListeners,
+  );
+
   /// Whether saved memories are on, and saved from chats; null before they are read.
-  MemorySwitches? switches;
+  MemorySwitches? get switches => _memory.value?.$1;
 
   /// The saved memories, or null before they are read or while they are off.
-  SavedMemories? saved;
+  SavedMemories? get saved => _memory.value?.$2;
 
-  bool loading = false;
+  bool get loading => _memory.loading;
 
   /// Whether a change is being sent.
   bool busy = false;
 
-  Notice? savedProblem;
+  Notice? get savedProblem => _memory.problem;
 
-  int _reads = 0;
-
-  void _changed() {
-    final here = _settings.connection;
-    if (here == _server) return;
-    _server = here;
+  @override
+  void serverChanged(_) {
     _picked = null;
     _reset();
   }
@@ -67,12 +63,8 @@ class MemoryController extends ChangeNotifier {
 
   void _reset() {
     _shown = slug;
-    _reads++;
-    switches = null;
-    saved = null;
-    loading = false;
+    _memory.reset();
     busy = false;
-    savedProblem = null;
     notifyListeners();
   }
 
@@ -83,12 +75,11 @@ class MemoryController extends ChangeNotifier {
     _reset();
   }
 
-  /// Reads the memory unless it is read already, or the last read failed (Refresh asks again).
-  /// It asks after the frame, since a read tells the listeners at once, so a build may call it.
+  /// Reads the memory after the frame, unless it is read already, or the last read failed
+  /// (Refresh asks again).
   void want() {
-    if (switches != null || loading || savedProblem != null) return;
-    if (slug == null || _server == null) return;
-    SchedulerBinding.instance.addPostFrameCallback((_) {
+    if (_memory.asked || slug == null || server == null) return;
+    afterFrame(() {
       if (switches == null && !loading) unawaited(read());
     });
   }
@@ -96,27 +87,11 @@ class MemoryController extends ChangeNotifier {
   /// Reads the saved memories of the workspace shown again.
   Future<void> read() async {
     final slug = this.slug;
-    if (slug == null || _server == null) return;
-    final number = ++_reads;
-    loading = true;
-    notifyListeners();
-    try {
+    if (slug == null || server == null) return;
+    await _memory.read(() async {
       final on = await _api.memorySwitches();
-      final listed = on.enabled ? await _api.savedMemories(slug) : null;
-      if (number != _reads) return;
-      switches = on;
-      saved = listed;
-      savedProblem = null;
-    } on ApiException catch (error) {
-      if (number != _reads) return;
-      savedProblem = Notice('Could not read the saved memories', error.message);
-    } finally {
-      // A failure of any kind ends the read; a newer read or a reset has the flag by then.
-      if (number == _reads) {
-        loading = false;
-        notifyListeners();
-      }
-    }
+      return (on, on.enabled ? await _api.savedMemories(slug) : null);
+    }, failTitle: 'Could not read the saved memories');
   }
 
   /// Turns saved memories, or saving them from chats, on or off.
@@ -151,35 +126,29 @@ class MemoryController extends ChangeNotifier {
     String title,
     Future<void> Function(String slug) call,
   ) async {
-    final server = _server;
+    final at = here;
     final slug = this.slug;
     if (slug == null || busy) return false;
-    busy = true;
-    notifyListeners();
-    Notice? failed;
-    try {
-      await call(slug);
-    } on ApiException catch (error) {
-      failed = Notice(title, error.message);
-    } finally {
-      // A failure of any kind leaves the page free for the next change too.
-      if (server == _server && slug == this.slug) {
-        busy = false;
+    return changeThenRead(
+      title,
+      () => call(slug),
+      current: () => at.current && slug == this.slug,
+      busy: (on) {
+        busy = on;
         notifyListeners();
-      }
-    }
-    if (server != _server || slug != this.slug) return false;
-    await read();
-    if (failed != null) {
-      savedProblem = failed;
-      notifyListeners();
-    }
-    return failed == null;
+      },
+      readAgain: (failed) async {
+        await read();
+        if (failed != null) {
+          _memory.problem = failed;
+          notifyListeners();
+        }
+      },
+    );
   }
 
   @override
   void dispose() {
-    _settings.removeListener(_changed);
     _chat.removeListener(_followed);
     super.dispose();
   }

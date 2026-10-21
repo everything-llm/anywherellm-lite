@@ -48,11 +48,7 @@ class _ServerPageState extends State<ServerPage> {
   @override
   void initState() {
     super.initState();
-    final system = AppScope.of(context).system;
-    // A read tells the controller's listeners at once, so it waits for the frame.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && system.vectors == null) system.readVectors();
-    });
+    AppScope.of(context).system.wantVectors();
   }
 
   @override

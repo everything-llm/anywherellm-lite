@@ -46,11 +46,7 @@ class _WorkspacePagesState extends State<WorkspacePages> {
   @override
   void initState() {
     super.initState();
-    _files = AppScope.of(context).files;
-    // Loading notifies, which must wait until the frame that builds the pages is done.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _files.ensureLoaded();
-    });
+    _files = AppScope.of(context).files..shown();
   }
 
   @override

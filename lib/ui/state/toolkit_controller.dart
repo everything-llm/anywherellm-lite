@@ -7,33 +7,35 @@ import '../../core/ports.dart';
 import '../../core/schedule.dart';
 import '../../core/skill_pages.dart';
 import '../../core/toolkit.dart';
+import 'follows_server.dart';
 import 'notice.dart';
+import 'read.dart';
 import 'settings_controller.dart';
 
 /// What the app knows of the toolkit beside the server in use: whether it is there
 /// ([available]), what its bridge lets through, the pages set up and the scheduled jobs, which,
 /// where it allows, the app makes, changes, runs and deletes. Another server, or the toolkit said
 /// to run elsewhere, starts it afresh, Test connection asks again whether the toolkit is there,
-/// and an answer about a server no longer in use is dropped.
-class ToolkitController extends ChangeNotifier {
+/// and an answer from before either is dropped, even once the server is back.
+class ToolkitController extends ChangeNotifier with FollowsServer {
   ToolkitController(this._api, this._settings) {
-    _server = _settings.connection;
-    _address = _settings.addressOf(toolkitCompanion);
+    followServer(_settings);
     _tests = _settings.tests;
-    _settings.addListener(_settingsChanged);
-    if (_server != null) unawaited(_detect());
+    _settings.addListener(_tested);
+    if (server != null) unawaited(_detect());
   }
 
   final ToolkitApi _api;
   final SettingsController _settings;
 
-  /// The server in use, and where the toolkit was said to run beside it, as last seen.
-  Connection? _server;
-  Uri? _address;
+  /// How many times Test connection had asked, as last seen.
   int _tests = 0;
 
-  /// Counts the connection changes, so an answer from the server before is dropped.
-  int _epoch = 0;
+  /// The server in use and where the toolkit was said to run beside it: another of either starts
+  /// this afresh.
+  @override
+  Object? get serverKey =>
+      (_settings.connection, _settings.addressOf(toolkitCompanion));
 
   /// Whether the toolkit answers beside the server in use: null until it is asked.
   bool? available;
@@ -58,13 +60,13 @@ class ToolkitController extends ChangeNotifier {
   /// card shows a row for each of.
   bool get pagesServed => _serves(ToolkitFeature.pages);
 
-  final _pages = _Read<Set<SkillPage>>();
+  late final _pages = ReadSlot<Set<SkillPage>>(notifyListeners);
 
   /// Which of the suite's pages are set up, as the last read said; never where they are, since
   /// a page's address is a bearer capability that [pagePath] hands to its one caller.
   Set<SkillPage> get pagesFound => _pages.value ?? const {};
 
-  final _jobs = _Read<List<ScheduledJob>>();
+  late final _jobs = ReadSlot<List<ScheduledJob>>(notifyListeners);
 
   /// The jobs the server runs on a schedule, or null until read.
   List<ScheduledJob>? get jobs => _jobs.value;
@@ -86,41 +88,35 @@ class ToolkitController extends ChangeNotifier {
   Timer? _watching;
 
   /// Another server is in use, or the toolkit was said to run elsewhere: forgets what was read
-  /// from the one before and asks afresh. Test connection asks again where it is.
-  void _settingsChanged() {
-    final here = _settings.connection;
-    final address = _settings.addressOf(toolkitCompanion);
-    if (here != _server || address != _address) {
-      // The same server with the toolkit said to run elsewhere asks there afresh.
-      final moved = here == _server;
-      _server = here;
-      _address = address;
-      _tests = _settings.tests;
-      _epoch++;
-      available = null;
-      _features = const {};
-      for (final read in [_jobs, _pages]) {
-        read.reset();
-      }
-      busy = false;
-      changeProblem = null;
-      runs.clear();
-      stopFollowing();
-      notifyListeners();
-      if (here != null) unawaited(_detect(again: moved));
-      return;
-    }
-    if (_settings.tests != _tests) {
-      _tests = _settings.tests;
-      if (here != null) unawaited(_detect(again: true));
-    }
+  /// from the one before and asks afresh.
+  @override
+  void serverChanged(Connection? was) {
+    _tests = _settings.tests;
+    available = null;
+    _features = const {};
+    _jobs.reset();
+    _pages.reset();
+    busy = false;
+    changeProblem = null;
+    runs.clear();
+    stopFollowing();
+    notifyListeners();
+    // The same server with the toolkit said to run elsewhere asks there afresh.
+    if (server != null) unawaited(_detect(again: server == was));
+  }
+
+  /// Test connection asks again where the toolkit is.
+  void _tested() {
+    if (_settings.tests == _tests) return;
+    _tests = _settings.tests;
+    if (server != null) unawaited(_detect(again: true));
   }
 
   /// Asks whether the toolkit is there and what it serves, [again] afresh.
   Future<void> _detect({bool again = false}) async {
-    final asked = _epoch;
+    final at = here;
     final found = await _api.features(again: again);
-    if (asked != _epoch) return;
+    if (!at.unchanged) return;
     final features = found ?? const <String>{};
     if (available == (found != null) && setEquals(features, _features)) return;
     available = found != null;
@@ -132,44 +128,54 @@ class ToolkitController extends ChangeNotifier {
   /// being read.
   List<void Function()> get _unasked => [
     if (jobsServed && !_jobs.asked) () => unawaited(readJobs()),
-    if (pagesServed && !_pages.asked) wantPages,
+    if (pagesServed && !_pages.asked) _readPages,
   ];
 
-  /// Whether a feature the toolkit serves has not been read on this server, nor is being read.
-  bool get wants => _unasked.isNotEmpty;
-
-  /// Reads each feature the toolkit serves that has not been read on this server, nor is being
-  /// read.
+  /// Reads, after the frame, each feature the toolkit serves that has not been read on this
+  /// server, nor is being read.
   void want() {
-    for (final read in _unasked) {
-      read();
-    }
+    if (_unasked.isEmpty) return;
+    afterFrame(() {
+      for (final read in _unasked) {
+        read();
+      }
+    });
   }
 
-  /// Reads which pages are set up afresh, unless that read is on its way. A refusal or any other
+  /// Reads which pages are set up afresh, after the frame, unless that read is on its way.
+  void wantPages() => afterFrame(_readPages);
+
+  /// Reads which pages are set up afresh unless that read is on its way. A refusal or any other
   /// failure leaves none found, and says nothing.
-  void wantPages() => unawaited(
-    _read(_pages, pagesServed, 'Could not read the pages', () async {
-      try {
-        return (await _api.pages()).keys.toSet();
-      } on ApiException {
-        return const <SkillPage>{};
-      }
-    }),
-  );
+  void _readPages() {
+    if (!pagesServed) return;
+    unawaited(
+      _pages.read(
+        () async {
+          try {
+            return (await _api.pages()).keys.toSet();
+          } on ApiException {
+            return const <SkillPage>{};
+          }
+        },
+        failTitle: 'Could not read the pages',
+        join: true,
+      ),
+    );
+  }
 
   /// Where [page] is, read afresh and never kept, or null when it is not set up. The answer also
   /// says which pages are set up. A key the bridge refuses (401 or 403) leaves none found, and
   /// any [ApiException] is thrown on for the caller to show.
   Future<String?> pagePath(SkillPage page) async {
-    final asked = _epoch;
+    final at = here;
     try {
       final read = await _api.pages();
-      if (asked != _epoch) return null;
+      if (!at.unchanged) return null;
       _foundNow(read.keys.toSet());
       return read[page];
     } on ApiException catch (error) {
-      if (asked == _epoch && (error.status == 401 || error.status == 403)) {
+      if (at.unchanged && (error.status == 401 || error.status == 403)) {
         _foundNow(const {});
       }
       rethrow;
@@ -183,66 +189,33 @@ class ToolkitController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Reads the jobs the server runs on a schedule, or waits for the read on its way and, [again],
-  /// reads afresh after it, for what a change made.
-  Future<void> readJobs({bool again = false}) => _read(
-    _jobs,
-    jobsServed,
-    'Could not read the scheduled jobs',
-    _api.scheduledJobs,
-    again: again,
-    clearsChange: true,
-  );
+  /// Reads the jobs afresh after the frame, unless that read is on its way, as Upcoming does as
+  /// it opens.
+  void wantJobs() => afterFrame(() => unawaited(readJobs()));
 
-  /// Reads [into] with [fetch] where the toolkit [served] it, showing why it failed as [title].
-  /// While a read is on its way it waits for that one instead, and then reads afresh only
-  /// [again]. A read that succeeds takes away the [changeProblem] when it [clearsChange].
-  Future<void> _read<T>(
-    _Read<T> into,
-    bool served,
-    String title,
-    Future<T> Function() fetch, {
-    bool again = false,
-    bool clearsChange = false,
-  }) async {
-    if (!served) return;
-    if (into.pending case final pending?) {
-      await pending;
-      if (!again) return;
-    }
-    final asked = _epoch;
-    final reading = into.pending = () async {
-      try {
-        final read = await fetch();
-        if (asked != _epoch) return;
-        into
-          ..value = read
-          ..problem = null;
-        if (clearsChange) changeProblem = null;
-      } on ApiException catch (error) {
-        if (asked != _epoch) return;
-        into.problem = Notice(title, error.message);
-      } finally {
-        // Another server's read, or a failure of any kind, leaves nothing marked as on its way.
-        if (asked == _epoch) {
-          into.pending = null;
-          notifyListeners();
-        }
-      }
-    }();
-    notifyListeners();
-    await reading;
+  /// Reads the jobs the server runs on a schedule, or waits for the read on its way and, [again],
+  /// reads afresh after it, for what a change made. A read that succeeds takes away the
+  /// [changeProblem].
+  Future<void> readJobs({bool again = false}) async {
+    if (!jobsServed) return;
+    await _jobs.read(
+      _api.scheduledJobs,
+      failTitle: 'Could not read the scheduled jobs',
+      kept: (_) => changeProblem = null,
+      join: true,
+      again: again,
+    );
   }
 
   /// Reads job [id]'s latest runs, for the sheet that shows them.
   Future<void> readRuns(String id) async {
-    final asked = _epoch;
+    final at = here;
     try {
       final read = await _api.jobRuns(id);
-      if (asked != _epoch) return;
+      if (!at.unchanged) return;
       runs[id] = read;
     } on ApiException {
-      if (asked != _epoch) return;
+      if (!at.unchanged) return;
       runs.remove(id);
     }
     notifyListeners();
@@ -299,12 +272,12 @@ class ToolkitController extends ChangeNotifier {
     required int tries,
     bool first = false,
   }) async {
-    final asked = _epoch;
+    final at = here;
     stopFollowing();
     final following = _follows;
     await readRuns(id);
     // A stop while the runs were being read ends the following too.
-    if (asked != _epoch || following != _follows) return;
+    if (!at.unchanged || following != _follows) return;
     if (runs[id]?.firstOrNull?.running ?? false) {
       if (tries > 1) {
         _watching = Timer(const Duration(seconds: 3), () {
@@ -326,52 +299,30 @@ class ToolkitController extends ChangeNotifier {
   /// over them. Whether it went.
   Future<bool> _change(String title, Future<void> Function() call) async {
     if (busy) return false;
-    final asked = _epoch;
-    busy = true;
+    final at = here;
     changeProblem = null;
-    notifyListeners();
-    Notice? failed;
-    try {
-      await call();
-    } on ApiException catch (error) {
-      failed = Notice(title, error.message);
-    } finally {
-      // A failure of any other kind leaves the toolkit free for the next change too.
-      if (asked == _epoch) {
-        busy = false;
+    return changeThenRead(
+      title,
+      call,
+      current: () => at.unchanged,
+      busy: (on) {
+        busy = on;
         notifyListeners();
-      }
-    }
-    if (asked != _epoch) return false;
-    await readJobs(again: true);
-    if (failed != null) {
-      changeProblem = failed;
-      notifyListeners();
-    }
-    return failed == null;
+      },
+      readAgain: (failed) async {
+        await readJobs(again: true);
+        if (failed != null) {
+          changeProblem = failed;
+          notifyListeners();
+        }
+      },
+    );
   }
 
   @override
   void dispose() {
     stopFollowing();
-    _settings.removeListener(_settingsChanged);
+    _settings.removeListener(_tested);
     super.dispose();
-  }
-}
-
-/// One list the toolkit serves: what was read last, why the last read failed, and the read on
-/// its way.
-class _Read<T> {
-  T? value;
-  Notice? problem;
-  Future<void>? pending;
-
-  /// Whether it was read, refused, or is being read.
-  bool get asked => value != null || problem != null || pending != null;
-
-  void reset() {
-    value = null;
-    problem = null;
-    pending = null;
   }
 }

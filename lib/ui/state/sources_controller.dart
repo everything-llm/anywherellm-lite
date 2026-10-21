@@ -13,6 +13,7 @@ import 'chat_controller.dart';
 import 'fleeting.dart';
 import 'notice.dart';
 import 'prefs_controller.dart';
+import 'read.dart';
 
 /// The active workspace's Sources: what it answers from, adding files, switching them on and off,
 /// and removing them with a short chance to undo.
@@ -36,13 +37,12 @@ class SourcesController extends ChangeNotifier {
   int get onCount => _files.where((f) => f.on).length;
   List<SourceFile> _files = const [];
 
-  bool loading = false;
+  late final _workspace = ReadSlot<Workspace>(notifyListeners);
+
+  bool get loading => _workspace.loading;
 
   /// The workspace as last read, from which [files] and [chatMode] come, or null before then.
-  Workspace? read;
-
-  /// Counts the reads started, so an answer that comes after a newer read's is dropped.
-  int _reads = 0;
+  Workspace? get read => _workspace.value;
 
   /// The workspace's chat mode on the server, which every message answers in, or null before it
   /// is read or when the server names one this app does not know.
@@ -90,11 +90,10 @@ class SourcesController extends ChangeNotifier {
   void _chatChanged() {
     if (_chat.activeSlug == _slug) return;
     _slug = _chat.activeSlug;
-    read = null;
+    _workspace.reset();
     _files = const [];
     chatMode.value = null;
     problems = const [];
-    loading = false;
     sending = null;
     _accepted = null;
     searched = null;
@@ -110,39 +109,26 @@ class SourcesController extends ChangeNotifier {
     final slug = _slug;
     final server = _chat.server;
     if (slug == null) return;
-    final go = ++_reads;
-    bool current() => server == _chat.server && slug == _slug && go == _reads;
-    loading = true;
-    notifyListeners();
-    try {
-      final workspace = await _api.workspace(slug);
-      if (!current()) return;
-      _apply(workspace);
-    } on ApiException catch (error) {
-      if (!current()) return;
-      problems = [
-        Notice('Could not read this workspace\'s files', error.message),
-      ];
-    } finally {
-      if (current()) {
-        loading = false;
-        notifyListeners();
-      }
-    }
+    await _workspace.read(
+      () => _api.workspace(slug),
+      failTitle: 'Could not read this workspace\'s files',
+      current: () => server == _chat.server && slug == _slug,
+      kept: _apply,
+      failed: (why) => problems = [why],
+    );
   }
 
   /// Shows [workspace], already read by someone else, when it is the active one.
   void show(Workspace workspace) {
     if (workspace.slug != _slug) return;
     // A read of Sources' own still under way is older than this one.
-    _reads++;
-    loading = false;
+    _workspace.take(workspace);
     _apply(workspace);
     notifyListeners();
   }
 
+  /// Takes what [files] and [chatMode] say from [workspace], the one [read] holds.
   void _apply(Workspace workspace) {
-    read = workspace;
     _files = mergeSources(workspace.documents, _prefs.offIn(workspace.slug));
     chatMode.value = ChatMode.fromServer(
       workspace.settings?.values['chatMode'],
@@ -404,6 +390,8 @@ class SourcesController extends ChangeNotifier {
         if (off) file.asOff,
       ]);
 
+  /// Runs [op] on the active workspace, then shows why it failed, or nothing, and reads the
+  /// workspace again, while it is still the active one on the same server.
   Future<void> _change(
     String failTitle,
     Future<void> Function(String) op,
@@ -411,14 +399,14 @@ class SourcesController extends ChangeNotifier {
     final slug = _slug;
     final server = _chat.server;
     if (slug == null) return;
-    try {
-      await op(slug);
-      if (server == _chat.server && slug == _slug) problems = const [];
-    } on ApiException catch (error) {
-      if (server == _chat.server && slug == _slug) {
-        problems = [Notice(failTitle, error.message)];
-      }
-    }
-    await refresh();
+    await changeThenRead(
+      failTitle,
+      () => op(slug),
+      current: () => server == _chat.server && slug == _slug,
+      readAgain: (failed) {
+        problems = [?failed];
+        return refresh();
+      },
+    );
   }
 }

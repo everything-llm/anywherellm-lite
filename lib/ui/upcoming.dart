@@ -37,7 +37,7 @@ class UpcomingPage extends StatelessWidget {
         listenable: toolkit,
         builder: (context, _) => ToolkitPageFrame(
           title: 'Upcoming',
-          read: toolkit.readJobs,
+          read: toolkit.wantJobs,
           action: toolkit.jobsWritable
               ? IconBtn.header(
                   'plus',

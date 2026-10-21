@@ -30,10 +30,7 @@ class _ToolkitCardState extends State<ToolkitCard> {
   @override
   void initState() {
     super.initState();
-    // A read tells the controller's listeners at once, so it waits for the frame.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) AppScope.of(context).toolkit.wantPages();
-    });
+    AppScope.of(context).toolkit.wantPages();
   }
 
   @override
@@ -43,12 +40,7 @@ class _ToolkitCardState extends State<ToolkitCard> {
       listenable: Listenable.merge([scope.toolkit, scope.chat]),
       builder: (context, _) {
         final toolkit = scope.toolkit;
-        // A read tells the controller's listeners at once, so it waits for the frame.
-        if (toolkit.wants) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) toolkit.want();
-          });
-        }
+        toolkit.want();
         final rows = [
           if (toolkit.pagesServed)
             for (final page in SkillPage.values)

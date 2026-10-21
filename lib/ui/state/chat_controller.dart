@@ -11,6 +11,7 @@ import '../../core/server_models.dart';
 import 'answer_bytes.dart';
 import 'answer_waits.dart';
 import 'fleeting.dart';
+import 'follows_server.dart';
 import 'notice.dart';
 import 'prefs_controller.dart';
 import 'settings_controller.dart';
@@ -74,24 +75,16 @@ class OnDeck {
 /// AnythingLLM keeps each run's history and saved answer by its thread.
 ///
 /// A chat not yet asked anything is a draft: it lives only here until its first message, which
-/// makes the thread on the server. Everything it knows is about the server in [_settings]; a new
-/// server starts it afresh.
-class ChatController extends ChangeNotifier {
-  ChatController(this._api, this._settings, this._prefs)
-    : _server = _settings.connection {
-    _settings.addListener(_serverChanged);
-    unawaited(_prefs.useServer(_server?.baseUrl));
+/// makes the thread on the server. Everything it knows is about the [server] in use; a new server
+/// starts it afresh.
+class ChatController extends ChangeNotifier with FollowsServer {
+  ChatController(this._api, SettingsController settings, this._prefs) {
+    followServer(settings);
+    unawaited(_prefs.useServer(server?.baseUrl));
   }
 
   final AnythingLlmApi _api;
-  final SettingsController _settings;
   final PrefsController _prefs;
-
-  /// The server the fields below describe.
-  Connection? _server;
-
-  /// The server the workspaces and chats are about.
-  Connection? get server => _server;
 
   List<Workspace> workspaces = const [];
 
@@ -354,7 +347,7 @@ class ChatController extends ChangeNotifier {
   /// not stopped: the server may finish it, and it shows when the chat is read again. A chat
   /// deleted on the server gives way to its workspace's newest chat.
   Future<void> refresh() async {
-    if (_server == null || _refreshing) return;
+    if (server == null || _refreshing) return;
     _refreshing = true;
     if (_here case final running?) {
       unawaited(running.stream?.cancel());
@@ -405,7 +398,6 @@ class ChatController extends ChangeNotifier {
     // The last chance to send a delete still waiting to be undone.
     unawaited(flushDelete());
     _disposed = true;
-    _settings.removeListener(_serverChanged);
     for (final running in _runs) {
       running.stream?.cancel();
     }
@@ -415,13 +407,13 @@ class ChatController extends ChangeNotifier {
     super.dispose();
   }
 
-  void _serverChanged() {
-    final now = _settings.connection;
-    if (now == _server) return;
-    // A delete still waiting to be undone goes to the server it was made on.
-    unawaited(flushDelete());
-    _server = now;
-    unawaited(_prefs.useServer(_server?.baseUrl));
+  /// A delete still waiting to be undone goes to the server it was made on.
+  @override
+  void leavingServer() => unawaited(flushDelete());
+
+  @override
+  void serverChanged(_) {
+    unawaited(_prefs.useServer(server?.baseUrl));
     for (final running in _runs) {
       running.stream?.cancel();
     }
@@ -446,7 +438,7 @@ class ChatController extends ChangeNotifier {
     problem = null;
     _link.take();
     notifyListeners();
-    if (_server != null) unawaited(load());
+    if (server != null) unawaited(load());
   }
 
   /// The title of the [problem] a failed [load] leaves.
@@ -454,15 +446,15 @@ class ChatController extends ChangeNotifier {
 
   /// Reads the workspaces and their chats, keeping the one on screen when it still exists.
   Future<void> load() async {
-    if (_server == null) return;
-    final server = _server;
+    final at = here;
+    if (at.server == null) return;
     loading = true;
     notifyListeners();
     var failed = true;
     final asked = _made;
     await _try(_readFailed, () async {
       final read = await _api.workspaces();
-      if (_server != server) return;
+      if (!at.current) return;
       failed = false;
       workspaces = read;
       final before = {..._threads};
@@ -491,7 +483,7 @@ class ChatController extends ChangeNotifier {
         ];
       }
     });
-    if (_server != server) return;
+    if (!at.current) return;
     loading = false;
     _readNotice = failed ? problem : null;
     unreachable.value = failed;
@@ -535,11 +527,11 @@ class ChatController extends ChangeNotifier {
   /// Asks each workspace how many documents it holds, all at once. Best effort: a count that
   /// cannot be read is left out. Sources reports the active workspace's own count.
   Future<void> _countDocs() async {
-    final server = _server;
+    final at = here;
     Future<void> count(String slug) async {
       try {
         final workspace = await _api.workspace(slug);
-        if (_server != server) return;
+        if (!at.current) return;
         docCounts[slug] = workspace.documents.length;
       } on ApiException {
         return;
@@ -551,7 +543,7 @@ class ChatController extends ChangeNotifier {
         if (w.slug != activeSlug && !docCounts.containsKey(w.slug))
           count(w.slug),
     ]);
-    if (_server != server) return;
+    if (!at.current) return;
     notifyListeners();
   }
 
@@ -567,7 +559,7 @@ class ChatController extends ChangeNotifier {
   (String?, String?) get _startChat {
     final last = _prefs.prefs.lastChat;
     if (last == null ||
-        last.server != _server?.baseUrl ||
+        last.server != server?.baseUrl ||
         !workspaces.any((w) => w.slug == last.slug)) {
       return (_firstSlug, null);
     }
@@ -619,12 +611,12 @@ class ChatController extends ChangeNotifier {
             (!again && known.lastOrNull?.unfinished != true))) {
       return;
     }
-    final server = _server;
+    final at = here;
     final shown = known;
     final newest = _newest[threadSlug];
     await _try('Could not read the chat', () async {
       final history = await _api.history(slug, threadSlug);
-      if (_server != server) return;
+      if (!at.current) return;
       // A message sent or an answer settled while the read was away says more than it does.
       if (!identical(_turns[threadSlug], shown) ||
           _newest[threadSlug] != newest) {
@@ -676,13 +668,13 @@ class ChatController extends ChangeNotifier {
   /// Makes workspace [name] with [prompt] as its instructions and opens it. An empty prompt is
   /// none, so the server's default applies.
   Future<void> createWorkspace(String name, {String prompt = ''}) {
-    final server = _server;
+    final at = here;
     return _try('Could not make the workspace', () async {
       final made = await _api.createWorkspace(
         name.trim(),
         prompt: prompt.trim().isEmpty ? null : prompt,
       );
-      if (_server != server) return;
+      if (!at.current) return;
       workspaces = [...workspaces, made];
       _threads[made.slug] = [];
       docCounts[made.slug] = 0;
@@ -696,18 +688,18 @@ class ChatController extends ChangeNotifier {
     final clean = name.trim();
     final old = workspaces.where((w) => w.slug == slug).firstOrNull;
     if (old == null || clean.isEmpty || clean == old.name) return;
-    final server = _server;
+    final at = here;
     Workspace? renamed;
     await _try('Could not rename the workspace', () async {
       renamed = await _api.renameWorkspace(slug, clean);
-      if (_server != server || renamed!.slug != slug) return;
+      if (!at.current || renamed!.slug != slug) return;
       workspaces = [
         for (final w in workspaces)
           w.slug == slug ? w.withName(renamed!.name) : w,
       ];
     });
     // Read again outside the rename's own notice, so a failed read stays shown.
-    if (renamed case final made? when _server == server && made.slug != slug) {
+    if (renamed case final made? when at.current && made.slug != slug) {
       final shown = activeSlug == slug;
       unawaited(_prefs.renameWorkspace(slug, made.slug));
       await load();
@@ -719,10 +711,10 @@ class ChatController extends ChangeNotifier {
   /// workspace left, in the person's order, when it was the one on screen.
   Future<void> deleteWorkspace(String slug) async {
     if (answeringIn(slug)) return;
-    final server = _server;
+    final at = here;
     await _try('Could not delete the workspace', () async {
       await _api.deleteWorkspace(slug);
-      if (_server != server) return;
+      if (!at.current) return;
       // A chat waiting to be deleted goes with its workspace: its delete would find none.
       if (_deleted.value?.slug == slug) _deleted.take();
       for (final t in threadsOf(slug)) {
@@ -746,10 +738,10 @@ class ChatController extends ChangeNotifier {
     final slug = activeSlug;
     final clean = name.trim();
     if (slug == null || clean.isEmpty) return;
-    final server = _server;
+    final at = here;
     await _try('Could not rename the chat', () async {
       await _api.renameThread(slug, threadSlug, clean);
-      if (_server != server) return;
+      if (!at.current) return;
       _named.add(threadSlug);
       _replace(slug, Thread(slug: threadSlug, name: clean));
     });
@@ -773,7 +765,7 @@ class ChatController extends ChangeNotifier {
   /// a draft in the same workspace.
   Future<void> delete(String threadSlug) async {
     final slug = activeSlug;
-    final server = _server;
+    final server = this.server;
     if (slug == null || server == null || isAnswering(threadSlug)) return;
     unawaited(flushDelete());
     final was = threadsOf(slug);
@@ -826,7 +818,7 @@ class ChatController extends ChangeNotifier {
     final thread = deleted.chat.slug;
     try {
       await _api.deleteThread(deleted.slug, thread, on: deleted.server);
-      if (!_disposed && _server == deleted.server) {
+      if (!_disposed && server == deleted.server) {
         unawaited(_prefs.forgetChat(deleted.slug, thread));
       }
     } on ApiException catch (error) {
@@ -838,7 +830,7 @@ class ChatController extends ChangeNotifier {
 
   /// Puts [deleted] back in its list, and says whether it was its server's to put back.
   bool _restore(_Deleted deleted) {
-    if (_server != deleted.server) return false;
+    if (server != deleted.server) return false;
     final list = [...threadsOf(deleted.slug)];
     if (list.any((t) => t.slug == deleted.chat.slug)) return true;
     list.insert(deleted.at.clamp(0, list.length), deleted.chat);
@@ -873,7 +865,7 @@ class ChatController extends ChangeNotifier {
     final running = _Running(user, answer, slug, shortcutUse)
       ..thread = activeThread;
     _runs.add(running);
-    final server = _server;
+    final at = here;
     final draftGo = _draftGo;
     _setTurns(turns);
     _sends++;
@@ -884,7 +876,7 @@ class ChatController extends ChangeNotifier {
       try {
         final made = await _api.createThread(slug);
         // A new server has started afresh: the chat belongs to the old one.
-        if (_server != server) return true;
+        if (!at.current) return true;
         threadSlug = made.slug;
         _madeAt[made.slug] = ++_made;
         _newest[made.slug] = -1;
@@ -1009,13 +1001,13 @@ class ChatController extends ChangeNotifier {
     final slug = activeSlug;
     final thread = activeThread;
     if (slug == null || thread == null || !canReset) return;
-    final server = _server;
+    final at = here;
     _clearing.add(thread);
     notifyListeners();
     await _try('Could not clear the chat', () async {
       try {
         await _api.resetChat(slug, thread);
-        if (_server != server) return;
+        if (!at.current) return;
         _turns[thread] = [];
         _newest[thread] = -1;
       } finally {
@@ -1092,13 +1084,13 @@ class ChatController extends ChangeNotifier {
     String thread,
     ShortcutUse? use,
   ) async {
-    final server = _server;
+    final at = here;
     final go = _learning[thread] = Object();
     try {
       final history = await _api.history(slug, thread);
       // Only the latest read counts: an answer that ended meanwhile, as a waiting message
       // sent since, settled the chat afresh.
-      if (_server == server && identical(_learning[thread], go)) {
+      if (at.current && identical(_learning[thread], go)) {
         _learnFrom(thread, history.map((m) => m.chatId));
         if (use != null && (_newest[thread] ?? -1) >= 0) {
           unawaited(
@@ -1164,10 +1156,10 @@ class ChatController extends ChangeNotifier {
   /// Names a new chat after its first message, unless it was renamed meanwhile.
   Future<void> _nameAfter(String slug, String thread, String message) async {
     final name = defaultTitle(message);
-    final server = _server;
+    final at = here;
     try {
       await _api.renameThread(slug, thread, name);
-      if (_server == server && !_named.contains(thread)) {
+      if (at.current && !_named.contains(thread)) {
         _replace(slug, Thread(slug: thread, name: name));
       }
     } on ApiException {
@@ -1205,13 +1197,13 @@ class ChatController extends ChangeNotifier {
   /// Runs [op], showing its failure as a [Notice] titled [failTitle]. A new server meanwhile has
   /// started afresh, so neither its success nor its failure is shown.
   Future<void> _try(String failTitle, Future<void> Function() op) async {
-    final server = _server;
+    final at = here;
     try {
       await op();
-      if (_server != server) return;
+      if (!at.current) return;
       problem = null;
     } on ApiException catch (error) {
-      if (_server != server) return;
+      if (!at.current) return;
       problem = Notice(failTitle, error.message);
     }
     notifyListeners();

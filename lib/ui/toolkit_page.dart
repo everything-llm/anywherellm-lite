@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import 'app_scope.dart';
@@ -26,8 +24,8 @@ class ToolkitPageFrame extends StatefulWidget {
 
   final String title;
 
-  /// Reads what the page shows.
-  final Future<void> Function() read;
+  /// Reads what the page shows, once the frame that opens it is done.
+  final VoidCallback read;
 
   /// The header's round button, such as Upcoming's New task, or null for none.
   final Widget? action;
@@ -41,10 +39,7 @@ class _ToolkitPageFrameState extends State<ToolkitPageFrame> {
   @override
   void initState() {
     super.initState();
-    // A read tells the controller's listeners at once, so it waits for the frame.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(widget.read());
-    });
+    widget.read();
   }
 
   @override

@@ -2,13 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../../core/connection.dart';
 import '../../core/copy.dart';
 import '../../core/files.dart';
 import '../../core/ports.dart';
 import '../../core/server_models.dart';
 import 'chat_controller.dart';
+import 'follows_server.dart';
 import 'notice.dart';
+import 'read.dart';
 import 'settings_controller.dart';
 import 'sources_controller.dart';
 
@@ -19,22 +20,22 @@ import 'sources_controller.dart';
 /// change; the server's own settings belong to `SystemController`. A new server starts it
 /// afresh. A change to a workspace's documents is shown in Sources when that workspace is
 /// active.
-class FilesController extends ChangeNotifier {
-  FilesController(this._api, this._settings, this._chat, this._sources)
-    : _server = _settings.connection {
-    _settings.addListener(_serverChanged);
+class FilesController extends ChangeNotifier with FollowsServer {
+  FilesController(
+    this._api,
+    SettingsController settings,
+    this._chat,
+    this._sources,
+  ) {
+    followServer(settings);
     _chat.addListener(_chatChanged);
     _sources.addListener(_sourcesChanged);
     _sourcesChanged();
   }
 
   final AnythingLlmApi _api;
-  final SettingsController _settings;
   final ChatController _chat;
   final SourcesController _sources;
-
-  /// The connection the fields below describe.
-  Connection? _server;
 
   /// Each workspace as last read, with its prompt, settings and documents, by slug.
   final Map<String, Workspace> _details = {};
@@ -58,14 +59,16 @@ class FilesController extends ChangeNotifier {
   ({String path, String title})? get reading => _reading;
   ({String path, String title})? _reading;
 
+  late final _text = ReadSlot<DocBody>(notifyListeners);
+
   /// The text of the document [reading] shows, or null while it loads or when it has none.
-  String? text;
+  String? get text => _text.value?.text;
 
   /// Counts each time the workspace the pages show is read afresh, so an editor knows to drop
   /// its draft.
   int revision = 0;
 
-  bool contentLoading = false;
+  bool get contentLoading => _text.loading;
 
   /// Whether the workspace the pages show is still being read.
   bool get loading => _pagesSlug != null && _sources.loading;
@@ -77,20 +80,17 @@ class FilesController extends ChangeNotifier {
 
   @override
   void dispose() {
-    _settings.removeListener(_serverChanged);
     _chat.removeListener(_chatChanged);
     _sources.removeListener(_sourcesChanged);
     super.dispose();
   }
 
-  void _serverChanged() {
-    final now = _settings.connection;
-    if (now == _server) return;
-    _server = now;
+  @override
+  void serverChanged(_) {
     _details.clear();
     _pagesSlug = null;
     _reading = null;
-    _clearContent();
+    _text.reset();
     problems = const [];
     notifyListeners();
   }
@@ -129,6 +129,13 @@ class FilesController extends ChangeNotifier {
     _followWorkspace();
   }
 
+  /// Notes that the pages are on screen, and follows the open workspace after the frame that
+  /// builds them, since that tells the listeners at once.
+  void shown() {
+    _showing = true;
+    afterFrame(_followWorkspace);
+  }
+
   /// Notes that the pages are no longer on screen. It tells no listener.
   void hidden() => _showing = false;
 
@@ -137,7 +144,7 @@ class FilesController extends ChangeNotifier {
     _section = section;
     _pagesSlug = _chat.activeSlug;
     _reading = null;
-    _clearContent();
+    _text.reset();
     problems = const [];
     notifyListeners();
   }
@@ -151,23 +158,15 @@ class FilesController extends ChangeNotifier {
   /// Reads the text the server keeps of the document at [path], called [title], and shows it in
   /// place of the page.
   Future<void> viewText(String path, String title) async {
-    final reading = _reading = (path: path, title: title);
+    _reading = (path: path, title: title);
     _pagesSlug = _chat.activeSlug;
-    text = null;
-    contentLoading = true;
-    notifyListeners();
-    final server = _server;
-    try {
-      final read = await _api.document(path);
-      if (_reading != reading || _server != server) return;
-      text = read.text;
-      problems = const [];
-    } on ApiException catch (error) {
-      if (_reading != reading || _server != server) return;
-      problems = [Notice('Could not read $title', error.message)];
-    }
-    contentLoading = false;
-    notifyListeners();
+    _text.reset();
+    await _text.read(
+      () => _api.document(path),
+      failTitle: 'Could not read $title',
+      kept: (_) => problems = const [],
+      failed: (why) => problems = [why],
+    );
   }
 
   /// The text the server keeps of the document at [path], or an [ApiException] when it cannot
@@ -179,7 +178,7 @@ class FilesController extends ChangeNotifier {
   void closeText() {
     if (_reading == null) return;
     _reading = null;
-    _clearContent();
+    _text.reset();
     notifyListeners();
   }
 
@@ -224,29 +223,28 @@ class FilesController extends ChangeNotifier {
     String failTitle,
     Future<void> Function() op, {
     required String slug,
-  }) async {
-    final server = _server;
-    Notice? failed;
-    try {
-      await op();
-    } on ApiException catch (error) {
-      failed = Notice(failTitle, error.message);
-    }
-    if (_server != server) return false;
-    final unread = await _readWorkspace(slug, keepDraft: failed != null);
-    if (_server != server) return false;
-    problems = [?failed, ?unread];
-    notifyListeners();
-    return failed == null;
+  }) {
+    final at = here;
+    return changeThenRead(
+      failTitle,
+      op,
+      current: () => at.current,
+      readAgain: (failed) async {
+        final unread = await _readWorkspace(slug, keepDraft: failed != null);
+        if (!at.current) return;
+        problems = [?failed, ?unread];
+        notifyListeners();
+      },
+    );
   }
 
   /// Reads workspace [slug] again and hands it to Sources. Returns why it could not, or null.
   /// A draft is dropped only when the read [keepDraft] is not.
   Future<Notice?> _readWorkspace(String slug, {bool keepDraft = false}) async {
-    final server = _server;
+    final at = here;
     try {
       final w = await _api.workspace(slug);
-      if (_server != server) return null;
+      if (!at.current) return null;
       _details[slug] = w;
       if (slug == _pagesSlug && !keepDraft) revision++;
       if (slug == _chat.activeSlug) {
@@ -258,10 +256,5 @@ class FilesController extends ChangeNotifier {
     } on ApiException catch (error) {
       return Notice('Could not read $slug', error.message);
     }
-  }
-
-  void _clearContent() {
-    text = null;
-    contentLoading = false;
   }
 }
