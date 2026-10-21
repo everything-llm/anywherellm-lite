@@ -8,9 +8,9 @@ import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../settings/rows.dart';
+import '../shell_popup.dart';
 import '../widgets/phone_page.dart';
 import '../widgets/radio_card.dart';
-import '../widgets/sheet.dart';
 import 'composer_chip.dart';
 import 'model_picker.dart';
 
@@ -100,7 +100,7 @@ class _AnswerFromChipState extends State<AnswerFromChip> {
 /// [ShellController.answerFromOpen], its modes as cards, ending with the Chat model row
 /// [onPickModel] answers. A tap outside, Esc or Back closes
 /// it, and so do another workspace and an answer starting in this one.
-class AnswerFromAnchor extends StatefulWidget {
+class AnswerFromAnchor extends StatelessWidget {
   const AnswerFromAnchor({
     super.key,
     required this.onPickModel,
@@ -111,62 +111,32 @@ class AnswerFromAnchor extends StatefulWidget {
   final Widget child;
 
   @override
-  State<AnswerFromAnchor> createState() => _AnswerFromAnchorState();
-}
-
-class _AnswerFromAnchorState extends State<AnswerFromAnchor> {
-  late final AppScope _scope;
-  String? _slug;
-
-  @override
-  void initState() {
-    super.initState();
-    _scope = AppScope.of(context);
-    _slug = _scope.chat.activeSlug;
-    _scope.chat.addListener(_chatChanged);
-  }
-
-  @override
-  void dispose() {
-    _scope.chat.removeListener(_chatChanged);
-    super.dispose();
-  }
-
-  void _close() => _scope.shell.closePopup(Popup.answerFrom);
-
-  void _chatChanged() {
-    final slug = _scope.chat.activeSlug;
-    final moved = slug != _slug;
-    _slug = slug;
-    if (moved || (slug != null && _scope.chat.answeringIn(slug))) _close();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final scope = _scope;
+    final scope = AppScope.of(context);
     final listened = Listenable.merge([
       scope.chat,
       scope.sources,
       scope.sources.chatMode,
       scope.system,
     ]);
-    return ValueListenableBuilder(
-      valueListenable: scope.shell.popup,
-      builder: (context, popup, child) => PopupSheet(
-        open: popup == Popup.answerFrom,
-        onClose: _close,
+    return ListenableBuilder(
+      listenable: scope.chat,
+      builder: (context, child) => ShellPopup(
+        popup: Popup.answerFrom,
         title: 'Answer from',
-        sheet: (context) => ListenableBuilder(
+        subject: scope.chat.activeSlug,
+        present: scope.chat.activeIdle,
+        builder: (context, close) => ListenableBuilder(
           listenable: listened,
           builder: (context, _) {
             if (!_canChoose(scope)) return const SizedBox.shrink();
             scope.system.wantSettingsOnce();
-            return _Sheet(onPickModel: widget.onPickModel, onClose: _close);
+            return _Sheet(onPickModel: onPickModel, onClose: close);
           },
         ),
         child: child!,
       ),
-      child: widget.child,
+      child: child,
     );
   }
 }

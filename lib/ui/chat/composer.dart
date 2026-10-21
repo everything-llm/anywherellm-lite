@@ -15,6 +15,7 @@ import '../icons.dart';
 import '../layout.dart';
 import '../settings/settings_pages.dart';
 import '../settings/rows.dart';
+import '../shell_popup.dart';
 import '../state/chat_controller.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';
@@ -23,7 +24,6 @@ import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/fields.dart';
 import '../widgets/rise.dart';
-import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
 import '../widgets/segmented.dart';
 import 'answer_from.dart';
@@ -289,57 +289,51 @@ class ComposerState extends State<Composer> {
   Widget _attachSheet(Widget child) {
     final shell = _scope.shell;
     final photos = _scope.photos;
-    void close() => shell.closePopup(Popup.attach);
-    return ValueListenableBuilder(
-      valueListenable: shell.popup,
-      builder: (context, popup, child) => PopupSheet(
-        open: popup == Popup.attach,
-        onClose: close,
-        title: 'Add to your message',
-        sheet: (context) => Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 12,
-          children: [
-            Segmented<bool>(
-              options: const [(false, 'Attach'), (true, 'Shortcuts')],
-              value: _shortcutsTab,
-              onChanged: (show) => setState(() => _shortcutsTab = show),
-            ),
-            AnimatedSize(
-              duration: motion(context, const Duration(milliseconds: 180)),
-              curve: Curves.easeOut,
-              alignment: Alignment.topCenter,
-              child: _shortcutsTab
-                  ? _ShortcutPicker(
-                      onSelect: _selectShortcut,
-                      onManage: () {
-                        close();
-                        shell.openSettings(SettingsPage.shortcuts);
-                      },
-                    )
-                  : AttachSheet(
-                      attached: _attached,
-                      onRemove: _remove,
-                      onPhotos: photos == null
-                          ? null
-                          : () => _pickWith(
-                              photos.choose,
-                              'The photos did not open',
-                            ),
-                      onCamera: photos == null
-                          ? null
-                          : () => _pickWith(
-                              () async => [?await photos.take()],
-                              'The camera did not open',
-                            ),
-                      onFiles: _attach,
-                      onDone: close,
-                    ),
-            ),
-          ],
-        ),
-        child: child!,
+    return ShellPopup(
+      popup: Popup.attach,
+      title: 'Add to your message',
+      builder: (context, close) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 12,
+        children: [
+          Segmented<bool>(
+            options: const [(false, 'Attach'), (true, 'Shortcuts')],
+            value: _shortcutsTab,
+            onChanged: (show) => setState(() => _shortcutsTab = show),
+          ),
+          AnimatedSize(
+            duration: motion(context, const Duration(milliseconds: 180)),
+            curve: Curves.easeOut,
+            alignment: Alignment.topCenter,
+            child: _shortcutsTab
+                ? _ShortcutPicker(
+                    onSelect: _selectShortcut,
+                    onManage: () {
+                      close();
+                      shell.openSettings(SettingsPage.shortcuts);
+                    },
+                  )
+                : AttachSheet(
+                    attached: _attached,
+                    onRemove: _remove,
+                    onPhotos: photos == null
+                        ? null
+                        : () => _pickWith(
+                            photos.choose,
+                            'The photos did not open',
+                          ),
+                    onCamera: photos == null
+                        ? null
+                        : () => _pickWith(
+                            () async => [?await photos.take()],
+                            'The camera did not open',
+                          ),
+                    onFiles: _attach,
+                    onDone: close,
+                  ),
+          ),
+        ],
       ),
       child: child,
     );

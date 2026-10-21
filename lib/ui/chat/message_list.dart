@@ -11,6 +11,7 @@ import '../../core/shortcuts.dart';
 import '../../core/server_models.dart';
 import '../app_scope.dart';
 import '../links.dart';
+import '../shell_popup.dart';
 import '../icons.dart';
 import '../layout.dart';
 import '../state/chat_controller.dart';
@@ -25,7 +26,6 @@ import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
 import '../widgets/pull_refresh.dart';
 import '../widgets/rise.dart';
-import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
 import 'answer_body.dart';
 import 'markdown_lists.dart';
@@ -1096,36 +1096,11 @@ class _MoreSources extends StatelessWidget {
 /// the server sent them, or else lights up in Documents; a web
 /// page an agent read opens in the browser; anything else, such as a file since removed, only
 /// shows its title.
-class _Citation extends StatefulWidget {
+class _Citation extends StatelessWidget {
   const _Citation({required this.number, required this.citation});
 
   final int number;
   final Citation citation;
-
-  @override
-  State<_Citation> createState() => _CitationState();
-}
-
-class _CitationState extends State<_Citation> {
-  late final ShellController _shell;
-
-  @override
-  void initState() {
-    super.initState();
-    _shell = AppScope.of(context).shell;
-  }
-
-  @override
-  void dispose() {
-    // A citation that leaves the screen takes its sheet with it, after the frame.
-    final (shell, citation) = (_shell, widget.citation);
-    if (identical(shell.popup.value, citation)) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => shell.closePopup(citation),
-      );
-    }
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -1136,14 +1111,11 @@ class _CitationState extends State<_Citation> {
   Widget _build(BuildContext context, Widget? _) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
-    final citation = widget.citation;
-    final number = widget.number;
     final title = citation.title;
     final url = citation.url;
     final present = scope.sources.byTitle(title) != null;
     final live = present || url != null;
     final passages = present && citation.passages.isNotEmpty;
-    void close() => scope.shell.closePopup(citation);
     final chip = Tappable(
       label: present || url == null
           ? 'Source $number: $title'
@@ -1196,16 +1168,12 @@ class _CitationState extends State<_Citation> {
     );
     if (!passages) return chip;
     // Only a citation that opens a sheet follows the popup.
-    return ValueListenableBuilder(
-      valueListenable: scope.shell.popup,
+    return ShellPopup(
+      popup: citation,
+      title: 'Passages read',
+      builder: (context, close) =>
+          PassagesView(citation: citation, onClose: close),
       child: chip,
-      builder: (context, popup, chip) => PopupSheet(
-        open: identical(popup, citation),
-        onClose: close,
-        title: 'Passages read',
-        sheet: (context) => PassagesView(citation: citation, onClose: close),
-        child: chip!,
-      ),
     );
   }
 }

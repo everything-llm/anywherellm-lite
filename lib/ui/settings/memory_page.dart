@@ -15,6 +15,7 @@ import '../widgets/radio_card.dart';
 import '../widgets/sheet.dart';
 import '../widgets/fields.dart';
 import '../widgets/tappable.dart';
+import '../shell_popup.dart';
 import 'rows.dart';
 
 /// The Memory page's sheet for one saved memory, or a new one, in the shell's popup, so Back
@@ -47,45 +48,32 @@ class MemoryPage extends StatelessWidget {
     final scope = AppScope.of(context);
     final shell = scope.shell;
     return ListenableBuilder(
-      listenable: Listenable.merge([scope.memory, scope.chat, shell.popup]),
+      listenable: Listenable.merge([scope.memory, scope.chat]),
       builder: (context, _) {
         final memory = scope.memory;
         memory.want();
         final slug = memory.slug;
         final names = {for (final w in scope.chat.workspaces) w.slug: w.name};
         final name = names[slug] ?? slug ?? 'this workspace';
-        final open = switch (shell.popup.value) {
-          final MemorySheet sheet => sheet,
-          _ => null,
-        };
-        // A memory gone from a read leaves nothing to change, so its sheet closes rather than
-        // turn into a new memory that keeps its text.
-        if (open != null &&
-            open.id != null &&
-            memory.saved != null &&
-            _memoryOf(memory, open) == null) {
-          WidgetsBinding.instance.addPostFrameCallback(
-            (_) => shell.closePopup(open),
-          );
-        }
-        return PopupSheet(
-          open: open != null,
-          onClose: shell.closePopup,
-          title: open != null && open.id == null
-              ? 'New memory'
-              : 'Saved memory',
-          sheet: (context) => _SavedEditor(
+        return ShellPopup<MemorySheet>.any(
+          // A memory gone from a read leaves nothing to change, so its sheet closes rather than
+          // turn into a new memory that keeps its text.
+          present: (open) =>
+              open.id == null ||
+              memory.saved == null ||
+              _memoryOf(memory, open) != null,
+          title: (open) => open.id == null ? 'New memory' : 'Saved memory',
+          builder: (context, open, close) => _SavedEditor(
             key: ValueKey(open),
             memory: _memoryOf(memory, open),
-            global: open?.global ?? true,
+            global: open.global,
             name: name,
-            onDone: shell.closePopup,
+            onDone: close,
           ),
-          child: PopupSheet(
-            open: shell.popup.value == Popup.memoryWorkspace,
-            onClose: shell.closePopup,
+          child: ShellPopup(
+            popup: Popup.memoryWorkspace,
             title: 'Workspace',
-            sheet: (context) => _WorkspaceChoice(names, slug),
+            builder: (context, _) => _WorkspaceChoice(names, slug),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -111,8 +99,8 @@ class MemoryPage extends StatelessWidget {
   }
 
   /// The saved memory [open] names, or null for a new one.
-  static SavedMemory? _memoryOf(MemoryController memory, MemorySheet? open) {
-    final id = open?.id;
+  static SavedMemory? _memoryOf(MemoryController memory, MemorySheet open) {
+    final id = open.id;
     if (id == null) return null;
     final saved = memory.saved;
     return [

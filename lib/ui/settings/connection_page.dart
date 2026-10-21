@@ -8,6 +8,7 @@ import '../../core/connection.dart';
 import '../../core/ports.dart';
 import '../app_scope.dart';
 import '../share/shared_item.dart';
+import '../shell_popup.dart';
 import '../state/settings_controller.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';
@@ -336,23 +337,18 @@ class _KeyCardState extends State<_KeyCard> {
         ),
       ],
     );
-    return ValueListenableBuilder(
-      valueListenable: _shell.popup,
-      builder: (context, popup, card) => PopupSheet(
-        open: popup == Popup.forgetServer,
-        onClose: _shell.closePopup,
-        title: 'Forget this server',
-        sheet: (context) => SheetQuestion(
-          'Forget ${connection.host}? Its key leaves this phone, and connecting again takes the '
-          'key or a pairing code.',
-          action: 'Forget',
-          onKeep: _shell.closePopup,
-          onConfirm: () {
-            _shell.closePopup();
-            unawaited(_settings.clear());
-          },
-        ),
-        child: card!,
+    return ShellPopup(
+      popup: Popup.forgetServer,
+      title: 'Forget this server',
+      builder: (context, close) => SheetQuestion(
+        'Forget ${connection.host}? Its key leaves this phone, and connecting again takes the '
+        'key or a pairing code.',
+        action: 'Forget',
+        onKeep: close,
+        onConfirm: () {
+          close();
+          unawaited(_settings.clear());
+        },
       ),
       child: card,
     );

@@ -6,13 +6,13 @@ import '../../core/outputs.dart';
 import '../../core/upload.dart';
 import '../app_scope.dart';
 import '../files/save_file.dart';
+import '../shell_popup.dart';
 import '../sources/sources_panel.dart';
 import '../icons.dart';
 import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';
-import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
 
 /// The files and images an agent made with an answer. An image shows, read from the server with
@@ -255,7 +255,7 @@ class _MadeImageState extends State<_MadeImage> {
 }
 
 /// [child], with [ImageViewer] showing [file] over the window while it is the popup open, keyed
-/// by the file, so Esc and Back close it.
+/// by the file, so Esc and Back close it, as does the image leaving the screen.
 class ViewerWhileOpen extends StatelessWidget {
   const ViewerWhileOpen(
     this.file,
@@ -269,24 +269,12 @@ class ViewerWhileOpen extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    final shell = AppScope.of(context).shell;
-    return ValueListenableBuilder(
-      valueListenable: shell.popup,
-      child: child,
-      builder: (context, popup, child) => OverlayWhile(
-        open: identical(popup, file),
-        overlay: (context) => SafeArea(
-          child: ImageViewer(
-            file,
-            bytes,
-            onClose: () => shell.closePopup(file),
-          ),
-        ),
-        child: child!,
-      ),
-    );
-  }
+  Widget build(BuildContext context) => ShellPopup(
+    popup: file,
+    builder: (context, close) =>
+        SafeArea(child: ImageViewer(file, bytes, onClose: close)),
+    child: child,
+  );
 }
 
 /// An image an agent made, [file] holding [bytes], over the whole window on a dark ground, to

@@ -6,6 +6,7 @@ import 'state/toolkit_controller.dart';
 import 'layout.dart';
 import 'links.dart';
 import 'settings/rows.dart';
+import 'shell_popup.dart';
 import 'task_sheet.dart';
 import 'toolkit_page.dart';
 import 'tokens.dart';
@@ -14,7 +15,6 @@ import 'widgets/basics.dart';
 import 'widgets/buttons.dart';
 import 'icons.dart';
 import 'widgets/fields.dart';
-import 'widgets/sheet.dart';
 import 'widgets/tappable.dart';
 
 /// A phone's Upcoming: each job the server runs on a schedule, with its schedule in local time,
@@ -29,13 +29,26 @@ class UpcomingPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final toolkit = scope.toolkit;
-    final shell = scope.shell;
+    ScheduledJob? jobOf(TaskSheet open) => jobById(toolkit.jobs, open.id);
     return ListenableBuilder(
-      listenable: Listenable.merge([toolkit, shell.popup]),
-      // Only the sheet follows the popup, so opening one leaves the list as it is.
-      child: ListenableBuilder(
-        listenable: toolkit,
-        builder: (context, _) => ToolkitPageFrame(
+      listenable: toolkit,
+      builder: (context, _) => ShellPopup<TaskSheet>.any(
+        // A task gone from a read leaves nothing to show, so its sheet closes.
+        present: (open) => open.id == null || jobOf(open) != null,
+        title: (open) => switch (open) {
+          TaskSheet(id: null) => 'New task',
+          TaskSheet(editing: true) => 'Edit task',
+          _ => jobOf(open)?.name ?? 'Task',
+        },
+        builder: (context, open, _) => switch (open) {
+          TaskSheet(editing: true) => TaskForm(
+            key: ValueKey(open),
+            existing: jobOf(open),
+          ),
+          TaskSheet(:final id?) => TaskDetail(id, key: ValueKey(open)),
+          _ => const TaskForm(),
+        },
+        child: ToolkitPageFrame(
           title: 'Upcoming',
           read: toolkit.wantJobs,
           action: toolkit.jobsWritable
@@ -48,41 +61,6 @@ class UpcomingPage extends StatelessWidget {
           body: _body(context, toolkit),
         ),
       ),
-      builder: (context, page) {
-        final open = switch (shell.popup.value) {
-          final TaskSheet sheet => sheet,
-          _ => null,
-        };
-        final job = jobById(toolkit.jobs, open?.id);
-        // A task gone from a read leaves no sheet to close, so the popup goes too.
-        if (open != null &&
-            open.id != null &&
-            job == null &&
-            toolkit.jobs != null) {
-          WidgetsBinding.instance.addPostFrameCallback(
-            (_) => shell.closePopup(open),
-          );
-        }
-        return PopupSheet(
-          open: open != null && (open.id == null || job != null),
-          onClose: shell.closePopup,
-          title: switch (open) {
-            null => 'Task',
-            TaskSheet(id: null) => 'New task',
-            TaskSheet(editing: true) => 'Edit task',
-            _ => job?.name ?? 'Task',
-          },
-          sheet: (context) => switch (open) {
-            TaskSheet(editing: true) => TaskForm(
-              key: ValueKey(open),
-              existing: job,
-            ),
-            TaskSheet(:final id?) => TaskDetail(id, key: ValueKey(open)),
-            _ => const TaskForm(),
-          },
-          child: page!,
-        );
-      },
     );
   }
 

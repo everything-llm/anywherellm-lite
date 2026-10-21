@@ -6,6 +6,7 @@ import '../tokens.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';
 import '../settings/rows.dart';
+import '../shell_popup.dart';
 import '../state/shell_controller.dart';
 import '../widgets/sheet.dart';
 import 'workspace_pages.dart';
@@ -82,24 +83,19 @@ class TextViewer extends StatelessWidget {
       ],
     );
     if (file == null) return page;
-    return ValueListenableBuilder(
-      valueListenable: shell.popup,
-      builder: (context, popup, page) => PopupSheet(
-        open: popup == Popup.removeDoc,
-        onClose: shell.closePopup,
-        title: 'Remove from workspace',
-        sheet: (context) => SheetQuestion(
-          'Remove ${file.title} from ${scope.chat.active?.name ?? 'this workspace'}? Answers '
-          'stop drawing on it. The server keeps the file, to add again from Documents.',
-          action: 'Remove',
-          onKeep: shell.closePopup,
-          onConfirm: () {
-            shell.closePopup();
-            closeDocText(scope);
-            scope.sources.remove(file);
-          },
-        ),
-        child: page!,
+    return ShellPopup(
+      popup: Popup.removeDoc,
+      title: 'Remove from workspace',
+      builder: (context, close) => SheetQuestion(
+        'Remove ${file.title} from ${scope.chat.active?.name ?? 'this workspace'}? Answers '
+        'stop drawing on it. The server keeps the file, to add again from Documents.',
+        action: 'Remove',
+        onKeep: close,
+        onConfirm: () {
+          close();
+          closeDocText(scope);
+          scope.sources.remove(file);
+        },
       ),
       child: page,
     );
