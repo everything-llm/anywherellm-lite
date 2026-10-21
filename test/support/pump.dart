@@ -264,12 +264,6 @@ class Harness extends Rig {
   /// Every file the app saved, by the name it suggested, with its bytes.
   final Map<String, List<int>> saved = {};
 
-  /// Whether the person picks a place in the save dialog rather than cancelling.
-  bool saveChosen = true;
-
-  /// What saving a file throws, when set.
-  Exception? saveThrows;
-
   Widget get app => AnywhereLlmApp(
     prefs: prefs,
     home: AppScope(
@@ -289,8 +283,6 @@ class Harness extends Rig {
         return openSucceeds;
       },
       save: (name, bytes) async {
-        if (saveThrows case final error?) throw error;
-        if (!saveChosen) return null;
         final data = await bytes();
         if (data == null) return null;
         saved[name] = data;

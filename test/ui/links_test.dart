@@ -188,18 +188,21 @@ void main() {
       await tapLink(tester, 'the tab');
       await tester.pumpAndSettle();
       final page = Uri.parse('https://h:3001/browser-lean/3kQ.html');
-      expect(h.shell.browserTab, page);
+      expect(
+        h.shell.popup.value,
+        isA<BrowserOpen>().having((o) => o.tab, 'tab', page),
+      );
       expect(find.text('Web view of $page'), findsOneWidget);
       expect(h.opened, isEmpty);
       // The page's own Back closes it, as its window.close() does.
       h.appView!.close!();
       await tester.pumpAndSettle();
-      expect(h.shell.browserTab, isNull);
+      expect(h.shell.popup.value, isNot(isA<BrowserOpen>()));
       await tapLink(tester, 'the tab');
       await tester.pumpAndSettle();
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(h.shell.browserTab, isNull);
+      expect(h.shell.popup.value, isNot(isA<BrowserOpen>()));
     },
   );
 

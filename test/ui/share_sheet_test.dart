@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:anywherellm/ui/share/share_sheet.dart';
 import 'package:anywherellm/ui/share/shared_item.dart';
+import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -58,7 +59,7 @@ void main() {
     expect(h.chat.activeSlug, 'household');
     expect(llm.calls, contains('uploadLink:https://example.test/prices'));
     expect(find.byType(ShareSheet), findsNothing);
-    expect(h.shell.sourcesOpen, isTrue);
+    expect((h.shell.rightOpen, h.shell.beside), (true, Beside.sources));
     await shares.close();
   });
 
@@ -78,7 +79,7 @@ void main() {
     await tester.tap(inSheet(control('Add to documents')));
     await tester.pumpAndSettle();
     expect(h.shell.shelfOpen, isFalse);
-    expect(h.shell.sourcesOpen, isTrue);
+    expect((h.shell.rightOpen, h.shell.beside), (true, Beside.sources));
     await shares.close();
   });
 

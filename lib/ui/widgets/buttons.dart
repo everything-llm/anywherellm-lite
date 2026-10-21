@@ -189,23 +189,22 @@ class IconBtn extends StatelessWidget {
 }
 
 /// The Save and Revert buttons of a form, for an [ActionRow]: Save reads Saving… while [saving],
-/// and both wait for a change ([dirty]) and for any save to end. Revert comes first, or after
-/// Save when [saveFirst].
+/// and both wait for a change ([dirty]) and for any save to end. Revert comes first.
 List<Widget> saveRevertButtons({
   required bool dirty,
   required bool saving,
   required VoidCallback onSave,
   required VoidCallback onRevert,
-  bool saveFirst = false,
 }) {
   final ready = dirty && !saving;
-  final save = AppButton(
-    saving ? 'Saving…' : 'Save',
-    primary: true,
-    onPressed: ready ? onSave : null,
-  );
-  final revert = AppButton('Revert', onPressed: ready ? onRevert : null);
-  return saveFirst ? [save, revert] : [revert, save];
+  return [
+    AppButton('Revert', onPressed: ready ? onRevert : null),
+    AppButton(
+      saving ? 'Saving…' : 'Save',
+      primary: true,
+      onPressed: ready ? onSave : null,
+    ),
+  ];
 }
 
 /// A form's buttons, such as Cancel and Add, in a row at its end that wraps when narrow. A

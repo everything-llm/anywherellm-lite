@@ -1,6 +1,7 @@
 import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
+import 'package:anywherellm/ui/state/turn.dart';
 import 'package:anywherellm/ui/widgets/sheet.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/services.dart';
@@ -109,18 +110,18 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(h.shell.answerMenu, isNull);
+    expect(h.shell.popup.value, isNot(isA<Turn>()));
     expect(find.byType(SheetFrame), findsNothing);
     await tester.tap(control(_more));
     await tester.pumpAndSettle();
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
-    expect(h.shell.answerMenu, isNull);
+    expect(h.shell.popup.value, isNot(isA<Turn>()));
     await tester.tap(control(_more));
     await tester.pumpAndSettle();
     await tester.tapAt(const Offset(195, 30));
     await tester.pumpAndSettle();
-    expect(h.shell.answerMenu, isNull);
+    expect(h.shell.popup.value, isNot(isA<Turn>()));
   });
 
   testWidgets('the menu goes with its answer when another chat opens', (
@@ -133,7 +134,7 @@ void main() {
     await h.chat.open('priorities');
     await tester.pumpAndSettle();
     expect(find.text('This answer'), findsNothing);
-    expect(h.shell.answerMenu, isNull);
+    expect(h.shell.popup.value, isNot(isA<Turn>()));
   });
 
   testWidgets('the menu\'s switch shows the details under every answer', (

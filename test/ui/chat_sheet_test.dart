@@ -1,3 +1,4 @@
+import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -75,7 +76,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Q3 planning · 2 docs in use'));
     await tester.pumpAndSettle();
-    expect(h.shell.chatSheet, isNull);
+    expect(h.shell.popup.value, isNot(isA<ChatSheetFor>()));
     expect(h.shell.pane.name, 'files');
   });
 
@@ -88,7 +89,10 @@ void main() {
     // A chat's More opens its sheet over the shelf.
     await tester.tap(control('Rename, pin or delete Budget questions'));
     await tester.pumpAndSettle();
-    expect(h.shell.chatSheet?.thread.slug, 'budget');
+    expect(
+      h.shell.popup.value,
+      isA<ChatSheetFor>().having((s) => s.thread.slug, 'slug', 'budget'),
+    );
     expect(h.shell.shelfOpen, isTrue);
     h.shell.closePopup();
     await tester.pumpAndSettle();

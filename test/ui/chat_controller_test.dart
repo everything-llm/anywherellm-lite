@@ -147,7 +147,7 @@ void main() {
       expect(await rig.chat.send('another'), isTrue);
       await pumpEventQueue();
       expect(llm.calls.where((c) => c.startsWith('streamChat')), hasLength(2));
-      final second = rig.chat.runningHere!;
+      final second = rig.chat.turns.last;
       llm.chats['priorities']!.add(const TextChunk('Ship the beta.'));
       await pumpEventQueue();
       expect(second.text, 'Ship the beta.');
@@ -733,7 +733,7 @@ void main() {
       expect(rig.chat.busy, isFalse);
       expect(await rig.chat.send('And next quarter?'), isTrue);
       await pumpEventQueue();
-      final budget = rig.chat.runningHere!;
+      final budget = rig.chat.turns.last;
       llm.chats['budget']!.add(const TextChunk('About 45k.'));
       meals.add(const TextChunk('Soup on Monday.'));
       await pumpEventQueue();
@@ -741,7 +741,7 @@ void main() {
       expect(rig.chat.answeringIn('q3'), isTrue);
       expect(rig.chat.answeringIn('household'), isTrue);
       await rig.chat.select('household', thread: 'th-1');
-      expect(rig.chat.runningHere!.text, 'Soup on Monday.');
+      expect(rig.chat.turns.last.text, 'Soup on Monday.');
     });
 
     test('stop stops only the chat on screen', () async {

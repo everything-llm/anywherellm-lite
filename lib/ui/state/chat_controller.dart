@@ -345,10 +345,6 @@ class ChatController extends ChangeNotifier {
 
   bool isAnswering(String thread) => _runs.any((r) => r.thread == thread);
 
-  /// The answer running in the chat on screen, or null. It notifies on each chunk, which this
-  /// controller does not.
-  Turn? get runningHere => _here?.answer;
-
   /// Whether [refresh] is reading the server again.
   bool get refreshing => _refreshing;
   bool _refreshing = false;

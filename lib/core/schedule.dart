@@ -115,15 +115,17 @@ class JobRun {
   }.contains(status?.toLowerCase());
 }
 
-/// The first [limit] runs in an answer, a list or an object with them under `runs`, each read
-/// only when kept, since a run's result can be a long trace.
-List<JobRun> jobRunsOf(Object? json, {int? limit}) {
-  final runs = jsonObjects(json is Map ? json['runs'] : json);
-  return [
-    for (final run in limit == null ? runs : runs.take(limit))
-      JobRun.fromJson(run),
-  ];
-}
+/// How many of a job's latest runs the app reads, of the newest 50 AnythingLLM lists.
+const runsRead = 5;
+
+/// The first [runsRead] runs in an answer, a list or an object with them under `runs`, each
+/// read only when kept, since a run's result can be a long trace.
+List<JobRun> jobRunsOf(Object? json) => [
+  for (final run in jsonObjects(
+    json is Map ? json['runs'] : json,
+  ).take(runsRead))
+    JobRun.fromJson(run),
+];
 
 /// What a new or changed job says, as AnythingLLM takes it. [cron] is in UTC. Its tools are left
 /// as they are: none for a new job.
@@ -245,16 +247,5 @@ String whenText(DateTime at, DateTime now) {
     1 => 'tomorrow $time',
     -1 => 'yesterday $time',
     _ => '${_dateText(local)}, $time',
-  };
-}
-
-/// The day [at] falls on, in local time, as [now] gives it: Today, Yesterday, or `Mon 6 Oct`.
-String dayText(DateTime at, DateTime now) {
-  final local = at.toLocal();
-  final days = calendarDays(local, now);
-  return switch (days) {
-    0 => 'Today',
-    -1 => 'Yesterday',
-    _ => _dateText(local),
   };
 }

@@ -45,36 +45,38 @@ void main() {
     });
   });
 
-  group('test', () {
-    test('verifies the normalised candidate and saves nothing', () async {
-      await settings.test(' https://h:3001/api/ ', ' K1 ');
+  group('a test', () {
+    test('connect verifies the normalised candidate first', () async {
+      expect(await settings.connect(' https://h:3001/api/ ', ' K1 '), isTrue);
       expect(llm.verified, [_saved]);
-      expect(settings.check, ConnectionCheck.ok);
-      expect(settings.message, 'Connected to h.');
+      expect(settings.connection, _saved);
+    });
+
+    test('says why the server refused, and saves nothing', () async {
+      llm.verifyError = const ApiException('The server rejected the key.');
+      expect(await settings.connect('https://h:3001', 'bad'), isFalse);
+      expect(settings.check, ConnectionCheck.failed);
+      expect(settings.message, 'The server rejected the key.');
       expect(store.saved, isNull);
       expect(settings.configured, isFalse);
     });
 
-    test('says why the server refused', () async {
-      llm.verifyError = const ApiException('The server rejected the key.');
-      await settings.test('https://h:3001', 'bad');
-      expect(settings.check, ConnectionCheck.failed);
-      expect(settings.message, 'The server rejected the key.');
-    });
-
     test('a bad address or an empty key never reaches the server', () async {
-      await settings.test('nonsense', 'K1');
+      await settings.connect('nonsense', 'K1');
       expect(settings.check, ConnectionCheck.failed);
-      await settings.test('https://h:3001', '  ');
+      await settings.connect('https://h:3001', '  ');
       expect(settings.message, 'Enter the API key.');
       expect(llm.verified, isEmpty);
     });
 
-    test('notifies on start and on finish', () async {
+    test('of the saved connection notifies on start and on finish', () async {
+      store.saved = _saved;
+      await settings.load();
       final states = <ConnectionCheck>[];
       settings.addListener(() => states.add(settings.check));
-      await settings.test('https://h:3001', 'K1');
+      await settings.testSaved();
       expect(states, [ConnectionCheck.testing, ConnectionCheck.ok]);
+      expect(settings.message, 'Connected to h.');
     });
   });
 
@@ -202,11 +204,13 @@ void main() {
     });
 
     test('does not let an older test speak after a newer one', () async {
+      store.saved = _saved;
+      await settings.load();
       final slow = llm.gates['verify'] = Completer<void>();
-      final first = settings.test('https://h:3001', 'K1');
+      final first = settings.testSaved();
       await pumpEventQueue();
       llm.gates.remove('verify');
-      await settings.test('https://h:3001', 'K1');
+      await settings.testSaved();
       llm.verifyError = const ApiException('The server rejected the key.');
       slow.complete();
       await first;

@@ -12,15 +12,11 @@ const toolkitCompanion = Companion(
   code: 'toolkit',
 );
 
-/// Every companion the app knows.
-const knownCompanions = [toolkitCompanion];
-
-/// [key], under which an older version kept a companion's address, as the app keys it now: a
-/// companion's [Companion.code] in place of any of its [Companion.names], and any other key as it
+/// [key], under which an older version kept a companion's address, as the app keys it now: the
+/// toolkit's [Companion.code] in place of any of its [Companion.names], and any other key as it
 /// is.
 String companionKey(String key) =>
-    knownCompanions.where((c) => c.names.contains(key)).firstOrNull?.code ??
-    key;
+    toolkitCompanion.names.contains(key) ? toolkitCompanion.code : key;
 
 /// The features the app finds in what the toolkit allows ([bridgeFeatures]).
 abstract final class ToolkitFeature {
@@ -29,9 +25,6 @@ abstract final class ToolkitFeature {
 
   /// Whether the scheduled jobs can be made, changed, run and deleted, not only listed.
   static const jobsWrite = 'jobs-write';
-
-  /// Whether what the agent did is listed. No route serves it yet.
-  static const activity = 'activity';
 
   /// Whether the bridge says where the suite's Library and Vault pages are (`GET /pages`). The
   /// bridge serves it itself and names it in its `/health` as `pages: true`, so no allowed

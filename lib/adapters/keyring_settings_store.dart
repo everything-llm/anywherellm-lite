@@ -11,12 +11,9 @@ import '../core/toolkit.dart';
 /// or with a companion's address under the name its `/health` gave, is written again as this
 /// version keeps it ([companionKey]).
 class KeyringSettingsStore implements SettingsStore {
-  KeyringSettingsStore({FlutterSecureStorage? storage})
-    : _storage = storage ?? const FlutterSecureStorage();
-
   static const _entry = 'anythingllm-connection';
 
-  final FlutterSecureStorage _storage;
+  static const _storage = FlutterSecureStorage();
 
   @override
   Future<Pairing?> load() async {

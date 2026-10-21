@@ -1,8 +1,7 @@
 // The design prototype's sample server, which `tool/screens.dart` draws the screens over and
 // `tool/audit_app.dart` runs the app over: Household and Q3 planning, their documents and chats,
-// the saved memories, the scheduled jobs and the Activity.
+// the saved memories and the scheduled jobs.
 
-import 'package:anywherellm/core/activity.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/memory.dart';
 import 'package:anywherellm/core/outputs.dart';
@@ -43,7 +42,7 @@ const _metrics = AnswerMetrics(
 );
 
 /// The prototype's server: Household and Q3 planning, their documents and chats, the saved
-/// memories, the scheduled jobs and the Activity.
+/// memories and the scheduled jobs.
 (FakeAnythingLlm, FakeToolkit) sampleServer() {
   final toolkit = FakeToolkit();
   final llm = FakeAnythingLlm()
@@ -202,7 +201,6 @@ const _metrics = AnswerMetrics(
     ToolkitFeature.memories,
     ToolkitFeature.jobs,
     ToolkitFeature.jobsWrite,
-    ToolkitFeature.activity,
   };
   final at16 = DateTime(now.year, now.month, now.day, 16).toUtc();
   toolkit.jobs = [
@@ -240,66 +238,6 @@ const _metrics = AnswerMetrics(
         status: 'completed',
         result: 'Done. The answer is in the chat.',
       ),
-  ];
-  ActivityEvent event(
-    int hoursAgo,
-    String title,
-    ActivityKind kind, {
-    ActivityOutcome outcome = ActivityOutcome.ok,
-    String detail = '',
-    String workspace = 'Household',
-    ActivityLink? link,
-  }) => ActivityEvent(
-    id: 'e$hoursAgo',
-    at: now.toUtc().subtract(Duration(hours: hoursAgo)),
-    title: title,
-    kind: kind,
-    outcome: outcome,
-    workspace: workspace,
-    detail: detail,
-    link: link,
-  );
-  toolkit.activityEvents = [
-    event(
-      0,
-      'Check the boiler service price',
-      ActivityKind.action,
-      outcome: ActivityOutcome.failed,
-      detail: 'Failed: the site answered 503.',
-    ),
-    event(
-      1,
-      'Book a boiler service',
-      ActivityKind.action,
-      detail: 'Booked Tue 14 Oct · 08:00–10:00, while the agent wrote it.',
-    ),
-    event(
-      2,
-      'Morning brief',
-      ActivityKind.task,
-      detail: 'Done. The answer is in the chat.',
-      link: const ChatLink('household', 'errands'),
-    ),
-    event(
-      3,
-      'Habits',
-      ActivityKind.app,
-      detail: 'Marked Evening walk on Monday and Tuesday.',
-      link: const PageLink('/apps-lean/h1.html'),
-    ),
-    event(
-      30,
-      'Boiler service quote.pdf',
-      ActivityKind.file,
-      detail: 'The agent made an 84 KB PDF.',
-    ),
-    event(
-      32,
-      'Groceries',
-      ActivityKind.app,
-      detail: 'Added Eggs, Oat milk and Coffee.',
-      link: const PageLink('/apps-lean/g1.html'),
-    ),
   ];
   llm.system = const {
     'LLMProvider': 'generic-openai',

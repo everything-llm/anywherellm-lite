@@ -105,11 +105,6 @@ void main() {
         isEmpty,
       );
     });
-
-    test('the Activity has no route yet', () {
-      final all = bridgeFeatures(_rules(['/activity', '/workspaces']));
-      expect(all, isNot(contains(ToolkitFeature.activity)));
-    });
   });
 
   test(

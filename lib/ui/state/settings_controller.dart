@@ -54,12 +54,6 @@ class SettingsController extends ChangeNotifier {
   Future<bool> pair(Pairing pairing) =>
       _connect(pairing.connection, pairing.companions);
 
-  /// Asks the server whether [url] and [key] open it. Saves nothing.
-  Future<void> test(String url, String key) async {
-    final candidate = _parse(url, key);
-    if (candidate != null) await _check(candidate);
-  }
-
   /// How many times Test connection has asked about the saved connection, so what remembers
   /// an answer per connection, such as whether the toolkit is there, asks again.
   int tests = 0;

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../core/activity.dart';
 import '../core/copy.dart';
 import '../core/ports.dart';
 import '../core/schedule.dart';
@@ -15,10 +14,9 @@ import 'state/toolkit_controller.dart';
 import 'widgets/phone_page.dart';
 
 /// What the toolkit adds to the shelf, a card under a 20 px gap with a row for each thing it
-/// serves: the suite's Library and Vault pages that are set up, then Activity and Upcoming, each
-/// of those with a line of what is in it once read, which a tap opens as a page over the chat.
-/// It reads each the first time it shows on a server, and which pages are set up each time it
-/// opens. A page's row reads where the page is afresh at the tap, opens it, and closes the shelf
+/// serves: the suite's Library and Vault pages that are set up, then Upcoming, with a line of
+/// what is in it once read, which a tap opens as a page over the chat. It reads the jobs the
+/// first time it shows on a server, and which pages are set up each time it opens. A page's row reads where the page is afresh at the tap, opens it, and closes the shelf
 /// once the read is back, so the page or the notice shows; the page's address is never kept. It
 /// shows nothing while the toolkit serves none.
 class ToolkitCard extends StatefulWidget {
@@ -64,13 +62,6 @@ class _ToolkitCardState extends State<ToolkitCard> {
                   about: page.about,
                   onTap: () => _open(page),
                 ),
-          if (toolkit.activityServed)
-            NavRow(
-              icon: 'pulse',
-              title: 'Activity',
-              about: _activity(toolkit),
-              onTap: () => scope.shell.openToolkitPage(ToolkitPage.activity),
-            ),
           if (toolkit.jobsServed)
             NavRow(
               icon: 'clock',
@@ -109,22 +100,6 @@ class _ToolkitCardState extends State<ToolkitCard> {
       scope.chat.reportLink('Could not open the ${page.title}', error.message);
     }
     scope.shell.closeShelf();
-  }
-
-  /// What went wrong or what happened today, or null until read.
-  static String? _activity(ToolkitController toolkit) {
-    final events = toolkit.activity;
-    if (events == null) return null;
-    final now = DateTime.now();
-    final today = [
-      for (final e in events)
-        if (calendarDays(e.at.toLocal(), now) == 0) e,
-    ];
-    final failed = today
-        .where((e) => e.outcome == ActivityOutcome.failed)
-        .length;
-    if (failed > 0) return '$failed failed today';
-    return today.isEmpty ? 'Nothing today' : '${today.length} today';
   }
 
   /// How many jobs there are and when the next runs, or null until read. They are tasks where

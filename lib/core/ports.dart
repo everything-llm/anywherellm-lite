@@ -1,8 +1,6 @@
 import 'dart:typed_data';
 
-import 'activity.dart';
 import 'chat.dart';
-import 'companion.dart';
 import 'connection.dart';
 import 'memory.dart';
 import 'prefs.dart';
@@ -128,23 +126,16 @@ abstract interface class AnythingLlmApi {
   Future<int> vectorCount();
 }
 
-/// A [Companion]: a server that may run beside AnythingLLM on its host and takes the same
-/// developer key.
-abstract interface class CompanionApi {
-  /// Which companion this is.
-  Companion get companion;
-
-  /// The features the companion's `/health` offers beside the server in use, asked without the
-  /// key, or null when it is not there. Remembered for the connection; [again] asks afresh.
-  /// Never throws.
+/// The toolkit, the anywherellm-bridge ([toolkitCompanion]): AnythingLLM's saved memories and
+/// scheduled jobs, which its developer API lacks, through the bridge to its internal API, as the
+/// [ToolkitFeature]s the bridge allows. Every method but [features] uses the connection in use
+/// and throws [ApiException] on failure, [NotConfigured] when there is none.
+abstract interface class ToolkitApi {
+  /// The features the toolkit's `/health` offers beside the server in use, asked without the
+  /// key, or null when it is not there. Remembered for its address; [again] asks afresh. Never
+  /// throws.
   Future<Set<String>?> features({bool again = false});
-}
 
-/// The toolkit, anythingllm-toolkit: AnythingLLM's saved memories and scheduled jobs, which
-/// its developer API lacks, through the toolkit's bridge to its internal API, as the
-/// [ToolkitFeature]s the bridge allows. Every method but [features] uses the
-/// connection in use and throws [ApiException] on failure, [NotConfigured] when there is none.
-abstract interface class ToolkitApi implements CompanionApi {
   /// Where the suite's Library and Vault pages are now. The paths are bearer capabilities: the
   /// caller opens one and keeps none. Fails with status 401 or 403 for a key the bridge does not
   /// take for this route.
@@ -153,12 +144,8 @@ abstract interface class ToolkitApi implements CompanionApi {
   /// The jobs AnythingLLM runs on a schedule. Times are UTC.
   Future<List<ScheduledJob>> scheduledJobs();
 
-  /// What the agent did, newest first: the events before the one named [before] when it is
-  /// given, up to [limit].
-  Future<ActivityEvents> activity({String? before, int limit = 50});
-
-  /// The latest runs of job [id], newest first.
-  Future<List<JobRun>> jobRuns(String id, {int limit = 5});
+  /// The latest [runsRead] runs of job [id], newest first.
+  Future<List<JobRun>> jobRuns(String id);
 
   /// Makes a job, switched on.
   Future<void> createJob(JobDraft draft);

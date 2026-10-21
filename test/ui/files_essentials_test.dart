@@ -70,7 +70,7 @@ void main() {
     (tester) async {
       final h = await openPages(tester);
       await openPage(tester, 'Documents');
-      expect(h.shell.sourcesOpen, isTrue);
+      expect((h.shell.rightOpen, h.shell.beside), (true, Beside.sources));
       expect(inSheet(find.text('120 words')), findsNWidgets(2));
       for (final label in ['Add a file', 'Add a link', 'Paste text']) {
         expect(inSheet(control(label)), findsOneWidget, reason: label);
@@ -113,7 +113,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(h.files.reading, isNull);
     // The sheet the text was opened from comes back, with the undo.
-    expect(h.shell.sourcesOpen, isTrue);
+    expect((h.shell.rightOpen, h.shell.beside), (true, Beside.sources));
     expect(inSheet(find.text('Removed Q3 roadmap.pdf')), findsOneWidget);
     expect(
       h.sources.files.where((f) => f.on).map((f) => f.title),

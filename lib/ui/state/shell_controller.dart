@@ -11,7 +11,7 @@ import 'turn.dart';
 enum Pane { chats, files }
 
 /// A page of what the toolkit adds that lies over the chat, opened from its card in the shelf.
-enum ToolkitPage { upcoming, activity }
+enum ToolkitPage { upcoming }
 
 /// What the sheet over the chat shows: Sources, the passages an answer read from one
 /// file, or all of an answer's sources ([cited]).
@@ -100,27 +100,9 @@ class ShellController extends ChangeNotifier {
   /// Whether the composer's Answer from menu is open.
   bool get answerFromOpen => _popup.value == Popup.answerFrom;
 
-  /// The answer whose More menu is open, or null.
-  Turn? get answerMenu => switch (_popup.value) {
-    final Turn turn => turn,
-    _ => null,
-  };
-
-  /// The chat whose sheet is open, or null.
-  ChatSheetFor? get chatSheet => switch (_popup.value) {
-    final ChatSheetFor sheet => sheet,
-    _ => null,
-  };
-
   /// Opens the page of [pictures] at [index], over the window.
   void openGallery(List<Picture> pictures, int index, {required String chat}) =>
       _popup.value = GalleryOpen(pictures, index, chat: chat);
-
-  /// browser-lean's page for the agent's tab, shown in a tall sheet over the chat, or null.
-  Uri? get browserTab => switch (_popup.value) {
-    BrowserOpen(:final tab) => tab,
-    _ => null,
-  };
 
   /// Shows [tab], browser-lean's page for an agent's tab, in its sheet over the chat, closing
   /// any other popup.
@@ -276,7 +258,6 @@ class ShellController extends ChangeNotifier {
   /// What the sheet over the chat shows, open or not.
   Beside get beside => _beside;
 
-  bool get sourcesOpen => rightOpen && _beside == Beside.sources;
   bool get passagesOpen => rightOpen && _beside == Beside.passages;
   bool get citedOpen => rightOpen && _beside == Beside.cited;
   bool get settingsOpen => _settingsOpen;

@@ -95,7 +95,6 @@ class FakeAnythingLlm implements AnythingLlmApi {
 
   /// What [vectorCount] answers.
   int vectors = 796;
-  Set<String> acceptedValue = {'.md', '.txt', '.pdf'};
 
   String answer = 'Here is what your sources say.';
   List<String> cited = const [];
@@ -287,7 +286,7 @@ class FakeAnythingLlm implements AnythingLlmApi {
 
   @override
   Future<Set<String>> acceptedExtensions() =>
-      _run('acceptedExtensions', () => acceptedValue);
+      _run('acceptedExtensions', () => {'.md', '.txt', '.pdf'});
 
   /// Files the server reads in as `<folder>/<name>.json`, `custom-documents` by default.
   @override

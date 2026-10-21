@@ -12,7 +12,7 @@ import 'widgets/buttons.dart';
 import 'widgets/phone_page.dart';
 import 'widgets/scroll_fades.dart';
 
-/// A page of what the toolkit adds over the chat, such as Activity: its title under a round
+/// A page of what the toolkit adds over the chat, such as Upcoming: its title under a round
 /// Back, [action] at the end, and [body] below. It runs [read] once as it opens, so what it shows
 /// is read afresh.
 class ToolkitPageFrame extends StatefulWidget {
@@ -29,16 +29,9 @@ class ToolkitPageFrame extends StatefulWidget {
   /// Reads what the page shows.
   final Future<void> Function() read;
 
-  /// The header's round button, such as [readAgain]'s, or null for none.
+  /// The header's round button, such as Upcoming's New task, or null for none.
   final Widget? action;
   final Widget body;
-
-  /// A round Read again, which runs [read].
-  static Widget readAgain(Future<void> Function() read) => IconBtn.header(
-    'refresh',
-    tooltip: 'Read again',
-    onPressed: () => unawaited(read()),
-  );
 
   @override
   State<ToolkitPageFrame> createState() => _ToolkitPageFrameState();

@@ -9,13 +9,10 @@ enum BadgeKind { ok, warn, accent }
 
 /// A small rounded label: a status, or a count.
 class AppBadge extends StatelessWidget {
-  const AppBadge(this.text, {super.key, required this.kind, this.pill = false});
+  const AppBadge(this.text, {super.key, required this.kind});
 
   final String text;
   final BadgeKind kind;
-
-  /// Fully rounded, for a count.
-  final bool pill;
 
   @override
   Widget build(BuildContext context) {
@@ -26,13 +23,10 @@ class AppBadge extends StatelessWidget {
       BadgeKind.accent => (t.accent, t.accentbg),
     };
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: pill ? 7 : 8,
-        vertical: pill ? 1 : 2,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(pill ? 99 : 6),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Text(text, style: Type.sans(12, height: 1.4, color: fg)),
     );

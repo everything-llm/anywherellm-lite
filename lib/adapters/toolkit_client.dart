@@ -1,6 +1,9 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:http/http.dart' as http;
 
-import '../core/activity.dart';
 import '../core/companion.dart';
 import '../core/connection.dart';
 import '../core/json.dart';
@@ -9,40 +12,66 @@ import '../core/ports.dart';
 import '../core/schedule.dart';
 import '../core/skill_pages.dart';
 import '../core/toolkit.dart';
-import 'companion_client.dart';
 
 /// [ToolkitApi] over the toolkit's bridge, at the address a pairing code gave
-/// [toolkitCompanion], with the connection's developer key on every call but `/health`.
-/// Each call is one of AnythingLLM's internal routes, without its `/api`, answered in
-/// AnythingLLM's own JSON.
+/// [toolkitCompanion], over the connection the holder has when each call is made: its `/health`,
+/// asked without the key and remembered by the toolkit's address, and every other call with the
+/// connection's developer key, only where the key may go ([keySafe]). Each call is one of
+/// AnythingLLM's internal routes, without its `/api`, answered in AnythingLLM's own JSON. An
+/// error message names the toolkit and never contains the key.
 class HttpToolkitApi implements ToolkitApi {
-  HttpToolkitApi({
-    required ConnectionHolder holder,
-    http.Client? client,
-    Duration timeout = const Duration(seconds: 15),
-    Duration healthTimeout = const Duration(seconds: 5),
-  }) : _companion = CompanionClient(
-         toolkitCompanion,
-         holder: holder,
-         client: client ?? http.Client(),
-         timeout: timeout,
-         healthTimeout: healthTimeout,
-       );
+  HttpToolkitApi({required this._holder, http.Client? client})
+    : _client = client ?? http.Client();
 
-  final CompanionClient _companion;
+  /// How long a call may take.
+  static const timeout = Duration(seconds: 15);
 
-  @override
-  Companion get companion => _companion.companion;
+  /// How long `/health` may take before the toolkit is taken to be absent.
+  static const healthTimeout = Duration(seconds: 5);
 
-  /// The features the routes the bridge allows let through.
+  final ConnectionHolder _holder;
+
+  /// What every call goes through.
+  final http.Client _client;
+
+  /// Each `/health` answer, null when the toolkit is not there, by the toolkit's address.
+  final _found = <String, Future<Object?>>{};
+
+  /// Where the toolkit runs beside the server in use, as a pairing code said
+  /// ([ConnectionHolder.companions]). Null with no server or no such code.
+  Uri? get _address => _holder.addressOf(toolkitCompanion);
+
+  /// The features the routes the bridge allows let through, from its `/health` at [_address].
+  /// Null when it is not there, has no address, or the key could not go there ([keySafe]).
   @override
   Future<Set<String>?> features({bool again = false}) async {
-    final health = await _companion.health(again: again);
+    final at = _address;
+    if (at == null || !keySafe(at)) return null;
+    final key = '$at';
+    if (again) _found.remove(key);
+    final health = await (_found[key] ??= _health(at));
     if (health == null) return null;
     return {
       ...bridgeFeatures(bridgeRules(health)),
       if (health case {'pages': true}) ToolkitFeature.pages,
     };
+  }
+
+  /// The toolkit's `/health` at [at], or null for anything else that answers, or nothing.
+  Future<Object?> _health(Uri at) async {
+    try {
+      final response = await _client
+          .get(
+            under(at, const ['health']),
+            headers: const {'Accept': 'application/json'},
+          )
+          .timeout(healthTimeout);
+      if (response.statusCode != 200) return null;
+      final json = _bodyOf(response);
+      return toolkitCompanion.isHealth(json) ? json : null;
+    } on Object {
+      return null;
+    }
   }
 
   @override
@@ -54,21 +83,8 @@ class HttpToolkitApi implements ToolkitApi {
       scheduledJobsOf(await _json('GET', ['scheduled-jobs']));
 
   @override
-  Future<ActivityEvents> activity({String? before, int limit = 50}) async =>
-      activityOf(
-        await _json(
-          'GET',
-          ['activity'],
-          query: {'limit': '$limit', 'before': ?before},
-        ),
-      );
-
-  /// The newest [limit] of the 50 runs AnythingLLM lists.
-  @override
-  Future<List<JobRun>> jobRuns(String id, {int limit = 5}) async => jobRunsOf(
-    await _json('GET', ['scheduled-jobs', id, 'runs']),
-    limit: limit,
-  );
+  Future<List<JobRun>> jobRuns(String id) async =>
+      jobRunsOf(await _json('GET', ['scheduled-jobs', id, 'runs']));
 
   // The calls below answer with what they did, which the app reads again as a list of jobs.
   @override
@@ -170,16 +186,104 @@ class HttpToolkitApi implements ToolkitApi {
     Map<String, Object?>? body,
     String refused = 'AnythingLLM did not do it.',
   }) async {
-    final answer = await _companion.json(
-      method,
-      path,
-      query: query,
-      body: body,
-    );
+    final response = await _call(method, path, query: query, body: body);
+    final answer =
+        _bodyOf(response) ??
+        (throw ApiException(
+          '${toolkitCompanion.name} did not answer with JSON.',
+        ));
     if (answer is Map && answer['success'] == false) {
       throw ApiException(saidIn(answer) ?? refused);
     }
     return answer;
+  }
+
+  /// The connection in use and the toolkit's [_address], where its key may go ([keySafe]).
+  (Connection, Uri) get _target {
+    final connection = _holder.current ?? (throw const NotConfigured());
+    final at =
+        _address ??
+        (throw ApiException(
+          '${toolkitCompanion.name}\'s address is not known: connect with the pairing link it prints.',
+        ));
+    if (!keySafe(at)) throw const ApiException(plainHttpRefused);
+    return (connection, at);
+  }
+
+  /// A [method] to [path] with the key, failing with the toolkit's words on any status but a
+  /// success.
+  Future<http.Response> _call(
+    String method,
+    List<String> path, {
+    Map<String, String> query = const {},
+    Map<String, Object?>? body,
+  }) async {
+    final (connection, at) = _target;
+    final request = http.Request(method, under(at, path, query))
+      ..headers['Authorization'] = 'Bearer ${connection.apiKey}'
+      ..headers['Accept'] = 'application/json';
+    if (body != null) {
+      request
+        ..headers['Content-Type'] = 'application/json'
+        ..body = jsonEncode(body);
+    }
+    final response = await _fetch(
+      () async => http.Response.fromStream(await _client.send(request)),
+    );
+    final status = response.statusCode;
+    if (status >= 200 && status < 300) return response;
+    if (status == 401) {
+      throw ApiException(
+        '${toolkitCompanion.name} did not accept the key.',
+        status: 401,
+      );
+    }
+    throw ApiException(
+      _said(response) ?? '${toolkitCompanion.name} answered HTTP $status.',
+      status: status,
+    );
+  }
+
+  /// What [send] gets within [timeout], or an [ApiException] in plain words.
+  Future<T> _fetch<T>(Future<T> Function() send) async {
+    final name = toolkitCompanion.name;
+    final lower = name.toLowerCase();
+    try {
+      return await send().timeout(timeout);
+    } on TimeoutException {
+      throw ApiException(
+        '$name did not answer within ${timeout.inSeconds} seconds.',
+      );
+    } on HandshakeException {
+      throw ApiException('$name\'s certificate could not be verified.');
+    } on SocketException catch (error) {
+      throw ApiException(
+        'Could not reach $lower on ${_address?.host}: ${error.message}',
+      );
+    } on http.ClientException catch (error) {
+      throw ApiException('Could not reach $lower: ${error.message}');
+    } on Exception {
+      // Never the error's text: a header the platform refused is quoted in it, key and all.
+      throw ApiException('Could not reach $lower.');
+    }
+  }
+
+  /// The decoded JSON of [response], or null when it is not JSON.
+  static Object? _bodyOf(http.Response response) =>
+      jsonOrNull(utf8.decode(response.bodyBytes, allowMalformed: true));
+
+  static final _endsSentence = RegExp(r'[.?!]$');
+
+  /// The `error` the toolkit put in a failed answer, with its first letter raised and a full
+  /// stop unless it ends with one, a `?` or a `!`.
+  static String? _said(http.Response response) {
+    final said = switch (_bodyOf(response)) {
+      {'error': final String error} => error.trim(),
+      _ => '',
+    };
+    if (said.isEmpty) return null;
+    final raised = '${said[0].toUpperCase()}${said.substring(1)}';
+    return _endsSentence.hasMatch(raised) ? raised : '$raised.';
   }
 
   /// The memory an answer holds under `memory`.

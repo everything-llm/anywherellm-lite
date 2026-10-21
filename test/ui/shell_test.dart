@@ -105,7 +105,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(control('Source 1: Q3 roadmap.pdf').last);
         await tester.pump();
-        expect(h.shell.sourcesOpen, isTrue);
+        expect((h.shell.rightOpen, h.shell.beside), (true, Beside.sources));
         expect(h.sources.flashed, 'custom-documents/Q3 roadmap.pdf.json');
         await tester.pumpAndSettle(const Duration(seconds: 2));
       },
@@ -149,7 +149,7 @@ void main() {
         tester.getTopLeft(find.text('82% match')).dy,
         lessThan(tester.getTopLeft(find.text('47% match')).dy),
       );
-      expect(h.shell.sourcesOpen, isFalse);
+      expect(h.shell.rightOpen, isFalse);
       expect(tester.takeException(), isNull);
       await tester.tap(control('View extracted text'));
       await tester.pumpAndSettle();
@@ -222,7 +222,7 @@ void main() {
 
       await tester.tap(control('2 documents in use. Open Documents'));
       await tester.pumpAndSettle();
-      expect(h.shell.sourcesOpen, isTrue);
+      expect((h.shell.rightOpen, h.shell.beside), (true, Beside.sources));
       h.shell.closeSources();
       await tester.pumpAndSettle();
 
@@ -406,7 +406,7 @@ void main() {
         final h = await withDocuments(tester, llm);
         await tester.tap(control('View extracted text of Q3 roadmap.pdf'));
         await tester.pumpAndSettle();
-        expect(h.shell.sourcesOpen, isFalse);
+        expect(h.shell.rightOpen, isFalse);
         expect(h.files.reading?.title, 'Q3 roadmap.pdf');
         await tapVisible(tester, control('Remove from workspace'));
         await tester.pumpAndSettle();
@@ -414,7 +414,7 @@ void main() {
         await tester.tap(asked('Remove'));
         await tester.pumpAndSettle();
         // Its undo is in the sheet, which comes back over what showed under it.
-        expect(h.shell.sourcesOpen, isTrue);
+        expect((h.shell.rightOpen, h.shell.beside), (true, Beside.sources));
         expect(h.shell.pane, Pane.chats);
         expect(find.text('Removed Q3 roadmap.pdf'), findsOneWidget);
         await tester.tap(control('Undo'));
@@ -804,7 +804,7 @@ void main() {
         // On a saved chat the title opens the chat's sheet.
         await tester.tap(find.text('Q3 planning · 2 docs in use'));
         await tester.pumpAndSettle();
-        expect(h.shell.chatSheet, isNotNull);
+        expect(h.shell.popup.value, isA<ChatSheetFor>());
         expect(tester.takeException(), isNull);
       },
     );
@@ -838,10 +838,10 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(h.shell.settingsOpen, isFalse);
-      expect(h.shell.sourcesOpen, isTrue);
+      expect((h.shell.rightOpen, h.shell.beside), (true, Beside.sources));
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(h.shell.sourcesOpen, isFalse);
+      expect(h.shell.rightOpen, isFalse);
     });
 
     testWidgets('on a phone, Documents is a sheet over the chat', (
@@ -864,13 +864,13 @@ void main() {
       // The scrim above the sheet closes it, and so do Back and a drag down.
       await tester.tapAt(const Offset(195, 30));
       await tester.pumpAndSettle();
-      expect(h.shell.sourcesOpen, isFalse);
+      expect(h.shell.rightOpen, isFalse);
       expect(find.byType(SheetFrame), findsNothing);
       h.shell.openSources();
       await tester.pumpAndSettle();
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(h.shell.sourcesOpen, isFalse);
+      expect(h.shell.rightOpen, isFalse);
       h.shell.openSources();
       await tester.pumpAndSettle();
       await tester.drag(
@@ -878,7 +878,7 @@ void main() {
         const Offset(0, 300),
       );
       await tester.pumpAndSettle();
-      expect(h.shell.sourcesOpen, isFalse);
+      expect(h.shell.rightOpen, isFalse);
     });
   });
 }

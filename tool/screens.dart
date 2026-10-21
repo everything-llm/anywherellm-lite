@@ -13,7 +13,6 @@ import 'dart:io';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/files.dart';
-import 'package:anywherellm/ui/activity.dart' show ActivityOpen;
 import 'package:anywherellm/ui/chat/message_list.dart';
 import 'package:anywherellm/ui/settings/memory_page.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
@@ -150,16 +149,6 @@ final _screens = <String, _Setup>{
     h.shell.openToolkitPage(ToolkitPage.upcoming);
     await _settle(tester);
     h.shell.togglePopup(const TaskSheet());
-    await _settle(tester);
-  },
-  'activity': (tester, h) async {
-    h.shell.openToolkitPage(ToolkitPage.activity);
-    await _settle(tester);
-  },
-  'run': (tester, h) async {
-    h.shell.openToolkitPage(ToolkitPage.activity);
-    await _settle(tester);
-    h.shell.togglePopup(const ActivityOpen('e0'));
     await _settle(tester);
   },
   'workspace': _workspace,

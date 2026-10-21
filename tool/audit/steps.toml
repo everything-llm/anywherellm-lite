@@ -270,16 +270,6 @@ do = ["tap Memory", "tap Workspace: Household", "sleep 1"]
 # --- The toolkit's pages -----------------------------------------------------------------
 
 [[step]]
-name = "activity"
-group = "toolkit"
-do = ["tap Chats", "tap Activity", "wait TODAY"]
-
-[[step]]
-name = "activity-run"
-group = "toolkit"
-do = ["tap Chats", "tap Activity", "tap Check the boiler service price", "sleep 1"]
-
-[[step]]
 name = "upcoming"
 group = "toolkit"
 do = ["tap Chats", "tap Upcoming", "wait Morning brief"]

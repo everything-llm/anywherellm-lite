@@ -20,7 +20,6 @@ import 'shelf.dart';
 import 'share/shared_item.dart';
 import 'workspace_sheets.dart';
 import 'sources/sources_panel.dart';
-import 'activity.dart';
 import 'upcoming.dart';
 import 'workspace_switcher.dart';
 import 'state/shell_controller.dart';
@@ -33,9 +32,9 @@ import 'widgets/window_insets.dart';
 /// The window: the chat, which is the base screen; the chats as a shelf over it, with Settings
 /// at its foot; the workspace's pages or Upcoming over those; Settings, its list or a page, over
 /// them all; and the sheets and popups over the whole window. Esc and Back close the topmost
-/// thing open: a skill's request, which closing refuses, the popup, Settings' page, the shelf,
-/// the sheet, Upcoming, the workspace's pages a step at a time; with nothing open Back puts the
-/// app out of sight.
+/// thing open: a walk-through, the camera, what another app shared, the popup, Settings' page,
+/// the shelf, the sheet, Upcoming, the workspace's pages a step at a time; with nothing open Back
+/// puts the app out of sight.
 class AppShell extends StatelessWidget {
   const AppShell({super.key});
 
@@ -148,7 +147,6 @@ class AppShell extends StatelessWidget {
                               bottom: false,
                               child: switch (page) {
                                 ToolkitPage.upcoming => const UpcomingPage(),
-                                ToolkitPage.activity => const ActivityPage(),
                               },
                             ),
                           ),

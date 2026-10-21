@@ -2,42 +2,61 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../../core/activity.dart';
+import '../../core/connection.dart';
 import '../../core/ports.dart';
 import '../../core/schedule.dart';
 import '../../core/skill_pages.dart';
 import '../../core/toolkit.dart';
-import 'companion_watch.dart';
 import 'notice.dart';
 import 'settings_controller.dart';
 
-/// What the app knows of the toolkit beside the server in use: whether it is there, what its
-/// bridge lets through, the scheduled jobs, which, where it allows, the app makes, changes,
-/// runs and deletes.
-/// Another server starts it afresh, and Test connection asks again whether the toolkit is
-/// there.
-class ToolkitController extends ChangeNotifier with CompanionWatch {
-  ToolkitController(this._api, SettingsController settings) {
-    watch(_api, settings);
+/// What the app knows of the toolkit beside the server in use: whether it is there
+/// ([available]), what its bridge lets through, the pages set up and the scheduled jobs, which,
+/// where it allows, the app makes, changes, runs and deletes. Another server, or the toolkit said
+/// to run elsewhere, starts it afresh, Test connection asks again whether the toolkit is there,
+/// and an answer about a server no longer in use is dropped.
+class ToolkitController extends ChangeNotifier {
+  ToolkitController(this._api, this._settings) {
+    _server = _settings.connection;
+    _address = _settings.addressOf(toolkitCompanion);
+    _tests = _settings.tests;
+    _settings.addListener(_settingsChanged);
+    if (_server != null) unawaited(_detect());
   }
 
   final ToolkitApi _api;
+  final SettingsController _settings;
+
+  /// The server in use, and where the toolkit was said to run beside it, as last seen.
+  Connection? _server;
+  Uri? _address;
+  int _tests = 0;
+
+  /// Counts the connection changes, so an answer from the server before is dropped.
+  int _epoch = 0;
+
+  /// Whether the toolkit answers beside the server in use: null until it is asked.
+  bool? available;
+  Set<String> _features = const {};
+
+  /// Whether the toolkit's `/health` names [feature].
+  bool _serves(String feature) => _features.contains(feature);
+
+  /// Whether the toolkit is known to serve nothing: it is not there, or names no feature.
+  bool get servesNothing => available != null && _features.isEmpty;
 
   /// Whether the toolkit serves the saved memories, which the Memory page shows.
-  bool get memories => serves(ToolkitFeature.memories);
+  bool get memories => _serves(ToolkitFeature.memories);
 
   /// Whether the toolkit lists the scheduled jobs, which Upcoming shows.
-  bool get jobsServed => serves(ToolkitFeature.jobs);
+  bool get jobsServed => _serves(ToolkitFeature.jobs);
 
   /// Whether the toolkit lets jobs be made, changed, run and deleted, not only listed.
-  bool get jobsWritable => serves(ToolkitFeature.jobsWrite);
-
-  /// Whether the toolkit lists what the agent did, which Activity shows.
-  bool get activityServed => serves(ToolkitFeature.activity);
+  bool get jobsWritable => _serves(ToolkitFeature.jobsWrite);
 
   /// Whether the bridge says where the suite's Library and Vault pages are, which the shelf's
   /// card shows a row for each of.
-  bool get pagesServed => serves(ToolkitFeature.pages);
+  bool get pagesServed => _serves(ToolkitFeature.pages);
 
   final _pages = _Read<Set<SkillPage>>();
 
@@ -46,25 +65,12 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   Set<SkillPage> get pagesFound => _pages.value ?? const {};
 
   final _jobs = _Read<List<ScheduledJob>>();
-  final _activity = _Read<ActivityEvents>();
 
   /// The jobs the server runs on a schedule, or null until read.
   List<ScheduledJob>? get jobs => _jobs.value;
 
   /// Why the last read of the jobs failed.
   Notice? get jobsProblem => _jobs.problem;
-
-  /// What the agent did, newest first, or null until read.
-  List<ActivityEvent>? get activity => _activity.value?.events;
-
-  /// Whether the toolkit has events older than [activity].
-  bool get activityMore => _activity.value?.more ?? false;
-
-  /// Why the last read of the activity failed.
-  Notice? get activityProblem => _activity.problem;
-
-  /// Whether events are being read.
-  bool get activityLoading => _activity.pending != null;
 
   /// Whether a change to a job is on its way, which keeps a second from starting.
   bool busy = false;
@@ -79,28 +85,56 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   int _follows = 0;
   Timer? _watching;
 
-  @override
-  void serverChanged() {
-    for (final read in [_jobs, _activity, _pages]) {
-      read.reset();
+  /// Another server is in use, or the toolkit was said to run elsewhere: forgets what was read
+  /// from the one before and asks afresh. Test connection asks again where it is.
+  void _settingsChanged() {
+    final here = _settings.connection;
+    final address = _settings.addressOf(toolkitCompanion);
+    if (here != _server || address != _address) {
+      // The same server with the toolkit said to run elsewhere asks there afresh.
+      final moved = here == _server;
+      _server = here;
+      _address = address;
+      _tests = _settings.tests;
+      _epoch++;
+      available = null;
+      _features = const {};
+      for (final read in [_jobs, _pages]) {
+        read.reset();
+      }
+      busy = false;
+      changeProblem = null;
+      runs.clear();
+      stopFollowing();
+      notifyListeners();
+      if (here != null) unawaited(_detect(again: moved));
+      return;
     }
-    busy = false;
-    changeProblem = null;
-    runs.clear();
-    stopFollowing();
+    if (_settings.tests != _tests) {
+      _tests = _settings.tests;
+      if (here != null) unawaited(_detect(again: true));
+    }
+  }
+
+  /// Asks whether the toolkit is there and what it serves, [again] afresh.
+  Future<void> _detect({bool again = false}) async {
+    final asked = _epoch;
+    final found = await _api.features(again: again);
+    if (asked != _epoch) return;
+    final features = found ?? const <String>{};
+    if (available == (found != null) && setEquals(features, _features)) return;
+    available = found != null;
+    _features = features;
+    notifyListeners();
   }
 
   /// Whether a feature the toolkit serves has not been read on this server, nor is being read.
-  bool get wants =>
-      jobsServed && !_jobs.asked ||
-      activityServed && !_activity.asked ||
-      pagesServed && !_pages.asked;
+  bool get wants => jobsServed && !_jobs.asked || pagesServed && !_pages.asked;
 
   /// Reads each feature the toolkit serves that has not been read on this server, nor is being
   /// read.
   void want() {
     if (jobsServed && !_jobs.asked) unawaited(readJobs());
-    if (activityServed && !_activity.asked) unawaited(readActivity());
     if (pagesServed && !_pages.asked) wantPages();
   }
 
@@ -120,14 +154,14 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   /// says which pages are set up. A key the bridge refuses (401 or 403) leaves none found, and
   /// any [ApiException] is thrown on for the caller to show.
   Future<String?> pagePath(SkillPage page) async {
-    final asked = epoch;
+    final asked = _epoch;
     try {
       final read = await _api.pages();
-      if (asked != epoch) return null;
+      if (asked != _epoch) return null;
       _foundNow(read.keys.toSet());
       return read[page];
     } on ApiException catch (error) {
-      if (asked == epoch && (error.status == 401 || error.status == 403)) {
+      if (asked == _epoch && (error.status == 401 || error.status == 403)) {
         _foundNow(const {});
       }
       rethrow;
@@ -152,33 +186,6 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
     clearsChange: true,
   );
 
-  /// Reads the newest events, in place of those read before, or waits for the read on its way.
-  Future<void> readActivity() => _read(
-    _activity,
-    activityServed,
-    'Could not read the activity',
-    () => _api.activity(),
-  );
-
-  /// Reads the events before the oldest one read, and adds them.
-  Future<void> moreActivity() async {
-    final have = _activity.value;
-    final before = have?.events.lastOrNull?.id;
-    if (have == null || before == null || _activity.pending != null) return;
-    await _read(
-      _activity,
-      activityServed,
-      'Could not read the activity',
-      () async {
-        final older = await _api.activity(before: before);
-        return ActivityEvents([
-          ...have.events,
-          ...older.events,
-        ], more: older.more);
-      },
-    );
-  }
-
   /// Reads [into] with [fetch] where the toolkit [served] it, showing why it failed as [title].
   /// While a read is on its way it waits for that one instead, and then reads afresh only
   /// [again]. A read that succeeds takes away the [changeProblem] when it [clearsChange].
@@ -195,21 +202,21 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
       await pending;
       if (!again) return;
     }
-    final asked = epoch;
+    final asked = _epoch;
     final reading = into.pending = () async {
       try {
         final read = await fetch();
-        if (asked != epoch) return;
+        if (asked != _epoch) return;
         into
           ..value = read
           ..problem = null;
         if (clearsChange) changeProblem = null;
       } on ApiException catch (error) {
-        if (asked != epoch) return;
+        if (asked != _epoch) return;
         into.problem = Notice(title, error.message);
       } finally {
         // Another server's read, or a failure of any kind, leaves nothing marked as on its way.
-        if (asked == epoch) {
+        if (asked == _epoch) {
           into.pending = null;
           notifyListeners();
         }
@@ -221,13 +228,13 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
 
   /// Reads job [id]'s latest runs, for the sheet that shows them.
   Future<void> readRuns(String id) async {
-    final asked = epoch;
+    final asked = _epoch;
     try {
       final read = await _api.jobRuns(id);
-      if (asked != epoch) return;
+      if (asked != _epoch) return;
       runs[id] = read;
     } on ApiException {
-      if (asked != epoch) return;
+      if (asked != _epoch) return;
       runs.remove(id);
     }
     notifyListeners();
@@ -273,12 +280,12 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   /// Reads [id]'s runs, and again in 3 seconds while its latest is still going, up to [tries]
   /// reads.
   Future<void> _follow(String id, {required int tries}) async {
-    final asked = epoch;
+    final asked = _epoch;
     stopFollowing();
     final follow = _follows;
     await readRuns(id);
     // A stop while the runs were being read ends the following too.
-    if (asked != epoch || follow != _follows || tries <= 1) return;
+    if (asked != _epoch || follow != _follows || tries <= 1) return;
     if (runs[id]?.firstOrNull?.running ?? false) {
       _watching = Timer(const Duration(seconds: 3), () {
         unawaited(_follow(id, tries: tries - 1));
@@ -299,7 +306,7 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   /// over them. Whether it went.
   Future<bool> _change(String title, Future<void> Function() call) async {
     if (busy) return false;
-    final asked = epoch;
+    final asked = _epoch;
     busy = true;
     changeProblem = null;
     notifyListeners();
@@ -310,12 +317,12 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
       failed = Notice(title, error.message);
     } finally {
       // A failure of any other kind leaves the toolkit free for the next change too.
-      if (asked == epoch) {
+      if (asked == _epoch) {
         busy = false;
         notifyListeners();
       }
     }
-    if (asked != epoch) return false;
+    if (asked != _epoch) return false;
     await readJobs(again: true);
     if (failed != null) {
       changeProblem = failed;
@@ -327,7 +334,7 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   @override
   void dispose() {
     stopFollowing();
-    unwatch();
+    _settings.removeListener(_settingsChanged);
     super.dispose();
   }
 }

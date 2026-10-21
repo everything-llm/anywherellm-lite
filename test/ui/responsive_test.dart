@@ -4,7 +4,6 @@ import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/core/outputs.dart';
-import 'package:anywherellm/core/activity.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/core/skill_pages.dart';
@@ -17,7 +16,6 @@ import 'package:anywherellm/ui/files/workspace_pages.dart';
 import 'package:anywherellm/ui/home.dart';
 import 'package:anywherellm/ui/shelf.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
-import 'package:anywherellm/ui/activity.dart' show ActivityOpen;
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/task_sheet.dart';
 import 'package:file_picker_platform_interface/file_picker_platform_interface.dart';
@@ -458,7 +456,6 @@ void main() {
           ..served = {
             ToolkitFeature.memories,
             ToolkitFeature.jobs,
-            ToolkitFeature.activity,
             ToolkitFeature.pages,
           }
           ..skillPages = const {
@@ -475,39 +472,6 @@ void main() {
         expect(find.text('Library'), findsOneWidget);
         expect(find.text('Vault'), findsOneWidget);
         expect(tester.takeException(), isNull);
-      });
-
-      testWidgets('Activity fits, with long names', (tester) async {
-        final toolkit = FakeToolkit()
-          ..served = {
-            ToolkitFeature.memories,
-            ToolkitFeature.jobs,
-            ToolkitFeature.activity,
-          }
-          ..activityEvents = [
-            ActivityEvent(
-              at: DateTime.now().toUtc(),
-              title: 'event-$longWord',
-              kind: ActivityKind.task,
-              outcome: ActivityOutcome.failed,
-              workspace: 'name-$longWord',
-              detail: 'detail-$longWord ' * 6,
-            ),
-          ];
-        final h = await pumpApp(
-          tester,
-          llm: awkward(),
-          toolkitServer: toolkit,
-          size: size,
-          shelf: true,
-        );
-        expect(tester.takeException(), isNull, reason: 'the card');
-        h.shell.openToolkitPage(ToolkitPage.activity);
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull, reason: 'the activity');
-        h.shell.togglePopup(ActivityOpen(toolkit.activityEvents.first.key));
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull, reason: 'the event');
       });
 
       testWidgets('each screen of Add the toolkit fits', (tester) async {

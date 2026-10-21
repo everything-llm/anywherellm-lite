@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:anywherellm/adapters/toolkit_client.dart';
 import 'package:anywherellm/core/connection.dart';
@@ -44,6 +45,28 @@ class _Toolkit {
   );
 }
 
+/// The toolkit, at the address a pairing code said beside [holder]'s connection, answering
+/// through [handler].
+HttpToolkitApi _api(
+  Future<http.Response> Function(http.Request) handler, {
+  ConnectionHolder? holder,
+}) => HttpToolkitApi(
+  holder:
+      holder ??
+      pairedHolder(_connection, Uri.parse('https://host.example.ts.net:8467')),
+  client: MockClient(handler),
+);
+
+/// A toolkit that answers [body] to every request and records each one in [seen].
+HttpToolkitApi _answering(
+  Object body, {
+  List<http.Request>? seen,
+  int status = 200,
+}) => _api((request) async {
+  seen?.add(request);
+  return http.Response(jsonEncode(body), status);
+});
+
 Future<ApiException> _failure(Future<void> call) async {
   try {
     await call;
@@ -54,6 +77,196 @@ Future<ApiException> _failure(Future<void> call) async {
 }
 
 void main() {
+  group('health', () {
+    test('asks /health where it was said to run without the key, and believes '
+        'only the toolkit server', () async {
+      final seen = <http.Request>[];
+      final api = _answering({
+        'service': 'anywherellm-bridge',
+        'server': 'toolkit',
+        'ok': true,
+      }, seen: seen);
+      expect(await api.features(), isNotNull);
+      expect(
+        seen.single.url.toString(),
+        'https://host.example.ts.net:8467/health',
+      );
+      expect(seen.single.headers.containsKey('Authorization'), isFalse);
+    });
+
+    test(
+      'believes the toolkit by its names before the rename and the suite',
+      () async {
+        for (final name in ['anythingllm-bridge', 'anythingllm-toolkit']) {
+          expect(await _answering({'service': name}).features(), isNotNull);
+        }
+      },
+    );
+
+    test('is null for anything else that answers, or nothing', () async {
+      expect(await _answering({'service': 'other'}).features(), isNull);
+      expect(
+        await _api((_) async => http.Response('<html>AnythingLLM</html>', 200))
+            .features(),
+        isNull,
+      );
+      expect(
+        await _answering({
+          'service': 'anythingllm-bridge',
+        }, status: 502).features(),
+        isNull,
+      );
+      expect(
+        await _api((_) async => throw const SocketException('refused'))
+            .features(),
+        isNull,
+      );
+    });
+
+    test('is remembered per address, until asked again', () async {
+      var asked = 0;
+      final holder = pairedHolder(
+        _connection,
+        Uri.parse('https://host.example.ts.net:8467'),
+      );
+      final api = _api((request) async {
+        asked++;
+        return http.Response('{"service":"anythingllm-bridge"}', 200);
+      }, holder: holder);
+      await api.features();
+      await api.features();
+      expect(asked, 1);
+      await api.features(again: true);
+      expect(asked, 2);
+      holder
+        ..current = const Connection(
+          baseUrl: 'https://other.example:3001',
+          apiKey: 'K',
+        )
+        ..companions = {
+          toolkitCompanion.code: Uri.parse('https://other.example:8467'),
+        };
+      await api.features();
+      expect(asked, 3);
+    });
+
+    test(
+      'is null with no server, no address said, or at a public http address, '
+      'without asking',
+      () async {
+        var asked = 0;
+        Future<http.Response> count(http.Request _) async {
+          asked++;
+          return http.Response('{"service":"anythingllm-bridge"}', 200);
+        }
+
+        expect(
+          await _api(count, holder: ConnectionHolder()).features(),
+          isNull,
+        );
+        expect(
+          await _api(count, holder: ConnectionHolder(_connection)).features(),
+          isNull,
+          reason: 'no address is guessed beside the server',
+        );
+        expect(
+          await _api(
+            count,
+            holder: ConnectionHolder(_connection)
+              ..companions = {
+                toolkitCompanion.code: Uri.parse('http://toolkit.example.com'),
+              },
+          ).features(),
+          isNull,
+        );
+        expect(asked, 0);
+      },
+    );
+
+    test('is asked at the address said, under its path', () async {
+      final seen = <Uri>[];
+      final api = _api(
+        (request) async {
+          seen.add(request.url);
+          return http.Response('{"service":"anythingllm-bridge"}', 200);
+        },
+        holder: ConnectionHolder(_connection)
+          ..companions = {
+            toolkitCompanion.code: Uri.parse('http://toolkit.lan/v2'),
+          },
+      );
+      expect(await api.features(), isNotNull);
+      expect(seen.single.toString(), 'http://toolkit.lan/v2/health');
+    });
+  });
+
+  group('calls', () {
+    test(
+      'send the key, and a refused one says so in the toolkit\'s name',
+      () async {
+        final seen = <http.Request>[];
+        final api = _api((request) async {
+          seen.add(request);
+          return http.Response(jsonEncode({'error': 'bad key'}), 401);
+        });
+        final error = await _failure(api.memorySwitches());
+        expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
+        expect(error.message, 'The toolkit did not accept the key.');
+        expect(error.message, isNot(contains('SECRET-KEY')));
+      },
+    );
+
+    test(
+      'a failure ends with one full stop, or the mark it ended with',
+      () async {
+        for (final (said, shown) in [
+          ('not allowed', 'Not allowed.'),
+          ('Not allowed.', 'Not allowed.'),
+          ('is it on?', 'Is it on?'),
+          ('stop it!', 'Stop it!'),
+        ]) {
+          final error = await _failure(
+            _answering({'error': said}, status: 400).scheduledJobs(),
+          );
+          expect(error.message, shown);
+        }
+      },
+    );
+
+    test('a bare 404 says the status', () async {
+      final api = _api((_) async => http.Response('Not Found', 404));
+      final error = await _failure(api.savedMemories('home'));
+      expect(error.status, 404);
+      expect(error.message, 'The toolkit answered HTTP 404.');
+    });
+
+    test('an answer that is not JSON fails in plain words', () async {
+      final api = _api((_) async => http.Response('<html></html>', 200));
+      expect(
+        (await _failure(api.scheduledJobs())).message,
+        'The toolkit did not answer with JSON.',
+      );
+    });
+
+    test('a server out of reach is named, without the key', () async {
+      final api = _api((_) async => throw const SocketException('refused'));
+      final error = await _failure(api.memorySwitches());
+      expect(error.message, contains('the toolkit on host.example.ts.net'));
+      expect(error.message, isNot(contains('SECRET-KEY')));
+    });
+
+    test('any other failure is named without its text', () async {
+      final api = _api(
+        (request) async => throw FormatException(
+          'Invalid HTTP header field value: "${request.headers['Authorization']}"',
+        ),
+      );
+      final error = await _failure(api.memorySwitches());
+      expect(error.message, 'Could not reach the toolkit.');
+      expect(error.message, isNot(contains('SECRET-KEY')));
+    });
+  });
+
   test(
     'its features are what the routes its bridge allows let through',
     () async {
@@ -118,17 +331,18 @@ void main() {
       cron: '0 7 * * *',
     );
 
-    test('a job\'s runs are listed, newest first', () async {
+    test('a job\'s newest runs are listed, newest first', () async {
       final toolkit = _Toolkit()
         ..routes['/scheduled-jobs/7/runs'] = {
           'runs': [
             {'status': 'running'},
             {'status': 'failed', 'error': 'The site answered 503'},
-            {'status': 'completed'},
+            for (var n = 0; n < 10; n++) {'status': 'completed'},
           ],
         };
-      final runs = await toolkit.api().jobRuns('7', limit: 2);
-      expect(runs.map((r) => r.status), ['running', 'failed']);
+      final runs = await toolkit.api().jobRuns('7');
+      expect(runs, hasLength(runsRead));
+      expect(runs.take(2).map((r) => r.status), ['running', 'failed']);
     });
 
     test('a job is made, changed, switched, run and deleted', () async {
@@ -222,36 +436,6 @@ void main() {
       final failure = await _failure(toolkit.api().scheduledJobs());
       expect(failure.status, 403);
       expect(failure.message, contains("bridge doesn't pass"));
-    });
-  });
-
-  group('the Activity', () {
-    test('an activity is read by pages', () async {
-      final toolkit = _Toolkit()
-        ..routes['/activity'] = {
-          'events': [
-            {
-              'id': 'e2',
-              'at': '2026-10-14T16:00:00Z',
-              'title': 'Price watch',
-              'kind': 'action',
-              'outcome': 'failed',
-            },
-          ],
-          'more': true,
-        };
-      final api = toolkit.api();
-      final first = await api.activity();
-      expect(first.events.single.title, 'Price watch');
-      expect(toolkit.seen.last.url.path, '/activity');
-      expect(toolkit.seen.last.headers['Authorization'], 'Bearer SECRET-KEY');
-      expect(first.more, isTrue);
-      expect(toolkit.seen.last.url.queryParameters, {'limit': '50'});
-      await api.activity(before: 'e2', limit: 10);
-      expect(toolkit.seen.last.url.queryParameters, {
-        'limit': '10',
-        'before': 'e2',
-      });
     });
   });
 

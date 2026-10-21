@@ -24,7 +24,6 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     required this._holder,
     http.Client? client,
     this.timeout = const Duration(seconds: 15),
-    this.uploadTimeout = const Duration(minutes: 5),
     this.idle = const Duration(minutes: 5),
   }) : assert(client != null || connectTimeout < timeout),
        _client =
@@ -35,13 +34,14 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   /// not answered.
   static const connectTimeout = Duration(seconds: 10);
 
+  /// How long a call that sends a file may take: the server reads an upload in before it
+  /// answers, which takes a while for a long PDF.
+  static const uploadTimeout = Duration(minutes: 5);
+
   final ConnectionHolder _holder;
 
   final http.Client _client;
   final Duration timeout;
-
-  /// The server reads an upload in before it answers, which takes a while for a long PDF.
-  final Duration uploadTimeout;
 
   /// How long an answer or a reset may send nothing before it is given up. AnythingLLM
   /// sends no pings, and an agent's tool can run a while without a word.
