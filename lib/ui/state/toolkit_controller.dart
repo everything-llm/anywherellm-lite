@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import '../../core/activity.dart';
 import '../../core/ports.dart';
 import '../../core/schedule.dart';
+import '../../core/skill_pages.dart';
 import '../../core/toolkit.dart';
 import 'companion_watch.dart';
 import 'notice.dart';
@@ -33,6 +34,17 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
 
   /// Whether the toolkit lists what the agent did, which Activity shows.
   bool get activityServed => serves(ToolkitFeature.activity);
+
+  /// Whether the bridge says where the suite's Library and Vault pages are, which the shelf's
+  /// card shows a row for each of.
+  bool get pagesServed => serves(ToolkitFeature.pages);
+
+  Set<SkillPage>? _pagesFound;
+  Future<void>? _pagesReading;
+
+  /// Which of the suite's pages are set up, as the last read said; never where they are, since
+  /// a page's address is a bearer capability that [pagePath] hands to its one caller.
+  Set<SkillPage> get pagesFound => _pagesFound ?? const {};
 
   final _jobs = _Read<List<ScheduledJob>>();
   final _activity = _Read<ActivityEvents>();
@@ -73,6 +85,8 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
     for (final read in [_jobs, _activity]) {
       read.reset();
     }
+    _pagesFound = null;
+    _pagesReading = null;
     busy = false;
     changeProblem = null;
     runs.clear();
@@ -81,13 +95,68 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
 
   /// Whether a feature the toolkit serves has not been read on this server, nor is being read.
   bool get wants =>
-      jobsServed && !_jobs.asked || activityServed && !_activity.asked;
+      jobsServed && !_jobs.asked ||
+      activityServed && !_activity.asked ||
+      _wantsPages;
+
+  bool get _wantsPages =>
+      pagesServed && _pagesFound == null && _pagesReading == null;
 
   /// Reads each feature the toolkit serves that has not been read on this server, nor is being
   /// read.
   void want() {
     if (jobsServed && !_jobs.asked) unawaited(readJobs());
     if (activityServed && !_activity.asked) unawaited(readActivity());
+    if (_wantsPages) wantPages();
+  }
+
+  /// Reads which pages are set up afresh, unless that read is on its way. A refusal or any other
+  /// failure leaves none found, and says nothing.
+  void wantPages() {
+    if (!pagesServed || _pagesReading != null) return;
+    final asked = epoch;
+    final reading = _pagesReading = () async {
+      try {
+        _found(await _api.pages());
+      } on ApiException {
+        if (asked == epoch) _pagesFound = {};
+      } finally {
+        if (asked == epoch) {
+          _pagesReading = null;
+          notifyListeners();
+        }
+      }
+    }();
+    unawaited(reading);
+    notifyListeners();
+  }
+
+  /// Keeps which of [read]'s pages are set up, and none of where.
+  void _found(SkillPages read) {
+    _pagesFound = {
+      for (final page in SkillPage.values)
+        if (read.of(page) != null) page,
+    };
+  }
+
+  /// Where [page] is, read afresh and never kept, or null when it is not set up. The answer also
+  /// says which pages are set up. A key the bridge refuses (401 or 403) leaves none found, and
+  /// any [ApiException] is thrown on for the caller to show.
+  Future<String?> pagePath(SkillPage page) async {
+    final asked = epoch;
+    try {
+      final read = await _api.pages();
+      if (asked != epoch) return null;
+      _found(read);
+      notifyListeners();
+      return read.of(page);
+    } on ApiException catch (error) {
+      if (asked == epoch && (error.status == 401 || error.status == 403)) {
+        _pagesFound = {};
+        notifyListeners();
+      }
+      rethrow;
+    }
   }
 
   /// Reads the jobs the server runs on a schedule, or waits for the read on its way and, [again],

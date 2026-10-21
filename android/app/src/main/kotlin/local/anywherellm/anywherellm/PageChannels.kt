@@ -1,5 +1,6 @@
 package local.anywherellm.anywherellm
 
+import android.webkit.WebSettings
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -13,6 +14,8 @@ import io.flutter.plugins.webviewflutter.WebViewFlutterAndroidExternalApi
  * (`{view, name, message}`); it answers false where the device's web view cannot, and the page
  * then has no channel. The plugin's own `addJavaScriptChannel` gives every frame of every origin
  * the object and never says which posted, so a frame the page embeds could speak as the page.
+ * `noCache` (`{view}`) switches the web view's HTTP cache off, for a page that holds a secret; it
+ * answers false where the web view is not found.
  */
 class PageChannels : FlutterPlugin {
     private var binding: FlutterPlugin.FlutterPluginBinding? = null
@@ -33,6 +36,10 @@ class PageChannels : FlutterPlugin {
                             ),
                         )
                     }
+                    "noCache" -> {
+                        val args = call.arguments as Map<*, *>
+                        result.success(noCache((args["view"] as Number).toLong()))
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -43,6 +50,14 @@ class PageChannels : FlutterPlugin {
         channel?.setMethodCallHandler(null)
         channel = null
         this.binding = null
+    }
+
+    /** Switches web view [view]'s HTTP cache off; false when it is not found. */
+    private fun noCache(view: Long): Boolean {
+        val web = binding?.let { WebViewFlutterAndroidExternalApi.getWebView(it, view) }
+            ?: return false
+        web.settings.cacheMode = WebSettings.LOAD_NO_CACHE
+        return true
     }
 
     /** Gives web view [view] an object of each of [names] in frames of [origin]; false where it cannot. */

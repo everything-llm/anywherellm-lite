@@ -74,6 +74,43 @@ void main() {
     },
   );
 
+  test('pages: true in /health makes the pages a feature', () async {
+    final toolkit = _Toolkit()..routes['/health'] = {..._health, 'pages': true};
+    expect(await toolkit.api().features(), {ToolkitFeature.pages});
+    toolkit.routes['/health'] = {..._health, 'pages': 'yes'};
+    expect(await toolkit.api().features(), isEmpty);
+    toolkit.routes['/health'] = _health;
+    expect(await toolkit.api().features(), isEmpty);
+  });
+
+  group('the pages', () {
+    test('are read with the key and decoded', () async {
+      final toolkit = _Toolkit()
+        ..routes['/pages'] = {
+          'library': '/library-lean/aB3.html',
+          'vault': null,
+        };
+      final pages = await toolkit.api().pages();
+      expect(pages.library, '/library-lean/aB3.html');
+      expect(pages.vault, isNull);
+      final request = toolkit.seen.single;
+      expect(request.method, 'GET');
+      expect(request.url.toString(), 'https://host.example.ts.net:8467/pages');
+      expect(request.headers['Authorization'], 'Bearer SECRET-KEY');
+    });
+
+    test('are refused with the status the bridge gave', () async {
+      final toolkit = _Toolkit()
+        ..routes['/pages'] = http.Response(
+          jsonEncode({'error': 'That key may not read this.'}),
+          403,
+        );
+      final error = await _failure(toolkit.api().pages());
+      expect(error.status, 403);
+      expect(error.message, isNot(contains('SECRET-KEY')));
+    });
+  });
+
   group('scheduled jobs', () {
     const draft = JobDraft(
       name: 'Brief',

@@ -32,6 +32,11 @@ abstract final class ToolkitFeature {
 
   /// Whether what the agent did is listed. No route serves it yet.
   static const activity = 'activity';
+
+  /// Whether the bridge says where the suite's Library and Vault pages are (`GET /pages`). The
+  /// bridge serves it itself and names it in its `/health` as `pages: true`, so no allowed
+  /// call stands for it.
+  static const pages = 'pages';
 }
 
 const _methods = {'GET', 'POST', 'PUT', 'DELETE'};

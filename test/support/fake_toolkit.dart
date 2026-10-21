@@ -4,6 +4,7 @@ import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/memory.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/schedule.dart';
+import 'package:anywherellm/core/skill_pages.dart';
 import 'package:anywherellm/core/toolkit.dart';
 
 import 'fake_companion.dart';
@@ -34,6 +35,12 @@ class FakeToolkit with FakeCompanion implements ToolkitApi {
 
   @override
   Set<String> served = {ToolkitFeature.memories, ToolkitFeature.jobs};
+
+  /// What [pages] answers: where the Library and the Vault are.
+  SkillPages skillPages = const SkillPages();
+
+  @override
+  Future<SkillPages> pages() => run('pages', () => skillPages);
 
   @override
   Future<List<ScheduledJob>> scheduledJobs() =>

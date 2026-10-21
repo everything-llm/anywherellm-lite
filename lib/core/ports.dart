@@ -8,6 +8,7 @@ import 'memory.dart';
 import 'prefs.dart';
 import 'schedule.dart';
 import 'server_models.dart';
+import 'skill_pages.dart';
 import 'toolkit.dart';
 
 export 'errors.dart';
@@ -144,6 +145,11 @@ abstract interface class CompanionApi {
 /// [ToolkitFeature]s the bridge allows. Every method but [features] uses the
 /// connection in use and throws [ApiException] on failure, [NotConfigured] when there is none.
 abstract interface class ToolkitApi implements CompanionApi {
+  /// Where the suite's Library and Vault pages are now. The paths are bearer capabilities: the
+  /// caller opens one and keeps none. Fails with status 401 or 403 for a key the bridge does not
+  /// take for this route.
+  Future<SkillPages> pages();
+
   /// The jobs AnythingLLM runs on a schedule. Times are UTC.
   Future<List<ScheduledJob>> scheduledJobs();
 

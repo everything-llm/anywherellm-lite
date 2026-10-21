@@ -7,13 +7,17 @@ import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
+import '../../core/browser.dart';
 import 'app_view.dart';
 
 /// A page an answer links to in the device's web view. The page runs its scripts and stays on
 /// its own origin; a link anywhere else goes to `onLeave` when the main frame follows it, and
 /// `window.close()`, which a web view ignores, to `onClose`. A page the server answers with an
 /// error, or cannot be reached, is covered by [PageGone] and tells `onFailed`. Only the page's own origin is given its channels, and only what
-/// its main frame posts is heard, so a frame it embeds cannot speak as it.
+/// its main frame posts is heard, so a frame it embeds cannot speak as it. A page that holds a
+/// secret ([holdsSecret]) is never kept in the web view's cache: the cache is off for it and
+/// cleared before it loads and when it closes, so one left by an app ended while it showed goes
+/// too.
 class AppWebViews implements AppView {
   const AppWebViews();
 
@@ -52,6 +56,15 @@ final _pages = const MethodChannel('anywherellm/pages')
 
 /// What each web view's main frame posts to a channel goes to, by the web view and the name.
 final _heard = <(int, String), void Function(String message)>{};
+
+/// Asks `PageChannels` to switch web view [view]'s HTTP cache off; false where it cannot.
+Future<bool> _noCache(int view) async {
+  try {
+    return await _pages.invokeMethod<bool>('noCache', {'view': view}) ?? false;
+  } on PlatformException {
+    return false;
+  }
+}
 
 /// Asks `PageChannels` to give web view [view]'s frames of [page]'s origin a channel of each of
 /// [names]; false where the device's web view cannot, and the page then has none.
@@ -100,6 +113,10 @@ class _AppWebViewState extends State<_AppWebView> {
   /// The web view's id at `PageChannels`, once its channels are asked for.
   int? _view;
 
+  /// Whether the web view shows, or has shown, a page that holds a secret ([holdsSecret]), so its
+  /// cache is cleared when it closes: the page it opened on, or one it moved to in place.
+  late bool _private = holdsSecret(widget.page);
+
   @override
   void initState() {
     super.initState();
@@ -135,6 +152,7 @@ class _AppWebViewState extends State<_AppWebView> {
             if (url == null) return NavigationDecision.prevent;
             switch (offOriginMove(page, url, request.isMainFrame)) {
               case PageMove.stay:
+                if (request.isMainFrame && holdsSecret(url)) _private = true;
                 return NavigationDecision.navigate;
               case PageMove.leave:
                 widget.onLeave(url);
@@ -172,6 +190,11 @@ class _AppWebViewState extends State<_AppWebView> {
       }
     }
     if (!mounted) return;
+    if (_private) {
+      if (_view case final view?) await _noCache(view);
+      await _web.clearCache();
+      if (!mounted) return;
+    }
     widget.channel?.runner = _web.runJavaScript;
     await _web.loadRequest(page);
   }
@@ -186,6 +209,7 @@ class _AppWebViewState extends State<_AppWebView> {
         when channel.runner == _web.runJavaScript) {
       channel.runner = null;
     }
+    if (_private) unawaited(_web.clearCache().catchError((_) {}));
     super.dispose();
   }
 

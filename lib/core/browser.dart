@@ -10,10 +10,22 @@ bool isSkillPage(Uri link, Uri? server, String folder) =>
     link.scheme == server.scheme &&
     link.port == server.port &&
     loadableImage(link, server) &&
-    _page.firstMatch(link.path)?[1] == folder;
+    isSkillPath(link.path, folder);
 
 /// A page's path, `/<folder>/<token>.html`, with the folder in its one group.
 final _page = RegExp(r'^/([^/]+)/[A-Za-z0-9_-]+\.html$');
+
+/// Whether [path] is exactly `/<folder>/<token>.html`, a page of that skill's folder: no host,
+/// query, fragment or further segment.
+bool isSkillPath(String path, String folder) =>
+    _page.firstMatch(path)?[1] == folder;
+
+/// Whether [page] holds a secret in its address, as the Vault (`vault-lean`) and the Library
+/// (`library-lean`) do: the page embeds the secret its address carries, so the web view keeps no
+/// copy of it.
+bool holdsSecret(Uri page) =>
+    isSkillPath(page.path, 'vault-lean') ||
+    isSkillPath(page.path, 'library-lean');
 
 /// Whether [link] is browser-lean's page for an agent's tab: `/browser-lean/<token>.html`, which
 /// the skill links its tab's card to.

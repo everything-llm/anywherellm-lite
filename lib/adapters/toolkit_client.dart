@@ -7,6 +7,7 @@ import '../core/json.dart';
 import '../core/memory.dart';
 import '../core/ports.dart';
 import '../core/schedule.dart';
+import '../core/skill_pages.dart';
 import '../core/toolkit.dart';
 import 'companion_client.dart';
 
@@ -38,8 +39,15 @@ class HttpToolkitApi implements ToolkitApi {
   Future<Set<String>?> features({bool again = false}) async {
     final health = await _companion.health(again: again);
     if (health == null) return null;
-    return bridgeFeatures(bridgeRules(health));
+    return {
+      ...bridgeFeatures(bridgeRules(health)),
+      if (health case {'pages': true}) ToolkitFeature.pages,
+    };
   }
+
+  @override
+  Future<SkillPages> pages() async =>
+      skillPagesOf(await _json('GET', ['pages']));
 
   @override
   Future<List<ScheduledJob>> scheduledJobs() async =>

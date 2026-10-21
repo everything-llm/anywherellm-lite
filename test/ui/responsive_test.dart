@@ -7,6 +7,7 @@ import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/activity.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/schedule.dart';
+import 'package:anywherellm/core/skill_pages.dart';
 import 'package:anywherellm/core/toolkit.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/settings/memory_page.dart';
@@ -450,6 +451,30 @@ void main() {
         h.shell.togglePopup(const TaskSheet());
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull, reason: 'the new task');
+      });
+
+      testWidgets('the card\'s Library and Vault rows fit', (tester) async {
+        final toolkit = FakeToolkit()
+          ..served = {
+            ToolkitFeature.memories,
+            ToolkitFeature.jobs,
+            ToolkitFeature.activity,
+            ToolkitFeature.pages,
+          }
+          ..skillPages = const SkillPages(
+            library: '/library-lean/abc.html',
+            vault: '/vault-lean/abc.html',
+          );
+        await pumpApp(
+          tester,
+          llm: awkward(),
+          toolkitServer: toolkit,
+          size: size,
+          shelf: true,
+        );
+        expect(find.text('Library'), findsOneWidget);
+        expect(find.text('Vault'), findsOneWidget);
+        expect(tester.takeException(), isNull);
       });
 
       testWidgets('Activity fits, with long names', (tester) async {
