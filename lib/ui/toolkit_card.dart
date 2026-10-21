@@ -61,10 +61,7 @@ class _ToolkitCardState extends State<ToolkitCard> {
                     SkillPage.vault => 'shield',
                   },
                   title: page.title,
-                  about: switch (page) {
-                    SkillPage.library => 'Toolkits and runs',
-                    SkillPage.vault => 'Keys, sign-ins and allowed addresses',
-                  },
+                  about: page.about,
                   onTap: () => _open(page),
                 ),
           if (toolkit.activityServed)
@@ -96,23 +93,20 @@ class _ToolkitCardState extends State<ToolkitCard> {
   /// address is held by this call alone.
   Future<void> _open(SkillPage page) async {
     final scope = AppScope.of(context);
-    final String? path;
     try {
-      path = await scope.toolkit.pagePath(page);
+      final path = await scope.toolkit.pagePath(page);
+      if (!mounted) return;
+      if (path == null) {
+        scope.chat.reportLink(
+          'The ${page.title} is not set up yet',
+          'Ask the agent to open the ${page.title} in a chat, then try again.',
+        );
+      } else {
+        // The shelf holds this card: it opens first, since it needs the card's context.
+        unawaited(openAnswerLink(context, path));
+      }
     } on ApiException catch (error) {
       scope.chat.reportLink('Could not open the ${page.title}', error.message);
-      scope.shell.closeShelf();
-      return;
-    }
-    if (!mounted) return;
-    if (path == null) {
-      scope.chat.reportLink(
-        'The ${page.title} is not set up yet',
-        'Ask the agent to open the ${page.title} in a chat, then try again.',
-      );
-    } else {
-      // The shelf holds this card: it opens first, since it needs the card's context.
-      unawaited(openAnswerLink(context, path));
     }
     scope.shell.closeShelf();
   }

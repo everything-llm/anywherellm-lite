@@ -15,7 +15,7 @@ const _library = '/library-lean/q9Zx_-1aB2.html';
 
 FakeToolkit _toolkit({
   Set<String> extra = const {ToolkitFeature.pages},
-  SkillPages pages = const SkillPages(vault: _vault),
+  SkillPages pages = const {SkillPage.vault: _vault},
 }) => FakeToolkit()
   ..served = {ToolkitFeature.memories, ToolkitFeature.jobs, ...extra}
   ..skillPages = pages;
@@ -50,7 +50,7 @@ void main() {
     final h = await _open(tester, toolkit);
     final before = _reads(toolkit);
     expect(before, greaterThanOrEqualTo(1));
-    toolkit.skillPages = const SkillPages(vault: _newVault);
+    toolkit.skillPages = const {SkillPage.vault: _newVault};
     await tester.tap(find.text('Vault'));
     await tester.pumpAndSettle();
     expect(_reads(toolkit), before + 1);
@@ -64,7 +64,7 @@ void main() {
 
   testWidgets('the Library opens as it is, without a theme', (tester) async {
     final toolkit = _toolkit(
-      pages: const SkillPages(library: _library, vault: _vault),
+      pages: const {SkillPage.library: _library, SkillPage.vault: _vault},
     );
     final h = await _open(tester, toolkit);
     expect(find.text('Toolkits and runs'), findsOneWidget);
@@ -82,7 +82,7 @@ void main() {
   ) async {
     final toolkit = _toolkit();
     final h = await _open(tester, toolkit);
-    toolkit.skillPages = const SkillPages();
+    toolkit.skillPages = const {};
     await tester.tap(find.text('Vault'));
     await tester.pump();
     await tester.pump();
@@ -158,7 +158,7 @@ void main() {
     final toolkit = _toolkit();
     final h = await _open(tester, toolkit);
     expect(h.toolkit.pagesFound, {SkillPage.vault});
-    toolkit.skillPages = const SkillPages(library: _library);
+    toolkit.skillPages = const {SkillPage.library: _library};
     await h.settings.save('https://other:3001', 'K2');
     await tester.pumpAndSettle();
     // The new server's card reads afresh; nothing of the old one's remains.

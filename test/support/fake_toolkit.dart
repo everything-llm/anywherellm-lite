@@ -37,7 +37,7 @@ class FakeToolkit with FakeCompanion implements ToolkitApi {
   Set<String> served = {ToolkitFeature.memories, ToolkitFeature.jobs};
 
   /// What [pages] answers: where the Library and the Vault are.
-  SkillPages skillPages = const SkillPages();
+  SkillPages skillPages = const {};
 
   @override
   Future<SkillPages> pages() => run('pages', () => skillPages);

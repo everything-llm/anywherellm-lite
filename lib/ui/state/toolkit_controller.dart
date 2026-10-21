@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../core/activity.dart';
 import '../../core/ports.dart';
@@ -39,12 +39,11 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   /// card shows a row for each of.
   bool get pagesServed => serves(ToolkitFeature.pages);
 
-  Set<SkillPage>? _pagesFound;
-  Future<void>? _pagesReading;
+  final _pages = _Read<Set<SkillPage>>();
 
   /// Which of the suite's pages are set up, as the last read said; never where they are, since
   /// a page's address is a bearer capability that [pagePath] hands to its one caller.
-  Set<SkillPage> get pagesFound => _pagesFound ?? const {};
+  Set<SkillPage> get pagesFound => _pages.value ?? const {};
 
   final _jobs = _Read<List<ScheduledJob>>();
   final _activity = _Read<ActivityEvents>();
@@ -82,11 +81,9 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
 
   @override
   void serverChanged() {
-    for (final read in [_jobs, _activity]) {
+    for (final read in [_jobs, _activity, _pages]) {
       read.reset();
     }
-    _pagesFound = null;
-    _pagesReading = null;
     busy = false;
     changeProblem = null;
     runs.clear();
@@ -97,47 +94,27 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
   bool get wants =>
       jobsServed && !_jobs.asked ||
       activityServed && !_activity.asked ||
-      _wantsPages;
-
-  bool get _wantsPages =>
-      pagesServed && _pagesFound == null && _pagesReading == null;
+      pagesServed && !_pages.asked;
 
   /// Reads each feature the toolkit serves that has not been read on this server, nor is being
   /// read.
   void want() {
     if (jobsServed && !_jobs.asked) unawaited(readJobs());
     if (activityServed && !_activity.asked) unawaited(readActivity());
-    if (_wantsPages) wantPages();
+    if (pagesServed && !_pages.asked) wantPages();
   }
 
   /// Reads which pages are set up afresh, unless that read is on its way. A refusal or any other
   /// failure leaves none found, and says nothing.
-  void wantPages() {
-    if (!pagesServed || _pagesReading != null) return;
-    final asked = epoch;
-    final reading = _pagesReading = () async {
+  void wantPages() => unawaited(
+    _read(_pages, pagesServed, 'Could not read the pages', () async {
       try {
-        _found(await _api.pages());
+        return (await _api.pages()).keys.toSet();
       } on ApiException {
-        if (asked == epoch) _pagesFound = {};
-      } finally {
-        if (asked == epoch) {
-          _pagesReading = null;
-          notifyListeners();
-        }
+        return const <SkillPage>{};
       }
-    }();
-    unawaited(reading);
-    notifyListeners();
-  }
-
-  /// Keeps which of [read]'s pages are set up, and none of where.
-  void _found(SkillPages read) {
-    _pagesFound = {
-      for (final page in SkillPage.values)
-        if (read.of(page) != null) page,
-    };
-  }
+    }),
+  );
 
   /// Where [page] is, read afresh and never kept, or null when it is not set up. The answer also
   /// says which pages are set up. A key the bridge refuses (401 or 403) leaves none found, and
@@ -147,16 +124,21 @@ class ToolkitController extends ChangeNotifier with CompanionWatch {
     try {
       final read = await _api.pages();
       if (asked != epoch) return null;
-      _found(read);
-      notifyListeners();
-      return read.of(page);
+      _foundNow(read.keys.toSet());
+      return read[page];
     } on ApiException catch (error) {
       if (asked == epoch && (error.status == 401 || error.status == 403)) {
-        _pagesFound = {};
-        notifyListeners();
+        _foundNow(const {});
       }
       rethrow;
     }
+  }
+
+  /// Keeps [found] as the pages set up, telling the listeners only when that changed.
+  void _foundNow(Set<SkillPage> found) {
+    if (setEquals(_pages.value, found)) return;
+    _pages.value = found;
+    notifyListeners();
   }
 
   /// Reads the jobs the server runs on a schedule, or waits for the read on its way and, [again],

@@ -461,10 +461,10 @@ void main() {
             ToolkitFeature.activity,
             ToolkitFeature.pages,
           }
-          ..skillPages = const SkillPages(
-            library: '/library-lean/abc.html',
-            vault: '/vault-lean/abc.html',
-          );
+          ..skillPages = const {
+            SkillPage.library: '/library-lean/abc.html',
+            SkillPage.vault: '/vault-lean/abc.html',
+          };
         await pumpApp(
           tester,
           llm: awkward(),

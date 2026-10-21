@@ -4,6 +4,7 @@ import 'package:anywherellm/adapters/toolkit_client.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/schedule.dart';
+import 'package:anywherellm/core/skill_pages.dart';
 import 'package:anywherellm/core/toolkit.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -91,8 +92,7 @@ void main() {
           'vault': null,
         };
       final pages = await toolkit.api().pages();
-      expect(pages.library, '/library-lean/aB3.html');
-      expect(pages.vault, isNull);
+      expect(pages, {SkillPage.library: '/library-lean/aB3.html'});
       final request = toolkit.seen.single;
       expect(request.method, 'GET');
       expect(request.url.toString(), 'https://host.example.ts.net:8467/pages');

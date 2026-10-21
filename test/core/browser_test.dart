@@ -133,14 +133,4 @@ void main() {
     expect(isSkillPath('https://h/vault-lean/aB3.html', 'vault-lean'), isFalse);
     expect(isSkillPath('/vault-lean/a/b.html', 'vault-lean'), isFalse);
   });
-
-  test('only the Vault and the Library hold a secret in their address', () {
-    bool holds(String link) => holdsSecret(Uri.parse(link));
-    expect(holds('https://h:3001/vault-lean/aB3.html'), isTrue);
-    expect(holds('https://h:3001/vault-lean/aB3.html?theme=dark'), isTrue);
-    expect(holds('/library-lean/aB3.html'), isTrue);
-    expect(holds('https://h:3001/apps-lean/aB3.html'), isFalse);
-    expect(holds('https://h:3001/browser-lean/aB3.html'), isFalse);
-    expect(holds('https://h:3001/vault-lean/aB3.json'), isFalse);
-  });
 }

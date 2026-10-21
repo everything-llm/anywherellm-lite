@@ -20,12 +20,11 @@ final _page = RegExp(r'^/([^/]+)/[A-Za-z0-9_-]+\.html$');
 bool isSkillPath(String path, String folder) =>
     _page.firstMatch(path)?[1] == folder;
 
-/// Whether [page] holds a secret in its address, as the Vault (`vault-lean`) and the Library
-/// (`library-lean`) do: the page embeds the secret its address carries, so the web view keeps no
-/// copy of it.
-bool holdsSecret(Uri page) =>
-    isSkillPath(page.path, 'vault-lean') ||
-    isSkillPath(page.path, 'library-lean');
+/// library-lean's folder, which holds its Library page.
+const libraryFolder = 'library-lean';
+
+/// vault-lean's folder, which holds the Vault.
+const vaultFolder = 'vault-lean';
 
 /// Whether [link] is browser-lean's page for an agent's tab: `/browser-lean/<token>.html`, which
 /// the skill links its tab's card to.
@@ -35,10 +34,10 @@ bool isBrowserTab(Uri link, Uri? server) =>
 /// Whether [link] is library-lean's Library page, `/library-lean/<token>.html`, its toolkits and
 /// runs.
 bool isLibraryPage(Uri link, Uri? server) =>
-    isSkillPage(link, server, 'library-lean');
+    isSkillPage(link, server, libraryFolder);
 
 /// Whether [link] is the Vault, `/vault-lean/<token>.html`, the page the skills that keep secrets
 /// share: where the person gives a service's key or OAuth client without the agent seeing it, and
 /// sees and deletes every saved key, sign-in and login.
 bool isVaultPage(Uri link, Uri? server) =>
-    isSkillPage(link, server, 'vault-lean');
+    isSkillPage(link, server, vaultFolder);

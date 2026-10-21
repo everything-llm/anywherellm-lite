@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
-import '../../core/browser.dart';
+import '../../core/skill_pages.dart';
 import 'app_view.dart';
 
 /// A page an answer links to in the device's web view. The page runs its scripts and stays on
@@ -191,8 +191,10 @@ class _AppWebViewState extends State<_AppWebView> {
     }
     if (!mounted) return;
     if (_private) {
-      if (_view case final view?) await _noCache(view);
-      await _web.clearCache();
+      await Future.wait([
+        if (_view case final view?) _noCache(view),
+        _web.clearCache(),
+      ]);
       if (!mounted) return;
     }
     widget.channel?.runner = _web.runJavaScript;
