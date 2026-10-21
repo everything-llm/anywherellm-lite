@@ -15,9 +15,9 @@ import 'app_view.dart';
 /// `window.close()`, which a web view ignores, to `onClose`. A page the server answers with an
 /// error, or cannot be reached, is covered by [PageGone] and tells `onFailed`. Only the page's own origin is given its channels, and only what
 /// its main frame posts is heard, so a frame it embeds cannot speak as it. A page that holds a
-/// secret ([holdsSecret]) is never kept in the web view's cache: the cache is off for it and
-/// cleared before it loads and when it closes, so one left by an app ended while it showed goes
-/// too.
+/// secret ([holdsSecret]) is kept in the web view's cache only while it shows: the cache is
+/// cleared before it loads and, with the page blanked so its scripts fetch nothing more, when it
+/// closes, so one left by an app ended while it showed goes with the next such page.
 class AppWebViews implements AppView {
   const AppWebViews();
 
@@ -57,12 +57,14 @@ final _pages = const MethodChannel('anywherellm/pages')
 /// What each web view's main frame posts to a channel goes to, by the web view and the name.
 final _heard = <(int, String), void Function(String message)>{};
 
-/// Asks `PageChannels` to switch web view [view]'s HTTP cache off; false where it cannot.
-Future<bool> _noCache(int view) async {
+/// Asks `PageChannels` to blank web view [view] and empty the HTTP cache the app's web views
+/// share. It goes through the app's own channel, since the plugin answers no call on a web view
+/// whose widget has gone.
+Future<void> _forget(int view) async {
   try {
-    return await _pages.invokeMethod<bool>('noCache', {'view': view}) ?? false;
+    await _pages.invokeMethod<void>('forget', {'view': view});
   } on PlatformException {
-    return false;
+    // The cache is emptied again before the next page that holds a secret loads.
   }
 }
 
@@ -191,10 +193,7 @@ class _AppWebViewState extends State<_AppWebView> {
     }
     if (!mounted) return;
     if (_private) {
-      await Future.wait([
-        if (_view case final view?) _noCache(view),
-        _web.clearCache(),
-      ]);
+      await _web.clearCache();
       if (!mounted) return;
     }
     widget.channel?.runner = _web.runJavaScript;
@@ -211,7 +210,9 @@ class _AppWebViewState extends State<_AppWebView> {
         when channel.runner == _web.runJavaScript) {
       channel.runner = null;
     }
-    if (_private) unawaited(_web.clearCache().catchError((_) {}));
+    if (_private) {
+      if (_view case final view?) unawaited(_forget(view));
+    }
     super.dispose();
   }
 

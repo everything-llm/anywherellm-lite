@@ -1,6 +1,6 @@
 package local.anywherellm.anywherellm
 
-import android.webkit.WebSettings
+import android.webkit.WebView
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -14,8 +14,8 @@ import io.flutter.plugins.webviewflutter.WebViewFlutterAndroidExternalApi
  * (`{view, name, message}`); it answers false where the device's web view cannot, and the page
  * then has no channel. The plugin's own `addJavaScriptChannel` gives every frame of every origin
  * the object and never says which posted, so a frame the page embeds could speak as the page.
- * `noCache` (`{view}`) switches the web view's HTTP cache off, for a page that holds a secret; it
- * answers false where the web view is not found.
+ * `forget` (`{view}`) blanks that web view, so its page's scripts stop, and empties the HTTP cache
+ * the app's web views share, for a page that holds a secret as it closes.
  */
 class PageChannels : FlutterPlugin {
     private var binding: FlutterPlugin.FlutterPluginBinding? = null
@@ -36,9 +36,10 @@ class PageChannels : FlutterPlugin {
                             ),
                         )
                     }
-                    "noCache" -> {
+                    "forget" -> {
                         val args = call.arguments as Map<*, *>
-                        result.success(noCache((args["view"] as Number).toLong()))
+                        forget((args["view"] as Number).toLong())
+                        result.success(null)
                     }
                     else -> result.notImplemented()
                 }
@@ -52,12 +53,23 @@ class PageChannels : FlutterPlugin {
         this.binding = null
     }
 
-    /** Switches web view [view]'s HTTP cache off; false when it is not found. */
-    private fun noCache(view: Long): Boolean {
-        val web = binding?.let { WebViewFlutterAndroidExternalApi.getWebView(it, view) }
-            ?: return false
-        web.settings.cacheMode = WebSettings.LOAD_NO_CACHE
-        return true
+    /**
+     * Blanks web view [view], which lives on after its widget until it is collected, and empties
+     * the HTTP cache every web view of the app shares, through a new web view when [view] is gone.
+     */
+    private fun forget(view: Long) {
+        val binding = binding ?: return
+        val web = WebViewFlutterAndroidExternalApi.getWebView(binding, view)
+        if (web != null) {
+            web.stopLoading()
+            web.loadUrl("about:blank")
+            web.clearCache(true)
+        } else {
+            WebView(binding.applicationContext).apply {
+                clearCache(true)
+                destroy()
+            }
+        }
     }
 
     /** Gives web view [view] an object of each of [names] in frames of [origin]; false where it cannot. */
