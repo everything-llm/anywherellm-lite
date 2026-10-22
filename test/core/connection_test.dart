@@ -284,28 +284,36 @@ void main() {
     });
   });
 
-  test(
-    'a companion runs where its code says, and nowhere a code did not say',
-    () {
-      final holder =
-          ConnectionHolder(
-              const Connection(baseUrl: 'https://ai.example.com', apiKey: 'K'),
-            )
-            ..companions = {
-              toolkitCompanion.code: Uri.parse('https://bridge.example.com'),
-            };
-      expect(
-        holder.addressOf(toolkitCompanion),
-        Uri.parse('https://bridge.example.com'),
-      );
-      holder.companions = const {};
-      expect(
-        holder.addressOf(toolkitCompanion),
-        isNull,
-        reason: 'the key never goes to a guessed address',
-      );
-    },
-  );
+  test('a companion runs where its code says, else under its path on the server\'s own origin', () {
+    final holder =
+        ConnectionHolder(
+            const Connection(baseUrl: 'https://ai.example.com', apiKey: 'K'),
+          )
+          ..companions = {
+            toolkitCompanion.code: Uri.parse('https://bridge.example.com'),
+          };
+    expect(
+      holder.addressOf(toolkitCompanion),
+      Uri.parse('https://bridge.example.com'),
+    );
+    holder.companions = const {};
+    expect(
+      holder.addressOf(toolkitCompanion),
+      Uri.parse('https://ai.example.com/anywherellm-bridge'),
+      reason: 'the key already goes to that origin',
+    );
+    holder.current = const Connection(
+      baseUrl: 'http://box.lan:3001/anythingllm',
+      apiKey: 'K',
+    );
+    expect(
+      holder.addressOf(toolkitCompanion),
+      Uri.parse('http://box.lan:3001/anywherellm-bridge'),
+      reason: 'the same scheme, host and port, never another',
+    );
+    holder.current = null;
+    expect(holder.addressOf(toolkitCompanion), isNull);
+  });
 }
 
 /// The pairing code that carries [connection], as AnywhereLLM on a computer drew it.

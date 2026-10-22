@@ -4,12 +4,14 @@ import 'companion.dart';
 /// AnythingLLM's internal API (`/api`) its owner allows, for the developer key. The app uses it
 /// for what AnythingLLM keeps behind its web login: the saved memories and the scheduled jobs.
 /// Before the rename it was anythingllm-bridge, and before the suite anythingllm-toolkit; the
-/// `/health` and saved address of either still count.
+/// `/health` and saved address of either still count. Without a pairing code it is looked for
+/// at `/anywherellm-bridge` on AnythingLLM's own origin.
 const toolkitCompanion = Companion(
   service: 'anywherellm-bridge',
   formerly: ['anythingllm-bridge', 'anythingllm-toolkit'],
   name: 'The toolkit',
   code: 'toolkit',
+  path: 'anywherellm-bridge',
 );
 
 /// [key], under which an older version kept a companion's address, as the app keys it now: the

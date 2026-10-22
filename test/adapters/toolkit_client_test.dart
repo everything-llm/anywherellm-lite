@@ -151,8 +151,7 @@ void main() {
     });
 
     test(
-      'is null with no server, no address said, or at a public http address, '
-      'without asking',
+      'is null with no server or at a public http address, without asking',
       () async {
         var asked = 0;
         Future<http.Response> count(http.Request _) async {
@@ -163,11 +162,6 @@ void main() {
         expect(
           await _api(count, holder: ConnectionHolder()).features(),
           isNull,
-        );
-        expect(
-          await _api(count, holder: ConnectionHolder(_connection)).features(),
-          isNull,
-          reason: 'no address is guessed beside the server',
         );
         expect(
           await _api(
@@ -182,6 +176,27 @@ void main() {
         expect(asked, 0);
       },
     );
+
+    test('with no address said, is asked on the server\'s own origin, and is '
+        'absent where anything else answers there', () async {
+      final seen = <Uri>[];
+      var body = '{"service":"anywherellm-bridge","allow":[]}';
+      final api = _api((request) async {
+        seen.add(request.url);
+        return http.Response(body, 200);
+      }, holder: ConnectionHolder(_connection));
+      expect(await api.features(), isNotNull);
+      expect(
+        seen.single.toString(),
+        'https://host.example.ts.net:3001/anywherellm-bridge/health',
+      );
+      body = '<!doctype html><title>AnythingLLM</title>';
+      expect(
+        await api.features(again: true),
+        isNull,
+        reason: 'AnythingLLM answers its own page for a path it does not know',
+      );
+    });
 
     test('is asked at the address said, under its path', () async {
       final seen = <Uri>[];

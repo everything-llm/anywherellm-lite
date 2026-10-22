@@ -61,11 +61,15 @@ class ConnectionHolder {
   /// Where each companion runs, by [Companion.code], as a pairing code said.
   Map<String, Uri> companions = const {};
 
-  /// Where [companion] runs beside the server in use, as a pairing code said. Null with no
-  /// server or where no code named it: the key never goes to an address the app guessed, where
-  /// whoever answers `/health` with the companion's name would get it.
-  Uri? addressOf(Companion companion) =>
-      current == null ? null : companions[companion.code];
+  /// Where [companion] runs beside the server in use: as a pairing code said, else under its
+  /// path on the server's own origin ([Companion.onOrigin]). Null with no server. The key never
+  /// goes to another host or port the app guessed, where whoever answers `/health` with the
+  /// companion's name would get it.
+  Uri? addressOf(Companion companion) => switch (current) {
+    final server? =>
+      companions[companion.code] ?? companion.onOrigin(server.uri),
+    null => null,
+  };
 }
 
 /// A host name as a resolver takes it, lowercased as [Uri.parse] leaves it. A name with letters

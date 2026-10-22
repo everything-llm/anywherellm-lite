@@ -155,10 +155,13 @@ void main() {
       expect(settings.addressOf(toolkitCompanion), toolkit);
       expect(store.savedCompanions, isNotEmpty);
       await settings.connect('https://other.example:3001', 'K1');
+      expect(store.savedCompanions, isEmpty);
       expect(
         settings.addressOf(toolkitCompanion),
-        isNull,
-        reason: 'another server has none until a code names one',
+        Uri.parse('https://other.example:3001/anywherellm-bridge'),
+        reason:
+            'another server is looked at on its own origin until a code '
+            'names one',
       );
     });
 

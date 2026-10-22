@@ -1,13 +1,15 @@
 /// A companion server: one that may run beside AnythingLLM, takes the same developer key, and
 /// says what it is at `GET /health` under `service`. It runs where a pairing code said it does,
-/// and without one the app does not look for it. The app works without any, and shows what one
-/// adds only while it answers.
+/// and without one under its [path] on the server's own origin, where a proxy in front of
+/// AnythingLLM may route it. The app works without any, and shows what one adds only while it
+/// answers.
 class Companion {
   const Companion({
     required this.service,
     required this.name,
     required this.code,
     this.formerly = const [],
+    this.path,
   });
 
   /// What its `/health` names itself, as `anywherellm-bridge`.
@@ -25,6 +27,23 @@ class Companion {
 
   /// How a message names it, as `The toolkit`.
   final String name;
+
+  /// The path it is looked for under on the server's own origin when no pairing code said where
+  /// it runs, as `anywherellm-bridge`, or null for none.
+  final String? path;
+
+  /// Where it runs on [server]'s own origin, its scheme, host and port, under [path], or null
+  /// without one. The key already goes to that origin, so asking there hands it to no one new;
+  /// another host or port could be anyone's.
+  Uri? onOrigin(Uri server) => switch (path) {
+    final path? => Uri(
+      scheme: server.scheme,
+      host: server.host,
+      port: server.hasPort ? server.port : null,
+      pathSegments: [path],
+    ),
+    null => null,
+  };
 
   /// Whether [json], an answer to `GET /health`, is this companion's, under any of its [names].
   bool isHealth(Object? json) => json is Map && names.contains(json['service']);
