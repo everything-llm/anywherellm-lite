@@ -48,28 +48,9 @@ void main() {
     expect(sharedTextItem('Pair with ${_link()}'), isA<SharedText>());
     expect(
       sharedTextItem('anywherellm://signed-in?service=github'),
-      isA<SharedSignIn>().having((s) => s.service, 'service', 'github'),
-    );
-    expect(
-      sharedTextItem('anywherellm://signed-in?service=%3Cb%3E'),
       isA<SharedPairing>(),
       reason: 'a link it cannot use is offered as a pairing, which says why',
     );
-  });
-
-  testWidgets('a signed-in link brings the chat back with the message in its '
-      'composer, and sends nothing', (tester) async {
-    final shares = StreamController<SharedItem>();
-    final h = await pumpApp(tester, shares: shares);
-    h.shell.openSettings();
-    await tester.pumpAndSettle();
-    await _open(tester, shares, 'anywherellm://signed-in?service=github');
-    expect(h.shell.settingsOpen, isFalse);
-    expect(find.byType(PairingSheet), findsNothing);
-    expect(find.byType(ShareSheet), findsNothing);
-    expect(composerText(tester), 'I\'ve signed in to github.');
-    expect(h.llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
-    await shares.close();
   });
 
   testWidgets('a link connects once Connect is pressed, with the toolkit\'s '

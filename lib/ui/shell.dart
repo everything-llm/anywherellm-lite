@@ -319,8 +319,7 @@ class _AboveKeyboard extends StatelessWidget {
   }
 }
 
-/// Hands each item another app shares to the shell, which offers it in a sheet. A signed-in link
-/// shows no sheet: the chat comes back with the message in its composer, sent only by the person.
+/// Hands each item another app shares to the shell, which offers it in a sheet.
 class _ShareListener extends StatefulWidget {
   const _ShareListener({required this.child});
 
@@ -337,17 +336,7 @@ class _ShareListenerState extends State<_ShareListener> {
   void initState() {
     super.initState();
     final scope = AppScope.of(context);
-    _shares = scope.shares?.listen(_take);
-  }
-
-  void _take(SharedItem item) {
-    final scope = AppScope.of(context);
-    if (item is SharedSignIn) {
-      scope.shell.openChat();
-      scope.chat.putInComposer(item.message, const []);
-    } else {
-      scope.shell.showShared(item);
-    }
+    _shares = scope.shares?.listen(scope.shell.showShared);
   }
 
   @override

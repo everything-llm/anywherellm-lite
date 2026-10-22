@@ -1,5 +1,4 @@
 import '../../core/chat.dart';
-import '../../core/signed_in.dart';
 
 /// Something another app shared with AnywhereLLM through the system's share sheet, or a link
 /// it opened in AnywhereLLM.
@@ -13,17 +12,6 @@ class SharedPairing extends SharedItem {
   const SharedPairing(this.code);
 
   final String code;
-}
-
-/// A signed-in link, `anywherellm://signed-in?service=<name>`, which library-lean's OAuth return
-/// page offers: the person signed in to [service] and came back to tell the agent.
-class SharedSignIn extends SharedItem {
-  const SharedSignIn(this.service);
-
-  final String service;
-
-  /// What goes in the composer for the person to send.
-  String get message => 'I\'ve signed in to $service.';
 }
 
 /// What can be added to a workspace's documents or asked about: a link, text or a file.
@@ -57,13 +45,12 @@ class SharedFile extends SharedContent {
 
 final _space = RegExp(r'\s');
 
-/// What shared [text] holds: a signed-in link or a pairing link when it is one alone (any other
-/// `anywherellm:` link is offered as a pairing, which says why it cannot be used), a link when it
-/// is an address alone, or a title over one, and the text itself otherwise.
+/// What shared [text] holds: a pairing link when it is an `anywherellm:` link alone (one that is
+/// not a pairing code says why it cannot be used), a link when it is an address alone, or a title
+/// over one, and the text itself otherwise.
 SharedItem sharedTextItem(String text) {
   final trimmed = text.trim();
   if (trimmed.startsWith('anywherellm:') && !trimmed.contains(_space)) {
-    if (signedInOf(trimmed) case final service?) return SharedSignIn(service);
     return SharedPairing(trimmed);
   }
   final lines = [
