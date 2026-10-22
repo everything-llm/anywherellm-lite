@@ -159,7 +159,8 @@ class _SheetFrameState extends State<SheetFrame>
             constraints: BoxConstraints(maxHeight: most),
             height: tall ? most : null,
             decoration: BoxDecoration(
-              color: t.tile,
+              // A bare sheet holds a page drawn on the ground, which its handle's strip matches.
+              color: widget.bare ? t.ground : t.tile,
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(28),
               ),

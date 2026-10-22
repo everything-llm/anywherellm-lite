@@ -1,6 +1,8 @@
 package local.anywherellm.anywherellm
 
 import android.webkit.WebView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -15,7 +17,9 @@ import io.flutter.plugins.webviewflutter.WebViewFlutterAndroidExternalApi
  * then has no channel. The plugin's own `addJavaScriptChannel` gives every frame of every origin
  * the object and never says which posted, so a frame the page embeds could speak as the page.
  * `forget` (`{view}`) blanks that web view, so its page's scripts stop, and empties the HTTP cache
- * the app's web views share, for a page that holds a secret as it closes.
+ * the app's web views share, for a page that holds a secret as it closes. `edgeless` (`{view}`)
+ * keeps the window's insets from that web view: it shows in a sheet clear of the system bars, so
+ * a page's `env(safe-area-inset-*)` is 0 there, as in a browser tab, not the status bar's height.
  */
 class PageChannels : FlutterPlugin {
     private var binding: FlutterPlugin.FlutterPluginBinding? = null
@@ -35,6 +39,11 @@ class PageChannels : FlutterPlugin {
                                 args["origin"] as String,
                             ),
                         )
+                    }
+                    "edgeless" -> {
+                        val args = call.arguments as Map<*, *>
+                        edgeless((args["view"] as Number).toLong())
+                        result.success(null)
                     }
                     "forget" -> {
                         val args = call.arguments as Map<*, *>
@@ -70,6 +79,15 @@ class PageChannels : FlutterPlugin {
                 destroy()
             }
         }
+    }
+
+    /** Hands web view [view] no window insets, now and whenever the window's change. */
+    private fun edgeless(view: Long) {
+        val web = binding?.let { WebViewFlutterAndroidExternalApi.getWebView(it, view) } ?: return
+        ViewCompat.setOnApplyWindowInsetsListener(web) { v, _ ->
+            ViewCompat.onApplyWindowInsets(v, WindowInsetsCompat.CONSUMED)
+        }
+        ViewCompat.requestApplyInsets(web)
     }
 
     /** Gives web view [view] an object of each of [names] in frames of [origin]; false where it cannot. */

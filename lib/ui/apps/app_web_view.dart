@@ -57,14 +57,17 @@ final _pages = const MethodChannel('anywherellm/pages')
 /// What each web view's main frame posts to a channel goes to, by the web view and the name.
 final _heard = <(int, String), void Function(String message)>{};
 
-/// Asks `PageChannels` to blank web view [view] and empty the HTTP cache the app's web views
-/// share. It goes through the app's own channel, since the plugin answers no call on a web view
-/// whose widget has gone.
-Future<void> _forget(int view) async {
+/// Asks `PageChannels` to do [method] to web view [view] through the app's own channel, since
+/// the plugin answers no call on a web view whose widget has gone: `forget` blanks it and empties
+/// the HTTP cache the app's web views share, and `edgeless` keeps the window's insets from it,
+/// since it shows in a sheet clear of the system bars. A failure leaves it as it was: the cache is
+/// emptied again before the next page that holds a secret loads, and a page leaves room for bars
+/// it is not under.
+Future<void> _tell(String method, int view) async {
   try {
-    await _pages.invokeMethod<void>('forget', {'view': view});
+    await _pages.invokeMethod<void>(method, {'view': view});
   } on PlatformException {
-    // The cache is emptied again before the next page that holds a secret loads.
+    // As above.
   }
 }
 
@@ -180,6 +183,8 @@ class _AppWebViewState extends State<_AppWebView> {
   Future<void> _open() async {
     final page = widget.page;
     if (_view case final view?) {
+      await _tell('edgeless', view);
+      if (!mounted) return;
       final heard = <String, void Function(String message)>{
         _closeChannel: (_) => widget.onClose(),
         if (widget.channel case final channel?) channel.name: channel.onMessage,
@@ -209,7 +214,7 @@ class _AppWebViewState extends State<_AppWebView> {
       channel.runner = null;
     }
     if (_private) {
-      if (_view case final view?) unawaited(_forget(view));
+      if (_view case final view?) unawaited(_tell('forget', view));
     }
     super.dispose();
   }
