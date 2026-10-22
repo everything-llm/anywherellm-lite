@@ -153,8 +153,8 @@ class _FeatureGraphic extends StatelessWidget {
               children: [
                 Text(
                   'AnywhereLLM',
-                  style: Type.sans(
-                    104,
+                  style: Type.display(
+                    92,
                     weight: FontWeight.w700,
                     color: iconInk,
                     height: 1,
