@@ -157,7 +157,7 @@ class _PendingRow extends StatelessWidget {
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Type.sans(13.5, color: t.ink),
+                  style: Type.note(t.ink),
                 ),
               ),
               IconBtn(

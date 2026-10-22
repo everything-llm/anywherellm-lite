@@ -140,7 +140,7 @@ void main() {
     await tapShown(tester, control('Where do I find a key?'));
     expect(h.shell.guide, Guide.connect);
     expect(find.text('2 of 3'), findsOneWidget);
-    expect(find.text('THE KEY'), findsOneWidget);
+    expect(find.text('The key'), findsOneWidget);
   });
 
   testWidgets('the first run\'s help link is at the foot while there is room', (

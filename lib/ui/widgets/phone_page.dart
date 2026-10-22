@@ -7,8 +7,9 @@ import '../type.dart';
 import 'buttons.dart';
 import 'tappable.dart';
 
-/// The bar over a phone's full page: a round back button, heard as [back], [title] centred at
-/// 19, or [heading] in its place, and at most one round [action] at its end.
+/// The bar over a phone's full page: a round back button floating on the tile, heard as
+/// [back], [title] centred as [Type.title], or [heading] in its place, and at most one round
+/// [action] at its end.
 class PhonePageHeader extends StatelessWidget {
   const PhonePageHeader({
     super.key,
@@ -61,11 +62,7 @@ class PhonePageHeader extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
-                      style: Type.sans(
-                        19,
-                        weight: FontWeight.w600,
-                        color: t.ink,
-                      ),
+                      style: Type.title(t.ink),
                     ),
                   ),
             ),
@@ -78,8 +75,8 @@ class PhonePageHeader extends StatelessWidget {
   }
 }
 
-/// A row that opens another page: an [icon] at 24, [title], the line [about] under it, and a
-/// chevron, or the [end] icon in its place.
+/// A row that opens another page: an [icon] at 24, [title] as [Type.body], the line [about]
+/// under it at 13 in ink, and a chevron, or the [end] icon in its place.
 class NavRow extends StatelessWidget {
   const NavRow({
     super.key,
@@ -144,16 +141,14 @@ class NavRow extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: mono
-                        ? Type.mono(14, color: ink)
-                        : Type.sans(17, weight: FontWeight.w500, color: ink),
+                    style: mono ? Type.mono(15, color: ink) : Type.body(ink),
                   ),
                   if (about case final about? when about.isNotEmpty)
                     Text(
                       about,
                       maxLines: aboutLines,
                       overflow: TextOverflow.ellipsis,
-                      style: Type.sans(13, color: t.muted),
+                      style: Type.note(t.ink),
                     ),
                 ],
               ),

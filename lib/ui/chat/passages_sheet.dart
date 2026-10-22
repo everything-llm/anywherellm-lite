@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/server_models.dart';
+import '../../core/sources.dart';
 import '../app_scope.dart';
 import '../state/shell_controller.dart';
+import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/sheet.dart';
@@ -60,40 +62,35 @@ class PassagesView extends StatelessWidget {
           // The file and its count in one line.
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              '${citation.title} · $count',
-              style: Type.sans(13, color: t.muted, height: 1.4),
-            ),
+            child: Text('${citation.title} · $count', style: Type.note(t.ink)),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           for (final passage in passages) ...[
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: t.bg,
-                border: Border.all(color: t.line2),
-                borderRadius: BorderRadius.circular(20),
+                color: t.ground,
+                border: Border.all(color: t.tileEdge),
+                borderRadius: BorderRadius.circular(Sizes.control),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: 4,
                 children: [
                   if (passage.score case final score?)
                     Text(
-                      '${(score * 100).round()}% match',
+                      matchText(score),
                       textAlign: TextAlign.end,
-                      style: Type.sans(13.5, color: t.muted, height: 1.5),
+                      style: Type.note(t.ink),
                     ),
-                  SelectableText(
-                    passage.text,
-                    style: Type.sans(14, color: t.ink2, height: 1.5),
-                  ),
+                  SelectableText(passage.text, style: Type.note(t.ink)),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
           ],
           if (file != null) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             ActionRow(even: true, alignment: WrapAlignment.start, [
               AppButton(
                 'View extracted text',
@@ -112,19 +109,26 @@ class PassagesView extends StatelessWidget {
   }
 }
 
-/// A citation's [number] in a small circle, in the accent while it leads somewhere ([live]).
+/// A citation's [number] in a small circle [diameter] across, in the accent while it leads
+/// somewhere ([live]).
 class CitationNumber extends StatelessWidget {
-  const CitationNumber(this.number, {super.key, this.live = true});
+  const CitationNumber(
+    this.number, {
+    super.key,
+    this.live = true,
+    this.diameter = 17,
+  });
 
   final int number;
   final bool live;
+  final double diameter;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return Container(
-      width: 17,
-      height: 17,
+      width: diameter,
+      height: diameter,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: live ? t.accent : t.muted,
@@ -133,12 +137,19 @@ class CitationNumber extends StatelessWidget {
       child: Text(
         '$number',
         style: Type.sans(
-          12,
+          13,
           weight: FontWeight.w600,
-          color: t.onaccent,
+          color: t.onAccent,
           height: 1,
         ),
       ),
     );
   }
+}
+
+/// Shows the cited file [title] in Documents, lit up: the sheet, or the pane on a wide window.
+void showCitedInDocuments(BuildContext context, String title) {
+  final scope = AppScope.of(context);
+  scope.shell.openSources(asPane: Wide.split(context));
+  scope.sources.flash(title);
 }

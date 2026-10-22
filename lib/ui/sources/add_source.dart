@@ -10,11 +10,15 @@ enum _Adding { none, link, text }
 /// Adds a source that is not a file: a web page the server reads in, or text pasted here, each
 /// with optional details. Its form takes the place of its row of ways to add one.
 class AddSource extends StatefulWidget {
-  const AddSource({super.key, required this.leading});
+  const AddSource({super.key, required this.leading, this.place});
 
   /// What the row holds before Add a link, such as an Add a file button. It gives way to an
   /// open form.
   final Widget leading;
+
+  /// Where what shows goes, given it and whether it is a form, as the Documents pane puts the
+  /// row beside its title and a form under it; null shows it as it is.
+  final Widget Function(Widget shown, bool form)? place;
 
   @override
   State<AddSource> createState() => _AddSourceState();
@@ -73,7 +77,12 @@ class _AddSourceState extends State<AddSource> {
   );
 
   @override
-  Widget build(BuildContext context) => switch (_adding) {
+  Widget build(BuildContext context) {
+    final shown = _shown();
+    return widget.place?.call(shown, _adding != _Adding.none) ?? shown;
+  }
+
+  Widget _shown() => switch (_adding) {
     _Adding.none => _row(),
     _Adding.link => _Form(
       ready: _link,

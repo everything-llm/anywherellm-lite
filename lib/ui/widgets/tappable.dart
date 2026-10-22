@@ -9,7 +9,8 @@ import 'package:flutter/material.dart';
 ///
 /// The surface is [color] and [side] inside [radius], or [shape] when the outline is not a
 /// rounded rectangle. With none of them the control is bare ink over whatever is behind it.
-/// [hoverColor] defaults to the theme's.
+/// [hoverColor] defaults to the theme's. [shadows] fall from the surface's own outline, as a
+/// floating button's or the primary action's glow do.
 class Tappable extends StatelessWidget {
   const Tappable({
     super.key,
@@ -24,6 +25,7 @@ class Tappable extends StatelessWidget {
     this.color,
     this.side,
     this.hoverColor,
+    this.shadows = const [],
     this.tooltip,
     this.dimWhenDisabled,
     this.excludeSemantics = true,
@@ -42,6 +44,7 @@ class Tappable extends StatelessWidget {
   final Color? color;
   final BorderSide? side;
   final Color? hoverColor;
+  final List<BoxShadow> shadows;
   final String? tooltip;
 
   /// The opacity while [onTap] is null, or null to leave the control as it is.
@@ -56,6 +59,20 @@ class Tappable extends StatelessWidget {
 
   /// The least a finger needs.
   static const touchSide = 44.0;
+
+  /// [surface] over [shadows] in the shape of its [outline], whose edge it does not draw again.
+  Widget _shadowed(ShapeBorder? outline, Widget surface) {
+    if (shadows.isEmpty) return surface;
+    final shape = switch (outline) {
+      final OutlinedBorder o => o.copyWith(side: BorderSide.none),
+      final other? => other,
+      null => RoundedRectangleBorder(borderRadius: radius ?? BorderRadius.zero),
+    };
+    return DecoratedBox(
+      decoration: ShapeDecoration(shape: shape, shadows: shadows),
+      child: surface,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,13 +100,16 @@ class Tappable extends StatelessWidget {
       expanded: expanded,
       label: label,
       excludeSemantics: excludeSemantics,
-      child: color == null && outline == null
-          ? Material(type: MaterialType.transparency, child: ink)
-          : Material(
-              color: color ?? Colors.transparent,
-              shape: outline,
-              child: ink,
-            ),
+      child: _shadowed(
+        outline,
+        color == null && outline == null
+            ? Material(type: MaterialType.transparency, child: ink)
+            : Material(
+                color: color ?? Colors.transparent,
+                shape: outline,
+                child: ink,
+              ),
+      ),
     );
     final dim = dimWhenDisabled;
     if (dim != null) {

@@ -72,7 +72,7 @@ void main() {
     }
     // Household's own memory is not Q3 planning's.
     expect(find.text('The boiler is from 2019.'), findsNothing);
-    expect(find.textContaining('2 OF 5'), findsOneWidget);
+    expect(find.textContaining('2 of 5'), findsOneWidget);
   });
 
   testWidgets('a memory added for every workspace is saved there', (

@@ -57,12 +57,26 @@ class _Welcome extends StatelessWidget {
                       'the address.'
                 : 'Enter your AnythingLLM server\'s address and a developer key, or paste a '
                       'pairing link as the address.',
-            style: Type.lead(t.muted),
+            style: Type.body(t.muted),
           ),
         ],
       ),
     );
   }
+}
+
+/// [button] 52 tall, as the saved connection's own buttons are, one under another across the
+/// page.
+class _Tall extends StatelessWidget {
+  const _Tall(this.button);
+
+  final Widget button;
+
+  @override
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: const BoxConstraints(minHeight: 52),
+    child: button,
+  );
 }
 
 /// A line across the page with [label] centred in it, where one way in gives way to another.
@@ -91,7 +105,7 @@ class _OrDivider extends StatelessWidget {
                 child: Text(
                   label,
                   textAlign: TextAlign.center,
-                  style: Type.sans(13, color: t.muted),
+                  style: Type.note(t.ink),
                 ),
               ),
               line,
@@ -323,25 +337,30 @@ class _KeyCardState extends State<_KeyCard> {
           ),
         if (_settings.keyringProblem case final problem?)
           AlertBox.notice(AlertKind.warn, problem),
-        AppButton(
-          saving && !_replacing ? 'Testing…' : 'Test connection',
-          primary: true,
-          onPressed: saving ? null : _test,
+        _Tall(
+          AppButton(
+            saving && !_replacing ? 'Testing…' : 'Test connection',
+            primary: true,
+            onPressed: saving ? null : _test,
+          ),
         ),
-        AppButton(
-          _replacing ? 'Cancel' : 'Edit connection',
-          onPressed: () => setState(() {
-            _replacing = !_replacing;
-            _shell.setScanning(false);
-            if (!_replacing) _backToSaved();
-          }),
+        _Tall(
+          AppButton(
+            _replacing ? 'Cancel' : 'Edit connection',
+            onPressed: () => setState(() {
+              _replacing = !_replacing;
+              _shell.setScanning(false);
+              if (!_replacing) _backToSaved();
+            }),
+          ),
         ),
-        const SizedBox(height: 8),
-        AppButton(
-          'Forget this server',
-          danger: true,
-          quiet: true,
-          onPressed: () => _shell.togglePopup(Popup.forgetServer),
+        _Tall(
+          AppButton(
+            'Forget this server',
+            danger: true,
+            quiet: true,
+            onPressed: () => _shell.togglePopup(Popup.forgetServer),
+          ),
         ),
       ],
     );
@@ -515,7 +534,6 @@ class _KeyCardState extends State<_KeyCard> {
               child: TextAction.plain(
                 'Where do I find a key?',
                 () => _shell.showGuide(Guide.connect, step: connectKeyStep),
-                weight: FontWeight.w600,
               ),
             ),
           ],
@@ -571,8 +589,8 @@ class _KeyCardState extends State<_KeyCard> {
         if (typing)
           DecoratedBox(
             decoration: BoxDecoration(
-              color: t.bg,
-              border: Border(top: BorderSide(color: t.line2)),
+              color: t.ground,
+              border: Border(top: BorderSide(color: t.line)),
             ),
             child: Align(
               alignment: Alignment.topLeft,

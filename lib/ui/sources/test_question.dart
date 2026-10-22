@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/server_models.dart';
+import '../../core/sources.dart';
 import '../app_scope.dart';
 import '../layout.dart';
 import '../tokens.dart';
@@ -125,9 +126,8 @@ class _HitState extends State<_Hit> {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final hit = widget.hit;
-    final percent = (hit.score * 100).round();
     return Tappable(
-      label: '${hit.title}, $percent% match',
+      label: '${hit.title}, ${matchText(hit.score)}',
       onTap: () {
         setState(() => _whole = !_whole);
         AppScope.of(context).sources.flash(hit.title);
@@ -136,9 +136,9 @@ class _HitState extends State<_Hit> {
       child: Container(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         decoration: BoxDecoration(
-          color: t.panel,
+          color: t.tile,
           borderRadius: BorderRadius.circular(Sizes.small),
-          border: Border.all(color: t.line2),
+          border: Border.all(color: t.line),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -150,15 +150,11 @@ class _HitState extends State<_Hit> {
                     hit.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Type.sans(
-                      13.5,
-                      weight: FontWeight.w600,
-                      color: t.ink,
-                    ),
+                    style: Type.caption(t.ink, weight: FontWeight.w600),
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text('$percent% match', style: Type.sans(12.5, color: t.muted)),
+                Text(matchText(hit.score), style: Type.note(t.ink)),
               ],
             ),
             const SizedBox(height: 4),
@@ -166,7 +162,7 @@ class _HitState extends State<_Hit> {
               hit.text,
               maxLines: _whole ? null : 3,
               overflow: _whole ? null : TextOverflow.ellipsis,
-              style: Type.note(t.ink2),
+              style: Type.note(t.ink),
             ),
           ],
         ),

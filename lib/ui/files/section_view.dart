@@ -24,7 +24,7 @@ class Blank extends StatelessWidget {
       child: Text(
         text,
         textAlign: TextAlign.center,
-        style: Type.sans(15, color: Tokens.of(context).muted),
+        style: Type.body(Tokens.of(context).muted),
       ),
     ),
   );
@@ -94,13 +94,13 @@ class _EditorState extends State<_Editor> {
                   textAlignVertical: TextAlignVertical.top,
                   autocorrect: false,
                   enableSuggestions: false,
-                  style: Type.textAreaMono(14.5, t.ink),
+                  style: Type.mono(15, color: t.ink, height: 1.45),
                   cursorColor: t.accent,
-                  decoration: editorDecoration(context, t.panel).copyWith(
+                  decoration: editorDecoration(context, t.tile).copyWith(
                     // An empty prompt says what applies instead.
                     hintText:
                         'Empty: the server\'s default system prompt applies.',
-                    hintStyle: Type.textAreaMono(14.5, t.muted),
+                    hintStyle: Type.mono(15, color: t.muted, height: 1.45),
                   ),
                 ),
               ),

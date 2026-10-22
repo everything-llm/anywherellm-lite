@@ -54,7 +54,7 @@ void main() {
       await tester.tap(find.text('Begin'));
       await tester.pumpAndSettle();
       expect(find.text('2 of ${connectSteps.length}'), findsOneWidget);
-      expect(find.text('THE KEY'), findsOneWidget);
+      expect(find.text('The key'), findsOneWidget);
       await tester.tap(control('Screen 3: The address'));
       await tester.pumpAndSettle();
       expect(find.text('3 of ${connectSteps.length}'), findsOneWidget);

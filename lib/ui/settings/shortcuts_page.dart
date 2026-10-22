@@ -245,16 +245,17 @@ class _ShortcutEditorState extends State<_ShortcutEditor> {
                 ),
               ),
               const CardCaption('Example of what is sent'),
+              // A well on the ground, as a preview rather than a card.
               Container(
                 padding: const EdgeInsets.all(14),
-                decoration: cardDecoration(Tokens.of(context)),
+                decoration: BoxDecoration(
+                  color: Tokens.of(context).ground,
+                  border: Border.all(color: Tokens.of(context).line),
+                  borderRadius: BorderRadius.circular(24),
+                ),
                 child: Text(
                   example.isEmpty ? 'Write a prompt to preview it.' : example,
-                  style: Type.sans(
-                    15,
-                    color: Tokens.of(context).ink,
-                    height: 1.5,
-                  ),
+                  style: Type.body(Tokens.of(context).ink),
                 ),
               ),
               if (_name.text.trim().isNotEmpty &&

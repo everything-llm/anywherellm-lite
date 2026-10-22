@@ -10,12 +10,14 @@ import '../widgets/fields.dart';
 import '../widgets/sheet.dart';
 import '../widgets/tappable.dart';
 
-/// A card's ground: [Tokens.panel], or [Tokens.bg] for a card in a sheet ([inSheet]), with
-/// the rounded [Tokens.line2] edge every card has.
+/// A card: a [Tokens.tile] floating on the tile's shadow inside its [Tokens.tileEdge], which
+/// only the increased-contrast themes draw; or, in a sheet ([inSheet]), a flat [Tokens.ground]
+/// well inside a [Tokens.line] edge.
 BoxDecoration cardDecoration(Tokens t, {bool inSheet = false}) => BoxDecoration(
-  color: inSheet ? t.bg : t.panel,
+  color: inSheet ? t.ground : t.tile,
   borderRadius: BorderRadius.circular(Sizes.card),
-  border: Border.all(color: t.line2),
+  border: Border.all(color: inSheet ? t.line : t.tileEdge),
+  boxShadow: inSheet ? null : t.tileShadow,
 );
 
 /// A rounded panel holding [children] one above another, [spacing] apart, as Settings draws a
@@ -41,7 +43,7 @@ class PanelCard extends StatelessWidget {
   }
 }
 
-/// A muted line of words in line with a [CardHeading] and the text of a card's rows, which is
+/// A small line of words in line with a [CardHeading] and the text of a card's rows, which is
 /// [FieldCard.inset] in from the card's sides.
 class CardCaption extends StatelessWidget {
   const CardCaption(this.text, {super.key});
@@ -51,13 +53,13 @@ class CardCaption extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
-    child: Text(text, style: Type.note(Tokens.of(context).muted)),
+    child: Text(text, style: Type.note(Tokens.of(context).ink)),
   );
 }
 
-/// A rounded panel of [rows], a hairline between each, as a grouped card: its edge is
-/// [Tokens.line2] and its hairlines stop [inset] short of its sides, where its rows keep their
-/// text. In a [SheetFrame] it is filled with [Tokens.bg], as a card in a sheet is.
+/// A rounded panel of [rows], a hairline between each, as a grouped card: a [cardDecoration],
+/// whose hairlines stop [inset] short of its sides, where its rows keep their
+/// text. In a [SheetFrame] it is filled with [Tokens.ground], as a card in a sheet is.
 class FieldCard extends StatelessWidget {
   const FieldCard(this.rows, {super.key});
 
@@ -95,7 +97,7 @@ class Ruled extends StatelessWidget {
   Widget build(BuildContext context) => !ruled
       ? child
       : CustomPaint(
-          foregroundPainter: CardHairline(Tokens.of(context).line2),
+          foregroundPainter: CardHairline(Tokens.of(context).line),
           child: child,
         );
 }
@@ -220,14 +222,7 @@ class FieldRow extends StatelessWidget {
     final about = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: Type.sans(
-            17,
-            weight: inSheet ? FontWeight.w400 : FontWeight.w500,
-            color: t.ink,
-          ),
-        ),
+        Text(label, style: Type.body(t.ink)),
         if (help.isNotEmpty) HelpText(help),
       ],
     );
@@ -263,25 +258,23 @@ class FieldRow extends StatelessWidget {
   }
 }
 
-/// [control] under its [name] in the sans at [size], as a phone's settings set a field or a
-/// choice. The name is heard once: as the control's own label when it has one ([labelled]),
+/// [control] under its [name] as [Type.body], or small at 13 when [quiet], as a phone's
+/// settings set a field or a choice. The name is heard once: as the control's own label when it has one ([labelled]),
 /// else as this group's.
 class NamedControl extends StatelessWidget {
   const NamedControl(
     this.name,
     this.control, {
     super.key,
-    this.size = 17,
     this.labelled = false,
     this.quiet = false,
   });
 
   final String name;
   final Widget control;
-  final double size;
   final bool labelled;
 
-  /// The name small and muted over its field, as a phone's sign-in form sets it.
+  /// The name small over its field, as a phone's sign-in form sets it.
   final bool quiet;
 
   @override
@@ -296,12 +289,8 @@ class NamedControl extends StatelessWidget {
             child: Text(
               name,
               style: quiet
-                  ? Type.sans(13, color: Tokens.of(context).muted)
-                  : Type.sans(
-                      size,
-                      weight: FontWeight.w500,
-                      color: Tokens.of(context).ink,
-                    ),
+                  ? Type.note(Tokens.of(context).ink)
+                  : Type.body(Tokens.of(context).ink),
             ),
           ),
         ),
@@ -313,7 +302,7 @@ class NamedControl extends StatelessWidget {
   }
 }
 
-/// A row of a [FieldCard] that only says something: [title] at 17, with [tag] beside it, over
+/// A row of a [FieldCard] that only says something: [title] as [Type.body], with [tag] beside it, over
 /// the line [about], in the mono face when [mono], or the line [aboutSpan] drawn as it says. It
 /// is as tall as a row that opens something, or a sheet's row in a sheet.
 class InfoRow extends StatelessWidget {
@@ -362,16 +351,7 @@ class InfoRow extends StatelessWidget {
                 Row(
                   spacing: 10,
                   children: [
-                    Flexible(
-                      child: Text(
-                        title,
-                        style: Type.sans(
-                          17,
-                          weight: FontWeight.w500,
-                          color: t.ink,
-                        ),
-                      ),
-                    ),
+                    Flexible(child: Text(title, style: Type.body(t.ink))),
                     ?tag,
                   ],
                 ),
@@ -381,8 +361,8 @@ class InfoRow extends StatelessWidget {
                     maxLines: mono ? null : aboutLines,
                     overflow: mono ? null : TextOverflow.ellipsis,
                     style: mono
-                        ? Type.mono(13, color: t.muted)
-                        : Type.sans(13, color: t.muted),
+                        ? Type.mono(13, color: t.ink, height: 1.4)
+                        : Type.note(t.ink),
                   ),
               ],
             ),
@@ -415,16 +395,16 @@ class PageNote extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    return Text(text, style: Type.sans(13.5, color: t.muted, height: 1.55));
+    return Text(text, style: Type.note(t.ink));
   }
 }
 
 /// How a [CardRow]'s words are drawn: as text, as an action in the accent, or as a destructive
-/// action in [Tokens.badfg].
+/// action in [Tokens.danger].
 enum RowTone { plain, accent, danger }
 
 /// A row of a phone's [FieldCard] that does one thing when tapped: [icon] at 22, then [label]
-/// at 17 in its [tone], then [trailing], kept [FieldCard.inset] from the card's sides. A
+/// as [Type.body] in its [tone], then [trailing], kept [FieldCard.inset] from the card's sides. A
 /// [large] row is a page's, as tall as a [NavRow] with its icon at 24.
 class CardRow extends StatelessWidget {
   const CardRow(
@@ -470,7 +450,7 @@ class CardRow extends StatelessWidget {
     final color = switch (tone) {
       RowTone.plain => t.ink,
       RowTone.accent => t.accent,
-      RowTone.danger => t.badfg,
+      RowTone.danger => t.danger,
     };
     return Tappable(
       label: heard ?? label,
@@ -503,14 +483,11 @@ class CardRow extends StatelessWidget {
                 label,
                 maxLines: maxLines,
                 overflow: maxLines == null ? null : TextOverflow.ellipsis,
-                style: Type.sans(
-                  17,
-                  weight: strong || checked == true
+                style: Type.body(
+                  color,
+                  weight: strong || checked == true || tone == RowTone.accent
                       ? FontWeight.w600
-                      : tone == RowTone.accent || large
-                      ? FontWeight.w500
                       : FontWeight.w400,
-                  color: color,
                 ),
               ),
             ),
@@ -522,7 +499,7 @@ class CardRow extends StatelessWidget {
   }
 }
 
-/// A card that sums one thing up, as Settings' server and the workspace are: [title] at 19,
+/// A card that sums one thing up, as Settings' server and the workspace are: [title] as [Type.title],
 /// with [trailing] at its end, the [lines] under it, then [link], a row in the accent over a
 /// hairline, which does [onLink].
 class SummaryCard extends StatelessWidget {
@@ -533,11 +510,15 @@ class SummaryCard extends StatelessWidget {
     this.lines = const [],
     this.link,
     this.onLink,
+    this.action,
   });
 
   final String title;
   final Widget? trailing;
   final List<Widget> lines;
+
+  /// A button under [lines], such as the primary one the card exists for.
+  final Widget? action;
   final String? link;
 
   /// Null while the link can do nothing, which fades it.
@@ -574,17 +555,19 @@ class SummaryCard extends StatelessWidget {
                         title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: Type.sans(
-                          19,
-                          weight: FontWeight.w500,
-                          color: t.ink,
-                        ),
+                        style: Type.title(t.ink),
                       ),
                     ),
-                    ?trailing,
+                    // It gives way to the title on a narrow card with large text.
+                    if (trailing case final trailing?)
+                      Flexible(child: trailing),
                   ],
                 ),
                 ...lines,
+                if (action case final action?) ...[
+                  const SizedBox(height: 4),
+                  action,
+                ],
               ],
             ),
           ),
@@ -601,14 +584,7 @@ class SummaryCard extends StatelessWidget {
                     horizontal: FieldCard.inset,
                   ),
                   alignment: AlignmentDirectional.centerStart,
-                  child: Text(
-                    link,
-                    style: Type.sans(
-                      17,
-                      weight: FontWeight.w500,
-                      color: t.accent,
-                    ),
-                  ),
+                  child: Text(link, style: Type.label(t.accent)),
                 ),
               ),
             ),
@@ -647,11 +623,11 @@ class CardNote extends StatelessWidget {
       vertical: 12,
     ),
     alignment: Alignment.centerLeft,
-    child: Text(text, style: Type.sans(15.5, color: Tokens.of(context).muted)),
+    child: Text(text, style: Type.body(Tokens.of(context).muted)),
   );
 }
 
-/// Words in a [FieldCard], wrapped, in [color] or else [Tokens.ink2], such as what a task asks.
+/// Words in a [FieldCard], wrapped, in [color] or else [Tokens.ink], such as what a task asks.
 class CardWords extends StatelessWidget {
   const CardWords(this.text, {super.key, this.color});
 
@@ -664,14 +640,7 @@ class CardWords extends StatelessWidget {
       horizontal: FieldCard.inset,
       vertical: 16,
     ),
-    child: Text(
-      text,
-      style: Type.sans(
-        15.5,
-        color: color ?? Tokens.of(context).ink2,
-        height: 1.5,
-      ),
-    ),
+    child: Text(text, style: Type.body(color ?? Tokens.of(context).ink)),
   );
 }
 

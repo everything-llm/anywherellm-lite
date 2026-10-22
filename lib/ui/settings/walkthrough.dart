@@ -181,7 +181,7 @@ class _WalkthroughState extends State<Walkthrough> {
           explicitChildNodes: true,
           label: widget.title,
           child: ColoredBox(
-            color: t.bg,
+            color: t.ground,
             child: SafeArea(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -198,18 +198,14 @@ class _WalkthroughState extends State<Walkthrough> {
                             widget.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: Type.sans(
-                              16,
-                              weight: FontWeight.w600,
-                              color: t.ink,
-                            ),
+                            style: Type.label(t.ink),
                           ),
                         ),
                         Semantics(
                           liveRegion: true,
                           child: Text(
                             '${_at + 1} of ${steps.length}',
-                            style: Type.sans(12.5, color: t.muted).copyWith(
+                            style: Type.note(t.ink).copyWith(
                               fontFeatures: const [
                                 FontFeature.tabularFigures(),
                               ],
@@ -257,7 +253,7 @@ class _WalkthroughState extends State<Walkthrough> {
                             child: Text(
                               'Swipe, or use the arrow keys',
                               textAlign: TextAlign.center,
-                              style: Type.sans(12, color: t.muted),
+                              style: Type.note(t.ink),
                             ),
                           ),
                       ],
@@ -288,20 +284,20 @@ class _Marks extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
-        spacing: 2,
         children: [
           for (final (n, step) in steps.indexed)
             Flexible(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 28),
+                constraints: const BoxConstraints(maxWidth: 48),
                 child: Tappable(
                   label: 'Screen ${n + 1}: ${step.kicker}',
                   selected: n == at,
                   onTap: () => onTap(n),
                   child: SizedBox(
-                    height: 32,
+                    height: 48,
                     child: Center(
                       child: AnimatedContainer(
+                        width: 28,
                         duration: motion(
                           context,
                           const Duration(milliseconds: 250),
@@ -340,13 +336,9 @@ class _Screen extends StatelessWidget {
     final t = Tokens.of(context);
     final height = MediaQuery.sizeOf(context).height;
     final short = height < 680;
-    final says = Type.sans(
-      step.hero ? (short ? 32 : 38) : 20,
-      weight: FontWeight.w500,
-      color: t.ink2,
-      height: step.hero ? 1.1 : 1.3,
-      letterSpacing: step.hero ? -1 : -0.2,
-    );
+    final says = step.hero
+        ? Type.headline(t.ink).copyWith(letterSpacing: -1)
+        : Type.title(t.ink).copyWith(letterSpacing: -0.2);
     final art = step.art;
     final code = step.code;
     return LayoutBuilder(
@@ -369,7 +361,7 @@ class _Screen extends StatelessWidget {
                   ),
                 ),
                 if (step.sub case final sub?)
-                  _Padded(Text(sub, style: Type.lead(t.muted))),
+                  _Padded(Text(sub, style: Type.body(t.muted))),
                 if (art != null)
                   GuideFigure(art, maxHeight: height * (short ? 0.22 : 0.26)),
                 if (code != null) _Code(code),
@@ -420,7 +412,7 @@ class _Code extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final plain = Type.mono(12.5, color: t.ink2, height: 1.65);
+    final plain = Type.mono(13, color: t.ink, height: 1.4);
     return Container(
       decoration: cardDecoration(t),
       child: SideScroll(
@@ -456,7 +448,7 @@ class _Code extends StatelessWidget {
     return _marked(
       line,
       _brackets,
-      TextStyle(color: t.ink, backgroundColor: t.accentbg),
+      TextStyle(color: t.ink, backgroundColor: t.accentSoft),
     );
   }
 }
@@ -471,9 +463,9 @@ class _Lines extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final code = Type.mono(
-      12.5,
-      color: t.ink2,
-    ).copyWith(backgroundColor: t.hover);
+      13,
+      color: t.ink,
+    ).copyWith(backgroundColor: t.sunken);
     return FieldCard([
       for (final (name, about) in lines)
         Container(
@@ -488,18 +480,10 @@ class _Lines extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             spacing: 2,
             children: [
-              Text(
-                name,
-                style: Type.sans(
-                  16,
-                  weight: FontWeight.w500,
-                  color: t.ink,
-                  height: 1.3,
-                ),
-              ),
+              Text(name, style: Type.body(t.ink)),
               Text.rich(
                 TextSpan(
-                  style: Type.note(t.muted),
+                  style: Type.note(t.ink),
                   children: _marked(about, '`', code),
                 ),
               ),
@@ -522,11 +506,12 @@ class _Go extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    return Tappable(
+    final radius = BorderRadius.circular(Sizes.control);
+    final go = Tappable(
       label: '$label, $about',
       onTap: onTap,
       color: t.accent,
-      radius: BorderRadius.circular(Sizes.control),
+      radius: radius,
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 56),
         child: Padding(
@@ -540,29 +525,24 @@ class _Go extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   spacing: 2,
                   children: [
-                    Text(
-                      label,
-                      style: Type.sans(
-                        17,
-                        weight: FontWeight.w600,
-                        color: t.onaccent,
-                      ),
-                    ),
+                    Text(label, style: Type.label(t.onAccent)),
                     Text(
                       about,
-                      style: Type.sans(
-                        12.5,
-                        color: t.onaccent.withValues(alpha: 0.9),
-                      ),
+                      style: Type.note(t.onAccent.withValues(alpha: 0.9)),
                     ),
                   ],
                 ),
               ),
-              AppIcon('arrow', color: t.onaccent, size: IconSize.medium),
+              AppIcon('arrow', color: t.onAccent, size: IconSize.medium),
             ],
           ),
         ),
       ),
+    );
+    // The walk-through's one primary action carries the glow.
+    return DecoratedBox(
+      decoration: BoxDecoration(borderRadius: radius, boxShadow: t.glow),
+      child: go,
     );
   }
 }
@@ -590,7 +570,7 @@ class GuideLink extends StatelessWidget {
               widthFactor: 1,
               child: Text(
                 label,
-                style: Type.sans(14, color: t.muted).copyWith(
+                style: Type.note(t.ink).copyWith(
                   decoration: TextDecoration.underline,
                   decorationColor: t.line,
                 ),

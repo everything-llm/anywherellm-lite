@@ -33,20 +33,20 @@ class ShortcutChip extends StatelessWidget {
         bottom: onClear == null ? 6 : 0,
       ),
       decoration: BoxDecoration(
-        color: t.accentbg,
+        color: t.accentSoft,
         borderRadius: BorderRadius.circular(99),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         spacing: 6,
         children: [
-          AppIcon('slash', size: IconSize.tiny, color: t.accentfg),
+          AppIcon('slash', size: IconSize.tiny, color: t.accent),
           Flexible(
             child: Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: Type.sans(12, color: t.accentfg),
+              style: Type.caption(t.accent),
             ),
           ),
           if (onClear case final clear?)

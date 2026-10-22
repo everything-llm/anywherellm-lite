@@ -5,8 +5,9 @@ import '../tokens.dart';
 import '../type.dart';
 import 'tappable.dart';
 
-/// One choice of several: a radio ring, [title] and the line [about] under it, in a box filled
-/// while chosen. A title not chosen is medium, and a chosen one semibold.
+/// One choice of several: a radio ring, [title] and the line [about] under it, in a box inside a
+/// [Tokens.lineStrong] edge, filled with [Tokens.accentSoft] while chosen. A chosen title is
+/// semibold.
 class RadioCard extends StatelessWidget {
   const RadioCard({
     super.key,
@@ -30,9 +31,9 @@ class RadioCard extends StatelessWidget {
       label: [title, ?about].join('. '),
       selected: selected,
       onTap: onTap,
-      radius: BorderRadius.circular(20),
-      color: selected ? t.sel : t.panel,
-      side: BorderSide(color: selected ? t.sel : t.edge),
+      radius: BorderRadius.circular(Sizes.control),
+      color: selected ? t.accentSoft : t.tile,
+      side: BorderSide(color: selected ? t.accentSoft : t.lineStrong),
       child: Container(
         constraints: const BoxConstraints(minHeight: Sizes.cardRow),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
@@ -54,21 +55,16 @@ class RadioCard extends StatelessWidget {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                spacing: 1,
                 children: [
                   Text(
                     title,
-                    style: Type.sans(
-                      15,
-                      weight: selected ? FontWeight.w600 : FontWeight.w500,
-                      color: t.ink,
+                    style: Type.body(
+                      t.ink,
+                      weight: selected ? FontWeight.w600 : FontWeight.w400,
                     ),
                   ),
                   if (about case final about?)
-                    Text(
-                      about,
-                      style: Type.sans(13, color: t.muted, height: 1.4),
-                    ),
+                    Text(about, style: Type.note(t.ink)),
                 ],
               ),
             ),

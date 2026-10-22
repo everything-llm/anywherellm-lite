@@ -189,22 +189,22 @@ class _AgentBarState extends State<AgentBar> {
                       textInputAction: TextInputAction.send,
                       textCapitalization: TextCapitalization.sentences,
                       onSubmitted: (_) => _send(),
-                      style: Type.sans(16, color: t.ink),
+                      style: Type.body(t.ink),
                       cursorColor: t.accent,
                       decoration: InputDecoration(
                         hintText: chat.busy
                             ? 'Answering…'
                             : 'Message the agent…',
-                        hintStyle: Type.sans(16, color: t.muted),
+                        hintStyle: Type.body(t.muted),
                         filled: true,
-                        fillColor: t.panel,
+                        fillColor: t.tile,
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 18,
                           vertical: 14,
                         ),
-                        enabledBorder: edge(t.edge),
-                        disabledBorder: edge(t.edge),
+                        enabledBorder: edge(t.lineStrong),
+                        disabledBorder: edge(t.lineStrong),
                         focusedBorder: edge(t.ink),
                       ),
                     ),
@@ -236,27 +236,27 @@ class _AgentBarState extends State<AgentBar> {
       return RoundButton(
         label: 'Hand back to the agent',
         color: t.accent,
+        glow: true,
         onTap: widget.onGive,
         size: 44,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 18),
-          child: Text(
-            'Hand back',
-            style: Type.sans(15, weight: FontWeight.w600, color: t.onaccent),
-          ),
+          child: Text('Hand back', style: Type.label(t.onAccent)),
         ),
       );
     }
     final sendable = chat.canSend(_draft.text);
     return RoundButton(
       label: 'Send to the agent',
-      color: sendable ? t.accent : t.off,
+      // As the composer's Send: the accent with its glow while it can send.
+      color: sendable ? t.accent : t.sunken,
+      glow: sendable,
       onTap: sendable ? _send : null,
       size: 44,
       child: AppIcon(
         'send',
         size: IconSize.small,
-        color: sendable ? t.onaccent : t.muted,
+        color: sendable ? t.onAccent : t.muted,
       ),
     );
   }
@@ -284,9 +284,9 @@ class _Said extends StatelessWidget {
           constraints: const BoxConstraints(maxHeight: 84),
           padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
           decoration: BoxDecoration(
-            color: t.panel,
+            color: t.tile,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: t.line2),
+            border: Border.all(color: t.line),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -298,20 +298,14 @@ class _Said extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'You: $question',
-                          style: Type.sans(13, color: t.muted),
-                        ),
+                        Text('You: $question', style: Type.note(t.ink)),
                         const SizedBox(height: 4),
                         if (answer.error case final error?)
-                          Text(error, style: Type.sans(14.5, color: t.badfg))
+                          Text(error, style: Type.body(t.danger))
                         else if (text.isNotEmpty)
-                          Text(
-                            text,
-                            style: Type.sans(14.5, color: t.ink, height: 1.45),
-                          )
+                          Text(text, style: Type.body(t.ink))
                         else if (answer.status case final status?)
-                          Text(status, style: Type.sans(14.5, color: t.muted)),
+                          Text(status, style: Type.body(t.muted)),
                         if (answer.streaming) const Caret(),
                       ],
                     ),

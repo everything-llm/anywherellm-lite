@@ -162,7 +162,7 @@ class _WorkspacePagesState extends State<WorkspacePages> {
               title: name,
               trailing: Text(
                 plural(chats, 'chat', 'chats'),
-                style: Type.sans(13, color: t.muted),
+                style: Type.note(t.ink),
               ),
               lines: [
                 Text(
@@ -170,7 +170,7 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                       ? 'No documents yet'
                       : '${plural(docs.length, 'document', 'documents')}, '
                             '$on used in answers',
-                  style: Type.note(t.muted),
+                  style: Type.note(t.ink),
                 ),
               ],
               link: 'Rename',
@@ -184,7 +184,7 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                 about: docs.isEmpty
                     ? 'None yet'
                     : '$on of ${docs.length} used in answers',
-                onTap: shell.openSources,
+                onTap: () => shell.openSources(asPane: Wide.split(context)),
               ),
               NavRow(
                 icon: 'pencil',

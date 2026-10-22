@@ -70,13 +70,13 @@ void main() {
       .whereType<BoxDecoration>()
       .firstWhere((d) => d.boxShadow != null);
 
-  testWidgets('the composer has a faint edge and round corners', (
+  testWidgets('the composer has a control\'s edge and round corners', (
     tester,
   ) async {
     await pumpApp(tester, llm: planningServer());
     final t = Tokens.of(tester.element(composerField));
     final phone = card(tester);
-    expect((phone.border! as Border).top.color, t.line2);
+    expect((phone.border! as Border).top.color, t.lineStrong);
     expect(phone.borderRadius, BorderRadius.circular(28));
   });
 }

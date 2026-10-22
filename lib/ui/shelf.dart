@@ -96,12 +96,12 @@ class _ChatsShelfState extends State<ChatsShelf>
                   // The shelf runs the window's full height, behind the bars, and keeps its
                   // rows clear of them. Its edge is ruled so it stands off the dimmed chat.
                   child: Material(
-                    color: t.bg,
+                    color: t.ground,
                     clipBehavior: Clip.antiAlias,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: corner,
-                      side: BorderSide(color: t.line2),
+                      side: BorderSide(color: t.line),
                     ),
                     child: const SafeArea(
                       right: false,
@@ -133,7 +133,7 @@ class _SettingsFoot extends StatelessWidget {
     final shell = AppScope.of(context).shell;
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: Tokens.of(context).line2)),
+        border: Border(top: BorderSide(color: Tokens.of(context).line)),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),

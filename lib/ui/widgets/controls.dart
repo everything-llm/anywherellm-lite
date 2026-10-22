@@ -7,7 +7,7 @@ import 'rise.dart';
 
 enum BadgeKind { ok, warn, accent }
 
-/// A small rounded label: a status, or a count.
+/// A status tag or a count: its words at 13 on the status's soft fill.
 class AppBadge extends StatelessWidget {
   const AppBadge(this.text, {super.key, required this.kind});
 
@@ -18,22 +18,22 @@ class AppBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final (fg, bg) = switch (kind) {
-      BadgeKind.ok => (t.okfg, t.okbg),
-      BadgeKind.warn => (t.warnfg, t.warnbg),
-      BadgeKind.accent => (t.accentfg, t.accentbg),
+      BadgeKind.ok => (t.success, t.successSoft),
+      BadgeKind.warn => (t.warning, t.warningSoft),
+      BadgeKind.accent => (t.accent, t.accentSoft),
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: Text(text, style: Type.sans(12, height: 1.4, color: fg)),
+      child: Text(text, style: Type.note(fg)),
     );
   }
 }
 
-/// An on and off switch: a track with a knob, the accent when on.
+/// An on and off switch: a [Tokens.lineStrong] track with a tile knob, the accent when on.
 class AppSwitch extends StatelessWidget {
   const AppSwitch({
     super.key,
@@ -86,16 +86,13 @@ class SwitchTrack extends StatelessWidget {
       padding: const EdgeInsets.all(2),
       alignment: value ? Alignment.centerRight : Alignment.centerLeft,
       decoration: BoxDecoration(
-        color: value ? t.accent : t.off,
+        color: value ? t.accent : t.lineStrong,
         borderRadius: BorderRadius.circular(99),
       ),
       child: Container(
         width: knob,
         height: knob,
-        decoration: BoxDecoration(
-          color: value ? t.panel : t.knob,
-          shape: BoxShape.circle,
-        ),
+        decoration: BoxDecoration(color: t.tile, shape: BoxShape.circle),
       ),
     );
   }

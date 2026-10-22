@@ -116,7 +116,7 @@ class _PullRefreshState extends State<PullRefresh>
                         height: 32,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: t.panel,
+                          color: t.tile,
                           shape: BoxShape.circle,
                           border: Border.all(color: t.line),
                         ),

@@ -105,7 +105,7 @@ class _ModelPickerState extends State<ModelPicker> {
                     'Chat model for ${scope.chat.active?.name ?? 'this workspace'}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Type.sans(14, weight: FontWeight.w600, color: t.ink),
+                    style: Type.caption(t.ink, weight: FontWeight.w600),
                   ),
                 ),
                 IconBtn(

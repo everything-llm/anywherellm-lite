@@ -61,6 +61,13 @@ class FilesController extends ChangeNotifier with FollowsServer {
 
   late final _text = ReadSlot<DocBody>(notifyListeners);
 
+  /// The text of the documents read lately, by path, the oldest first, so going back to one
+  /// reads nothing again.
+  final _texts = <String, String>{};
+
+  /// How many documents' text [_texts] keeps.
+  static const textsKept = 8;
+
   /// The text of the document [reading] shows, or null while it loads or when it has none.
   String? get text => _text.value?.text;
 
@@ -91,6 +98,7 @@ class FilesController extends ChangeNotifier with FollowsServer {
     _pagesSlug = null;
     _reading = null;
     _text.reset();
+    _texts.clear();
     problems = const [];
     notifyListeners();
   }
@@ -170,9 +178,20 @@ class FilesController extends ChangeNotifier with FollowsServer {
   }
 
   /// The text the server keeps of the document at [path], or an [ApiException] when it cannot
-  /// be read or the server left it out.
-  Future<String> textOf(String path) async =>
-      (await _api.document(path)).text ?? (throw const ApiException(noDocText));
+  /// be read or the server left it out. The last [textsKept] read are kept, so reading one again
+  /// asks the server nothing.
+  Future<String> textOf(String path) async {
+    if (_texts.remove(path) case final kept?) return _texts[path] = kept;
+    final at = here;
+    final text =
+        (await _api.document(path)).text ??
+        (throw const ApiException(noDocText));
+    if (at.current) {
+      _texts[path] = text;
+      if (_texts.length > textsKept) _texts.remove(_texts.keys.first);
+    }
+    return text;
+  }
 
   /// Puts the extracted text away, back to the page.
   void closeText() {

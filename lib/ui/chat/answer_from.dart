@@ -178,7 +178,7 @@ class _Sheet extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
             child: Text(
               'Applies to every chat in $workspace.',
-              style: Type.sans(13, color: t.muted, height: 1.4),
+              style: Type.note(t.ink),
             ),
           ),
           FieldCard([

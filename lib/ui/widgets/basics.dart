@@ -29,13 +29,18 @@ class AlertBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final (fill, border, ink, body) = switch (kind) {
-      AlertKind.bad => (t.badbg, Border.all(color: t.badln), t.badfg, t.badfg),
-      AlertKind.warn => (t.warnbg, null, t.warnfg, t.warnfg),
-      AlertKind.info => (t.accentbg, null, t.ink, t.ink2),
+      AlertKind.bad => (
+        t.dangerSoft,
+        Border.all(color: t.danger),
+        t.danger,
+        t.danger,
+      ),
+      AlertKind.warn => (t.warningSoft, null, t.warning, t.warning),
+      AlertKind.info => (t.accentSoft, null, t.ink, t.ink),
     };
     final heading = Text(
       title,
-      style: Type.sans(14, weight: FontWeight.w600, color: ink),
+      style: Type.caption(ink, weight: FontWeight.w600),
     );
     return Semantics(
       liveRegion: kind != AlertKind.warn,
@@ -63,7 +68,7 @@ class AlertBox extends StatelessWidget {
               heading,
             if (text != null) ...[
               const SizedBox(height: 6),
-              Text(text!, style: Type.sans(14, color: body)),
+              Text(text!, style: Type.note(body)),
             ],
             if (action case final action?) ...[
               const SizedBox(height: 10),
@@ -110,13 +115,12 @@ class UndoBar extends StatelessWidget {
   final String text;
   final VoidCallback onUndo;
 
-  /// Over a phone's chat: rounder, its words at 14 and centred, Undo bold and underlined.
+  /// Over a phone's chat: rounder, its words at 16 and centred, Undo underlined.
   final bool floating;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final size = floating ? 14.0 : 13.0;
     return Semantics(
       liveRegion: true,
       child: Container(
@@ -131,7 +135,7 @@ class UndoBar extends StatelessWidget {
           boxShadow: floating
               ? [
                   BoxShadow(
-                    color: t.shadow,
+                    color: t.shadowInk,
                     blurRadius: 24,
                     spreadRadius: -8,
                     offset: const Offset(0, 8),
@@ -147,14 +151,14 @@ class UndoBar extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: floating ? TextAlign.center : TextAlign.start,
-                style: Type.sans(size, color: t.bg),
+                style: floating ? Type.body(t.ground) : Type.note(t.ground),
               ),
             ),
             Tappable(
               label: 'Undo',
               onTap: onUndo,
               radius: BorderRadius.circular(6),
-              hoverColor: t.bg.withValues(alpha: 0.1),
+              hoverColor: t.ground.withValues(alpha: 0.1),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -163,14 +167,15 @@ class UndoBar extends StatelessWidget {
                 child: Text(
                   'Undo',
                   style:
-                      Type.sans(
-                        size,
-                        weight: floating ? FontWeight.w700 : FontWeight.w600,
-                        color: t.bg,
-                      ).copyWith(
-                        decoration: floating ? TextDecoration.underline : null,
-                        decorationColor: t.bg,
-                      ),
+                      (floating
+                              ? Type.label(t.ground)
+                              : Type.caption(t.ground, weight: FontWeight.w600))
+                          .copyWith(
+                            decoration: floating
+                                ? TextDecoration.underline
+                                : null,
+                            decorationColor: t.ground,
+                          ),
                 ),
               ),
             ),
@@ -181,8 +186,8 @@ class UndoBar extends StatelessWidget {
   }
 }
 
-/// A small capitalised heading over a group, as over the files and in Settings, or over a
-/// column of a card's rows. It keeps to one line.
+/// A small heading over a group, as over the files and in Settings, or over a column of a
+/// card's rows: [Type.caption] in ink, in sentence case. It keeps to one line.
 class SectionLabel extends StatelessWidget {
   const SectionLabel(
     this.text, {
@@ -203,16 +208,11 @@ class SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
     header: header,
     child: Text(
-      text.toUpperCase(),
+      text,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       textAlign: end ? TextAlign.end : TextAlign.start,
-      style: Type.sans(
-        12,
-        weight: FontWeight.w500,
-        color: Tokens.of(context).muted,
-        letterSpacing: 12 * 0.04,
-      ),
+      style: Type.caption(Tokens.of(context).ink),
     ),
   );
 }

@@ -133,7 +133,7 @@ class _ShareSheetState extends State<ShareSheet> {
           if (!mounted) return;
           shell
             ..closeShared()
-            ..openSources();
+            ..openSources(asPane: Wide.split(context));
         case _Use.ask:
           final (message, attachments) = switch (item) {
             SharedLink(:final url) => ('$url\n\n', const <Attachment>[]),
@@ -181,40 +181,45 @@ class _ShareSheetState extends State<ShareSheet> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               spacing: 16,
               children: [
-                FieldCard([
-                  Container(
-                    constraints: const BoxConstraints(minHeight: Sizes.cardRow),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: FieldCard.inset,
-                      vertical: 10,
-                    ),
-                    child: Row(
-                      spacing: 14,
-                      children: [
-                        TypeTile.label(tile),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Type.sans(17, color: t.ink),
-                              ),
-                              Text(
-                                about,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Type.sans(13, color: t.muted),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                // What was shared, a tile of its own: a link's address in the mono face.
+                Container(
+                  constraints: const BoxConstraints(minHeight: Sizes.cardRow),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: FieldCard.inset,
+                    vertical: 12,
                   ),
-                ]),
+                  decoration: cardDecoration(
+                    t,
+                    inSheet: true,
+                  ).copyWith(borderRadius: BorderRadius.circular(Sizes.notice)),
+                  child: Row(
+                    spacing: 14,
+                    children: [
+                      TypeTile.label(tile),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Type.body(t.ink),
+                            ),
+                            Text(
+                              about,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: widget.item is SharedLink
+                                  ? Type.mono(13, color: t.muted)
+                                  : Type.note(t.ink),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 if (!scope.settings.configured) ...[
                   const HelpText(
                     'Connect to your AnythingLLM server first, then share it again.',

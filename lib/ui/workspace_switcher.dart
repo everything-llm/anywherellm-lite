@@ -13,10 +13,13 @@ import 'widgets/basics.dart';
 import 'widgets/tappable.dart';
 import 'widgets/scroll_fades.dart';
 
-/// The shelf's title: the open workspace's name at 26 and a chevron, which open the
+/// The shelf's title: the open workspace's name at [size] and a chevron, which open the
 /// Workspaces sheet. Its documents are heard, not shown.
 class WorkspaceSwitcher extends StatelessWidget {
-  const WorkspaceSwitcher({super.key});
+  const WorkspaceSwitcher({super.key, this.size = 26});
+
+  /// The name's size: 26 in the shelf, smaller in the sidebar.
+  final double size;
 
   @override
   Widget build(BuildContext context) {
@@ -55,9 +58,8 @@ class WorkspaceSwitcher extends StatelessWidget {
                       active?.name ?? 'No workspace yet',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Type.sans(
-                        26,
-                        weight: FontWeight.w600,
+                      style: Type.display(
+                        size,
                         letterSpacing: -0.3,
                         color: active == null ? t.muted : t.ink,
                       ),
@@ -172,10 +174,7 @@ class _WorkspaceItem extends StatelessWidget {
             children: [
               if (ready) const ReadyDot(),
               if (count != null)
-                Text(
-                  plural(count, 'doc', 'docs'),
-                  style: Type.sans(13, color: t.muted),
-                ),
+                Text(plural(count, 'doc', 'docs'), style: Type.note(t.ink)),
             ],
           ),
         ),
@@ -193,18 +192,19 @@ class _DragGhost extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    return Material(
-      color: t.panel,
-      elevation: 6,
-      shadowColor: t.shadow,
-      borderRadius: BorderRadius.circular(Sizes.row),
+    return Container(
+      decoration: BoxDecoration(
+        color: t.tile,
+        borderRadius: BorderRadius.circular(Sizes.small),
+        boxShadow: t.raisedShadow,
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
         child: Text(
           name,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: Type.sans(14, weight: FontWeight.w600, color: t.ink),
+          style: Type.body(t.ink, weight: FontWeight.w600),
         ),
       ),
     );

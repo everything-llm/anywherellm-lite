@@ -74,12 +74,9 @@ class GuideFigure extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
             decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: t.line2)),
+              border: Border(top: BorderSide(color: t.line)),
             ),
-            child: Text(
-              art.name,
-              style: Type.sans(12.5, weight: FontWeight.w500, color: t.muted),
-            ),
+            child: Text(art.name, style: Type.caption(t.ink)),
           ),
         ],
       ),
@@ -127,7 +124,7 @@ class _FigurePainter extends CustomPainter {
         pen
           ..window(14, 16, 272, 148)
           ..text(26, 58, 'Settings', _Ink.note)
-          ..box(20, 68, 78, 20, 6, fill: t.accentbg)
+          ..box(20, 68, 78, 20, 6, fill: t.accentSoft)
           ..text(26, 82, 'Developer API', _Ink.name)
           ..text(26, 106, 'Appearance', _Ink.note)
           ..text(26, 126, 'Agent skills', _Ink.note)
@@ -144,14 +141,14 @@ class _FigurePainter extends CustomPainter {
           ..box(14, 134, 76, 28, 14, fill: t.accent)
           ..text(52, 152, 'Toolkit', _Ink.onAccent, centred: true)
           ..path('M98 92H128', faint: true, dashed: true)
-          ..box(136, 14, 150, 152, 12, fill: t.panel, edge: true)
+          ..box(136, 14, 150, 152, 12, fill: t.tile, edge: true)
           ..text(150, 36, 'Settings', _Ink.name)
           ..text(150, 62, 'Connection', _Ink.note)
           ..path('M150 72h122', faint: true)
           ..text(150, 90, 'Appearance', _Ink.note)
           ..path('M150 100h122', faint: true)
           ..text(150, 118, 'Server', _Ink.note)
-          ..box(144, 128, 134, 28, 8, fill: t.accentbg)
+          ..box(144, 128, 134, 28, 8, fill: t.accentSoft)
           ..text(154, 146, 'Memory', _Ink.name)
           ..text(268, 146, 'new', _Ink.note, end: true);
       case GuideArt.pair:
@@ -172,7 +169,7 @@ class _FigurePainter extends CustomPainter {
 /// The kinds of words in a figure: a muted note, a name, words on the accent, and a key.
 enum _Ink { note, name, onAccent, mono }
 
-/// Draws a figure's marks in the box's units: lines in [Tokens.ink2], faint ones in
+/// Draws a figure's marks in the box's units: lines in [Tokens.ink], faint ones in
 /// [Tokens.muted], fills in the accent.
 class _Pen {
   _Pen(this.canvas, this.t);
@@ -182,7 +179,7 @@ class _Pen {
 
   Paint _stroke({bool faint = false}) => Paint()
     ..style = PaintingStyle.stroke
-    ..color = faint ? t.muted : t.ink2
+    ..color = faint ? t.muted : t.ink
     ..strokeWidth = faint ? 1.2 : 1.5
     ..strokeCap = StrokeCap.round
     ..strokeJoin = StrokeJoin.round;
@@ -197,7 +194,7 @@ class _Pen {
   void path(String data, {bool faint = false, bool dashed = false}) =>
       _draw(parseSvgPathData(data), _stroke(faint: faint), dashed);
 
-  /// A rounded box, filled with [fill], edged in [Tokens.ink2] with [edge].
+  /// A rounded box, filled with [fill], edged in [Tokens.ink] with [edge].
   void box(
     double x,
     double y,
@@ -219,7 +216,7 @@ class _Pen {
 
   /// A browser window: its frame and a bar with two dots.
   void window(double x, double y, double w, double h) {
-    box(x, y, w, h, 10, fill: t.panel, edge: true);
+    box(x, y, w, h, 10, fill: t.tile, edge: true);
     path('M$x ${y + 20}h$w', faint: true);
     _ring(x + 12, y + 10, 3);
     _ring(x + 22, y + 10, 3);
@@ -245,7 +242,7 @@ class _Pen {
 
   /// A server named AnythingLLM: three lines and a light.
   void server(double x, double y) {
-    box(x, y, 76, 78, 8, fill: t.panel, edge: true);
+    box(x, y, 76, 78, 8, fill: t.tile, edge: true);
     for (final o in [18.0, 30.0, 42.0]) {
       _bar(x + 10, y + o, 56);
     }
@@ -256,7 +253,7 @@ class _Pen {
   /// A key whose ring is centred on [x], [y].
   void key(double x, double y) {
     _dot(x, y, 9, t.accent);
-    _dot(x, y, 3.5, t.panel);
+    _dot(x, y, 3.5, t.tile);
     box(x + 7, y - 2.5, 20, 5, 0, fill: t.accent);
     box(x + 21, y, 4, 7, 0, fill: t.accent);
   }
@@ -266,7 +263,7 @@ class _Pen {
   void code(double x, double y) {
     for (final (a, b) in [(0.0, 0.0), (42.0, 0.0), (0.0, 42.0)]) {
       box(x + a, y + b, 21, 21, 2, fill: t.accent);
-      box(x + a + 3, y + b + 3, 15, 15, 1, fill: t.panel);
+      box(x + a + 3, y + b + 3, 15, 15, 1, fill: t.tile);
       box(x + a + 6, y + b + 6, 9, 9, 1, fill: t.accent);
     }
     for (final (a, b) in const [
@@ -288,14 +285,10 @@ class _Pen {
     bool end = false,
   }) {
     final style = switch (ink) {
-      _Ink.note => Type.sans(10, weight: FontWeight.w500, color: t.muted),
-      _Ink.name => Type.sans(10, weight: FontWeight.w600, color: t.ink),
-      _Ink.onAccent => Type.sans(
-        10,
-        weight: FontWeight.w600,
-        color: t.onaccent,
-      ),
-      _Ink.mono => Type.mono(9, weight: FontWeight.w500, color: t.ink2),
+      _Ink.note => Type.display(13, weight: FontWeight.w500, color: t.muted),
+      _Ink.name => Type.display(13, color: t.ink),
+      _Ink.onAccent => Type.display(13, color: t.onAccent),
+      _Ink.mono => Type.mono(13, weight: FontWeight.w500, color: t.ink),
     };
     final painter = TextPainter(
       text: TextSpan(text: words, style: style),

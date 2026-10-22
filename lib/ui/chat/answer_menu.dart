@@ -64,9 +64,7 @@ class AnswerMore extends StatelessWidget {
             ),
             if (details) ...[
               const SizedBox(width: 12),
-              Flexible(
-                child: Text(metrics.text, style: Type.sans(12, color: t.muted)),
-              ),
+              Flexible(child: Text(metrics.text, style: Type.note(t.ink))),
             ],
           ],
         );
@@ -104,13 +102,13 @@ class _AnswerMenu extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: Row(
                     children: [
-                      Text(name, style: Type.sans(15, color: t.muted)),
+                      Text(name, style: Type.body(t.muted)),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           value,
                           textAlign: TextAlign.end,
-                          style: Type.sans(15, color: t.ink),
+                          style: Type.body(t.ink),
                         ),
                       ),
                     ],

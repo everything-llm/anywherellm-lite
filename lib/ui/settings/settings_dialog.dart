@@ -4,13 +4,17 @@ import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
 import '../layout.dart';
+import '../list_detail.dart';
 import '../state/settings_controller.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../upcoming.dart';
 import '../type.dart';
+import '../widgets/buttons.dart';
+import '../widgets/list_row.dart';
 import '../widgets/phone_page.dart';
 import '../widgets/sheet.dart';
+import '../widgets/window_insets.dart';
 import 'connection_page.dart';
 import 'device_pages.dart';
 import 'memory_page.dart';
@@ -24,7 +28,7 @@ import '../widgets/scroll_fades.dart';
 
 /// Settings: its list over the chat, opened from the shelf's foot, in two groups, This app and
 /// AnythingLLM, whose Server row opens the Server page; a page shows over what showed. Each is
-/// under a back arrow and its name.
+/// under a back arrow and its name. On a wide window the list and the page show side by side.
 class SettingsDialog extends StatefulWidget {
   const SettingsDialog({super.key});
 
@@ -53,7 +57,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
       child: FocusScope(
         autofocus: true,
         child: ColoredBox(
-          color: t.bg,
+          color: t.ground,
           child: ListenableBuilder(
             listenable: Listenable.merge([scope.shell, scope.settings]),
             builder: (context, _) => _Frame(
@@ -67,7 +71,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
   }
 }
 
-/// The list or a page, each under a back arrow and its name.
+/// The list or a page, each under a back arrow and its name, or on a wide window both side by
+/// side.
 class _Frame extends StatelessWidget {
   const _Frame({required this.page, required this.configured});
 
@@ -82,6 +87,8 @@ class _Frame extends StatelessWidget {
     if (page != null && page.needsServer && !configured) {
       page = SettingsPage.connection;
     }
+    final split = Wide.split(context);
+    if (split) return _SplitFrame(page ?? SettingsPage.connection);
     // A first run opens on its welcome alone, with no header over it; Back still closes it.
     if (page == SettingsPage.connection && !configured) {
       return const _PageView(SettingsPage.connection);
@@ -111,8 +118,42 @@ class _Frame extends StatelessWidget {
 /// connection; This app's pages; then AnythingLLM's Server, Memory and Upcoming rows, the last
 /// two while the toolkit serves them; and,
 /// while no toolkit answers beside the server, a card that opens Add the toolkit over the list.
+///
+/// Beside a page ([split]), its rows are drawn as a wide window's list, [chosen]'s marked, and
+/// Upcoming opens beside the chats rather than in Settings.
 class _Nav extends StatelessWidget {
-  const _Nav();
+  const _Nav({this.chosen, this.split = false});
+
+  /// The row of the page shown beside the list.
+  final SettingsPage? chosen;
+  final bool split;
+
+  /// A row that opens [page], with [icon] and the line [about] under its name.
+  Widget _row(
+    BuildContext context,
+    SettingsPage page,
+    String icon, {
+    String? about,
+  }) {
+    final shell = AppScope.of(context).shell;
+    void open() => split && page == SettingsPage.upcoming
+        ? shell.openPane(Pane.upcoming)
+        : shell.showSettingsPage(page);
+    if (!split) {
+      return NavRow(icon: icon, title: page.label, about: about, onTap: open);
+    }
+    return ListRow(
+      icon: icon,
+      title: page.label,
+      about: about,
+      selected: page == chosen,
+      onTap: open,
+    );
+  }
+
+  /// A group of [rows]: a grouped card, or beside a page a card of a wide window's rows.
+  Widget _group(BuildContext context, List<Widget> rows) =>
+      split ? ListCard(rows) : FieldCard(rows);
 
   @override
   Widget build(BuildContext context) {
@@ -125,43 +166,32 @@ class _Nav extends StatelessWidget {
         final toolkit = scope.toolkit..wantJobsOnce();
         final connection = settings.connection;
         final list = ListView(
-          padding: Sizes.pageIn(context),
+          padding: split ? EdgeInsets.zero : Sizes.pageIn(context),
           children: [
             if (connection != null) const _ServerCard(),
             CardHeading('This app', top: connection != null ? 20 : 0),
-            FieldCard([
-              for (final (page, icon) in [
-                (SettingsPage.connection, 'link'),
-                (SettingsPage.appearance, 'brush'),
-                (SettingsPage.chat, 'chat'),
-              ])
-                NavRow(
-                  icon: icon,
-                  title: page.label,
-                  onTap: () => shell.showSettingsPage(page),
-                ),
+            _group(context, [
+              _row(context, SettingsPage.connection, 'link'),
+              _row(context, SettingsPage.appearance, 'brush'),
+              _row(context, SettingsPage.chat, 'chat'),
             ]),
             if (connection != null) ...[
               const CardHeading('AnythingLLM'),
-              FieldCard([
-                NavRow(
-                  icon: 'server',
-                  title: SettingsPage.server.label,
+              _group(context, [
+                _row(
+                  context,
+                  SettingsPage.server,
+                  'server',
                   about: serverSummary(scope.system),
-                  onTap: () => shell.showSettingsPage(SettingsPage.server),
                 ),
                 if (toolkit.memories)
-                  NavRow(
-                    icon: 'memory',
-                    title: SettingsPage.memory.label,
-                    onTap: () => shell.showSettingsPage(SettingsPage.memory),
-                  ),
+                  _row(context, SettingsPage.memory, 'memory'),
                 if (toolkit.jobsServed)
-                  NavRow(
-                    icon: 'clock',
-                    title: SettingsPage.upcoming.label,
+                  _row(
+                    context,
+                    SettingsPage.upcoming,
+                    'clock',
                     about: upcomingSummary(toolkit),
-                    onTap: () => shell.showSettingsPage(SettingsPage.upcoming),
                   ),
               ]),
               if (toolkit.servesNothing) ...[
@@ -175,7 +205,7 @@ class _Nav extends StatelessWidget {
                                 'Run its install again to add Memory and Upcoming here.'
                           : 'Install the free toolkit beside AnythingLLM to add Memory and '
                                 'Upcoming here.',
-                      style: Type.sans(13, color: Tokens.of(context).muted),
+                      style: Type.note(Tokens.of(context).ink),
                     ),
                   ],
                   link: 'See how to add it',
@@ -248,31 +278,34 @@ class _ServerCard extends StatelessWidget {
     final connection = settings.connection!;
     final (state, color) = switch (settings.check) {
       ConnectionCheck.testing => ('Testing…', t.muted),
-      ConnectionCheck.failed => ('Not answering', t.badfg),
-      _ when scope.chat.unreachable.value => ('Connection problem', t.badfg),
-      _ => ('Connected', t.okfg),
+      ConnectionCheck.failed => ('Not answering', t.danger),
+      _ when scope.chat.unreachable.value => ('Connection problem', t.danger),
+      _ => ('Connected', t.success),
     };
     return SummaryCard(
       title: 'AnythingLLM',
       trailing: Semantics(
         liveRegion: true,
-        child: Text(state, style: Type.sans(15, color: color)),
+        child: Text(state, style: Type.body(color)),
       ),
       lines: [
         Text(
           connection.host,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: Type.mono(13, color: t.muted, height: 1.45),
+          style: Type.code(t.muted),
         ),
         if (settings.check == ConnectionCheck.failed)
           if (settings.message case final message?)
-            Text(message, style: Type.sans(13, color: t.badfg, height: 1.4)),
+            Text(message, style: Type.note(t.danger)),
       ],
-      link: 'Test connection',
-      onLink: settings.check == ConnectionCheck.testing
-          ? null
-          : () => unawaited(settings.testSaved()),
+      action: AppButton(
+        'Test connection',
+        primary: true,
+        onPressed: settings.check == ConnectionCheck.testing
+            ? null
+            : () => unawaited(settings.testSaved()),
+      ),
     );
   }
 }
@@ -280,9 +313,12 @@ class _ServerCard extends StatelessWidget {
 /// [page]'s line about what it is for, and its settings, scrolling. A new server builds it
 /// afresh.
 class _PageView extends StatelessWidget {
-  const _PageView(this.page);
+  const _PageView(this.page, {this.split = false});
 
   final SettingsPage page;
+
+  /// Whether the page shows beside the list, in a card of its own, as wide as a column.
+  final bool split;
 
   @override
   Widget build(BuildContext context) {
@@ -293,12 +329,12 @@ class _PageView extends StatelessWidget {
     final column = Align(
       alignment: Alignment.topLeft,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680),
+        constraints: BoxConstraints(maxWidth: split ? Sizes.column : 680),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (page.about case final about?) ...[
-              Text(about, style: Type.sans(14.5, color: t.ink2, height: 1.5)),
+              Text(about, style: Type.note(t.ink)),
               const SizedBox(height: 14),
             ],
             KeyedSubtree(key: ValueKey((page, server)), child: _body(page)),
@@ -312,7 +348,9 @@ class _PageView extends StatelessWidget {
     }
     return SingleChildScrollView(
       key: ValueKey(page),
-      padding: Sizes.pageIn(context),
+      padding: split
+          ? const EdgeInsets.fromLTRB(24, 8, 24, 24)
+          : Sizes.pageIn(context),
       child: column,
     );
   }
@@ -333,4 +371,71 @@ class _PageView extends StatelessWidget {
     SettingsPage.shortcuts => const ShortcutsPage(),
     SettingsPage.privacy => const PrivacyPage(),
   };
+}
+
+/// Settings on a wide window: its title over the list and [page] side by side, the list's row
+/// of the page shown marked. Beside the sidebar there is no way back but the sidebar; with the
+/// shelf, a back arrow gives back the chat.
+class _SplitFrame extends StatelessWidget {
+  const _SplitFrame(this.page);
+
+  final SettingsPage page;
+
+  @override
+  Widget build(BuildContext context) {
+    final shell = AppScope.of(context).shell;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PaneHeader(
+          title: 'Settings',
+          back: 'Back to the chat',
+          onBack: shell.closeSettings,
+        ),
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              8,
+              16,
+              16 + WindowInsets.of(context).bottom,
+            ),
+            child: ListDetail(
+              list: ScrollFades(
+                child: _Nav(chosen: page.parent ?? page, split: true),
+              ),
+              detail: _Detail(page),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// [page] beside the list, in a card under its name, with a back arrow to its parent when it has
+/// one, as Privacy and data has the Server page.
+class _Detail extends StatelessWidget {
+  const _Detail(this.page);
+
+  final SettingsPage page;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final parent = page.parent;
+    final firstRun =
+        page == SettingsPage.connection && scope.settings.connection == null;
+    final body = _PageView(page, split: true);
+    return DetailCard(
+      title: page.label,
+      back: 'Back to ${parent?.label}',
+      onBack: parent == null
+          ? null
+          : () => scope.shell.showSettingsPage(parent),
+      actions: [?_PageView.actionOf(page)],
+      // The first run lays out and scrolls itself. Its cards are wells in this one.
+      child: SheetCards(child: firstRun ? body : ScrollFades(child: body)),
+    );
+  }
 }

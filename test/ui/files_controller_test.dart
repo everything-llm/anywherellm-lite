@@ -33,6 +33,14 @@ void main() {
     expect(rig.files.detail('household'), isNull);
   });
 
+  test('a document\'s text read again asks the server nothing', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    final first = await rig.files.textOf(roadmap);
+    expect(await rig.files.textOf(roadmap), first);
+    expect(llm.calls.where((c) => c.startsWith('document')), hasLength(1));
+  });
+
   group('saving', () {
     test('a prompt writes it, and an empty one clears it', () async {
       final llm = planningServer();

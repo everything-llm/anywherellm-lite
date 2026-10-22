@@ -28,11 +28,19 @@ class AnywhereLlmApp extends StatelessWidget {
     );
   }
 
+  /// The four themes, built once rather than on every change to the preferences.
+  static final _light = buildTheme(Brightness.light);
+  static final _dark = buildTheme(Brightness.dark);
+  static final _lightMore = buildTheme(Brightness.light, more: true);
+  static final _darkMore = buildTheme(Brightness.dark, more: true);
+
   Widget _app(ThemeMode mode) => MaterialApp(
     title: 'AnywhereLLM',
     debugShowCheckedModeBanner: false,
-    theme: buildTheme(Brightness.light),
-    darkTheme: buildTheme(Brightness.dark),
+    theme: _light,
+    darkTheme: _dark,
+    highContrastTheme: _lightMore,
+    highContrastDarkTheme: _darkMore,
     themeMode: mode,
     // Inside the Navigator, which supplies the Overlay that selection handles need.
     home: SelectionArea(child: home),

@@ -44,7 +44,7 @@ class _WaitLineState extends State<WaitLine> {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final style = Type.sans(13, color: t.muted, height: 1.4);
+    final style = Type.body(t.ink);
     final step =
         widget.turn.status ??
         'Asking ${knownWorkspaceModel(AppScope.of(context)) ?? 'the model'}…';
@@ -55,7 +55,7 @@ class _WaitLineState extends State<WaitLine> {
       child: Row(
         children: [
           const _Pulse(),
-          const SizedBox(width: 6),
+          const SizedBox(width: 10),
           Flexible(
             child: Semantics(
               liveRegion: true,
@@ -71,9 +71,9 @@ class _WaitLineState extends State<WaitLine> {
             ExcludeSemantics(
               child: Text(
                 ' · ${waited.inSeconds} s',
-                style: style.copyWith(
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+                style: Type.note(
+                  t.ink,
+                ).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
               ),
             ),
         ],

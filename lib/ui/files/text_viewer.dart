@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/sources.dart';
+
 import '../app_scope.dart';
 import '../layout.dart';
 import '../tokens.dart';
@@ -43,29 +45,22 @@ class TextViewer extends StatelessWidget {
                 Expanded(
                   child: Text(
                     '${file.tile} · ${file.size}',
-                    style: Type.sans(13, color: t.muted),
+                    style: Type.note(t.ink),
                   ),
                 ),
-                Text(
-                  file.on ? 'Used in answers' : 'Not used',
-                  style: Type.sans(13, color: t.muted),
-                ),
+                Text(usedLine(file), style: Type.note(t.ink)),
               ],
             ),
           ),
         if (files.contentLoading)
-          Text('Loading…', style: Type.sans(14, color: t.muted))
+          Text('Loading…', style: Type.body(t.muted))
         else
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
             decoration: cardDecoration(t),
             child: SelectableText(
               text ?? 'The server sent no text for this document.',
-              style: Type.sans(
-                15.5,
-                color: text == null ? t.muted : t.ink2,
-                height: 1.65,
-              ),
+              style: Type.body(text == null ? t.muted : t.ink),
             ),
           ),
         const SizedBox(height: 16),
@@ -83,6 +78,34 @@ class TextViewer extends StatelessWidget {
       ],
     );
     if (file == null) return page;
+    return RemoveDocPopup(
+      file,
+      onRemoved: () => closeDocText(scope),
+      child: page,
+    );
+  }
+}
+
+/// Whether answers use [file], in words.
+String usedLine(SourceFile file) => file.on ? 'Used in answers' : 'Not used';
+
+/// [child] under the question whether to take [file] out of the open workspace, in the shell's
+/// [Popup.removeDoc]: Remove takes it out after [onRemoved], Keep leaves it.
+class RemoveDocPopup extends StatelessWidget {
+  const RemoveDocPopup(
+    this.file, {
+    super.key,
+    required this.onRemoved,
+    required this.child,
+  });
+
+  final SourceFile file;
+  final VoidCallback onRemoved;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
     return ShellPopup(
       popup: Popup.removeDoc,
       title: 'Remove from workspace',
@@ -93,11 +116,11 @@ class TextViewer extends StatelessWidget {
         onKeep: close,
         onConfirm: () {
           close();
-          closeDocText(scope);
+          onRemoved();
           scope.sources.remove(file);
         },
       ),
-      child: page,
+      child: child,
     );
   }
 }

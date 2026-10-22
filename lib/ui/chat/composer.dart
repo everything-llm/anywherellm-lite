@@ -685,18 +685,10 @@ class _Form extends StatelessWidget {
       },
       child: Container(
         decoration: BoxDecoration(
-          color: t.panel,
+          color: t.tile,
           borderRadius: BorderRadius.circular(Sizes.composer),
-          border: Border.all(color: t.line2),
-          boxShadow: [
-            BoxShadow(
-              color: t.shadow,
-              // Flutter blurs a radius more than CSS does; 20 here is CSS's 24.
-              blurRadius: 20,
-              spreadRadius: -12,
-              offset: const Offset(0, 8),
-            ),
-          ],
+          border: Border.all(color: t.lineStrong),
+          boxShadow: t.tileShadow,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -846,14 +838,15 @@ class _Form extends StatelessWidget {
                           )
                         : RoundButton(
                             label: 'Send',
-                            // Send is the accent while it can send, and `hover` with a muted
-                            // arrow while it cannot, as the Lite prototype draws it.
-                            color: canTap ? t.accent : t.hover,
+                            // Send is the accent with its glow while it can send, and sunken
+                            // with a muted arrow while it cannot.
+                            color: canTap ? t.accent : t.sunken,
+                            glow: canTap,
                             onTap: canTap ? tap : null,
                             child: AppIcon(
                               'send',
                               size: IconSize.small,
-                              color: canTap ? t.onaccent : t.muted,
+                              color: canTap ? t.onAccent : t.muted,
                             ),
                           ),
                   ),
@@ -889,14 +882,13 @@ class _ShortcutSuggestions extends StatelessWidget {
     return Container(
       constraints: const BoxConstraints(maxHeight: 220),
       margin: const EdgeInsets.only(bottom: 8),
-      decoration: cardDecoration(t)
-          .copyWith(boxShadow: [BoxShadow(color: t.shadow, blurRadius: 18)]),
+      decoration: cardDecoration(t).copyWith(boxShadow: t.raisedShadow),
       child: shortcuts.isEmpty && onReset == null
           ? Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
                 'No shortcut called /$query. It is sent as typed.',
-                style: Type.sans(14, color: t.muted),
+                style: Type.body(t.muted),
               ),
             )
           : ListView(
@@ -913,7 +905,7 @@ class _ShortcutSuggestions extends StatelessWidget {
                     heard: 'Clear this chat, /reset. Asks first',
                     trailing: Text(
                       '/reset',
-                      style: Type.mono(12, color: t.muted),
+                      style: Type.mono(13, color: t.ink),
                     ),
                     onTap: onReset,
                   ),
@@ -938,7 +930,7 @@ class _ShortcutRow extends StatelessWidget {
     heard: '${shortcut.label}, /${shortcut.name}. Add to the message',
     trailing: Text(
       '/${shortcut.name}',
-      style: Type.mono(12, color: Tokens.of(context).muted),
+      style: Type.mono(13, color: Tokens.of(context).ink),
     ),
     onTap: () => onSelect(shortcut),
   );
@@ -1003,12 +995,12 @@ class _FilesPill extends StatelessWidget {
       label: '$words attached. Review',
       onTap: onTap,
       radius: BorderRadius.circular(99),
-      color: t.accentbg,
+      color: t.accentSoft,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         child: Text(
           words,
-          style: Type.sans(13, weight: FontWeight.w600, color: t.accentfg),
+          style: Type.caption(t.accent, weight: FontWeight.w600),
         ),
       ),
     );
@@ -1024,7 +1016,7 @@ class StopMark extends StatelessWidget {
     width: 10,
     height: 10,
     decoration: BoxDecoration(
-      color: Tokens.of(context).bg,
+      color: Tokens.of(context).ground,
       borderRadius: BorderRadius.circular(2),
     ),
   );
@@ -1039,6 +1031,7 @@ class RoundButton extends StatelessWidget {
     required this.onTap,
     required this.child,
     this.size = 40,
+    this.glow = false,
   });
 
   final String label;
@@ -1046,6 +1039,9 @@ class RoundButton extends StatelessWidget {
   final VoidCallback? onTap;
   final Widget child;
   final double size;
+
+  /// Whether it carries the glow of a screen's one primary action, as Send does when it can.
+  final bool glow;
 
   @override
   Widget build(BuildContext context) => Tappable(
@@ -1055,6 +1051,7 @@ class RoundButton extends StatelessWidget {
     onTap: onTap,
     radius: BorderRadius.circular(99),
     color: color,
+    shadows: glow ? Tokens.of(context).glow : const [],
     child: ConstrainedBox(
       constraints: BoxConstraints(minWidth: size, minHeight: size),
       child: Center(widthFactor: 1, heightFactor: 1, child: child),
@@ -1085,12 +1082,7 @@ class _FormNote extends StatelessWidget {
     padding: const EdgeInsets.only(bottom: 8),
     child: Row(
       children: [
-        Expanded(
-          child: Text(
-            text,
-            style: Type.sans(12, color: Tokens.of(context).muted),
-          ),
-        ),
+        Expanded(child: Text(text, style: Type.note(Tokens.of(context).ink))),
         if (other case final other?) ...[
           TextAction.plain(other, onOther!),
           const SizedBox(width: 12),
@@ -1098,7 +1090,7 @@ class _FormNote extends StatelessWidget {
         if (other == null)
           TextAction('close', action, onAction)
         else
-          TextAction.plain(action, onAction, weight: FontWeight.w600),
+          TextAction.plain(action, onAction),
       ],
     ),
   );
@@ -1131,7 +1123,7 @@ class _OnDeckList extends StatelessWidget {
             items.length == 1
                 ? 'Sends when this answer ends.'
                 : 'Each sends in turn, when the answer before it ends.',
-            style: Type.sans(12, color: t.muted),
+            style: Type.note(t.ink),
           ),
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 132),
@@ -1147,7 +1139,7 @@ class _OnDeckList extends StatelessWidget {
                             _shown(item),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: Type.sans(13.5, color: t.ink2),
+                            style: Type.body(t.ink),
                           ),
                         ),
                         IconBtn(
@@ -1185,10 +1177,10 @@ class _SendWhenDone extends StatelessWidget {
       label: 'Send when done',
       tooltip: 'Send when done',
       onTap: onTap,
-      radius: BorderRadius.circular(Sizes.small),
-      color: t.accentbg,
+      radius: BorderRadius.circular(99),
+      color: t.accentSoft,
       child: SizedBox(
-        height: 34,
+        height: 32,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Center(
@@ -1197,7 +1189,7 @@ class _SendWhenDone extends StatelessWidget {
               'Send when done',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: Type.sans(13.5, weight: FontWeight.w500, color: t.accentfg),
+              style: Type.caption(t.accent, weight: FontWeight.w600),
             ),
           ),
         ),
@@ -1214,11 +1206,11 @@ class _NoKey extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
-    final style = Type.sans(14, color: t.warnfg, height: 1.5);
+    final style = Type.note(t.warning);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       decoration: BoxDecoration(
-        color: t.warnbg,
+        color: t.warningSoft,
         borderRadius: BorderRadius.circular(Sizes.notice),
       ),
       child: Wrap(

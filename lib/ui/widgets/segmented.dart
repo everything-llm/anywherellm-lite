@@ -5,8 +5,9 @@ import '../tokens.dart';
 import '../type.dart';
 import 'tappable.dart';
 
-/// A row of equal segments, one of them chosen. [onChanged] null shows it disabled. Each segment
-/// is at least 44 tall, its label at 15, as the Lite prototype draws it.
+/// A row of equal segments on a [Tokens.sunken] track, one of them chosen: the chosen one a tile
+/// inside a [Tokens.lineStrong] ring, its label at 600. [onChanged] null shows it disabled. Each
+/// segment is at least 44 tall, its label [Type.body].
 class Segmented<T> extends StatelessWidget {
   const Segmented({
     super.key,
@@ -29,10 +30,11 @@ class Segmented<T> extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
-          color: t.hover,
+          color: t.sunken,
           borderRadius: BorderRadius.circular(Sizes.control),
         ),
         child: Row(
+          spacing: 8,
           children: [
             for (final (option, label) in options)
               Expanded(
@@ -40,8 +42,11 @@ class Segmented<T> extends StatelessWidget {
                   label: label,
                   selected: value == option,
                   onTap: onChanged == null ? null : () => onChanged(option),
-                  radius: BorderRadius.circular(13),
-                  color: value == option ? t.chosen : null,
+                  radius: BorderRadius.circular(Sizes.small),
+                  color: value == option ? t.tile : null,
+                  side: value == option
+                      ? BorderSide(color: t.lineStrong, width: 1.5)
+                      : null,
                   child: Container(
                     constraints: const BoxConstraints(minHeight: 44),
                     alignment: Alignment.center,
@@ -51,12 +56,11 @@ class Segmented<T> extends StatelessWidget {
                       textAlign: TextAlign.center,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Type.sans(
-                        15,
+                      style: Type.body(
+                        t.ink,
                         weight: value == option
                             ? FontWeight.w600
                             : FontWeight.w400,
-                        color: t.ink,
                       ),
                     ),
                   ),

@@ -4,7 +4,7 @@ import '../tokens.dart';
 import '../type.dart';
 
 /// A screen's big line, such as Connect to your AnythingLLM.: [before], then [name] in the accent,
-/// then [after], at 32 in [Tokens.ink2].
+/// then [after], as House UI's headline: Instrument Sans at 32 in [Tokens.ink].
 class Headline extends StatelessWidget {
   const Headline(
     this.before, {
@@ -20,13 +20,8 @@ class Headline extends StatelessWidget {
   final TextAlign? textAlign;
 
   /// The style of a headline in [context].
-  static TextStyle styleOf(BuildContext context) => Type.sans(
-    32,
-    weight: FontWeight.w500,
-    color: Tokens.of(context).ink2,
-    height: 1.15,
-    letterSpacing: -0.8,
-  );
+  static TextStyle styleOf(BuildContext context) =>
+      Type.headline(Tokens.of(context).ink);
 
   @override
   Widget build(BuildContext context) {

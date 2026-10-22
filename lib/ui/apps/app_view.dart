@@ -70,7 +70,7 @@ class PageGone extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return ColoredBox(
-      color: t.bg,
+      color: t.ground,
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -82,12 +82,12 @@ class PageGone extends StatelessWidget {
               Text(
                 'This page is gone',
                 textAlign: TextAlign.center,
-                style: Type.sans(20, weight: FontWeight.w600, color: t.ink),
+                style: Type.title(t.ink),
               ),
               Text(
                 'Links in older answers can stop working. Ask the agent for the page again.',
                 textAlign: TextAlign.center,
-                style: Type.sans(15, color: t.muted, height: 1.45),
+                style: Type.body(t.muted),
               ),
               const SizedBox(height: 8),
               AppButton('Close', onPressed: onClose),

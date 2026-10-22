@@ -33,7 +33,7 @@ class ComposerChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final ink = tinted ? t.accentfg : t.ink2;
+    final ink = tinted ? t.accent : t.ink;
     return Tappable(
       touchTarget: true,
       label: label,
@@ -43,15 +43,15 @@ class ComposerChip extends StatelessWidget {
       dimWhenDisabled: 0.4,
       radius: BorderRadius.circular(99),
       color: tinted
-          ? t.accentbg
+          ? t.accentSoft
           : open
-          ? t.hover
+          ? t.sunken
           : Colors.transparent,
       side: BorderSide(color: tinted ? Colors.transparent : t.line),
       child: SizedBox(
         height: 28,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -60,10 +60,9 @@ class ComposerChip extends StatelessWidget {
                   text,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Type.sans(
-                    12.5,
+                  style: Type.caption(
+                    ink,
                     weight: tinted ? FontWeight.w600 : FontWeight.w400,
-                    color: ink,
                   ),
                 ),
               ),

@@ -84,7 +84,7 @@ class _SaveButtonState extends State<_SaveButton> {
       },
       radius: BorderRadius.circular(8),
       child: SizedBox(
-        height: 32,
+        height: 44,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Row(
@@ -96,14 +96,7 @@ class _SaveButtonState extends State<_SaveButton> {
                 color: t.accent,
               ),
               const SizedBox(width: 6),
-              Text(
-                _saved ? 'Saved' : 'Save',
-                style: Type.sans(
-                  13.5,
-                  weight: FontWeight.w500,
-                  color: t.accent,
-                ),
-              ),
+              Text(_saved ? 'Saved' : 'Save', style: Type.caption(t.accent)),
             ],
           ),
         ),
@@ -127,9 +120,9 @@ class _MadeFile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
         decoration: BoxDecoration(
-          color: t.panel,
+          color: t.tile,
           border: Border.all(color: t.line),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(Sizes.small),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -145,10 +138,10 @@ class _MadeFile extends StatelessWidget {
                     file.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Type.sans(14, weight: FontWeight.w500, color: t.ink),
+                    style: Type.caption(t.ink),
                   ),
                   if (size != null)
-                    Text(sizeText(size), style: Type.sans(12, color: t.muted)),
+                    Text(sizeText(size), style: Type.note(t.ink)),
                 ],
               ),
             ),
@@ -194,10 +187,7 @@ class _MadeImageState extends State<_MadeImage> {
       future: _bytes,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return Text(
-            'Loading ${file.name}…',
-            style: Type.sans(12.5, color: t.muted),
-          );
+          return Text('Loading ${file.name}…', style: Type.note(t.ink));
         }
         final bytes = snapshot.data;
         if (bytes == null) return _MadeFile(file);
@@ -233,7 +223,7 @@ class _MadeImageState extends State<_MadeImage> {
               children: [
                 Text(
                   'Image · ${sourceExt(file.name)} · ${sizeText(size)}',
-                  style: Type.sans(12.5, color: t.muted),
+                  style: Type.note(t.ink),
                 ),
                 _SaveButton(file),
                 if (scope.share != null)
@@ -277,8 +267,9 @@ class ViewerWhileOpen extends StatelessWidget {
   );
 }
 
-/// An image an agent made, [file] holding [bytes], over the whole window on a dark ground, to
-/// pinch and pan: its name and Close, then Save and, where the device can share, Share.
+/// An image an agent made, [file] holding [bytes], over the whole window in the dark theme's
+/// colours whatever the app's theme, to pinch and pan: its name and Close, then Save and, where
+/// the device can share, Share.
 class ImageViewer extends StatelessWidget {
   const ImageViewer(this.file, this.bytes, {super.key, required this.onClose});
 
@@ -286,12 +277,10 @@ class ImageViewer extends StatelessWidget {
   final Uint8List bytes;
   final VoidCallback onClose;
 
-  static const _ground = Color(0xFF101018);
-
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
-    final light = Colors.white;
+    const t = Tokens.dark;
     Widget button(
       String label,
       String icon,
@@ -302,10 +291,8 @@ class ImageViewer extends StatelessWidget {
         label: label,
         onTap: onTap,
         radius: BorderRadius.circular(Sizes.small),
-        color: filled ? light : Colors.transparent,
-        side: filled
-            ? null
-            : BorderSide(color: light.withValues(alpha: 0.55), width: 1.5),
+        color: filled ? t.ink : Colors.transparent,
+        side: filled ? null : BorderSide(color: t.lineStrong, width: 1.5),
         child: SizedBox(
           height: 48,
           child: Row(
@@ -314,17 +301,10 @@ class ImageViewer extends StatelessWidget {
               AppIcon(
                 icon,
                 size: IconSize.small,
-                color: filled ? _ground : light,
+                color: filled ? t.ground : t.ink,
               ),
               const SizedBox(width: 8),
-              Text(
-                label,
-                style: Type.sans(
-                  15.5,
-                  weight: FontWeight.w600,
-                  color: filled ? _ground : light,
-                ),
-              ),
+              Text(label, style: Type.label(filled ? t.ground : t.ink)),
             ],
           ),
         ),
@@ -340,7 +320,7 @@ class ImageViewer extends StatelessWidget {
           explicitChildNodes: true,
           label: 'Image',
           child: ColoredBox(
-            color: _ground,
+            color: t.ground,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -355,11 +335,7 @@ class ImageViewer extends StatelessWidget {
                             file.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: Type.sans(
-                              15,
-                              weight: FontWeight.w500,
-                              color: light,
-                            ),
+                            style: Type.body(t.ink),
                           ),
                         ),
                         Tappable(
@@ -373,7 +349,7 @@ class ImageViewer extends StatelessWidget {
                               child: AppIcon(
                                 'close',
                                 size: IconSize.small,
-                                color: light,
+                                color: t.ink,
                               ),
                             ),
                           ),

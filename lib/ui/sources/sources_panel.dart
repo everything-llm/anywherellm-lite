@@ -40,13 +40,13 @@ class SourcesPanel extends StatelessWidget {
 }
 
 /// What waits, is being added or went wrong, and the undo of a removal, under the ways to add.
-List<Widget> _notices(BuildContext context) {
+List<Widget> documentNotices(BuildContext context) {
   final sources = AppScope.of(context).sources;
   final t = Tokens.of(context);
   return [
     if (sources.sending case final name?) ...[
       const SizedBox(height: 10),
-      Text('Adding $name…', style: Type.sans(12.5, color: t.muted)),
+      Text('Adding $name…', style: Type.note(t.ink)),
     ],
     for (final problem in sources.problems) ...[
       const SizedBox(height: 10),
@@ -86,7 +86,7 @@ class _Body extends StatelessWidget {
                     ? 'No documents in this workspace yet.'
                     : 'Answers draw on the ones switched on.',
               ),
-              ..._notices(context),
+              ...documentNotices(context),
               const SizedBox(height: 16),
             ],
           ),
@@ -127,12 +127,7 @@ class _Body extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: open == null
                       ? const SizedBox.shrink()
-                      : TextAction(
-                          'search',
-                          'Test a question',
-                          open,
-                          weight: FontWeight.w600,
-                        ),
+                      : TextAction('search', 'Test a question', open),
                 ),
               ),
             ],
@@ -158,7 +153,7 @@ class _FileRow extends StatelessWidget {
     // A citation's flash fills the row.
     return AnimatedContainer(
       duration: motion(context, const Duration(milliseconds: 300)),
-      color: flashed ? t.accentbg : Colors.transparent,
+      color: flashed ? t.accentSoft : Colors.transparent,
       child: Row(
         children: [
           Expanded(
@@ -216,14 +211,14 @@ class SourceRow extends StatelessWidget {
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Type.sans(15, color: t.ink),
+                style: Type.body(t.ink),
               ),
               if (meta.isNotEmpty)
                 Text(
                   meta,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Type.note(t.muted),
+                  style: Type.note(t.ink),
                 ),
             ],
           ),
@@ -255,12 +250,12 @@ class TypeTile extends StatelessWidget {
         height: 40,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: t.accentbg,
-          borderRadius: BorderRadius.circular(6),
+          color: t.accentSoft,
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
           label,
-          style: Type.sans(12, weight: FontWeight.w700, color: t.accentfg),
+          style: Type.caption(t.accent, weight: FontWeight.w700),
         ),
       ),
     );

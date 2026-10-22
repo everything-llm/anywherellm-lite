@@ -84,7 +84,7 @@ void main() {
     tester,
   ) async {
     final h = await pumpApp(tester, llm: planningServer(), shelf: true);
-    expect(find.text('CHATS'), findsOneWidget);
+    expect(find.text('Chats'), findsOneWidget);
     expect(
       find.text('Upcoming'),
       findsNothing,

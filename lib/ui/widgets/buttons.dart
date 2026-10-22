@@ -6,9 +6,11 @@ import '../tokens.dart';
 import '../type.dart';
 import 'tappable.dart';
 
-/// The button: bordered, with a filled `primary` form, 52 tall with its label at 16, as the
-/// Lite prototype draws it. In an [ActionRow.even] it keeps 8 px either side of its
-/// label rather than 16.
+/// House UI's button: the `primary` one a pill on the accent with its glow, 48 tall, for the one
+/// action a screen exists for; any other on the tile inside a [Tokens.lineStrong] edge, 44
+/// tall, or [danger] inside a [Tokens.danger] one. Its label is 16 at 600 and wraps rather than
+/// truncating. Disabled, it stays readable on [Tokens.sunken]. In an [ActionRow.even] it keeps
+/// 8 px either side of its label rather than 16.
 class AppButton extends StatelessWidget {
   const AppButton(
     this.label, {
@@ -26,14 +28,14 @@ class AppButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool primary;
 
-  /// A button 48 tall with its label at 15, for two side by side inside a card.
+  /// A primary button 44 tall, as every other button is, for two side by side inside a card.
   final bool compact;
 
-  /// A destructive action that is not the primary one: its label in [Tokens.badfg].
+  /// A destructive action: its label and edge in [Tokens.danger], never filled.
   final bool danger;
 
   /// A button with no edge or fill, for an action that should not weigh as much as the ones
-  /// around it, such as forgetting a server.
+  /// around it.
   final bool quiet;
 
   /// An icon after the label, such as `external` for a button that leaves the app.
@@ -42,58 +44,79 @@ class AppButton extends StatelessWidget {
   /// An icon before the label, such as `qr` for the button that scans a code.
   final String? leading;
 
+  /// The height of every button but a full-size primary one.
+  static const height = 44.0;
+
+  /// A primary button's height.
+  static const primaryHeight = 48.0;
+
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final height = compact ? 48.0 : 52.0;
-    final fg = primary
-        ? t.onaccent
+    final enabled = onPressed != null;
+    final pill = primary && enabled;
+    final fg = !enabled
+        ? t.muted
+        : primary
+        ? t.onAccent
         : danger
-        ? t.badfg
+        ? t.danger
+        : quiet
+        ? t.accent
         : t.ink;
+    final edge = !enabled
+        ? t.line
+        : primary
+        ? t.accent
+        : danger
+        ? t.danger
+        : t.lineStrong;
+    final radius = BorderRadius.circular(primary ? 999 : Sizes.control);
     return Tappable(
       label: label,
       onTap: onPressed,
-      radius: BorderRadius.circular(Sizes.control),
-      color: primary
+      radius: radius,
+      color: !enabled
+          ? t.sunken
+          : primary
           ? t.accent
           : quiet
           ? Colors.transparent
-          : t.panel,
-      side: quiet
-          ? BorderSide.none
-          : BorderSide(color: primary ? t.accent : t.edge),
-      hoverColor: primary ? t.onaccent.withValues(alpha: 0.1) : null,
-      dimWhenDisabled: 0.5,
+          : t.tile,
+      side: quiet && enabled ? BorderSide.none : BorderSide(color: edge),
+      hoverColor: primary ? t.onAccent.withValues(alpha: 0.1) : null,
+      shadows: pill ? t.glow : const [],
       child: ConstrainedBox(
-        constraints: BoxConstraints(minHeight: height),
+        constraints: BoxConstraints(
+          minHeight: primary && !compact ? primaryHeight : height,
+        ),
         child: Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: _EvenRow.holds(context) ? 8 : 16,
+            horizontal: _EvenRow.holds(context)
+                ? 8
+                : primary
+                ? 24
+                : 16,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (leading case final leading?) ...[
-                AppIcon(leading, size: IconSize.small, color: fg),
-                const SizedBox(width: 10),
+                AppIcon(leading, size: IconSize.medium, color: fg),
+                const SizedBox(width: 8),
               ],
               // A label wider than the space wraps rather than overflows.
               Flexible(
                 child: Text(
                   label,
                   textAlign: TextAlign.center,
-                  style: Type.sans(
-                    compact ? 15 : 16,
-                    weight: FontWeight.w500,
-                    color: fg,
-                  ),
+                  style: Type.label(fg),
                 ),
               ),
               if (icon case final icon?) ...[
                 const SizedBox(width: 8),
-                AppIcon(icon, size: IconSize.xs, color: fg),
+                AppIcon(icon, size: IconSize.small, color: fg),
               ],
             ],
           ),
@@ -119,7 +142,7 @@ class IconBtn extends StatelessWidget {
     this.expanded,
   });
 
-  /// A header's round button: 48 across, on [Tokens.hover], its icon at [IconSize.small].
+  /// A header's round button: 48 across, floating on the tile, its icon at [IconSize.small].
   const IconBtn.header(
     this.icon, {
     super.key,
@@ -142,7 +165,7 @@ class IconBtn extends StatelessWidget {
   /// The button's diameter.
   final double box;
 
-  /// Whether it sits on [Tokens.hover] with its icon in [Tokens.ink].
+  /// Whether it floats on the tile with a tile's shadow, as a bar's buttons do.
   final bool filled;
 
   /// What a screen reader hears, when it says more than [tooltip].
@@ -156,6 +179,7 @@ class IconBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    final floats = filled && active != true;
     return Tappable(
       touchTarget: true,
       label: heard ?? tooltip,
@@ -163,11 +187,14 @@ class IconBtn extends StatelessWidget {
       onTap: onPressed,
       toggled: active,
       expanded: expanded,
-      shape: const CircleBorder(),
+      shape: CircleBorder(
+        side: floats ? BorderSide(color: t.tileEdge) : BorderSide.none,
+      ),
+      shadows: floats ? t.tileShadow : const [],
       color: active == true
-          ? t.accentbg
+          ? t.accentSoft
           : filled
-          ? t.hover
+          ? t.tile
           : null,
       dimWhenDisabled: 0.4,
       child: SizedBox.square(
@@ -176,11 +203,7 @@ class IconBtn extends StatelessWidget {
           child: AppIcon(
             icon,
             size: size,
-            color: active == true
-                ? t.accentfg
-                : filled
-                ? t.ink
-                : t.ink2,
+            color: active == true ? t.accent : t.ink,
           ),
         ),
       ),
@@ -253,7 +276,7 @@ class _EvenRow extends InheritedWidget {
   bool updateShouldNotify(_EvenRow old) => false;
 }
 
-/// A small text button in the accent, with an icon before it, or only its words
+/// A small text button, its words at 13 in the accent, with an icon before it, or only its words
 /// ([TextAction.plain]).
 class TextAction extends StatelessWidget {
   const TextAction(
@@ -262,7 +285,6 @@ class TextAction extends StatelessWidget {
     this.onTap, {
     super.key,
     this.semanticLabel,
-    this.weight = FontWeight.w400,
   });
 
   const TextAction.plain(
@@ -270,7 +292,6 @@ class TextAction extends StatelessWidget {
     this.onTap, {
     super.key,
     this.semanticLabel,
-    this.weight = FontWeight.w400,
   }) : icon = null;
 
   final String? icon;
@@ -279,9 +300,6 @@ class TextAction extends StatelessWidget {
 
   /// What a screen reader hears, when [label] alone is not enough, as in a list.
   final String? semanticLabel;
-
-  /// The weight of the words.
-  final FontWeight weight;
 
   @override
   Widget build(BuildContext context) {
@@ -297,7 +315,7 @@ class TextAction extends StatelessWidget {
         Flexible(
           child: Text(
             label,
-            style: Type.sans(14, weight: weight, color: t.accent),
+            style: Type.caption(t.accent, weight: FontWeight.w600),
           ),
         ),
       ],

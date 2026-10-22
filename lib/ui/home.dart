@@ -56,7 +56,6 @@ class _ChatsListState extends State<ChatsList> {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final chat = scope.chat;
-    final shell = scope.shell;
     return Semantics(
       container: true,
       label: 'Chats',
@@ -67,42 +66,9 @@ class _ChatsListState extends State<ChatsList> {
           children: [
             ConstrainedBox(
               constraints: const BoxConstraints(minHeight: Sizes.header),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 16, 0),
-                child: Row(
-                  children: [
-                    const Expanded(child: WorkspaceSwitcher()),
-                    ListenableBuilder(
-                      listenable: chat,
-                      builder: (context, _) => Row(
-                        // A gap after the title, then between the buttons.
-                        spacing: 8,
-                        children: [
-                          if (chat.active != null) ...[
-                            const SizedBox.shrink(),
-                            IconBtn(
-                              'settings',
-                              tooltip: 'Workspace settings',
-                              box: 48,
-                              filled: true,
-                              onPressed: () => shell.showPane(Pane.files),
-                            ),
-                            IconBtn(
-                              'plus',
-                              tooltip: 'New chat',
-                              box: 48,
-                              filled: true,
-                              onPressed: () {
-                                chat.newChat();
-                                shell.openChat();
-                              },
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+              child: const Padding(
+                padding: EdgeInsets.fromLTRB(20, 0, 16, 0),
+                child: Center(child: WorkspaceBar()),
               ),
             ),
             Expanded(
@@ -122,14 +88,14 @@ class _ChatsListState extends State<ChatsList> {
                         sliver: SliverMainAxisGroup(
                           slivers: [
                             SliverToBoxAdapter(
-                              child: _Search(_search, focus: _searchFocus),
+                              child: ChatSearch(_search, focus: _searchFocus),
                             ),
                             if (query.isNotEmpty)
                               SliverToBoxAdapter(
                                 child: Column(
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
-                                  children: _found(context, query),
+                                  children: foundChats(context, query),
                                 ),
                               )
                             else ...[
@@ -159,16 +125,7 @@ class _ChatsListState extends State<ChatsList> {
   /// The open workspace's chats, built as they scroll into view: the pinned ones, then the
   /// ones this device used last, then the rest.
   Widget _chats(BuildContext context, String slug) {
-    final scope = AppScope.of(context);
-    final groups = groupChats(
-      scope.chat.threadsOf(slug),
-      scope.prefs.pinnedIn(slug),
-      scope.prefs.recentIn(slug),
-    );
-    final rows = [
-      for (final thread in groups.pinned) (thread, true),
-      for (final thread in [...groups.recent, ...groups.rest]) (thread, false),
-    ];
+    final rows = chatsInOrder(AppScope.of(context), slug);
     if (rows.isEmpty) {
       return const SliverToBoxAdapter(
         child: FieldCard([CardNote('No chats yet.')]),
@@ -181,58 +138,146 @@ class _ChatsListState extends State<ChatsList> {
           _ChatRow(rows[i].$1, workspace: slug, pinned: rows[i].$2),
     );
   }
+}
 
-  /// What [query] finds: each workspace whose name or a chat of which matches, in a card with
-  /// its matching chats under it.
-  List<Widget> _found(BuildContext context, String query) {
+/// [slug]'s chats in the order a list of them shows them, each with whether it is pinned: the
+/// pinned ones, then the ones this device used last, then the rest.
+List<(Thread, bool)> chatsInOrder(AppScope scope, String slug) => inListOrder(
+  groupChats(
+    scope.chat.threadsOf(slug),
+    scope.prefs.pinnedIn(slug),
+    scope.prefs.recentIn(slug),
+  ),
+);
+
+/// What a screen reader hears for a chat in a list: its name, whether it is [pinned], and
+/// whether its answer is [ready].
+String chatHeard(Thread thread, {required bool pinned, required bool ready}) =>
+    [thread.name, if (pinned) 'pinned', if (ready) 'answer ready'].join(', ');
+
+/// The marks after a chat's name in a list: its pin, and the dot of an answer [ready].
+List<Widget> chatMarks(Tokens t, {required bool pinned, required bool ready}) =>
+    [
+      if (pinned) AppIcon('pin', size: IconSize.xs, color: t.muted),
+      if (ready) const ReadyDot(gap: false),
+    ];
+
+/// The open workspace's name, which opens the Workspaces sheet, with Workspace settings and New
+/// chat beside it, as the shelf and, [dense], the sidebar head their chats.
+class WorkspaceBar extends StatelessWidget {
+  const WorkspaceBar({super.key, this.dense = false});
+
+  final bool dense;
+
+  @override
+  Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final chat = scope.chat;
-    final found = findChats(query, chat.orderedWorkspaces, chat.threadsOf);
-    if (found.isEmpty) {
-      return [
-        const SizedBox(height: 20),
-        FieldCard([CardNote('Nothing matches "$query".')]),
-      ];
-    }
-    return [
-      for (final (workspace, threads) in found) ...[
-        const SizedBox(height: 20),
-        FieldCard([
-          _FoundWorkspace(workspace),
-          for (final thread in threads)
-            _ChatRow(
-              thread,
-              workspace: workspace.slug,
-              pinned: scope.prefs
-                  .pinnedIn(workspace.slug)
-                  .contains(thread.slug),
+    final box = dense ? 44.0 : 48.0;
+    return ListenableBuilder(
+      listenable: chat,
+      builder: (context, _) => Row(
+        spacing: 8,
+        children: [
+          Expanded(child: WorkspaceSwitcher(size: dense ? 20 : 26)),
+          if (chat.active != null) ...[
+            IconBtn(
+              'settings',
+              tooltip: 'Workspace settings',
+              box: box,
+              filled: true,
+              onPressed: () => scope.shell.openPane(Pane.files),
             ),
-        ]),
-      ],
-    ];
+            IconBtn(
+              'plus',
+              tooltip: 'New chat',
+              box: box,
+              filled: true,
+              onPressed: () {
+                chat.newChat();
+                scope.shell.openChat();
+              },
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 
-/// The search: a field on the panel inside a [Tokens.line] edge, with the [FocusRing] round the
-/// text while it has the focus.
-class _Search extends StatelessWidget {
-  const _Search(this.controller, {required this.focus});
+/// What [query] finds: each workspace whose name or a chat of which matches, in a card with
+/// its matching chats under it.
+List<Widget> foundChats(BuildContext context, String query) {
+  final scope = AppScope.of(context);
+  final chat = scope.chat;
+  final found = findChats(query, chat.orderedWorkspaces, chat.threadsOf);
+  if (found.isEmpty) {
+    return [
+      const SizedBox(height: 20),
+      FieldCard([CardNote('Nothing matches "$query".')]),
+    ];
+  }
+  return [
+    for (final (workspace, threads) in found) ...[
+      const SizedBox(height: 20),
+      FieldCard([
+        _FoundWorkspace(workspace),
+        for (final thread in threads)
+          _ChatRow(
+            thread,
+            workspace: workspace.slug,
+            pinned: scope.prefs.pinnedIn(workspace.slug).contains(thread.slug),
+          ),
+      ]),
+    ],
+  ];
+}
+
+/// Opens [thread] of [workspace] in the chat, opening the workspace first when another is open,
+/// with nothing over the chat.
+Future<void> openThread(AppScope scope, String workspace, Thread thread) async {
+  scope.shell.openChat();
+  if (scope.chat.activeSlug != workspace) {
+    await scope.chat.select(workspace, thread: thread.slug);
+  } else {
+    await scope.chat.open(thread.slug);
+  }
+}
+
+/// The search: a field on the tile inside a [Tokens.lineStrong] edge, with the [FocusRing]
+/// round the text while it has the focus; [dense], as the sidebar sets it, it is a control's
+/// height with smaller corners.
+class ChatSearch extends StatelessWidget {
+  const ChatSearch(
+    this.controller, {
+    super.key,
+    required this.focus,
+    this.dense = false,
+  });
 
   final TextEditingController controller;
   final FocusNode focus;
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final searching = controller.text.isNotEmpty;
     return Container(
-      // Its edge sits outside the field's height, as the Lite prototype draws it.
-      constraints: const BoxConstraints(minHeight: Sizes.field + 2),
-      padding: EdgeInsets.only(left: 16, right: searching ? 4 : 16),
+      // Its edge sits outside the field's height, as the boards draw it.
+      constraints: BoxConstraints(
+        minHeight: dense ? AppButton.height : Sizes.field + 2,
+      ),
+      padding: EdgeInsets.only(
+        left: dense ? 12 : 16,
+        right: searching ? 4 : (dense ? 12 : 16),
+      ),
       decoration: BoxDecoration(
-        color: t.panel,
-        borderRadius: BorderRadius.circular(Sizes.control),
-        border: Border.all(color: t.line),
+        color: t.tile,
+        borderRadius: BorderRadius.circular(
+          dense ? Sizes.small : Sizes.control,
+        ),
+        border: Border.all(color: t.lineStrong),
       ),
       child: Row(
         spacing: 10,
@@ -247,13 +292,13 @@ class _Search extends StatelessWidget {
                   controller: controller,
                   focusNode: focus,
                   autocorrect: false,
-                  style: Type.sans(16, color: t.ink),
+                  style: Type.body(t.ink),
                   cursorColor: t.accent,
                   decoration: InputDecoration(
                     isCollapsed: true,
                     border: InputBorder.none,
                     hintText: 'Search chats',
-                    hintStyle: Type.sans(16, color: t.muted),
+                    hintStyle: Type.body(t.muted),
                   ),
                 ),
               ),
@@ -319,19 +364,8 @@ class _ChatRow extends StatelessWidget {
         children: [
           Expanded(
             child: Tappable(
-              label: [
-                thread.name,
-                if (pinned) 'pinned',
-                if (ready) 'answer ready',
-              ].join(', '),
-              onTap: () async {
-                scope.shell.openChat();
-                if (chat.activeSlug != workspace) {
-                  await chat.select(workspace, thread: thread.slug);
-                } else {
-                  await chat.open(thread.slug);
-                }
-              },
+              label: chatHeard(thread, pinned: pinned, ready: ready),
+              onTap: () => openThread(scope, workspace, thread),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minHeight: Sizes.cardRow),
                 child: Row(
@@ -342,16 +376,10 @@ class _ChatRow extends StatelessWidget {
                         thread.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Type.sans(
-                          16,
-                          weight: FontWeight.w500,
-                          color: t.ink,
-                        ),
+                        style: Type.body(t.ink),
                       ),
                     ),
-                    if (pinned)
-                      AppIcon('pin', size: IconSize.xs, color: t.muted),
-                    if (ready) const ReadyDot(gap: false),
+                    ...chatMarks(t, pinned: pinned, ready: ready),
                   ],
                 ),
               ),

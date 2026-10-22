@@ -32,7 +32,7 @@ class AttachSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final plus = AppIcon('plus', size: IconSize.small, color: t.ink2);
+    final plus = AppIcon('plus', size: IconSize.small, color: t.ink);
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -54,7 +54,7 @@ class AttachSheet extends StatelessWidget {
                           a.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Type.sans(17, color: t.ink),
+                          style: Type.body(t.ink),
                         ),
                       ),
                       IconBtn(

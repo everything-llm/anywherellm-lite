@@ -4,7 +4,6 @@ import '../../core/copy.dart';
 import '../../core/server_models.dart';
 import '../app_scope.dart';
 import '../links.dart';
-import '../settings/rows.dart';
 import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
@@ -30,7 +29,7 @@ class CitedPanel extends StatelessWidget {
   }
 }
 
-/// How many [citations] there are, under the sheet's title, then each a row that opens what it
+/// How many [citations] there are, under the sheet's title, then each a tile that opens what it
 /// names: a web page in the browser, a file's passages, or the file in Documents.
 class CitedSources extends StatelessWidget {
   const CitedSources(this.citations, {super.key});
@@ -46,17 +45,18 @@ class CitedSources extends StatelessWidget {
       padding: EdgeInsets.zero,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
           child: Text(
             web
                 ? '${plural(citations.length, 'web page', 'web pages')} the agent read.'
                 : plural(citations.length, 'source', 'sources'),
-            style: Type.note(t.muted),
+            style: Type.note(t.ink),
           ),
         ),
-        FieldCard([
-          for (final (i, c) in citations.indexed) _CitedRow(c, number: i + 1),
-        ]),
+        for (final (i, c) in citations.indexed) ...[
+          if (i > 0) const SizedBox(height: 8),
+          _CitedRow(c, number: i + 1),
+        ],
       ],
     );
   }
@@ -87,35 +87,38 @@ class _CitedRow extends StatelessWidget {
         : passages > 0 && present
         ? () => scope.shell.togglePassages(citation)
         : present
-        ? () {
-            scope.shell.openSources();
-            scope.sources.flash(citation.title);
-          }
+        ? () => showCitedInDocuments(context, citation.title)
         : null;
     return Tappable(
       label: [citation.title, ?about].join(', '),
       onTap: open,
+      radius: BorderRadius.circular(Sizes.control),
+      color: t.ground,
+      side: BorderSide(color: t.tileEdge),
       child: Container(
-        constraints: const BoxConstraints(minHeight: Sizes.citedRow),
-        padding: const EdgeInsets.symmetric(
-          horizontal: FieldCard.inset,
-          vertical: 8,
-        ),
+        constraints: const BoxConstraints(minHeight: Sizes.cardRow),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
-          spacing: 14,
+          spacing: 12,
           children: [
-            CitationNumber(number, live: open != null),
+            CitationNumber(number, live: open != null, diameter: 22),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     citation.title,
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Type.sans(15, color: t.ink),
+                    style: Type.body(t.ink, weight: FontWeight.w600),
                   ),
-                  if (about != null) Text(about, style: Type.note(t.muted)),
+                  if (about != null)
+                    Text(
+                      about,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Type.note(t.ink),
+                    ),
                 ],
               ),
             ),

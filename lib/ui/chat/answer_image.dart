@@ -129,10 +129,8 @@ class _AnswerImageState extends State<AnswerImage> {
           Flexible(
             child: Text(
               '[$name: ${widget.uri.host}]',
-              style: Type.sans(
-                14,
-                color: t.accent,
-              ).copyWith(decoration: TextDecoration.underline),
+              style: Type.note(t.accent)
+                  .copyWith(decoration: TextDecoration.underline),
             ),
           ),
         ],
@@ -150,8 +148,8 @@ class _AnswerImageState extends State<AnswerImage> {
       constraints: const BoxConstraints(minHeight: 44),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: t.panel2,
-        borderRadius: BorderRadius.circular(Sizes.row + 2),
+        color: t.sunken,
+        borderRadius: BorderRadius.circular(Sizes.small),
         border: Border.all(color: t.line),
       ),
       child: Row(
@@ -160,10 +158,7 @@ class _AnswerImageState extends State<AnswerImage> {
         children: [
           AppIcon('image', size: IconSize.normal, color: t.muted),
           Flexible(
-            child: Text(
-              '[$name: did not load]',
-              style: Type.sans(13.5, color: t.muted, height: 1.35),
-            ),
+            child: Text('[$name: did not load]', style: Type.note(t.ink)),
           ),
         ],
       ),
@@ -205,7 +200,7 @@ class _AnswerImageState extends State<AnswerImage> {
         foregroundDecoration: widget.framed
             ? BoxDecoration(
                 borderRadius: corners,
-                border: Border.all(color: Tokens.of(context).line2),
+                border: Border.all(color: Tokens.of(context).line),
               )
             : null,
         child: Image.memory(

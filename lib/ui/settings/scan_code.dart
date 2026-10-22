@@ -54,7 +54,7 @@ class _CameraScannerState extends State<_CameraScanner> {
           controller: _controller,
           onDetect: _detect,
           errorBuilder: (context, error) => ColoredBox(
-            color: t.panel,
+            color: t.tile,
             child: Center(
               child: Padding(
                 padding: const EdgeInsets.all(20),

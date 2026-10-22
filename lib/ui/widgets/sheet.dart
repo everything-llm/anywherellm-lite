@@ -10,6 +10,7 @@ import 'buttons.dart';
 import 'rise.dart';
 import 'window_insets.dart';
 import 'scroll_fades.dart';
+import 'tappable.dart';
 
 /// How tall a [SheetFrame] stands: [tall] fills the screen but for [SheetFrame.gap] above it,
 /// and [fit] takes the height of what it holds, at most [SheetFrame.fitFraction] of the screen.
@@ -55,7 +56,7 @@ class SheetFrame extends StatefulWidget {
   /// The most of the screen a [SheetHeight.fit] sheet takes.
   static const fitFraction = 0.9;
 
-  /// Whether [context] is inside a sheet, whose cards are filled with [Tokens.bg].
+  /// Whether [context] is inside a sheet, whose cards are filled with [Tokens.ground].
   static bool holds(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<_InSheet>() != null;
 
@@ -158,18 +159,13 @@ class _SheetFrameState extends State<SheetFrame>
             constraints: BoxConstraints(maxHeight: most),
             height: tall ? most : null,
             decoration: BoxDecoration(
-              color: t.panel,
+              color: t.tile,
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(28),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: t.shadow,
-                  blurRadius: 40,
-                  spreadRadius: -12,
-                  offset: const Offset(0, -12),
-                ),
-              ],
+              // Its foot runs on behind the navigation bar, so an edge there is never seen.
+              border: Border.all(color: t.tileEdge),
+              boxShadow: t.sheetShadow,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -186,7 +182,7 @@ class _SheetFrameState extends State<SheetFrame>
                       ),
                       child: widget.bare
                           ? widget.child
-                          : ScrollFades(color: t.panel, child: widget.child),
+                          : ScrollFades(color: t.tile, child: widget.child),
                     ),
                   ),
                 ),
@@ -225,6 +221,17 @@ class _SheetFrameState extends State<SheetFrame>
   }
 }
 
+/// Draws the cards [child] holds as a sheet's, flat [Tokens.ground] wells with a sheet's rows,
+/// for a page held in a card of its own, as a Settings page beside its list is.
+class SheetCards extends StatelessWidget {
+  const SheetCards({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => _InSheet(child: child);
+}
+
 /// Marks what a [SheetFrame] holds, for [SheetFrame.holds].
 class _InSheet extends InheritedWidget {
   const _InSheet({required super.child});
@@ -233,7 +240,8 @@ class _InSheet extends InheritedWidget {
   bool updateShouldNotify(_InSheet old) => false;
 }
 
-/// A sheet's header: [title] at 19 and a 44 px Close, with a rule under it when [divided].
+/// A sheet's header: [title] as [Type.title] and a 48 px Close on [Tokens.sunken] inside a
+/// [Tokens.lineStrong] ring, with a rule under it when [divided].
 class SheetHeader extends StatelessWidget {
   const SheetHeader({
     super.key,
@@ -253,7 +261,7 @@ class SheetHeader extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(24, 10, 12, divided ? 10 : 8),
       decoration: divided
           ? BoxDecoration(
-              border: Border(bottom: BorderSide(color: t.line2)),
+              border: Border(bottom: BorderSide(color: t.line)),
             )
           : null,
       child: Row(
@@ -265,23 +273,24 @@ class SheetHeader extends StatelessWidget {
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Type.sans(
-                  19,
-                  weight: FontWeight.w600,
-                  color: t.ink,
-                  height: 1.3,
-                ),
+                style: Type.title(t.ink),
               ),
             ),
           ),
           const SizedBox(width: 4),
-          IconBtn(
-            'close',
+          Tappable(
+            touchTarget: true,
+            label: 'Close',
             tooltip: 'Close',
-            box: 44,
-            filled: true,
-            size: IconSize.small,
-            onPressed: onClose,
+            onTap: onClose,
+            shape: CircleBorder(side: BorderSide(color: t.lineStrong)),
+            color: t.sunken,
+            child: SizedBox.square(
+              dimension: 48,
+              child: Center(
+                child: AppIcon('close', size: IconSize.small, color: t.ink),
+              ),
+            ),
           ),
         ],
       ),
@@ -423,10 +432,7 @@ class SheetQuestion extends StatelessWidget {
       Flexible(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Text(
-            question,
-            style: Type.sans(15.5, color: Tokens.of(context).ink, height: 1.5),
-          ),
+          child: Text(question, style: Type.body(Tokens.of(context).ink)),
         ),
       ),
       ActionRow(even: true, [

@@ -9,10 +9,10 @@ import '../type.dart';
 import 'tappable.dart';
 
 /// A text field's outline.
-Color fieldEdge(BuildContext context) => Tokens.of(context).edge;
+Color fieldEdge(BuildContext context) => Tokens.of(context).lineStrong;
 
 /// A text field's fill.
-Color fieldFill(BuildContext context) => Tokens.of(context).bg;
+Color fieldFill(BuildContext context) => Tokens.of(context).ground;
 
 /// The look of a text area that fills its space, such as the prompt editor: [fill] behind it,
 /// [fieldEdge] round it, and the accent, 2 px, while it has the focus. [padding] is round the
@@ -150,11 +150,10 @@ class AppField extends StatelessWidget {
           borderSide: BorderSide(color: color, width: width),
           gapPadding: 0,
         );
-    // Several lines are set apart, as the Lite prototype sets a text area.
-    final text = Type.sans(
-      size,
-      height: maxLines > 1 ? Type.textAreaLine : null,
-    );
+    // One line is set at the field's own line, so the field keeps its height whatever the
+    // face; several lines are set apart, as a text area is.
+    final line = maxLines > 1 ? Type.textAreaLine : Type.fieldLine;
+    final text = Type.sans(size, height: line);
     return FieldName(
       label: label,
       child: TextField(
@@ -189,8 +188,8 @@ class AppField extends StatelessWidget {
                   child: suffix,
                 ),
           contentPadding: EdgeInsets.symmetric(
-            horizontal: 13,
-            vertical: (height - 18) / 2,
+            horizontal: 16,
+            vertical: (height - size * Type.fieldLine) / 2,
           ),
           constraints: BoxConstraints(minHeight: height),
           enabledBorder: border(fieldEdge(context)),
@@ -248,7 +247,7 @@ class _SecretFieldState extends State<SecretField> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Text(
             verb,
-            style: Type.sans(14, weight: FontWeight.w600, color: t.accent),
+            style: Type.caption(t.accent, weight: FontWeight.w600),
           ),
         ),
       ),
@@ -290,9 +289,9 @@ class AppSelect extends StatelessWidget {
         child: DropdownButton<String>(
           isExpanded: true,
           value: choices.contains(value) ? value : null,
-          hint: Text('Not set', style: Type.sans(15, color: t.muted)),
-          style: Type.sans(15, color: t.ink),
-          dropdownColor: t.panel,
+          hint: Text('Not set', style: Type.body(t.muted)),
+          style: Type.body(t.ink),
+          dropdownColor: t.tile,
           borderRadius: radius,
           icon: RotatedBox(
             quarterTurns: 1,
@@ -322,10 +321,7 @@ class HelpText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final body = Text(
-      text,
-      style: Type.sans(12.5, color: t.muted, height: 1.45),
-    );
+    final body = Text(text, style: Type.note(t.ink));
     return status ? Semantics(liveRegion: true, child: body) : body;
   }
 }

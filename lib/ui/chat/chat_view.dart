@@ -18,6 +18,7 @@ import '../settings/settings_pages.dart';
 import '../state/shell_controller.dart';
 import 'composer.dart';
 import 'message_list.dart';
+import 'sources_aside.dart';
 
 /// The chat on screen: its header, its turns and the composer.
 class ChatView extends StatefulWidget {
@@ -31,11 +32,16 @@ class _ChatViewState extends State<ChatView> {
   final _draft = TextEditingController();
   final _focus = FocusNode();
   final _composer = GlobalKey<ComposerState>();
+  late final _followed = FollowedSource(
+    AppScope.of(context).chat,
+    AppScope.of(context).shell.aside,
+  );
 
   @override
   void dispose() {
     _draft.dispose();
     _focus.dispose();
+    _followed.dispose();
     super.dispose();
   }
 
@@ -80,7 +86,7 @@ class _ChatViewState extends State<ChatView> {
         ),
       ],
     );
-    return ClipRect(
+    final chat = ClipRect(
       child: CustomMultiChildLayout(
         delegate: _chatLayout,
         children: [
@@ -107,6 +113,21 @@ class _ChatViewState extends State<ChatView> {
         ],
       ),
     );
+    // On a wide window an answer's sources sit beside the chat. The chat keeps its place in the
+    // row either way, so crossing the width keeps its state.
+    final row = Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(child: chat),
+        if (Wide.split(context))
+          // Under the header's height, so the header reads across the top of both.
+          const Padding(
+            padding: EdgeInsets.fromLTRB(Wide.gap - 16, Sizes.header, 16, 16),
+            child: SizedBox(width: Wide.sourcesPanel, child: SourcesAside()),
+          ),
+      ],
+    );
+    return FollowedScope(notifier: _followed, child: row);
   }
 }
 
@@ -126,17 +147,10 @@ class _Unreachable extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
         decoration: BoxDecoration(
-          color: t.panel,
-          border: Border.all(color: t.line2),
+          color: t.tile,
+          border: Border.all(color: t.tileEdge),
           borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: t.shadow,
-              blurRadius: 24,
-              spreadRadius: -12,
-              offset: const Offset(0, 8),
-            ),
-          ],
+          boxShadow: t.raisedShadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -151,13 +165,13 @@ class _Unreachable extends StatelessWidget {
                   height: 36,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: t.hover,
+                    color: t.sunken,
                     shape: BoxShape.circle,
                   ),
                   child: AppIcon(
                     'alert',
                     size: IconSize.normal,
-                    color: t.badfg,
+                    color: t.danger,
                   ),
                 ),
                 Expanded(
@@ -167,24 +181,19 @@ class _Unreachable extends StatelessWidget {
                     children: [
                       Text(
                         'Can’t reach your AnythingLLM',
-                        style: Type.sans(
-                          16,
-                          weight: FontWeight.w600,
-                          color: t.ink,
-                          height: 1.3,
-                        ),
+                        style: Type.body(t.ink, weight: FontWeight.w600),
                       ),
                       Text(
                         'Check that the computer is on and that this phone is on the '
                         'same network.',
-                        style: Type.sans(14, color: t.ink2, height: 1.45),
+                        style: Type.note(t.ink),
                       ),
                       if (scope.settings.connection case final server?)
                         Text(
                           server.baseUrl,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Type.mono(12, color: t.muted),
+                          style: Type.mono(13, color: t.muted),
                         ),
                     ],
                   ),
@@ -192,7 +201,7 @@ class _Unreachable extends StatelessWidget {
               ],
             ),
             Row(
-              spacing: 8,
+              spacing: 12,
               children: [
                 Expanded(
                   child: ListenableBuilder(
@@ -306,7 +315,7 @@ class _Body extends StatelessWidget {
                   Text(
                     text,
                     textAlign: TextAlign.center,
-                    style: Type.sans(15, color: t.muted),
+                    style: Type.body(t.muted),
                   ),
                 ],
               ],
@@ -320,6 +329,7 @@ class _Body extends StatelessWidget {
 
 /// The chat's header: Chats, which opens the Chats shelf, the workspace and its documents over the chat's
 /// name, which opens the chat's sheet, or on a new chat the workspace's settings, then New chat.
+/// Beside the sidebar, which has both, it holds the name alone.
 class _Header extends StatelessWidget {
   const _Header();
 
@@ -334,66 +344,71 @@ class _Header extends StatelessWidget {
         final workspace = chat.active;
         final thread = chat.thread;
         final docs = scope.sources.onCount;
+        final sidebar = Wide.sidebarShown(context);
         final title = Text(
           workspace == null ? 'AnywhereLLM' : chat.title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: Type.sans(18, weight: FontWeight.w600, color: t.ink),
+          style: Type.title(t.ink),
         );
+        final heading = workspace == null
+            ? Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Semantics(header: true, child: title),
+              )
+            : Tappable(
+                label: thread != null
+                    ? '${chat.title}. Rename, pin or delete this chat'
+                    : '${workspace.name}. Open workspace settings',
+                onTap: () => thread != null
+                    ? scope.shell.openChatSheet(thread)
+                    : scope.shell.showPane(Pane.files),
+                radius: BorderRadius.circular(Sizes.small),
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Row(
+                        spacing: 4,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              '${workspace.name} · '
+                              '${plural(docs, 'doc', 'docs')} in use',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Type.caption(
+                                t.ink,
+                                weight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          AppIcon('chevron', size: IconSize.tiny, color: t.ink),
+                        ],
+                      ),
+                      title,
+                    ],
+                  ),
+                ),
+              );
+        if (sidebar) {
+          return ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: Sizes.header),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Align(alignment: Alignment.centerLeft, child: heading),
+            ),
+          );
+        }
         return PhonePageHeader(
           back: 'Chats',
           backIcon: 'menu',
           onBack: scope.shell.openShelf,
-          heading: workspace == null
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Semantics(header: true, child: title),
-                )
-              : Tappable(
-                  label: thread != null
-                      ? '${chat.title}. Rename, pin or delete this chat'
-                      : '${workspace.name}. Open workspace settings',
-                  onTap: () => thread != null
-                      ? scope.shell.openChatSheet(thread)
-                      : scope.shell.showPane(Pane.files),
-                  radius: BorderRadius.circular(Sizes.small),
-                  child: Container(
-                    constraints: const BoxConstraints(minHeight: 48),
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Row(
-                          spacing: 4,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                '${workspace.name} · '
-                                '${plural(docs, 'doc', 'docs')} in use',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Type.sans(
-                                  13,
-                                  weight: FontWeight.w700,
-                                  color: t.muted,
-                                  height: 1.3,
-                                ),
-                              ),
-                            ),
-                            AppIcon(
-                              'chevron',
-                              size: IconSize.tiny,
-                              color: t.muted,
-                            ),
-                          ],
-                        ),
-                        title,
-                      ],
-                    ),
-                  ),
-                ),
+          heading: heading,
           action: workspace == null
               ? null
               : IconBtn.header(

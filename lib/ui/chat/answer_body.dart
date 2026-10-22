@@ -9,6 +9,7 @@ import '../../core/apps_lean.dart';
 import '../../core/gallery.dart';
 import '../../core/markdown.dart';
 import '../app_scope.dart';
+import '../layout.dart';
 import '../links.dart';
 import '../tokens.dart';
 import '../type.dart';
@@ -72,12 +73,12 @@ class AnswerBody extends StatelessWidget {
   /// [text] drawn as Markdown, ending in the caret when [caret].
   Widget _markdown(BuildContext context, String text, {required bool caret}) {
     final t = Tokens.of(context);
-    final ink = muted ? t.ink2 : t.ink;
-    const lineHeight = 1.6;
+    final ink = muted ? t.muted : t.ink;
+    const lineHeight = 1.5;
     final body = Type.sans(Type.chat, color: ink, height: lineHeight);
-    final code = Type.mono(14, color: ink, height: 1.5);
+    final code = Type.mono(15, color: ink, height: 1.45);
     TextStyle heading(double size) =>
-        Type.sans(size, weight: FontWeight.w600, color: ink, height: 1.35);
+        Type.display(size, color: ink, height: 1.3);
     final border = BorderSide(color: t.line);
     final settings = AppScope.of(context).settings;
     final server = settings.connection?.uri;
@@ -119,7 +120,7 @@ class AnswerBody extends StatelessWidget {
           decoration: TextDecoration.underline,
           decorationColor: t.accent,
         ),
-        code: code.copyWith(backgroundColor: t.panel2),
+        code: code.copyWith(backgroundColor: t.sunken),
         h1: heading(22),
         h2: heading(20),
         h3: heading(18),
@@ -137,7 +138,7 @@ class AnswerBody extends StatelessWidget {
           height: lineHeight,
         ),
         del: body.copyWith(decoration: TextDecoration.lineThrough),
-        blockquote: body.copyWith(color: t.ink2),
+        blockquote: body.copyWith(color: t.ink),
         blockquotePadding: const EdgeInsets.only(left: 14),
         blockquoteDecoration: BoxDecoration(
           border: Border(left: BorderSide(color: t.line, width: 3)),
@@ -146,19 +147,19 @@ class AnswerBody extends StatelessWidget {
         listIndent: 20,
         listBullet: body,
         tableHead: Type.sans(
-          14.5,
+          Type.chat,
           weight: FontWeight.w600,
           color: ink,
           height: 1.4,
         ),
-        tableBody: Type.sans(14.5, color: ink, height: 1.4),
+        tableBody: Type.sans(Type.chat, color: ink, height: 1.4),
         tableBorder: TableBorder.all(color: t.line),
         tableColumnWidth: const IntrinsicColumnWidth(),
         tableCellsPadding: const EdgeInsets.symmetric(
           horizontal: 10,
           vertical: 6,
         ),
-        tableHeadCellsDecoration: BoxDecoration(color: t.panel2),
+        tableHeadCellsDecoration: BoxDecoration(color: t.sunken),
         // The package scrolls a table itself; these give it what [SideScroll] gives a code
         // block and display math: its scrollbar under it while it is wider than the chat.
         tableScrollbarThumbVisibility: true,
@@ -217,12 +218,12 @@ class _CodeBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final style = Type.mono(13.5, color: t.ink, height: 1.5);
+    final style = Type.mono(15, color: t.ink, height: 1.45);
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: t.panel2,
-        borderRadius: BorderRadius.circular(10),
+        color: t.sunken,
+        borderRadius: BorderRadius.circular(Sizes.control),
         border: Border.all(color: t.line),
       ),
       child: Stack(
@@ -298,7 +299,7 @@ class _CopyButtonState extends State<CopyButton> {
         if (_copied)
           Padding(
             padding: const EdgeInsets.only(right: 4),
-            child: Text('Copied', style: Type.sans(12.5, color: t.muted)),
+            child: Text('Copied', style: Type.note(t.ink)),
           ),
         IconBtn(
           'copy',

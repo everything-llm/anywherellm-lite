@@ -5,7 +5,7 @@ import '../type.dart';
 import 'robin_mark.dart';
 
 /// The logo tile, the robin in [iconInk] on [iconGround] as on the launcher icon, and the
-/// wordmark at 34, on a screen of its own.
+/// wordmark in the display face at 34, on a screen of its own.
 class Brand extends StatelessWidget {
   const Brand({super.key});
 
@@ -33,7 +33,7 @@ class Brand extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Text(
               'AnywhereLLM',
-              style: Type.sans(
+              style: Type.display(
                 34,
                 weight: FontWeight.w700,
                 color: t.ink,

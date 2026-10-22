@@ -78,9 +78,9 @@ class _UpcomingPageState extends State<UpcomingPage> {
           const SizedBox(height: 12),
         ],
         if (jobs == null || toolkit.jobsProblem != null)
-          _NotRead(toolkit.jobsProblem)
+          JobsNotRead(toolkit.jobsProblem)
         else if (jobs.isEmpty)
-          _NoTasks(writable: writable)
+          NoTasks(writable: writable)
         else
           // One card, a rule between its jobs, as the Lite prototype draws it.
           FieldCard([
@@ -151,8 +151,8 @@ String? upcomingSummary(ToolkitController toolkit) {
 
 /// What Upcoming shows before it has something to: why its read failed, with a way to the
 /// Connection page, or Reading… while it reads.
-class _NotRead extends StatelessWidget {
-  const _NotRead(this.problem);
+class JobsNotRead extends StatelessWidget {
+  const JobsNotRead(this.problem, {super.key});
 
   final Notice? problem;
 
@@ -170,7 +170,9 @@ class _NotRead extends StatelessWidget {
         AlertBox.notice(AlertKind.warn, problem),
         AppButton(
           'Open Connection',
-          onPressed: () => shell.showSettingsPage(SettingsPage.connection),
+          onPressed: () => shell.settingsOpen
+              ? shell.showSettingsPage(SettingsPage.connection)
+              : shell.openSettings(SettingsPage.connection),
         ),
       ],
     );
@@ -191,12 +193,8 @@ class _JobRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final failed = job.lastWentWell == false;
-    final when = failed
-        ? job.lastFailedText(now)
-        : !job.enabled
-        ? 'Off'
-        : job.nextText(now);
+    final (:text, :failed) = job.status(now);
+    final when = text;
     final about = describeSchedule(job.cron, now);
     final row = InfoRow(
       job.name,
@@ -208,7 +206,7 @@ class _JobRow extends StatelessWidget {
             const TextSpan(text: '\n'),
             TextSpan(
               text: when,
-              style: failed ? Type.sans(13, color: t.badfg) : null,
+              style: failed ? TextStyle(color: t.danger) : null,
             ),
           ],
         ],
@@ -233,11 +231,14 @@ class _JobRow extends StatelessWidget {
 
 /// What shows before anything is scheduled: a clock, what a task is, and where a task is made
 /// from, so the empty page says what to do rather than only that there is nothing.
-class _NoTasks extends StatelessWidget {
-  const _NoTasks({required this.writable});
+class NoTasks extends StatelessWidget {
+  const NoTasks({super.key, required this.writable, this.onNew});
 
   /// Whether tasks can be made here, which adds a New task button.
   final bool writable;
+
+  /// Opens a new task's form, in place of its sheet.
+  final VoidCallback? onNew;
 
   @override
   Widget build(BuildContext context) {
@@ -254,16 +255,16 @@ class _NoTasks extends StatelessWidget {
             height: 72,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: t.accentbg,
+              color: t.accentSoft,
               shape: BoxShape.circle,
             ),
-            child: AppIcon('clock', size: IconSize.large, color: t.accentfg),
+            child: AppIcon('clock', size: IconSize.large, color: t.accent),
           ),
           const SizedBox(height: 4),
           Text(
             'No scheduled tasks',
             textAlign: TextAlign.center,
-            style: Type.sans(19, weight: FontWeight.w500, color: t.ink),
+            style: Type.title(t.ink),
           ),
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 320),
@@ -273,7 +274,7 @@ class _NoTasks extends StatelessWidget {
                         'Make one here, or ask the agent to.'
                   : 'Nothing is scheduled on your server.',
               textAlign: TextAlign.center,
-              style: Type.sans(14.5, color: t.muted, height: 1.5),
+              style: Type.note(t.ink),
             ),
           ),
           if (writable) ...[
@@ -282,7 +283,7 @@ class _NoTasks extends StatelessWidget {
               'New task',
               primary: true,
               leading: 'plus',
-              onPressed: () => openTask(scope, const TaskSheet()),
+              onPressed: onNew ?? () => openTask(scope, const TaskSheet()),
             ),
           ],
         ],

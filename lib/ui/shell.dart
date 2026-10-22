@@ -12,17 +12,21 @@ import 'chat/gallery.dart';
 import 'chat_sheet.dart';
 import 'chat/page_sheet.dart';
 import 'chat/passages_sheet.dart';
+import 'files/documents_pane.dart';
 import 'files/workspace_pages.dart';
 import 'settings/pairing_sheet.dart';
 import 'settings/settings_dialog.dart';
 import 'share/share_sheet.dart';
+import 'layout.dart';
 import 'shelf.dart';
+import 'sidebar.dart';
 import 'share/shared_item.dart';
 import 'workspace_sheets.dart';
 import 'sources/sources_panel.dart';
 import 'workspace_switcher.dart';
 import 'state/shell_controller.dart';
 import 'tokens.dart';
+import 'upcoming_pane.dart';
 import 'widgets/keyboard_up.dart';
 import 'widgets/basics.dart';
 import 'widgets/sheet.dart';
@@ -38,13 +42,21 @@ class AppShell extends StatelessWidget {
   const AppShell({super.key});
 
   @override
-  Widget build(BuildContext context) =>
-      _ShareListener(child: Builder(builder: _build));
+  Widget build(BuildContext context) => WideScope(
+    child: _ShareListener(child: Builder(builder: _build)),
+  );
 
   Widget _build(BuildContext context) {
     final scope = AppScope.of(context);
     final shell = scope.shell;
     final t = Tokens.of(context);
+    // From wide enough, the chats are a sidebar beside everything, in place of the shelf.
+    final sidebar = Wide.sidebarShown(context);
+    final split = Wide.split(context);
+    // The sidebar takes the shelf's place, so a shelf left open does not come back narrower.
+    if (sidebar && shell.shelfOpen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => shell.closeShelf());
+    }
 
     /// What closes the thing on top, or null when nothing is open that Esc or Back closes: in
     /// Settings, a page goes back to its parent first.
@@ -54,8 +66,8 @@ class AppShell extends StatelessWidget {
       if (shell.scanning) return () => shell.setScanning(false);
       if (shell.shared != null) return shell.closeShared;
       if (shell.popup.value != null) return shell.closePopup;
-      if (shell.settingsOpen) return shell.settingsBack;
-      if (shell.shelfOpen) return shell.closeShelf;
+      if (shell.settingsOpen) return () => shell.settingsBack(split: split);
+      if (shell.shelfOpen && !sidebar) return shell.closeShelf;
       if (shell.passagesOpen) return shell.closePassages;
       if (shell.citedOpen) return shell.closeCited;
       if (shell.rightOpen) return shell.closeSources;
@@ -67,16 +79,13 @@ class AppShell extends StatelessWidget {
         }
         return () => shell.showPane(Pane.chats);
       }
+      if (shell.pane != Pane.chats) return shell.closePane;
       return null;
     }
 
     return ListenableBuilder(
       listenable: shell,
       builder: (context, _) {
-        final files = shell.pane == Pane.files;
-        // The chat is the base screen: it shows unless the workspace's pages or Settings cover
-        // it.
-        final chatShown = !files && !shell.settingsOpen;
         final right = switch (shell.beside) {
           Beside.sources => const SourcesPanel(),
           Beside.passages => const PassagesPanel(),
@@ -102,49 +111,18 @@ class AppShell extends StatelessWidget {
                 autofocus: true,
                 // InkWell needs a Material above it, and the shell has no Scaffold.
                 child: Material(
-                  color: t.bg,
+                  color: t.ground,
                   child: _AboveKeyboard(
                     // Full window: each page keeps itself clear of the system bars, and what
                     // reaches the window's edges, the scrims, sheets and shelf, covers them.
                     child: Stack(
                       children: [
-                        // The chat stays built while it is off the screen, so a draft and a
-                        // running answer survive.
-                        Positioned.fill(
-                          child: Offstage(
-                            offstage: !chatShown,
-                            child: TickerMode(
-                              enabled: chatShown,
-                              child: ExcludeFocus(
-                                excluding: !chatShown,
-                                child: ColoredBox(
-                                  color: t.bg,
-                                  child: const SafeArea(child: ChatView()),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        // The chats as a shelf from the left over the chat.
-                        if (shell.shelfOpen)
-                          const Positioned.fill(child: ChatsShelf()),
-                        if (files)
-                          Positioned.fill(
-                            child: ColoredBox(
-                              color: t.bg,
-                              child: const SafeArea(
-                                bottom: false,
-                                child: WorkspacePages(),
-                              ),
-                            ),
-                          ),
-                        // A deleted chat is put back from over the chat's composer.
-                        if (!shell.settingsOpen) const _PhoneUndo(),
+                        Positioned.fill(child: _Main(sidebar: sidebar)),
                         // The sheet's own scrim closes it.
                         if (shell.rightOpen) Positioned.fill(child: right),
                         // Over the sheet, since a page opened from elsewhere, as a pairing
                         // link opens Connection, shows over what showed.
-                        if (shell.settingsOpen)
+                        if (shell.settingsOpen && !sidebar)
                           const Positioned.fill(
                             child: SafeArea(
                               bottom: false,
@@ -214,6 +192,82 @@ class AppShell extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// What the window shows under the sheets and popups: the chat, the shelf, the pane over the chat
+/// and, beside the [sidebar] when it shows, Settings.
+class _Main extends StatelessWidget {
+  const _Main({required this.sidebar});
+
+  final bool sidebar;
+
+  @override
+  Widget build(BuildContext context) {
+    final shell = AppScope.of(context).shell;
+    final t = Tokens.of(context);
+    // The chat is the base screen: it shows unless another pane or Settings cover it.
+    final chatShown = shell.pane == Pane.chats && !shell.settingsOpen;
+    final pane = switch (shell.pane) {
+      Pane.chats => null,
+      Pane.files => const WorkspacePages(),
+      Pane.documents => const DocumentsPane(),
+      Pane.upcoming => const UpcomingPane(),
+    };
+    final region = Stack(
+      children: [
+        // The chat stays built while it is off the screen, so a draft and a running answer
+        // survive.
+        Positioned.fill(
+          child: Offstage(
+            offstage: !chatShown,
+            child: TickerMode(
+              enabled: chatShown,
+              child: ExcludeFocus(
+                excluding: !chatShown,
+                child: ColoredBox(
+                  color: t.ground,
+                  child: const SafeArea(child: ChatView()),
+                ),
+              ),
+            ),
+          ),
+        ),
+        // The chats as a shelf from the left over the chat.
+        if (shell.shelfOpen && !sidebar)
+          const Positioned.fill(child: ChatsShelf()),
+        if (pane != null)
+          Positioned.fill(
+            child: ColoredBox(
+              color: t.ground,
+              child: SafeArea(bottom: false, child: pane),
+            ),
+          ),
+        // A deleted chat is put back from over the chat's composer.
+        if (!shell.settingsOpen) const _PhoneUndo(),
+        // Beside the sidebar, Settings takes the room the chat has.
+        if (shell.settingsOpen && sidebar)
+          const Positioned.fill(
+            child: SafeArea(bottom: false, child: SettingsDialog()),
+          ),
+      ],
+    );
+    // The region keeps its place in the row whether the sidebar shows or not, so the chat
+    // survives the window crossing the sidebar's width.
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (sidebar) const SizedBox(width: Wide.sidebar, child: Sidebar()),
+        Expanded(
+          // The sidebar keeps clear of the window's left edge.
+          child: MediaQuery.removePadding(
+            context: context,
+            removeLeft: sidebar,
+            child: region,
+          ),
+        ),
+      ],
     );
   }
 }

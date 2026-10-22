@@ -267,12 +267,7 @@ class _Item extends StatelessWidget {
             Expanded(
               child: Text(
                 text,
-                style: Type.sans(
-                  16,
-                  weight: add ? FontWeight.w600 : FontWeight.w500,
-                  color: add ? t.accent : t.ink,
-                  height: 1.35,
-                ),
+                style: add ? Type.label(t.accent) : Type.body(t.ink),
               ),
             ),
             // A memory opens in a sheet to change, which the chevron says.
@@ -395,7 +390,7 @@ class _SavedEditorState extends State<_SavedEditor> {
           if (_problem case final problem?)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(problem, style: Type.sans(13.5, color: t.badfg)),
+              child: Text(problem, style: Type.note(t.danger)),
             ),
           if (_asking && existing != null)
             SheetQuestion(

@@ -79,13 +79,13 @@ class _SizePreview extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: t.bg,
+          color: t.ground,
           borderRadius: BorderRadius.circular(Sizes.control),
-          border: Border.all(color: t.line2),
+          border: Border.all(color: t.line),
         ),
         child: Text(
           'An answer in the chat reads like this.',
-          style: Type.sans(Type.chat * size.scale, color: t.ink, height: 1.6),
+          style: Type.sans(Type.chat * size.scale, color: t.ink, height: 1.5),
         ),
       ),
     );

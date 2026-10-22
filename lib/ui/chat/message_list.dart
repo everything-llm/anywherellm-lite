@@ -33,6 +33,7 @@ import 'shortcut_chip.dart';
 import 'answer_menu.dart';
 import 'generated_files.dart';
 import 'passages_sheet.dart';
+import 'sources_aside.dart';
 import 'speaker.dart';
 import 'wait_line.dart';
 import '../widgets/scroll_fades.dart';
@@ -283,7 +284,7 @@ class _MessageListState extends State<MessageList> {
 }
 
 /// The round button over the composer that scrolls the chat back to its newest text: 48 across
-/// on [Tokens.panel], inside a [Tokens.line2] edge, floating on a shadow.
+/// on [Tokens.tile], inside its [Tokens.tileEdge], floating on the tile's shadow.
 class _JumpButton extends StatelessWidget {
   const _JumpButton({required this.onTap});
 
@@ -295,21 +296,14 @@ class _JumpButton extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: t.shadow,
-            blurRadius: 24,
-            spreadRadius: -8,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        boxShadow: t.tileShadow,
       ),
       child: Tappable(
         label: 'Jump to the newest message',
         tooltip: 'Jump to the newest message',
         onTap: onTap,
-        shape: CircleBorder(side: BorderSide(color: t.line2)),
-        color: t.panel,
+        shape: CircleBorder(side: BorderSide(color: t.tileEdge)),
+        color: t.tile,
         child: SizedBox.square(
           dimension: 48,
           child: Center(
@@ -542,7 +536,8 @@ class _Hero extends StatelessWidget {
               return Tappable(
                 label: '$label. Open Documents',
                 radius: BorderRadius.circular(Sizes.small),
-                onTap: scope.shell.openSources,
+                onTap: () =>
+                    scope.shell.openSources(asPane: Wide.split(context)),
                 child: SizedBox(
                   width: MediaQuery.sizeOf(context).width - 32,
                   child: ConstrainedBox(
@@ -553,7 +548,7 @@ class _Hero extends StatelessWidget {
                         AppIcon(
                           'doc',
                           size: IconSize.xs,
-                          color: Tokens.of(context).muted,
+                          color: Tokens.of(context).ink,
                         ),
                         const SizedBox(width: 8),
                         Flexible(
@@ -561,17 +556,14 @@ class _Hero extends StatelessWidget {
                             label,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: Type.sans(
-                              14,
-                              color: Tokens.of(context).muted,
-                            ),
+                            style: Type.note(Tokens.of(context).ink),
                           ),
                         ),
                         const SizedBox(width: 8),
                         AppIcon(
                           'chevron',
                           size: IconSize.tiny,
-                          color: Tokens.of(context).muted,
+                          color: Tokens.of(context).ink,
                         ),
                       ],
                     ),
@@ -665,8 +657,8 @@ class _UserBubble extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: t.bubble,
-        border: notSent ? Border.all(color: t.badfg) : null,
+        color: t.accentSoft,
+        border: notSent ? Border.all(color: t.danger) : null,
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(24),
           topRight: Radius.circular(24),
@@ -694,7 +686,7 @@ class _UserBubble extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               'Shortcut · the server keeps the full prompt',
-              style: Type.note(t.muted),
+              style: Type.note(t.ink),
             ),
           ] else
             Text(text, style: Type.sans(Type.chat, color: t.ink, height: 1.5)),
@@ -729,16 +721,16 @@ class _NotSent extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AppIcon('alert', size: IconSize.small, color: t.badfg),
+          AppIcon('alert', size: IconSize.small, color: t.danger),
           const SizedBox(width: 6),
           Text(
             'Not sent',
-            style: Type.sans(13, weight: FontWeight.w700, color: t.badfg),
+            style: Type.caption(t.danger, weight: FontWeight.w700),
           ),
           const SizedBox(width: 6),
           if (onTryAgain case final again?)
-            TextAction.plain('Try again', again, weight: FontWeight.w600),
-          TextAction.plain('Edit', onEdit, weight: FontWeight.w600),
+            TextAction.plain('Try again', again),
+          TextAction.plain('Edit', onEdit),
         ],
       ),
     );
@@ -757,14 +749,14 @@ class _FileName extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        AppIcon('attach', size: IconSize.xs, color: t.muted),
+        AppIcon('attach', size: IconSize.xs, color: t.ink),
         const SizedBox(width: 6),
         Flexible(
           child: Text(
             name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Type.sans(13, color: t.muted),
+            style: Type.note(t.ink),
           ),
         ),
       ],
@@ -903,7 +895,7 @@ class _Answer extends StatelessWidget {
         ],
         if (!turn.streaming && turn.citations.isNotEmpty) ...[
           const SizedBox(height: 8),
-          _Citations(turn.citations),
+          _Citations(turn),
         ],
         if (!turn.streaming && turn.files.isNotEmpty) ...[
           const SizedBox(height: 12),
@@ -942,7 +934,7 @@ class _Answer extends StatelessWidget {
                 if (turn.stopped)
                   Text(
                     'Stopped · the server may still save it',
-                    style: Type.sans(12, color: Tokens.of(context).muted),
+                    style: Type.note(Tokens.of(context).ink),
                   ),
               ],
             ),
@@ -994,11 +986,7 @@ class _Status extends StatelessWidget {
           text,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: Type.sans(
-            13,
-            color: t.muted,
-            height: 1.4,
-          ).copyWith(fontStyle: FontStyle.italic),
+          style: Type.note(t.ink).copyWith(fontStyle: FontStyle.italic),
         ),
       ),
     );
@@ -1007,11 +995,12 @@ class _Status extends StatelessWidget {
 
 /// The sources an answer drew on, in one line that never wraps, so the answer keeps its height:
 /// the first three by name, then the rest folded into one "+N" chip that lists them all in a
-/// sheet. A web page is named by its site.
+/// sheet. A web page is named by its site. On a wide window a chip picks its source, and +N the
+/// answer, in the Sources panel beside the chat instead.
 class _Citations extends StatelessWidget {
-  const _Citations(this.citations);
+  const _Citations(this.turn);
 
-  final List<Citation> citations;
+  final Turn turn;
 
   /// How many are named before the rest fold.
   static const shown = 3;
@@ -1019,12 +1008,19 @@ class _Citations extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final shell = AppScope.of(context).shell;
+    final citations = turn.citations;
     final folded = citations.length > shown + 1;
     final named = folded ? citations.take(shown) : citations;
+    final beside = Wide.split(context);
+    final follow = FollowedScope.of(context);
     return ListenableBuilder(
-      listenable: shell,
+      listenable: beside ? follow : shell,
       builder: (context, _) {
-        final open = shell.citedOpen && identical(shell.cited, citations);
+        final picked = beside ? follow.value : null;
+        final mine = picked != null && identical(picked.turn, turn);
+        final open = beside
+            ? mine && picked.source == null
+            : shell.citedOpen && identical(shell.cited, citations);
         // The line is 44 tall around its chips, as the Lite prototype draws it.
         return ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 44),
@@ -1037,13 +1033,23 @@ class _Citations extends StatelessWidget {
                 children: [
                   for (final (i, citation) in named.indexed)
                     Flexible(
-                      child: _Citation(number: i + 1, citation: citation),
+                      child: _Citation(
+                        number: i + 1,
+                        citation: citation,
+                        // Beside the panel, a chip picks its source there.
+                        onPick: beside
+                            ? () => shell.aside.value = AsideChoice(turn, i)
+                            : null,
+                        picked: mine && picked.source == i,
+                      ),
                     ),
                   if (folded)
                     _MoreSources(
                       citations.length - shown,
                       open: open,
-                      onTap: () => shell.toggleCited(citations),
+                      onTap: beside
+                          ? () => shell.aside.value = AsideChoice(turn)
+                          : () => shell.toggleCited(citations),
                     ),
                 ],
               ),
@@ -1072,8 +1078,8 @@ class _MoreSources extends StatelessWidget {
       toggled: open,
       onTap: onTap,
       radius: BorderRadius.circular(99),
-      color: open ? t.sel : t.panel,
-      side: BorderSide(color: t.edge),
+      color: open ? t.accentSoft : t.tile,
+      side: BorderSide(color: t.lineStrong),
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 36),
         child: Padding(
@@ -1083,7 +1089,10 @@ class _MoreSources extends StatelessWidget {
             heightFactor: 1,
             child: Text(
               '+$count',
-              style: Type.sans(14, color: open ? t.accent : t.ink2),
+              style: Type.caption(
+                open ? t.accent : t.ink,
+                weight: FontWeight.w600,
+              ),
             ),
           ),
         ),
@@ -1097,10 +1106,21 @@ class _MoreSources extends StatelessWidget {
 /// page an agent read opens in the browser; anything else, such as a file since removed, only
 /// shows its title.
 class _Citation extends StatelessWidget {
-  const _Citation({required this.number, required this.citation});
+  const _Citation({
+    required this.number,
+    required this.citation,
+    this.onPick,
+    this.picked = false,
+  });
 
   final int number;
   final Citation citation;
+
+  /// What a tap does in place of opening the source, as picking it in the panel beside the chat.
+  final VoidCallback? onPick;
+
+  /// Whether the panel beside the chat shows this source as chosen.
+  final bool picked;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -1125,21 +1145,21 @@ class _Citation extends StatelessWidget {
           : present
           ? 'Show in Documents'
           : url?.toString(),
-      onTap: passages
-          ? () => scope.shell.togglePopup(citation)
-          : present
-          ? () {
-              scope.shell.openSources();
-              scope.sources.flash(title);
-            }
-          : url == null
-          ? null
-          : () => openLink(context, url),
+      selected: onPick == null ? null : picked,
+      onTap:
+          onPick ??
+          (passages
+              ? () => scope.shell.togglePopup(citation)
+              : present
+              ? () => showCitedInDocuments(context, title)
+              : url == null
+              ? null
+              : () => openLink(context, url)),
       radius: BorderRadius.circular(99),
       // A chip is the panel's colour, outlined, as the Lite prototype draws it. One that opens
       // nothing, as a file since removed, is fainter all through, not only in its number.
-      color: t.panel,
-      side: BorderSide(color: live ? t.edge : t.line),
+      color: picked ? t.accentSoft : t.tile,
+      side: BorderSide(color: live ? t.lineStrong : t.line),
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 36),
         child: Padding(
@@ -1149,6 +1169,18 @@ class _Citation extends StatelessWidget {
             children: [
               CitationNumber(number, live: live),
               const SizedBox(width: 6),
+              // What it is, as the boards mark it: a web page or a document.
+              SizedBox.square(
+                dimension: 13,
+                child: FittedBox(
+                  child: AppIcon(
+                    url != null ? 'globe' : 'doc',
+                    size: IconSize.tiny,
+                    color: live ? t.ink : t.muted,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
               Flexible(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 240),
@@ -1157,7 +1189,7 @@ class _Citation extends StatelessWidget {
                     url?.host ?? title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Type.sans(14, color: live ? t.ink2 : t.muted),
+                    style: Type.note(live ? t.ink : t.muted),
                   ),
                 ),
               ),
@@ -1166,7 +1198,7 @@ class _Citation extends StatelessWidget {
         ),
       ),
     );
-    if (!passages) return chip;
+    if (!passages || onPick != null) return chip;
     // Only a citation that opens a sheet follows the popup.
     return ShellPopup(
       popup: citation,

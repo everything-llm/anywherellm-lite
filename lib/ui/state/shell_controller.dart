@@ -8,8 +8,9 @@ import '../settings/settings_pages.dart';
 import '../share/shared_item.dart';
 import 'turn.dart';
 
-/// What the main pane shows: the chat, or the open workspace's pages.
-enum Pane { chats, files }
+/// What the main pane shows: the chat, the open workspace's pages, or, on a wide window, its
+/// Documents or Upcoming as a list beside what it opens.
+enum Pane { chats, files, documents, upcoming }
 
 /// What the sheet over the chat shows: Sources, the passages an answer read from one
 /// file, or all of an answer's sources ([cited]).
@@ -23,6 +24,15 @@ class GalleryOpen {
   final List<Picture> pictures;
   final int index;
   final String chat;
+}
+
+/// What the Sources panel beside the chat follows on a wide window: [turn]'s sources, with the
+/// one numbered [source] from 0 chosen, or none.
+class AsideChoice {
+  const AsideChoice(this.turn, [this.source]);
+
+  final Turn turn;
+  final int? source;
 }
 
 /// browser-lean's page for an agent's [tab], in its tall sheet over the chat.
@@ -85,8 +95,14 @@ class ShellController extends ChangeNotifier {
   @override
   void dispose() {
     _popup.dispose();
+    aside.dispose();
     super.dispose();
   }
+
+  /// The answer, and the source of it, that the Sources panel beside the chat follows once a
+  /// chip picked them; null, or an answer no longer on screen, follows the chat's latest answer
+  /// with sources. It notifies apart from the shell.
+  final aside = ValueNotifier<AsideChoice?>(null);
 
   /// The popup open: a [Popup], or the [Turn] whose More menu is open, or null. It notifies
   /// apart from the shell, so opening or closing one rebuilds only what listens to it.
@@ -294,9 +310,25 @@ class ShellController extends ChangeNotifier {
     _settingsOpen = false;
     _settingsPage = null;
     _settingsDirect = false;
+    _overPages = false;
   }
 
-  void openSources() => _setRight(open: true, beside: Beside.sources);
+  bool _overPages = false;
+
+  /// Whether the Documents pane opened over the workspace's pages, which [closePane] gives back.
+  bool get overPages => _overPages;
+
+  /// Opens the open workspace's Documents: the sheet over what shows, or [asPane], as a wide
+  /// window does, the Documents pane in place of what shows.
+  void openSources({bool asPane = false}) {
+    if (!asPane) return _setRight(open: true, beside: Beside.sources);
+    openPane(Pane.documents, overPages: _pane == Pane.files);
+  }
+
+  /// Leaves Documents or Upcoming as a pane for the workspace's pages when Documents opened over
+  /// them, or the chat.
+  void closePane() =>
+      showPane(_pane == Pane.documents && _overPages ? Pane.files : Pane.chats);
 
   /// Closes the sheet over the chat, whatever it shows.
   void closeSources() => _setRight(open: false, beside: Beside.sources);
@@ -388,16 +420,26 @@ class ShellController extends ChangeNotifier {
 
   /// Goes back from the Settings page shown to the page it is reached from: the Server page, the
   /// list, or what showed under Settings when it opened on the page. From the list, Settings
-  /// closes, back to the chat.
-  void settingsBack() {
+  /// closes, back to the chat, and so it does from a page with no parent when Settings shows its
+  /// list beside the page ([split]), as on a wide window.
+  void settingsBack({bool split = false}) {
     final page = _settingsPage;
     if (page == null) {
       closeSettings();
-    } else if (page.parent == null && _settingsDirect) {
+    } else if (page.parent == null && (_settingsDirect || split)) {
       closeSettings();
     } else {
       showSettingsPage(page.parent);
     }
+  }
+
+  /// Shows [pane] with nothing over it, as the sidebar's rows do; the Documents pane goes back
+  /// to the workspace's pages when it opens [overPages].
+  void openPane(Pane pane, {bool overPages = false}) {
+    _reset();
+    _pane = pane;
+    _overPages = overPages;
+    notifyListeners();
   }
 
   void showPane(Pane pane) {

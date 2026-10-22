@@ -10,7 +10,7 @@ class ScrollFades extends StatefulWidget {
 
   final Widget child;
 
-  /// The ground the fades blend into; [Tokens.bg] when null.
+  /// The ground the fades blend into; [Tokens.ground] when null.
   final Color? color;
 
   /// How tall each fade is.
@@ -48,7 +48,7 @@ class _ScrollFadesState extends State<ScrollFades> {
 
   @override
   Widget build(BuildContext context) {
-    final color = widget.color ?? Tokens.of(context).bg;
+    final color = widget.color ?? Tokens.of(context).ground;
     Widget fade({required bool on, required bool top}) => Align(
       alignment: top ? Alignment.topCenter : Alignment.bottomCenter,
       child: IgnorePointer(

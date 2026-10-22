@@ -102,7 +102,7 @@ class _Tile extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            ColoredBox(color: t.hover),
+            ColoredBox(color: t.sunken),
             AnswerImage(
               picture.image,
               alt: picture.caption,
@@ -113,17 +113,11 @@ class _Tile extends StatelessWidget {
               unloaded: (context) => _Unloaded(picture, small: true),
             ),
             if (more > 0)
+              // The dark theme's tile, in either theme, as a picture's frame is dark.
               ColoredBox(
-                color: const Color(0xC7252836),
+                color: Tokens.dark.tile,
                 child: Center(
-                  child: Text(
-                    '+$more',
-                    style: Type.sans(
-                      19,
-                      weight: FontWeight.w600,
-                      color: const Color(0xFFFFFFFF),
-                    ),
-                  ),
+                  child: Text('+$more', style: Type.title(Tokens.dark.ink)),
                 ),
               ),
           ],
@@ -145,7 +139,7 @@ class _Unloaded extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return Container(
-      color: t.hover,
+      color: t.sunken,
       padding: const EdgeInsets.all(6),
       alignment: Alignment.center,
       child: Column(
@@ -157,13 +151,10 @@ class _Unloaded extends StatelessWidget {
             maxLines: small ? 3 : 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: Type.mono(small ? 10.5 : 14, color: t.muted),
+            style: Type.mono(small ? 11 : 15, color: t.muted),
           ),
           if (!small)
-            Text(
-              'The picture did not load.',
-              style: Type.sans(14, color: t.muted),
-            ),
+            Text('The picture did not load.', style: Type.body(t.muted)),
         ],
       ),
     );
@@ -218,7 +209,7 @@ class _GalleryPageState extends State<GalleryPage> {
       child: Focus(
         autofocus: true,
         child: ColoredBox(
-          color: t.bg,
+          color: t.ground,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -239,17 +230,14 @@ class _GalleryPageState extends State<GalleryPage> {
                           child: Row(
                             spacing: 12,
                             children: [
-                              Text(
-                                'From this answer',
-                                style: Type.sans(13, color: t.muted),
-                              ),
+                              Text('From this answer', style: Type.note(t.ink)),
                               Expanded(
                                 child: Text(
                                   widget.open.chat,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   textAlign: TextAlign.end,
-                                  style: Type.sans(13, color: t.muted),
+                                  style: Type.note(t.ink),
                                 ),
                               ),
                             ],
@@ -270,16 +258,12 @@ class _GalleryPageState extends State<GalleryPage> {
                                     : picture.caption,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: Type.sans(
-                                  16,
+                                style: Type.body(
+                                  t.ink,
                                   weight: FontWeight.w600,
-                                  color: t.ink,
                                 ),
                               ),
-                              Text(
-                                picture.site,
-                                style: Type.mono(13, color: t.muted),
-                              ),
+                              Text(picture.site, style: Type.code(t.muted)),
                             ],
                           ),
                         ),
@@ -322,26 +306,19 @@ class _GalleryPageState extends State<GalleryPage> {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: t.shadow,
-                    blurRadius: 8,
-                    spreadRadius: -2,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                boxShadow: t.tileShadow,
               ),
               child: Tappable(
                 label: label,
                 tooltip: label,
                 onTap: to < 0 || to >= count ? null : () => _go(to),
                 shape: const CircleBorder(),
-                color: t.panel,
+                color: t.tile,
                 dimWhenDisabled: 0.4,
                 child: SizedBox.square(
                   dimension: 44,
                   child: Center(
-                    child: AppIcon(icon, size: IconSize.small, color: t.ink2),
+                    child: AppIcon(icon, size: IconSize.small, color: t.ink),
                   ),
                 ),
               ),

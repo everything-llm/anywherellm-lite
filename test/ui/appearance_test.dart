@@ -70,10 +70,11 @@ void main() {
   });
 
   test('the chosen segment is lighter than its track, in light and dark', () {
+    // The chosen segment is a tile on the sunken track.
     for (final t in [Tokens.light, Tokens.dark]) {
       expect(
-        t.chosen.computeLuminance(),
-        greaterThan(t.hover.computeLuminance()),
+        t.tile.computeLuminance(),
+        greaterThan(t.sunken.computeLuminance()),
       );
     }
   });

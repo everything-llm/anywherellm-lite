@@ -14,6 +14,7 @@ import 'type.dart';
 import 'widgets/basics.dart';
 import 'widgets/buttons.dart';
 import 'widgets/fields.dart';
+import 'widgets/list_row.dart';
 import 'widgets/segmented.dart';
 import 'widgets/sheet.dart';
 import 'widgets/tappable.dart';
@@ -39,12 +40,28 @@ class TaskSheet {
 ScheduledJob? jobById(List<ScheduledJob>? jobs, String? id) =>
     id == null ? null : jobs?.where((j) => j.id == id).firstOrNull;
 
-/// A scheduled task: when it runs, whether it is on, Run now, Edit and Delete, what it does and
-/// how its latest runs went.
+/// A scheduled task in its sheet: when it runs, whether it is on, Run now, Edit and Delete, what
+/// it does and how its latest runs went. Edit opens the form's sheet and Delete asks in this one.
 class TaskDetail extends StatefulWidget {
-  const TaskDetail(this.id, {super.key});
+  const TaskDetail(this.id, {super.key})
+    : onEdit = null,
+      onDelete = null,
+      wide = false;
+
+  /// The task as a list's detail shows it, under a header that says when it runs and holds its
+  /// On switch: Run now, Edit, which calls [onEdit], and Delete task, which calls [onDelete], in
+  /// one row.
+  const TaskDetail.beside(
+    this.id, {
+    super.key,
+    required VoidCallback this.onEdit,
+    required VoidCallback this.onDelete,
+  }) : wide = true;
 
   final String id;
+  final bool wide;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   @override
   State<TaskDetail> createState() => _TaskDetailState();
@@ -84,12 +101,61 @@ class _TaskDetailState extends State<TaskDetail> {
         final now = DateTime.now();
         final runs = toolkit.runs[widget.id];
         final running = runs?.firstOrNull?.running ?? false;
-        final failed = job.enabled && job.lastWentWell == false;
-        final when = !job.enabled
+        final status = job.status(now);
+        // Off says what it means here, where the switch that turns it on is.
+        final when = !status.failed && !job.enabled
             ? 'Off: nothing runs it until you turn it on.'
-            : failed
-            ? job.lastFailedText(now)
-            : job.nextText(now) ?? '';
+            : status.text ?? '';
+        final run = AppButton(
+          running ? 'Running…' : 'Run now',
+          onPressed: toolkit.busy || running
+              ? null
+              : () => toolkit.runNow(widget.id),
+        );
+        final edit = AppButton(
+          'Edit',
+          onPressed:
+              widget.onEdit ??
+              () => shell.togglePopup(TaskSheet(id: widget.id, editing: true)),
+        );
+        final delete = AppButton(
+          'Delete task',
+          danger: true,
+          onPressed: toolkit.busy
+              ? null
+              : widget.onDelete ?? () => setState(() => _asking = true),
+        );
+        final prompt = job.prompt.isEmpty ? 'Nothing saved.' : job.prompt;
+        final tools = job.tools > 0
+            ? CardCaption(
+                'May use ${plural(job.tools, 'tool', 'tools')}, which only AnythingLLM\'s web page sets.',
+              )
+            : null;
+        if (widget.wide) {
+          return SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              spacing: 16,
+              children: [
+                if (toolkit.changeProblem case final problem?)
+                  AlertBox.notice(AlertKind.bad, problem),
+                Wrap(spacing: 8, runSpacing: 8, children: [run, edit, delete]),
+                const SheetLabel('What it does'),
+                FieldCard([CardWords(prompt)]),
+                ?tools,
+                const SheetLabel('Recent runs'),
+                if (runs == null)
+                  const HelpText('Reading…', status: true)
+                else if (runs.isEmpty)
+                  const CardCaption('No runs yet.')
+                else
+                  FieldCard([
+                    for (final run in runs) _RunRow(run, now: now, wide: true),
+                  ]),
+              ],
+            ),
+          );
+        }
         // It scrolls where large text leaves the sheet too short for what it holds.
         return SingleChildScrollView(
           child: Column(
@@ -116,28 +182,10 @@ class _TaskDetailState extends State<TaskDetail> {
                       : (on) => toolkit.setEnabled(widget.id, on),
                 ),
               ]),
-              ActionRow(even: true, [
-                AppButton(
-                  running ? 'Running…' : 'Run now',
-                  onPressed: toolkit.busy || running
-                      ? null
-                      : () => toolkit.runNow(widget.id),
-                ),
-                AppButton(
-                  'Edit',
-                  onPressed: () => shell.togglePopup(
-                    TaskSheet(id: widget.id, editing: true),
-                  ),
-                ),
-              ]),
+              ActionRow(even: true, [run, edit]),
               const SheetLabel('What it does'),
-              FieldCard([
-                CardWords(job.prompt.isEmpty ? 'Nothing saved.' : job.prompt),
-              ]),
-              if (job.tools > 0)
-                CardCaption(
-                  'May use ${plural(job.tools, 'tool', 'tools')}, which only AnythingLLM\'s web page sets.',
-                ),
+              FieldCard([CardWords(prompt)]),
+              ?tools,
               const SheetLabel('Recent runs'),
               if (runs == null)
                 const HelpText('Reading…', status: true)
@@ -146,28 +194,18 @@ class _TaskDetailState extends State<TaskDetail> {
               else
                 FieldCard([for (final run in runs) _RunRow(run, now: now)]),
               if (_asking)
-                SheetQuestion(
-                  'Delete ${job.name}? Its earlier runs go with it.',
+                deleteTaskQuestion(
+                  context,
+                  widget.id,
                   onKeep: () => setState(() => _asking = false),
-                  onConfirm: toolkit.busy
-                      ? null
-                      : () async {
-                          // Only this sheet closes, not a popup opened while it waited.
-                          final sheet = shell.popup.value;
-                          if (await toolkit.removeJob(widget.id) &&
-                              sheet != null) {
-                            shell.closePopup(sheet);
-                          }
-                        },
+                  // Only this sheet closes, not a popup opened while it waited.
+                  onDeleted: switch (shell.popup.value) {
+                    final sheet? => () => shell.closePopup(sheet),
+                    null => () {},
+                  },
                 )
               else
-                AppButton(
-                  'Delete task',
-                  danger: true,
-                  onPressed: toolkit.busy
-                      ? null
-                      : () => setState(() => _asking = true),
-                ),
+                delete,
             ],
           ),
         );
@@ -176,19 +214,49 @@ class _TaskDetailState extends State<TaskDetail> {
   }
 }
 
-/// One run: when it started, in red for one that failed, and what it left.
+/// One run: when it started, then what it left, in red for one that failed; [wide] sets the
+/// two side by side.
 class _RunRow extends StatelessWidget {
-  const _RunRow(this.run, {required this.now});
+  const _RunRow(this.run, {required this.now, this.wide = false});
 
   final JobRun run;
   final DateTime now;
+  final bool wide;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final at = run.startedAt;
-    final when = at == null ? 'Run' : whenText(at, now);
+    final when = Text(
+      capitalized(at == null ? 'Run' : whenText(at, now)),
+      style: Type.body(t.ink),
+    );
     final result = run.running ? 'Running…' : run.result ?? '';
+    final left = result.isEmpty
+        ? null
+        : Text(
+            result,
+            style: Type.note(
+              run.wentWell == false
+                  ? t.danger
+                  : run.running
+                  ? t.accent
+                  : t.ink,
+            ),
+          );
+    if (wide) {
+      return Container(
+        constraints: const BoxConstraints(minHeight: ListRow.height),
+        padding: const EdgeInsets.symmetric(horizontal: FieldCard.inset),
+        child: Row(
+          spacing: 16,
+          children: [
+            SizedBox(width: 152, child: when),
+            Expanded(child: left ?? const SizedBox.shrink()),
+          ],
+        ),
+      );
+    }
     return Container(
       constraints: const BoxConstraints(minHeight: Sizes.cardRow),
       padding: const EdgeInsets.symmetric(
@@ -199,35 +267,41 @@ class _RunRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            capitalized(when),
-            style: Type.sans(15, weight: FontWeight.w500, color: t.ink),
-          ),
-          if (result.isNotEmpty)
-            Text(
-              result,
-              style: Type.sans(
-                13,
-                color: run.wentWell == false
-                    ? t.badfg
-                    : run.running
-                    ? t.accent
-                    : t.muted,
-              ),
-            ),
-        ],
+        children: [when, ?left],
       ),
     );
   }
 }
 
+/// The question before the task [id] is deleted: Keep calls [onKeep], and Delete deletes it and,
+/// once it is gone, calls [onDeleted].
+Widget deleteTaskQuestion(
+  BuildContext context,
+  String id, {
+  required VoidCallback onKeep,
+  required VoidCallback onDeleted,
+}) {
+  final toolkit = AppScope.of(context).toolkit;
+  return SheetQuestion(
+    'Delete ${jobById(toolkit.jobs, id)?.name ?? 'this task'}? Its earlier runs go with it.',
+    onKeep: onKeep,
+    onConfirm: toolkit.busy
+        ? null
+        : () async {
+            if (await toolkit.removeJob(id)) onDeleted();
+          },
+  );
+}
+
 /// A new task, or [existing] changed: its name, what it asks and when, as the person writes it,
 /// which becomes a UTC cron for AnythingLLM.
 class TaskForm extends StatefulWidget {
-  const TaskForm({super.key, this.existing});
+  const TaskForm({super.key, this.existing, this.onDone});
 
   final ScheduledJob? existing;
+
+  /// Called once the form is saved or cancelled, in place of closing its sheet.
+  final VoidCallback? onDone;
 
   @override
   State<TaskForm> createState() => _TaskFormState();
@@ -273,10 +347,16 @@ class _TaskFormState extends State<TaskForm> {
       existing,
       JobDraft(name: name, prompt: prompt, cron: cron),
     );
-    if (done && sheet != null) scope.shell.closePopup(sheet);
+    if (!done) return;
+    if (widget.onDone case final onDone?) {
+      if (mounted) onDone();
+    } else if (sheet != null) {
+      scope.shell.closePopup(sheet);
+    }
   }
 
   void _cancel() {
+    if (widget.onDone case final onDone?) return onDone();
     final shell = AppScope.of(context).shell;
     final id = widget.existing?.id;
     if (id == null) {
@@ -374,7 +454,7 @@ class _TaskFormState extends State<TaskForm> {
               child: Text(
                 problem ?? _spec.caption(now),
                 key: const ValueKey('schedule caption'),
-                style: Type.note(problem == null ? t.muted : t.badfg),
+                style: Type.note(problem == null ? t.ink : t.danger),
               ),
             ),
             ActionRow(even: true, [
@@ -424,9 +504,7 @@ class _Picker extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Expanded(
-              child: Text(value, style: Type.sans(16, color: t.ink)),
-            ),
+            Expanded(child: Text(value, style: Type.body(t.ink))),
             if (icon case final icon?) AppIcon(icon, color: t.muted),
           ],
         ),
@@ -457,17 +535,16 @@ class _DayChips extends StatelessWidget {
               if (!days.contains(i + 1)) i + 1,
             }),
             shape: const CircleBorder(),
-            color: days.contains(i + 1) ? t.accent : t.hover,
+            color: days.contains(i + 1) ? t.accent : t.sunken,
             child: SizedBox(
               width: 44,
               height: 44,
               child: Center(
                 child: Text(
                   weekdayNames[i][0],
-                  style: Type.sans(
-                    13,
+                  style: Type.caption(
+                    days.contains(i + 1) ? t.onAccent : t.ink,
                     weight: FontWeight.w600,
-                    color: days.contains(i + 1) ? t.onaccent : t.muted,
                   ),
                 ),
               ),

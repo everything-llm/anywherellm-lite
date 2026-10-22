@@ -45,7 +45,7 @@ class AppCardView extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final about = card.about;
-    return Tappable(
+    final tile = Tappable(
       label: [
         card.title,
         if (about.isNotEmpty) about,
@@ -53,8 +53,8 @@ class AppCardView extends StatelessWidget {
       ].join(', '),
       onTap: () => unawaited(openAnswerLink(context, card.href)),
       radius: BorderRadius.circular(Sizes.notice),
-      color: t.panel,
-      side: BorderSide(color: t.line),
+      color: t.tile,
+      side: BorderSide(color: t.tileEdge),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
@@ -68,19 +68,14 @@ class AppCardView extends StatelessWidget {
                 children: [
                   Text(
                     card.title,
-                    style: Type.sans(
-                      16,
-                      weight: FontWeight.w600,
-                      color: t.ink,
-                      height: 1.35,
-                    ),
+                    style: Type.body(t.ink, weight: FontWeight.w600),
                   ),
                   if (about.isNotEmpty)
                     Text(
                       about,
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
-                      style: Type.sans(14, color: t.ink2, height: 1.4),
+                      style: Type.note(t.ink),
                     ),
                 ],
               ),
@@ -90,6 +85,13 @@ class AppCardView extends StatelessWidget {
           ],
         ),
       ),
+    );
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(Sizes.notice),
+        boxShadow: t.tileShadow,
+      ),
+      child: tile,
     );
   }
 }
