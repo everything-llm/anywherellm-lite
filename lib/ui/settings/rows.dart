@@ -545,23 +545,31 @@ class SummaryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               spacing: 8,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  spacing: 12,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Type.title(t.ink),
+                LayoutBuilder(
+                  builder: (context, box) => Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    spacing: 12,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Type.title(t.ink),
+                        ),
                       ),
-                    ),
-                    // It gives way to the title on a narrow card with large text.
-                    if (trailing case final trailing?)
-                      Flexible(child: trailing),
-                  ],
+                      // At the card's end, and no wider than half of it, so it gives way to the
+                      // title on a narrow card with large text.
+                      if (trailing case final trailing?)
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: box.maxWidth / 2,
+                          ),
+                          child: trailing,
+                        ),
+                    ],
+                  ),
                 ),
                 ...lines,
                 if (action case final action?) ...[
