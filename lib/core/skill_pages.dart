@@ -3,13 +3,15 @@ import 'connection.dart';
 
 /// How the bridge's `GET /pages` lists one of the suite's pages and the toolkit's card shows it:
 /// the [name] its answer keys the page by, the page's [title] for people, what it holds
-/// ([about]), how a sentence names it ([called]) and its row's [icon].
+/// ([about]), how a sentence names it ([called]), its row's [icon], and what sets it up when it
+/// is not yet ([setUp]).
 typedef PageListing = ({
   String name,
   String title,
   String about,
   String called,
   String icon,
+  String setUp,
 });
 
 /// A page an agent skill publishes into AnythingLLM's web folder, `/<folder>/<token>.html`,
@@ -36,6 +38,7 @@ enum SkillPage {
       about: 'Every workspace\'s apps',
       called: 'the app manager',
       icon: 'apps',
+      setUp: 'Ask the agent about your apps in a chat, then try again.',
     ),
   ),
 
@@ -52,6 +55,7 @@ enum SkillPage {
       about: 'Toolkits and runs',
       called: 'the Library',
       icon: 'grid',
+      setUp: 'Ask the agent to open the Library in a chat, then try again.',
     ),
   ),
 
@@ -68,6 +72,7 @@ enum SkillPage {
       about: 'Keys, sign-ins and allowed addresses',
       called: 'the Vault',
       icon: 'shield',
+      setUp: 'Ask the agent to open the Vault in a chat, then try again.',
     ),
   );
 

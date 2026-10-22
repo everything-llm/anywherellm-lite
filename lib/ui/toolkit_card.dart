@@ -45,7 +45,7 @@ class _ToolkitCardState extends State<ToolkitCard> {
                   icon: listing.icon,
                   title: listing.title,
                   about: listing.about,
-                  onTap: () => _open(page, listing.called),
+                  onTap: () => _open(page, listing),
                 ),
         ];
         if (rows.isEmpty) return const SizedBox.shrink();
@@ -57,10 +57,11 @@ class _ToolkitCardState extends State<ToolkitCard> {
     );
   }
 
-  /// Opens [page], which a sentence names as [called], at the address the toolkit gives now,
-  /// on the connected server. A failure, or a page not set up, shows as a notice in the chat. The shelf closes
+  /// Opens [page], listed as [listing], at the address the toolkit gives now, on the connected
+  /// server. A failure, or a page not set up, shows as a notice in the chat. The shelf closes
   /// after the read, so what opened shows, and the address is held by this call alone.
-  Future<void> _open(SkillPage page, String called) async {
+  Future<void> _open(SkillPage page, PageListing listing) async {
+    final called = listing.called;
     final scope = AppScope.of(context);
     try {
       final path = await scope.toolkit.pagePath(page);
@@ -69,7 +70,7 @@ class _ToolkitCardState extends State<ToolkitCard> {
       if (path == null || server == null) {
         scope.chat.reportLink(
           '${called[0].toUpperCase()}${called.substring(1)} is not set up yet',
-          'Ask the agent to open $called in a chat, then try again.',
+          listing.setUp,
         );
       } else {
         // The shelf holds this card: it opens first, since it needs the card's context.

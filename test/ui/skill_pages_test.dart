@@ -94,6 +94,7 @@ void main() {
     await tester.tap(find.text('Apps'));
     await tester.pumpAndSettle();
     expect(h.chat.linkNotice?.title, 'The app manager is not set up yet');
+    expect(h.chat.linkNotice?.text, contains('about your apps'));
     await tester.pump(ChatController.linkNoticeFor);
     await tester.pumpAndSettle();
   });
