@@ -10,17 +10,25 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Loads the app's own faces, which a test otherwise draws as boxes.
 Future<void> loadFonts() async {
-  const fonts = {
-    'Instrument Sans': 'InstrumentSans.ttf',
-    'JetBrains Mono': 'JetBrainsMono.ttf',
+  // Roboto is Android's own face, so the app does not bundle it: it comes from Flutter's cache.
+  // The test runner is bin/cache/artifacts/engine/<platform>/flutter_tester in Flutter's tree.
+  final artifacts = File(Platform.resolvedExecutable).parent.parent.parent;
+  final roboto = '${artifacts.path}/material_fonts';
+  final fonts = {
+    'Instrument Sans': ['assets/fonts/InstrumentSans.ttf'],
+    'JetBrains Mono': ['assets/fonts/JetBrainsMono.ttf'],
+    'Roboto': [
+      for (final weight in ['Regular', 'Medium', 'Bold'])
+        '$roboto/Roboto-$weight.ttf',
+    ],
   };
-  for (final MapEntry(key: family, value: file) in fonts.entries) {
-    final loader = FontLoader(family)
-      ..addFont(
-        File('assets/fonts/$file')
-            .readAsBytes()
-            .then((bytes) => ByteData.sublistView(bytes)),
+  for (final MapEntry(key: family, value: files) in fonts.entries) {
+    final loader = FontLoader(family);
+    for (final file in files) {
+      loader.addFont(
+        File(file).readAsBytes().then((bytes) => ByteData.sublistView(bytes)),
       );
+    }
     await loader.load();
   }
 }

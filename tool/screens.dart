@@ -4,7 +4,7 @@
 //
 //   flutter test tool/screens.dart
 //
-// writes `<screen>-light.png` and `<screen>-dark.png` to `$SCREENS` or else `build/screens`.
+// and the wide window's screens at 1440 by 900 (`desk-*`), and writes `<screen>-light.png` and `<screen>-dark.png` to `$SCREENS` or else `build/screens`.
 // `flutter test tool/screens.dart --plain-name chats` draws one screen. It sits outside `test/`,
 // so the suite does not run it.
 
@@ -255,12 +255,37 @@ final _signedOut = <String, _Setup>{
     },
 };
 
+/// The screens drawn on a desktop's window, 1440 by 900, with the chats as a sidebar.
+final _wide = <String, _Setup>{
+  'desk-answer': (tester, h) => _openChat(tester, h, 'budget'),
+  'desk-documents': (tester, h) async {
+    await _openChat(tester, h, 'budget');
+    h.shell.openPane(Pane.documents);
+    await _settle(tester);
+  },
+  'desk-upcoming': (tester, h) async {
+    h.shell.openPane(Pane.upcoming);
+    await _settle(tester);
+  },
+  'desk-settings': (tester, h) => _settings(tester, h, SettingsPage.connection),
+};
+
+/// The desktop's window.
+const _desktop = Size(1440, 900);
+
 void main() {
   setUpAll(loadFonts);
 
-  for (final (screens, connected) in [(_screens, true), (_signedOut, false)]) {
+  for (final (screens, connected, size) in [
+    (_screens, true, phoneSize),
+    (_signedOut, false, phoneSize),
+    (_wide, true, _desktop),
+  ]) {
     for (final MapEntry(key: name, value: setup) in screens.entries) {
       testWidgets(name, (tester) async {
+        // Tests draw shadows unblurred unless told otherwise; the pictures show them as a phone
+        // does.
+        debugDisableShadows = false;
         for (final theme in [ThemePref.light, ThemePref.dark]) {
           final (llm, toolkit) = sampleServer();
           final h = await pumpApp(
@@ -268,7 +293,8 @@ void main() {
             llm: llm,
             toolkitServer: toolkit,
             canViewApps: true,
-            shelf: true,
+            size: size,
+            shelf: size == phoneSize,
             canScan: !connected,
             canDictate: true,
             canSpeak: true,
@@ -284,6 +310,7 @@ void main() {
           await tester.pumpWidget(const SizedBox.shrink());
           await tester.pumpAndSettle();
         }
+        debugDisableShadows = true;
       });
     }
   }
