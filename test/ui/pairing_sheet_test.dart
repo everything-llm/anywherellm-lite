@@ -225,4 +225,69 @@ void main() {
     expect(h.settings.connection, sampleConnection);
     await shares.close();
   });
+
+  testWidgets('a pairing link pasted as the address asks first, then '
+      'connects with the toolkit\'s address', (tester) async {
+    final h = await pumpApp(tester, connection: null);
+    h.shell.openSettings(SettingsPage.connection);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.bySemanticsLabel('Server address').last,
+      _link(toolkit: 'https://toolkit.example.com'),
+    );
+    await tapVisible(tester, control('Connect'));
+    await tester.pumpAndSettle();
+    expect(_inSheet(find.text('Connect to this server?')), findsOneWidget);
+    expect(h.llm.verified, isEmpty, reason: 'nothing is sent before Connect');
+    await tester.tap(_inSheet(control('Connect')));
+    await tester.pumpAndSettle();
+    expect(h.settings.connection?.baseUrl, 'https://ai.example.com');
+    expect(h.settings.connection?.apiKey, 'K9');
+    expect(
+      h.settings.addressOf(toolkitCompanion),
+      Uri.parse('https://toolkit.example.com'),
+    );
+    expect(
+      holding(_link(toolkit: 'https://toolkit.example.com')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('a pairing link pasted in Edit connection replaces the saved '
+      'server once Connect is pressed', (tester) async {
+    final h = await pumpApp(tester);
+    h.shell.openSettings(SettingsPage.connection);
+    await tester.pumpAndSettle();
+    await tapVisible(tester, control('Edit connection'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.bySemanticsLabel('AnythingLLM server address').last,
+      _link(),
+    );
+    await tapVisible(tester, control('Save key'));
+    await tester.pumpAndSettle();
+    expect(_inSheet(find.text('Connect to this server?')), findsOneWidget);
+    expect(h.settings.connection, sampleConnection);
+    await tester.tap(_inSheet(control('Connect')));
+    await tester.pumpAndSettle();
+    expect(h.settings.connection?.baseUrl, 'https://ai.example.com');
+  });
+
+  testWidgets('a pasted link it cannot use says why', (tester) async {
+    final h = await pumpApp(tester, connection: null);
+    h.shell.openSettings(SettingsPage.connection);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.bySemanticsLabel('Server address').last,
+      'anywherellm://connect?url=https%3A%2F%2Fai',
+    );
+    await tapVisible(tester, control('Connect'));
+    await tester.pumpAndSettle();
+    expect(
+      _inSheet(find.text('This is not an AnywhereLLM pairing code.')),
+      findsOneWidget,
+    );
+    expect(h.llm.verified, isEmpty);
+    expect(h.settings.connection, isNull);
+  });
 }

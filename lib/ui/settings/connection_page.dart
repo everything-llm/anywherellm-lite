@@ -53,8 +53,10 @@ class _Welcome extends StatelessWidget {
           const Headline('Connect to your ', name: 'AnythingLLM', after: '.'),
           Text(
             scan
-                ? 'Already set up on your computer? Scan its code and this phone is connected.'
-                : 'Enter your AnythingLLM server\'s address and a developer key.',
+                ? 'Already set up on your computer? Scan its code, or paste its pairing link as '
+                      'the address.'
+                : 'Enter your AnythingLLM server\'s address and a developer key, or paste a '
+                      'pairing link as the address.',
             style: Type.lead(t.muted),
           ),
         ],
@@ -161,8 +163,15 @@ class _KeyCardState extends State<_KeyCard> {
     super.dispose();
   }
 
-  /// Saves the typed address and key once they open the server, and closes the form.
+  /// Saves the typed address and key once they open the server, and closes the form. A pairing
+  /// link pasted as the address is offered as a scanned code is, and the key field is not read.
   Future<void> _save() async {
+    final typed = _url.text.trim();
+    if (typed.startsWith('anywherellm:')) {
+      setState(() => _scanProblem = null);
+      _offer(typed);
+      return;
+    }
     if (await _settings.connect(_url.text, _key.text) && mounted) {
       setState(_backToSaved);
     }
@@ -203,9 +212,9 @@ class _KeyCardState extends State<_KeyCard> {
     _key.clear();
   }
 
-  /// Offers a scanned [code] in Connect to this server?, as a tapped link is, which says why when
-  /// it is not a pairing code: a code on a sticker can name any server, so none replaces the
-  /// saved one unasked.
+  /// Offers a scanned or pasted [code] in Connect to this server?, as a tapped link is, which
+  /// says why when it is not a pairing code: a code on a sticker can name any server, so none
+  /// replaces the saved one unasked.
   void _offer(String code) {
     _shell
       ..setScanning(false)
