@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../core/copy.dart';
 import '../core/schedule.dart';
 import 'app_scope.dart';
 import 'state/toolkit_controller.dart';
-import 'layout.dart';
 import 'links.dart';
 import 'settings/rows.dart';
+import 'settings/settings_pages.dart';
+import 'state/notice.dart';
 import 'shell_popup.dart';
 import 'task_sheet.dart';
-import 'toolkit_page.dart';
 import 'tokens.dart';
 import 'type.dart';
 import 'widgets/basics.dart';
@@ -17,13 +18,24 @@ import 'icons.dart';
 import 'widgets/fields.dart';
 import 'widgets/tappable.dart';
 
-/// A phone's Upcoming: each job the server runs on a schedule, with its schedule in local time,
-/// when it runs next and how its last run went. Where the toolkit lets jobs be changed
-/// ([ToolkitController.jobsWritable]) a plus makes one and a row opens its [TaskSheet];
-/// otherwise it is read only, with a way to AnythingLLM's web page. It reads the jobs afresh as
-/// it opens, through the toolkit.
-class UpcomingPage extends StatelessWidget {
+/// Settings' Upcoming page: each job the server runs on a schedule, with its schedule in local
+/// time, when it runs next and how its last run went. Where the toolkit lets jobs be changed
+/// ([ToolkitController.jobsWritable]) the header's plus ([upcomingAction]) makes one and a row
+/// opens its [TaskSheet]; otherwise it is read only, with a way to AnythingLLM's web page. It
+/// reads the jobs afresh as it opens, through the toolkit.
+class UpcomingPage extends StatefulWidget {
   const UpcomingPage({super.key});
+
+  @override
+  State<UpcomingPage> createState() => _UpcomingPageState();
+}
+
+class _UpcomingPageState extends State<UpcomingPage> {
+  @override
+  void initState() {
+    super.initState();
+    AppScope.of(context).toolkit.wantJobs();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,18 +60,7 @@ class UpcomingPage extends StatelessWidget {
           TaskSheet(:final id?) => TaskDetail(id, key: ValueKey(open)),
           _ => const TaskForm(),
         },
-        child: ToolkitPageFrame(
-          title: 'Upcoming',
-          read: toolkit.wantJobs,
-          action: toolkit.jobsWritable
-              ? IconBtn.header(
-                  'plus',
-                  tooltip: 'New task',
-                  onPressed: () => openTask(scope, const TaskSheet()),
-                )
-              : null,
-          body: _body(context, toolkit),
-        ),
+        child: _body(context, toolkit),
       ),
     );
   }
@@ -69,15 +70,15 @@ class UpcomingPage extends StatelessWidget {
     final jobs = toolkit.jobs;
     final now = DateTime.now();
     final writable = toolkit.jobsWritable;
-    return ListView(
-      padding: Sizes.pageIn(context),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (toolkit.changeProblem case final problem?) ...[
           AlertBox.notice(AlertKind.bad, problem),
           const SizedBox(height: 12),
         ],
         if (jobs == null || toolkit.jobsProblem != null)
-          NotRead(toolkit.jobsProblem)
+          _NotRead(toolkit.jobsProblem)
         else if (jobs.isEmpty)
           _NoTasks(writable: writable)
         else
@@ -103,6 +104,65 @@ class UpcomingPage extends StatelessWidget {
               onPressed: () => openServerPage(context),
             ),
           ]),
+      ],
+    );
+  }
+}
+
+/// Upcoming's header button, New task, where the toolkit lets jobs be made; null otherwise.
+Widget? upcomingAction(AppScope scope) => scope.toolkit.jobsWritable
+    ? IconBtn.header(
+        'plus',
+        tooltip: 'New task',
+        onPressed: () => openTask(scope, const TaskSheet()),
+      )
+    : null;
+
+/// How many jobs there are and when the next runs, or null until read: the line under
+/// Upcoming's row in Settings. They are tasks where the toolkit lets them be changed.
+String? upcomingSummary(ToolkitController toolkit) {
+  final jobs = toolkit.jobs;
+  if (jobs == null) return null;
+  final now = DateTime.now();
+  final next = [
+    for (final job in jobs)
+      if (job.enabled) ?job.nextRun,
+  ]..sort();
+  final (one, many) = toolkit.jobsWritable
+      ? ('task', 'tasks')
+      : ('job', 'jobs');
+  return [
+    plural(jobs.length, one, many),
+    if (next.isNotEmpty) 'next ${whenText(next.first, now)}',
+  ].join(' · ');
+}
+
+/// What Upcoming shows before it has something to: why its read failed, with a way to the
+/// Connection page, or Reading… while it reads.
+class _NotRead extends StatelessWidget {
+  const _NotRead(this.problem);
+
+  final Notice? problem;
+
+  @override
+  Widget build(BuildContext context) {
+    final problem = this.problem;
+    if (problem == null) {
+      return Text(
+        'Reading…',
+        style: Type.sans(14, color: Tokens.of(context).muted),
+      );
+    }
+    final shell = AppScope.of(context).shell;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: 12,
+      children: [
+        AlertBox.notice(AlertKind.warn, problem),
+        AppButton(
+          'Open Connection',
+          onPressed: () => shell.showSettingsPage(SettingsPage.connection),
+        ),
       ],
     );
   }

@@ -135,18 +135,15 @@ final _screens = <String, _Setup>{
     await _settle(tester);
   },
   'privacy': (tester, h) => _settings(tester, h, SettingsPage.privacy),
-  'upcoming': (tester, h) async {
-    h.shell.openToolkitPage(ToolkitPage.upcoming);
-    await _settle(tester);
-  },
+  'upcoming': (tester, h) => _settings(tester, h, SettingsPage.upcoming),
   'task': (tester, h) async {
-    h.shell.openToolkitPage(ToolkitPage.upcoming);
+    h.shell.openSettings(SettingsPage.upcoming);
     await _settle(tester);
     h.shell.togglePopup(const TaskSheet(id: '1'));
     await _settle(tester);
   },
   'newtask': (tester, h) async {
-    h.shell.openToolkitPage(ToolkitPage.upcoming);
+    h.shell.openSettings(SettingsPage.upcoming);
     await _settle(tester);
     h.shell.togglePopup(const TaskSheet());
     await _settle(tester);

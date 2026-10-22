@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/core/toolkit.dart';
+import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/task_sheet.dart';
 import 'package:flutter/material.dart';
@@ -44,7 +45,7 @@ Future<Harness> _open(WidgetTester tester, FakeToolkit toolkit) async {
     shelf: true,
     size: const Size(390, 1000),
   );
-  h.shell.openToolkitPage(ToolkitPage.upcoming);
+  h.shell.openSettings(SettingsPage.upcoming);
   await tester.pumpAndSettle();
   return h;
 }

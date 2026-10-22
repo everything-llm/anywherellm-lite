@@ -3,6 +3,7 @@ import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/toolkit.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/schedule.dart';
+import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/upcoming.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -33,8 +34,9 @@ void main() {
       tester,
       llm: planningServer(),
       toolkitServer: toolkit,
-      shelf: true,
     );
+    h.shell.openSettings();
+    await tester.pumpAndSettle();
     expect(find.textContaining('2 jobs · next today'), findsOneWidget);
     await tester.tap(find.text('Upcoming'));
     await tester.pumpAndSettle();
@@ -46,7 +48,7 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(h.shell.toolkitPage, isNull);
+    expect(h.shell.settingsPage, isNull, reason: 'Back gives Settings back');
   });
 
   testWidgets('a read the toolkit refuses says why and offers Connection', (
@@ -58,13 +60,12 @@ void main() {
         status: 401,
       );
     final h = await pumpApp(tester, toolkitServer: toolkit);
-    h.shell.openToolkitPage(ToolkitPage.upcoming);
+    h.shell.openSettings(SettingsPage.upcoming);
     await tester.pumpAndSettle();
     expect(find.textContaining('did not accept the key'), findsOneWidget);
     await tester.tap(control('Open Connection'));
     await tester.pumpAndSettle();
-    expect(h.shell.toolkitPage, isNull);
-    expect(h.shell.settingsOpen, isTrue);
+    expect(h.shell.settingsPage, SettingsPage.connection);
   });
 
   testWidgets('without the toolkit there is no Upcoming, and no Memory', (
@@ -75,11 +76,11 @@ void main() {
       toolkitServer: FakeToolkit(present: false),
       shelf: true,
     );
-    expect(find.text('Upcoming'), findsNothing);
     h.shell.openSettings();
     await tester.pumpAndSettle();
     expect(find.text('Server'), findsOneWidget);
     expect(find.text('Memory'), findsNothing);
+    expect(find.text('Upcoming'), findsNothing);
     await h.toolkitServer.features();
     expect(h.toolkitServer.calls, isNot(contains('scheduledJobs')));
   });
@@ -96,6 +97,7 @@ void main() {
         toolkitCompanion.code: Uri.parse('https://toolkit.example.com'),
       }),
     );
+    h.shell.openSettings();
     await tester.pumpAndSettle();
     expect(h.toolkit.available, isTrue);
     expect(find.text('Upcoming'), findsOneWidget);
@@ -116,7 +118,7 @@ void main() {
       llm: planningServer(),
       toolkitServer: toolkit,
     );
-    h.shell.openToolkitPage(ToolkitPage.upcoming);
+    h.shell.openSettings(SettingsPage.upcoming);
     await tester.pumpAndSettle();
     expect(find.text('No scheduled tasks'), findsOneWidget);
     expect(
@@ -137,7 +139,7 @@ void main() {
       llm: planningServer(),
       toolkitServer: FakeToolkit(),
     );
-    h.shell.openToolkitPage(ToolkitPage.upcoming);
+    h.shell.openSettings(SettingsPage.upcoming);
     await tester.pumpAndSettle();
     expect(find.text('No scheduled tasks'), findsOneWidget);
     expect(find.text('Nothing is scheduled on your server.'), findsOneWidget);

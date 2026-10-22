@@ -39,11 +39,13 @@ name = "upcoming"
 do = [
   "tap Chats",
   "wait What is the weather",
+  "tap Settings",
   "wait Upcoming within 20 s",
   "tap Upcoming",
   "wait Morning check within 20 s",
   "key back",
   "gone Morning check",
+  "key back",
 ]
 
 [[step]]

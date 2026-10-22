@@ -437,7 +437,7 @@ void main() {
           size: size,
           shelf: true,
         );
-        h.shell.openToolkitPage(ToolkitPage.upcoming);
+        h.shell.openSettings(SettingsPage.upcoming);
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull, reason: 'the page');
         h.shell.togglePopup(const TaskSheet(id: '1'));

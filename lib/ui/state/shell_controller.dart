@@ -11,9 +11,6 @@ import 'turn.dart';
 /// What the main pane shows: the chat, or the open workspace's pages.
 enum Pane { chats, files }
 
-/// A page of what the toolkit adds that lies over the chat, opened from its card in the shelf.
-enum ToolkitPage { upcoming }
-
 /// What the sheet over the chat shows: Sources, the passages an answer read from one
 /// file, or all of an answer's sources ([cited]).
 enum Beside { sources, passages, cited }
@@ -143,26 +140,6 @@ class ShellController extends ChangeNotifier {
   bool _scanning = false;
   Guide? _guide;
   int _guideStep = 0;
-  ToolkitPage? _toolkitPage;
-
-  /// The page of what the toolkit shows that lies over the chat, from its card in the shelf, or
-  /// null.
-  ToolkitPage? get toolkitPage => _toolkitPage;
-
-  /// Shows [page] over the chat, closing the shelf and the popup open.
-  void openToolkitPage(ToolkitPage page) {
-    if (_toolkitPage == page) return;
-    _coverChat();
-    _toolkitPage = page;
-    notifyListeners();
-  }
-
-  /// Closes the toolkit's page over the chat, whichever it is.
-  void closeToolkitPage() {
-    if (_toolkitPage == null) return;
-    _toolkitPage = null;
-    notifyListeners();
-  }
 
   SharedItem? _shared;
 
@@ -313,7 +290,6 @@ class ShellController extends ChangeNotifier {
     _sourcesUnder = null;
     _pane = Pane.chats;
     _workspacePage = null;
-    _toolkitPage = null;
     _scanning = false;
     _guide = null;
     _rightOpen = false;

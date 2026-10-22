@@ -85,7 +85,11 @@ void main() {
   ) async {
     final h = await pumpApp(tester, llm: planningServer(), shelf: true);
     expect(find.text('CHATS'), findsOneWidget);
-    expect(find.text('Upcoming'), findsOneWidget);
+    expect(
+      find.text('Upcoming'),
+      findsNothing,
+      reason: 'AnythingLLM\'s own scheduled tasks are in Settings',
+    );
     // A chat's More opens its sheet over the shelf.
     await tester.tap(control('Rename, pin or delete Budget questions'));
     await tester.pumpAndSettle();

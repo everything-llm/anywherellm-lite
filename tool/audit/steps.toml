@@ -272,17 +272,17 @@ do = ["tap Memory", "tap Workspace: Household", "sleep 1"]
 [[step]]
 name = "upcoming"
 group = "toolkit"
-do = ["tap Chats", "tap Upcoming", "wait Morning brief"]
+do = ["tap Chats", "tap Settings", "tap Upcoming", "wait Morning brief"]
 
 [[step]]
 name = "task"
 group = "toolkit"
-do = ["tap Chats", "tap Upcoming", "tap Morning brief", "sleep 1"]
+do = ["tap Chats", "tap Settings", "tap Upcoming", "tap Morning brief", "sleep 1"]
 
 [[step]]
 name = "task-new"
 group = "toolkit"
-do = ["tap Chats", "tap Upcoming", "tap New task", "sleep 1"]
+do = ["tap Chats", "tap Settings", "tap Upcoming", "tap New task", "sleep 1"]
 
 # --- What other apps hand over -----------------------------------------------------------
 

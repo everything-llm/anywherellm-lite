@@ -7,6 +7,7 @@ import '../layout.dart';
 import '../state/settings_controller.dart';
 import '../state/shell_controller.dart';
 import '../tokens.dart';
+import '../upcoming.dart';
 import '../type.dart';
 import '../widgets/phone_page.dart';
 import '../widgets/sheet.dart';
@@ -54,7 +55,11 @@ class _SettingsDialogState extends State<SettingsDialog> {
         child: ColoredBox(
           color: t.bg,
           child: ListenableBuilder(
-            listenable: Listenable.merge([scope.shell, scope.settings]),
+            listenable: Listenable.merge([
+              scope.shell,
+              scope.settings,
+              scope.toolkit,
+            ]),
             builder: (context, _) => _Frame(
               page: scope.shell.settingsPage,
               configured: scope.settings.configured,
@@ -94,6 +99,9 @@ class _Frame extends StatelessWidget {
               ? 'Back to the chat'
               : 'Back to ${page.parent?.label ?? 'Settings'}',
           onBack: shell.settingsBack,
+          action: page == SettingsPage.upcoming
+              ? upcomingAction(AppScope.of(context))
+              : null,
         ),
         Expanded(
           child: ScrollFades(
@@ -106,7 +114,8 @@ class _Frame extends StatelessWidget {
 }
 
 /// The list of Settings: once a server is saved, a card with it, whether it answers and Test
-/// connection; This app's pages; then AnythingLLM's Server and Memory rows; and,
+/// connection; This app's pages; then AnythingLLM's Server, Memory and Upcoming rows, the last
+/// two while the toolkit serves them; and,
 /// while no toolkit answers beside the server, a card that opens Add the toolkit over the list.
 class _Nav extends StatelessWidget {
   const _Nav();
@@ -119,6 +128,7 @@ class _Nav extends StatelessWidget {
     return ListenableBuilder(
       listenable: Listenable.merge([scope.system, settings, scope.toolkit]),
       builder: (context, _) {
+        final toolkit = scope.toolkit..want();
         final connection = settings.connection;
         final list = ListView(
           padding: Sizes.pageIn(context),
@@ -146,25 +156,31 @@ class _Nav extends StatelessWidget {
                   about: serverSummary(scope.system),
                   onTap: () => shell.showSettingsPage(SettingsPage.server),
                 ),
-                if (scope.toolkit.memories)
+                if (toolkit.memories)
                   NavRow(
                     icon: 'memory',
                     title: SettingsPage.memory.label,
                     onTap: () => shell.showSettingsPage(SettingsPage.memory),
                   ),
+                if (toolkit.jobsServed)
+                  NavRow(
+                    icon: 'clock',
+                    title: SettingsPage.upcoming.label,
+                    about: upcomingSummary(toolkit),
+                    onTap: () => shell.showSettingsPage(SettingsPage.upcoming),
+                  ),
               ]),
-              if (scope.toolkit.servesNothing) ...[
+              if (toolkit.servesNothing) ...[
                 const SizedBox(height: 20),
                 SummaryCard(
                   title: 'Get more from your server',
                   lines: [
                     Text(
-                      scope.toolkit.available ?? false
+                      toolkit.available ?? false
                           ? 'The toolkit answers, but lets none of this app\'s calls through. '
-                                'Run its install again to add Memory here, and Upcoming in '
-                                'the chats.'
-                          : 'Install the free toolkit beside AnythingLLM to add Memory here, '
-                                'and Upcoming in the chats.',
+                                'Run its install again to add Memory and Upcoming here.'
+                          : 'Install the free toolkit beside AnythingLLM to add Memory and '
+                                'Upcoming here.',
                       style: Type.sans(13, color: Tokens.of(context).muted),
                     ),
                   ],
@@ -311,6 +327,7 @@ class _PageView extends StatelessWidget {
     SettingsPage.connection => const ConnectionPage(),
     SettingsPage.server => const ServerPage(),
     SettingsPage.memory => const MemoryPage(),
+    SettingsPage.upcoming => const UpcomingPage(),
     SettingsPage.appearance => const AppearancePage(),
     SettingsPage.chat => const ChatPage(),
     SettingsPage.shortcuts => const ShortcutsPage(),
