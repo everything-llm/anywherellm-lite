@@ -4,7 +4,6 @@ import 'package:anywherellm/core/toolkit.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
-import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/upcoming.dart';
 import 'package:flutter_test/flutter_test.dart';
 

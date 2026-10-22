@@ -72,4 +72,21 @@ void main() {
       'What is the budget?',
     );
   });
+
+  testWidgets('Summarise is /summarise, and /summarize still finds it', (
+    tester,
+  ) async {
+    final h = await pumpApp(tester, llm: planningServer());
+    h.chat.newChat();
+    await tester.pumpAndSettle();
+    await tester.enterText(composerField, '/summariz');
+    await tester.pump();
+    expect(find.text('/summarise'), findsOneWidget);
+    await tester.enterText(composerField, '/summarize ');
+    await tester.pump();
+    expect(find.text('Summarise'), findsOneWidget);
+    expect(tester.widget<EditableText>(composerField).controller.text, isEmpty);
+    expect(h.prefs.shortcutNameAvailable('summarize'), isFalse);
+    expect(h.prefs.shortcutNameAvailable('summarise'), isFalse);
+  });
 }

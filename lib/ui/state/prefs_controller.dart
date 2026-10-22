@@ -137,7 +137,7 @@ class PrefsController extends ChangeNotifier {
       ![
         ...builtInPromptShortcuts,
         ...prefs.shortcuts.where((shortcut) => shortcut.id != exceptId),
-      ].any((shortcut) => shortcut.name == name);
+      ].any((shortcut) => shortcut.answersTo(name));
 
   Future<void> saveShortcut(PromptShortcut shortcut) => _change(
     prefs.withShortcuts([

@@ -222,7 +222,7 @@ class ComposerState extends State<Composer> {
       if (match != null) {
         final shortcut = _scope.prefs
             .shortcutsIn(_scope.chat.activeSlug)
-            .where((item) => item.name == match[1]!.toLowerCase())
+            .where((item) => item.answersTo(match[1]!.toLowerCase()))
             .firstOrNull;
         if (shortcut != null) {
           // Shown even when the rest is empty, which leaves the message as it was.
@@ -586,6 +586,7 @@ class _Form extends StatelessWidget {
                 (item) =>
                     slashQuery.isEmpty ||
                     item.name.startsWith(slashQuery) ||
+                    item.formerly.any((name) => name.startsWith(slashQuery)) ||
                     item.label.toLowerCase().startsWith(slashQuery),
               )
               .toList();

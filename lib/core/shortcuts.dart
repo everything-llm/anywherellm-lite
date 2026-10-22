@@ -9,6 +9,7 @@ class PromptShortcut {
     this.requiresDetail = false,
     this.detailHint = 'Add a detail',
     this.barePrompt,
+    this.formerly = const [],
   });
 
   final String id;
@@ -19,6 +20,12 @@ class PromptShortcut {
   final bool requiresDetail;
   final String detailHint;
   final String? barePrompt;
+
+  /// Names this shortcut went by before [name], which still find it when typed.
+  final List<String> formerly;
+
+  /// Whether typing `/`[typed] means this shortcut: its [name], or one of its [formerly] names.
+  bool answersTo(String typed) => name == typed || formerly.contains(typed);
 
   bool appliesTo(String? workspaceKey) =>
       this.workspaceKey == null || this.workspaceKey == workspaceKey;
@@ -33,6 +40,7 @@ class PromptShortcut {
     requiresDetail: requiresDetail,
     detailHint: detailHint,
     barePrompt: barePrompt,
+    formerly: formerly,
   );
 
   static final _placeholder = RegExp(r'\s*\{text\}\s*[.,!?;:]?');
@@ -172,9 +180,11 @@ bool validShortcutName(String name) => _shortcutName.hasMatch(name);
 
 /// The prompts built into the app, which cannot be edited or deleted.
 const builtInPromptShortcuts = [
+  // Its id predates the British spelling and stays as saved prefs know it.
   PromptShortcut(
     id: 'summarize',
-    name: 'summarize',
+    name: 'summarise',
+    formerly: ['summarize'],
     label: 'Summarise',
     prompt: 'Summarise {text}.',
     barePrompt: 'Summarise this chat so far in a few lines.',
