@@ -83,7 +83,7 @@ class _CitedRow extends StatelessWidget {
         ? 'In Documents'
         : null;
     final VoidCallback? open = url != null
-        ? () => openLink(context, url.toString())
+        ? () => openLink(context, url)
         : passages > 0 && present
         ? () => scope.shell.togglePassages(citation)
         : present

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/files.dart';
 import '../../core/gallery.dart';
 import '../../core/server_models.dart';
+import '../../core/skill_pages.dart';
 import '../settings/settings_pages.dart';
 import '../share/shared_item.dart';
 import 'turn.dart';
@@ -34,12 +35,14 @@ class BrowserOpen {
   final Uri tab;
 }
 
-/// A [page] on the connected server that an answer links to, such as an apps-lean app's page,
-/// in a tall sheet over the chat.
+/// The suite's [page] at [url] on the connected server, such as an apps-lean app's page, in a
+/// tall sheet over the chat, its address as it opens: in the app's theme where the page is
+/// [SkillPage.themed].
 class PageOpen {
-  const PageOpen(this.page);
+  const PageOpen(this.page, this.url);
 
-  final Uri page;
+  final SkillPage page;
+  final Uri url;
 }
 
 /// A walk-through over the whole window: How connecting works, over the Connection page and the
@@ -113,9 +116,9 @@ class ShellController extends ChangeNotifier {
     if (_popup.value is BrowserOpen) _popup.value = null;
   }
 
-  /// Shows [page], a page on the connected server, in its sheet over the chat, closing any
-  /// other popup.
-  void openPage(Uri page) => _popup.value = PageOpen(page);
+  /// Shows [url], the suite's [page] on the connected server, in its sheet over the chat,
+  /// closing any other popup.
+  void openPage(SkillPage page, Uri url) => _popup.value = PageOpen(page, url);
 
   /// Closes the page's sheet, when it is open.
   void closePage() {

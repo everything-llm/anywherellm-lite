@@ -168,6 +168,11 @@ String plainHttpWarning(String host) =>
 bool keySafe(Uri uri) =>
     uri.scheme == 'https' || (uri.scheme == 'http' && isPrivateHost(uri.host));
 
+/// Whether [a] and [b] are on one origin: the same scheme, host and port. It is written out,
+/// since [Uri.origin] throws for a scheme other than http and https.
+bool sameOrigin(Uri a, Uri b) =>
+    a.scheme == b.scheme && a.host == b.host && a.port == b.port;
+
 final _trailingDot = RegExp(r'\.$');
 final _v6Brackets = RegExp(r'^\[|\]$');
 final _v6UniqueLocal = RegExp(r'^f[cd][0-9a-f]{2}:');

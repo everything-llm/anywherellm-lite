@@ -5,25 +5,28 @@ import 'package:flutter/widgets.dart';
 
 import '../../core/apps_lean.dart';
 import '../../core/json.dart';
+import '../../core/skill_pages.dart';
 import '../app_scope.dart';
 import '../apps/app_view.dart';
 import '../links.dart';
+import '../state/shell_controller.dart';
 import '../widgets/sheet.dart';
 
 /// The channel an apps-lean page posts its Comment to; seeing it, the page offers Comment.
 const appsChannel = 'AnywhereLLMApps';
 
-/// A page on the connected server that an answer links to, such as an apps-lean app's page, in
-/// a tall sheet over the chat: the page edge to edge under the drag handle, drawing its own
-/// controls. A comment the page posts to [appsChannel] asks Send this to the chat? over the page,
-/// and once sent goes in the chat under the sheet as the person's message, and the sheet closes
-/// so its answer shows. Only an apps-lean page on the connected server ([isAppsLeanPage]) is given
-/// that channel; the Vault and the Library page have none. Esc, Back on the device, the scrim and
-/// a drag down close it, and so does the page's own `window.close()`.
+/// One of the suite's pages on the connected server, such as an apps-lean app's page, in a tall
+/// sheet over the chat: the page edge to edge under the drag handle, drawing its own controls. A
+/// comment the page posts to [appsChannel] asks Send this to the chat? over the page, and once
+/// sent goes in the chat under the sheet as the person's message, and the sheet closes so its
+/// answer shows. Only a page that takes comments ([SkillPage.comments], an apps-lean page) on the
+/// server connected now is given that channel; the Vault and the Library page have none. Esc, Back on the device, the
+/// scrim and a drag down close it, and so does the page's own `window.close()`.
 class PageSheet extends StatefulWidget {
-  const PageSheet(this.page, {super.key});
+  const PageSheet(this.open, {super.key});
 
-  final Uri page;
+  /// The page and its address as it opens.
+  final PageOpen open;
 
   @override
   State<PageSheet> createState() => _PageSheetState();
@@ -31,6 +34,12 @@ class PageSheet extends StatefulWidget {
 
 class _PageSheetState extends State<PageSheet> {
   late final _channel = PageChannel(appsChannel, _heard);
+
+  /// Whether the page takes comments ([SkillPage.comments]) and is on the server connected now,
+  /// checked again as it is drawn, since another server may be in use since it opened.
+  bool _comments(AppScope scope) =>
+      skillPageOf(widget.open.url, scope.settings.connection?.uri)?.comments ??
+      false;
 
   /// The comment the page posted, waiting for the person to send it or not.
   PageComment? _pending;
@@ -88,10 +97,6 @@ class _PageSheetState extends State<PageSheet> {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final view = scope.appView;
-    final comments = isAppsLeanPage(
-      widget.page,
-      scope.settings.connection?.uri,
-    );
     return SheetFrame(
       title: 'The app’s page',
       bare: true,
@@ -116,10 +121,10 @@ class _PageSheetState extends State<PageSheet> {
                 onConfirm: _send,
               ),
               child: view.show(
-                widget.page,
-                onLeave: (url) => openLink(context, url.toString()),
+                widget.open.url,
+                onLeave: (url) => openLink(context, url),
                 onClose: scope.shell.closePage,
-                channel: comments ? _channel : null,
+                channel: _comments(scope) ? _channel : null,
               ),
             ),
     );

@@ -108,7 +108,7 @@ class _AnswerImageState extends State<AnswerImage> {
     return Tappable(
       label: 'Open $name',
       tooltip: why,
-      onTap: () => openLink(context, widget.uri.toString()),
+      onTap: () => openLink(context, widget.uri),
       child: child,
     );
   }

@@ -44,15 +44,13 @@ class _ToolkitCardState extends State<ToolkitCard> {
         final rows = [
           if (toolkit.pagesServed)
             for (final page in SkillPage.values)
-              if (toolkit.pagesFound.contains(page))
+              if (page.listing case final listing?
+                  when toolkit.pagesFound.contains(page))
                 NavRow(
-                  icon: switch (page) {
-                    SkillPage.library => 'grid',
-                    SkillPage.vault => 'shield',
-                  },
-                  title: page.title,
-                  about: page.about,
-                  onTap: () => _open(page),
+                  icon: page == SkillPage.vault ? 'shield' : 'grid',
+                  title: listing.title,
+                  about: listing.about,
+                  onTap: () => _open(page, listing.title),
                 ),
           if (toolkit.jobsServed)
             NavRow(
@@ -71,25 +69,26 @@ class _ToolkitCardState extends State<ToolkitCard> {
     );
   }
 
-  /// Opens [page] at the address the toolkit gives now. A failure, or a page not set up, shows
-  /// as a notice in the chat. The shelf closes after the read, so what opened shows, and the
-  /// address is held by this call alone.
-  Future<void> _open(SkillPage page) async {
+  /// Opens [page], named [title], at the address the toolkit gives now, on the connected
+  /// server. A failure, or a page not set up, shows as a notice in the chat. The shelf closes
+  /// after the read, so what opened shows, and the address is held by this call alone.
+  Future<void> _open(SkillPage page, String title) async {
     final scope = AppScope.of(context);
     try {
       final path = await scope.toolkit.pagePath(page);
       if (!mounted) return;
-      if (path == null) {
+      final server = scope.settings.connection?.uri;
+      if (path == null || server == null) {
         scope.chat.reportLink(
-          'The ${page.title} is not set up yet',
-          'Ask the agent to open the ${page.title} in a chat, then try again.',
+          'The $title is not set up yet',
+          'Ask the agent to open the $title in a chat, then try again.',
         );
       } else {
         // The shelf holds this card: it opens first, since it needs the card's context.
-        unawaited(openAnswerLink(context, path));
+        unawaited(openSkillPage(context, page, server.resolve(path)));
       }
     } on ApiException catch (error) {
-      scope.chat.reportLink('Could not open the ${page.title}', error.message);
+      scope.chat.reportLink('Could not open the $title', error.message);
     }
     scope.shell.closeShelf();
   }

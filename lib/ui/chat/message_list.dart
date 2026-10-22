@@ -1134,7 +1134,7 @@ class _Citation extends StatelessWidget {
             }
           : url == null
           ? null
-          : () => openLink(context, url.toString()),
+          : () => openLink(context, url),
       radius: BorderRadius.circular(99),
       // A chip is the panel's colour, outlined, as the Lite prototype draws it. One that opens
       // nothing, as a file since removed, is fainter all through, not only in its number.

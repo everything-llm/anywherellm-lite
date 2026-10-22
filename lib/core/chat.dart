@@ -108,13 +108,11 @@ Uri onServer(Uri address, Uri? server) =>
     ? server.resolveUri(address)
     : address;
 
-/// The address a link in an answer opens, or null for one the app will not open. Only web
+/// The address [link] in an answer opens, or null for one the app will not open. Only web
 /// pages and mail open; `javascript:`, `file:` and app schemes do not, and a relative path only
 /// as a path from the root of [server] ([onServer]).
-Uri? openableLink(String href, {Uri? server}) {
-  final parsed = Uri.tryParse(href.trim());
-  if (parsed == null) return null;
-  final uri = onServer(parsed, server);
+Uri? openableLink(Uri link, {Uri? server}) {
+  final uri = onServer(link, server);
   if (isWebAddress(uri)) return uri;
   return uri.scheme == 'mailto' && uri.path.contains('@') ? uri : null;
 }

@@ -86,7 +86,7 @@ class _BrowserSheetState extends State<BrowserSheet> {
                 Expanded(
                   child: view.show(
                     widget.tab,
-                    onLeave: (url) => openLink(context, url.toString()),
+                    onLeave: (url) => openLink(context, url),
                     onClose: scope.shell.closeBrowser,
                     onFailed: () => setState(() => _gone = true),
                     channel: _channel,

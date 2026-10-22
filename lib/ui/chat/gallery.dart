@@ -290,7 +290,7 @@ class _GalleryPageState extends State<GalleryPage> {
                             primary: true,
                             onPressed: () => openLink(
                               context,
-                              (picture.page ?? picture.image).toString(),
+                              picture.page ?? picture.image,
                             ),
                           ),
                         ]),

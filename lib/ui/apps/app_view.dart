@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/browser.dart';
+import '../../core/connection.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';

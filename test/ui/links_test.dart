@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:anywherellm/core/skill_pages.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/apps/app_view.dart';
@@ -505,6 +506,16 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
     }
+    h.shell.openPage(
+      SkillPage.apps,
+      Uri.parse('https://other.example/apps-lean/q9Zx_-1aB2.html'),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      h.appView!.channel,
+      isNull,
+      reason: 'an apps-lean page off the server in use takes no comment',
+    );
   });
 
   testWidgets('without a web view an apps-lean page opens in the browser', (

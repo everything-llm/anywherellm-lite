@@ -254,7 +254,7 @@ void main() {
           'https://',
           'mailto:',
         ])
-          openableLink(href)?.toString(),
+          openableLink(Uri.parse(href))?.toString(),
       ],
       [
         'https://example.com/a',
@@ -275,7 +275,10 @@ void main() {
     () {
       final server = Uri.parse('https://owen.example.ts.net:3001/');
       expect(
-        openableLink('/browser-lean/3kQ.html', server: server).toString(),
+        openableLink(
+          Uri.parse('/browser-lean/3kQ.html'),
+          server: server,
+        ).toString(),
         'https://owen.example.ts.net:3001/browser-lean/3kQ.html',
       );
       expect(
@@ -285,8 +288,8 @@ void main() {
         ).toString(),
         'https://owen.example.ts.net:3001/browser-lean/3kQ-card.jpg?v=lq2m1',
       );
-      expect(openableLink('relative/path', server: server), isNull);
-      expect(openableLink('/relative/path'), isNull);
+      expect(openableLink(Uri.parse('relative/path'), server: server), isNull);
+      expect(openableLink(Uri.parse('/relative/path')), isNull);
       expect(
         onServer(Uri.parse('https://example.com/a.png'), server).host,
         'example.com',

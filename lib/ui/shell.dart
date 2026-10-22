@@ -205,9 +205,9 @@ class AppShell extends StatelessWidget {
                                 tab,
                                 key: ValueKey(tab),
                               ),
-                              PageOpen(:final page) => PageSheet(
-                                page,
-                                key: ValueKey(page),
+                              final PageOpen open => PageSheet(
+                                open,
+                                key: ValueKey(open.url),
                               ),
                               final ChatSheetFor of => ChatSheet(
                                 of,

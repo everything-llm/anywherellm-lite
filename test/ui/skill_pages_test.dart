@@ -55,7 +55,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(_reads(toolkit), before + 1);
     expect(
-      (h.shell.popup.value as PageOpen).page,
+      (h.shell.popup.value as PageOpen).url,
       Uri.parse('https://h:3001$_newVault?theme=light'),
     );
     expect(h.shell.shelfOpen, isFalse);
@@ -71,7 +71,7 @@ void main() {
     await tester.tap(find.text('Library'));
     await tester.pumpAndSettle();
     expect(
-      (h.shell.popup.value as PageOpen).page,
+      (h.shell.popup.value as PageOpen).url,
       Uri.parse('https://h:3001$_library'),
     );
     expect(h.shell.shelfOpen, isFalse);

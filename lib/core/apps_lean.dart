@@ -1,30 +1,7 @@
 import 'package:markdown/markdown.dart' as md;
 
-import 'browser.dart';
 import 'chat.dart';
-
-/// Whether [link] is an apps-lean app's page: `/apps-lean/<token>.html`, which the skill
-/// publishes into AnythingLLM's web folder.
-bool isAppsLeanPage(Uri link, Uri? server) =>
-    isSkillPage(link, server, _folder);
-
-const _folder = 'apps-lean';
-
-/// [page] opened in the light or dark theme, as `?theme=light` or `?theme=dark`, which the
-/// skill's `app.js` reads to keep the page to that theme whatever the web view's own scheme is.
-/// The rest of the address is kept, and a `theme` it already had is replaced. A query that is not
-/// valid UTF-8 cannot be kept, and is replaced by the theme.
-Uri pageInTheme(Uri page, {required bool dark}) {
-  Map<String, String> kept;
-  try {
-    kept = page.queryParameters;
-  } on FormatException {
-    kept = const {};
-  }
-  return page.replace(
-    queryParameters: {...kept, 'theme': dark ? 'dark' : 'light'},
-  );
-}
+import 'skill_pages.dart';
 
 /// The element [AppLinkSyntax] wraps a paragraph in.
 const appCardTag = 'appcard';
@@ -36,7 +13,7 @@ const appCardTag = 'appcard';
 /// only: the opening paragraph of a quote is read by [appCardOf] as it stands.
 class AppLinkSyntax extends md.BlockSyntax {
   static final _link = RegExp(
-    '^ {0,3}(?:\\*\\*|\\*|__|_)?\\[[^\\]]+\\]\\([^)\\s]*/$_folder/[^)\\s]*\\)',
+    '^ {0,3}(?:\\*\\*|\\*|__|_)?\\[[^\\]]+\\]\\([^)\\s]*/${SkillPage.apps.folder}/[^)\\s]*\\)',
   );
 
   @override
@@ -45,7 +22,7 @@ class AppLinkSyntax extends md.BlockSyntax {
   @override
   bool canParse(md.BlockParser parser) =>
       parser.parentSyntax == null &&
-      parser.current.content.contains(_folder) &&
+      parser.current.content.contains(SkillPage.apps.folder) &&
       super.canParse(parser);
 
   /// Never ends the paragraph before it.
@@ -105,8 +82,11 @@ AppCard? _cardOf(List<md.Node> inline, Iterable<md.Node> more, Uri? server) {
   final link = _linkIn(inline[at]);
   final href = link?.attributes['href'];
   if (link == null || href == null) return null;
-  final url = openableLink(href, server: server);
-  if (url == null || !isAppsLeanPage(url, server)) return null;
+  final url = Uri.tryParse(href.trim());
+  if (url == null ||
+      skillPageOf(onServer(url, server), server) != SkillPage.apps) {
+    return null;
+  }
   final title = link.textContent.trim();
   if (title.isEmpty) return null;
   final rest = [

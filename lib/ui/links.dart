@@ -1,25 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../core/apps_lean.dart';
-import '../core/browser.dart';
 import '../core/chat.dart';
+import '../core/skill_pages.dart';
 import 'app_scope.dart';
 
-/// Opens [href], a link in an answer, outside the app. Only web and mail links open; anything
-/// else, or a link nothing on the device opens, becomes a short notice in the chat.
-Future<void> openLink(BuildContext context, String href) async {
+/// Opens [link] outside the app. Only web and mail links open; anything else, or a link nothing
+/// on the device opens, becomes a short notice in the chat.
+Future<void> openLink(BuildContext context, Uri link) async {
   final scope = AppScope.of(context);
-  final url = openableLink(href, server: scope.settings.connection?.uri);
-  if (url == null) {
-    final scheme = Uri.tryParse(href.trim())?.scheme ?? '';
-    scope.chat.reportLink(
-      'Could not open the link',
-      scheme.isEmpty || scheme.length > 20
-          ? 'AnywhereLLM opens only web and mail links, not this link.'
-          : 'AnywhereLLM opens only web and mail links, not $scheme: links.',
-    );
-    return;
-  }
+  final url = openableLink(link, server: scope.settings.connection?.uri);
+  if (url == null) return _refused(scope, link.scheme);
   var opened = false;
   try {
     opened = await scope.launch(url);
@@ -34,29 +24,48 @@ Future<void> openLink(BuildContext context, String href) async {
   }
 }
 
-/// Opens [href], a link in an answer: where the device has a web view, browser-lean's page for
-/// an agent's tab opens in its sheet ([isBrowserTab]) and an apps-lean app's page in the page's
-/// sheet ([isAppsLeanPage]), in the theme the app shows in ([pageInTheme]), as does the Vault
-/// ([isVaultPage]); the Library page ([isLibraryPage]) opens in that sheet as it is; anything
-/// else opens as [openLink] does.
+/// Says in the chat that a link of [scheme] does not open, naming the scheme when it reads as
+/// one.
+void _refused(AppScope scope, String scheme) => scope.chat.reportLink(
+  'Could not open the link',
+  scheme.isEmpty || scheme.length > 20
+      ? 'AnywhereLLM opens only web and mail links, not this link.'
+      : 'AnywhereLLM opens only web and mail links, not $scheme: links.',
+);
+
+/// Opens [href], a link in an answer as written: one of the suite's pages ([skillPageOf]) opens
+/// as [openSkillPage] opens it, and anything else as [openLink] does.
 Future<void> openAnswerLink(BuildContext context, String href) async {
   final scope = AppScope.of(context);
+  final link = Uri.tryParse(href.trim());
+  if (link == null) return _refused(scope, '');
   final server = scope.settings.connection?.uri;
-  final url = openableLink(href, server: server);
-  if (url != null && scope.appView != null) {
-    if (isBrowserTab(url, server)) return scope.shell.openBrowser(url);
-    if (isAppsLeanPage(url, server) || isVaultPage(url, server)) {
-      final dark = Theme.of(context).brightness == Brightness.dark;
-      return scope.shell.openPage(pageInTheme(url, dark: dark));
-    }
-    if (isLibraryPage(url, server)) return scope.shell.openPage(url);
+  final url = onServer(link, server);
+  if (skillPageOf(url, server) case final page?) {
+    return openSkillPage(context, page, url);
   }
-  await openLink(context, url?.toString() ?? href);
+  await openLink(context, url);
+}
+
+/// Opens [url], the suite's [page] on the connected server, where the device has a web view:
+/// browser-lean's page for an agent's tab in its sheet, and any other in the page's sheet, in the
+/// theme the app shows in when it is [SkillPage.themed] ([pageInTheme]). Without a web view it
+/// opens as [openLink] does.
+Future<void> openSkillPage(
+  BuildContext context,
+  SkillPage page,
+  Uri url,
+) async {
+  final scope = AppScope.of(context);
+  if (scope.appView == null) return openLink(context, url);
+  if (page == SkillPage.browserTab) return scope.shell.openBrowser(url);
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  scope.shell.openPage(page, page.themed ? pageInTheme(url, dark: dark) : url);
 }
 
 /// Opens AnythingLLM's own web page, at the connected server's address.
 Future<void> openServerPage(BuildContext context) async {
   if (AppScope.of(context).settings.connection case final connection?) {
-    await openLink(context, connection.uri.toString());
+    await openLink(context, connection.uri);
   }
 }
