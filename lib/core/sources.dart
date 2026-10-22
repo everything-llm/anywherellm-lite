@@ -88,3 +88,7 @@ List<SourceFile> mergeSources(List<WorkspaceDoc> embedded, List<OffDoc> off) {
         ),
   ];
 }
+
+/// How close a passage came to what was asked, as `82% match`, from the server's [score]
+/// between 0 and 1.
+String matchText(double score) => '${(score * 100).round()}% match';

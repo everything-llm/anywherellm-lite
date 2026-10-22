@@ -36,3 +36,9 @@ ChatGroups groupChats(
     ],
   );
 }
+
+/// [groups] in the order a list of chats shows them, each with whether it is pinned.
+List<(Thread, bool)> inListOrder(ChatGroups groups) => [
+  for (final thread in groups.pinned) (thread, true),
+  for (final thread in [...groups.recent, ...groups.rest]) (thread, false),
+];

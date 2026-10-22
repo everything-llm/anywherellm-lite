@@ -87,6 +87,12 @@ class ScheduledJob {
     final next? => 'Next: ${whenText(next, now)}',
     null => null,
   };
+
+  /// What a list says of the job beside its schedule, as seen from [now]: that its last run
+  /// failed, which comes first, else Off, else when it runs next; with whether it [failed].
+  ({String? text, bool failed}) status(DateTime now) => lastWentWell == false
+      ? (text: lastFailedText(now), failed: true)
+      : (text: enabled ? nextText(now) : 'Off', failed: false);
 }
 
 /// One run of a [ScheduledJob]: when it started, the server's word for how it [status] ended and

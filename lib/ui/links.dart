@@ -48,7 +48,8 @@ Future<void> openAnswerLink(BuildContext context, String href) async {
 
 /// Opens [url], the suite's [page] on the connected server, where the device has a web view:
 /// browser-lean's page for an agent's tab in its sheet, and any other in the page's sheet at
-/// [SkillPage.openedAt], in the theme the app shows in and on the open workspace. Without a web
+/// [SkillPage.openedAt], in the theme the app shows in, in increased contrast when the device
+/// asks for it, and on the open workspace. Without a web
 /// view it opens as [openLink] does.
 Future<void> openSkillPage(
   BuildContext context,
@@ -62,6 +63,7 @@ Future<void> openSkillPage(
     page.openedAt(
       url,
       dark: Theme.of(context).brightness == Brightness.dark,
+      more: MediaQuery.highContrastOf(context),
       workspace: scope.chat.activeSlug,
     ),
   );

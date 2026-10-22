@@ -16,7 +16,8 @@ typedef PageListing = ({
 
 /// A page an agent skill publishes into AnythingLLM's web folder, `/<folder>/<token>.html`,
 /// which AnythingLLM serves without a sign-in: each kind with the [folder] it lives in and the
-/// [prefix] its token starts with, whether it opens in the app's theme ([themed]) and on the
+/// [prefix] its token starts with, whether it opens in the app's theme ([themed]), in its
+/// increased-contrast form too ([contrasted]), and on the
 /// open workspace's section ([onWorkspace]), whether its address carries a secret the page
 /// embeds ([secret]), whether it is given the apps channel for its Comment ([comments]), and,
 /// for the pages the bridge knows the place of, how `GET /pages` lists it ([listing]).
@@ -31,6 +32,7 @@ enum SkillPage {
     'apps-lean',
     prefix: 'manager-',
     themed: true,
+    contrasted: true,
     onWorkspace: true,
     secret: true,
     listing: (
@@ -66,6 +68,7 @@ enum SkillPage {
   vault(
     'vault-lean',
     themed: true,
+    contrasted: true,
     secret: true,
     listing: (
       name: 'vault',
@@ -81,6 +84,7 @@ enum SkillPage {
     this.folder, {
     this.prefix = '',
     this.themed = false,
+    this.contrasted = false,
     this.onWorkspace = false,
     this.secret = false,
     this.comments = false,
@@ -95,6 +99,10 @@ enum SkillPage {
 
   /// Whether the page opens in the theme the app shows in ([pageInTheme]).
   final bool themed;
+
+  /// Whether a [themed] page takes the increased-contrast themes as well, as the suite's own
+  /// pages do; an app's page has only light and dark.
+  final bool contrasted;
 
   /// Whether the page opens on the open workspace's section, as `#ws=<slug>`.
   final bool onWorkspace;
@@ -111,9 +119,17 @@ enum SkillPage {
   final PageListing? listing;
 
   /// The address the page at [url] opens at: in the [dark] or light theme when it is [themed],
-  /// and on [workspace]'s section when it opens [onWorkspace] and one is open.
-  Uri openedAt(Uri url, {required bool dark, String? workspace}) {
-    final themedUrl = themed ? pageInTheme(url, dark: dark) : url;
+  /// with [more] contrast when it is [contrasted], and on [workspace]'s section when it opens
+  /// [onWorkspace] and one is open.
+  Uri openedAt(
+    Uri url, {
+    required bool dark,
+    bool more = false,
+    String? workspace,
+  }) {
+    final themedUrl = themed
+        ? pageInTheme(url, dark: dark, more: more && contrasted)
+        : url;
     return onWorkspace && workspace != null
         ? themedUrl.replace(fragment: 'ws=$workspace')
         : themedUrl;
@@ -169,11 +185,12 @@ SkillPage? skillPageOf(Uri url, Uri? server) =>
 /// ([SkillPage.secret]), so the web view keeps no copy of it.
 bool holdsSecret(Uri page) => skillPageAt(page.path)?.secret ?? false;
 
-/// [page] opened in the light or dark theme, as `?theme=light` or `?theme=dark`, which the
-/// skill's script reads to keep the page to that theme whatever the web view's own scheme is.
-/// The rest of the address is kept, and a `theme` it already had is replaced. A query that is not
-/// valid UTF-8 cannot be kept, and is replaced by the theme.
-Uri pageInTheme(Uri page, {required bool dark}) {
+/// [page] opened in the light or dark theme, as `?theme=light` or `?theme=dark`, or with [more]
+/// contrast as `?theme=light-hc` or `?theme=dark-hc`, which the skill's script reads to keep the
+/// page to that theme whatever the web view's own scheme is. The rest of the address is kept,
+/// and a `theme` it already had is replaced. A query that is not valid UTF-8 cannot be kept, and
+/// is replaced by the theme.
+Uri pageInTheme(Uri page, {required bool dark, bool more = false}) {
   Map<String, String> kept;
   try {
     kept = page.queryParameters;
@@ -181,7 +198,10 @@ Uri pageInTheme(Uri page, {required bool dark}) {
     kept = const {};
   }
   return page.replace(
-    queryParameters: {...kept, 'theme': dark ? 'dark' : 'light'},
+    queryParameters: {
+      ...kept,
+      'theme': '${dark ? 'dark' : 'light'}${more ? '-hc' : ''}',
+    },
   );
 }
 

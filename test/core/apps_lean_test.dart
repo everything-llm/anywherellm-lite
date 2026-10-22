@@ -33,6 +33,24 @@ void main() {
     },
   );
 
+  test('only the suite\'s own pages take the increased-contrast themes', () {
+    final server = Uri.parse('https://owen.example.ts.net:3001');
+    String theme(SkillPage page, String path) => page
+        .openedAt(server.resolve(path), dark: true, more: true)
+        .queryParameters['theme']!;
+    expect(theme(SkillPage.vault, '/vault-lean/v1.html'), 'dark-hc');
+    expect(
+      theme(SkillPage.appsManager, '/apps-lean/manager-m1.html'),
+      'dark-hc',
+    );
+    // An app's page has only light and dark.
+    expect(theme(SkillPage.apps, '/apps-lean/a1.html'), 'dark');
+    expect(
+      pageInTheme(server, dark: false, more: true).queryParameters['theme'],
+      'light-hc',
+    );
+  });
+
   test('a query that is not valid UTF-8 is replaced by the theme', () {
     final page = Uri.parse(
       'https://owen.example.ts.net:3001/apps-lean/a.html?x=%ff',
