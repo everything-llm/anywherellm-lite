@@ -9,6 +9,7 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 | Generate or edit an image | `POST /v1/openai/images/generations`, multipart with `prompt`, optional `size` and optional `image_references` to edit. It answers a base64 PNG, and only when the server has an image provider set up. |
 | Chats that are in no chat thread | `GET /v1/workspace/{slug}/chats` answers `history`: the chats sent outside any thread, such as the web UI's default workspace chat. Every workspace on the server checked on 2026-10-06 answered an empty list, so this waits until someone uses the default chat. |
 | Settings when a workspace is made | `POST /v1/workspace/new` takes `similarityThreshold`, `openAiTemp`, `openAiHistory`, `queryRefusalResponse` and `topN` besides the `openAiPrompt` New workspace sends. Today they are set afterwards on the workspace's Answer from page. |
+| A documents library in Settings | Every document on the server, beside each workspace's own Documents: `GET /v1/documents` lists the library as a folder tree, a document is added to or taken from a workspace with `update-embeddings`, and `DELETE /v1/system/remove-documents` with `names` deletes it from the server. To be checked against v1.16.2 before building. |
 | Edit a stored answer's text | The web UI edits one answer in place. The app's Edit replaces a question and everything after it; `update-chat`, which rewrites one exchange's text, is not used. |
 
 ## Local, no server needed
@@ -68,6 +69,7 @@ Since the app was simplified to AnywhereLLM Lite, a phone chat client rather tha
 | Gap | Note |
 | --- | --- |
 | Activity | A page of what the agent did, opened from the shelf. AnythingLLM has no route that lists the agent's apps or files or what it did, and apps-lean keeps its apps as files with no listing route. The page built against `FakeToolkit` was removed and is in git history. |
+| An Apps row in the shelf's toolkit card | Beside Library, Vault and Upcoming, opening apps-lean's app manager, a page listing the agent's apps, in `PageSheet`. The manager was built on the lean edition's `apps-manager` branch and never merged, so the suite's apps-lean has no such page. It needs the suite to publish one (it was one page per workspace), the bridge's `GET /pages` to name it, by workspace if it stays one per workspace, and a `listing` on `SkillPage.apps`. |
 | A task that runs once | The prototype's New task offers Once. AnythingLLM's scheduled jobs have no one-shot job, and a dated cron runs again every year, so the form leaves Once out. |
 | A task's workspace | The prototype's New task picks a workspace. AnythingLLM's scheduled jobs belong to none. |
 
