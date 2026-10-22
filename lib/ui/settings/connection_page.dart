@@ -166,10 +166,9 @@ class _KeyCardState extends State<_KeyCard> {
   /// Saves the typed address and key once they open the server, and closes the form. A pairing
   /// link pasted as the address is offered as a scanned code is, and the key field is not read.
   Future<void> _save() async {
-    final typed = _url.text.trim();
-    if (typed.startsWith('anywherellm:')) {
+    if (sharedTextItem(_url.text) case SharedPairing(:final code)) {
       setState(() => _scanProblem = null);
-      _offer(typed);
+      _offer(code);
       return;
     }
     if (await _settings.connect(_url.text, _key.text) && mounted) {

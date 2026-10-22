@@ -37,12 +37,12 @@ class HttpToolkitApi implements ToolkitApi {
   /// Each `/health` answer, null when the toolkit is not there, by the toolkit's address.
   final _found = <String, Future<Object?>>{};
 
-  /// Where the toolkit runs beside the server in use, as a pairing code said
-  /// ([ConnectionHolder.companions]). Null with no server or no such code.
+  /// Where the toolkit runs beside the server in use ([ConnectionHolder.addressOf]). Null with no
+  /// server.
   Uri? get _address => _holder.addressOf(toolkitCompanion);
 
   /// The features the routes the bridge allows let through, from its `/health` at [_address].
-  /// Null when it is not there, has no address, or the key could not go there ([keySafe]).
+  /// Null when it is not there, with no server, or where the key could not go ([keySafe]).
   @override
   Future<Set<String>?> features({bool again = false}) async {
     final at = _address;
@@ -201,11 +201,7 @@ class HttpToolkitApi implements ToolkitApi {
   /// The connection in use and the toolkit's [_address], where its key may go ([keySafe]).
   (Connection, Uri) get _target {
     final connection = _holder.current ?? (throw const NotConfigured());
-    final at =
-        _address ??
-        (throw ApiException(
-          '${toolkitCompanion.name}\'s address is not known: connect with the pairing link it prints.',
-        ));
+    final at = _address!;
     if (!keySafe(at)) throw const ApiException(plainHttpRefused);
     return (connection, at);
   }

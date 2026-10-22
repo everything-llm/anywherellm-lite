@@ -8,8 +8,8 @@ class Companion {
     required this.service,
     required this.name,
     required this.code,
+    required this.path,
     this.formerly = const [],
-    this.path,
   });
 
   /// What its `/health` names itself, as `anywherellm-bridge`.
@@ -29,21 +29,13 @@ class Companion {
   final String name;
 
   /// The path it is looked for under on the server's own origin when no pairing code said where
-  /// it runs, as `anywherellm-bridge`, or null for none.
-  final String? path;
+  /// it runs, as `anywherellm-bridge`.
+  final String path;
 
-  /// Where it runs on [server]'s own origin, its scheme, host and port, under [path], or null
-  /// without one. The key already goes to that origin, so asking there hands it to no one new;
-  /// another host or port could be anyone's.
-  Uri? onOrigin(Uri server) => switch (path) {
-    final path? => Uri(
-      scheme: server.scheme,
-      host: server.host,
-      port: server.hasPort ? server.port : null,
-      pathSegments: [path],
-    ),
-    null => null,
-  };
+  /// Where it runs on [server]'s own origin, its scheme, host and port, under [path]. The key
+  /// already goes to that origin, so asking there hands it to no one new; another host or port
+  /// could be anyone's.
+  Uri onOrigin(Uri server) => server.replace(pathSegments: [path]);
 
   /// Whether [json], an answer to `GET /health`, is this companion's, under any of its [names].
   bool isHealth(Object? json) => json is Map && names.contains(json['service']);
