@@ -121,6 +121,9 @@ class AnswerBody extends StatelessWidget {
           decorationColor: t.accent,
         ),
         code: code.copyWith(backgroundColor: t.sunken),
+        // A code block draws its own box; the package's default would set it on a square of
+        // Material's card colour.
+        codeblockDecoration: const BoxDecoration(),
         h1: heading(22),
         h2: heading(20),
         h3: heading(18),
@@ -204,9 +207,9 @@ class _CodeBlockBuilder extends MarkdownElementBuilder {
   }
 }
 
-/// A code block: monospaced, scrolling sideways ([SideScroll]), with a Copy button in its
-/// corner. Code in a [language] [highlighted] knows is coloured; Copy takes the plain code
-/// either way.
+/// A code block: monospaced, scrolling sideways ([SideScroll]), with a Copy button in a gutter
+/// of its own at its end, so no code ever scrolls under it. Code in a [language] [highlighted]
+/// knows is coloured; Copy takes the plain code either way.
 class _CodeBlock extends StatelessWidget {
   const _CodeBlock(this.code, {this.language});
 
@@ -221,28 +224,32 @@ class _CodeBlock extends StatelessWidget {
     final style = Type.mono(15, color: t.ink, height: 1.45);
     return Container(
       width: double.infinity,
+      // The scrollbar stays inside the rounded corners.
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: t.sunken,
         borderRadius: BorderRadius.circular(Sizes.control),
         border: Border.all(color: t.line),
       ),
-      child: Stack(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SideScroll(
-            padding: const EdgeInsets.fromLTRB(14, 12, 44, 14),
-            child: Text.rich(
-              highlighted(
-                    code,
-                    language,
-                    base: style,
-                    dark: Theme.of(context).brightness == Brightness.dark,
-                  ) ??
-                  TextSpan(text: code, style: style),
+          Expanded(
+            child: SideScroll(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+              child: Text.rich(
+                highlighted(
+                      code,
+                      language,
+                      base: style,
+                      dark: Theme.of(context).brightness == Brightness.dark,
+                    ) ??
+                    TextSpan(text: code, style: style),
+              ),
             ),
           ),
-          Positioned(
-            top: 4,
-            right: 4,
+          Padding(
+            padding: const EdgeInsets.only(top: 4, right: 4),
             child: CopyButton(code, tooltip: 'Copy code', box: 28),
           ),
         ],

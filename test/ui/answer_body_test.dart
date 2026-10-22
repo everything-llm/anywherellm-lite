@@ -3,6 +3,7 @@ import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/chat/answer_body.dart';
 import 'package:anywherellm/ui/chat/markdown_lists.dart';
 import 'package:anywherellm/ui/chat/wait_line.dart';
+import 'package:anywherellm/ui/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:anywherellm/ui/widgets/controls.dart';
@@ -101,25 +102,80 @@ void main() {
     expect(bars.map((b) => b.thumbVisibility), contains(true));
   });
 
-  testWidgets('a code block and display math show their scrollbars', (
-    tester,
-  ) async {
-    final code = 'final total = ${List.filled(30, 'price').join(' + ')};';
-    final sum = List.filled(40, 'x_i').join(' + ');
-    await pumpApp(
-      tester,
-      llm: answering('```dart\n$code\n```\n\n\$\$$sum\$\$'),
-      size: const Size(500, 800),
+  testWidgets(
+    'a code block and display math show thin scrollbars in the line colour',
+    (tester) async {
+      final code = 'final total = ${List.filled(30, 'price').join(' + ')};';
+      final sum = List.filled(40, 'x_i').join(' + ');
+      await pumpApp(
+        tester,
+        llm: answering('```dart\n$code\n```\n\n\$\$$sum\$\$'),
+        size: const Size(500, 800),
+      );
+      await tester.pumpAndSettle();
+      final bars = tester.widgetList<RawScrollbar>(
+        find.descendant(
+          of: find.byType(AnswerBody),
+          matching: find.byType(RawScrollbar),
+        ),
+      );
+      expect(bars.where((b) => b.thumbVisibility == true), hasLength(2));
+      final line = Tokens.light.lineStrong;
+      for (final bar in bars) {
+        expect(bar.thickness, lessThanOrEqualTo(4));
+        expect(bar.thumbColor, line);
+      }
+    },
+  );
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'a code block keeps its Copy button clear of the code, scrolled or not, '
+      'and sits on nothing square (text at ${scale}x)',
+      (tester) async {
+        final code =
+            'Linux agents-vm 6.12.113+deb13-cloud-amd64 #1 SMP PREEMPT_DYNAMIC '
+            'Debian 6.12.113-1 (2026-10-15) x86_64 GNU/Linux';
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await pumpApp(
+          tester,
+          llm: answering('Just ran it:\n\n```\n$code\n```'),
+          size: const Size(320, 700),
+        );
+        await tester.pumpAndSettle();
+        final copy = find.byTooltip('Copy code');
+        final view = find.descendant(
+          of: find.byType(AnswerBody),
+          matching: find.byType(Scrollable),
+        );
+        for (final end in [false, true]) {
+          if (end) {
+            final scroll = tester.state<ScrollableState>(view.first).position;
+            scroll.jumpTo(scroll.maxScrollExtent);
+            await tester.pump();
+          }
+          final viewport = tester.getRect(view.first);
+          expect(
+            viewport.overlaps(tester.getRect(copy)),
+            isFalse,
+            reason: 'the code scrolls only beside the button',
+          );
+        }
+        // Nothing behind the rounded box paints a colour of its own: the package's wrapper of a
+        // code block is bare.
+        final behind = tester
+            .widgetList<Container>(
+              find.ancestor(of: copy, matching: find.byType(Container)),
+            )
+            .map((c) => c.decoration)
+            .whereType<BoxDecoration>()
+            .where((d) => d.color != null && d.color != Tokens.light.sunken);
+        expect(behind, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
     );
-    await tester.pumpAndSettle();
-    final bars = tester.widgetList<Scrollbar>(
-      find.descendant(
-        of: find.byType(AnswerBody),
-        matching: find.byType(Scrollbar),
-      ),
-    );
-    expect(bars.where((b) => b.thumbVisibility == true), hasLength(2));
-  });
+  }
 
   testWidgets('an answer is drawn as Markdown', (tester) async {
     await pumpApp(tester, llm: _server());
