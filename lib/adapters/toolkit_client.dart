@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../core/companion.dart';
 import '../core/connection.dart';
+import '../core/copy.dart';
 import '../core/json.dart';
 import '../core/memory.dart';
 import '../core/ports.dart';
@@ -269,7 +270,7 @@ class HttpToolkitApi implements ToolkitApi {
       _ => '',
     };
     if (said.isEmpty) return null;
-    final raised = '${said[0].toUpperCase()}${said.substring(1)}';
+    final raised = capitalized(said);
     return _endsSentence.hasMatch(raised) ? raised : '$raised.';
   }
 

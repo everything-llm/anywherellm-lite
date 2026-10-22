@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:anywherellm/core/skill_pages.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/apps/app_view.dart';
@@ -507,7 +506,6 @@ void main() {
       await tester.pumpAndSettle();
     }
     h.shell.openPage(
-      SkillPage.apps,
       Uri.parse('https://other.example/apps-lean/q9Zx_-1aB2.html'),
     );
     await tester.pumpAndSettle();

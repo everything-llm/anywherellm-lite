@@ -6,7 +6,8 @@ import 'package:markdown/markdown.dart' as md;
 
 void main() {
   final server = Uri.parse('https://owen.example.ts.net:3001');
-  bool page(String link, {Uri? on}) => _isApps(Uri.parse(link), on);
+  bool page(String link, {Uri? on}) =>
+      skillPageOf(Uri.parse(link), on) == SkillPage.apps;
 
   test(
     'a page opens in the light or dark theme, keeping the rest of its address',
@@ -25,7 +26,10 @@ void main() {
         ).queryParameters,
         {'tab': '2', 'theme': 'dark'},
       );
-      expect(_isApps(pageInTheme(page, dark: true), server), isTrue);
+      expect(
+        skillPageOf(pageInTheme(page, dark: true), server),
+        SkillPage.apps,
+      );
     },
   );
 
@@ -167,7 +171,3 @@ void main() {
     });
   });
 }
-
-/// Whether [link] is an apps-lean app's page on [server]'s origin.
-bool _isApps(Uri link, Uri? server) =>
-    skillPageOf(link, server) == SkillPage.apps;

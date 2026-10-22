@@ -96,160 +96,106 @@ void main() {
 
   group('on the server\'s origin', () {
     final server = Uri.parse('https://owen.example.ts.net:3001');
-    bool tab(String link, {Uri? on}) => isBrowserTab(Uri.parse(link), on);
 
     test('a tab\'s page on the server\'s host is the agent\'s browser', () {
       expect(
-        tab(
+        _at(
           'https://owen.example.ts.net:3001/browser-lean/3kQ_Zx-1.html',
           on: server,
         ),
-        isTrue,
+        SkillPage.browserTab,
       );
     });
 
     test(
       'never another host, another path, plain http off home, or no server',
       () {
-        expect(
-          tab('https://evil.test/browser-lean/3kQ.html', on: server),
-          isFalse,
-        );
-        expect(
-          tab(
+        for (final (link, on) in [
+          ('https://evil.test/browser-lean/3kQ.html', server),
+          (
             'https://owen.example.ts.net:3001/browser-lean/3kQ-card.jpg',
-            on: server,
+            server,
           ),
-          isFalse,
-        );
-        expect(
-          tab(
-            'https://owen.example.ts.net:3001/browser-lean/a/b.html',
-            on: server,
+          ('https://owen.example.ts.net:3001/browser-lean/a/b.html', server),
+          (
+            'http://ai.example.com/browser-lean/3kQ.html',
+            Uri.parse('https://ai.example.com'),
           ),
-          isFalse,
-        );
-        final public = Uri.parse('https://ai.example.com');
-        expect(
-          tab('http://ai.example.com/browser-lean/3kQ.html', on: public),
-          isFalse,
-        );
-        expect(
-          tab('https://owen.example.ts.net:3001/browser-lean/3kQ.html'),
-          isFalse,
-        );
+          ('https://owen.example.ts.net:3001/browser-lean/3kQ.html', null),
+        ]) {
+          expect(_at(link, on: on), isNull, reason: link);
+        }
       },
     );
 
     test('never the server\'s host on another scheme or port', () {
       final named = Uri.parse('https://nas.ts.net');
-      for (final link in [
-        'http://nas.ts.net:8080/vault-lean/x.html',
-        'http://nas.ts.net/vault-lean/x.html',
-        'https://nas.ts.net:8443/vault-lean/x.html',
+      for (final origin in [
+        'http://nas.ts.net:8080',
+        'http://nas.ts.net',
+        'https://nas.ts.net:8443',
       ]) {
-        final url = Uri.parse(link);
-        expect(isVaultPage(url, named), isFalse, reason: link);
-        expect(
-          isBrowserTab(Uri.parse(link.replaceAll('vault', 'browser')), named),
-          isFalse,
-          reason: link,
-        );
-        expect(
-          isLibraryPage(Uri.parse(link.replaceAll('vault', 'library')), named),
-          isFalse,
-          reason: link,
-        );
-        expect(
-          isAppsLeanPage(Uri.parse(link.replaceAll('vault', 'apps')), named),
-          isFalse,
-          reason: link,
-        );
+        for (final page in SkillPage.values) {
+          final link = '$origin/${page.folder}/${page.prefix}x.html';
+          expect(_at(link, on: named), isNull, reason: link);
+        }
       }
       expect(
-        isVaultPage(
-          Uri.parse('https://nas.ts.net:443/vault-lean/x.html'),
-          named,
+        _at('https://nas.ts.net:443/vault-lean/x.html', on: named),
+        SkillPage.vault,
+      );
+      expect(
+        _at('https://nas.ts.net/vault-lean/x.html', on: named),
+        SkillPage.vault,
+      );
+      expect(
+        _at(
+          'https://nas.ts.net:3001/vault-lean/x.html',
+          on: Uri.parse('https://nas.ts.net:3001'),
         ),
-        isTrue,
-      );
-      expect(
-        isVaultPage(Uri.parse('https://nas.ts.net/vault-lean/x.html'), named),
-        isTrue,
-      );
-      expect(
-        isVaultPage(
-          Uri.parse('https://nas.ts.net:3001/vault-lean/x.html'),
-          Uri.parse('https://nas.ts.net:3001'),
-        ),
-        isTrue,
+        SkillPage.vault,
       );
     });
 
-    test('the Vault is its page on the server\'s host', () {
-      bool vault(String link) => isVaultPage(Uri.parse(link), server);
-      expect(
-        vault('https://owen.example.ts.net:3001/vault-lean/aB3_-x9.html'),
-        isTrue,
-      );
-      expect(vault('https://evil.test/vault-lean/aB3.html'), isFalse);
-      expect(
-        vault('https://owen.example.ts.net:3001/library-lean/aB3.html'),
-        isFalse,
-      );
-      expect(
-        vault('https://owen.example.ts.net:3001/vault-lean/aB3-keys.json'),
-        isFalse,
-      );
+    test('each page is its own folder\'s page, and nothing else is', () {
+      for (final (path, page) in [
+        ('/vault-lean/aB3_-x9.html', SkillPage.vault),
+        ('/library-lean/aB3_-x9.html', SkillPage.library),
+        ('/apps-lean/aB3.html', SkillPage.apps),
+      ]) {
+        expect(
+          _at('https://owen.example.ts.net:3001$path', on: server),
+          page,
+          reason: path,
+        );
+        expect(_at('https://evil.test$path', on: server), isNull);
+      }
+      for (final path in [
+        '/vault-lean/aB3-keys.json',
+        '/library-lean/s-aB3.json',
+      ]) {
+        expect(
+          _at('https://owen.example.ts.net:3001$path', on: server),
+          isNull,
+          reason: path,
+        );
+      }
     });
 
-    test('the Library page is library-lean\'s page on the server\'s host', () {
-      bool library(String link) => isLibraryPage(Uri.parse(link), server);
-      expect(
-        library('https://owen.example.ts.net:3001/library-lean/aB3_-x9.html'),
-        isTrue,
-      );
-      expect(library('https://evil.test/library-lean/aB3.html'), isFalse);
-      expect(
-        library('https://owen.example.ts.net:3001/apps-lean/aB3.html'),
-        isFalse,
-      );
-      expect(
-        library('https://owen.example.ts.net:3001/library-lean/s-aB3.json'),
-        isFalse,
-      );
-    });
-
-    test('a skill path is exactly /<folder>/<token>.html in its folder', () {
-      expect(isSkillPath('/vault-lean/aB3_-x9.html', 'vault-lean'), isTrue);
-      expect(isSkillPath('/vault-lean/aB3.html', 'library-lean'), isFalse);
-      expect(isSkillPath('/vault-lean/aB3.html?x=1', 'vault-lean'), isFalse);
-      expect(isSkillPath('/vault-lean/../x.html', 'vault-lean'), isFalse);
-      expect(
-        isSkillPath('https://h/vault-lean/aB3.html', 'vault-lean'),
-        isFalse,
-      );
-      expect(isSkillPath('/vault-lean/a/b.html', 'vault-lean'), isFalse);
+    test('a skill path is exactly /<folder>/<token>.html', () {
+      expect(skillPageAt('/vault-lean/aB3_-x9.html'), SkillPage.vault);
+      for (final path in [
+        '/vault-lean/aB3.html?x=1',
+        '/vault-lean/../x.html',
+        'https://h/vault-lean/aB3.html',
+        '/vault-lean/a/b.html',
+        '/other-lean/aB3.html',
+      ]) {
+        expect(skillPageAt(path), isNull, reason: path);
+      }
     });
   });
 }
 
-/// Whether [link] is browser-lean's page for an agent's tab on [server]'s origin.
-bool isBrowserTab(Uri link, Uri? server) =>
-    skillPageOf(link, server) == SkillPage.browserTab;
-
-/// Whether [link] is the Vault on [server]'s origin.
-bool isVaultPage(Uri link, Uri? server) =>
-    skillPageOf(link, server) == SkillPage.vault;
-
-/// Whether [link] is the Library page on [server]'s origin.
-bool isLibraryPage(Uri link, Uri? server) =>
-    skillPageOf(link, server) == SkillPage.library;
-
-/// Whether [link] is an apps-lean app's page on [server]'s origin.
-bool isAppsLeanPage(Uri link, Uri? server) =>
-    skillPageOf(link, server) == SkillPage.apps;
-
-/// Whether [path] is exactly a page's path in [folder].
-bool isSkillPath(String path, String folder) =>
-    skillPageAt(path)?.folder == folder;
+/// The suite's page [link] is on [on]'s origin ([skillPageOf]).
+SkillPage? _at(String link, {Uri? on}) => skillPageOf(Uri.parse(link), on);

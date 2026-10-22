@@ -77,7 +77,7 @@ void main() {
     await tester.tap(find.text('Apps'));
     await tester.pumpAndSettle();
     final open = h.shell.popup.value as PageOpen;
-    expect(open.page, SkillPage.appsManager);
+    expect(skillPageAt(open.url.path), SkillPage.appsManager);
     expect(
       open.url,
       Uri.parse('https://h:3001$_manager?theme=light#ws=${h.chat.activeSlug}'),

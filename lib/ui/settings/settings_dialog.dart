@@ -55,11 +55,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
         child: ColoredBox(
           color: t.bg,
           child: ListenableBuilder(
-            listenable: Listenable.merge([
-              scope.shell,
-              scope.settings,
-              scope.toolkit,
-            ]),
+            listenable: Listenable.merge([scope.shell, scope.settings]),
             builder: (context, _) => _Frame(
               page: scope.shell.settingsPage,
               configured: scope.settings.configured,
@@ -99,9 +95,7 @@ class _Frame extends StatelessWidget {
               ? 'Back to the chat'
               : 'Back to ${page.parent?.label ?? 'Settings'}',
           onBack: shell.settingsBack,
-          action: page == SettingsPage.upcoming
-              ? upcomingAction(AppScope.of(context))
-              : null,
+          action: page == null ? null : _PageView.actionOf(page),
         ),
         Expanded(
           child: ScrollFades(
@@ -128,7 +122,7 @@ class _Nav extends StatelessWidget {
     return ListenableBuilder(
       listenable: Listenable.merge([scope.system, settings, scope.toolkit]),
       builder: (context, _) {
-        final toolkit = scope.toolkit..want();
+        final toolkit = scope.toolkit..wantJobsOnce();
         final connection = settings.connection;
         final list = ListView(
           padding: Sizes.pageIn(context),
@@ -322,6 +316,12 @@ class _PageView extends StatelessWidget {
       child: column,
     );
   }
+
+  /// The round button at the end of [page]'s header, or null for none.
+  static Widget? actionOf(SettingsPage page) => switch (page) {
+    SettingsPage.upcoming => const UpcomingAction(),
+    _ => null,
+  };
 
   static Widget _body(SettingsPage page) => switch (page) {
     SettingsPage.connection => const ConnectionPage(),

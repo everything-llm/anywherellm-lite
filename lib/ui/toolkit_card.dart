@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../core/copy.dart';
 import '../core/ports.dart';
 import '../core/skill_pages.dart';
 import 'app_scope.dart';
@@ -35,7 +36,7 @@ class _ToolkitCardState extends State<ToolkitCard> {
       listenable: Listenable.merge([scope.toolkit, scope.chat]),
       builder: (context, _) {
         final toolkit = scope.toolkit;
-        toolkit.want();
+        toolkit.wantPagesOnce();
         final rows = [
           if (toolkit.pagesServed)
             for (final page in SkillPage.values)
@@ -69,7 +70,7 @@ class _ToolkitCardState extends State<ToolkitCard> {
       final server = scope.settings.connection?.uri;
       if (path == null || server == null) {
         scope.chat.reportLink(
-          '${called[0].toUpperCase()}${called.substring(1)} is not set up yet',
+          '${capitalized(called)} is not set up yet',
           listing.setUp,
         );
       } else {

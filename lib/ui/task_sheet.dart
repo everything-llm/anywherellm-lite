@@ -201,7 +201,7 @@ class _RunRow extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            '${when[0].toUpperCase()}${when.substring(1)}',
+            capitalized(when),
             style: Type.sans(15, weight: FontWeight.w500, color: t.ink),
           ),
           if (result.isNotEmpty)

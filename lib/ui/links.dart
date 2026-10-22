@@ -33,24 +33,23 @@ void _refused(AppScope scope, String scheme) => scope.chat.reportLink(
       : 'AnywhereLLM opens only web and mail links, not $scheme: links.',
 );
 
-/// Opens [href], a link in an answer as written: one of the suite's pages ([skillPageOf]) opens
+/// Opens [href], a link in an answer as written: one of the suite's pages ([skillLinkOf]) opens
 /// as [openSkillPage] opens it, and anything else as [openLink] does.
 Future<void> openAnswerLink(BuildContext context, String href) async {
   final scope = AppScope.of(context);
-  final link = Uri.tryParse(href.trim());
-  if (link == null) return _refused(scope, '');
   final server = scope.settings.connection?.uri;
-  final url = onServer(link, server);
-  if (skillPageOf(url, server) case final page?) {
+  if (skillLinkOf(href, server) case (final page, final url)) {
     return openSkillPage(context, page, url);
   }
-  await openLink(context, url);
+  final link = Uri.tryParse(href.trim());
+  if (link == null) return _refused(scope, '');
+  await openLink(context, onServer(link, server));
 }
 
 /// Opens [url], the suite's [page] on the connected server, where the device has a web view:
-/// browser-lean's page for an agent's tab in its sheet, and any other in the page's sheet, in the
-/// theme the app shows in when it is [SkillPage.themed] ([pageInTheme]), and the app manager on
-/// the open workspace's section (`#ws=<slug>`). Without a web view it opens as [openLink] does.
+/// browser-lean's page for an agent's tab in its sheet, and any other in the page's sheet at
+/// [SkillPage.openedAt], in the theme the app shows in and on the open workspace. Without a web
+/// view it opens as [openLink] does.
 Future<void> openSkillPage(
   BuildContext context,
   SkillPage page,
@@ -59,14 +58,13 @@ Future<void> openSkillPage(
   final scope = AppScope.of(context);
   if (scope.appView == null) return openLink(context, url);
   if (page == SkillPage.browserTab) return scope.shell.openBrowser(url);
-  final dark = Theme.of(context).brightness == Brightness.dark;
-  var opened = page.themed ? pageInTheme(url, dark: dark) : url;
-  if (page == SkillPage.appsManager) {
-    if (scope.chat.activeSlug case final slug?) {
-      opened = opened.replace(fragment: 'ws=$slug');
-    }
-  }
-  scope.shell.openPage(page, opened);
+  scope.shell.openPage(
+    page.openedAt(
+      url,
+      dark: Theme.of(context).brightness == Brightness.dark,
+      workspace: scope.chat.activeSlug,
+    ),
+  );
 }
 
 /// Opens AnythingLLM's own web page, at the connected server's address.

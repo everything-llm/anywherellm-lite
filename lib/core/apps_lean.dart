@@ -82,11 +82,7 @@ AppCard? _cardOf(List<md.Node> inline, Iterable<md.Node> more, Uri? server) {
   final link = _linkIn(inline[at]);
   final href = link?.attributes['href'];
   if (link == null || href == null) return null;
-  final url = Uri.tryParse(href.trim());
-  if (url == null ||
-      skillPageOf(onServer(url, server), server) != SkillPage.apps) {
-    return null;
-  }
+  if (skillLinkOf(href, server)?.$1 != SkillPage.apps) return null;
   final title = link.textContent.trim();
   if (title.isEmpty) return null;
   final rest = [

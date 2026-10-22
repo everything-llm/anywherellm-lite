@@ -5,6 +5,10 @@ import 'dart:convert';
 /// What a document whose text the server left out says in place of it.
 const noDocText = 'The server did not send this document\'s text.';
 
+/// [text] with its first letter raised: `the Vault` as `The Vault`.
+String capitalized(String text) =>
+    text.isEmpty ? text : '${text[0].toUpperCase()}${text.substring(1)}';
+
 /// `1 item`, `3 items`, `1,284 items`.
 String plural(int count, String one, String many) =>
     '${grouped(count)} ${count == 1 ? one : many}';

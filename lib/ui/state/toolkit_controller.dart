@@ -124,21 +124,22 @@ class ToolkitController extends ChangeNotifier with FollowsServer {
     notifyListeners();
   }
 
-  /// The read of each feature the toolkit serves that has not been read on this server, nor is
-  /// being read.
-  List<void Function()> get _unasked => [
-    if (jobsServed && !_jobs.asked) () => unawaited(readJobs()),
-    if (pagesServed && !_pages.asked) _readPages,
-  ];
-
-  /// Reads, after the frame, each feature the toolkit serves that has not been read on this
-  /// server, nor is being read.
-  void want() {
-    if (_unasked.isEmpty) return;
+  /// Reads the jobs after the frame, where the toolkit serves them and they have not been read
+  /// on this server, nor are being read, as the Settings list does for Upcoming's line.
+  void wantJobsOnce() {
+    if (!jobsServed || _jobs.asked) return;
     afterFrame(() {
-      for (final read in _unasked) {
-        read();
-      }
+      if (!_jobs.asked) unawaited(readJobs());
+    });
+  }
+
+  /// Reads which pages are set up after the frame, where the toolkit serves them and they have
+  /// not been read on this server, nor are being read, as the shelf's card does once the
+  /// toolkit is found.
+  void wantPagesOnce() {
+    if (!pagesServed || _pages.asked) return;
+    afterFrame(() {
+      if (!_pages.asked) _readPages();
     });
   }
 

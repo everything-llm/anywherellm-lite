@@ -32,13 +32,11 @@ class BrowserOpen {
   final Uri tab;
 }
 
-/// The suite's [page] at [url] on the connected server, such as an apps-lean app's page, in a
-/// tall sheet over the chat, its address as it opens: in the app's theme where the page is
-/// [SkillPage.themed].
+/// One of the suite's pages on the connected server at [url], such as an apps-lean app's page,
+/// in a tall sheet over the chat, its address as it opens ([SkillPage.openedAt]).
 class PageOpen {
-  const PageOpen(this.page, this.url);
+  const PageOpen(this.url);
 
-  final SkillPage page;
   final Uri url;
 }
 
@@ -113,9 +111,9 @@ class ShellController extends ChangeNotifier {
     if (_popup.value is BrowserOpen) _popup.value = null;
   }
 
-  /// Shows [url], the suite's [page] on the connected server, in its sheet over the chat,
+  /// Shows [url], one of the suite's pages on the connected server, in its sheet over the chat,
   /// closing any other popup.
-  void openPage(SkillPage page, Uri url) => _popup.value = PageOpen(page, url);
+  void openPage(Uri url) => _popup.value = PageOpen(url);
 
   /// Closes the page's sheet, when it is open.
   void closePage() {
@@ -276,14 +274,14 @@ class ShellController extends ChangeNotifier {
   }
 
   /// Shows the chat with nothing over it: the shelf, the sheet, the popup, Settings, the
-  /// workspace's pages and a page of the toolkit's are closed.
+  /// workspace's pages are closed.
   void openChat() {
     _reset();
     notifyListeners();
   }
 
   /// Closes everything over the chat, without telling listeners: the shelf, the sheet, the popup,
-  /// the workspace's pages, a page of the toolkit's, the scanner, the walk-through and Settings.
+  /// the workspace's pages, the scanner, the walk-through and Settings.
   /// A document's text forgets what it was opened over.
   void _reset() {
     _coverChat();

@@ -20,7 +20,7 @@ import 'widgets/tappable.dart';
 
 /// Settings' Upcoming page: each job the server runs on a schedule, with its schedule in local
 /// time, when it runs next and how its last run went. Where the toolkit lets jobs be changed
-/// ([ToolkitController.jobsWritable]) the header's plus ([upcomingAction]) makes one and a row
+/// ([ToolkitController.jobsWritable]) the header's plus ([UpcomingAction]) makes one and a row
 /// opens its [TaskSheet]; otherwise it is read only, with a way to AnythingLLM's web page. It
 /// reads the jobs afresh as it opens, through the toolkit.
 class UpcomingPage extends StatefulWidget {
@@ -109,14 +109,26 @@ class _UpcomingPageState extends State<UpcomingPage> {
   }
 }
 
-/// Upcoming's header button, New task, where the toolkit lets jobs be made; null otherwise.
-Widget? upcomingAction(AppScope scope) => scope.toolkit.jobsWritable
-    ? IconBtn.header(
-        'plus',
-        tooltip: 'New task',
-        onPressed: () => openTask(scope, const TaskSheet()),
-      )
-    : null;
+/// Upcoming's header button, New task, where the toolkit lets jobs be made, and the header's
+/// empty end otherwise. It follows the toolkit itself, so the header around it need not.
+class UpcomingAction extends StatelessWidget {
+  const UpcomingAction({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    return ListenableBuilder(
+      listenable: scope.toolkit,
+      builder: (context, _) => scope.toolkit.jobsWritable
+          ? IconBtn.header(
+              'plus',
+              tooltip: 'New task',
+              onPressed: () => openTask(scope, const TaskSheet()),
+            )
+          : const SizedBox(width: 48),
+    );
+  }
+}
 
 /// How many jobs there are and when the next runs, or null until read: the line under
 /// Upcoming's row in Settings. They are tasks where the toolkit lets them be changed.
@@ -148,10 +160,7 @@ class _NotRead extends StatelessWidget {
   Widget build(BuildContext context) {
     final problem = this.problem;
     if (problem == null) {
-      return Text(
-        'Reading…',
-        style: Type.sans(14, color: Tokens.of(context).muted),
-      );
+      return const HelpText('Reading…', status: true);
     }
     final shell = AppScope.of(context).shell;
     return Column(
