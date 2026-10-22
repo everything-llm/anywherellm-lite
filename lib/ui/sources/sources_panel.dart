@@ -260,7 +260,7 @@ class TypeTile extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: Type.sans(12, weight: FontWeight.w700, color: t.accent),
+          style: Type.sans(12, weight: FontWeight.w700, color: t.accentfg),
         ),
       ),
     );

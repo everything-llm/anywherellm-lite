@@ -20,7 +20,7 @@ class AppBadge extends StatelessWidget {
     final (fg, bg) = switch (kind) {
       BadgeKind.ok => (t.okfg, t.okbg),
       BadgeKind.warn => (t.warnfg, t.warnbg),
-      BadgeKind.accent => (t.accent, t.accentbg),
+      BadgeKind.accent => (t.accentfg, t.accentbg),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

@@ -33,7 +33,7 @@ class ComposerChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final ink = tinted ? t.accent : t.ink2;
+    final ink = tinted ? t.accentfg : t.ink2;
     return Tappable(
       touchTarget: true,
       label: label,

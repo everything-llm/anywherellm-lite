@@ -40,13 +40,13 @@ class ShortcutChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         spacing: 6,
         children: [
-          AppIcon('slash', size: IconSize.tiny, color: t.accent),
+          AppIcon('slash', size: IconSize.tiny, color: t.accentfg),
           Flexible(
             child: Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: Type.sans(12, color: t.accent),
+              style: Type.sans(12, color: t.accentfg),
             ),
           ),
           if (onClear case final clear?)

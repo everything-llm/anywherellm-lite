@@ -1008,7 +1008,7 @@ class _FilesPill extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         child: Text(
           words,
-          style: Type.sans(13, weight: FontWeight.w600, color: t.accent),
+          style: Type.sans(13, weight: FontWeight.w600, color: t.accentfg),
         ),
       ),
     );
@@ -1197,7 +1197,7 @@ class _SendWhenDone extends StatelessWidget {
               'Send when done',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: Type.sans(13.5, weight: FontWeight.w500, color: t.accent),
+              style: Type.sans(13.5, weight: FontWeight.w500, color: t.accentfg),
             ),
           ),
         ),

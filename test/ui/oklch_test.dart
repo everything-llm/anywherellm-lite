@@ -62,7 +62,7 @@ void main() {
         (t.muted, t.bg),
         (t.muted, t.panel2),
         (t.accent, t.bg),
-        (t.accent, t.accentbg),
+        (t.accentfg, t.accentbg),
         (t.onaccent, t.accent),
       ]) {
         expect(ratio(text, ground), greaterThanOrEqualTo(4.5));

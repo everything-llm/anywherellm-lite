@@ -177,7 +177,7 @@ class IconBtn extends StatelessWidget {
             icon,
             size: size,
             color: active == true
-                ? t.accent
+                ? t.accentfg
                 : filled
                 ? t.ink
                 : t.ink2,

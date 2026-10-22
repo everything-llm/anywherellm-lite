@@ -257,7 +257,7 @@ class _NoTasks extends StatelessWidget {
               color: t.accentbg,
               shape: BoxShape.circle,
             ),
-            child: AppIcon('clock', size: IconSize.large, color: t.accent),
+            child: AppIcon('clock', size: IconSize.large, color: t.accentfg),
           ),
           const SizedBox(height: 4),
           Text(
