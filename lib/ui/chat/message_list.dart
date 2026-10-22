@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -31,6 +32,7 @@ import 'answer_body.dart';
 import 'markdown_lists.dart';
 import 'shortcut_chip.dart';
 import 'answer_menu.dart';
+import 'citation_fit.dart';
 import 'generated_files.dart';
 import 'passages_sheet.dart';
 import 'sources_aside.dart';
@@ -994,23 +996,84 @@ class _Status extends StatelessWidget {
 }
 
 /// The sources an answer drew on, in one line that never wraps, so the answer keeps its height:
-/// the first three by name, then the rest folded into one "+N" chip that lists them all in a
-/// sheet. A web page is named by its site. On a wide window a chip picks its source, and +N the
-/// answer, in the Sources panel beside the chat instead.
+/// the first by name, as many as fit with at least [readable] characters of their names and at
+/// most three (four when there are only four), then the rest folded into one "+N" chip that
+/// lists them all in a sheet ([fitChips]). A web page is named by its site. On a wide window a
+/// chip picks its source, and +N the answer, in the Sources panel beside the chat instead.
 class _Citations extends StatelessWidget {
   const _Citations(this.turn);
 
   final Turn turn;
 
-  /// How many are named before the rest fold.
+  /// How many are named before the rest fold, at most.
   static const shown = 3;
 
+  /// The fewest characters of a name a chip shows; one that can't fit them folds.
+  static const readable = 8;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) {
+      final citations = turn.citations;
+      final scaler = MediaQuery.textScalerOf(context);
+      // As a [Text] draws it: over the style around it, which may space its letters.
+      final around = DefaultTextStyle.of(context).style;
+      double widthOf(String text, TextStyle style) {
+        final painter = TextPainter(
+          text: TextSpan(text: text, style: around.merge(style)),
+          textDirection: TextDirection.ltr,
+          textScaler: scaler,
+          maxLines: 1,
+        )..layout();
+        final width = painter.width.ceilToDouble();
+        painter.dispose();
+        return width;
+      }
+
+      // Only the ones that may lead the line are measured; the rest can only fold.
+      final most = citations.length <= shown + 1 ? citations.length : shown;
+      final names = [for (final c in citations.take(most)) citedName(c)];
+      final whole = [
+        for (final name in names)
+          _Citation.frame + widthOf(name, _Citation.nameStyle),
+      ];
+      final least = [
+        for (final (i, name) in names.indexed)
+          math.min(
+            whole[i],
+            _Citation.frame +
+                widthOf(
+                  '${name.characters.take(readable)}…',
+                  _Citation.nameStyle,
+                ),
+          ),
+      ];
+      final widths = fitChips(
+        // At most [_Citation.most] wide, as the board draws them, but never cut below readable.
+        natural: [
+          for (final (i, w) in whole.indexed)
+            math.max(least[i], math.min(w, _Citation.most)),
+        ],
+        readable: least,
+        count: citations.length,
+        // As wide as it can be: holding them all.
+        more: math.max(
+          Tappable.touchSide,
+          _MoreSources.frame +
+              widthOf('+${citations.length}', _MoreSources.style),
+        ),
+        width: box.maxWidth,
+        gap: _Citation.gap,
+      );
+      return _line(context, widths);
+    },
+  );
+
+  Widget _line(BuildContext context, List<double> widths) {
     final shell = AppScope.of(context).shell;
     final citations = turn.citations;
-    final folded = citations.length > shown + 1;
-    final named = folded ? citations.take(shown) : citations;
+    final folded = citations.length > widths.length;
+    final named = citations.take(widths.length);
     final beside = Wide.split(context);
     final follow = FollowedScope.of(context);
     return ListenableBuilder(
@@ -1029,10 +1092,11 @@ class _Citations extends StatelessWidget {
             heightFactor: 1,
             child: ClipRect(
               child: Row(
-                spacing: 6,
+                spacing: _Citation.gap,
                 children: [
                   for (final (i, citation) in named.indexed)
-                    Flexible(
+                    SizedBox(
+                      width: widths[i],
                       child: _Citation(
                         number: i + 1,
                         citation: citation,
@@ -1045,7 +1109,7 @@ class _Citations extends StatelessWidget {
                     ),
                   if (folded)
                     _MoreSources(
-                      citations.length - shown,
+                      citations.length - widths.length,
                       open: open,
                       onTap: beside
                           ? () => shell.aside.value = AsideChoice(turn)
@@ -1069,6 +1133,16 @@ class _MoreSources extends StatelessWidget {
   final bool open;
   final VoidCallback onTap;
 
+  /// Its count's style, but for the colour.
+  static final style = Type.caption(
+    const Color(0x00000000),
+    weight: FontWeight.w600,
+  );
+
+  /// Its width around its count.
+  static const frame = 2 * _pad;
+  static const _pad = 12.0;
+
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
@@ -1083,16 +1157,13 @@ class _MoreSources extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 36),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.symmetric(horizontal: _pad),
           child: Center(
             widthFactor: 1,
             heightFactor: 1,
             child: Text(
               '+$count',
-              style: Type.caption(
-                open ? t.accent : t.ink,
-                weight: FontWeight.w600,
-              ),
+              style: style.copyWith(color: open ? t.accent : t.ink),
             ),
           ),
         ),
@@ -1121,6 +1192,22 @@ class _Citation extends StatelessWidget {
 
   /// Whether the panel beside the chat shows this source as chosen.
   final bool picked;
+
+  /// The name's style, but for the colour.
+  static final nameStyle = Type.note(const Color(0x00000000));
+
+  /// The widest a chip is drawn, unless its readable name needs more.
+  static const most = 140.0;
+
+  /// A chip's width around its name: its padding, number, icon and the gaps between them.
+  static const frame = _padStart + _number + gap + _icon + gap + _padEnd;
+  static const _padStart = 8.0;
+  static const _padEnd = 12.0;
+  static const _number = 17.0;
+  static const _icon = 13.0;
+
+  /// The room between its parts, and between chips in a line.
+  static const gap = 6.0;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -1163,15 +1250,15 @@ class _Citation extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 36),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 0, 12, 0),
+          padding: const EdgeInsets.fromLTRB(_padStart, 0, _padEnd, 0),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CitationNumber(number, live: live),
-              const SizedBox(width: 6),
+              CitationNumber(number, live: live, diameter: _number),
+              const SizedBox(width: gap),
               // What it is, as the boards mark it: a web page or a document.
               SizedBox.square(
-                dimension: 13,
+                dimension: _icon,
                 child: FittedBox(
                   child: AppIcon(
                     url != null ? 'globe' : 'doc',
@@ -1180,17 +1267,13 @@ class _Citation extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: gap),
               Flexible(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 240),
-                  child: Text(
-                    // A web page goes by its site, as a row of them reads best.
-                    url?.host ?? title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Type.note(live ? t.ink : t.muted),
-                  ),
+                child: Text(
+                  citedName(citation),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: nameStyle.copyWith(color: live ? t.ink : t.muted),
                 ),
               ),
             ],

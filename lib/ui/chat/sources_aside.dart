@@ -178,7 +178,7 @@ class _AsideRow extends StatelessWidget {
     final passage = citation.passages.firstOrNull?.text.trim();
     final score = citation.passages.firstOrNull?.score;
     final match = score == null ? null : matchText(score);
-    final title = url?.host ?? citation.title;
+    final title = citedName(citation);
     const radius = BorderRadius.all(Radius.circular(Sizes.control));
     // Chosen, it is filled with the accent's tint and barred in the accent at its start, as a
     // selected row is.
@@ -312,3 +312,7 @@ class _FootAction extends StatelessWidget {
     );
   }
 }
+
+/// What a source goes by in a line or a list of them: a web page by its site, as a row of them
+/// reads best, anything else by its title.
+String citedName(Citation citation) => citation.url?.host ?? citation.title;

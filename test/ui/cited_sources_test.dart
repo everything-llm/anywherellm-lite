@@ -24,10 +24,16 @@ void main() {
         );
       await llm.chat!.close();
       await tester.pumpAndSettle();
-      // A web page's chip names its site.
+      // A web page's chip names its site; those that don't fit with a readable name fold into
+      // +N, which counts every one not shown.
       expect(find.text('site1.example'), findsOneWidget);
       expect(find.text('site4.example'), findsNothing);
-      await tester.tap(control('4 more sources'));
+      final shown = [
+        for (var i = 1; i <= 7; i++)
+          if (find.text('site$i.example').evaluate().isNotEmpty) i,
+      ];
+      expect(shown, [for (var i = 1; i <= shown.length; i++) i]);
+      await tester.tap(control('${7 - shown.length} more sources'));
       await tester.pumpAndSettle();
       final sheet = find.byType(SheetFrame);
       expect(

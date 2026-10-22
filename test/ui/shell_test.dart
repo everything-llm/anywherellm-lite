@@ -354,10 +354,16 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Running web-browsing'), findsNothing);
         expect(h.chat.turns.last.text, 'Headline');
-        // Three by name in one line, the rest behind +6, which lists them all in a sheet.
-        expect(control('Source 3: Story 3'), findsOneWidget);
-        expect(control('Source 4: Story 4'), findsNothing);
-        await tester.tap(control('6 more sources'));
+        // As many by name as fit in one line, at most three, the rest behind +N, which lists
+        // them all in a sheet.
+        final named = [
+          for (var i = 1; i <= 9; i++)
+            if (control('Source $i: Story $i').evaluate().isNotEmpty) i,
+        ];
+        expect(named, isNotEmpty);
+        expect(named, [for (var i = 1; i <= named.length; i++) i]);
+        expect(named.length, lessThanOrEqualTo(3));
+        await tester.tap(control('${9 - named.length} more sources'));
         await tester.pumpAndSettle();
         expect(h.shell.citedOpen, isTrue);
         expect(find.text('Sources'), findsOneWidget);

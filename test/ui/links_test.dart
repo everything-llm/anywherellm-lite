@@ -122,6 +122,8 @@ void main() {
             const Citation('Q3 roadmap.pdf'),
           ],
         ),
+        // Room for both chips with readable names in the test font, whose glyphs are an em wide.
+        size: const Size(480, 844),
       );
       await tester.tap(control('Source 1: A story, opens in the browser'));
       await tester.pump();
