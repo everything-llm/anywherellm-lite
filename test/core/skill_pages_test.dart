@@ -60,6 +60,23 @@ void main() {
     }
   });
 
+  test('the app manager is its own page in the apps folder', () {
+    const manager = '/apps-lean/manager-q9Zx_-1aB2c3D4e5F6g7H8i9.html';
+    expect(skillPageAt(manager), SkillPage.appsManager);
+    expect(
+      skillPageAt('/apps-lean/q9Zx_-1aB2c3D4e5F6g7H8i9.html'),
+      SkillPage.apps,
+    );
+    expect(SkillPage.appsManager.comments, isFalse);
+    expect(holdsSecret(Uri.parse('https://h:3001$manager')), isTrue);
+    expect(skillPagesOf({'apps': manager}), {SkillPage.appsManager: manager});
+    expect(
+      skillPagesOf({'apps': '/apps-lean/q9Zx_-1aB2c3D4e5F6g7H8i9.html'}),
+      isEmpty,
+      reason: 'an app\'s own page is not the manager',
+    );
+  });
+
   test('the pages are named for people', () {
     expect(SkillPage.library.listing?.title, 'Library');
     expect(SkillPage.vault.listing?.title, 'Vault');

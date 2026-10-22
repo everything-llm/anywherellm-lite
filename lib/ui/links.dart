@@ -49,8 +49,8 @@ Future<void> openAnswerLink(BuildContext context, String href) async {
 
 /// Opens [url], the suite's [page] on the connected server, where the device has a web view:
 /// browser-lean's page for an agent's tab in its sheet, and any other in the page's sheet, in the
-/// theme the app shows in when it is [SkillPage.themed] ([pageInTheme]). Without a web view it
-/// opens as [openLink] does.
+/// theme the app shows in when it is [SkillPage.themed] ([pageInTheme]), and the app manager on
+/// the open workspace's section (`#ws=<slug>`). Without a web view it opens as [openLink] does.
 Future<void> openSkillPage(
   BuildContext context,
   SkillPage page,
@@ -60,7 +60,13 @@ Future<void> openSkillPage(
   if (scope.appView == null) return openLink(context, url);
   if (page == SkillPage.browserTab) return scope.shell.openBrowser(url);
   final dark = Theme.of(context).brightness == Brightness.dark;
-  scope.shell.openPage(page, page.themed ? pageInTheme(url, dark: dark) : url);
+  var opened = page.themed ? pageInTheme(url, dark: dark) : url;
+  if (page == SkillPage.appsManager) {
+    if (scope.chat.activeSlug case final slug?) {
+      opened = opened.replace(fragment: 'ws=$slug');
+    }
+  }
+  scope.shell.openPage(page, opened);
 }
 
 /// Opens AnythingLLM's own web page, at the connected server's address.

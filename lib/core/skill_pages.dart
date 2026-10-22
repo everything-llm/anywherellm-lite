@@ -2,18 +2,42 @@ import 'chat.dart';
 import 'connection.dart';
 
 /// How the bridge's `GET /pages` lists one of the suite's pages and the toolkit's card shows it:
-/// the [name] its answer keys the page by, the page's [title] for people and what it holds,
-/// [about].
-typedef PageListing = ({String name, String title, String about});
+/// the [name] its answer keys the page by, the page's [title] for people, what it holds
+/// ([about]), how a sentence names it ([called]) and its row's [icon].
+typedef PageListing = ({
+  String name,
+  String title,
+  String about,
+  String called,
+  String icon,
+});
 
 /// A page an agent skill publishes into AnythingLLM's web folder, `/<folder>/<token>.html`,
-/// which AnythingLLM serves without a sign-in: each kind with the [folder] it lives in, whether
+/// which AnythingLLM serves without a sign-in: each kind with the [folder] it lives in and the
+/// [prefix] its token starts with, whether
 /// it opens in the app's theme ([themed]), whether its address carries a secret the page embeds
 /// ([secret]), whether it is given the apps channel for its Comment ([comments]), and, for the
 /// pages the bridge knows the place of, how `GET /pages` lists it ([listing]).
 enum SkillPage {
   /// browser-lean's page for an agent's tab, which the skill links its tab's card to.
   browserTab('browser-lean'),
+
+  /// apps-lean's app manager, one page for every workspace's apps, opened on the open
+  /// workspace's section (`#ws=<slug>`). It shares the app pages' folder, its token marked
+  /// `manager-`, and takes no comments.
+  appsManager(
+    'apps-lean',
+    prefix: 'manager-',
+    themed: true,
+    secret: true,
+    listing: (
+      name: 'apps',
+      title: 'Apps',
+      about: 'Every workspace\'s apps',
+      called: 'the app manager',
+      icon: 'apps',
+    ),
+  ),
 
   /// An apps-lean app's page.
   apps('apps-lean', themed: true, comments: true),
@@ -22,7 +46,13 @@ enum SkillPage {
   library(
     'library-lean',
     secret: true,
-    listing: (name: 'library', title: 'Library', about: 'Toolkits and runs'),
+    listing: (
+      name: 'library',
+      title: 'Library',
+      about: 'Toolkits and runs',
+      called: 'the Library',
+      icon: 'grid',
+    ),
   ),
 
   /// The Vault, the page the skills that keep secrets share: where the person gives a service's
@@ -36,11 +66,14 @@ enum SkillPage {
       name: 'vault',
       title: 'Vault',
       about: 'Keys, sign-ins and allowed addresses',
+      called: 'the Vault',
+      icon: 'shield',
     ),
   );
 
   const SkillPage(
     this.folder, {
+    this.prefix = '',
     this.themed = false,
     this.secret = false,
     this.comments = false,
@@ -49,6 +82,9 @@ enum SkillPage {
 
   /// The skill's folder in the web folder, the first segment of its pages' paths.
   final String folder;
+
+  /// What the page's token starts with, which tells it from another kind in the same folder.
+  final String prefix;
 
   /// Whether the page opens in the theme the app shows in ([pageInTheme]).
   final bool themed;
@@ -65,14 +101,20 @@ enum SkillPage {
   final PageListing? listing;
 }
 
-/// A page's path, `/<folder>/<token>.html`, with the folder in its one group.
-final _page = RegExp(r'^/([^/]+)/[A-Za-z0-9_-]+\.html$');
+/// A page's path, `/<folder>/<token>.html`, with the folder and the token in its groups.
+final _page = RegExp(r'^/([^/]+)/([A-Za-z0-9_-]+)\.html$');
 
 /// The suite's page [path] is, whatever the origin: exactly `/<folder>/<token>.html` in that
-/// page's folder, with no host, query, fragment or further segment; null for any other path.
+/// page's folder, its token starting with the page's [SkillPage.prefix], with no host, query,
+/// fragment or further segment; null for any other path. A kind with a prefix comes before the
+/// one without in the same folder, so the app manager is never read as an app's page.
 SkillPage? skillPageAt(String path) {
-  final folder = _page.firstMatch(path)?[1];
-  return SkillPage.values.where((page) => page.folder == folder).firstOrNull;
+  final match = _page.firstMatch(path);
+  if (match == null) return null;
+  final (folder, token) = (match[1], match[2]!);
+  return SkillPage.values
+      .where((page) => page.folder == folder && token.startsWith(page.prefix))
+      .firstOrNull;
 }
 
 /// The suite's page [url] is, or null when it is none: a page's path ([skillPageAt]) on

@@ -69,7 +69,6 @@ Since the app was simplified to AnywhereLLM Lite, a phone chat client rather tha
 | Gap | Note |
 | --- | --- |
 | Activity | A page of what the agent did, opened from the shelf. AnythingLLM has no route that lists the agent's apps or files or what it did, and apps-lean keeps its apps as files with no listing route. The page built against `FakeToolkit` was removed and is in git history. |
-| An Apps row in the shelf's toolkit card | Beside Library and Vault, opening apps-lean's app manager, a page listing the agent's apps, in `PageSheet`. The manager was built on the lean edition's `apps-manager` branch and never merged, so the suite's apps-lean has no such page. It needs the suite to publish one (it was one page per workspace), the bridge's `GET /pages` to name it, by workspace if it stays one per workspace, and a `listing` on `SkillPage.apps`. |
 | A task that runs once | The prototype's New task offers Once. AnythingLLM's scheduled jobs have no one-shot job, and a dated cron runs again every year, so the form leaves Once out. |
 | A task's workspace | The prototype's New task picks a workspace. AnythingLLM's scheduled jobs belong to none. |
 

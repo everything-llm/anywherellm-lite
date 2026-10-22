@@ -12,6 +12,7 @@ import '../support/pump.dart';
 const _vault = '/vault-lean/aB3_-x9.html';
 const _newVault = '/vault-lean/zZ8_-q2.html';
 const _library = '/library-lean/q9Zx_-1aB2.html';
+const _manager = '/apps-lean/manager-q9Zx_-1aB2c3D4e5F6g7H8i9.html';
 
 FakeToolkit _toolkit({
   Set<String> extra = const {ToolkitFeature.pages},
@@ -60,6 +61,41 @@ void main() {
     );
     expect(h.shell.shelfOpen, isFalse);
     expect(h.chat.linkNotice, isNull);
+  });
+
+  testWidgets('the app manager comes first and opens on the open workspace, '
+      'with no comment channel', (tester) async {
+    final toolkit = _toolkit(
+      pages: const {SkillPage.appsManager: _manager, SkillPage.vault: _vault},
+    );
+    final h = await _open(tester, toolkit);
+    expect(
+      tester.getTopLeft(find.text('Apps')).dy,
+      lessThan(tester.getTopLeft(find.text('Vault')).dy),
+    );
+    expect(find.text('Every workspace\'s apps'), findsOneWidget);
+    await tester.tap(find.text('Apps'));
+    await tester.pumpAndSettle();
+    final open = h.shell.popup.value as PageOpen;
+    expect(open.page, SkillPage.appsManager);
+    expect(
+      open.url,
+      Uri.parse('https://h:3001$_manager?theme=light#ws=${h.chat.activeSlug}'),
+    );
+    expect(h.appView!.channel, isNull, reason: 'the manager takes no comment');
+  });
+
+  testWidgets('an app manager not set up yet says so in plain words', (
+    tester,
+  ) async {
+    final toolkit = _toolkit(pages: const {SkillPage.appsManager: _manager});
+    final h = await _open(tester, toolkit);
+    toolkit.skillPages = const {};
+    await tester.tap(find.text('Apps'));
+    await tester.pumpAndSettle();
+    expect(h.chat.linkNotice?.title, 'The app manager is not set up yet');
+    await tester.pump(ChatController.linkNoticeFor);
+    await tester.pumpAndSettle();
   });
 
   testWidgets('the Library opens as it is, without a theme', (tester) async {
