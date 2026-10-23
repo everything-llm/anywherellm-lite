@@ -13,6 +13,7 @@ import 'chat/gallery.dart';
 import 'chat_sheet.dart';
 import 'chat/page_sheet.dart';
 import 'chat/passages_sheet.dart';
+import 'chat/tabs_sheet.dart';
 import 'files/documents_pane.dart';
 import 'files/workspace_pages.dart';
 import 'settings/pairing_sheet.dart';
@@ -168,10 +169,13 @@ class AppShell extends StatelessWidget {
                                 kind,
                                 key: ValueKey(kind),
                               ),
-                              BrowserOpen(:final tab) => BrowserSheet(
-                                tab,
-                                key: ValueKey(tab),
-                              ),
+                              BrowserOpen(:final tab, :final inChat) =>
+                                BrowserSheet(
+                                  tab,
+                                  inChat: inChat,
+                                  key: ValueKey(tab),
+                                ),
+                              Popup.browserTabs => const TabsSheet(),
                               final PageOpen open => PageSheet(
                                 open,
                                 key: ValueKey(open.url),

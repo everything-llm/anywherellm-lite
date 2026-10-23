@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'browser_tabs.dart';
 import 'chat.dart';
 import 'connection.dart';
 import 'memory.dart';
@@ -115,6 +116,10 @@ abstract interface class AnythingLlmApi {
   /// The bytes of the image at [url], from an answer. Sent without the key.
   Future<Uint8List> answerImage(Uri url);
 
+  /// What browser-lean writes about the tab whose page is at [path], `/browser-lean/<token>.html`
+  /// on the server's origin: its `<token>.json`, read afresh without the key.
+  Future<TabState> tabState(String path);
+
   /// The server's settings, with every secret replaced by whether it is set.
   Future<Map<String, Object?>> systemSettings();
 
@@ -136,10 +141,11 @@ abstract interface class ToolkitApi {
   /// throws.
   Future<Set<String>?> features({bool again = false});
 
-  /// Where the suite's Library and Vault pages are now. The paths are bearer capabilities: the
-  /// caller opens one and keeps none. Fails with status 401 or 403 for a key the bridge does not
-  /// take for this route.
-  Future<SkillPages> pages();
+  /// Where the suite's listed pages are now, the agent's browser's open tabs and what the bridge
+  /// says of the pages. The paths are bearer capabilities: the caller opens a page's and keeps
+  /// none, and keeps the tabs' in memory only. Fails with status 401 or 403 for a key the bridge
+  /// does not take for this route.
+  Future<SuitePages> pages();
 
   /// The jobs AnythingLLM runs on a schedule. Times are UTC.
   Future<List<ScheduledJob>> scheduledJobs();

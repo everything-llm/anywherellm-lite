@@ -22,6 +22,16 @@ void main() {
     );
   });
 
+  test('when the Library was seen round-trips, by server', () {
+    final at = DateTime.utc(2026, 10, 23, 8, 30);
+    final prefs = const Prefs().withLibrarySeen(_s, at);
+    expect(Prefs.decode(prefs.encode()).librarySeen, {_s: at});
+    expect(
+      Prefs.decode('{"librarySeen": {"a": 3, "b": "no"}}').librarySeen,
+      isEmpty,
+    );
+  });
+
   test('shortcuts and their sent exchange details round-trip', () {
     const shortcut = PromptShortcut(
       id: 'formal',

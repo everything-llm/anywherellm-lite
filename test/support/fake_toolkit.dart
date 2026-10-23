@@ -1,5 +1,7 @@
+import 'package:anywherellm/core/browser_tabs.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/memory.dart';
+import 'package:anywherellm/core/page_status.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/core/skill_pages.dart';
@@ -48,8 +50,17 @@ class FakeToolkit with FakeCalls implements ToolkitApi {
   /// What [pages] answers: where the Library and the Vault are.
   SkillPages skillPages = const {};
 
+  /// The agent's browser's open tabs [pages] lists, or null for a bridge that does not say.
+  List<OpenTab>? tabs;
+
+  /// What [pages] says of the pages.
+  PageStatus status = const PageStatus();
+
   @override
-  Future<SkillPages> pages() => record('pages', () => skillPages);
+  Future<SuitePages> pages() => record(
+    'pages',
+    () => SuitePages(paths: skillPages, tabs: tabs, status: status),
+  );
 
   @override
   Future<List<ScheduledJob>> scheduledJobs() =>

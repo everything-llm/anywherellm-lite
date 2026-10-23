@@ -2,11 +2,14 @@
 // `tool/audit_app.dart` runs the app over: Household and Q3 planning, their documents and chats,
 // the saved memories and the scheduled jobs.
 
+import 'package:anywherellm/core/browser_tabs.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/memory.dart';
 import 'package:anywherellm/core/outputs.dart';
+import 'package:anywherellm/core/page_status.dart';
 import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/core/server_models.dart';
+import 'package:anywherellm/core/skill_pages.dart';
 import 'package:anywherellm/core/toolkit.dart';
 
 import '../test/support/fake_api.dart';
@@ -249,4 +252,54 @@ const _metrics = AnswerMetrics(
   };
   llm.vectors = 1284;
   return (llm, toolkit);
+}
+
+/// The suite's pages set up on the sample server, as the LiteShelf and LiteBrowserSheet boards
+/// draw them: the app manager, the Library and the Vault, three apps changed today and a run
+/// failed, and three tabs open in two workspaces, one the person holds.
+void samplePages(FakeAnythingLlm llm, FakeToolkit toolkit) {
+  const errands = '/browser-lean/aaaaaaaaaaaaaaaaaaaaaaaa.html';
+  const boiler = '/browser-lean/bbbbbbbbbbbbbbbbbbbbbbbb.html';
+  const loans = '/browser-lean/cccccccccccccccccccccccc.html';
+  final now = DateTime.now().toUtc();
+  toolkit
+    ..served = {...toolkit.served, ToolkitFeature.pages}
+    ..skillPages = const {
+      SkillPage.appsManager: '/apps-lean/manager-aaaaaaaaaaaaaaaaaaaaaaaa.html',
+      SkillPage.library: '/library-lean/aaaaaaaaaaaaaaaaaaaaaaaa.html',
+      SkillPage.vault: '/vault-lean/aaaaaaaaaaaaaaaaaaaaaaaa.html',
+    }
+    ..status = PageStatus(
+      changed: [
+        for (var m = 1; m <= 3; m++) now.subtract(Duration(minutes: m)),
+      ],
+      failed: [now.subtract(const Duration(minutes: 30))],
+    )
+    ..tabs = [
+      OpenTab(
+        path: loans,
+        workspace: 'q3',
+        until: now.add(const Duration(minutes: 2, seconds: 50)),
+      ),
+      for (final path in [errands, boiler])
+        OpenTab(
+          path: path,
+          workspace: 'household',
+          until: now.add(const Duration(minutes: 13, seconds: 50)),
+        ),
+    ];
+  llm.tabStates
+    ..[errands] = const TabState(
+      title: 'Weekend errands',
+      host: 'news.example.com',
+    )
+    ..[boiler] = const TabState(
+      title: 'Book the boiler service',
+      host: 'heating.example.com',
+      mine: true,
+    )
+    ..[loans] = const TabState(
+      title: 'Library loans',
+      host: 'library.example.org',
+    );
 }

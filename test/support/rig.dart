@@ -34,7 +34,11 @@ class Rig {
     sources = SourcesController(this.llm, chat, prefs);
     files = FilesController(this.llm, settings, chat, sources);
     system = SystemController(this.llm, settings);
-    toolkit = ToolkitController(this.toolkitServer, settings);
+    toolkit = ToolkitController(
+      this.toolkitServer,
+      settings,
+      tabState: this.llm.tabState,
+    );
   }
 
   final FakeAnythingLlm llm;

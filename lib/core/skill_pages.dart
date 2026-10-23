@@ -1,5 +1,7 @@
+import 'browser_tabs.dart';
 import 'chat.dart';
 import 'connection.dart';
+import 'page_status.dart';
 
 /// How the bridge's `GET /pages` lists one of the suite's pages and the toolkit's card shows it:
 /// the [name] its answer keys the page by, the page's [title] for people, what it holds
@@ -223,3 +225,25 @@ SkillPages skillPagesOf(Object? body) => {
             when skillPageAt(path) == page)
           page: path,
 };
+
+/// A `GET /pages` answer: where the listed pages are ([paths]), the agent's browser's open tabs
+/// ([tabs], null when the bridge does not say), and what it says of the pages ([status]).
+class SuitePages {
+  const SuitePages({
+    this.paths = const {},
+    this.tabs,
+    this.status = const PageStatus(),
+  });
+
+  final SkillPages paths;
+  final List<OpenTab>? tabs;
+  final PageStatus status;
+
+  /// What a `GET /pages` answer [body] says, answered with the server's clock [skew] ahead of
+  /// the phone's ([openTabsOf]).
+  static SuitePages fromJson(Object? body, {Duration? skew}) => SuitePages(
+    paths: skillPagesOf(body),
+    tabs: body is Map ? openTabsOf(body['browser'], skew: skew) : null,
+    status: PageStatus.fromJson(body is Map ? body['status'] : null),
+  );
+}

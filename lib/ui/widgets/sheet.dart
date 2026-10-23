@@ -37,6 +37,7 @@ class SheetFrame extends StatefulWidget {
     this.height = SheetHeight.fit,
     this.padding = const EdgeInsets.fromLTRB(16, 4, 16, 24),
     this.bare = false,
+    this.header,
   });
 
   final String title;
@@ -47,8 +48,12 @@ class SheetFrame extends StatefulWidget {
   /// Around [child].
   final EdgeInsets padding;
 
-  /// Whether the header is the drag handle alone.
+  /// Whether the sheet is the page's [Tokens.ground] with no [SheetHeader], its cards tiles on
+  /// it, as for a page in a web view.
   final bool bare;
+
+  /// What a [bare] sheet shows under its drag handle, where a drag down closes it too.
+  final Widget? header;
 
   /// The room left above a [SheetHeight.tall] sheet, where the chat shows through the scrim.
   static const gap = 72.0;
@@ -56,7 +61,8 @@ class SheetFrame extends StatefulWidget {
   /// The most of the screen a [SheetHeight.fit] sheet takes.
   static const fitFraction = 0.9;
 
-  /// Whether [context] is inside a sheet, whose cards are filled with [Tokens.ground].
+  /// Whether [context] is inside a sheet that is not [bare], whose cards are filled with
+  /// [Tokens.ground].
   static bool holds(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<_InSheet>() != null;
 
@@ -131,7 +137,9 @@ class _SheetFrameState extends State<SheetFrame>
               ),
             ),
           ),
-          if (!widget.bare)
+          if (widget.bare)
+            ?widget.header
+          else
             Padding(
               padding: EdgeInsets.only(left: bars.left, right: bars.right),
               child: SheetHeader(
@@ -175,16 +183,20 @@ class _SheetFrameState extends State<SheetFrame>
                 header,
                 Flexible(
                   fit: tall ? FlexFit.tight : FlexFit.loose,
-                  child: _InSheet(
-                    child: Padding(
-                      padding: widget.padding.copyWith(
-                        left: widget.padding.left + bars.left,
-                        right: widget.padding.right + bars.right,
-                      ),
-                      child: widget.bare
-                          ? widget.child
-                          : ScrollFades(color: t.tile, child: widget.child),
+                  child: Padding(
+                    padding: widget.padding.copyWith(
+                      left: widget.padding.left + bars.left,
+                      right: widget.padding.right + bars.right,
                     ),
+                    // A bare sheet's cards are tiles on its ground.
+                    child: widget.bare
+                        ? widget.child
+                        : _InSheet(
+                            child: ScrollFades(
+                              color: t.tile,
+                              child: widget.child,
+                            ),
+                          ),
                   ),
                 ),
                 // The sheet's ground goes on behind the navigation bar.

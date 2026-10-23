@@ -12,6 +12,7 @@ import '../core/ports.dart';
 import '../core/schedule.dart';
 import '../core/skill_pages.dart';
 import '../core/toolkit.dart';
+import 'server_clock.dart';
 import 'unreachable.dart';
 
 /// [ToolkitApi] over the toolkit's bridge, at the address a pairing code gave
@@ -76,8 +77,13 @@ class HttpToolkitApi implements ToolkitApi {
   }
 
   @override
-  Future<SkillPages> pages() async =>
-      skillPagesOf(await _json('GET', ['pages']));
+  Future<SuitePages> pages() async {
+    final response = await _call('GET', ['pages']);
+    return SuitePages.fromJson(
+      _answerOf(response),
+      skew: skewOf(response.headers),
+    );
+  }
 
   @override
   Future<List<ScheduledJob>> scheduledJobs() async =>
@@ -177,9 +183,8 @@ class HttpToolkitApi implements ToolkitApi {
         ]),
       );
 
-  /// The decoded JSON of a [method] to AnythingLLM's [path] through the bridge. AnythingLLM
-  /// refuses some calls with `success: false` at HTTP 200, which fails in its words, or else
-  /// [refused].
+  /// The decoded JSON of a [method] to AnythingLLM's [path] through the bridge, failing as
+  /// [_answerOf] does.
   Future<Object?> _json(
     String method,
     List<String> path, {
@@ -188,6 +193,15 @@ class HttpToolkitApi implements ToolkitApi {
     String refused = 'AnythingLLM did not do it.',
   }) async {
     final response = await _call(method, path, query: query, body: body);
+    return _answerOf(response, refused: refused);
+  }
+
+  /// The decoded JSON of [response]. AnythingLLM refuses some calls with `success: false` at
+  /// HTTP 200, which fails in its words, or else [refused].
+  static Object _answerOf(
+    http.Response response, {
+    String refused = 'AnythingLLM did not do it.',
+  }) {
     final answer =
         _bodyOf(response) ??
         (throw ApiException(

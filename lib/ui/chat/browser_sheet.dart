@@ -22,14 +22,16 @@ import 'composer.dart';
 const browserChannel = 'AnywhereLLMBrowser';
 
 /// The agent's browser: browser-lean's page for its tab, in a tall sheet over the chat, edge to
-/// edge under the drag handle, and under it [AgentBar], for messaging the agent. The page draws
-/// its own controls: who has the tab, its address, Logins and taking it over; inside the app it
+/// edge under the drag handle, and under it [AgentBar], for messaging the agent, when the tab is
+/// the chat on screen's ([inChat]). The page draws its own controls: who has the tab, its
+/// address, Logins and taking it over; given the channel, which it has only with the bar, it
 /// leaves handing back to the bar. Its Back, Esc, Back on the device, the scrim and a drag down
 /// close the sheet.
 class BrowserSheet extends StatefulWidget {
-  const BrowserSheet(this.tab, {super.key});
+  const BrowserSheet(this.tab, {super.key, required this.inChat});
 
   final Uri tab;
+  final bool inChat;
 
   @override
   State<BrowserSheet> createState() => _BrowserSheetState();
@@ -89,10 +91,11 @@ class _BrowserSheetState extends State<BrowserSheet> {
                     onLeave: (url) => openLink(context, url),
                     onClose: scope.shell.closeBrowser,
                     onFailed: () => setState(() => _gone = true),
-                    channel: _channel,
+                    channel: widget.inChat ? _channel : null,
                   ),
                 ),
-                if (!_gone) AgentBar(mine: _mine, onGive: _give),
+                if (widget.inChat && !_gone)
+                  AgentBar(mine: _mine, onGive: _give),
               ],
             ),
     );

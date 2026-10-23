@@ -35,11 +35,13 @@ class AsideChoice {
   final int? source;
 }
 
-/// browser-lean's page for an agent's [tab], in its tall sheet over the chat.
+/// browser-lean's page for an agent's [tab], in its tall sheet over the chat, with the bar that
+/// messages the agent in the chat on screen when the tab is that chat's ([inChat]).
 class BrowserOpen {
-  const BrowserOpen(this.tab);
+  const BrowserOpen(this.tab, {required this.inChat});
 
   final Uri tab;
+  final bool inChat;
 }
 
 /// One of the suite's pages on the connected server at [url], such as an apps-lean app's page,
@@ -82,6 +84,9 @@ enum Popup {
 
   /// Remove from workspace?, under a document's text.
   removeDoc,
+
+  /// The agent's browser's open tabs, from the shelf's Browser row.
+  browserTabs,
 }
 
 /// What is open over the chat, which is the base screen: the chats as a shelf,
@@ -119,8 +124,9 @@ class ShellController extends ChangeNotifier {
       _popup.value = GalleryOpen(pictures, index, chat: chat);
 
   /// Shows [tab], browser-lean's page for an agent's tab, in its sheet over the chat, closing
-  /// any other popup.
-  void openBrowser(Uri tab) => _popup.value = BrowserOpen(tab);
+  /// any other popup; [inChat] when the tab is the chat on screen's.
+  void openBrowser(Uri tab, {required bool inChat}) =>
+      _popup.value = BrowserOpen(tab, inChat: inChat);
 
   /// Closes the agent's browser, when it is open.
   void closeBrowser() {

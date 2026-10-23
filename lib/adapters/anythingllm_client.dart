@@ -6,13 +6,16 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 
+import '../core/browser_tabs.dart';
 import '../core/chat.dart';
 import '../core/connection.dart';
 import '../core/json.dart';
 import '../core/ports.dart';
 import '../core/server_models.dart';
+import '../core/skill_pages.dart';
 import '../core/upload.dart';
 import 'anythingllm_stream.dart';
+import 'server_clock.dart';
 import 'unreachable.dart';
 
 /// [AnythingLlmApi] over the server's HTTP API, with the bearer key on every request.
@@ -295,6 +298,37 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       throw ApiException('The image was cut off: ${error.message}');
     }
     return bytes.takeBytes();
+  }
+
+  @override
+  Future<TabState> tabState(String path) async {
+    final connection = _current;
+    if (skillPageAt(path) != SkillPage.browserTab) {
+      throw const ApiException('That is not a tab of the agent’s browser.');
+    }
+    // A query that changes, since the skill rewrites the state in place.
+    final url = connection.uri
+        .resolve(tabStatePath(path))
+        .replace(
+          queryParameters: {'t': '${DateTime.now().millisecondsSinceEpoch}'},
+        );
+    final response = await _fetch(
+      connection,
+      timeout,
+      () async => http.Response.fromStream(
+        await _client.send(http.Request('GET', url)),
+      ),
+    );
+    // A tab's files are gone once it closes, and AnythingLLM answers its own page for a file
+    // it does not have, so anything but a tab's state is a closed tab.
+    if (response.statusCode == 404) return const TabState(closed: true);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw ApiException(
+        'The tab could not be read: the server answered ${response.statusCode}.',
+      );
+    }
+    return TabState.fromJson(_json(response), skew: skewOf(response.headers)) ??
+        const TabState(closed: true);
   }
 
   /// The bytes of the file the server answers [path] with, which is not always JSON; a failure

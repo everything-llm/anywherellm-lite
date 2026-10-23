@@ -49,6 +49,14 @@ Future<void> _openChat(WidgetTester tester, Harness h, String thread) async {
   await _settle(tester);
 }
 
+/// Has the toolkit serve the suite's pages, with the sample's tabs and news ([samplePages]),
+/// and the app ask it again.
+Future<void> _withPages(WidgetTester tester, Harness h) async {
+  samplePages(h.llm, h.toolkitServer);
+  await h.settings.testSaved();
+  await _settle(tester);
+}
+
 Future<void> _workspace(WidgetTester tester, Harness h) async {
   h.shell.showPane(Pane.files);
   await _settle(tester);
@@ -217,6 +225,18 @@ final _screens = <String, _Setup>{
   'shelf': (tester, h) async {
     await _openChat(tester, h, 'errands');
     h.shell.openShelf();
+    await _settle(tester);
+  },
+  'shelf-toolkit': (tester, h) async {
+    await _withPages(tester, h);
+    await _openChat(tester, h, 'errands');
+    h.shell.openShelf();
+    await _settle(tester);
+  },
+  'browser': (tester, h) async {
+    await _withPages(tester, h);
+    await _openChat(tester, h, 'errands');
+    h.shell.togglePopup(Popup.browserTabs);
     await _settle(tester);
   },
   'share': (tester, h) async {

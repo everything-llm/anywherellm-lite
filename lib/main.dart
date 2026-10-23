@@ -137,7 +137,11 @@ class _SessionHostState extends State<SessionHost> {
     _files = FilesController(widget.llm, widget.settings, _chat, _sources);
     _system = SystemController(widget.llm, widget.settings);
     _memory = MemoryController(widget.toolkit, widget.settings, _chat);
-    _toolkit = ToolkitController(widget.toolkit, widget.settings);
+    _toolkit = ToolkitController(
+      widget.toolkit,
+      widget.settings,
+      tabState: widget.llm.tabState,
+    );
     _readAloud = ReadAloud(DeviceSpeaker(), _chat, widget.prefs);
     _keepAnswering = KeepAnswering(_background, _chat, widget.shell);
     // A deleted chat waiting to be undone is deleted as the app hides: Android can end a hidden

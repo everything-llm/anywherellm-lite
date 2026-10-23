@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/chat.dart';
@@ -57,8 +59,17 @@ Future<void> openSkillPage(
   Uri url,
 ) async {
   final scope = AppScope.of(context);
+  // Opening the Library sees its failures listed so far.
+  if (page == SkillPage.library) {
+    if (scope.toolkit.pageStatus.failed?.firstOrNull case final newest?) {
+      unawaited(scope.prefs.seeLibrary(newest));
+    }
+  }
   if (scope.appView == null) return openLink(context, url);
-  if (page == SkillPage.browserTab) return scope.shell.openBrowser(url);
+  if (page == SkillPage.browserTab) {
+    // An answer's link: its tab is the chat on screen's.
+    return scope.shell.openBrowser(url, inChat: true);
+  }
   scope.shell.openPage(
     page.openedAt(
       url,

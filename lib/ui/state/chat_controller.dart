@@ -453,6 +453,20 @@ class ChatController extends ChangeNotifier with FollowsServer {
 
   List<Thread> threadsOf(String slug) => _threads[slug] ?? const [];
 
+  /// The chat of workspace [slug] whose turns read so far link to each tab page of [paths] that
+  /// one does, by the page's path, each turn read once.
+  Map<String, Thread> chatsLinking(String slug, Set<String> paths) {
+    final found = <String, Thread>{};
+    for (final thread in threadsOf(slug)) {
+      for (final turn in _turns[thread.slug] ?? const <Turn>[]) {
+        for (final path in paths) {
+          if (turn.text.contains(path)) found.putIfAbsent(path, () => thread);
+        }
+      }
+    }
+    return found;
+  }
+
   Thread? get thread => activeSlug == null
       ? null
       : threadsOf(activeSlug!).where((t) => t.slug == activeThread).firstOrNull;

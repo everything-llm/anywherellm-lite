@@ -1,8 +1,11 @@
 import 'dart:async';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../core/browser_tabs.dart';
 import '../../core/connection.dart';
+import '../../core/page_status.dart';
 import '../../core/ports.dart';
 import '../../core/schedule.dart';
 import '../../core/skill_pages.dart';
@@ -18,7 +21,7 @@ import 'settings_controller.dart';
 /// to run elsewhere, starts it afresh, Test connection asks again whether the toolkit is there,
 /// and an answer from before either is dropped, even once the server is back.
 class ToolkitController extends ChangeNotifier with FollowsServer {
-  ToolkitController(this._api, this._settings) {
+  ToolkitController(this._api, this._settings, {required this._tabState}) {
     followServer(_settings);
     _tests = _settings.tests;
     _settings.addListener(_tested);
@@ -27,6 +30,9 @@ class ToolkitController extends ChangeNotifier with FollowsServer {
 
   final ToolkitApi _api;
   final SettingsController _settings;
+
+  /// What browser-lean wrote about the tab whose page is at a path ([AnythingLlmApi.tabState]).
+  final Future<TabState> Function(String path) _tabState;
 
   /// How many times Test connection had asked, as last seen.
   int _tests = 0;
@@ -60,11 +66,39 @@ class ToolkitController extends ChangeNotifier with FollowsServer {
   /// card shows a row for each of.
   bool get pagesServed => _serves(ToolkitFeature.pages);
 
-  late final _pages = ReadSlot<Set<SkillPage>>(notifyListeners);
+  late final _pages = ReadSlot<_PagesRead>(notifyListeners);
 
   /// Which of the suite's pages are set up, as the last read said; never where they are, since
   /// a page's address is a bearer capability that [pagePath] hands to its one caller.
-  Set<SkillPage> get pagesFound => _pages.value ?? const {};
+  Set<SkillPage> get pagesFound => _pages.value?.found ?? const {};
+
+  /// The agent's browser's tabs still open now, as the last read of the pages listed them, or
+  /// null when the toolkit does not serve the pages or the bridge does not say. Their paths are
+  /// held in memory only.
+  List<OpenTab>? get tabs {
+    final listed = _pages.value?.rest.tabs;
+    return pagesServed && listed != null
+        ? stillOpen(listed, clock.now())
+        : null;
+  }
+
+  /// What the last read of the pages said of them.
+  PageStatus get pageStatus => _pages.value?.rest.status ?? const PageStatus();
+
+  /// What browser-lean last wrote about each tab [readTabs] read, by its page's path.
+  Map<String, TabState> _tabStates = const {};
+
+  /// The tabs whose state the last [readTabs] could not read.
+  Set<String> _tabsFailed = const {};
+
+  /// How many times [readTabs] began, so only the newest keeps its answer.
+  int _tabReads = 0;
+
+  /// The state of the tab at [path], or null until [readTabs] read it.
+  TabState? tabState(String path) => _tabStates[path];
+
+  /// Whether the last read of the tab at [path] failed.
+  bool tabFailed(String path) => _tabsFailed.contains(path);
 
   late final _jobs = ReadSlot<List<ScheduledJob>>(notifyListeners);
 
@@ -96,6 +130,9 @@ class ToolkitController extends ChangeNotifier with FollowsServer {
     _features = const {};
     _jobs.reset();
     _pages.reset();
+    _tabStates = const {};
+    _tabsFailed = const {};
+    _tabReads++;
     busy = false;
     changeProblem = null;
     runs.clear();
@@ -146,22 +183,23 @@ class ToolkitController extends ChangeNotifier with FollowsServer {
   /// Reads which pages are set up afresh, after the frame, unless that read is on its way.
   void wantPages() => afterFrame(_readPages);
 
-  /// Reads which pages are set up afresh unless that read is on its way. A refusal or any other
-  /// failure leaves none found, and says nothing.
-  void _readPages() {
+  /// Reads which pages are set up afresh unless that read is on its way.
+  void _readPages() => unawaited(readPages());
+
+  /// Reads which pages are set up afresh, or waits for the read on its way. A refusal or any
+  /// other failure leaves none found and no tabs, and says nothing.
+  Future<void> readPages() async {
     if (!pagesServed) return;
-    unawaited(
-      _pages.read(
-        () async {
-          try {
-            return (await _api.pages()).keys.toSet();
-          } on ApiException {
-            return const <SkillPage>{};
-          }
-        },
-        failTitle: 'Could not read the pages',
-        join: true,
-      ),
+    await _pages.read(
+      () async {
+        try {
+          return _kept(await _api.pages());
+        } on ApiException {
+          return _nothingFound;
+        }
+      },
+      failTitle: 'Could not read the pages',
+      join: true,
     );
   }
 
@@ -173,20 +211,47 @@ class ToolkitController extends ChangeNotifier with FollowsServer {
     try {
       final read = await _api.pages();
       if (!at.unchanged) return null;
-      _foundNow(read.keys.toSet());
-      return read[page];
+      _foundNow(_kept(read));
+      return read.paths[page];
     } on ApiException catch (error) {
       if (at.unchanged && (error.status == 401 || error.status == 403)) {
-        _foundNow(const {});
+        _foundNow(_nothingFound);
       }
       rethrow;
     }
   }
 
-  /// Keeps [found] as the pages set up, telling the listeners only when that changed.
-  void _foundNow(Set<SkillPage> found) {
-    if (setEquals(_pages.value, found)) return;
-    _pages.value = found;
+  /// Reads the pages afresh, then the state of each tab they list, at once, telling the
+  /// listeners once they are all back. A tab whose state cannot be read is [tabFailed].
+  Future<void> readTabs() async {
+    await readPages();
+    final at = here;
+    final read = ++_tabReads;
+    final paths = [for (final tab in tabs ?? const <OpenTab>[]) tab.path];
+    final states = await Future.wait([
+      for (final path in paths) _tabStateOrNull(path),
+    ]);
+    if (!at.unchanged || read != _tabReads) return;
+    _tabStates = {for (final (i, path) in paths.indexed) path: ?states[i]};
+    _tabsFailed = {
+      for (final (i, path) in paths.indexed)
+        if (states[i] == null) path,
+    };
+    notifyListeners();
+  }
+
+  /// The state of the tab at [path], or null when it cannot be read.
+  Future<TabState?> _tabStateOrNull(String path) async {
+    try {
+      return await _tabState(path);
+    } on ApiException {
+      return null;
+    }
+  }
+
+  /// Keeps [read] as what the pages last said.
+  void _foundNow(_PagesRead read) {
+    _pages.value = read;
     notifyListeners();
   }
 
@@ -327,3 +392,16 @@ class ToolkitController extends ChangeNotifier with FollowsServer {
     super.dispose();
   }
 }
+
+/// What a read of the pages keeps: which are set up, never where, and the rest of what it
+/// said with no paths.
+typedef _PagesRead = ({Set<SkillPage> found, SuitePages rest});
+
+/// What [read] keeps.
+_PagesRead _kept(SuitePages read) => (
+  found: read.paths.keys.toSet(),
+  rest: SuitePages(tabs: read.tabs, status: read.status),
+);
+
+/// Nothing set up, as a refusal leaves it.
+const _PagesRead _nothingFound = (found: <SkillPage>{}, rest: SuitePages());

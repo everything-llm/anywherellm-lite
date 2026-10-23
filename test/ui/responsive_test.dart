@@ -1,9 +1,11 @@
 import 'dart:ui' show Offset, Size;
 
+import 'package:anywherellm/core/browser_tabs.dart';
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/core/outputs.dart';
+import 'package:anywherellm/core/page_status.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/core/skill_pages.dart';
@@ -471,6 +473,47 @@ void main() {
         );
         expect(find.text('Library'), findsOneWidget);
         expect(find.text('Vault'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('the card\'s news and the Browser sheet fit', (tester) async {
+        const tab = '/browser-lean/aaaaaaaaaaaaaaaaaaaaaaaa.html';
+        final llm = awkward();
+        final slug = llm.spaces.first.slug;
+        llm.tabStates[tab] = TabState(
+          title: 'A' * 120,
+          host: '${'sub' * 30}.example.com',
+          mine: true,
+        );
+        final now = DateTime.now().toUtc();
+        final toolkit = FakeToolkit()
+          ..served = {ToolkitFeature.pages}
+          ..skillPages = const {
+            SkillPage.appsManager: '/apps-lean/manager-abc.html',
+            SkillPage.library: '/library-lean/abc.html',
+          }
+          ..status = PageStatus(failed: [now], changed: [now, now])
+          ..tabs = [
+            OpenTab(
+              path: tab,
+              workspace: slug,
+              until: now.add(const Duration(minutes: 9)),
+            ),
+          ];
+        final h = await pumpApp(
+          tester,
+          llm: llm,
+          toolkitServer: toolkit,
+          size: size,
+          shelf: true,
+        );
+        expect(find.text('1 tab open · closes in 9 min'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        h.shell
+          ..closeShelf()
+          ..togglePopup(Popup.browserTabs);
+        await tester.pumpAndSettle();
+        expect(find.text('1 tab open'), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
 

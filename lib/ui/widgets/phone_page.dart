@@ -83,9 +83,12 @@ class NavRow extends StatelessWidget {
     required this.title,
     required this.onTap,
     this.about,
+    this.aboutSpan,
     this.aboutLines = 1,
+    this.failed = false,
     this.heard,
     this.icon,
+    this.lead,
     this.end = 'chevron',
     this.accent = false,
     this.mono = false,
@@ -95,12 +98,21 @@ class NavRow extends StatelessWidget {
   final String title;
   final String? about;
 
+  /// The line under [title] as styled text, in place of [about].
+  final InlineSpan? aboutSpan;
+
   /// How many lines [about] may take before it is cut short.
   final int aboutLines;
+
+  /// Whether [about] says something failed, which a [Tokens.danger] mark goes before.
+  final bool failed;
   final VoidCallback? onTap;
 
   /// An icon before [title], as Settings' rows have.
   final String? icon;
+
+  /// What stands before [title] in place of an [icon].
+  final Widget? lead;
 
   /// The icon the row ends in, such as `external` for a page outside the app, or none.
   final String? end;
@@ -130,7 +142,10 @@ class NavRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         child: Row(
           children: [
-            if (icon case final icon?) ...[
+            if (lead case final lead?) ...[
+              lead,
+              const SizedBox(width: 16),
+            ] else if (icon case final icon?) ...[
               AppIcon(icon, size: IconSize.large, color: t.ink),
               const SizedBox(width: 16),
             ],
@@ -143,12 +158,30 @@ class NavRow extends StatelessWidget {
                     title,
                     style: mono ? Type.mono(15, color: ink) : Type.body(ink),
                   ),
-                  if (about case final about? when about.isNotEmpty)
-                    Text(
-                      about,
-                      maxLines: aboutLines,
-                      overflow: TextOverflow.ellipsis,
-                      style: Type.note(t.ink),
+                  if (aboutSpan ??
+                          (about?.isNotEmpty ?? false
+                              ? TextSpan(text: about)
+                              : null)
+                      case final about?)
+                    Row(
+                      children: [
+                        if (failed) ...[
+                          AppIcon(
+                            'failed',
+                            size: IconSize.small,
+                            color: t.danger,
+                          ),
+                          const SizedBox(width: 4),
+                        ],
+                        Flexible(
+                          child: Text.rich(
+                            about,
+                            maxLines: aboutLines,
+                            overflow: TextOverflow.ellipsis,
+                            style: Type.note(t.ink),
+                          ),
+                        ),
+                      ],
                     ),
                 ],
               ),

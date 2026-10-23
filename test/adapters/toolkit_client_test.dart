@@ -320,11 +320,48 @@ void main() {
           'vault': null,
         };
       final pages = await toolkit.api().pages();
-      expect(pages, {SkillPage.library: '/library-lean/aB3.html'});
+      expect(pages.paths, {SkillPage.library: '/library-lean/aB3.html'});
+      expect(pages.tabs, isNull);
       final request = toolkit.seen.single;
       expect(request.method, 'GET');
       expect(request.url.toString(), 'https://host.example.ts.net:8467/pages');
       expect(request.headers['Authorization'], 'Bearer SECRET-KEY');
+    });
+
+    test('carry the open tabs, the status and the server\'s clock', () async {
+      const tab = '/browser-lean/aaaaaaaaaaaaaaaaaaaaaaaa.html';
+      final ahead = DateTime.now().add(const Duration(minutes: 5));
+      final toolkit = _Toolkit()
+        ..routes['/pages'] = http.Response(
+          jsonEncode({
+            'browser': [
+              {
+                'path': tab,
+                'workspace': 'home',
+                'until': ahead
+                    .add(const Duration(minutes: 10))
+                    .millisecondsSinceEpoch,
+              },
+            ],
+            'status': {
+              'library': {
+                'failed': ['2026-10-23T08:00:00.000Z'],
+              },
+            },
+          }),
+          200,
+          headers: {'date': HttpDate.format(ahead)},
+        );
+      final pages = await toolkit.api().pages();
+      expect(pages.tabs!.single.path, tab);
+      expect(pages.tabs!.single.workspace, 'home');
+      expect(pages.status.failed, [DateTime.utc(2026, 10, 23, 8)]);
+      expect(pages.status.changed, isNull);
+      // Ten minutes on the phone's clock, and a minute's grace.
+      expect(
+        pages.tabs!.single.until.difference(DateTime.now()).inSeconds,
+        closeTo(660, 2),
+      );
     });
 
     test('are refused with the status the bridge gave', () async {

@@ -1,5 +1,8 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 
+import '../core/browser_tabs.dart';
+import '../core/page_status.dart';
 import '../core/server_models.dart';
 import '../core/skill_pages.dart';
 import 'app_scope.dart';
@@ -222,9 +225,18 @@ class _SidebarState extends State<Sidebar> {
             ListRow(
               icon: listing.icon,
               title: listing.title,
-              heard: '${listing.title}, ${listing.about}',
+              heard:
+                  '${listing.title}, ${pageNews(page, toolkit.pageStatus, seen: scope.prefs.librarySeen, now: clock.now()).line ?? listing.about}',
               onTap: () => openListedPage(context, page, listing),
             ),
+      if (toolkit.tabs case final tabs?)
+        ListRow(
+          icon: 'globe',
+          title: 'Browser',
+          note: tabs.isEmpty ? null : '${tabs.length}',
+          heard: 'Browser, ${browserLine(tabs, clock.now())}',
+          onTap: () => shell.togglePopup(Popup.browserTabs),
+        ),
     ];
   }
 
