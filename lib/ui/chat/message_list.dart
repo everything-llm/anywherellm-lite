@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -30,11 +29,12 @@ import '../widgets/rise.dart';
 import '../widgets/tappable.dart';
 import 'answer_body.dart';
 import 'markdown_lists.dart';
-import 'shortcut_chip.dart';
+import 'on_deck_view.dart';
 import 'answer_menu.dart';
 import 'citation_fit.dart';
 import 'generated_files.dart';
 import 'passages_sheet.dart';
+import 'question_body.dart';
 import 'sources_aside.dart';
 import 'speaker.dart';
 import 'wait_line.dart';
@@ -49,10 +49,13 @@ import '../widgets/scroll_fades.dart';
 /// sent scrolls there. Scrolled up past [_MessageListState._jumpFrom], a round button over the
 /// composer scrolls back to it.
 class MessageList extends StatefulWidget {
-  const MessageList({super.key, required this.onEdit});
+  const MessageList({super.key, required this.onEdit, required this.onPutBack});
 
   /// Puts a sent message's text back in the composer, to send as a new message.
   final ValueChanged<String> onEdit;
+
+  /// Puts a waiting message back in the composer, ahead of what is typed there.
+  final ValueChanged<OnDeck> onPutBack;
 
   @override
   State<MessageList> createState() => _MessageListState();
@@ -76,6 +79,13 @@ class _MessageListState extends State<MessageList> {
 
   /// The newest turn's height as last laid out.
   final _newest = _Extent();
+
+  /// The waiting messages' height as last laid out.
+  final _waiting = _Extent();
+
+  /// The waiting messages, which go with the newest turn as turns are added, keeping their
+  /// state.
+  final _waitingKey = GlobalKey();
 
   @override
   void dispose() {
@@ -110,11 +120,16 @@ class _MessageListState extends State<MessageList> {
   /// with [ChatSwitch.followAnswer] off. The list is reversed, so its offset counts up from the
   /// newest text.
   bool _holds(Turn? newest, PrefsController prefs) {
-    if (_scroll.hasClients && _scroll.position.pixels > _atBottom) return true;
+    if (_scrolledUp()) return true;
     return newest != null &&
         newest.streaming &&
         !prefs.prefs.isOn(ChatSwitch.followAnswer);
   }
+
+  /// Whether the list is scrolled up from the newest text, where a change to the waiting
+  /// messages under it leaves what is in view put.
+  bool _scrolledUp() =>
+      _scroll.hasClients && _scroll.position.pixels > _atBottom;
 
   /// Scrolls to the newest turn after this frame when a message was sent since the last build.
   void _follow(ChatController chat) {
@@ -184,7 +199,9 @@ class _MessageListState extends State<MessageList> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           sliver: _HoldPlace(
             newest: _newest,
+            waiting: _waiting,
             holds: () => _holds(turns.lastOrNull, scope.prefs),
+            scrolledUp: _scrolledUp,
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, i) => _turn(chat, turns, i),
@@ -233,6 +250,13 @@ class _MessageListState extends State<MessageList> {
     );
   }
 
+  /// The messages waiting to be sent, under the newest turn.
+  Widget _onDeck() => _Measured(
+    key: _waitingKey,
+    into: _waiting,
+    child: OnDeckView(onPutBack: widget.onPutBack),
+  );
+
   /// The [i]th turn from the newest.
   Widget _turn(ChatController chat, List<Turn> turns, int i) {
     final scope = AppScope.of(context);
@@ -248,41 +272,53 @@ class _MessageListState extends State<MessageList> {
         // starts at its left edge rather than shrinking to its text and sitting in the middle.
         child: SizedBox(
           width: Sizes.column,
-          child: Padding(
-            padding: EdgeInsets.only(top: first ? 0 : 16),
-            child: Rise(
-              child: turn.role == Role.user
-                  ? ListenableBuilder(
-                      // Only a shortcut's bubble depends on the preference.
-                      listenable: turn.shortcutUse == null
-                          ? turn
-                          : Listenable.merge([turn, scope.prefs]),
-                      builder: (context, _) => _UserBubble(
-                        turn.text,
-                        attachments: turn.attachments,
-                        shortcutUse: turn.shortcutUse,
-                        hideShortcutPrompt:
-                            turn.shortcutUse != null &&
-                            scope.prefs.prefs.isOn(
-                              ChatSwitch.hideShortcutPrompts,
-                            ),
-                        notSent: turn.notSent,
-                        onTryAgain: chat.canSendAgain(turn)
-                            ? () => unawaited(chat.sendAgain(turn))
-                            : null,
-                        onEdit: () {
-                          chat.discard(turn);
-                          widget.onEdit(turn.text);
-                        },
-                      ),
-                    )
-                  : _Answer(turn, retry: i == 0 ? _retryOf(chat) : null),
+          // The newest turn holds the messages waiting under it, so its place in the list
+          // keeps what is in view put as either changes.
+          child: _withWaiting(
+            newest: i == 0,
+            Padding(
+              padding: EdgeInsets.only(top: first ? 0 : 16),
+              child: Rise(
+                child: turn.role == Role.user
+                    ? ListenableBuilder(
+                        // Only a shortcut's bubble depends on the preference.
+                        listenable: turn.shortcutUse == null
+                            ? turn
+                            : Listenable.merge([turn, scope.prefs]),
+                        builder: (context, _) => _UserBubble(
+                          turn.text,
+                          attachments: turn.attachments,
+                          shortcutUse: turn.shortcutUse,
+                          hideShortcutPrompt:
+                              turn.shortcutUse != null &&
+                              scope.prefs.prefs.isOn(
+                                ChatSwitch.hideShortcutPrompts,
+                              ),
+                          notSent: turn.notSent,
+                          onTryAgain: chat.canSendAgain(turn)
+                              ? () => unawaited(chat.sendAgain(turn))
+                              : null,
+                          onEdit: () {
+                            chat.discard(turn);
+                            widget.onEdit(turn.text);
+                          },
+                        ),
+                      )
+                    : _Answer(turn, retry: i == 0 ? _retryOf(chat) : null),
+              ),
             ),
           ),
         ),
       ),
     );
   }
+
+  /// [turn], over the waiting messages when it is the [newest]. Every turn has the same shape,
+  /// so the one that was newest keeps its state when another is added.
+  Widget _withWaiting(Widget turn, {required bool newest}) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [turn, if (newest) _onDeck()],
+  );
 }
 
 /// The round button over the composer that scrolls the chat back to its newest text: 48 across
@@ -317,13 +353,14 @@ class _JumpButton extends StatelessWidget {
   }
 }
 
-/// A turn's height as it was last laid out, written by [_Measured] during its own layout,
-/// where reading it is allowed.
+/// A height as it was last laid out, a turn's or the waiting messages', written by [_Measured]
+/// during its own layout, where reading it is allowed.
 class _Extent {
+  /// The turn laid out, or null for the waiting messages.
   Turn? turn;
   double height = 0;
 
-  /// Whether the turn was laid out since [_RenderHoldPlace] last looked.
+  /// Whether it was laid out since [_RenderHoldPlace] last looked.
   bool fresh = false;
 }
 
@@ -332,12 +369,12 @@ class _Measured extends SingleChildRenderObjectWidget {
   const _Measured({
     super.key,
     required this.into,
-    required this.turn,
+    this.turn,
     required Widget super.child,
   });
 
   final _Extent? into;
-  final Turn turn;
+  final Turn? turn;
 
   @override
   RenderObject createRenderObject(BuildContext context) =>
@@ -354,7 +391,7 @@ class _RenderMeasured extends RenderProxyBox {
   _RenderMeasured(this.into, this.turn);
 
   _Extent? into;
-  Turn turn;
+  Turn? turn;
 
   @override
   void performLayout() {
@@ -368,22 +405,26 @@ class _RenderMeasured extends RenderProxyBox {
   }
 }
 
-/// The turns' list, which keeps what is in view put when the newest turn grows while [holds]:
-/// in the same layout, it moves the scroll offset by as much as that turn grew, so nothing that
-/// was drawn moves.
+/// The turns' list, which keeps what is in view put when the newest turn grows while [holds],
+/// and when the waiting messages under it change while [scrolledUp]: in the same layout, it moves
+/// the scroll offset by as much as they grew or shrank, so nothing that was drawn moves.
 class _HoldPlace extends SingleChildRenderObjectWidget {
   const _HoldPlace({
     required this.newest,
+    required this.waiting,
     required this.holds,
+    required this.scrolledUp,
     required Widget sliver,
   }) : super(child: sliver);
 
   final _Extent newest;
+  final _Extent waiting;
   final bool Function() holds;
+  final bool Function() scrolledUp;
 
   @override
   RenderObject createRenderObject(BuildContext context) =>
-      _RenderHoldPlace(newest, holds);
+      _RenderHoldPlace(newest, waiting, holds, scrolledUp);
 
   @override
   void updateRenderObject(
@@ -391,22 +432,30 @@ class _HoldPlace extends SingleChildRenderObjectWidget {
     _RenderHoldPlace renderObject,
   ) => renderObject
     ..newest = newest
-    ..holds = holds;
+    ..waiting = waiting
+    ..holds = holds
+    ..scrolledUp = scrolledUp;
 }
 
 class _RenderHoldPlace extends RenderProxySliver {
-  _RenderHoldPlace(this.newest, this.holds);
+  _RenderHoldPlace(this.newest, this.waiting, this.holds, this.scrolledUp);
 
   _Extent newest;
+  _Extent waiting;
   bool Function() holds;
+  bool Function() scrolledUp;
 
   /// The newest turn and its height at the last layout that laid it out.
   Turn? _turn;
   double _height = 0;
 
+  /// The waiting messages' height at the last layout that laid them out.
+  double _waitingHeight = 0;
+
   @override
   void performLayout() {
     newest.fresh = false;
+    waiting.fresh = false;
     super.performLayout();
     final list = child;
     final first = list is RenderSliverMultiBoxAdaptor ? list.firstChild : null;
@@ -420,11 +469,21 @@ class _RenderHoldPlace extends RenderProxySliver {
     // Laid out before and not since, it has not changed.
     if (!newest.fresh) return;
     // A turn just added below the others is not growth either.
-    final grown = identical(newest.turn, _turn) ? newest.height - _height : 0.0;
+    final same = identical(newest.turn, _turn);
+    final grown = same ? newest.height - _height : 0.0;
+    // The newest turn holds the waiting messages, whose own change counts apart.
+    final was = _waitingHeight;
+    final waited = waiting.fresh && same ? waiting.height - was : 0.0;
     _turn = newest.turn;
     _height = newest.height;
-    if (grown > 0.5 && holds()) {
-      geometry = SliverGeometry(scrollOffsetCorrection: grown);
+    if (waiting.fresh) _waitingHeight = waiting.height;
+    var moved = 0.0;
+    if (grown - waited > 0.5 && holds()) moved += grown - waited;
+    if (waited.abs() > 0.5 && scrolledUp()) moved += waited;
+    // Never below the newest text.
+    moved = moved.clamp(-constraints.scrollOffset, double.infinity);
+    if (moved.abs() > 0.5) {
+      geometry = SliverGeometry(scrollOffsetCorrection: moved);
     }
   }
 }
@@ -634,7 +693,7 @@ class _UserBubble extends StatelessWidget {
       child: GestureDetector(
         onLongPress: onEdit,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 300),
+          constraints: const BoxConstraints(maxWidth: questionWidth),
           child: _bubble(context),
         ),
       ),
@@ -655,52 +714,17 @@ class _UserBubble extends StatelessWidget {
 
   Widget _bubble(BuildContext context) {
     final t = Tokens.of(context);
-    final compact = hideShortcutPrompt ? shortcutUse : null;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: questionPadding,
       decoration: BoxDecoration(
         color: t.accentSoft,
         border: notSent ? Border.all(color: t.danger) : null,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(8),
-        ),
+        borderRadius: questionRadius,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (compact case final use?) ...[
-            Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 6,
-              runSpacing: 4,
-              children: [
-                ShortcutChip(use.label),
-                if (use.detail.isNotEmpty)
-                  Text(
-                    use.detail,
-                    style: Type.sans(Type.chat, color: t.ink, height: 1.5),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Shortcut · the server keeps the full prompt',
-              style: Type.note(t.ink),
-            ),
-          ] else
-            Text(text, style: Type.sans(Type.chat, color: t.ink, height: 1.5)),
-          for (final file in attachments)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: switch (file.picture) {
-                final bytes? => _Picture(bytes, name: file.name),
-                null => _FileName(file.name),
-              },
-            ),
-        ],
+      child: QuestionBody(
+        text,
+        attachments: attachments,
+        shortcutUse: hideShortcutPrompt ? shortcutUse : null,
       ),
     );
   }
@@ -737,58 +761,6 @@ class _NotSent extends StatelessWidget {
       ),
     );
   }
-}
-
-/// A file sent with a question, by its name.
-class _FileName extends StatelessWidget {
-  const _FileName(this.name);
-
-  final String name;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AppIcon('attach', size: IconSize.xs, color: t.ink),
-        const SizedBox(width: 6),
-        Flexible(
-          child: Text(
-            name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Type.note(t.ink),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// A picture sent with a question, drawn small; its name when its bytes do not decode.
-class _Picture extends StatelessWidget {
-  const _Picture(this.bytes, {required this.name});
-
-  final Uint8List bytes;
-  final String name;
-
-  static const _height = 120.0;
-
-  @override
-  Widget build(BuildContext context) => ConstrainedBox(
-    constraints: const BoxConstraints(maxHeight: _height, maxWidth: 240),
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: Image.memory(
-        bytes,
-        fit: BoxFit.contain,
-        cacheHeight: (_height * MediaQuery.devicePixelRatioOf(context)).round(),
-        semanticLabel: name,
-        errorBuilder: (_, _, _) => _FileName(name),
-      ),
-    ),
-  );
 }
 
 /// In place of a failure that says the workspace's chat model takes text only, with Change the

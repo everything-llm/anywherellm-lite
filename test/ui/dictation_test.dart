@@ -105,10 +105,12 @@ void main() {
       await tester.pump();
       expect(h.dictation!.stopped, 1);
       expect(control('Dictate'), findsOneWidget);
-      // Starting a go is off while the chat answers.
+      // A go starts while the chat answers too, for the next message.
       await tester.tap(control('Dictate'));
       await tester.pump();
-      expect(h.dictation!.listening, isFalse);
+      expect(h.dictation!.listening, isTrue);
+      await tester.tap(control('Stop dictating'));
+      await tester.pump();
       await llm.chat!.close();
       await tester.pump(const Duration(seconds: 1));
     },

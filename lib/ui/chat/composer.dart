@@ -34,8 +34,8 @@ import 'shortcut_chip.dart';
 
 /// Where a question is written. On a desktop ([AppScope.enterSends]) Enter sends it and
 /// Shift+Enter starts a new line; on a phone Enter starts a new line and Send sends. While this
-/// chat answers, Send becomes Stop; while another chat answers, nothing can be sent. Files
-/// attached go with the next question only.
+/// chat answers, Send becomes Send when done while something is typed, and Stop while nothing
+/// is. Files attached go with the next question only.
 class Composer extends StatefulWidget {
   const Composer({super.key, required this.draft, required this.focus});
 
@@ -169,6 +169,20 @@ class ComposerState extends State<Composer> {
     widget.focus.requestFocus();
   }
 
+  /// Puts [item], a message waiting in this chat, back in the message to write again: its words
+  /// ahead of what is typed and its files ahead of those attached. Like [edit], it drops the
+  /// shortcut chosen, since its words are what a shortcut expanded to.
+  void putBack(OnDeck item) {
+    if (!_scope.chat.dropOnDeck(item)) return;
+    final typed = widget.draft.text;
+    setState(() {
+      _shortcut = null;
+      _attached = [...item.attachments, ..._attached];
+    });
+    _setDraft(typed.trim().isEmpty ? item.text : '${item.text}\n$typed');
+    widget.focus.requestFocus();
+  }
+
   /// Puts [text] in the message, with the cursor at its end.
   void _setDraft(String text) => widget.draft.value = TextEditingValue(
     text: text,
@@ -240,14 +254,32 @@ class ComposerState extends State<Composer> {
     setState(() => _typed = widget.draft.text);
   }
 
-  /// Puts the message typed while this chat answers after the messages waiting in it, emptying
-  /// the composer for the next.
+  /// Puts the message typed while this chat answers, with its files, after the messages waiting
+  /// in it, emptying the composer for the next.
   void _hold() {
     final (message, use) = _outgoing(widget.draft.text);
     if (message.trim().isEmpty) return;
-    if (!_scope.chat.sendWhenDone(message, shortcutUse: use)) return;
+    final sent = _scope.chat.sendWhenDone(
+      message,
+      shortcutUse: use,
+      attachments: _attached,
+      mode: _scope.sources.chatMode.value,
+    );
+    if (sent) _empty();
+  }
+
+  /// Empties the composer once its message has gone: the words, the files, the shortcut, and a
+  /// go of dictation, whose later words would land in the next message.
+  void _empty() {
     widget.draft.clear();
-    setState(() => _shortcut = null);
+    _go++;
+    if (_listening) _scope.dictation?.stop();
+    setState(() {
+      _attached = const [];
+      _problem = null;
+      _listening = false;
+      _shortcut = null;
+    });
   }
 
   /// The message [text] sends, with the shortcut it was sent with; empty when the shortcut
@@ -396,15 +428,7 @@ class ComposerState extends State<Composer> {
     if (message.trim().isEmpty) return;
     final attached = _attached;
     final shown = _chatShown;
-    widget.draft.clear();
-    _go++;
-    if (_listening) _scope.dictation?.stop();
-    setState(() {
-      _attached = const [];
-      _problem = null;
-      _listening = false;
-      _shortcut = null;
-    });
+    _empty();
     final sent = await _scope.chat.send(
       message,
       attachments: attached,
@@ -614,14 +638,13 @@ class _Form extends StatelessWidget {
     }
 
     // While this chat answers, each message typed waits its turn, to go when the answer before
-    // it ends. Send when done takes the chips' place, as they are off while the chat answers;
-    // while messages wait and nothing answers, Send alone queues. `/reset` is not one: it asks
+    // it ends. Send becomes Send when done while the chat answers; while messages wait and
+    // nothing answers, Send alone queues, unless they are held, when it sends at once. `/reset` is not one: it asks
     // first, which would hold up the messages after it.
     final holdable =
         filled &&
         chat.canSendWhenDone &&
         (shortcut != null || !isResetCommand(draft.text));
-    final onDeck = chat.onDeck;
 
     // While a message typed now waits its turn, Enter and Send hold only what Send when done
     // would: never `/reset`. On a phone the keyboard's Enter is left to the field, which starts
@@ -654,18 +677,10 @@ class _Form extends StatelessWidget {
           other: 'Keep',
           onOther: onKeepChat,
         ),
-      if (onDeck.isNotEmpty) _OnDeckList(onDeck, onDrop: chat.dropOnDeck),
       if (picking) ...[
         ModelPicker(onClose: onPickModel),
         Divider(height: 21, thickness: 1, color: t.line),
       ],
-      if (slashQuery != null)
-        _ShortcutSuggestions(
-          query: slashQuery,
-          shortcuts: matches,
-          onSelect: onSelectShortcut,
-          onReset: resetMatch ? onAskReset : null,
-        ),
     ];
 
     // One line of the field: its text's line and its padding, at least a button's 48.
@@ -708,6 +723,17 @@ class _Form extends StatelessWidget {
                   ),
                 ),
               ),
+            // The shortcuts a `/` finds, straight in the box over a rule, scrolling past about
+            // five, and giving up room to the field where the window has little.
+            if (slashQuery != null)
+              Flexible(
+                child: _ShortcutSuggestions(
+                  query: slashQuery,
+                  shortcuts: matches,
+                  onSelect: onSelectShortcut,
+                  onReset: resetMatch ? onAskReset : null,
+                ),
+              ),
             // What goes with the message: the shortcut, the files and where answers come from,
             // over the field. The row is no taller than nothing while none of them shows.
             Padding(
@@ -733,11 +759,6 @@ class _Form extends StatelessWidget {
                   // The model is a row in the Answer from sheet, since the row has room for
                   // one chip.
                   const AnswerFromChip(),
-                  if (holdable && here)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: _SendWhenDone(onTap: onHold),
-                    ),
                 ],
               ),
             ),
@@ -751,7 +772,7 @@ class _Form extends StatelessWidget {
                   IconBtn(
                     'plus',
                     tooltip: 'Add files or shortcuts to this message',
-                    onPressed: chat.busy ? null : onAttach,
+                    onPressed: chat.takesInput ? onAttach : null,
                     box: 48,
                     size: IconSize.small,
                   ),
@@ -773,7 +794,7 @@ class _Form extends StatelessWidget {
                             builder: (context, _) => TextField(
                               controller: draft,
                               focusNode: focus,
-                              enabled: !chat.busy || queues,
+                              enabled: chat.takesInput,
                               spellCheckConfiguration:
                                   scope.canSpellcheck &&
                                       scope.prefs.prefs.isOn(
@@ -820,16 +841,20 @@ class _Form extends StatelessWidget {
                       'mic',
                       tooltip: listening ? 'Stop dictating' : 'Dictate',
                       active: listening,
-                      onPressed: chat.busy && !listening ? null : onDictate,
+                      onPressed: chat.takesInput || listening
+                          ? onDictate
+                          : null,
                       box: 48,
                       size: IconSize.small,
                     ),
                   ),
                 // The round button is 40 across in a 48 square, as the Lite prototype draws it.
+                // While this chat answers it is Send when done once something is typed, and Stop
+                // while nothing is.
                 oneLine(
                   Padding(
                     padding: const EdgeInsets.all(4),
-                    child: here
+                    child: here && !holdable
                         ? RoundButton(
                             label: 'Stop the answer',
                             color: t.ink,
@@ -837,7 +862,7 @@ class _Form extends StatelessWidget {
                             child: const StopMark(),
                           )
                         : RoundButton(
-                            label: 'Send',
+                            label: here ? 'Send when done' : 'Send',
                             // Send is the accent with its glow while it can send, and sunken
                             // with a muted arrow while it cannot.
                             color: canTap ? t.accent : t.sunken,
@@ -861,6 +886,9 @@ class _Form extends StatelessWidget {
   }
 }
 
+/// The shortcuts a `/` finds, in the message box's own tile over a rule above the field: rows
+/// of 56, up to [maxHeight] before they scroll, with Clear this chat last where [onReset] is.
+/// With none, a line says the message is sent as typed.
 class _ShortcutSuggestions extends StatelessWidget {
   const _ShortcutSuggestions({
     required this.query,
@@ -876,58 +904,125 @@ class _ShortcutSuggestions extends StatelessWidget {
   /// What choosing `/reset` does, listed after the shortcuts; null when it is not listed.
   final VoidCallback? onReset;
 
+  /// About five rows, and the room under the last.
+  static const maxHeight = 290.0;
+
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    return Container(
-      constraints: const BoxConstraints(maxHeight: 220),
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: cardDecoration(t).copyWith(boxShadow: t.raisedShadow),
-      child: shortcuts.isEmpty && onReset == null
-          ? Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'No shortcut called /$query. It is sent as typed.',
-                style: Type.body(t.muted),
+    final rule = BoxDecoration(
+      border: Border(bottom: BorderSide(color: t.line)),
+    );
+    if (shortcuts.isEmpty && onReset == null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Container(
+          decoration: rule,
+          padding: const EdgeInsets.only(top: 16, bottom: 12),
+          child: Text(
+            'No shortcut called /$query. It is sent as typed.',
+            style: Type.note(t.ink),
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
+      child: DecoratedBox(
+        decoration: rule,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: maxHeight),
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.only(bottom: 6),
+            children: [
+              for (final shortcut in shortcuts)
+                _SlashRow(
+                  shortcut.label,
+                  name: shortcut.name,
+                  heard: _heard(shortcut),
+                  onTap: () => onSelect(shortcut),
+                ),
+              if (onReset case final reset?)
+                _SlashRow(
+                  'Clear this chat',
+                  name: 'reset',
+                  icon: 'trash',
+                  heard: 'Clear this chat, /reset. Asks first',
+                  onTap: reset,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// What a screen reader hears for [shortcut] in a list.
+String _heard(PromptShortcut shortcut) =>
+    '${shortcut.label}, /${shortcut.name}. Add to the message';
+
+/// A row of the `/` list: [label] on one line, then its `/name` in mono, muted, at the end.
+class _SlashRow extends StatelessWidget {
+  const _SlashRow(
+    this.label, {
+    required this.name,
+    required this.heard,
+    required this.onTap,
+    this.icon,
+  });
+
+  final String label;
+  final String name;
+  final String heard;
+  final VoidCallback onTap;
+  final String? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Tappable(
+      label: heard,
+      onTap: onTap,
+      radius: BorderRadius.circular(24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            spacing: 14,
+            children: [
+              if (icon case final icon?)
+                AppIcon(icon, size: IconSize.medium, color: t.ink),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Type.body(t.ink),
+                ),
               ),
-            )
-          : ListView(
-              shrinkWrap: true,
-              padding: const EdgeInsets.all(6),
-              children: [
-                for (final shortcut in shortcuts)
-                  _ShortcutRow(shortcut, onSelect, large: true),
-                if (onReset != null)
-                  CardRow(
-                    'Clear this chat',
-                    icon: 'trash',
-                    large: true,
-                    heard: 'Clear this chat, /reset. Asks first',
-                    trailing: Text(
-                      '/reset',
-                      style: Type.mono(13, color: t.ink),
-                    ),
-                    onTap: onReset,
-                  ),
-              ],
-            ),
+              Text('/$name', style: Type.mono(13, color: t.muted)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
 
 /// A shortcut in a list: its label and its `/name`, which [onSelect] adds to the message.
 class _ShortcutRow extends StatelessWidget {
-  const _ShortcutRow(this.shortcut, this.onSelect, {this.large = false});
+  const _ShortcutRow(this.shortcut, this.onSelect);
 
   final PromptShortcut shortcut;
   final ValueChanged<PromptShortcut> onSelect;
-  final bool large;
 
   @override
   Widget build(BuildContext context) => CardRow(
     shortcut.label,
-    large: large,
-    heard: '${shortcut.label}, /${shortcut.name}. Add to the message',
+    heard: _heard(shortcut),
     trailing: Text(
       '/${shortcut.name}',
       style: Type.mono(13, color: Tokens.of(context).ink),
@@ -1094,108 +1189,6 @@ class _FormNote extends StatelessWidget {
       ],
     ),
   );
-}
-
-/// The messages waiting in the chat on screen, first to go first, each with Don't send. A long
-/// list scrolls, so the field keeps its room.
-class _OnDeckList extends StatelessWidget {
-  const _OnDeckList(this.items, {required this.onDrop});
-
-  final List<OnDeck> items;
-  final ValueChanged<OnDeck> onDrop;
-
-  /// What a waiting message shows: its shortcut and detail for one sent with a shortcut.
-  static String _shown(OnDeck item) => switch (item.shortcutUse) {
-    null => item.text,
-    ShortcutUse(:final label, detail: '') => label,
-    ShortcutUse(:final label, :final detail) => '$label: $detail',
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            items.length == 1
-                ? 'Sends when this answer ends.'
-                : 'Each sends in turn, when the answer before it ends.',
-            style: Type.note(t.ink),
-          ),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 132),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final item in items)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            _shown(item),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Type.body(t.ink),
-                          ),
-                        ),
-                        IconBtn(
-                          'close',
-                          tooltip: "Don't send",
-                          heard: "Don't send ${_shown(item)}",
-                          onPressed: () => onDrop(item),
-                          box: 36,
-                          size: IconSize.xs,
-                        ),
-                      ],
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Puts the message typed while this chat answers after the ones waiting there, each to go when
-/// the answer before it ends. There is no Send now: a chat runs one answer at a time.
-class _SendWhenDone extends StatelessWidget {
-  const _SendWhenDone({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Tappable(
-      touchTarget: true,
-      label: 'Send when done',
-      tooltip: 'Send when done',
-      onTap: onTap,
-      radius: BorderRadius.circular(99),
-      color: t.accentSoft,
-      child: SizedBox(
-        height: 32,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Center(
-            widthFactor: 1,
-            child: Text(
-              'Send when done',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Type.caption(t.accent, weight: FontWeight.w600),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 /// In place of the composer until a key is saved.

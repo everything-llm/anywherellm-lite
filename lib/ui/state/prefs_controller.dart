@@ -97,6 +97,25 @@ class PrefsController extends ChangeNotifier {
     }
   }
 
+  /// The messages kept waiting in chat [thread] of workspace [slug] of the server in use.
+  List<SavedOnDeck> onDeckIn(String slug, String thread) =>
+      _server == null ? const [] : prefs.onDeckIn(_server!, slug, thread);
+
+  /// Keeps [messages] as the ones waiting in chat [thread] of workspace [slug], so they survive
+  /// the app closing.
+  Future<void> setOnDeck(
+    String slug,
+    String thread,
+    List<SavedOnDeck> messages,
+  ) async {
+    final server = _server;
+    if (server == null ||
+        (messages.isEmpty && prefs.onDeckIn(server, slug, thread).isEmpty)) {
+      return;
+    }
+    await _change(prefs.withOnDeck(server, slug, thread, messages));
+  }
+
   /// Drops a deleted workspace from the arrangement, the last chat, and what is kept of its
   /// chats and switched-off documents.
   Future<void> forgetWorkspace(String slug) async {

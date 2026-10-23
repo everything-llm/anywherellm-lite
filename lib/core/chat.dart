@@ -177,6 +177,9 @@ class Attachment {
   final Uint8List bytes;
 
   bool get isImage => mime.startsWith('image/');
+
+  /// This file as a sent question shows it: a picture with its bytes, any other by its name.
+  SentFile get sent => isImage ? SentFile.picture(name, bytes) : SentFile(name);
 }
 
 /// The type the server takes for an attached document, which it reads in for that message.

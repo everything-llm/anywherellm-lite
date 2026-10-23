@@ -60,6 +60,9 @@ Path _path(String name) =>
 enum IconSize {
   tiny(12),
   xs(14),
+
+  /// Beside a line of 13 px text, as a waiting message's clock is.
+  note(13),
   small(16),
   normal(18),
 

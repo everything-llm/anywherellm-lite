@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/copy.dart';
 import 'app_scope.dart';
 import 'chat/browser_sheet.dart';
 import 'chat/chat_view.dart';
@@ -272,7 +273,8 @@ class _Main extends StatelessWidget {
   }
 }
 
-/// Undo for a chat just deleted, over the chat's composer while it can be put back.
+/// Undo for a chat just deleted, or for the waiting messages Clear all took out, over the chat's
+/// composer while they can be put back.
 class _PhoneUndo extends StatelessWidget {
   const _PhoneUndo();
 
@@ -282,18 +284,24 @@ class _PhoneUndo extends StatelessWidget {
     final bars = WindowInsets.of(context);
     return ListenableBuilder(
       listenable: chat,
-      builder: (context, _) => chat.deletedChat == null
-          ? const SizedBox.shrink()
-          : Positioned(
-              left: 20 + bars.left,
-              right: 20 + bars.right,
-              bottom: 96 + bars.bottom,
-              child: UndoBar(
-                'Chat deleted',
-                onUndo: chat.undoDelete,
-                floating: true,
-              ),
-            ),
+      builder: (context, _) {
+        final (String, VoidCallback)? undo = chat.deletedChat != null
+            ? ('Chat deleted', chat.undoDelete)
+            : switch (chat.clearedOnDeck) {
+                final n? => (
+                  'Cleared ${plural(n, 'waiting message', 'waiting messages')}',
+                  chat.undoClearOnDeck,
+                ),
+                null => null,
+              };
+        if (undo == null) return const SizedBox.shrink();
+        return Positioned(
+          left: 20 + bars.left,
+          right: 20 + bars.right,
+          bottom: 96 + bars.bottom,
+          child: UndoBar(undo.$1, onUndo: undo.$2, floating: true),
+        );
+      },
     );
   }
 }

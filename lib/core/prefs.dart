@@ -79,6 +79,39 @@ class LastChat {
   }
 }
 
+/// A message waiting in a chat to be sent when the answer before it ends, as it is kept between
+/// runs: its words, the shortcut it was written with, and the names of the files that went with
+/// it, whose bytes are not kept.
+class SavedOnDeck {
+  const SavedOnDeck(this.text, {this.shortcutUse, this.files = const []});
+
+  final String text;
+  final ShortcutUse? shortcutUse;
+  final List<String> files;
+
+  Map<String, Object?> toJson() => {
+    'text': text,
+    if (shortcutUse != null) 'shortcutUse': shortcutUse!.toJson(),
+    if (files.isNotEmpty) 'files': files,
+  };
+
+  static SavedOnDeck? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final text = textOrNull(json['text']);
+    if (text == null) return null;
+    final files = json['files'];
+    return SavedOnDeck(
+      text,
+      shortcutUse: ShortcutUse.fromJson(json['shortcutUse']),
+      files: [
+        if (files is List)
+          for (final name in files)
+            if (name is String) name,
+      ],
+    );
+  }
+}
+
 /// Which colours the app uses: the system's light or dark, or one of them always.
 enum ThemePref { system, light, dark }
 
@@ -132,6 +165,7 @@ class Prefs {
     this.recent = const {},
     this.shortcuts = const [],
     this.shortcutUses = const {},
+    this.onDeck = const {},
   });
 
   /// How many chats [recent] keeps for a workspace.
@@ -172,6 +206,18 @@ class Prefs {
   /// Shortcut labels and details for exchanges on this device, keyed by server, workspace,
   /// thread and AnythingLLM's exchange id.
   final Map<String, ShortcutUse> shortcutUses;
+
+  /// The messages waiting in each chat, by [chatKey], first to go first, kept so they survive
+  /// the app closing.
+  final Map<String, List<SavedOnDeck>> onDeck;
+
+  /// The key of chat [thread] of workspace [slug] on [server] in [onDeck].
+  static String chatKey(String server, String slug, String thread) =>
+      '${offKey(server, slug)} $thread';
+
+  /// The messages waiting in chat [thread] of workspace [slug] on [server].
+  List<SavedOnDeck> onDeckIn(String server, String slug, String thread) =>
+      onDeck[chatKey(server, slug, thread)] ?? const [];
 
   /// The chats pinned in workspace [slug] on [server].
   List<String> pinnedIn(String server, String slug) =>
@@ -251,6 +297,7 @@ class Prefs {
     Map<String, List<String>>? recent,
     List<PromptShortcut>? shortcuts,
     Map<String, ShortcutUse>? shortcutUses,
+    Map<String, List<SavedOnDeck>>? onDeck,
   }) => Prefs(
     switchedOff: switchedOff ?? this.switchedOff,
     workspaceOrder: workspaceOrder ?? this.workspaceOrder,
@@ -262,6 +309,7 @@ class Prefs {
     recent: recent ?? this.recent,
     shortcuts: shortcuts ?? this.shortcuts,
     shortcutUses: shortcutUses ?? this.shortcutUses,
+    onDeck: onDeck ?? this.onDeck,
   );
 
   /// [map] with [key] set to [list], or without it when [list] is empty.
@@ -298,19 +346,30 @@ class Prefs {
     ]),
   );
 
+  /// These prefs with [messages] waiting in chat [thread] of workspace [slug] on [server].
+  Prefs withOnDeck(
+    String server,
+    String slug,
+    String thread,
+    List<SavedOnDeck> messages,
+  ) => _copy(onDeck: _with(onDeck, chatKey(server, slug, thread), messages));
+
   /// These prefs with chat [thread] of workspace [slug] on [server] neither pinned nor
-  /// recent, as when it is deleted.
+  /// recent, and nothing waiting in it, as when it is deleted.
   Prefs withoutChat(String server, String slug, String thread) =>
       withPin(server, slug, thread, on: false)._copy(
         recent: _with(recent, offKey(server, slug), [
           ...recentIn(server, slug).where((t) => t != thread),
         ]),
+        onDeck: _with(onDeck, chatKey(server, slug, thread), const []),
       );
 
-  /// Whether chat [thread] of workspace [slug] on [server] is pinned or recent.
+  /// Whether chat [thread] of workspace [slug] on [server] is pinned or recent, or has messages
+  /// waiting.
   bool keepsChat(String server, String slug, String thread) =>
       pinnedIn(server, slug).contains(thread) ||
-      recentIn(server, slug).contains(thread);
+      recentIn(server, slug).contains(thread) ||
+      onDeck.containsKey(chatKey(server, slug, thread));
 
   /// These prefs with the switched-off documents of [slug] on [server] set to [docs].
   Prefs withOff(String server, String slug, List<OffDoc> docs) =>
@@ -330,8 +389,8 @@ class Prefs {
       lastChat?.slug == slug && lastChat?.server == server;
 
   /// These prefs with what is kept of workspace [from] on [server], its order, switched-off
-  /// documents, last chat, pins, recent chats, shortcuts and their uses, moved to [to], as when a
-  /// workspace's slug changes.
+  /// documents, last chat, pins, recent chats, shortcuts and their uses, and the messages waiting
+  /// in its chats, moved to [to], as when a workspace's slug changes.
   Prefs withRenamedWorkspace(String server, String from, String to) {
     if (from == to) return this;
     final fromKey = offKey(server, from);
@@ -359,15 +418,21 @@ class Prefs {
               ? shortcut.inWorkspace(toKey)
               : shortcut,
       ],
-      shortcutUses: {
-        for (final entry in shortcutUses.entries)
-          entry.key.startsWith('$fromKey ')
-                  ? '$toKey ${entry.key.substring(fromKey.length + 1)}'
-                  : entry.key:
-              entry.value,
-      },
+      shortcutUses: _movedUnder(shortcutUses, fromKey, toKey),
+      onDeck: _movedUnder(onDeck, fromKey, toKey),
     );
   }
+
+  /// [map] with each key under workspace key [from], as `<from> <rest>`, under [to] instead.
+  static Map<String, T> _movedUnder<T>(
+    Map<String, T> map,
+    String from,
+    String to,
+  ) => {
+    for (final MapEntry(:key, :value) in map.entries)
+      key.startsWith('$from ') ? '$to ${key.substring(from.length + 1)}' : key:
+          value,
+  };
 
   /// [map] with what is under [from] under [to] instead.
   static Map<String, List<String>> _moved(
@@ -379,14 +444,18 @@ class Prefs {
       : map;
 
   /// These prefs with [slug] dropped from the order, from the last chat when it is on [server],
-  /// and with its pins, recent chats and switched-off documents forgotten, as when the
-  /// workspace is deleted.
+  /// and with its pins, recent chats, switched-off documents and the messages waiting in its
+  /// chats forgotten, as when the workspace is deleted.
   Prefs withoutWorkspace(String server, String slug) => _copy(
     workspaceOrder: [...workspaceOrder.where((s) => s != slug)],
     lastChat: () => lastChatIn(server, slug) ? null : lastChat,
     switchedOff: _with(switchedOff, offKey(server, slug), const []),
     pinned: _with(pinned, offKey(server, slug), const []),
     recent: _with(recent, offKey(server, slug), const []),
+    onDeck: {
+      for (final MapEntry(:key, :value) in onDeck.entries)
+        if (!key.startsWith('${offKey(server, slug)} ')) key: value,
+    },
   );
 
   /// These prefs with chat [thread] of workspace [slug] on [server] as the last on screen; a
@@ -433,6 +502,11 @@ class Prefs {
         for (final entry in shortcutUses.entries)
           entry.key: entry.value.toJson(),
       },
+    if (onDeck.isNotEmpty)
+      'onDeck': {
+        for (final entry in onDeck.entries)
+          entry.key: [for (final m in entry.value) m.toJson()],
+      },
   });
 
   /// Reads what [encode] wrote. Anything it cannot read falls back to the default, and keys it
@@ -476,8 +550,19 @@ class Prefs {
             ?PromptShortcut.fromJson(item),
       ],
       shortcutUses: _shortcutUsesOf(json['shortcutUses']),
+      onDeck: _onDeckOf(json['onDeck']),
     );
   }
+
+  /// Each chat's waiting messages in [json], as [onDeck] is written.
+  static Map<String, List<SavedOnDeck>> _onDeckOf(Object? json) => {
+    if (json is Map)
+      for (final MapEntry(:key, :value) in json.entries)
+        if (key is String && value is List)
+          if ([for (final m in value) ?SavedOnDeck.fromJson(m)]
+              case final messages when messages.isNotEmpty)
+            key: messages,
+  };
 
   /// Each workspace's chat slugs in [json], as [pinned] and [recent] are written.
   static Map<String, List<String>> _chatsOf(Object? json) => {

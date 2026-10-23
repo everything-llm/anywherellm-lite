@@ -217,6 +217,48 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
   });
 
+  testWidgets(
+    'scrolled up, a message waiting added or dropped leaves what is in view put',
+    (tester) async {
+      final llm = planningServer()..hold = true;
+      final h = await pumpApp(tester, llm: llm, size: const Size(390, 500));
+      await h.chat.send('Tell me everything.');
+      await tester.pump(const Duration(milliseconds: 300));
+      for (var i = 0; i < 12; i++) {
+        llm.chat!.add(TextChunk('Paragraph $i.\n\n'));
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      // At the bottom, a message added sits under the answer, in view.
+      expect(h.chat.sendWhenDone('First waiting'), isTrue);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(listOffset(tester), 0);
+      final scroll = tester.state<ScrollableState>(
+        find
+            .descendant(
+              of: find.byType(MessageList),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      scroll.position.jumpTo(200);
+      await tester.pump();
+      final read = find.textContaining('Paragraph 6.');
+      final before = tester.getTopLeft(read).dy;
+      expect(h.chat.sendWhenDone('Second waiting'), isTrue);
+      await tester.pump();
+      expect(tester.getTopLeft(read).dy, moreOrLessEquals(before, epsilon: 1));
+      await tester.pump(const Duration(milliseconds: 300));
+      h.chat.dropOnDeck(h.chat.onDeck.first);
+      await tester.pump();
+      expect(tester.getTopLeft(read).dy, moreOrLessEquals(before, epsilon: 1));
+      h.chat.clearOnDeck();
+      await tester.pump();
+      expect(tester.getTopLeft(read).dy, moreOrLessEquals(before, epsilon: 1));
+      await llm.chat!.close();
+      await tester.pump(const Duration(seconds: 7));
+    },
+  );
+
   testWidgets('spellcheck follows its switch where the device has one', (
     tester,
   ) async {

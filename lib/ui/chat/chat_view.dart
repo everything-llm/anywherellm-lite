@@ -15,6 +15,7 @@ import '../widgets/buttons.dart';
 import '../widgets/phone_page.dart';
 import '../widgets/tappable.dart';
 import '../settings/settings_pages.dart';
+import '../state/chat_controller.dart';
 import '../state/shell_controller.dart';
 import 'composer.dart';
 import 'message_list.dart';
@@ -46,6 +47,8 @@ class _ChatViewState extends State<ChatView> {
   }
 
   void _edit(String text) => _composer.currentState?.edit(text);
+
+  void _putBack(OnDeck item) => _composer.currentState?.putBack(item);
 
   @override
   Widget build(BuildContext context) {
@@ -103,7 +106,7 @@ class _ChatViewState extends State<ChatView> {
           ),
           LayoutId(
             id: _Slot.body,
-            child: _Body(onEdit: _edit),
+            child: _Body(onEdit: _edit, onPutBack: _putBack),
           ),
           // Last, so it paints over the header when there is no room for both.
           LayoutId(
@@ -271,9 +274,10 @@ class _ChatLayout extends MultiChildLayoutDelegate {
 }
 
 class _Body extends StatelessWidget {
-  const _Body({required this.onEdit});
+  const _Body({required this.onEdit, required this.onPutBack});
 
   final ValueChanged<String> onEdit;
+  final ValueChanged<OnDeck> onPutBack;
 
   @override
   Widget build(BuildContext context) {
@@ -287,7 +291,9 @@ class _Body extends StatelessWidget {
       ]),
       builder: (context, _) {
         final chat = scope.chat;
-        if (chat.active != null) return MessageList(onEdit: onEdit);
+        if (chat.active != null) {
+          return MessageList(onEdit: onEdit, onPutBack: onPutBack);
+        }
         // The banner says why there is nothing to show, so no empty state says otherwise.
         if (scope.settings.configured && chat.unreachable.value) {
           return const SizedBox.shrink();

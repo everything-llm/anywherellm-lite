@@ -298,4 +298,38 @@ void main() {
       });
     });
   });
+
+  group('messages waiting in a chat', () {
+    const server = 'https://llm.example';
+    final prefs = const Prefs().withOnDeck(server, 'plans', 't1', const [
+      SavedOnDeck(
+        'And French?',
+        shortcutUse: ShortcutUse(label: 'Translate', detail: 'French'),
+      ),
+      SavedOnDeck('This one', files: ['notes.pdf']),
+    ]);
+
+    test('round-trip, with their shortcut and the names of their files', () {
+      final read = Prefs.decode(prefs.encode());
+      final kept = read.onDeckIn(server, 'plans', 't1');
+      expect(kept.map((m) => m.text), ['And French?', 'This one']);
+      expect(kept.first.shortcutUse?.detail, 'French');
+      expect(kept.last.files, ['notes.pdf']);
+    });
+
+    test('none are dropped from the file', () {
+      final none = prefs.withOnDeck(server, 'plans', 't1', const []);
+      expect(none.onDeck, isEmpty);
+      expect(none.encode(), isNot(contains('onDeck')));
+    });
+
+    test('follow a workspace renamed, and go with it or its chat deleted', () {
+      final moved = prefs.withRenamedWorkspace(server, 'plans', 'plans-2');
+      expect(moved.onDeckIn(server, 'plans', 't1'), isEmpty);
+      expect(moved.onDeckIn(server, 'plans-2', 't1'), hasLength(2));
+      expect(prefs.withoutWorkspace(server, 'plans').onDeck, isEmpty);
+      expect(prefs.keepsChat(server, 'plans', 't1'), isTrue);
+      expect(prefs.withoutChat(server, 'plans', 't1').onDeck, isEmpty);
+    });
+  });
 }

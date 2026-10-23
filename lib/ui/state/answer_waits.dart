@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
 
 import '../../core/ports.dart';
 import '../../core/server_models.dart';
@@ -52,8 +51,8 @@ class AnswerWaits {
   /// Takes what the server saved for chat `thread`, whose last turn is the answer waited for.
   final void Function(String slug, String thread, List<Turn> saved) saved;
 
-  /// Says that a wait ended.
-  final VoidCallback changed;
+  /// Says that the wait in chat `thread` ended.
+  final void Function(String thread) changed;
 
   /// How many times the chat of an answer whose connection dropped is read before it counts as
   /// failed: every 5 s for 2 minutes, then every 20 s to 30 minutes.
@@ -169,7 +168,7 @@ class AnswerWaits {
     waiting.cancel();
     _waits.remove(waiting.thread);
     waiting.answer.stopWaiting();
-    changed();
+    changed(waiting.thread);
   }
 
   /// Whether [history] ends in [waiting]'s answer: its last exchange is newer than the

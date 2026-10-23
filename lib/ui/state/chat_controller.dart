@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/chat.dart';
 import '../../core/connection.dart';
 import '../../core/ports.dart';
+import '../../core/prefs.dart';
 import '../../core/shortcuts.dart';
 import '../../core/server_models.dart';
 import 'answer_bytes.dart';
@@ -63,11 +64,36 @@ class _Running {
 
 /// A message waiting in a chat to be sent when the answer before it ends ([sendWhenDone]).
 class OnDeck {
-  OnDeck(this.text, {this.shortcutUse});
+  OnDeck(
+    this.text, {
+    this.shortcutUse,
+    this.attachments = const [],
+    this.mode,
+    this.lost = const [],
+  });
 
   final String text;
   final ShortcutUse? shortcutUse;
+
+  /// The files that go with it.
+  final List<Attachment> attachments;
+
+  /// The workspace's chat mode when it was written, from which [modeForFiles] picks the mode
+  /// its files go in.
+  final ChatMode? mode;
+
+  /// The names of the files it was written with that were not kept when the app closed: it
+  /// goes without them.
+  final List<String> lost;
+
+  /// [attachments] as a sent question shows them.
+  late final List<SentFile> files = [for (final a in attachments) a.sent];
 }
+
+/// The messages waiting in a chat: its workspace, the messages in the order they go, and
+/// whether they are held, as after the answer before them stopped or failed, until the person
+/// resumes them or sends another message.
+typedef _Deck = ({String slug, List<OnDeck> next, bool held});
 
 /// The workspaces and their chats, the chat on screen, and the answers running.
 ///
@@ -134,7 +160,8 @@ class ChatController extends ChangeNotifier with FollowsServer {
       _turns[thread] = _withUnsent(thread, saved);
       _markFinished(saved.last, slug, thread);
     },
-    changed: () {
+    changed: (thread) {
+      _holdIfCut(thread);
       _sendOnDeck();
       notifyListeners();
     },
@@ -149,87 +176,221 @@ class ChatController extends ChangeNotifier with FollowsServer {
   /// The answers running, at most one in each chat.
   final _runs = <_Running>[];
 
-  /// The messages waiting in each chat, by chat, in the order they go, with the chat's
-  /// workspace. Each list is replaced, never changed, as the turns are.
-  final _onDeck = <String, ({String slug, List<OnDeck> next})>{};
+  /// The messages waiting in each chat, by chat. Each list is replaced, never changed, as the
+  /// turns are. Every change is kept in the prefs, from which a chat opened after the app
+  /// closed takes its messages back, held ([_restoreDeck]).
+  final _onDeck = <String, _Deck>{};
 
   /// The messages waiting in the chat on screen, first to go first.
   List<OnDeck> get onDeck => _onDeck[activeThread]?.next ?? const [];
 
+  /// Whether the messages waiting in the chat on screen are held: the answer before them
+  /// stopped or failed, or the app closed while they waited. [resumeOnDeck] sends them on, and
+  /// so does a message sent meanwhile once its answer ends.
+  bool get onDeckHeld => _onDeck[activeThread]?.held ?? false;
+
   /// Whether [sendWhenDone] can take a message: an answer runs in the chat on screen, whose
-  /// thread is made, or messages already wait there.
+  /// thread is made, or messages wait there that are not held.
   bool get canSendWhenDone =>
       activeThread != null && (answeringHere || _queued);
 
-  /// Whether messages wait in the chat on screen, held back by [_sendOnDeck]: one sent now
-  /// would go ahead of them, so it joins them instead.
-  bool get _queued => _onDeck.containsKey(activeThread);
+  /// Whether messages wait in the chat on screen, not held, held back by [_sendOnDeck]: one
+  /// sent now would go ahead of them, so it joins them instead.
+  bool get _queued => _onDeck.containsKey(activeThread) && !onDeckHeld;
 
-  /// Puts [message] at the end of the messages waiting in the chat on screen. Each is sent in
-  /// turn, when the answer before it ends, however it ends, while another chat shows or the app
-  /// is out of sight too. True when it was taken.
-  bool sendWhenDone(String message, {ShortcutUse? shortcutUse}) {
+  /// Puts [message], with [attachments], at the end of the messages waiting in the chat on
+  /// screen. Each is sent in turn, when the answer before it ends, while another chat shows or
+  /// the app is out of sight too, until an answer stops or fails. [mode] is the workspace's
+  /// chat mode, as [send] takes it. True when it was taken.
+  bool sendWhenDone(
+    String message, {
+    ShortcutUse? shortcutUse,
+    List<Attachment> attachments = const [],
+    ChatMode? mode,
+  }) {
     final slug = activeSlug;
     final thread = activeThread;
     final text = message.trim();
     if (slug == null || thread == null || text.isEmpty || !canSendWhenDone) {
       return false;
     }
-    _onDeck[thread] = (
-      slug: slug,
-      next: [
-        ...onDeck,
-        OnDeck(text, shortcutUse: shortcutUse),
-      ],
-    );
+    _setDeck(thread, slug, [
+      ...onDeck,
+      OnDeck(
+        text,
+        shortcutUse: shortcutUse,
+        attachments: attachments,
+        mode: mode,
+      ),
+    ]);
     notifyListeners();
     return true;
   }
 
-  /// Takes [item] out of the messages waiting in the chat on screen.
-  void dropOnDeck(OnDeck item) {
+  /// Takes [item] out of the messages waiting in the chat on screen, and says whether it was
+  /// there.
+  bool dropOnDeck(OnDeck item) {
     final thread = activeThread;
     final deck = _onDeck[thread];
-    if (thread == null || deck == null) return;
+    if (thread == null ||
+        deck == null ||
+        !deck.next.any((o) => identical(o, item))) {
+      return false;
+    }
     _setDeck(thread, deck.slug, [
       for (final o in deck.next)
         if (!identical(o, item)) o,
     ]);
     notifyListeners();
+    return true;
   }
 
-  /// Keeps [next] as the messages waiting in chat [thread] of workspace [slug], or none.
-  void _setDeck(String thread, String slug, List<OnDeck> next) {
+  /// The messages [clearOnDeck] took out, while [undoClearOnDeck] can put them back.
+  late final _cleared = Fleeting<({String thread, _Deck deck})>(
+    undoFor,
+    (_) => notifyListeners(),
+  );
+
+  /// How many messages [undoClearOnDeck] would put back, or null.
+  int? get clearedOnDeck => _cleared.value?.deck.next.length;
+
+  /// Takes every message waiting in the chat on screen out at once. [undoClearOnDeck] puts them
+  /// back for [undoFor].
+  void clearOnDeck() {
+    final thread = activeThread;
+    final deck = _onDeck[thread];
+    if (thread == null || deck == null) return;
+    _cleared.show((thread: thread, deck: deck));
+    _setDeck(thread, deck.slug, const []);
+    notifyListeners();
+  }
+
+  /// Puts back what [clearOnDeck] took out, ahead of any message written since, in its chat
+  /// unless that chat is gone.
+  void undoClearOnDeck() {
+    final cleared = _cleared.take();
+    if (cleared == null) return;
+    final (:thread, :deck) = cleared;
+    if (threadsOf(deck.slug).any((t) => t.slug == thread)) {
+      final now = _onDeck[thread];
+      _setDeck(thread, deck.slug, [
+        ...deck.next,
+        ...?now?.next,
+      ], held: now?.held ?? deck.held);
+      _sendOnDeck();
+    }
+    notifyListeners();
+  }
+
+  /// Sends on the messages held in the chat on screen, the first at once when the chat can
+  /// take it.
+  void resumeOnDeck() {
+    if (activeThread case final thread?) {
+      _holdDeck(thread, false);
+      _sendOnDeck();
+      notifyListeners();
+    }
+  }
+
+  /// Holds the messages waiting in chat [thread], or lets them go on. Whether they are held is
+  /// not kept in the prefs.
+  void _holdDeck(String thread, bool held) {
+    if (_onDeck[thread] case final deck? when deck.held != held) {
+      _onDeck[thread] = (slug: deck.slug, next: deck.next, held: held);
+    }
+  }
+
+  /// Holds the messages waiting in chat [thread] when the answer before them stopped, failed
+  /// or was not sent, for the person to resume.
+  void _holdIfCut(String thread) {
+    final last = _turns[thread]?.lastOrNull;
+    if (last != null && ((last.unfinished && !last.waiting) || last.notSent)) {
+      _holdDeck(thread, true);
+    }
+  }
+
+  /// Keeps [next] as the messages waiting in chat [thread] of workspace [slug], or none, [held]
+  /// or, by default, as held as they were, in the prefs too.
+  void _setDeck(String thread, String slug, List<OnDeck> next, {bool? held}) {
     if (next.isEmpty) {
       _onDeck.remove(thread);
     } else {
-      _onDeck[thread] = (slug: slug, next: next);
+      _onDeck[thread] = (
+        slug: slug,
+        next: next,
+        held: held ?? _onDeck[thread]?.held ?? false,
+      );
     }
+    unawaited(
+      _prefs.setOnDeck(slug, thread, [
+        for (final o in next)
+          SavedOnDeck(
+            o.text,
+            shortcutUse: o.shortcutUse,
+            files: [...o.lost, for (final a in o.attachments) a.name],
+          ),
+      ]),
+    );
   }
 
-  /// Sends the first message waiting in each chat that can take one: nothing runs, is waited
-  /// for or clears there, its turns are read and [refresh] is not reading them again.
+  /// Takes back the messages kept waiting in chat [thread] of workspace [slug] when the app
+  /// closed, held, since the answer before them ended out of sight. Their files were not kept.
+  void _restoreDeck(String slug, String thread) {
+    if (_onDeck.containsKey(thread)) return;
+    final saved = _prefs.onDeckIn(slug, thread);
+    if (saved.isEmpty) return;
+    _onDeck[thread] = (
+      slug: slug,
+      next: [
+        for (final m in saved)
+          OnDeck(m.text, shortcutUse: m.shortcutUse, lost: m.files),
+      ],
+      held: true,
+    );
+  }
+
+  /// Whether chat [thread] can take a waiting message now: nothing runs, is waited for or
+  /// clears there, and its turns are read.
+  bool _canTakeOnDeck(String thread) =>
+      _turns.containsKey(thread) &&
+      !isAnswering(thread) &&
+      !waits.has(thread) &&
+      !_clearing.contains(thread);
+
+  /// Sends the first message waiting in each chat that can take one and is not held, unless
+  /// [refresh] is reading the chats again.
   void _sendOnDeck() {
     if (_refreshing) return;
     for (final MapEntry(key: thread, value: deck) in [..._onDeck.entries]) {
-      final turns = _turns[thread];
-      if (turns == null ||
-          isAnswering(thread) ||
-          waits.has(thread) ||
-          _clearing.contains(thread)) {
-        continue;
-      }
-      final first = deck.next.first;
-      _setDeck(thread, deck.slug, deck.next.sublist(1));
-      final user = Turn.user(first.text, shortcutUse: first.shortcutUse);
-      final answer = Turn.answer();
-      _turns[thread] = [...turns, user, answer];
-      final running = _Running(user, answer, deck.slug, first.shortcutUse)
-        ..thread = thread;
-      _runs.add(running);
-      if (thread == activeThread) _sends++;
-      _follow(running, _api.streamChat(deck.slug, thread, first.text));
+      if (!deck.held && _canTakeOnDeck(thread)) _sendFirst(thread, deck);
     }
+  }
+
+  /// Sends the first of [deck], the messages waiting in chat [thread], with its files.
+  void _sendFirst(String thread, _Deck deck) {
+    final first = deck.next.first;
+    _setDeck(thread, deck.slug, deck.next.sublist(1));
+    final user = Turn.user(
+      first.text,
+      shortcutUse: first.shortcutUse,
+      attachments: first.files,
+    );
+    final answer = Turn.answer();
+    _turns[thread] = [..._turns[thread]!, user, answer];
+    final running = _Running(user, answer, deck.slug, first.shortcutUse)
+      ..thread = thread;
+    _runs.add(running);
+    if (thread == activeThread) _sends++;
+    _follow(
+      running,
+      _api.streamChat(
+        deck.slug,
+        thread,
+        first.text,
+        attachments: first.attachments,
+        mode: modeForFiles(first.mode, first.attachments),
+      ),
+    );
   }
 
   /// What waits for each chat's composer, by chat (null for a new one): what another app shared
@@ -303,8 +464,8 @@ class ChatController extends ChangeNotifier with FollowsServer {
   List<Turn> get turns =>
       activeThread == null ? _draft : (_turns[activeThread] ?? const []);
 
-  /// Whether the chat on screen can take no message now: it answers, messages wait there, or
-  /// its history is being cleared.
+  /// Whether the chat on screen can take no message now: it answers, messages wait there that
+  /// are not held, or its history is being cleared.
   bool get busy => answeringHere || _queued || _clearing.contains(activeThread);
 
   /// The chats whose history is being cleared on the server.
@@ -370,13 +531,15 @@ class ChatController extends ChangeNotifier with FollowsServer {
           !isAnswering(thread) &&
           !threadsOf(slug).any((t) => t.slug == thread)) {
         _turns.remove(thread);
-        _onDeck.remove(thread);
+        if (_onDeck.containsKey(thread)) _setDeck(thread, slug, const []);
         await select(slug);
       } else {
         await open(thread, again: true);
       }
     } finally {
       _refreshing = false;
+      // What the chat holds once read again says whether its waiting messages go on.
+      if (thread != null) _holdIfCut(thread);
       _sendOnDeck();
       notifyListeners();
     }
@@ -387,6 +550,10 @@ class ChatController extends ChangeNotifier with FollowsServer {
 
   /// Whether a workspace is open and no chat of it is answering ([answeringIn]).
   bool get activeIdle => activeSlug != null && !answeringIn(activeSlug!);
+
+  /// Whether the message box takes words, files and dictation: the chat on screen can take a
+  /// message now, or one to send when its answer ends.
+  bool get takesInput => !busy || canSendWhenDone;
 
   /// Whether [text] can be sent in the chat on screen: a workspace is open, nothing holds the
   /// chat ([busy]), it is [ready], and there is something to send.
@@ -403,6 +570,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
     }
     waits.clear();
     _link.take();
+    _cleared.take();
     unreachable.dispose();
     super.dispose();
   }
@@ -421,6 +589,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
     waits.clear();
     _forComposer.clear();
     _onDeck.clear();
+    _cleared.take();
     workspaces = const [];
     _threads.clear();
     _turns.clear();
@@ -595,7 +764,10 @@ class ChatController extends ChangeNotifier with FollowsServer {
   /// what the server saved since shows.
   Future<void> open(String? threadSlug, {bool again = false}) async {
     activeThread = threadSlug;
-    if (threadSlug != null) _ready.remove(threadSlug);
+    if (threadSlug != null) {
+      _ready.remove(threadSlug);
+      if (activeSlug case final slug?) _restoreDeck(slug, threadSlug);
+    }
     // What waits for the composer goes back only in its own chat.
     _forComposer.removeWhere((thread, _) => thread != threadSlug);
     _link.take();
@@ -851,14 +1023,13 @@ class ChatController extends ChangeNotifier with FollowsServer {
     if (!canSend(message)) return false;
     final slug = activeSlug!;
     final text = message.trim();
+    // Messages held in this chat follow this one, unless its answer stops or fails too.
+    if (activeThread case final thread?) _holdDeck(thread, false);
     _link.take();
     final user = Turn.user(
       text,
       shortcutUse: shortcutUse,
-      attachments: [
-        for (final a in attachments)
-          a.isImage ? SentFile.picture(a.name, a.bytes) : SentFile(a.name),
-      ],
+      attachments: [for (final a in attachments) a.sent],
     );
     final answer = Turn.answer();
     final turns = [...this.turns, user, answer];
@@ -1148,7 +1319,11 @@ class ChatController extends ChangeNotifier with FollowsServer {
         ..notifyListeners();
       _dropTurn(running.answer);
     }
-    // Before telling anyone, so [working] holds while a chat has messages waiting.
+    // Before telling anyone, so [working] holds while a chat has messages waiting. The answer
+    // [refresh] lets go of is judged once the chat is read again.
+    if (running.thread case final thread? when !_refreshing) {
+      _holdIfCut(thread);
+    }
     _sendOnDeck();
     notifyListeners();
   }

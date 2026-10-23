@@ -17,7 +17,7 @@ import '../support/fake_api.dart';
       turns[thread] = now;
       saved.add(now);
     },
-    changed: () {},
+    changed: (_) {},
   );
   return (waits, saved);
 }

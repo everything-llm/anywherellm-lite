@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:anywherellm/core/chat.dart' show ChatMode;
 import 'package:anywherellm/core/errors.dart';
+import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/ui/chat/composer.dart';
+import 'package:anywherellm/ui/widgets/buttons.dart';
 import 'package:anywherellm/ui/widgets/sheet.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:file_picker_platform_interface/file_picker_platform_interface.dart';
@@ -169,12 +171,12 @@ void main() {
     int sent(FakeAnythingLlm llm, String message) =>
         llm.calls.where((c) => c.endsWith(':$message')).length;
 
-    /// Types [text] and puts it after the messages waiting.
+    /// Types [text] and puts it after the messages waiting, letting its bubble rise in.
     Future<void> queue(WidgetTester tester, String text) async {
       await tester.enterText(composerField, text);
       await tester.pump();
       await tester.tap(sendWhenDone());
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
     }
 
     String typed(WidgetTester tester) =>
@@ -215,19 +217,184 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
     });
 
-    testWidgets('Enter queues it too, and Stop sends the next', (tester) async {
+    testWidgets('Enter queues it too, and Stop holds them until Resume', (
+      tester,
+    ) async {
       final (_, llm) = await answering(tester);
       await tester.enterText(composerField, 'Second');
       await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('Sends when this answer ends.'), findsOneWidget);
+      expect(find.text('Next'), findsOneWidget);
       expect(typed(tester), isEmpty);
       await tester.tap(find.byTooltip('Stop the answer'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(sent(llm, 'Second'), 0);
+      expect(find.text('Paused · 1 waiting'), findsOneWidget);
+      expect(find.text('Paused'), findsOneWidget);
+      expect(
+        find.text('Stopped · the server may still save it'),
+        findsOneWidget,
+      );
+
+      await tester.tap(control('Resume'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(sent(llm, 'Second'), 1);
+      expect(find.text('Paused · 1 waiting'), findsNothing);
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+    });
+
+    testWidgets(
+      'a failed answer holds them, and a retry that answers sends them on',
+      (tester) async {
+        final (h, llm) = await answering(tester);
+        await queue(tester, 'Second');
+        llm.chat!.addError(
+          const ApiException('The server closed the connection.'),
+        );
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.text('The answer stopped'), findsOneWidget);
+        expect(find.text('Paused · 1 waiting'), findsOneWidget);
+        expect(sent(llm, 'Second'), 0);
+
+        await tester.tap(find.text('Ask again'));
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.text('Sends when this answer ends.'), findsOneWidget);
+        expect(sent(llm, 'Second'), 0);
+        await llm.chat!.close();
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(sent(llm, 'Second'), 1);
+        expect(h.chat.onDeck, isEmpty);
+        await llm.chat!.close();
+        await tester.pump(const Duration(milliseconds: 300));
+      },
+    );
+
+    testWidgets('in a held queue Send sends at once and the rest follow', (
+      tester,
+    ) async {
+      final (_, llm) = await answering(tester);
+      await queue(tester, 'Second');
+      await tester.tap(find.byTooltip('Stop the answer'));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.enterText(composerField, 'Now');
+      await tester.pump();
+      expect(sendWhenDone(), findsNothing);
+      await tester.tap(find.byTooltip('Send'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(sent(llm, 'Now'), 1);
+      expect(sent(llm, 'Second'), 0);
+      expect(find.text('Sends when this answer ends.'), findsOneWidget);
+      await llm.chat!.close();
       await tester.pump(const Duration(milliseconds: 300));
       expect(sent(llm, 'Second'), 1);
       await llm.chat!.close();
       await tester.pump(const Duration(milliseconds: 300));
+    });
+
+    testWidgets(
+      'with the field empty the button is Stop, with words Send when done',
+      (tester) async {
+        await answering(tester);
+        expect(find.byTooltip('Stop the answer'), findsOneWidget);
+        await tester.enterText(composerField, 'Second');
+        await tester.pump();
+        expect(sendWhenDone(), findsOneWidget);
+        expect(find.byTooltip('Stop the answer'), findsNothing);
+        // + and the field stay open while the chat answers.
+        final add = find.ancestor(
+          of: find.byTooltip('Add files or shortcuts to this message'),
+          matching: find.byType(IconBtn),
+        );
+        expect(tester.widget<IconBtn>(add.first).onPressed, isNotNull);
+      },
+    );
+
+    testWidgets('a tap on a waiting message puts it back ahead of the draft', (
+      tester,
+    ) async {
+      final (h, llm) = await answering(tester);
+      await queue(tester, 'Second');
+      await queue(tester, 'Third');
+      await tester.enterText(composerField, 'Draft');
+      await tester.pump();
+      await tester.tap(find.text('Second'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(typed(tester), 'Second\nDraft');
+      expect(h.chat.onDeck.map((o) => o.text), ['Third']);
+      expect(find.text('Sends when this answer ends.'), findsOneWidget);
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(sent(llm, 'Second'), 0);
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+    });
+
+    testWidgets('Clear all takes them out at once, and Undo puts them back', (
+      tester,
+    ) async {
+      final (h, llm) = await answering(tester);
+      await queue(tester, 'Second');
+      await queue(tester, 'Third');
+      await tester.tap(control('Clear all'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(h.chat.onDeck, isEmpty);
+      expect(find.text('Second'), findsNothing);
+      expect(find.text('Cleared 2 waiting messages'), findsOneWidget);
+      await tester.tap(find.text('Undo'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(h.chat.onDeck.map((o) => o.text), ['Second', 'Third']);
+      expect(find.text('Cleared 2 waiting messages'), findsNothing);
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(sent(llm, 'Second'), 1);
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+    });
+
+    testWidgets('past ten the line warns of a long queue', (tester) async {
+      final (h, llm) = await answering(tester);
+      for (var i = 1; i <= 11; i++) {
+        expect(h.chat.sendWhenDone('Message $i'), isTrue);
+      }
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('11 waiting · a long queue'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      h.chat.clearOnDeck();
+      await llm.chat!.close();
+      await tester.pump(const Duration(seconds: 7));
+    });
+
+    testWidgets('they are kept, and come back held in a chat opened again', (
+      tester,
+    ) async {
+      final (h, llm) = await answering(tester);
+      final thread = h.chat.activeThread!;
+      await queue(tester, 'Second');
+      expect(h.prefs.onDeckIn(h.chat.activeSlug!, thread).map((m) => m.text), [
+        'Second',
+      ]);
+      // As the app does on a new start, which forgets what it held.
+      await tester.tap(find.byTooltip('Stop the answer'));
+      await tester.pump(const Duration(milliseconds: 300));
+      h.chat.clearOnDeck();
+      await tester.pump(const Duration(seconds: 7));
+      expect(h.prefs.onDeckIn(h.chat.activeSlug!, thread), isEmpty);
+      await h.prefs.setOnDeck(h.chat.activeSlug!, thread, const [
+        SavedOnDeck('Kept', files: ['notes.pdf']),
+      ]);
+      await h.chat.open('priorities');
+      await h.chat.open(thread);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(h.chat.onDeckHeld, isTrue);
+      expect(find.text('Paused · 1 waiting'), findsOneWidget);
+      expect(find.text('Kept'), findsOneWidget);
+      expect(find.text('notes.pdf · not kept'), findsOneWidget);
+      expect(sent(llm, 'Kept'), 0);
     });
 
     testWidgets("Don't send takes one out, and typing keeps the rest", (
