@@ -61,6 +61,10 @@ const _lucide = {
   'warning':
       'M21.73 18l-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z '
       'M12 9v4 M12 17h.01',
+  // circle-stop: what stops a recording, as dictation's button shows while it listens.
+  'stopCircle':
+      'M12 22A10 10 0 1 0 12 2a10 10 0 0 0 0 20z '
+      'M10 9h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1z',
   // square-x: danger.
   'danger':
       'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z '

@@ -142,6 +142,7 @@ class IconBtn extends StatelessWidget {
     this.filled = false,
     this.heard,
     this.expanded,
+    this.solid = false,
   });
 
   /// A header's round button: 48 across, floating on the tile, its icon at [IconSize.small].
@@ -155,6 +156,7 @@ class IconBtn extends StatelessWidget {
     this.expanded,
   }) : box = 48,
        filled = true,
+       solid = false,
        size = IconSize.small;
 
   final String icon;
@@ -169,6 +171,10 @@ class IconBtn extends StatelessWidget {
 
   /// Whether it floats on the tile with a tile's shadow, as a bar's buttons do.
   final bool filled;
+
+  /// Whether, while [active], it is filled with the accent and its icon is [Tokens.onAccent],
+  /// for a state that must not pass for a tint, as dictation listening.
+  final bool solid;
 
   /// What a screen reader hears, when it says more than [tooltip].
   final String? heard;
@@ -201,6 +207,8 @@ class IconBtn extends StatelessWidget {
       shadows: floats ? t.tileShadow : const [],
       color: !enabled
           ? (filled ? t.sunken : null)
+          : active == true && solid
+          ? t.accent
           : active == true
           ? t.accentSoft
           : filled
@@ -214,6 +222,8 @@ class IconBtn extends StatelessWidget {
             size: size,
             color: !enabled
                 ? t.muted
+                : active == true && solid
+                ? t.onAccent
                 : active == true
                 ? t.accent
                 : t.ink,

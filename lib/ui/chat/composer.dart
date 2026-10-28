@@ -837,10 +837,12 @@ class _Form extends StatelessWidget {
                 ),
                 if (onDictate != null)
                   oneLine(
+                    // Listening, it is a stop mark on the accent, not the microphone tinted.
                     IconBtn(
-                      'mic',
+                      listening ? 'stopCircle' : 'mic',
                       tooltip: listening ? 'Stop dictating' : 'Dictate',
                       active: listening,
+                      solid: true,
                       onPressed: chat.takesInput || listening
                           ? onDictate
                           : null,

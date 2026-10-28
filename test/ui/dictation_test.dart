@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:anywherellm/ui/widgets/buttons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -30,6 +31,15 @@ void main() {
     await tester.pump();
     expect(message(tester), 'Remind me to call Ana');
     expect(control('Stop dictating'), findsOneWidget);
+    // Listening reads as more than a tint: a stop mark on the accent.
+    final listening = tester.widget<IconBtn>(
+      find.ancestor(
+        of: control('Stop dictating'),
+        matching: find.byType(IconBtn),
+      ),
+    );
+    expect(listening.icon, 'stopCircle');
+    expect((listening.active, listening.solid), (true, true));
     await tester.tap(control('Stop dictating'));
     await tester.pump();
     expect(h.dictation!.stopped, 1);
