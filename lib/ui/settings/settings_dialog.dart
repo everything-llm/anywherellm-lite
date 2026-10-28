@@ -243,8 +243,14 @@ class _PageView extends StatelessWidget {
   /// Whether the page shows beside the list, in a card of its own, as wide as a column.
   final bool split;
 
+  // Const on a first run, so it listens itself to the settings for the server it keys on.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: AppScope.of(context).settings,
+    builder: _build,
+  );
+
+  Widget _build(BuildContext context, Widget? _) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
     final server = scope.settings.connection;

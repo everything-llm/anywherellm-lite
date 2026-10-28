@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/copy.dart';
 import '../../core/prefs.dart';
 import '../app_scope.dart';
 import '../layout.dart';
@@ -135,8 +136,9 @@ class ChatPage extends StatelessWidget {
         'Shows a chip for a shortcut you sent, not the question it expanded to.',
       ),
     ];
+    // The shortcuts counted are the open workspace's, so the page follows it as well.
     return ListenableBuilder(
-      listenable: prefs,
+      listenable: Listenable.merge([prefs, scope.chat]),
       builder: (context, _) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         spacing: 12,
@@ -156,7 +158,8 @@ class ChatPage extends StatelessWidget {
               icon: 'slash',
               title: 'Shortcuts',
               about:
-                  '${scope.prefs.shortcutsIn(scope.chat.activeSlug).length} prompts · type / to use them',
+                  '${plural(scope.prefs.shortcutsIn(scope.chat.activeSlug).length, 'prompt', 'prompts')} '
+                  '· type / to use them',
               onTap: () => scope.shell.showSettingsPage(SettingsPage.shortcuts),
             ),
           ]),

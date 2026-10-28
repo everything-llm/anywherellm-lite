@@ -49,13 +49,16 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final prefs = scope.prefs;
-    final workspace = scope.chat.active;
-    final workspaceKey = scope.chat.server == null || workspace == null
-        ? null
-        : Prefs.offKey(scope.chat.server!.baseUrl, workspace.slug);
+    // The page is const where Settings builds it, so it rebuilds only for what it listens to:
+    // the shortcuts, and the workspace open, which another opened beside it changes, so a
+    // shortcut for this workspace only is saved for the one on screen.
     return ListenableBuilder(
-      listenable: prefs,
+      listenable: Listenable.merge([prefs, scope.chat]),
       builder: (context, _) {
+        final workspace = scope.chat.active;
+        final workspaceKey = scope.chat.server == null || workspace == null
+            ? null
+            : Prefs.offKey(scope.chat.server!.baseUrl, workspace.slug);
         final own = {for (final item in prefs.prefs.shortcuts) item.id};
         return PopupSheet(
           open: _editing != null || _creating,

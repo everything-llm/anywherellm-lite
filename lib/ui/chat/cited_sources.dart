@@ -16,15 +16,17 @@ import 'passages_sheet.dart';
 class CitedPanel extends StatelessWidget {
   const CitedPanel({super.key});
 
+  // Const where the shell builds it, so it listens to the shell for the sources it shows.
   @override
   Widget build(BuildContext context) {
     final shell = AppScope.of(context).shell;
-    final cited = shell.cited ?? const <Citation>[];
-    return SheetFrame(
-      title: 'Sources',
-      onClose: shell.closeCited,
-
-      child: CitedSources(cited),
+    return ListenableBuilder(
+      listenable: shell,
+      builder: (context, _) => SheetFrame(
+        title: 'Sources',
+        onClose: shell.closeCited,
+        child: CitedSources(shell.cited ?? const <Citation>[]),
+      ),
     );
   }
 }

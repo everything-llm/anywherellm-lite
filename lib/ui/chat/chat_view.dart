@@ -147,8 +147,14 @@ class _ChatViewState extends State<ChatView> {
 class _Unreachable extends StatelessWidget {
   const _Unreachable();
 
+  // Const where the chat builds it, so it listens to the settings for the address it shows.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: AppScope.of(context).settings,
+    builder: _build,
+  );
+
+  Widget _build(BuildContext context, Widget? _) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
     return Semantics(

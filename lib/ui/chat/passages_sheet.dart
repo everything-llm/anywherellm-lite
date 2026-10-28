@@ -17,15 +17,22 @@ import '../widgets/buttons.dart';
 class PassagesPanel extends StatelessWidget {
   const PassagesPanel({super.key});
 
+  // Const where the shell builds it, so it listens to the shell for the citation it shows.
   @override
   Widget build(BuildContext context) {
     final shell = AppScope.of(context).shell;
-    final citation = shell.passages!;
-    return SheetFrame(
-      title: 'Passages read from this file',
-      onClose: shell.closePassages,
-      height: SheetHeight.tall,
-      child: PassagesView(citation: citation, onClose: shell.closePassages),
+    return ListenableBuilder(
+      listenable: shell,
+      builder: (context, _) {
+        final citation = shell.passages;
+        if (citation == null) return const SizedBox.shrink();
+        return SheetFrame(
+          title: 'Passages read from this file',
+          onClose: shell.closePassages,
+          height: SheetHeight.tall,
+          child: PassagesView(citation: citation, onClose: shell.closePassages),
+        );
+      },
     );
   }
 }

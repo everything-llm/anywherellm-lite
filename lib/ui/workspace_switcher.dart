@@ -86,8 +86,18 @@ class WorkspaceMenu extends StatelessWidget {
 
   final VoidCallback onCreate;
 
+  // The shell builds it for the popup alone, so it listens itself to the workspaces, their
+  // counts and the order a drag saves.
   @override
   Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    return ListenableBuilder(
+      listenable: Listenable.merge([scope.chat, scope.prefs]),
+      builder: _build,
+    );
+  }
+
+  Widget _build(BuildContext context, Widget? _) {
     final scope = AppScope.of(context);
     final ordered = scope.chat.orderedWorkspaces;
     final list = ConstrainedBox(
