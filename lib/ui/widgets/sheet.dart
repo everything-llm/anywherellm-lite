@@ -10,6 +10,7 @@ import 'buttons.dart';
 import 'rise.dart';
 import 'window_insets.dart';
 import 'scroll_fades.dart';
+import 'phone_page.dart';
 import 'tappable.dart';
 
 /// How tall a [SheetFrame] stands: [tall] fills the screen but for [SheetFrame.gap] above it,
@@ -277,16 +278,24 @@ class SheetHeader extends StatelessWidget {
               border: Border(bottom: BorderSide(color: t.line)),
             )
           : null,
+      // A title too long for a line wraps; Close stays at the top, level with its first line.
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: Semantics(
-              header: true,
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Type.title(t.ink),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TitleRoom(
+                    child: Semantics(
+                      header: true,
+                      child: Text(title, style: Type.title(t.ink)),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

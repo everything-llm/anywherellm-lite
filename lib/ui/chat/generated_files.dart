@@ -134,12 +134,7 @@ class _MadeFile extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    file.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Type.caption(t.ink),
-                  ),
+                  Text(file.name, style: Type.caption(t.ink)),
                   if (size != null)
                     Text(sizeText(size), style: Type.note(t.ink)),
                 ],
@@ -331,12 +326,7 @@ class ImageViewer extends StatelessWidget {
                     child: Row(
                       children: [
                         Expanded(
-                          child: Text(
-                            file.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Type.body(t.ink),
-                          ),
+                          child: Text(file.name, style: Type.body(t.ink)),
                         ),
                         Tappable(
                           label: 'Close',

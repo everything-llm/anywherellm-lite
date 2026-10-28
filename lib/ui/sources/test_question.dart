@@ -148,8 +148,6 @@ class _HitState extends State<_Hit> {
                 Expanded(
                   child: Text(
                     hit.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: Type.caption(t.ink, weight: FontWeight.w600),
                   ),
                 ),

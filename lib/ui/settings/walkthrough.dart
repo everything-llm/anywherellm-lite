@@ -9,6 +9,7 @@ import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
+import '../widgets/min_height.dart';
 import '../widgets/phone_page.dart';
 import '../widgets/rise.dart';
 import '../widgets/side_scroll.dart';
@@ -140,83 +141,83 @@ class _WalkthroughState extends State<Walkthrough> {
           child: ColoredBox(
             color: t.ground,
             child: SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  PhonePageHeader(
-                    back: 'Previous screen',
-                    onBack: _at == 0 ? null : () => _go(_at - 1),
-                    heading: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Semantics(
-                          header: true,
-                          child: Text(
-                            widget.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Type.label(t.ink),
+              // Shorter than its parts need at the text size in use, it scrolls whole, so a
+              // title that wraps never squeezes the screen it heads.
+              child: MinHeight(
+                min: MediaQuery.textScalerOf(context).scale(Sizes.panelMin),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    PhonePageHeader(
+                      back: 'Previous screen',
+                      onBack: _at == 0 ? null : () => _go(_at - 1),
+                      heading: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Semantics(
+                            header: true,
+                            child: Text(widget.title, style: Type.label(t.ink)),
                           ),
-                        ),
-                        Semantics(
-                          liveRegion: true,
-                          child: Text(
-                            '${_at + 1} of ${steps.length}',
-                            style: Type.note(t.ink).copyWith(
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    action: IconBtn.header(
-                      'close',
-                      tooltip: 'Close',
-                      onPressed: widget.onClose,
-                    ),
-                  ),
-                  _Marks(steps: steps, at: _at, onTap: _go),
-                  Expanded(
-                    child: PageView.builder(
-                      controller: _pages,
-                      itemCount: steps.length,
-                      onPageChanged: (page) => setState(() => _at = page),
-                      itemBuilder: (context, page) =>
-                          _Screen(steps[page], key: ValueKey(page)),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _Go(
-                          label: last
-                              ? widget.end
-                              : _at == 0
-                              ? 'Begin'
-                              : 'Continue',
-                          about: last
-                              ? widget.endAbout
-                              : 'next · ${steps[_at + 1].kicker.toLowerCase()}',
-                          onTap: last ? widget.onEnd : () => _go(_at + 1),
-                        ),
-                        // The hint gives way on a short window, where the screen needs the room.
-                        if (MediaQuery.sizeOf(context).height >= 560)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 10),
+                          Semantics(
+                            liveRegion: true,
                             child: Text(
-                              'Swipe, or use the arrow keys',
-                              textAlign: TextAlign.center,
-                              style: Type.note(t.ink),
+                              '${_at + 1} of ${steps.length}',
+                              style: Type.note(t.ink).copyWith(
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
                             ),
                           ),
-                      ],
+                        ],
+                      ),
+                      action: IconBtn.header(
+                        'close',
+                        tooltip: 'Close',
+                        onPressed: widget.onClose,
+                      ),
                     ),
-                  ),
-                ],
+                    _Marks(steps: steps, at: _at, onTap: _go),
+                    Expanded(
+                      child: PageView.builder(
+                        controller: _pages,
+                        itemCount: steps.length,
+                        onPageChanged: (page) => setState(() => _at = page),
+                        itemBuilder: (context, page) =>
+                            _Screen(steps[page], key: ValueKey(page)),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _Go(
+                            label: last
+                                ? widget.end
+                                : _at == 0
+                                ? 'Begin'
+                                : 'Continue',
+                            about: last
+                                ? widget.endAbout
+                                : 'next · ${steps[_at + 1].kicker.toLowerCase()}',
+                            onTap: last ? widget.onEnd : () => _go(_at + 1),
+                          ),
+                          // The hint gives way on a short window, where the screen needs the room.
+                          if (MediaQuery.sizeOf(context).height >= 560)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 10),
+                              child: Text(
+                                'Swipe, or use the arrow keys',
+                                textAlign: TextAlign.center,
+                                style: Type.note(t.ink),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

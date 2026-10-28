@@ -49,14 +49,7 @@ class AttachSheet extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      Expanded(
-                        child: Text(
-                          a.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Type.body(t.ink),
-                        ),
-                      ),
+                      Expanded(child: Text(a.name, style: Type.body(t.ink))),
                       IconBtn(
                         'close',
                         tooltip: 'Remove ${a.name}',

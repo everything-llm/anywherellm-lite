@@ -5,6 +5,7 @@ import 'package:anywherellm/ui/files/workspace_pages.dart';
 import 'package:anywherellm/ui/sidebar.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
+import 'package:flutter/widgets.dart' show ListView, Scrollable;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
@@ -200,7 +201,17 @@ void main() {
 
         await tester.tap(_inPane(find.text('Cancel')));
         await tester.pumpAndSettle();
-        await tester.ensureVisible(_inPane(find.text('Test a question')));
+        // Names wrap in full, so Test a question may lie past the list's fold, not yet built.
+        await tester.scrollUntilVisible(
+          _inPane(find.text('Test a question')),
+          100,
+          scrollable: find
+              .descendant(
+                of: _inPane(find.byType(ListView)).first,
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
         await tester.tap(_inPane(find.text('Test a question')));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);

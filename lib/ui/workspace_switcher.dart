@@ -10,6 +10,7 @@ import 'tokens.dart';
 import 'type.dart';
 import 'settings/rows.dart';
 import 'widgets/basics.dart';
+import 'widgets/phone_page.dart';
 import 'widgets/tappable.dart';
 import 'widgets/scroll_fades.dart';
 
@@ -52,16 +53,16 @@ class WorkspaceSwitcher extends StatelessWidget {
               spacing: 6,
               children: [
                 Flexible(
-                  child: Semantics(
-                    header: true,
-                    child: Text(
-                      active?.name ?? 'No workspace yet',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Type.display(
-                        size,
-                        letterSpacing: -0.3,
-                        color: active == null ? t.muted : t.ink,
+                  child: TitleRoom(
+                    child: Semantics(
+                      header: true,
+                      child: Text(
+                        active?.name ?? 'No workspace yet',
+                        style: Type.display(
+                          size,
+                          letterSpacing: -0.3,
+                          color: active == null ? t.muted : t.ink,
+                        ),
                       ),
                     ),
                   ),
@@ -200,12 +201,7 @@ class _DragGhost extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
-        child: Text(
-          name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Type.body(t.ink, weight: FontWeight.w600),
-        ),
+        child: Text(name, style: Type.body(t.ink, weight: FontWeight.w600)),
       ),
     );
   }

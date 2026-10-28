@@ -108,8 +108,6 @@ class _CitedRow extends StatelessWidget {
                 children: [
                   Text(
                     citation.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: Type.body(t.ink, weight: FontWeight.w600),
                   ),
                   if (about != null)

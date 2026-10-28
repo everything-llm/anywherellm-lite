@@ -1,7 +1,9 @@
 import 'dart:ui';
 
 import 'package:anywherellm/core/server_models.dart';
+import 'package:anywherellm/ui/chat/message_list.dart';
 import 'package:anywherellm/ui/chat/sources_aside.dart';
+import 'package:flutter/widgets.dart' show Scrollable;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
@@ -141,7 +143,19 @@ void main() {
       tester.platformDispatcher.textScaleFactorTestValue = scale;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       await openBudget(tester, size);
-      await tester.tap(control('Source 1: Customer interviews.docx'));
+      // At large text the earlier answer may lie above the chat's fold, not yet built.
+      final source = control('Source 1: Customer interviews.docx');
+      await tester.scrollUntilVisible(
+        source,
+        100,
+        scrollable: find
+            .descendant(
+              of: find.byType(MessageList),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.tap(source);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });

@@ -212,8 +212,6 @@ class _AsideRow extends StatelessWidget {
                     Expanded(
                       child: Text(
                         title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                         style: Type.body(t.ink, weight: FontWeight.w600),
                       ),
                     ),

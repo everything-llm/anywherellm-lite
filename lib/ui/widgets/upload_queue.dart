@@ -152,14 +152,7 @@ class _PendingRow extends StatelessWidget {
             children: [
               AppIcon('doc', size: IconSize.xs, color: t.muted),
               const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Type.note(t.ink),
-                ),
-              ),
+              Expanded(child: Text(name, style: Type.note(t.ink))),
               IconBtn(
                 'close',
                 tooltip: 'Remove $name',

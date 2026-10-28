@@ -95,8 +95,6 @@ class ListRow extends StatelessWidget {
                         Flexible(
                           child: Text(
                             title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                             style: Type.body(
                               t.ink,
                               weight: selected

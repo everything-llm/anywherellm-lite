@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../icons.dart';
@@ -9,7 +11,8 @@ import 'tappable.dart';
 
 /// The bar over a phone's full page: a round back button floating on the tile, heard as
 /// [back], [title] centred as [Type.title], or [heading] in its place, and at most one round
-/// [action] at its end.
+/// [action] at its end. A title too long for one line wraps under itself; the buttons stay at
+/// the top, level with its first line.
 class PhonePageHeader extends StatelessWidget {
   const PhonePageHeader({
     super.key,
@@ -41,38 +44,71 @@ class PhonePageHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
+    // At least [Sizes.header] tall, the row of buttons and title centred in it; a taller title
+    // takes the room it needs, with the buttons at its top.
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: Sizes.header),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          children: [
-            if (onBack case final onBack?)
-              IconBtn.header(backIcon, tooltip: back, onPressed: onBack)
-            else
-              const SizedBox(width: 48),
-            const SizedBox(width: 4),
-            Expanded(
-              child:
-                  heading ??
-                  Semantics(
-                    header: true,
-                    child: Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: Type.title(t.ink),
-                    ),
+      child: Align(
+        heightFactor: 1,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (onBack case final onBack?)
+                IconBtn.header(backIcon, tooltip: back, onPressed: onBack)
+              else
+                const SizedBox(width: 48),
+              const SizedBox(width: 4),
+              Expanded(
+                // A heading of one line sits level with the buttons; a longer one grows down.
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TitleRoom(
+                        child:
+                            heading ??
+                            Semantics(
+                              header: true,
+                              child: Text(
+                                title,
+                                textAlign: TextAlign.center,
+                                style: Type.title(t.ink),
+                              ),
+                            ),
+                      ),
+                    ],
                   ),
-            ),
-            const SizedBox(width: 4),
-            action ?? const SizedBox(width: 48),
-          ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              action ?? const SizedBox(width: 48),
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+/// Room for a title that wraps in a bar that stays put, such as a page's header: it takes all
+/// the lines it needs up to a quarter of the window's height, and scrolls inside that past it,
+/// so a name with no end never pushes the page out of the window, and is never cut short.
+class TitleRoom extends StatelessWidget {
+  const TitleRoom({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: BoxConstraints(
+      maxHeight: math.max(48, MediaQuery.sizeOf(context).height / 4),
+    ),
+    child: SingleChildScrollView(child: child),
+  );
 }
 
 /// A row that opens another page: an [icon] at 24, [title] as [Type.body], the line [about]

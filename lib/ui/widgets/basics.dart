@@ -187,7 +187,7 @@ class UndoBar extends StatelessWidget {
 }
 
 /// A small heading over a group, as over the files and in Settings, or over a column of a
-/// card's rows: [Type.caption] in ink, in sentence case. It keeps to one line.
+/// card's rows: [Type.caption] in ink, in sentence case. A long one wraps.
 class SectionLabel extends StatelessWidget {
   const SectionLabel(
     this.text, {
@@ -209,8 +209,6 @@ class SectionLabel extends StatelessWidget {
     header: header,
     child: Text(
       text,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
       textAlign: end ? TextAlign.end : TextAlign.start,
       style: Type.caption(Tokens.of(context).ink),
     ),

@@ -204,9 +204,11 @@ void main() {
         final h = await pumpApp(tester, llm: awkward(), size: size);
         h.shell.openSources();
         await tester.pumpAndSettle();
-        await tapVisible(tester, find.bySemanticsLabel('Paste text').last);
+        // A long name wraps in full, so the buttons may lie below the fold, out of the
+        // semantics tree: they are found as controls.
+        await tapVisible(tester, control('Paste text').last);
         await tester.pumpAndSettle();
-        await tapVisible(tester, find.bySemanticsLabel('Details').last);
+        await tapVisible(tester, control('Details').last);
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         final cancel = find.descendant(
@@ -217,9 +219,9 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(cancel);
         await tester.pumpAndSettle();
-        await tapVisible(tester, find.bySemanticsLabel('Add a link').last);
+        await tapVisible(tester, control('Add a link').last);
         await tester.pumpAndSettle();
-        await tapVisible(tester, find.bySemanticsLabel('Details').last);
+        await tapVisible(tester, control('Details').last);
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
       });
@@ -228,7 +230,8 @@ void main() {
         final h = await pumpApp(tester, llm: awkward(), size: size);
         h.shell.openSources();
         await tester.pumpAndSettle();
-        await tester.tap(find.bySemanticsLabel('Test a question').last);
+        // A long name wraps in full, so what follows the list may lie below the fold.
+        await tapVisible(tester, control('Test a question').last);
         await tester.pumpAndSettle();
         await h.sources.search('file-$longWord');
         await tester.pumpAndSettle();

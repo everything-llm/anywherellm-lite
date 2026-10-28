@@ -207,12 +207,7 @@ class SourceRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Type.body(t.ink),
-              ),
+              Text(title, style: Type.body(t.ink)),
               if (meta.isNotEmpty)
                 Text(
                   meta,

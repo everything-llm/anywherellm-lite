@@ -566,8 +566,6 @@ class _Hero extends StatelessWidget {
                       Flexible(
                         child: Text(
                           workspace,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.center,
                           style: titleStyle,
                         ),
@@ -1026,11 +1024,9 @@ class _Citations extends StatelessWidget {
           ),
       ];
       final widths = fitChips(
-        // At most [_Citation.most] wide, as the board draws them, but never cut below readable.
-        natural: [
-          for (final (i, w) in whole.indexed)
-            math.max(least[i], math.min(w, _Citation.most)),
-        ],
+        // Its whole name where the line has room: the line stays one line, so a wide chip
+        // costs the answer no height.
+        natural: whole,
         readable: least,
         count: citations.length,
         // As wide as it can be: holding them all.
@@ -1172,9 +1168,6 @@ class _Citation extends StatelessWidget {
 
   /// The name's style, but for the colour.
   static final nameStyle = Type.note(const Color(0x00000000));
-
-  /// The widest a chip is drawn, unless its readable name needs more.
-  static const most = 140.0;
 
   /// A chip's width around its name: its padding, number, icon and the gaps between them.
   static const frame = _padStart + _number + gap + _icon + gap + _padEnd;

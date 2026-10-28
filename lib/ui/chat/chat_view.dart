@@ -351,10 +351,9 @@ class _Header extends StatelessWidget {
         final thread = chat.thread;
         final docs = scope.sources.onCount;
         final sidebar = Wide.sidebarShown(context);
+        // The name and the workspace's line wrap rather than lose their ends.
         final title = Text(
           workspace == null ? 'AnywhereLLM' : chat.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
           style: Type.title(t.ink),
         );
         final heading = workspace == null
@@ -385,8 +384,6 @@ class _Header extends StatelessWidget {
                             child: Text(
                               '${workspace.name} · '
                               '${plural(docs, 'doc', 'docs')} in use',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                               style: Type.caption(
                                 t.ink,
                                 weight: FontWeight.w700,

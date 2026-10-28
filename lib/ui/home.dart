@@ -368,14 +368,7 @@ class _ChatRow extends StatelessWidget {
                 child: Row(
                   spacing: 8,
                   children: [
-                    Flexible(
-                      child: Text(
-                        thread.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Type.body(t.ink),
-                      ),
-                    ),
+                    Flexible(child: Text(thread.name, style: Type.body(t.ink))),
                     ...chatMarks(t, pinned: pinned, ready: ready),
                   ],
                 ),
