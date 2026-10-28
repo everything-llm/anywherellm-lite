@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../tokens.dart';
 import '../type.dart';
+import 'basics.dart';
 import 'tappable.dart';
 import 'rise.dart';
 
-enum BadgeKind { ok, warn, accent }
+/// What an [AppBadge] says: a success or a warning, with House UI's icon for it; the accent, as
+/// a count; or [plain], a state that is no status, such as Saved before a test.
+enum BadgeKind { ok, warn, accent, plain }
 
-/// A status tag or a count: its words at 13 on the status's soft fill.
+/// A status tag or a count: its words at 13 on the status's soft fill. A status's words are in
+/// ink beside its icon in the status's colour, so the colour never says it alone.
 class AppBadge extends StatelessWidget {
   const AppBadge(this.text, {super.key, required this.kind});
 
@@ -17,10 +21,11 @@ class AppBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final (fg, bg) = switch (kind) {
-      BadgeKind.ok => (t.success, t.successSoft),
-      BadgeKind.warn => (t.warning, t.warningSoft),
-      BadgeKind.accent => (t.accent, t.accentSoft),
+    final (fg, bg, status) = switch (kind) {
+      BadgeKind.ok => (t.ink, t.successSoft, Status.success),
+      BadgeKind.warn => (t.ink, t.warningSoft, Status.warning),
+      BadgeKind.accent => (t.accent, t.accentSoft, null),
+      BadgeKind.plain => (t.ink, t.sunken, null),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
@@ -28,7 +33,7 @@ class AppBadge extends StatelessWidget {
         color: bg,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Text(text, style: Type.note(fg)),
+      child: StatusWord(text, status: status, style: Type.note(fg)),
     );
   }
 }

@@ -8,6 +8,7 @@ import '../list_detail.dart';
 import '../state/settings_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
+import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/list_row.dart';
 import '../widgets/phone_page.dart';
@@ -199,17 +200,21 @@ class _ServerCard extends StatelessWidget {
     final settings = scope.settings;
     final t = Tokens.of(context);
     final connection = settings.connection!;
-    final (state, color) = switch (settings.check) {
-      ConnectionCheck.testing => ('Testing…', t.muted),
-      ConnectionCheck.failed => ('Not answering', t.danger),
-      _ when scope.chat.unreachable.value => ('Connection problem', t.danger),
-      _ => ('Connected', t.success),
+    // The word in ink beside its status's icon; Testing… is no status, so it stands alone.
+    final (state, status) = switch (settings.check) {
+      ConnectionCheck.testing => ('Testing…', null),
+      ConnectionCheck.failed => ('Not answering', Status.danger),
+      _ when scope.chat.unreachable.value => (
+        'Connection problem',
+        Status.danger,
+      ),
+      _ => ('Connected', Status.success),
     };
     return SummaryCard(
       title: 'AnythingLLM',
       trailing: Semantics(
         liveRegion: true,
-        child: Text(state, style: Type.body(color)),
+        child: StatusWord(state, status: status),
       ),
       lines: [
         Text(

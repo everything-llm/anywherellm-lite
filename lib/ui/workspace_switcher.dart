@@ -68,7 +68,7 @@ class WorkspaceSwitcher extends StatelessWidget {
                   ),
                 ),
                 AppIcon('down', color: t.muted),
-                if (elsewhere) const ReadyDot(gap: false),
+                if (elsewhere) const ReadyMark(),
               ],
             ),
           ),
@@ -183,7 +183,7 @@ class _WorkspaceItem extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             spacing: 8,
             children: [
-              if (ready) const ReadyDot(),
+              if (ready) const ReadyMark(),
               if (count != null)
                 Text(plural(count, 'doc', 'docs'), style: Type.note(t.ink)),
             ],

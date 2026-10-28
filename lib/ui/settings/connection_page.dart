@@ -289,12 +289,10 @@ class _KeyCardState extends State<_KeyCard> {
             'AnythingLLM server',
             about: _replacing ? null : connection.baseUrl,
             mono: true,
-            tag: AppBadge(
-              _tested && _settings.check == ConnectionCheck.ok
-                  ? 'Connected'
-                  : 'Saved',
-              kind: BadgeKind.ok,
-            ),
+            // Saved says nothing of whether it answers, so only Connected is a success.
+            tag: _tested && _settings.check == ConnectionCheck.ok
+                ? const AppBadge('Connected', kind: BadgeKind.ok)
+                : const AppBadge('Saved', kind: BadgeKind.plain),
           ),
           const InfoRow(
             'Developer key',

@@ -156,7 +156,7 @@ String chatHeard(Thread thread, {required bool pinned, required bool ready}) =>
 List<Widget> chatMarks(Tokens t, {required bool pinned, required bool ready}) =>
     [
       if (pinned) AppIcon('pin', size: IconSize.xs, color: t.muted),
-      if (ready) const ReadyDot(gap: false),
+      if (ready) const ReadyMark(),
     ];
 
 /// The open workspace's name, which opens the Workspaces sheet, with Workspace settings and New

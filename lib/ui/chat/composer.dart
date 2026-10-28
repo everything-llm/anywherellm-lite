@@ -1202,7 +1202,7 @@ class _NoKey extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
-    final style = Type.body(t.warning);
+    final style = Type.body(t.ink);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       decoration: BoxDecoration(
@@ -1216,19 +1216,36 @@ class _NoKey extends StatelessWidget {
         children: [
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 460),
-            child: Text.rich(
-              TextSpan(
-                style: style,
-                children: [
-                  TextSpan(
-                    text: 'Not connected yet. ',
-                    style: style.copyWith(fontWeight: FontWeight.w600),
+            // A warning: its icon in the warning's colour, its words in ink.
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: 8,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: AppIcon(
+                    Status.warning.icon,
+                    size: IconSize.normal,
+                    color: Status.warning.color(t),
                   ),
-                  const TextSpan(
-                    text: 'Set up your AnythingLLM server in Settings to start asking.',
+                ),
+                Flexible(
+                  child: Text.rich(
+                    TextSpan(
+                      style: style,
+                      children: [
+                        TextSpan(
+                          text: 'Not connected yet. ',
+                          style: style.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const TextSpan(
+                          text: 'Set up your AnythingLLM server in Settings to start asking.',
+                        ),
+                      ],
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           AppButton(

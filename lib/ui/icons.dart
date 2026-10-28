@@ -52,10 +52,32 @@ const _paths = {
   'link': 'M7 9a3 3 0 0 0 4 0l2-2a3 3 0 0 0-4-4l-1 1 M9 7a3 3 0 0 0-4 0l-2 2a3 3 0 0 0 4 4l1-1',
 };
 
+/// Lucide's paths, as House UI draws its status marks, on Lucide's own 24 unit box: each is
+/// scaled into the set's 16 unit box as it is parsed, so its stroke matches the rest.
+const _lucide = {
+  // circle-check: success.
+  'success': 'M12 22A10 10 0 1 0 12 2a10 10 0 0 0 0 20z M9 12l2 2 4-4',
+  // triangle-alert: a warning.
+  'warning':
+      'M21.73 18l-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z '
+      'M12 9v4 M12 17h.01',
+  // square-x: danger.
+  'danger':
+      'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z '
+      'M15 9l-6 6 M9 9l6 6',
+};
+
 final _parsed = <String, Path>{};
 
-Path _path(String name) =>
-    _parsed.putIfAbsent(name, () => parseSvgPathData(_paths[name]!));
+Path _path(String name) => _parsed.putIfAbsent(name, () {
+  if (_lucide[name] case final lucide?) {
+    const scale = 16 / 24;
+    return parseSvgPathData(lucide).transform(
+      (Matrix4.identity()..scaleByDouble(scale, scale, 1, 1)).storage,
+    );
+  }
+  return parseSvgPathData(_paths[name]!);
+});
 
 /// Icon sizes in logical pixels.
 enum IconSize {
@@ -96,7 +118,10 @@ class AppIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    assert(_paths.containsKey(name), 'no icon named $name');
+    assert(
+      _paths.containsKey(name) || _lucide.containsKey(name),
+      'no icon named $name',
+    );
     final icon = SizedBox.square(
       dimension: size.px,
       child: CustomPaint(

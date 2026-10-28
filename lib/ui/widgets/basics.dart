@@ -8,8 +8,57 @@ import '../type.dart';
 import 'tappable.dart';
 
 /// What a box says: a warning, a failure, or a calm note of something under way, which has
-/// an accent dot by its title.
+/// an accent dot by its title. A warning and a failure carry House UI's status icon by their
+/// title, and their words are in ink, so the colour never says it alone.
 enum AlertKind { warn, bad, info }
+
+/// House UI's states, each with its own icon: a circle with a check, a triangle, a square with
+/// a cross, which differ in shape as well as colour.
+enum Status {
+  success('success'),
+  warning('warning'),
+  danger('danger');
+
+  const Status(this.icon);
+
+  /// The icon's name in the set.
+  final String icon;
+
+  /// The status's colour, for its icon only.
+  Color color(Tokens t) => switch (this) {
+    success => t.success,
+    warning => t.warning,
+    danger => t.danger,
+  };
+}
+
+/// A state as House UI shows it: [status]'s icon in its colour beside [word] in [style], which
+/// is in ink, or the word alone when it has no status, as Testing… has.
+class StatusWord extends StatelessWidget {
+  const StatusWord(this.word, {super.key, required this.status, this.style});
+
+  final String word;
+  final Status? status;
+
+  /// The word's style; [Type.body] in ink when null.
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final text = Text(word, style: style ?? Type.body(t.ink));
+    final status = this.status;
+    if (status == null) return text;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      spacing: 6,
+      children: [
+        AppIcon(status.icon, size: IconSize.small, color: status.color(t)),
+        Flexible(child: text),
+      ],
+    );
+  }
+}
 
 class AlertBox extends StatelessWidget {
   const AlertBox(
@@ -44,16 +93,17 @@ class AlertBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final (fill, border, ink, body) = switch (kind) {
+    final (fill, border, status) = switch (kind) {
       AlertKind.bad => (
         t.dangerSoft,
         Border.all(color: t.danger),
-        t.danger,
-        t.danger,
+        Status.danger,
       ),
-      AlertKind.warn => (t.warningSoft, null, t.warning, t.warning),
-      AlertKind.info => (t.accentSoft, null, t.ink, t.ink),
+      AlertKind.warn => (t.warningSoft, null, Status.warning),
+      AlertKind.info => (t.accentSoft, null, null),
     };
+    final ink = t.ink;
+    final body = t.ink;
     // As large as the sentence under it, so it heads it rather than reading as a footnote.
     final heading = Text(title, style: Type.body(ink, weight: FontWeight.w600));
     return Semantics(
@@ -70,7 +120,7 @@ class AlertBox extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: _says(heading, body)),
+            Expanded(child: _says(heading, body, status, t)),
             if (onClose case final onClose?) ...[
               const SizedBox(width: 8),
               CloseButtonMark(color: ink, onTap: onClose),
@@ -82,10 +132,27 @@ class AlertBox extends StatelessWidget {
   }
 
   /// The title, the sentence and the action, one under another.
-  Widget _says(Widget heading, Color body) => Column(
+  Widget _says(Widget heading, Color body, Status? status, Tokens t) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      if (kind == AlertKind.info)
+      if (status != null)
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Level with the title's first line, 16 * 1.5 tall.
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: AppIcon(
+                status.icon,
+                size: IconSize.normal,
+                color: status.color(t),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: heading),
+          ],
+        )
+      else if (kind == AlertKind.info)
         Row(
           children: [
             const ReadyDot(gap: false),
@@ -151,6 +218,22 @@ class ReadyDot extends StatelessWidget {
         shape: BoxShape.circle,
       ),
     ),
+  );
+}
+
+/// [ReadyDot] with the word Ready beside it at caption size in ink, as a chat or workspace
+/// whose answer is ready shows it, so the dot is never the only sign.
+class ReadyMark extends StatelessWidget {
+  const ReadyMark({super.key});
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    spacing: 4,
+    children: [
+      const ReadyDot(gap: false),
+      Text('Ready', style: Type.caption(Tokens.of(context).ink)),
+    ],
   );
 }
 
