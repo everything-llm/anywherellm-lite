@@ -386,7 +386,7 @@ class ReadOnlyRow extends StatelessWidget {
       InfoRow(label, about: value, aboutLines: 4);
 }
 
-/// A line of muted text between a page's cards.
+/// A sentence between a page's cards, as running text: [Type.body] in ink.
 class PageNote extends StatelessWidget {
   const PageNote(this.text, {super.key});
 
@@ -395,7 +395,7 @@ class PageNote extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    return Text(text, style: Type.note(t.ink));
+    return Text(text, style: Type.body(t.ink));
   }
 }
 

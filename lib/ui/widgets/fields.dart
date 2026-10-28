@@ -311,7 +311,8 @@ class AppSelect extends StatelessWidget {
   }
 }
 
-/// A line of small muted text. [status] makes a screen reader announce it when it changes.
+/// Help under or between controls, a sentence or two of running text: [Type.body] in ink, as
+/// House UI sets help text. [status] makes a screen reader announce it when it changes.
 class HelpText extends StatelessWidget {
   const HelpText(this.text, {super.key, this.status = false});
 
@@ -321,7 +322,7 @@ class HelpText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final body = Text(text, style: Type.note(t.ink));
+    final body = Text(text, style: Type.body(t.ink));
     return status ? Semantics(liveRegion: true, child: body) : body;
   }
 }

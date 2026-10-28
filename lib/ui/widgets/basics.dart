@@ -38,10 +38,8 @@ class AlertBox extends StatelessWidget {
       AlertKind.warn => (t.warningSoft, null, t.warning, t.warning),
       AlertKind.info => (t.accentSoft, null, t.ink, t.ink),
     };
-    final heading = Text(
-      title,
-      style: Type.caption(ink, weight: FontWeight.w600),
-    );
+    // As large as the sentence under it, so it heads it rather than reading as a footnote.
+    final heading = Text(title, style: Type.body(ink, weight: FontWeight.w600));
     return Semantics(
       liveRegion: kind != AlertKind.warn,
       container: true,
@@ -68,7 +66,8 @@ class AlertBox extends StatelessWidget {
               heading,
             if (text != null) ...[
               const SizedBox(height: 6),
-              Text(text!, style: Type.note(body)),
+              // What it says is a sentence or two, so it is running text.
+              Text(text!, style: Type.body(body)),
             ],
             if (action case final action?) ...[
               const SizedBox(height: 10),

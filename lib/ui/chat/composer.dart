@@ -1202,7 +1202,7 @@ class _NoKey extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
-    final style = Type.note(t.warning);
+    final style = Type.body(t.warning);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       decoration: BoxDecoration(

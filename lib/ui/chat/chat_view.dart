@@ -189,7 +189,7 @@ class _Unreachable extends StatelessWidget {
                       Text(
                         'Check that the computer is on and that this phone is on the '
                         'same network.',
-                        style: Type.note(t.ink),
+                        style: Type.body(t.ink),
                       ),
                       if (scope.settings.connection case final server?)
                         Text(

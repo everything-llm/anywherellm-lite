@@ -225,7 +225,7 @@ class _AsideRow extends StatelessWidget {
                     passage,
                     maxLines: 4,
                     overflow: TextOverflow.ellipsis,
-                    style: Type.note(t.ink),
+                    style: Type.body(t.ink),
                   ),
               ],
             ),

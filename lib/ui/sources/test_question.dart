@@ -162,7 +162,7 @@ class _HitState extends State<_Hit> {
               hit.text,
               maxLines: _whole ? null : 3,
               overflow: _whole ? null : TextOverflow.ellipsis,
-              style: Type.note(t.ink),
+              style: Type.body(t.ink),
             ),
           ],
         ),

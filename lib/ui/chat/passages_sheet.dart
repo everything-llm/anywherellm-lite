@@ -83,7 +83,7 @@ class PassagesView extends StatelessWidget {
                       textAlign: TextAlign.end,
                       style: Type.note(t.ink),
                     ),
-                  SelectableText(passage.text, style: Type.note(t.ink)),
+                  SelectableText(passage.text, style: Type.body(t.ink)),
                 ],
               ),
             ),
