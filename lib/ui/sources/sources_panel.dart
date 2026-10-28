@@ -265,8 +265,9 @@ class SourceRow extends StatelessWidget {
 }
 
 /// A document's type on a small tile, such as `PDF`: in ink on a sunken well, as House UI's
-/// row leads are, at least 40 square and as wide as its word needs, so a long type is never
-/// cut. It looks the same switched on or off, never faded: the line under the name says
+/// row leads are, at least 48 wide and 40 tall, room for a four letter type such as DOCX so
+/// the names beside a list of them line up, and wider when its word needs it, so a long type or
+/// large text is never cut. It looks the same switched on or off, never faded: the line under the name says
 /// whether answers use it.
 class TypeTile extends StatelessWidget {
   /// [file]'s type.
@@ -281,13 +282,13 @@ class TypeTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+      constraints: const BoxConstraints(minWidth: 48, minHeight: 40),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: t.sunken,
           borderRadius: BorderRadius.circular(8),
         ),
-        // As large as its word and no larger, centred in the 40 square when that is more.
+        // As large as its word and no larger, centred in the least size when that is more.
         child: Center(
           widthFactor: 1,
           heightFactor: 1,
