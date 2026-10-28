@@ -2,7 +2,7 @@
 
 A lightweight chat client for an AnythingLLM server, for Android phones. Ask questions in a workspace and get answers drawn from the files you add to it.
 
-**This is the `lite-stock` branch**, a build for plain, unmodified AnythingLLM: it talks to AnythingLLM's own developer API only, with none of the toolkit (anywherellm-bridge) or suite features of `master` (no Memory, Upcoming, skill pages or agent's browser). It installs beside Lite as `local.anywherellm.lite.stock`, labelled **Lite (stock)**, version `1.19.0-stock`.
+**This is the `lite-stock` branch**, a build for plain, unmodified AnythingLLM: it talks to AnythingLLM's own developer API only, with none of the toolkit (anywherellm-bridge) or suite features of `master` (no Memory, Upcoming, skill pages or agent's browser). It installs beside Lite as `local.anywherellm.lite.stock`, labelled **Lite (stock)**, version `1.19.1-stock`.
 
 ## What it does
 
