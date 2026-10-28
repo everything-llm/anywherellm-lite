@@ -7,7 +7,8 @@ import '../widgets/tappable.dart';
 /// A pill in the composer's row that names a setting and opens what changes it, such as the
 /// Answer from menu or the model picker: 28 px tall, without a chevron, since the row has little
 /// room. [tinted] fills it with the accent, for a setting that
-/// changes how answers read. A null [onTap] fades it.
+/// changes how answers read. A null [onTap] shows it disabled, opaque: muted words on a sunken
+/// fill inside a line.
 class ComposerChip extends StatelessWidget {
   const ComposerChip({
     super.key,
@@ -33,21 +34,27 @@ class ComposerChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final ink = tinted ? t.accent : t.ink;
+    final enabled = onTap != null;
+    final ink = !enabled
+        ? t.muted
+        : tinted
+        ? t.accent
+        : t.ink;
     return Tappable(
       touchTarget: true,
       label: label,
       tooltip: tooltip,
       expanded: open,
       onTap: onTap,
-      dimWhenDisabled: 0.4,
       radius: BorderRadius.circular(99),
-      color: tinted
+      color: !enabled
+          ? t.sunken
+          : tinted
           ? t.accentSoft
           : open
           ? t.sunken
           : Colors.transparent,
-      side: BorderSide(color: tinted ? Colors.transparent : t.line),
+      side: BorderSide(color: tinted && enabled ? Colors.transparent : t.line),
       child: SizedBox(
         height: 28,
         child: Padding(

@@ -8,7 +8,8 @@ import 'package:flutter/rendering.dart';
 ///
 /// [label] is what a screen reader hears. [selected], [toggled] and [expanded] say which state
 /// the control reports; leave one null when the control has no such state. With no [onTap] the
-/// control reports itself disabled, and [dimWhenDisabled] fades it to that opacity.
+/// control reports itself disabled; it never fades: a disabled control draws itself in House
+/// UI's opaque disabled colours, muted words and icons on a sunken fill.
 ///
 /// The surface is [color] and [side] inside [radius], or [shape] when the outline is not a
 /// rounded rectangle. With none of them the control is bare ink over whatever is behind it.
@@ -30,7 +31,6 @@ class Tappable extends StatelessWidget {
     this.hoverColor,
     this.shadows = const [],
     this.tooltip,
-    this.dimWhenDisabled,
     this.excludeSemantics = true,
     this.touchTarget = false,
   }) : assert(radius == null || shape == null, 'give a radius or a shape');
@@ -49,9 +49,6 @@ class Tappable extends StatelessWidget {
   final Color? hoverColor;
   final List<BoxShadow> shadows;
   final String? tooltip;
-
-  /// The opacity while [onTap] is null, or null to leave the control as it is.
-  final double? dimWhenDisabled;
 
   /// True hides what [child] says from a screen reader, so [label] is all it hears.
   final bool excludeSemantics;
@@ -117,10 +114,6 @@ class Tappable extends StatelessWidget {
               ),
       ),
     );
-    final dim = dimWhenDisabled;
-    if (dim != null) {
-      result = Opacity(opacity: enabled ? 1 : dim, child: result);
-    }
     if (tooltip != null) result = Tooltip(message: tooltip, child: result);
     // Its own node with its tooltip, so its label and bounds never merge into what holds it.
     result = Semantics(container: true, child: result);

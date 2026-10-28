@@ -181,7 +181,9 @@ class IconBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final floats = filled && active != true;
+    final enabled = onPressed != null;
+    final floats = filled && active != true && enabled;
+    // Disabled, it stays opaque: a muted icon, and a filled one sunken inside a line.
     return Tappable(
       touchTarget: true,
       label: heard ?? tooltip,
@@ -190,22 +192,31 @@ class IconBtn extends StatelessWidget {
       toggled: active,
       expanded: expanded,
       shape: CircleBorder(
-        side: floats ? BorderSide(color: t.tileEdge) : BorderSide.none,
+        side: floats
+            ? BorderSide(color: t.tileEdge)
+            : filled && !enabled
+            ? BorderSide(color: t.line)
+            : BorderSide.none,
       ),
       shadows: floats ? t.tileShadow : const [],
-      color: active == true
+      color: !enabled
+          ? (filled ? t.sunken : null)
+          : active == true
           ? t.accentSoft
           : filled
           ? t.tile
           : null,
-      dimWhenDisabled: 0.4,
       child: SizedBox.square(
         dimension: box,
         child: Center(
           child: AppIcon(
             icon,
             size: size,
-            color: active == true ? t.accent : t.ink,
+            color: !enabled
+                ? t.muted
+                : active == true
+                ? t.accent
+                : t.ink,
           ),
         ),
       ),

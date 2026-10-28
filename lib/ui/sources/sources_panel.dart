@@ -264,34 +264,41 @@ class SourceRow extends StatelessWidget {
   }
 }
 
-/// A document's type on a small tile, such as `PDF`. Switched off, only the tile fades: the name
-/// beside it stays at full strength.
+/// A document's type on a small tile, such as `PDF`: in ink on a sunken well, as House UI's
+/// row leads are, at least 40 square and as wide as its word needs, so a long type is never
+/// cut. It looks the same switched on or off, never faded: the line under the name says
+/// whether answers use it.
 class TypeTile extends StatelessWidget {
-  /// [file]'s type, faded while it is switched off.
-  TypeTile(SourceFile file, {super.key}) : label = file.tile, on = file.on;
+  /// [file]'s type.
+  TypeTile(SourceFile file, {super.key}) : label = file.tile;
 
   /// The type [label], such as `PDF`, of a file that is not a document.
-  const TypeTile.label(this.label, {super.key}) : on = true;
+  const TypeTile.label(this.label, {super.key});
 
   final String label;
-  final bool on;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    return Opacity(
-      opacity: on ? 1 : 0.5,
-      child: Container(
-        width: 40,
-        height: 40,
-        alignment: Alignment.center,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+      child: DecoratedBox(
         decoration: BoxDecoration(
-          color: t.accentSoft,
+          color: t.sunken,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Text(
-          label,
-          style: Type.caption(t.accent, weight: FontWeight.w700),
+        // As large as its word and no larger, centred in the 40 square when that is more.
+        child: Center(
+          widthFactor: 1,
+          heightFactor: 1,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: Type.caption(t.ink, weight: FontWeight.w700),
+            ),
+          ),
         ),
       ),
     );

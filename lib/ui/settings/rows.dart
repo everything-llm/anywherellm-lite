@@ -447,16 +447,18 @@ class CardRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final color = switch (tone) {
-      RowTone.plain => t.ink,
-      RowTone.accent => t.accent,
-      RowTone.danger => t.danger,
-    };
+    // Disabled, its words and icon are muted, opaque.
+    final color = onTap == null
+        ? t.muted
+        : switch (tone) {
+            RowTone.plain => t.ink,
+            RowTone.accent => t.accent,
+            RowTone.danger => t.danger,
+          };
     return Tappable(
       label: heard ?? label,
       selected: checked,
       onTap: onTap,
-      dimWhenDisabled: 0.5,
       child: Container(
         constraints: BoxConstraints(
           minHeight: large ? Sizes.pageRow : Sizes.cardRow,
@@ -585,14 +587,16 @@ class SummaryCard extends StatelessWidget {
               child: Tappable(
                 label: link,
                 onTap: onLink,
-                dimWhenDisabled: 0.5,
                 child: Container(
                   constraints: const BoxConstraints(minHeight: 56),
                   padding: const EdgeInsets.symmetric(
                     horizontal: FieldCard.inset,
                   ),
                   alignment: AlignmentDirectional.centerStart,
-                  child: Text(link, style: Type.label(t.accent)),
+                  child: Text(
+                    link,
+                    style: Type.label(onLink == null ? t.muted : t.accent),
+                  ),
                 ),
               ),
             ),

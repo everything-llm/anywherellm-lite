@@ -12,7 +12,6 @@ Tappable make({
   bool? toggled,
   bool? expanded,
   String? tooltip,
-  double? dim,
 }) => Tappable(
   label: 'Go',
   onTap: onTap,
@@ -20,7 +19,6 @@ Tappable make({
   toggled: toggled,
   expanded: expanded,
   tooltip: tooltip,
-  dimWhenDisabled: dim,
   radius: BorderRadius.circular(8),
   color: Colors.white,
   child: const SizedBox(width: 60, height: 40, child: Text('inner')),
@@ -97,19 +95,19 @@ void main() {
     });
   });
 
-  testWidgets('without onTap it is disabled and dimmed', (tester) async {
-    await checked(tester, make(dim: 0.5), (data) {
+  // House UI: disabled controls stay visible, drawn in opaque disabled colours, never faded.
+  testWidgets('without onTap it is disabled, and never faded', (tester) async {
+    await checked(tester, make(), (data) {
       expect(isReported(data.flagsCollection.isEnabled), isTrue);
       expect(isOn(data.flagsCollection.isEnabled), isFalse);
-      expect(tester.widget<Opacity>(find.byType(Opacity)).opacity, 0.5);
+      expect(find.byType(Opacity), findsNothing);
     });
   });
 
-  testWidgets('with onTap it is enabled, undimmed and taps', (tester) async {
+  testWidgets('with onTap it is enabled and taps', (tester) async {
     var taps = 0;
-    await checked(tester, make(onTap: () => taps++, dim: 0.5), (data) {
+    await checked(tester, make(onTap: () => taps++), (data) {
       expect(isOn(data.flagsCollection.isEnabled), isTrue);
-      expect(tester.widget<Opacity>(find.byType(Opacity)).opacity, 1);
     });
     await tester.tap(find.text('inner'));
     expect(taps, 1);

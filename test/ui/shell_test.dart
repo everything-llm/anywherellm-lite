@@ -386,24 +386,26 @@ void main() {
       expect(find.text('Q3 planning · 2 docs in use'), findsOneWidget);
     });
 
-    testWidgets('a file switched off fades only its type and is counted out', (
-      tester,
-    ) async {
-      final llm = planningServer();
-      final h = await withDocuments(tester, llm);
-      await tester.tap(find.byType(AppSwitch).first);
-      await tester.pumpAndSettle();
-      expect(h.sources.onCount, 1);
-      expect(find.text('Q3 planning · 1 doc in use'), findsOneWidget);
-      expect(inSources(find.text('Not used · 120 words')), findsOneWidget);
-      double opacityOf(Finder finder) => tester
-          .widgetList<Opacity>(
-            find.ancestor(of: finder, matching: find.byType(Opacity)),
-          )
-          .fold(1, (all, o) => all * o.opacity);
-      expect(opacityOf(inSources(find.text('Q3 roadmap.pdf'))), 1);
-      expect(opacityOf(inSources(find.text('PDF'))), 0.5);
-    });
+    testWidgets(
+      'a file switched off fades nothing, says so and is counted out',
+      (tester) async {
+        final llm = planningServer();
+        final h = await withDocuments(tester, llm);
+        await tester.tap(find.byType(AppSwitch).first);
+        await tester.pumpAndSettle();
+        expect(h.sources.onCount, 1);
+        expect(find.text('Q3 planning · 1 doc in use'), findsOneWidget);
+        expect(inSources(find.text('Not used · 120 words')), findsOneWidget);
+        double opacityOf(Finder finder) => tester
+            .widgetList<Opacity>(
+              find.ancestor(of: finder, matching: find.byType(Opacity)),
+            )
+            .fold(1, (all, o) => all * o.opacity);
+        // Its words say it is not used; nothing of it is drawn faded.
+        expect(opacityOf(inSources(find.text('Q3 roadmap.pdf'))), 1);
+        expect(opacityOf(inSources(find.text('PDF'))), 1);
+      },
+    );
 
     testWidgets(
       'a file opens its text, which removes it, and the sheet comes back',

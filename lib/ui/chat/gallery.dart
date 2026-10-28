@@ -296,35 +296,44 @@ class _GalleryPageState extends State<GalleryPage> {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
     final count = _pictures.length;
-    Widget step(String icon, String label, int to, {required bool left}) =>
-        Positioned(
-          top: 0,
-          bottom: 0,
-          left: left ? 8 : null,
-          right: left ? null : 8,
-          child: Center(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: t.tileShadow,
+    // At either end the step that goes nowhere stays, opaque: sunken, its arrow muted.
+    Widget step(String icon, String label, int to, {required bool left}) {
+      final can = to >= 0 && to < count;
+      return Positioned(
+        top: 0,
+        bottom: 0,
+        left: left ? 8 : null,
+        right: left ? null : 8,
+        child: Center(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: can ? t.tileShadow : const [],
+            ),
+            child: Tappable(
+              label: label,
+              tooltip: label,
+              onTap: can ? () => _go(to) : null,
+              shape: CircleBorder(
+                side: can ? BorderSide.none : BorderSide(color: t.line),
               ),
-              child: Tappable(
-                label: label,
-                tooltip: label,
-                onTap: to < 0 || to >= count ? null : () => _go(to),
-                shape: const CircleBorder(),
-                color: t.tile,
-                dimWhenDisabled: 0.4,
-                child: SizedBox.square(
-                  dimension: Tappable.touchSide,
-                  child: Center(
-                    child: AppIcon(icon, size: IconSize.small, color: t.ink),
+              color: can ? t.tile : t.sunken,
+              child: SizedBox.square(
+                dimension: Tappable.touchSide,
+                child: Center(
+                  child: AppIcon(
+                    icon,
+                    size: IconSize.small,
+                    color: can ? t.ink : t.muted,
                   ),
                 ),
               ),
             ),
           ),
-        );
+        ),
+      );
+    }
+
     return Container(
       height: 390,
       clipBehavior: Clip.antiAlias,

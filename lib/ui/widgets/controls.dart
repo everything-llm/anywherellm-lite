@@ -64,21 +64,25 @@ class AppSwitch extends StatelessWidget {
       tooltip: tooltip,
       onTap: change == null ? null : () => change(!value),
       radius: BorderRadius.circular(8),
-      dimWhenDisabled: 0.5,
       child: SizedBox(
         width: 52,
         height: Tappable.touchSide,
-        child: Center(child: SwitchTrack(value: value)),
+        child: Center(
+          child: SwitchTrack(value: value, enabled: change != null),
+        ),
       ),
     );
   }
 }
 
-/// The look of an [AppSwitch] alone, for a row that is itself the switch.
+/// The look of an [AppSwitch] alone, for a row that is itself the switch. Disabled
+/// ([enabled] false) it stays opaque: a sunken track inside a line, its knob muted, which still
+/// shows on or off by where it sits.
 class SwitchTrack extends StatelessWidget {
-  const SwitchTrack({super.key, required this.value});
+  const SwitchTrack({super.key, required this.value, this.enabled = true});
 
   final bool value;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -91,13 +95,21 @@ class SwitchTrack extends StatelessWidget {
       padding: const EdgeInsets.all(2),
       alignment: value ? Alignment.centerRight : Alignment.centerLeft,
       decoration: BoxDecoration(
-        color: value ? t.accent : t.lineStrong,
+        color: !enabled
+            ? t.sunken
+            : value
+            ? t.accent
+            : t.lineStrong,
+        border: enabled ? null : Border.all(color: t.line),
         borderRadius: BorderRadius.circular(99),
       ),
       child: Container(
         width: knob,
         height: knob,
-        decoration: BoxDecoration(color: t.tile, shape: BoxShape.circle),
+        decoration: BoxDecoration(
+          color: enabled ? t.tile : t.muted,
+          shape: BoxShape.circle,
+        ),
       ),
     );
   }
