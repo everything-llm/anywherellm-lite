@@ -6,9 +6,7 @@ import '../app_scope.dart';
 import '../layout.dart';
 import '../list_detail.dart';
 import '../state/settings_controller.dart';
-import '../state/shell_controller.dart';
 import '../tokens.dart';
-import '../upcoming.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';
 import '../widgets/list_row.dart';
@@ -17,13 +15,11 @@ import '../widgets/sheet.dart';
 import '../widgets/window_insets.dart';
 import 'connection_page.dart';
 import 'device_pages.dart';
-import 'memory_page.dart';
 import 'privacy_page.dart';
 import 'shortcuts_page.dart';
 import 'rows.dart';
 import 'server_page.dart';
 import 'settings_pages.dart';
-import 'walkthrough.dart';
 import '../widgets/scroll_fades.dart';
 
 /// Settings: its list over the chat, opened from the shelf's foot, in two groups, This app and
@@ -102,7 +98,6 @@ class _Frame extends StatelessWidget {
               ? 'Back to the chat'
               : 'Back to ${page.parent?.label ?? 'Settings'}',
           onBack: shell.settingsBack,
-          action: page == null ? null : _PageView.actionOf(page),
         ),
         Expanded(
           child: ScrollFades(
@@ -115,12 +110,9 @@ class _Frame extends StatelessWidget {
 }
 
 /// The list of Settings: once a server is saved, a card with it, whether it answers and Test
-/// connection; This app's pages; then AnythingLLM's Server, Memory and Upcoming rows, the last
-/// two while the toolkit serves them; and,
-/// while no toolkit answers beside the server, a card that opens Add the toolkit over the list.
+/// connection; This app's pages; then AnythingLLM's Server row.
 ///
-/// Beside a page ([split]), its rows are drawn as a wide window's list, [chosen]'s marked, and
-/// Upcoming opens beside the chats rather than in Settings.
+/// Beside a page ([split]), its rows are drawn as a wide window's list, [chosen]'s marked.
 class _Nav extends StatelessWidget {
   const _Nav({this.chosen, this.split = false});
 
@@ -136,9 +128,7 @@ class _Nav extends StatelessWidget {
     String? about,
   }) {
     final shell = AppScope.of(context).shell;
-    void open() => split && page == SettingsPage.upcoming
-        ? shell.openPane(Pane.upcoming)
-        : shell.showSettingsPage(page);
+    void open() => shell.showSettingsPage(page);
     if (!split) {
       return NavRow(icon: icon, title: page.label, about: about, onTap: open);
     }
@@ -158,14 +148,12 @@ class _Nav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
-    final shell = scope.shell;
     final settings = scope.settings;
     return ListenableBuilder(
-      listenable: Listenable.merge([scope.system, settings, scope.toolkit]),
+      listenable: Listenable.merge([scope.system, settings]),
       builder: (context, _) {
-        final toolkit = scope.toolkit..wantJobsOnce();
         final connection = settings.connection;
-        final list = ListView(
+        return ListView(
           padding: split ? EdgeInsets.zero : Sizes.pageIn(context),
           children: [
             if (connection != null) const _ServerCard(),
@@ -184,75 +172,10 @@ class _Nav extends StatelessWidget {
                   'server',
                   about: serverSummary(scope.system),
                 ),
-                if (toolkit.memories)
-                  _row(context, SettingsPage.memory, 'memory'),
-                if (toolkit.jobsServed)
-                  _row(
-                    context,
-                    SettingsPage.upcoming,
-                    'clock',
-                    about: upcomingSummary(toolkit),
-                  ),
               ]),
-              if (toolkit.servesNothing) ...[
-                const SizedBox(height: 20),
-                SummaryCard(
-                  title: 'Get more from your server',
-                  lines: [
-                    Text(
-                      toolkit.available ?? false
-                          ? 'The toolkit answers, but lets none of this app\'s calls through. '
-                                'Run its install again to add Memory and Upcoming here.'
-                          : 'Install the free toolkit beside AnythingLLM to add Memory and '
-                                'Upcoming here.',
-                      style: Type.note(Tokens.of(context).ink),
-                    ),
-                  ],
-                  link: 'See how to add it',
-                  onLink: () => shell.showGuide(Guide.toolkit),
-                ),
-              ],
             ],
           ],
         );
-        return ListenableBuilder(
-          listenable: shell,
-          child: list,
-          builder: (context, list) => OverlayWhile(
-            open: shell.guide == Guide.toolkit,
-            overlay: (context) => const _ToolkitGuide(),
-            child: list!,
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// Add the toolkit, over the list of Settings. Its end opens the Connection page with the
-/// camera reading, for the pairing link drawn as a QR code, where there is a camera.
-class _ToolkitGuide extends StatelessWidget {
-  const _ToolkitGuide();
-
-  @override
-  Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    final shell = scope.shell;
-    final canScan = scope.scanner != null;
-    return Walkthrough(
-      title: 'Add the toolkit',
-      steps: toolkitSteps,
-      onClose: () => shell.showGuide(null),
-      end: canScan ? 'Scan the pairing code' : 'Close',
-      endAbout: canScan
-          ? 'or open the link on this phone'
-          : 'then open the link on this phone',
-      onEnd: () {
-        shell.showGuide(null);
-        if (!canScan) return;
-        shell
-          ..showSettingsPage(SettingsPage.connection)
-          ..setScanning(true);
       },
     );
   }
@@ -355,17 +278,9 @@ class _PageView extends StatelessWidget {
     );
   }
 
-  /// The round button at the end of [page]'s header, or null for none.
-  static Widget? actionOf(SettingsPage page) => switch (page) {
-    SettingsPage.upcoming => const UpcomingAction(),
-    _ => null,
-  };
-
   static Widget _body(SettingsPage page) => switch (page) {
     SettingsPage.connection => const ConnectionPage(),
     SettingsPage.server => const ServerPage(),
-    SettingsPage.memory => const MemoryPage(),
-    SettingsPage.upcoming => const UpcomingPage(),
     SettingsPage.appearance => const AppearancePage(),
     SettingsPage.chat => const ChatPage(),
     SettingsPage.shortcuts => const ShortcutsPage(),
@@ -433,7 +348,6 @@ class _Detail extends StatelessWidget {
       onBack: parent == null
           ? null
           : () => scope.shell.showSettingsPage(parent),
-      actions: [?_PageView.actionOf(page)],
       // The first run lays out and scrolls itself. Its cards are wells in this one.
       child: SheetCards(child: firstRun ? body : ScrollFades(child: body)),
     );

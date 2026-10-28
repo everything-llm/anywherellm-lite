@@ -12,7 +12,6 @@ import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/fake_api.dart';
-import 'support/fake_toolkit.dart';
 import 'support/fake_settings.dart';
 
 Future<void> _boot(
@@ -28,7 +27,6 @@ Future<void> _boot(
     AnywhereLlmApp(
       home: SessionHost(
         llm: llm,
-        toolkit: FakeToolkit(),
         settings: SettingsController(llm, store, ConnectionHolder()),
         prefs: PrefsController(prefsStore ?? FakePrefsStore()),
         shell: ShellController(),

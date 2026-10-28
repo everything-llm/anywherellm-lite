@@ -4,7 +4,6 @@ import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/fake_toolkit.dart';
 import '../support/pump.dart';
 
 /// Opens the first run's Connection page with nothing saved, as the app does at such a start.
@@ -22,21 +21,6 @@ Future<void> _openGuide(WidgetTester tester) async {
   await tester.pumpAndSettle();
   await tester.tap(link.hitTestable().first);
   await tester.pumpAndSettle();
-}
-
-/// Opens the list of Settings on a server whose toolkit is [present] or not.
-Future<Harness> _settings(
-  WidgetTester tester, {
-  bool present = false,
-  Set<String>? served,
-  bool canScan = false,
-}) async {
-  final toolkit = FakeToolkit(present: present);
-  if (served != null) toolkit.served = served;
-  final h = await pumpApp(tester, toolkitServer: toolkit, canScan: canScan);
-  h.shell.openSettings();
-  await tester.pumpAndSettle();
-  return h;
 }
 
 void main() {
@@ -147,75 +131,5 @@ void main() {
         expect(find.text('Fake scan').hitTestable(), findsOneWidget);
       },
     );
-  });
-
-  group('Add the toolkit', () {
-    testWidgets('Settings offers it while no toolkit answers, and opens it', (
-      tester,
-    ) async {
-      final h = await _settings(tester);
-      expect(find.text('Get more from your server'), findsOneWidget);
-      await tapVisible(tester, control('See how to add it'));
-      await tester.pumpAndSettle();
-      expect(h.shell.guide, Guide.toolkit);
-      expect(find.text('Add the toolkit'), findsOneWidget);
-      expect(find.text('1 of ${toolkitSteps.length}'), findsOneWidget);
-      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-      await tester.pumpAndSettle();
-      expect(
-        find.textContaining('anywherellm-bridge.cjs install'),
-        findsOneWidget,
-      );
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(h.shell.guiding, isFalse);
-      expect(h.shell.settingsOpen, isTrue);
-    });
-
-    testWidgets('a server with the toolkit is not offered it', (tester) async {
-      await _settings(tester, present: true);
-      expect(find.text('Get more from your server'), findsNothing);
-      expect(find.text('Memory'), findsOneWidget);
-    });
-
-    testWidgets('a toolkit whose bridge passes nothing the app uses is offered '
-        'like none', (tester) async {
-      await _settings(tester, present: true, served: const {});
-      expect(find.text('Get more from your server'), findsOneWidget);
-      expect(find.text('Memory'), findsNothing);
-    });
-
-    testWidgets('its end opens Connection with the camera reading', (
-      tester,
-    ) async {
-      final h = await _settings(tester, canScan: true);
-      h.shell.showGuide(Guide.toolkit);
-      await tester.pumpAndSettle();
-      await tester.tap(
-        control('Screen ${toolkitSteps.length}: Step 3 · Connect'),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Scan the pairing code'));
-      await tester.pumpAndSettle();
-      expect(h.shell.guiding, isFalse);
-      expect(h.shell.settingsPage, SettingsPage.connection);
-      expect(h.shell.scanning, isTrue);
-      expect(find.text('Fake scan'), findsOneWidget);
-    });
-
-    testWidgets('without a camera its end closes it', (tester) async {
-      final h = await _settings(tester);
-      h.shell.showGuide(Guide.toolkit);
-      await tester.pumpAndSettle();
-      await tester.tap(
-        control('Screen ${toolkitSteps.length}: Step 3 · Connect'),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(control('Close, then open the link on this phone'));
-      await tester.pumpAndSettle();
-      expect(h.shell.guiding, isFalse);
-      expect(h.shell.scanning, isFalse);
-      expect(h.shell.settingsPage, isNull);
-    });
   });
 }

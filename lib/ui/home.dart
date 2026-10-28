@@ -11,7 +11,6 @@ import 'settings/rows.dart';
 import 'state/shell_controller.dart';
 import 'tokens.dart';
 import 'type.dart';
-import 'toolkit_card.dart';
 import 'widgets/basics.dart';
 import 'widgets/buttons.dart';
 import 'widgets/fields.dart';
@@ -21,7 +20,7 @@ import 'widgets/tappable.dart';
 import 'workspace_switcher.dart';
 
 /// The chats list, drawn in the shelf: the open workspace's name as its title, which opens the Workspaces sheet,
-/// with Workspace settings and New chat beside it; the search; the toolkit's card; then the
+/// with Workspace settings and New chat beside it; the search; then the
 /// workspace's chats under Chats, each with a More button that opens its sheet. A chat opens in
 /// the chat and closes the shelf.
 class ChatsList extends StatefulWidget {
@@ -99,8 +98,6 @@ class _ChatsListState extends State<ChatsList> {
                                 ),
                               )
                             else ...[
-                              if (scope.settings.configured)
-                                const SliverToBoxAdapter(child: ToolkitCard()),
                               if (chat.activeSlug case final slug?) ...[
                                 const SliverToBoxAdapter(
                                   child: CardHeading('Chats'),

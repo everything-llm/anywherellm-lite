@@ -10,7 +10,6 @@ import 'dart:io';
 
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/prefs.dart';
-import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
@@ -20,7 +19,6 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../test/support/fake_api.dart';
-import '../test/support/fake_toolkit.dart';
 import '../test/support/fake_settings.dart';
 import '../test/support/pump.dart';
 import 'support.dart';
@@ -41,8 +39,7 @@ Future<void> _capture(
 }) => capture(tester, _out, name, density: density);
 
 /// A server with a few workspaces and a budget chat worth looking at.
-(FakeAnythingLlm, FakeToolkit) _server() {
-  final toolkit = FakeToolkit();
+FakeAnythingLlm _server() {
   final llm = FakeAnythingLlm();
   llm.spaces = [
     FakeWorkspace(
@@ -85,20 +82,6 @@ Future<void> _capture(
       docs: [libraryDoc(llm, 'Itinerary.pdf', words: 1280)],
     ),
   ];
-  // The drawer counts the jobs the server runs.
-  final now = DateTime.now().toUtc();
-  toolkit.jobs = [
-    ScheduledJob(
-      name: 'Morning brief',
-      cron: '30 6 * * *',
-      nextRun: now.add(const Duration(hours: 9)),
-    ),
-    ScheduledJob(
-      name: 'Roadmap check',
-      cron: '0 8 * * 1',
-      nextRun: now.add(const Duration(days: 2)),
-    ),
-  ];
   llm.histories['budget'] = const [
     ChatMessage(role: Role.user, text: 'How is the Q3 budget split?'),
     ChatMessage(
@@ -129,7 +112,7 @@ Future<void> _capture(
       ],
     ),
   ];
-  return (llm, toolkit);
+  return llm;
 }
 
 /// The banner across the top of the store page: the robin and the name on the icon's ground.
@@ -192,11 +175,10 @@ void main() {
   });
 
   testWidgets('the phone screenshots', (tester) async {
-    final (llm, toolkit) = _server();
+    final llm = _server();
     final h = await pumpApp(
       tester,
       llm: llm,
-      toolkitServer: toolkit,
       size: _phone,
       connection: const Connection(
         baseUrl: 'https://anythingllm.example.ts.net',

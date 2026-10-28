@@ -43,18 +43,6 @@ class PrefsController extends ChangeNotifier {
   List<OffDoc> offIn(String slug) =>
       _server == null ? const [] : prefs.offIn(_server!, slug);
 
-  /// The newest failure listed when the person last opened the Library page from the app on the
-  /// server in use, or null ([Prefs.librarySeen]).
-  DateTime? get librarySeen =>
-      _server == null ? null : prefs.librarySeen[_server!];
-
-  /// Notes the Library page opened on the server in use while its newest failure was [at].
-  Future<void> seeLibrary(DateTime at) async {
-    if (_server case final server?) {
-      await _changeIfNew(prefs.withLibrarySeen(server, at));
-    }
-  }
-
   Future<void> setOff(String slug, List<OffDoc> docs) async {
     if (_server case final server?) {
       await _change(prefs.withOff(server, slug, docs));

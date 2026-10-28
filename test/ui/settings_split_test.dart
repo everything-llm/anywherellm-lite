@@ -1,20 +1,17 @@
 import 'dart:ui';
 
-import 'package:anywherellm/core/toolkit.dart';
 import 'package:anywherellm/ui/settings/connection_page.dart';
 import 'package:anywherellm/ui/settings/device_pages.dart';
 import 'package:anywherellm/ui/settings/privacy_page.dart';
 import 'package:anywherellm/ui/settings/server_page.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
-import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/material.dart' show AxisDirection, Scrollable;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
-import '../support/fake_toolkit.dart';
 import '../support/pump.dart';
 
 const desktop = Size(1440, 900);
@@ -23,9 +20,6 @@ const tablet = Size(960, 600);
 /// [finder] in Settings.
 Finder inSettings(Finder finder) =>
     find.descendant(of: find.byType(SettingsDialog), matching: finder);
-
-FakeToolkit toolkit() =>
-    FakeToolkit()..served = {ToolkitFeature.memories, ToolkitFeature.jobs};
 
 /// Settings' row named [name], heard with the line under it.
 Finder row(String name) => inSettings(
@@ -54,7 +48,6 @@ void main() {
           size: size,
           canDictate: true,
           canSpeak: true,
-          toolkitServer: toolkit(),
         );
         h.shell.openSettings();
         await tester.pumpAndSettle();
@@ -92,7 +85,6 @@ void main() {
       tester,
       llm: planningServer(),
       size: desktop,
-      toolkitServer: toolkit(),
     );
     h.shell.openSettings();
     await tester.pumpAndSettle();
@@ -108,7 +100,6 @@ void main() {
       tester,
       llm: planningServer(),
       size: desktop,
-      toolkitServer: toolkit(),
     );
     h.shell.openSettings();
     await tester.pumpAndSettle();
@@ -130,7 +121,6 @@ void main() {
       tester,
       llm: planningServer(),
       size: desktop,
-      toolkitServer: toolkit(),
     );
     h.shell.openSettings(SettingsPage.server);
     await tester.pumpAndSettle();
@@ -184,25 +174,6 @@ void main() {
     expect(inSettings(control('Back to the chat')), findsNothing);
   });
 
-  testWidgets('Upcoming opens beside the chats, not in Settings', (
-    tester,
-  ) async {
-    final h = await pumpApp(
-      tester,
-      llm: planningServer(),
-      size: desktop,
-      toolkitServer: toolkit(),
-    );
-    h.shell.openSettings();
-    await tester.pumpAndSettle();
-
-    await tester.tap(inSettings(find.text('Upcoming')));
-    await tester.pumpAndSettle();
-
-    expect(h.shell.settingsOpen, isFalse);
-    expect(h.shell.pane, Pane.upcoming);
-  });
-
   testWidgets('a phone keeps the list and its pages one at a time', (
     tester,
   ) async {
@@ -210,15 +181,14 @@ void main() {
       tester,
       llm: planningServer(),
       size: const Size(800, 900),
-      toolkitServer: toolkit(),
     );
     h.shell.openSettings();
     await tester.pumpAndSettle();
 
     expect(find.byType(ConnectionPage), findsNothing);
-    await tester.tap(row('Upcoming').first);
+    await tester.tap(row('Server').first);
     await tester.pumpAndSettle();
-    expect(h.shell.settingsPage, SettingsPage.upcoming);
+    expect(h.shell.settingsPage, SettingsPage.server);
     expect(h.shell.settingsOpen, isTrue);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);

@@ -8,33 +8,25 @@ class FakeSettingsStore implements SettingsStore {
   FakeSettingsStore([this.saved]);
 
   Connection? saved;
-
-  /// Where the saved connection's companions run, as saved with it.
-  Map<String, Uri> savedCompanions = const {};
   ApiException? loadError;
   ApiException? saveError;
 
   @override
-  Future<Pairing?> load() async {
+  Future<Connection?> load() async {
     if (loadError != null) throw loadError!;
-    return switch (saved) {
-      final saved? => Pairing(saved, savedCompanions),
-      null => null,
-    };
+    return saved;
   }
 
   @override
-  Future<void> save(Pairing pairing) async {
+  Future<void> save(Connection connection) async {
     if (saveError != null) throw saveError!;
-    saved = pairing.connection;
-    savedCompanions = pairing.companions;
+    saved = connection;
   }
 
   @override
   Future<void> clear() async {
     if (saveError != null) throw saveError!;
     saved = null;
-    savedCompanions = const {};
   }
 }
 

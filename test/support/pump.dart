@@ -1,7 +1,6 @@
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/ui/app.dart';
 import 'package:anywherellm/ui/app_scope.dart';
-import 'package:anywherellm/ui/apps/app_view.dart';
 import 'package:anywherellm/ui/chat/background_work.dart';
 import 'package:anywherellm/ui/chat/composer.dart';
 import 'package:cross_file/cross_file.dart';
@@ -10,7 +9,6 @@ import 'package:anywherellm/ui/chat/photo_picker.dart';
 import 'package:anywherellm/ui/chat/speaker.dart';
 import 'package:anywherellm/ui/share/shared_item.dart';
 import 'package:anywherellm/ui/shell.dart';
-import 'package:anywherellm/ui/state/memory_controller.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/sheet.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
@@ -22,7 +20,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_api.dart';
-import 'fake_toolkit.dart';
 import 'fake_background.dart';
 import 'fake_settings.dart';
 import 'rig.dart';
@@ -113,65 +110,13 @@ class FakeSpeaker implements Speaker {
   }
 }
 
-/// An [AppView] that draws an app's page as the text `Web view of <page>`.
-class FakeAppView implements AppView {
-  final List<Uri> shown = [];
-
-  /// How the page shown last closes itself, as its `window.close()` does.
-  VoidCallback? close;
-
-  /// The channel the page shown last was given, whose scripts run are kept in [ran].
-  PageChannel? channel;
-  final List<String> ran = [];
-
-  /// Whether the page shown last failed to load, which draws [PageGone] over it.
-  final ValueNotifier<bool> gone = ValueNotifier(false);
-  VoidCallback? _failed;
-
-  /// Fails the page shown last as a 404 does: it draws [PageGone] and tells its sheet.
-  void fail() {
-    gone.value = true;
-    _failed?.call();
-  }
-
-  @override
-  Widget show(
-    Uri page, {
-    required void Function(Uri url) onLeave,
-    required VoidCallback onClose,
-    VoidCallback? onFailed,
-    PageChannel? channel,
-  }) {
-    // A sheet that rebuilds shows the same page again, which has not loaded afresh.
-    if (shown.isEmpty || shown.last != page) {
-      shown.add(page);
-      gone.value = false;
-    }
-    close = onClose;
-    _failed = onFailed;
-    this.channel = channel?..runner = (script) async => ran.add(script);
-    return ValueListenableBuilder<bool>(
-      valueListenable: gone,
-      builder: (context, failed, _) => Stack(
-        fit: StackFit.expand,
-        children: [
-          Center(child: Text('Web view of $page')),
-          if (failed) PageGone(onClose: onClose),
-        ],
-      ),
-    );
-  }
-}
-
 /// The controllers a test can read and drive, and the app built on them.
 class Harness extends Rig {
   Harness({
     super.llm,
     super.store,
     super.prefsStore,
-    super.toolkitServer,
     super.connection,
-    bool canViewApps = false,
     this.canScan = false,
     bool canDictate = false,
     bool canPickPhotos = false,
@@ -184,13 +129,9 @@ class Harness extends Rig {
   }) : dictation = canDictate ? FakeDictation() : null,
        photos = canPickPhotos ? FakePhotos() : null,
        speaker = canSpeak ? FakeSpeaker() : null,
-       appView = canViewApps ? FakeAppView() : null,
        shell = ShellController();
 
   final ShellController shell;
-
-  /// The device's web view for an app's page, or null where there is none.
-  final FakeAppView? appView;
 
   /// Whether the message box may spellcheck, as on Android.
   final bool canSpellcheck;
@@ -208,13 +149,6 @@ class Harness extends Rig {
   /// What reads answers aloud, or null when the device cannot speak.
   final FakeSpeaker? speaker;
 
-  /// The Memory page's memories as the fake server keeps them.
-  late final MemoryController memory = MemoryController(
-    toolkitServer,
-    settings,
-    chat,
-  );
-
   /// What keeps answers going out of sight, or null where nothing does.
   final FakeBackground? background;
 
@@ -230,7 +164,6 @@ class Harness extends Rig {
 
   @override
   void dispose() {
-    memory.dispose();
     keepAnswering?.dispose();
     readAloud?.dispose();
     super.dispose();
@@ -274,9 +207,6 @@ class Harness extends Rig {
       sources: sources,
       files: files,
       system: system,
-      memory: memory,
-      toolkit: toolkit,
-      appView: appView,
       launch: (url) async {
         opened.add(url);
         if (openThrows case final error?) throw error;
@@ -313,17 +243,13 @@ const phoneSize = Size(390, 844);
 /// Sizes the test window, builds the app on [llm] and lets the first loads finish. With no
 /// [connection], no server is set up. With [canScan], Settings offers a fake QR scanner, with
 /// [canDictate] the composer a microphone, with [canPickPhotos] the Attach sheet the device's
-/// photos and camera, and with [canSpeak] each answer Read aloud. [toolkitServer] is the toolkit,
-/// present unless given absent, and [canViewApps] draws a page an answer links to with a
-/// [FakeAppView]. The window is a phone's,
+/// photos and camera, and with [canSpeak] each answer Read aloud. The window is a phone's,
 /// [phoneSize], unless [size] says otherwise. The chat shows, as at start; with [shelf] the chats
 /// show as the shelf over it, as after the chat's menu button is tapped.
 Future<Harness> pumpApp(
   WidgetTester tester, {
   FakeAnythingLlm? llm,
   FakePrefsStore? prefsStore,
-  FakeToolkit? toolkitServer,
-  bool canViewApps = false,
   Connection? connection = sampleConnection,
   Size size = phoneSize,
   bool canScan = false,
@@ -343,8 +269,6 @@ Future<Harness> pumpApp(
   final harness = Harness(
     llm: llm,
     prefsStore: prefsStore,
-    toolkitServer: toolkitServer,
-    canViewApps: canViewApps,
     connection: connection,
     canScan: canScan,
     canShare: canShare,

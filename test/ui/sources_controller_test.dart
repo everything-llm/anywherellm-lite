@@ -30,9 +30,9 @@ class _SlowSettingsStore extends FakeSettingsStore {
   final gate = Completer<void>();
 
   @override
-  Future<void> save(Pairing pairing) async {
+  Future<void> save(Connection connection) async {
     await gate.future;
-    await super.save(pairing);
+    await super.save(connection);
   }
 }
 

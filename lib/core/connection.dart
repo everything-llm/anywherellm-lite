@@ -1,6 +1,4 @@
-import 'companion.dart';
 import 'errors.dart';
-import 'toolkit.dart';
 
 /// Where an AnythingLLM server is, and the developer key that opens its developer API, the one
 /// way the app reaches it.
@@ -57,19 +55,6 @@ class ConnectionHolder {
   ConnectionHolder([this.current]);
 
   Connection? current;
-
-  /// Where each companion runs, by [Companion.code], as a pairing code said.
-  Map<String, Uri> companions = const {};
-
-  /// Where [companion] runs beside the server in use: as a pairing code said, else under its
-  /// path on the server's own origin ([Companion.onOrigin]). Null with no server. The key never
-  /// goes to another host or port the app guessed, where whoever answers `/health` with the
-  /// companion's name would get it.
-  Uri? addressOf(Companion companion) => switch (current) {
-    final server? =>
-      companions[companion.code] ?? companion.onOrigin(server.uri),
-    null => null,
-  };
 }
 
 /// A host name as a resolver takes it, lowercased as [Uri.parse] leaves it. A name with letters
@@ -111,21 +96,12 @@ String normalizeBaseUrl(String raw) {
       .toString();
 }
 
-/// A connection and where each of its companions runs when that was said, by
-/// [Companion.code]: what a pairing code carries, and what the keyring keeps.
-class Pairing {
-  const Pairing(this.connection, [this.companions = const {}]);
-
-  final Connection connection;
-  final Map<String, Uri> companions;
-}
-
 /// What an AnywhereLLM pairing code carries, checked as [Connection.parse] checks a typed
 /// connection. The code is `anywherellm://connect?url=...&key=...`, both values
-/// percent-encoded, and may name companions' addresses by service after them, as
-/// `toolkit=...` by each one's [Companion.code]. Throws [ApiException] when [raw] is not a
-/// pairing code or what it carries cannot be used.
-Pairing parsePairingCode(String raw) {
+/// percent-encoded. Any other value it carries, such as where another server beside AnythingLLM
+/// runs, is ignored. Throws [ApiException] when [raw] is not a pairing code or
+/// what it carries cannot be used.
+Connection parsePairingCode(String raw) {
   const notOurs = ApiException('This is not an AnywhereLLM pairing code.');
   final uri = Uri.tryParse(raw.trim());
   if (uri == null || uri.scheme != 'anywherellm' || uri.host != 'connect') {
@@ -141,15 +117,8 @@ Pairing parsePairingCode(String raw) {
   final url = query['url'];
   final key = query['key'];
   if (url == null || key == null) throw notOurs;
-  return Pairing(Connection.parse(url, key), {
-    if (query[toolkitCompanion.code] case final address?)
-      toolkitCompanion.code: _companionAddress(address),
-  });
+  return Connection.parse(url, key);
 }
-
-/// A companion's address as a pairing code gives it, cleaned as [normalizeBaseUrl] cleans the server's:
-/// https, or http on a private network, with no query, no fragment and no trailing slash.
-Uri _companionAddress(String raw) => Uri.parse(normalizeBaseUrl(raw));
 
 /// Why a plain http address is refused.
 const plainHttpRefused =

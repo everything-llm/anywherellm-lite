@@ -74,8 +74,8 @@ class ScanView extends StatelessWidget {
                     spacing: 20,
                     children: [
                       Text(
-                        'The code comes from the toolkit\'s pair command, run on the '
-                        'server\'s computer, or from another AnywhereLLM.',
+                        'The code comes from another AnywhereLLM connected to your '
+                        'server.',
                         style: note,
                       ),
                       Text(

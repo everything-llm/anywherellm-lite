@@ -249,41 +249,6 @@ group = "settings"
 from = "settings"
 do = ["tap Server", "tap Privacy"]
 
-[[step]]
-name = "memory"
-group = "settings"
-from = "settings"
-do = ["tap Memory", "wait SAVED MEMORIES"]
-
-[[step]]
-name = "memory-edit"
-group = "settings"
-from = "settings"
-do = ["tap Memory", "tap Name is Anna", "sleep 1"]
-
-[[step]]
-name = "memory-workspace"
-group = "settings"
-from = "settings"
-do = ["tap Memory", "tap Workspace: Household", "sleep 1"]
-
-# --- The toolkit's pages -----------------------------------------------------------------
-
-[[step]]
-name = "upcoming"
-group = "toolkit"
-do = ["tap Chats", "tap Settings", "tap Upcoming", "wait Morning brief"]
-
-[[step]]
-name = "task"
-group = "toolkit"
-do = ["tap Chats", "tap Settings", "tap Upcoming", "tap Morning brief", "sleep 1"]
-
-[[step]]
-name = "task-new"
-group = "toolkit"
-do = ["tap Chats", "tap Settings", "tap Upcoming", "tap New task", "sleep 1"]
-
 # --- What other apps hand over -----------------------------------------------------------
 
 [[step]]
@@ -339,11 +304,3 @@ reason = "the emulator has no camera"
 [[skipped]]
 name = "dictation and read aloud"
 reason = "the emulator has no speech service"
-
-[[skipped]]
-name = "add-the-toolkit guide"
-reason = "the sample toolkit serves every feature, so the card that opens it does not show"
-
-[[skipped]]
-name = "browser and app sheets"
-reason = "they load a page from the server, which the fakes do not serve"

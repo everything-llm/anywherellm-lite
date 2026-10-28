@@ -204,7 +204,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(h.shell.scanning, isTrue);
     expect(find.text('Fake scan'), findsOneWidget);
-    expect(find.textContaining('toolkit\'s pair command'), findsOneWidget);
+    expect(find.textContaining('another AnywhereLLM'), findsOneWidget);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(h.shell.scanning, isFalse);

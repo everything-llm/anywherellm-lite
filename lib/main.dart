@@ -7,14 +7,12 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'adapters/anythingllm_client.dart';
-import 'adapters/toolkit_client.dart';
 import 'adapters/json_prefs_store.dart';
 import 'adapters/keyring_settings_store.dart';
 import 'core/connection.dart';
 import 'core/ports.dart';
 import 'ui/app.dart';
 import 'ui/app_scope.dart';
-import 'ui/apps/app_web_view.dart';
 import 'ui/boot_screen.dart';
 import 'ui/chat/android_background.dart';
 import 'ui/chat/background_work.dart';
@@ -31,7 +29,6 @@ import 'ui/share/android_shares.dart';
 import 'ui/share/shared_item.dart';
 import 'ui/settings/settings_pages.dart';
 import 'ui/shell.dart';
-import 'ui/state/memory_controller.dart';
 import 'ui/state/chat_controller.dart';
 import 'ui/state/files_controller.dart';
 import 'ui/state/prefs_controller.dart';
@@ -39,7 +36,6 @@ import 'ui/state/settings_controller.dart';
 import 'ui/state/shell_controller.dart';
 import 'ui/state/sources_controller.dart';
 import 'ui/state/system_controller.dart';
-import 'ui/state/toolkit_controller.dart';
 
 /// The composition root: the one place that knows the adapters and the UI.
 ///
@@ -53,14 +49,12 @@ Future<void> main() async {
   );
   final holder = ConnectionHolder();
   final llm = HttpAnythingLlmApi(holder: holder);
-  final toolkit = HttpToolkitApi(holder: holder);
   final prefs = PrefsController(JsonPrefsStore(prefsFile));
   runApp(
     AnywhereLlmApp(
       prefs: prefs,
       home: SessionHost(
         llm: llm,
-        toolkit: toolkit,
         settings: SettingsController(llm, KeyringSettingsStore(), holder),
         prefs: prefs,
         shell: ShellController(),
@@ -82,7 +76,6 @@ class SessionHost extends StatefulWidget {
   const SessionHost({
     super.key,
     required this.llm,
-    required this.toolkit,
     required this.settings,
     required this.prefs,
     required this.shell,
@@ -90,9 +83,6 @@ class SessionHost extends StatefulWidget {
   });
 
   final AnythingLlmApi llm;
-
-  /// The toolkit beside AnythingLLM, which may not be there.
-  final ToolkitApi toolkit;
   final SettingsController settings;
   final PrefsController prefs;
   final ShellController shell;
@@ -108,8 +98,6 @@ class _SessionHostState extends State<SessionHost> {
   late final SourcesController _sources;
   late final FilesController _files;
   late final SystemController _system;
-  late final MemoryController _memory;
-  late final ToolkitController _toolkit;
 
   /// Keeps an answer going while the app is out of sight.
   final BackgroundWork _background = AndroidBackground();
@@ -136,12 +124,6 @@ class _SessionHostState extends State<SessionHost> {
     _sources = SourcesController(widget.llm, _chat, widget.prefs);
     _files = FilesController(widget.llm, widget.settings, _chat, _sources);
     _system = SystemController(widget.llm, widget.settings);
-    _memory = MemoryController(widget.toolkit, widget.settings, _chat);
-    _toolkit = ToolkitController(
-      widget.toolkit,
-      widget.settings,
-      tabState: widget.llm.tabState,
-    );
     _readAloud = ReadAloud(DeviceSpeaker(), _chat, widget.prefs);
     _keepAnswering = KeepAnswering(_background, _chat, widget.shell);
     // A deleted chat waiting to be undone is deleted as the app hides: Android can end a hidden
@@ -159,8 +141,6 @@ class _SessionHostState extends State<SessionHost> {
     _lifecycle.dispose();
     _readAloud.dispose();
     _keepAnswering.dispose();
-    _toolkit.dispose();
-    _memory.dispose();
     _system.dispose();
     _files.dispose();
     _sources.dispose();
@@ -199,8 +179,6 @@ class _SessionHostState extends State<SessionHost> {
         sources: _sources,
         files: _files,
         system: _system,
-        memory: _memory,
-        toolkit: _toolkit,
         launch: widget.launch,
         save: saveWithPicker,
         scanner: cameraScanner,
@@ -209,7 +187,6 @@ class _SessionHostState extends State<SessionHost> {
         dictation: _dictation,
         photos: _photos,
         readAloud: _readAloud,
-        appView: const AppWebViews(),
         background: _background,
         canSpellcheck: WidgetsBinding
             .instance

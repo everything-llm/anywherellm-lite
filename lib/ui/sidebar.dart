@@ -1,25 +1,19 @@
-import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 
-import '../core/browser_tabs.dart';
-import '../core/page_status.dart';
 import '../core/server_models.dart';
-import '../core/skill_pages.dart';
 import 'app_scope.dart';
 import 'home.dart';
 import 'icons.dart';
 import 'state/shell_controller.dart';
 import 'tokens.dart';
-import 'toolkit_card.dart';
 import 'type.dart';
 import 'widgets/buttons.dart';
 import 'widgets/list_row.dart';
 
 /// The chats as a sidebar beside everything on a wide window, in place of the shelf: the open
 /// workspace's name, which opens the Workspaces sheet, with Workspace settings and New chat
-/// beside it; the search; a row for the workspace's Documents, Upcoming where the toolkit lists
-/// the jobs, and each of the suite's pages set up; then the workspace's chats under Chats, and
-/// Settings at its foot. The row of what shows is marked as chosen.
+/// beside it; the search; a row for the workspace's Documents; then the workspace's chats under
+/// Chats, and Settings at its foot. The row of what shows is marked as chosen.
 class Sidebar extends StatefulWidget {
   const Sidebar({super.key});
 
@@ -44,7 +38,6 @@ class _SidebarState extends State<Sidebar> {
       _query.value = _search.text.trim();
       _typed.value = _search.text.isNotEmpty;
     });
-    AppScope.of(context).toolkit.wantPages();
   }
 
   @override
@@ -103,11 +96,7 @@ class _SidebarState extends State<Sidebar> {
                           slivers: [
                             // The pages and the chats each rebuild on what they show.
                             ListenableBuilder(
-                              listenable: Listenable.merge([
-                                chat,
-                                shell,
-                                scope.toolkit,
-                              ]),
+                              listenable: Listenable.merge([chat, shell]),
                               builder: (context, _) => SliverPadding(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 8,
@@ -186,15 +175,10 @@ class _SidebarState extends State<Sidebar> {
     );
   }
 
-  /// A row for each page beside the chats: the workspace's Documents, Upcoming while the toolkit
-  /// lists the jobs, and each of the suite's pages that is set up.
+  /// A row for each page beside the chats: the workspace's Documents.
   List<Widget> _pages(BuildContext context) {
     final scope = AppScope.of(context);
     final shell = scope.shell;
-    final toolkit = scope.toolkit;
-    toolkit
-      ..wantPagesOnce()
-      ..wantJobsOnce();
     bool showing(Pane pane) => shell.pane == pane && !shell.settingsOpen;
     final docs = switch (scope.chat.activeSlug) {
       final slug? => scope.chat.docCounts[slug],
@@ -209,33 +193,6 @@ class _SidebarState extends State<Sidebar> {
           heard: docs == null ? 'Documents' : 'Documents, $docs',
           selected: showing(Pane.documents),
           onTap: () => shell.openPane(Pane.documents),
-        ),
-      if (toolkit.jobsServed)
-        ListRow(
-          icon: 'clock',
-          title: 'Upcoming',
-          note: toolkit.jobs?.length.toString(),
-          selected: showing(Pane.upcoming),
-          onTap: () => shell.openPane(Pane.upcoming),
-        ),
-      if (toolkit.pagesServed)
-        for (final page in SkillPage.values)
-          if (page.listing case final listing?
-              when toolkit.pagesFound.contains(page))
-            ListRow(
-              icon: listing.icon,
-              title: listing.title,
-              heard:
-                  '${listing.title}, ${pageNews(page, toolkit.pageStatus, seen: scope.prefs.librarySeen, now: clock.now()).line ?? listing.about}',
-              onTap: () => openListedPage(context, page, listing),
-            ),
-      if (toolkit.tabs case final tabs?)
-        ListRow(
-          icon: 'globe',
-          title: 'Browser',
-          note: tabs.isEmpty ? null : '${tabs.length}',
-          heard: 'Browser, ${browserLine(tabs, clock.now())}',
-          onTap: () => shell.togglePopup(Popup.browserTabs),
         ),
     ];
   }

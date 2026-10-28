@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:anywherellm/core/chat.dart';
-import 'package:anywherellm/core/browser_tabs.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/ports.dart';
@@ -113,9 +112,6 @@ class FakeAnythingLlm with FakeCalls implements AnythingLlmApi {
 
   /// What [answerImage] answers, by address. Any other address is not found.
   final Map<Uri, List<int>> images = {};
-
-  /// What [tabState] answers, by the tab page's path. Any other tab is closed.
-  final Map<String, TabState> tabStates = {};
 
   bool hold = false;
   StreamController<ChatEvent>? chat;
@@ -414,13 +410,6 @@ class FakeAnythingLlm with FakeCalls implements AnythingLlmApi {
     }
     return Uint8List.fromList(bytes);
   }, url.toString());
-
-  @override
-  Future<TabState> tabState(String path) => record(
-    'tabState',
-    () => tabStates[path] ?? const TabState(closed: true),
-    path,
-  );
 
   @override
   Future<List<int>> generatedFile(String storageName) =>

@@ -14,8 +14,7 @@ import io.flutter.plugin.common.MethodChannel
  * and an answer it reads go on, and hands over each notification tapped as `{slug, thread}`:
  * `launchTap` answers the one that started the activity, once, and `tap` sends one tapped while
  * it runs. Notifications need a permission on Android 13 and later, which it asks for when an
- * answer first runs. What other apps share with it goes through [Shares], and what a page in
- * its web view posts through [PageChannels].
+ * answer first runs. What other apps share with it goes through [Shares].
  */
 class MainActivity : FlutterActivity() {
     private var channel: MethodChannel? = null
@@ -25,7 +24,6 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        flutterEngine.plugins.add(PageChannels())
         Notes.retire(this)
         launchTap = takeTap(intent)
         shares = Shares(applicationContext, flutterEngine.dartExecutor.binaryMessenger).apply {

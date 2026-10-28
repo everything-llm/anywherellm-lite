@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart';
 
-import 'apps/app_view.dart';
 import 'chat/background_work.dart';
 import 'chat/dictation.dart';
 import 'chat/photo_picker.dart';
@@ -8,13 +7,11 @@ import 'chat/speaker.dart';
 import 'share/shared_item.dart';
 import 'state/chat_controller.dart';
 import 'state/files_controller.dart';
-import 'state/memory_controller.dart';
 import 'state/prefs_controller.dart';
 import 'state/settings_controller.dart';
 import 'state/shell_controller.dart';
 import 'state/sources_controller.dart';
 import 'state/system_controller.dart';
-import 'state/toolkit_controller.dart';
 
 /// Opens [url] outside the app, in the browser or the mail app. Says whether something did.
 typedef LinkOpener = Future<bool> Function(Uri url);
@@ -46,8 +43,6 @@ class AppScope extends InheritedWidget {
     required this.sources,
     required this.files,
     required this.system,
-    required this.memory,
-    required this.toolkit,
     required this.launch,
     required this.save,
     this.scanner,
@@ -56,7 +51,6 @@ class AppScope extends InheritedWidget {
     this.dictation,
     this.photos,
     this.readAloud,
-    this.appView,
     this.background,
     this.canSpellcheck = false,
     required this.enterSends,
@@ -70,13 +64,6 @@ class AppScope extends InheritedWidget {
   final SourcesController sources;
   final FilesController files;
   final SystemController system;
-
-  /// The Memory page's saved memories.
-  final MemoryController memory;
-
-  /// The toolkit beside the server in use, when it is there: what it serves, and the scheduled
-  /// jobs.
-  final ToolkitController toolkit;
 
   final LinkOpener launch;
   final FileSaver save;
@@ -101,10 +88,6 @@ class AppScope extends InheritedWidget {
 
   /// Reads an answer aloud, or null where the device has no speech to read with.
   final ReadAloud? readAloud;
-
-  /// Shows a page an answer links to in a web view, or null where the device has none, and the
-  /// link opens in the browser.
-  final AppView? appView;
 
   /// What keeps an answer going while the app is out of sight, or null where nothing does.
   final BackgroundWork? background;

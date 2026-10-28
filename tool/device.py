@@ -1,4 +1,4 @@
-"""An Android emulator driven through adb, shared by `tool/audit` and `tool/e2e`.
+"""An Android emulator driven through adb, used by `tool/audit`.
 
 A script under `tool/` imports it after putting this folder on `sys.path`. It finds or boots the
 emulator, installs an APK, steadies the screen, and runs step actions that find each control by

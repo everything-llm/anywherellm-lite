@@ -166,7 +166,6 @@ class Prefs {
     this.shortcuts = const [],
     this.shortcutUses = const {},
     this.onDeck = const {},
-    this.librarySeen = const {},
   });
 
   /// How many chats [recent] keeps for a workspace.
@@ -211,10 +210,6 @@ class Prefs {
   /// The messages waiting in each chat, by [chatKey], first to go first, kept so they survive
   /// the app closing.
   final Map<String, List<SavedOnDeck>> onDeck;
-
-  /// The newest failed run the bridge listed when the person last opened the Library page from
-  /// the app, by the server's address: the runs that failed after it are the ones not yet seen.
-  final Map<String, DateTime> librarySeen;
 
   /// The key of chat [thread] of workspace [slug] on [server] in [onDeck].
   static String chatKey(String server, String slug, String thread) =>
@@ -303,7 +298,6 @@ class Prefs {
     List<PromptShortcut>? shortcuts,
     Map<String, ShortcutUse>? shortcutUses,
     Map<String, List<SavedOnDeck>>? onDeck,
-    Map<String, DateTime>? librarySeen,
   }) => Prefs(
     switchedOff: switchedOff ?? this.switchedOff,
     workspaceOrder: workspaceOrder ?? this.workspaceOrder,
@@ -316,12 +310,7 @@ class Prefs {
     shortcuts: shortcuts ?? this.shortcuts,
     shortcutUses: shortcutUses ?? this.shortcutUses,
     onDeck: onDeck ?? this.onDeck,
-    librarySeen: librarySeen ?? this.librarySeen,
   );
-
-  /// These prefs with the Library page seen on [server] when its newest failure was [at].
-  Prefs withLibrarySeen(String server, DateTime at) =>
-      _copy(librarySeen: {...librarySeen, server: at.toUtc()});
 
   /// [map] with [key] set to [list], or without it when [list] is empty.
   static Map<String, List<T>> _with<T>(
@@ -518,11 +507,6 @@ class Prefs {
         for (final entry in onDeck.entries)
           entry.key: [for (final m in entry.value) m.toJson()],
       },
-    if (librarySeen.isNotEmpty)
-      'librarySeen': {
-        for (final MapEntry(:key, :value) in librarySeen.entries)
-          key: value.toIso8601String(),
-      },
   });
 
   /// Reads what [encode] wrote. Anything it cannot read falls back to the default, and keys it
@@ -567,11 +551,6 @@ class Prefs {
       ],
       shortcutUses: _shortcutUsesOf(json['shortcutUses']),
       onDeck: _onDeckOf(json['onDeck']),
-      librarySeen: {
-        if (json['librarySeen'] case final Map seen)
-          for (final MapEntry(:key, :value) in seen.entries)
-            if (key is String) key: ?timeOrNull(value),
-      },
     );
   }
 

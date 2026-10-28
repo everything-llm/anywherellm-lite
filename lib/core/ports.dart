@@ -1,14 +1,9 @@
 import 'dart:typed_data';
 
-import 'browser_tabs.dart';
 import 'chat.dart';
 import 'connection.dart';
-import 'memory.dart';
 import 'prefs.dart';
-import 'schedule.dart';
 import 'server_models.dart';
-import 'skill_pages.dart';
-import 'toolkit.dart';
 
 export 'errors.dart';
 
@@ -116,10 +111,6 @@ abstract interface class AnythingLlmApi {
   /// The bytes of the image at [url], from an answer. Sent without the key.
   Future<Uint8List> answerImage(Uri url);
 
-  /// What browser-lean writes about the tab whose page is at [path], `/browser-lean/<token>.html`
-  /// on the server's origin: its `<token>.json`, read afresh without the key.
-  Future<TabState> tabState(String path);
-
   /// The server's settings, with every secret replaced by whether it is set.
   Future<Map<String, Object?>> systemSettings();
 
@@ -131,79 +122,14 @@ abstract interface class AnythingLlmApi {
   Future<int> vectorCount();
 }
 
-/// The toolkit, the anywherellm-bridge ([toolkitCompanion]): AnythingLLM's saved memories and
-/// scheduled jobs, which its developer API lacks, through the bridge to its internal API, as the
-/// [ToolkitFeature]s the bridge allows. Every method but [features] uses the connection in use
-/// and throws [ApiException] on failure, [NotConfigured] when there is none.
-abstract interface class ToolkitApi {
-  /// The features the toolkit's `/health` offers beside the server in use, asked without the
-  /// key, or null when it is not there. Remembered for its address; [again] asks afresh. Never
-  /// throws.
-  Future<Set<String>?> features({bool again = false});
-
-  /// Where the suite's listed pages are now, the agent's browser's open tabs and what the bridge
-  /// says of the pages. The paths are bearer capabilities: the caller opens a page's and keeps
-  /// none, and keeps the tabs' in memory only. Fails with status 401 or 403 for a key the bridge
-  /// does not take for this route.
-  Future<SuitePages> pages();
-
-  /// The jobs AnythingLLM runs on a schedule. Times are UTC.
-  Future<List<ScheduledJob>> scheduledJobs();
-
-  /// The latest [runsRead] runs of job [id], newest first.
-  Future<List<JobRun>> jobRuns(String id);
-
-  /// Makes a job, switched on.
-  Future<void> createJob(JobDraft draft);
-
-  /// Replaces job [id]'s name, prompt and schedule with [draft]'s.
-  Future<void> updateJob(String id, JobDraft draft);
-
-  /// Switches job [id] on or off.
-  Future<void> setJobEnabled(String id, bool enabled);
-
-  Future<void> deleteJob(String id);
-
-  /// Starts one run of job [id] at once, and answers without waiting for it. Fails when one is
-  /// already running or waiting.
-  Future<void> runJob(String id);
-
-  /// Whether the server keeps saved memories, and saves them from chats itself.
-  Future<MemorySwitches> memorySwitches();
-
-  /// Turns saved memories, or the server saving them from chats, on or off; null leaves one as
-  /// it is.
-  Future<void> setMemorySwitches({bool? enabled, bool? learn});
-
-  /// The saved memories workspace [slug]'s chats are shown. Fails with status 403 while the
-  /// server keeps none.
-  Future<SavedMemories> savedMemories(String slug);
-
-  /// Saves [text] for every workspace when [global], else for workspace [slug]. A full list is
-  /// an [ApiException] in the server's words.
-  Future<SavedMemory> addMemory(
-    String slug,
-    String text, {
-    required bool global,
-  });
-
-  Future<SavedMemory> editMemory(int id, String text);
-
-  Future<void> deleteMemory(int id);
-
-  /// Shows memory [id] in every workspace's chats, or, given [toWorkspace], in that workspace's
-  /// only.
-  Future<SavedMemory> moveMemory(int id, {String? toWorkspace});
-}
-
 /// Where the connection is kept between runs.
 abstract interface class SettingsStore {
-  /// The saved connection, with where its companions run when that was said, or null when none
-  /// is saved. Throws [ApiException] when the store cannot be read.
-  Future<Pairing?> load();
+  /// The saved connection, or null when none is saved. Throws [ApiException] when the store
+  /// cannot be read.
+  Future<Connection?> load();
 
   /// Throws [ApiException] when the store cannot be written.
-  Future<void> save(Pairing saved);
+  Future<void> save(Connection saved);
 
   Future<void> clear();
 }

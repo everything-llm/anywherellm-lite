@@ -6,14 +6,11 @@ import 'package:flutter/services.dart';
 
 import '../core/copy.dart';
 import 'app_scope.dart';
-import 'chat/browser_sheet.dart';
 import 'chat/chat_view.dart';
 import 'chat/cited_sources.dart';
 import 'chat/gallery.dart';
 import 'chat_sheet.dart';
-import 'chat/page_sheet.dart';
 import 'chat/passages_sheet.dart';
-import 'chat/tabs_sheet.dart';
 import 'files/documents_pane.dart';
 import 'files/workspace_pages.dart';
 import 'settings/pairing_sheet.dart';
@@ -28,7 +25,6 @@ import 'sources/sources_panel.dart';
 import 'workspace_switcher.dart';
 import 'state/shell_controller.dart';
 import 'tokens.dart';
-import 'upcoming_pane.dart';
 import 'widgets/keyboard_up.dart';
 import 'widgets/basics.dart';
 import 'widgets/sheet.dart';
@@ -169,17 +165,6 @@ class AppShell extends StatelessWidget {
                                 kind,
                                 key: ValueKey(kind),
                               ),
-                              BrowserOpen(:final tab, :final inChat) =>
-                                BrowserSheet(
-                                  tab,
-                                  inChat: inChat,
-                                  key: ValueKey(tab),
-                                ),
-                              Popup.browserTabs => const TabsSheet(),
-                              final PageOpen open => PageSheet(
-                                open,
-                                key: ValueKey(open.url),
-                              ),
                               final ChatSheetFor of => ChatSheet(
                                 of,
                                 key: ValueKey((of.thread.slug, of.deleting)),
@@ -218,7 +203,6 @@ class _Main extends StatelessWidget {
       Pane.chats => null,
       Pane.files => const WorkspacePages(),
       Pane.documents => const DocumentsPane(),
-      Pane.upcoming => const UpcomingPane(),
     };
     final region = Stack(
       children: [

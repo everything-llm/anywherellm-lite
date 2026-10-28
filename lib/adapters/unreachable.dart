@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import '../core/errors.dart';
 
 /// [error], from sending a request to [name] that may take [limit], in plain words. [name] is
-/// what was asked, as `The server` or `The toolkit`, and [where] what a failed connection names,
+/// what was asked, as `The server`, and [where] what a failed connection names,
 /// as its host. An error of any other kind gets a fixed message with no error text, since a
 /// header the platform refused is quoted in it, key and all.
 ApiException unreachable(

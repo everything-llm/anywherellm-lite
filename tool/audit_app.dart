@@ -28,7 +28,7 @@ const _state = String.fromEnvironment('AUDIT_STATE');
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  final (llm, toolkit) = sampleServer();
+  final llm = sampleServer();
   switch (_state) {
     case 'unreachable':
       llm.errors['workspaces'] = const ApiException(
@@ -43,7 +43,6 @@ void main() {
       prefs: prefs,
       home: SessionHost(
         llm: llm,
-        toolkit: toolkit,
         settings: SettingsController(
           llm,
           FakeSettingsStore(_signedOut ? null : sampleServerConnection),

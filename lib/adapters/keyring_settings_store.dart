@@ -4,23 +4,20 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../core/connection.dart';
 import '../core/ports.dart';
-import '../core/toolkit.dart';
 
-/// [SettingsStore] in the Android Keystore, as one entry holding the address, the key and where
-/// its companions run, when said. An entry an older version saved with the server's password,
-/// or with a companion's address under the name its `/health` gave, is written again as this
-/// version keeps it ([companionKey]).
+/// [SettingsStore] in the Android Keystore, as one entry holding the address and the key. An
+/// entry an older version saved with the server's password, or with where other servers beside
+/// AnythingLLM ran, is written again with the address and the key alone.
 class KeyringSettingsStore implements SettingsStore {
   static const _entry = 'anythingllm-connection';
 
   static const _storage = FlutterSecureStorage();
 
   @override
-  Future<Pairing?> load() async {
+  Future<Connection?> load() async {
     final stored = await _guard('read', () => _storage.read(key: _entry));
     if (stored == null) return null;
     final Connection connection;
-    final Map<String, Uri> companions;
     final bool outdated;
     try {
       final json = jsonDecode(stored) as Map<String, dynamic>;
@@ -28,18 +25,7 @@ class KeyringSettingsStore implements SettingsStore {
         baseUrl: json['baseUrl'] as String,
         apiKey: json['apiKey'] as String,
       );
-      final named = json['companions'];
-      companions = {
-        if (named is Map)
-          for (final MapEntry(:key, :value) in named.entries)
-            // An address that cannot be read leaves that companion out, not the connection.
-            if (key is String && value is String && Uri.tryParse(value) != null)
-              companionKey(key): Uri.parse(value),
-      };
-      outdated =
-          json.containsKey('password') ||
-          (named is Map &&
-              named.keys.any((key) => companionKey('$key') != key));
+      outdated = json.keys.any((key) => key != 'baseUrl' && key != 'apiKey');
     } on Object {
       throw const ApiException(
         'The saved connection in the keyring is unreadable. Enter it again and save.',
@@ -47,28 +33,20 @@ class KeyringSettingsStore implements SettingsStore {
     }
     if (outdated) {
       try {
-        await save(Pairing(connection, companions));
+        await save(connection);
       } on ApiException {
         // The entry is written again on the next save; the connection works meanwhile.
       }
     }
-    return Pairing(connection, companions);
+    return connection;
   }
 
   @override
-  Future<void> save(Pairing saved) => _guard(
+  Future<void> save(Connection saved) => _guard(
     'written',
     () => _storage.write(
       key: _entry,
-      value: jsonEncode({
-        'baseUrl': saved.connection.baseUrl,
-        'apiKey': saved.connection.apiKey,
-        if (saved.companions.isNotEmpty)
-          'companions': {
-            for (final MapEntry(:key, :value) in saved.companions.entries)
-              key: '$value',
-          },
-      }),
+      value: jsonEncode({'baseUrl': saved.baseUrl, 'apiKey': saved.apiKey}),
     ),
   );
 

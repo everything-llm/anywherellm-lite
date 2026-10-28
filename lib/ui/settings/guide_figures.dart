@@ -16,14 +16,6 @@ enum GuideArt {
   key(
     'Key page',
     'AnythingLLM web page: Settings, Developer API, Generate New API Key',
-  ),
-  kit(
-    'Settings, expanded',
-    'The toolkit beside AnythingLLM adds a Memory row to this app\'s Settings',
-  ),
-  pair(
-    'Pairing code',
-    'The pairing link drawn as a QR code, and the phone scanning it',
   );
 
   const GuideArt(this.name, this.label);
@@ -135,30 +127,6 @@ class _FigurePainter extends CustomPainter {
           ..text(132, 113, 'ABC1D2E-F3GH…', _Ink.mono)
           ..key(140, 146)
           ..text(172, 149, 'copy it once', _Ink.note);
-      case GuideArt.kit:
-        pen
-          ..server(14, 22)
-          ..box(14, 134, 76, 28, 14, fill: t.accent)
-          ..text(52, 152, 'Toolkit', _Ink.onAccent, centred: true)
-          ..path('M98 92H128', faint: true, dashed: true)
-          ..box(136, 14, 150, 152, 12, fill: t.tile, edge: true)
-          ..text(150, 36, 'Settings', _Ink.name)
-          ..text(150, 62, 'Connection', _Ink.note)
-          ..path('M150 72h122', faint: true)
-          ..text(150, 90, 'Appearance', _Ink.note)
-          ..path('M150 100h122', faint: true)
-          ..text(150, 118, 'Server', _Ink.note)
-          ..box(144, 128, 134, 28, 8, fill: t.accentSoft)
-          ..text(154, 146, 'Memory', _Ink.name)
-          ..text(268, 146, 'new', _Ink.note, end: true);
-      case GuideArt.pair:
-        pen
-          ..window(14, 22, 156, 136)
-          ..code(60, 50)
-          ..text(92, 140, 'The code your phone scans', _Ink.note, centred: true)
-          ..path('M176 92H216', faint: true, dashed: true)
-          ..text(196, 84, 'scan', _Ink.note, centred: true)
-          ..phone(222, 40);
     }
   }
 

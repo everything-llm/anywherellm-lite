@@ -1,6 +1,5 @@
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
-import 'package:anywherellm/core/toolkit.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -226,34 +225,24 @@ void main() {
       final code = _code(connection);
       expect(code, startsWith('anywherellm://connect?'));
       expect(code, isNot(contains('&C=D')));
-      expect(parsePairingCode(code).connection, connection);
+      expect(parsePairingCode(code), connection);
     });
 
-    test('carries companions\' addresses when it names them', () {
-      final pairing = parsePairingCode(
-        'anywherellm://connect?url=https%3A%2F%2Fai.example.com&key=K'
+    test('another server\'s address, from an older code, is ignored', () {
+      for (final extra in [
         '&toolkit=https%3A%2F%2Ftoolkit.example.com%2F',
-      );
-      expect(pairing.connection.baseUrl, 'https://ai.example.com');
-      expect(pairing.companions, {
-        'toolkit': Uri.parse('https://toolkit.example.com'),
-      });
-      expect(
-        () => parsePairingCode(
-          'anywherellm://connect?url=https%3A%2F%2Fai.example.com&key=K'
-          '&toolkit=http%3A%2F%2Ftoolkit.example.com',
-        ),
-        throwsA(isA<ApiException>()),
-      );
-    });
-
-    test('an apps server\'s address, from an older code, is left out', () {
-      final pairing = parsePairingCode(
-        'anywherellm://connect?url=https%3A%2F%2Fai.example.com&key=K'
+        // Even one the app would refuse to send the key to.
+        '&toolkit=http%3A%2F%2Ftoolkit.example.com',
         '&apps=http%3A%2F%2Fapps.lan',
-      );
-      expect(pairing.connection.baseUrl, 'https://ai.example.com');
-      expect(pairing.companions, isEmpty);
+      ]) {
+        expect(
+          parsePairingCode(
+            'anywherellm://connect?url=https%3A%2F%2Fai.example.com&key=K$extra',
+          ),
+          const Connection(baseUrl: 'https://ai.example.com', apiKey: 'K'),
+          reason: extra,
+        );
+      }
     });
 
     test('anything else is refused', () {
@@ -282,37 +271,6 @@ void main() {
       final code = _code(const Connection(baseUrl: 'ftp://h', apiKey: 'k'));
       expect(() => parsePairingCode(code), throwsA(isA<ApiException>()));
     });
-  });
-
-  test('a companion runs where its code says, else under its path on the server\'s own origin', () {
-    final holder =
-        ConnectionHolder(
-            const Connection(baseUrl: 'https://ai.example.com', apiKey: 'K'),
-          )
-          ..companions = {
-            toolkitCompanion.code: Uri.parse('https://bridge.example.com'),
-          };
-    expect(
-      holder.addressOf(toolkitCompanion),
-      Uri.parse('https://bridge.example.com'),
-    );
-    holder.companions = const {};
-    expect(
-      holder.addressOf(toolkitCompanion),
-      Uri.parse('https://ai.example.com/anywherellm-bridge'),
-      reason: 'the key already goes to that origin',
-    );
-    holder.current = const Connection(
-      baseUrl: 'http://box.lan:3001/anythingllm',
-      apiKey: 'K',
-    );
-    expect(
-      holder.addressOf(toolkitCompanion),
-      Uri.parse('http://box.lan:3001/anywherellm-bridge'),
-      reason: 'the same scheme, host and port, never another',
-    );
-    holder.current = null;
-    expect(holder.addressOf(toolkitCompanion), isNull);
   });
 }
 

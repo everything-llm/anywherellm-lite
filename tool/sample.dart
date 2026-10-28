@@ -1,19 +1,11 @@
 // The design prototype's sample server, which `tool/screens.dart` draws the screens over and
-// `tool/audit_app.dart` runs the app over: Household and Q3 planning, their documents and chats,
-// the saved memories and the scheduled jobs.
+// `tool/audit_app.dart` runs the app over: Household and Q3 planning, their documents and chats.
 
-import 'package:anywherellm/core/browser_tabs.dart';
 import 'package:anywherellm/core/connection.dart';
-import 'package:anywherellm/core/memory.dart';
 import 'package:anywherellm/core/outputs.dart';
-import 'package:anywherellm/core/page_status.dart';
-import 'package:anywherellm/core/schedule.dart';
 import 'package:anywherellm/core/server_models.dart';
-import 'package:anywherellm/core/skill_pages.dart';
-import 'package:anywherellm/core/toolkit.dart';
 
 import '../test/support/fake_api.dart';
-import '../test/support/fake_toolkit.dart';
 
 /// The address the sample connection names.
 const sampleServerUrl = 'https://anythingllm.example.ts.net:3001';
@@ -44,10 +36,8 @@ const _metrics = AnswerMetrics(
   speed: 61,
 );
 
-/// The prototype's server: Household and Q3 planning, their documents and chats, the saved
-/// memories and the scheduled jobs.
-(FakeAnythingLlm, FakeToolkit) sampleServer() {
-  final toolkit = FakeToolkit();
+/// The prototype's server: Household and Q3 planning, their documents and chats.
+FakeAnythingLlm sampleServer() {
   final llm = FakeAnythingLlm()
     ..answer =
         'This is a sample answer. The prototype does not reach a server, so '
@@ -170,78 +160,6 @@ const _metrics = AnswerMetrics(
       ],
     ),
   ];
-  toolkit.globalMemories.addAll(const [
-    SavedMemory(id: 1, text: 'Name is Anna.', global: true),
-    SavedMemory(id: 2, text: 'Lives in Uppsala, Sweden.', global: true),
-    SavedMemory(
-      id: 3,
-      text: 'Prefers metric units and 24-hour times.',
-      global: true,
-    ),
-  ]);
-  toolkit.workspaceMemories['household'] = [
-    const SavedMemory(
-      id: 4,
-      text: 'The boiler is a Vaillant ecoTEC from 2019.',
-      global: false,
-    ),
-    const SavedMemory(
-      id: 5,
-      text: 'Bins go out on Tuesday mornings.',
-      global: false,
-    ),
-  ];
-  toolkit.workspaceMemories['q3'] = [
-    const SavedMemory(
-      id: 6,
-      text: 'Reports go to Maja on Fridays.',
-      global: false,
-    ),
-  ];
-  final now = DateTime.now();
-  final tomorrow = DateTime(now.year, now.month, now.day + 1, 6, 30);
-  toolkit.served = {
-    ToolkitFeature.memories,
-    ToolkitFeature.jobs,
-    ToolkitFeature.jobsWrite,
-  };
-  final at16 = DateTime(now.year, now.month, now.day, 16).toUtc();
-  toolkit.jobs = [
-    ScheduledJob(
-      id: '1',
-      name: 'Morning brief',
-      prompt: 'Give me today in four lines: the weather, the bins, and anything due.',
-      cron: '30 6 * * *',
-      nextRun: tomorrow.toUtc(),
-      lastRun: tomorrow.subtract(const Duration(days: 1)).toUtc(),
-      lastStatus: 'completed',
-    ),
-    ScheduledJob(
-      id: '2',
-      name: 'Roadmap check',
-      prompt: 'Compare the roadmap with last week and list what slipped.',
-      cron: '0 8 * * 1',
-      nextRun: tomorrow.add(const Duration(days: 3)).toUtc(),
-    ),
-    ScheduledJob(
-      id: '3',
-      name: 'Price watch: boiler service',
-      prompt: 'Check the boiler service price and tell me if it changed.',
-      tools: 2,
-      cron: '0 */6 * * *',
-      nextRun: tomorrow.add(const Duration(hours: 2)).toUtc(),
-      lastRun: at16,
-      lastStatus: 'failed',
-    ),
-  ];
-  toolkit.runRecords['1'] = [
-    for (var d = 0; d < 3; d++)
-      JobRun(
-        startedAt: tomorrow.subtract(Duration(days: d + 1)).toUtc(),
-        status: 'completed',
-        result: 'Done. The answer is in the chat.',
-      ),
-  ];
   llm.system = const {
     'LLMProvider': 'generic-openai',
     'GenericOpenAiModelPref': 'glm-5.3-flash',
@@ -251,55 +169,5 @@ const _metrics = AnswerMetrics(
     'TTSProvider': 'native',
   };
   llm.vectors = 1284;
-  return (llm, toolkit);
-}
-
-/// The suite's pages set up on the sample server, as the LiteShelf and LiteBrowserSheet boards
-/// draw them: the app manager, the Library and the Vault, three apps changed today and a run
-/// failed, and three tabs open in two workspaces, one the person holds.
-void samplePages(FakeAnythingLlm llm, FakeToolkit toolkit) {
-  const errands = '/browser-lean/aaaaaaaaaaaaaaaaaaaaaaaa.html';
-  const boiler = '/browser-lean/bbbbbbbbbbbbbbbbbbbbbbbb.html';
-  const loans = '/browser-lean/cccccccccccccccccccccccc.html';
-  final now = DateTime.now().toUtc();
-  toolkit
-    ..served = {...toolkit.served, ToolkitFeature.pages}
-    ..skillPages = const {
-      SkillPage.appsManager: '/apps-lean/manager-aaaaaaaaaaaaaaaaaaaaaaaa.html',
-      SkillPage.library: '/library-lean/aaaaaaaaaaaaaaaaaaaaaaaa.html',
-      SkillPage.vault: '/vault-lean/aaaaaaaaaaaaaaaaaaaaaaaa.html',
-    }
-    ..status = PageStatus(
-      changed: [
-        for (var m = 1; m <= 3; m++) now.subtract(Duration(minutes: m)),
-      ],
-      failed: [now.subtract(const Duration(minutes: 30))],
-    )
-    ..tabs = [
-      OpenTab(
-        path: loans,
-        workspace: 'q3',
-        until: now.add(const Duration(minutes: 2, seconds: 50)),
-      ),
-      for (final path in [errands, boiler])
-        OpenTab(
-          path: path,
-          workspace: 'household',
-          until: now.add(const Duration(minutes: 13, seconds: 50)),
-        ),
-    ];
-  llm.tabStates
-    ..[errands] = const TabState(
-      title: 'Weekend errands',
-      host: 'news.example.com',
-    )
-    ..[boiler] = const TabState(
-      title: 'Book the boiler service',
-      host: 'heating.example.com',
-      mine: true,
-    )
-    ..[loans] = const TabState(
-      title: 'Library loans',
-      host: 'library.example.org',
-    );
+  return llm;
 }

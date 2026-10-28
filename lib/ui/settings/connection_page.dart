@@ -234,12 +234,11 @@ class _KeyCardState extends State<_KeyCard> {
       ..showShared(SharedPairing(code));
   }
 
-  /// Connects with the address and key [code] holds, keeping where it says its companions run,
-  /// and says why when it cannot. Nothing of the code is put in the form, which goes back to the
+  /// Connects with the address and key [code] holds, and says why when it cannot. Nothing of the code is put in the form, which goes back to the
   /// saved connection whether it paired or not: a key typed after a failed code would go to the
   /// address it named.
   Future<void> _pair(String code) async {
-    final Pairing pairing;
+    final Connection pairing;
     try {
       pairing = parsePairingCode(code);
     } on ApiException catch (error) {

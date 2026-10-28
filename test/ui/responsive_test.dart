@@ -1,17 +1,11 @@
 import 'dart:ui' show Offset, Size;
 
-import 'package:anywherellm/core/browser_tabs.dart';
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/core/outputs.dart';
-import 'package:anywherellm/core/page_status.dart';
 import 'package:anywherellm/core/prefs.dart';
-import 'package:anywherellm/core/schedule.dart';
-import 'package:anywherellm/core/skill_pages.dart';
-import 'package:anywherellm/core/toolkit.dart';
 import 'package:anywherellm/core/server_models.dart';
-import 'package:anywherellm/ui/settings/memory_page.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/settings/walkthrough.dart';
 import 'package:anywherellm/ui/files/workspace_pages.dart';
@@ -19,7 +13,6 @@ import 'package:anywherellm/ui/home.dart';
 import 'package:anywherellm/ui/shelf.dart';
 import 'package:anywherellm/ui/sources/sources_panel.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
-import 'package:anywherellm/ui/task_sheet.dart';
 import 'package:file_picker_platform_interface/file_picker_platform_interface.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:anywherellm/ui/workspace_sheets.dart';
@@ -29,7 +22,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
 import '../support/fake_settings.dart';
-import '../support/fake_toolkit.dart';
 import '../support/picker.dart';
 import '../support/pump.dart';
 
@@ -135,8 +127,6 @@ void main() {
           size: size,
           canDictate: true,
           canSpeak: true,
-          toolkitServer: FakeToolkit()
-            ..served = {ToolkitFeature.memories, ToolkitFeature.jobs},
         );
         h.shell.openSettings();
         await tester.pumpAndSettle();
@@ -157,11 +147,6 @@ void main() {
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull, reason: page.name);
         }
-        h.shell
-          ..showSettingsPage(SettingsPage.memory)
-          ..togglePopup(const MemorySheet(global: true));
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull, reason: 'a new memory');
       });
 
       testWidgets('the scanner fits', (tester) async {
@@ -398,134 +383,6 @@ void main() {
         for (var n = 0; n < connectSteps.length; n++) {
           expect(
             find.text('${n + 1} of ${connectSteps.length}'),
-            findsOneWidget,
-          );
-          expect(tester.takeException(), isNull, reason: 'screen ${n + 1}');
-          await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-          await tester.pumpAndSettle();
-        }
-      });
-
-      testWidgets('Upcoming, a task and the New task form fit', (tester) async {
-        final toolkit = FakeToolkit()
-          ..served = {
-            ToolkitFeature.memories,
-            ToolkitFeature.jobs,
-            ToolkitFeature.jobsWrite,
-          }
-          ..jobs = [
-            ScheduledJob(
-              id: '1',
-              name: 'job-$longWord',
-              prompt: 'prompt-$longWord ' * 8,
-              cron: '0 7 * * 1',
-              tools: 3,
-              lastStatus: 'failed',
-              lastRun: DateTime.now().toUtc(),
-            ),
-          ]
-          ..runRecords['1'] = [
-            for (var n = 0; n < 5; n++)
-              JobRun(
-                startedAt: DateTime.now().toUtc(),
-                status: n == 0 ? 'failed' : 'completed',
-                result: 'result-$longWord',
-              ),
-          ];
-        final h = await pumpApp(
-          tester,
-          llm: awkward(),
-          toolkitServer: toolkit,
-          size: size,
-          shelf: true,
-        );
-        h.shell.openSettings(SettingsPage.upcoming);
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull, reason: 'the page');
-        h.shell.togglePopup(const TaskSheet(id: '1'));
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull, reason: 'the task');
-        h.shell.togglePopup(const TaskSheet(id: '1', editing: true));
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull, reason: 'the form');
-        h.shell.togglePopup(const TaskSheet());
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull, reason: 'the new task');
-      });
-
-      testWidgets('the card\'s Library and Vault rows fit', (tester) async {
-        final toolkit = FakeToolkit()
-          ..served = {
-            ToolkitFeature.memories,
-            ToolkitFeature.jobs,
-            ToolkitFeature.pages,
-          }
-          ..skillPages = const {
-            SkillPage.library: '/library-lean/abc.html',
-            SkillPage.vault: '/vault-lean/abc.html',
-          };
-        await pumpApp(
-          tester,
-          llm: awkward(),
-          toolkitServer: toolkit,
-          size: size,
-          shelf: true,
-        );
-        expect(find.text('Library'), findsOneWidget);
-        expect(find.text('Vault'), findsOneWidget);
-        expect(tester.takeException(), isNull);
-      });
-
-      testWidgets('the card\'s news and the Browser sheet fit', (tester) async {
-        const tab = '/browser-lean/aaaaaaaaaaaaaaaaaaaaaaaa.html';
-        final llm = awkward();
-        final slug = llm.spaces.first.slug;
-        llm.tabStates[tab] = TabState(
-          title: 'A' * 120,
-          host: '${'sub' * 30}.example.com',
-          mine: true,
-        );
-        final now = DateTime.now().toUtc();
-        final toolkit = FakeToolkit()
-          ..served = {ToolkitFeature.pages}
-          ..skillPages = const {
-            SkillPage.appsManager: '/apps-lean/manager-abc.html',
-            SkillPage.library: '/library-lean/abc.html',
-          }
-          ..status = PageStatus(failed: [now], changed: [now, now])
-          ..tabs = [
-            OpenTab(
-              path: tab,
-              workspace: slug,
-              until: now.add(const Duration(minutes: 9)),
-            ),
-          ];
-        final h = await pumpApp(
-          tester,
-          llm: llm,
-          toolkitServer: toolkit,
-          size: size,
-          shelf: true,
-        );
-        expect(find.text('1 tab open · closes in 9 min'), findsOneWidget);
-        expect(tester.takeException(), isNull);
-        h.shell
-          ..closeShelf()
-          ..togglePopup(Popup.browserTabs);
-        await tester.pumpAndSettle();
-        expect(find.text('1 tab open'), findsOneWidget);
-        expect(tester.takeException(), isNull);
-      });
-
-      testWidgets('each screen of Add the toolkit fits', (tester) async {
-        final h = await pumpApp(tester, size: size, canScan: true);
-        h.shell
-          ..openSettings()
-          ..showGuide(Guide.toolkit);
-        await tester.pumpAndSettle();
-        for (var n = 0; n < toolkitSteps.length; n++) {
-          expect(
-            find.text('${n + 1} of ${toolkitSteps.length}'),
             findsOneWidget,
           );
           expect(tester.takeException(), isNull, reason: 'screen ${n + 1}');

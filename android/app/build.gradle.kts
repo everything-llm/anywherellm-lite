@@ -87,8 +87,3 @@ kotlin {
 flutter {
     source = "../.."
 }
-
-dependencies {
-    // PageChannels' WebViewCompat.addWebMessageListener; the version webview_flutter_android uses.
-    implementation("androidx.webkit:webkit:1.15.0")
-}

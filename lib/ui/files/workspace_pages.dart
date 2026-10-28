@@ -16,7 +16,6 @@ import '../widgets/phone_page.dart';
 import 'section_view.dart';
 import 'save_file.dart';
 import '../settings/rows.dart';
-import '../settings/settings_pages.dart';
 import '../widgets/scroll_fades.dart';
 
 /// Closes the document's text shown, giving back the Documents sheet when the text was opened
@@ -135,19 +134,15 @@ class _WorkspacePagesState extends State<WorkspacePages> {
   }
 
   /// The workspace's settings: its name with its chats and documents, and Rename; then How it
-  /// answers, its Documents, Instructions and Answer from, each with what it holds, and Memory,
-  /// which opens Settings' Memory page on this workspace; then Delete workspace.
+  /// answers, its Documents, Instructions and Answer from, each with what it holds; then Delete
+  /// workspace.
   Widget _overview(BuildContext context, String name) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
     final shell = scope.shell;
     final chat = scope.chat;
     return ListenableBuilder(
-      listenable: Listenable.merge([
-        scope.sources,
-        scope.system,
-        scope.toolkit,
-      ]),
+      listenable: Listenable.merge([scope.sources, scope.system]),
       builder: (context, _) {
         final slug = chat.activeSlug ?? '';
         final docs = scope.sources.files;
@@ -200,16 +195,6 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                 about: (mode ?? ChatMode.automatic).title,
                 onTap: () => _open(shell, FilesSection.answers),
               ),
-              if (scope.toolkit.memories)
-                NavRow(
-                  icon: 'memory',
-                  title: 'Memory',
-                  about: 'What chats are told about you',
-                  onTap: () {
-                    scope.memory.show(slug);
-                    shell.openSettings(SettingsPage.memory);
-                  },
-                ),
             ]),
             const SizedBox(height: 20),
             FieldCard([

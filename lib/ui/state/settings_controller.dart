@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-import '../../core/companion.dart';
 import '../../core/connection.dart';
 import '../../core/ports.dart';
 import 'notice.dart';
@@ -35,34 +34,19 @@ class SettingsController extends ChangeNotifier {
   /// start.
   Future<void> load() async {
     await _keyring('Could not read the saved connection', () async {
-      if (await _store.load() case final saved?) {
-        _holder
-          ..current = saved.connection
-          ..companions = saved.companions;
-      }
+      if (await _store.load() case final saved?) _holder.current = saved;
     });
     notifyListeners();
   }
 
-  /// Where [companion] runs beside the server in use, as a pairing code said. Null with no
-  /// server or no such code.
-  Uri? addressOf(Companion companion) => _holder.addressOf(companion);
-
-  /// Connects as [pairing] says, once the server takes its key, keeping where its companions
-  /// run. One it names none for keeps where it was saved to run on the same server. True when it
-  /// did.
-  Future<bool> pair(Pairing pairing) =>
-      _connect(pairing.connection, pairing.companions);
-
-  /// How many times Test connection has asked about the saved connection, so what remembers
-  /// an answer per connection, such as whether the toolkit is there, asks again.
-  int tests = 0;
+  /// Connects to [pairing], a pairing code's connection, once the server takes its key. True
+  /// when it did.
+  Future<bool> pair(Connection pairing) => _connect(pairing);
 
   /// Asks the server whether the saved connection still opens it.
   Future<void> testSaved() async {
     final server = connection;
     if (server == null) return;
-    tests++;
     await _check(server);
   }
 
@@ -96,16 +80,13 @@ class SettingsController extends ChangeNotifier {
   /// Saves [url] and [key] only once the server accepts them. True when it did.
   Future<bool> connect(String url, String key) async {
     final candidate = _parse(url, key);
-    return candidate != null && await _connect(candidate, null);
+    return candidate != null && await _connect(candidate);
   }
 
-  /// Uses [candidate] once the server takes its key, with [companions] as in [_use].
-  Future<bool> _connect(
-    Connection candidate,
-    Map<String, Uri>? companions,
-  ) async {
+  /// Uses [candidate] once the server takes its key.
+  Future<bool> _connect(Connection candidate) async {
     if (!await _check(candidate)) return false;
-    await _use(candidate, 'The key was saved.', companions: companions);
+    await _use(candidate, 'The key was saved.');
     return true;
   }
 
@@ -118,26 +99,15 @@ class SettingsController extends ChangeNotifier {
   }
 
   /// Uses [candidate] from now on and keeps it in the keyring, saying [saved] once it is there.
-  /// Where companions run is kept when the server's address stays and forgotten for another
-  /// server, with [companions] over it. If the keyring refuses, it is still used for this run and
-  /// the refusal is shown.
-  Future<void> _use(
-    Connection candidate,
-    String saved, {
-    Map<String, Uri>? companions,
-  }) async {
-    final kept = connection?.baseUrl == candidate.baseUrl
-        ? _holder.companions
-        : const <String, Uri>{};
-    _holder
-      ..current = candidate
-      ..companions = {...kept, ...?companions};
+  /// If the keyring refuses, it is still used for this run and the refusal is shown.
+  Future<void> _use(Connection candidate, String saved) async {
+    _holder.current = candidate;
     _checks++;
     check = ConnectionCheck.idle;
     notifyListeners();
     await _keyring(
       'Could not save the connection',
-      () => _store.save(Pairing(candidate, _holder.companions)),
+      () => _store.save(candidate),
     );
     message = keyringProblem == null ? saved : null;
     notifyListeners();
@@ -145,9 +115,7 @@ class SettingsController extends ChangeNotifier {
 
   /// Forgets the connection and removes it from the keyring.
   Future<void> clear() async {
-    _holder
-      ..current = null
-      ..companions = const {};
+    _holder.current = null;
     _checks++;
     check = ConnectionCheck.idle;
     notifyListeners();

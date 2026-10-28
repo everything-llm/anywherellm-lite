@@ -14,11 +14,9 @@ import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/ui/chat/message_list.dart';
-import 'package:anywherellm/ui/settings/memory_page.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/settings/walkthrough.dart';
 import 'package:anywherellm/ui/share/shared_item.dart';
-import 'package:anywherellm/ui/task_sheet.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -46,14 +44,6 @@ Future<void> _openChat(WidgetTester tester, Harness h, String thread) async {
       .slug;
   h.shell.openChat();
   await h.chat.select(slug, thread: thread);
-  await _settle(tester);
-}
-
-/// Has the toolkit serve the suite's pages, with the sample's tabs and news ([samplePages]),
-/// and the app ask it again.
-Future<void> _withPages(WidgetTester tester, Harness h) async {
-  samplePages(h.llm, h.toolkitServer);
-  await h.settings.testSaved();
   await _settle(tester);
 }
 
@@ -89,17 +79,6 @@ Thread _thread(Harness h, String slug) =>
 
 final _screens = <String, _Setup>{
   'chats': (tester, h) async {},
-  for (var n = 0; n < toolkitSteps.length; n++)
-    'toolkit${n + 1}': (tester, h) async {
-      h.shell
-        ..openSettings()
-        ..showGuide(Guide.toolkit);
-      await _settle(tester);
-      for (var i = 0; i < n; i++) {
-        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-        await _settle(tester);
-      }
-    },
   'chat': (tester, h) => _openChat(tester, h, 'errands'),
   'hero': (tester, h) async {
     h.chat.newChat();
@@ -131,31 +110,7 @@ final _screens = <String, _Setup>{
   'appear': (tester, h) => _settings(tester, h, SettingsPage.appearance),
   'chatset': (tester, h) => _settings(tester, h, SettingsPage.chat),
   'server': (tester, h) => _settings(tester, h, SettingsPage.server),
-  'memory': (tester, h) => _settings(tester, h, SettingsPage.memory),
-  'memedit': (tester, h) async {
-    await _settings(tester, h, SettingsPage.memory);
-    h.shell.togglePopup(const MemorySheet(global: true, id: 1));
-    await _settle(tester);
-  },
-  'memws': (tester, h) async {
-    await _settings(tester, h, SettingsPage.memory);
-    h.shell.togglePopup(Popup.memoryWorkspace);
-    await _settle(tester);
-  },
   'privacy': (tester, h) => _settings(tester, h, SettingsPage.privacy),
-  'upcoming': (tester, h) => _settings(tester, h, SettingsPage.upcoming),
-  'task': (tester, h) async {
-    h.shell.openSettings(SettingsPage.upcoming);
-    await _settle(tester);
-    h.shell.togglePopup(const TaskSheet(id: '1'));
-    await _settle(tester);
-  },
-  'newtask': (tester, h) async {
-    h.shell.openSettings(SettingsPage.upcoming);
-    await _settle(tester);
-    h.shell.togglePopup(const TaskSheet());
-    await _settle(tester);
-  },
   'workspace': _workspace,
   'docs': (tester, h) async {
     await _workspace(tester, h);
@@ -227,18 +182,6 @@ final _screens = <String, _Setup>{
     h.shell.openShelf();
     await _settle(tester);
   },
-  'shelf-toolkit': (tester, h) async {
-    await _withPages(tester, h);
-    await _openChat(tester, h, 'errands');
-    h.shell.openShelf();
-    await _settle(tester);
-  },
-  'browser': (tester, h) async {
-    await _withPages(tester, h);
-    await _openChat(tester, h, 'errands');
-    h.shell.togglePopup(Popup.browserTabs);
-    await _settle(tester);
-  },
   'share': (tester, h) async {
     h.shell.showShared(
       SharedLink(
@@ -283,10 +226,6 @@ final _wide = <String, _Setup>{
     h.shell.openPane(Pane.documents);
     await _settle(tester);
   },
-  'desk-upcoming': (tester, h) async {
-    h.shell.openPane(Pane.upcoming);
-    await _settle(tester);
-  },
   'desk-settings': (tester, h) => _settings(tester, h, SettingsPage.connection),
 };
 
@@ -307,12 +246,10 @@ void main() {
         // does.
         debugDisableShadows = false;
         for (final theme in [ThemePref.light, ThemePref.dark]) {
-          final (llm, toolkit) = sampleServer();
+          final llm = sampleServer();
           final h = await pumpApp(
             tester,
             llm: llm,
-            toolkitServer: toolkit,
-            canViewApps: true,
             size: size,
             shelf: size == phoneSize,
             canScan: !connected,

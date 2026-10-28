@@ -3,14 +3,13 @@ import 'package:flutter/foundation.dart';
 import '../../core/files.dart';
 import '../../core/gallery.dart';
 import '../../core/server_models.dart';
-import '../../core/skill_pages.dart';
 import '../settings/settings_pages.dart';
 import '../share/shared_item.dart';
 import 'turn.dart';
 
 /// What the main pane shows: the chat, the open workspace's pages, or, on a wide window, its
-/// Documents or Upcoming as a list beside what it opens.
-enum Pane { chats, files, documents, upcoming }
+/// Documents as a list beside what it opens.
+enum Pane { chats, files, documents }
 
 /// What the sheet over the chat shows: Sources, the passages an answer read from one
 /// file, or all of an answer's sources ([cited]).
@@ -35,26 +34,9 @@ class AsideChoice {
   final int? source;
 }
 
-/// browser-lean's page for an agent's [tab], in its tall sheet over the chat, with the bar that
-/// messages the agent in the chat on screen when the tab is that chat's ([inChat]).
-class BrowserOpen {
-  const BrowserOpen(this.tab, {required this.inChat});
-
-  final Uri tab;
-  final bool inChat;
-}
-
-/// One of the suite's pages on the connected server at [url], such as an apps-lean app's page,
-/// in a tall sheet over the chat, its address as it opens ([SkillPage.openedAt]).
-class PageOpen {
-  const PageOpen(this.url);
-
-  final Uri url;
-}
-
 /// A walk-through over the whole window: How connecting works, over the Connection page and the
-/// camera, or Add the toolkit, over Settings' list.
-enum Guide { connect, toolkit }
+/// camera.
+enum Guide { connect }
 
 /// A phone's sheet for one chat of the workspace on screen: its name, its pin and Delete, or
 /// with [deleting] the question whether to delete it.
@@ -70,23 +52,19 @@ class ChatSheetFor {
 enum WorkspaceSheet { create, rename, delete }
 
 /// A popup over the window, at most one open at a time: the workspace menu, the composer's Answer
-/// from sheet, the Attach sheet, the Memory page's choice of workspace, or a question before
+/// from sheet, the Attach sheet, or a question before
 /// forgetting the server or removing a document. An answer's More sheet
 /// is keyed by its [Turn] instead.
 enum Popup {
   workspaces,
   answerFrom,
   attach,
-  memoryWorkspace,
 
   /// Forget this server?, on the Connection page.
   forgetServer,
 
   /// Remove from workspace?, under a document's text.
   removeDoc,
-
-  /// The agent's browser's open tabs, from the shelf's Browser row.
-  browserTabs,
 }
 
 /// What is open over the chat, which is the base screen: the chats as a shelf,
@@ -122,25 +100,6 @@ class ShellController extends ChangeNotifier {
   /// Opens the page of [pictures] at [index], over the window.
   void openGallery(List<Picture> pictures, int index, {required String chat}) =>
       _popup.value = GalleryOpen(pictures, index, chat: chat);
-
-  /// Shows [tab], browser-lean's page for an agent's tab, in its sheet over the chat, closing
-  /// any other popup; [inChat] when the tab is the chat on screen's.
-  void openBrowser(Uri tab, {required bool inChat}) =>
-      _popup.value = BrowserOpen(tab, inChat: inChat);
-
-  /// Closes the agent's browser, when it is open.
-  void closeBrowser() {
-    if (_popup.value is BrowserOpen) _popup.value = null;
-  }
-
-  /// Shows [url], one of the suite's pages on the connected server, in its sheet over the chat,
-  /// closing any other popup.
-  void openPage(Uri url) => _popup.value = PageOpen(url);
-
-  /// Closes the page's sheet, when it is open.
-  void closePage() {
-    if (_popup.value is PageOpen) _popup.value = null;
-  }
 
   /// Opens [thread]'s sheet, closing any other popup.
   void openChatSheet(Thread thread, {bool deleting = false}) =>
@@ -331,7 +290,7 @@ class ShellController extends ChangeNotifier {
     openPane(Pane.documents, overPages: _pane == Pane.files);
   }
 
-  /// Leaves Documents or Upcoming as a pane for the workspace's pages when Documents opened over
+  /// Leaves Documents as a pane for the workspace's pages when Documents opened over
   /// them, or the chat.
   void closePane() =>
       showPane(_pane == Pane.documents && _overPages ? Pane.files : Pane.chats);

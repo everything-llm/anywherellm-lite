@@ -5,11 +5,9 @@ import 'package:anywherellm/ui/state/prefs_controller.dart';
 import 'package:anywherellm/ui/state/settings_controller.dart';
 import 'package:anywherellm/ui/state/sources_controller.dart';
 import 'package:anywherellm/ui/state/system_controller.dart';
-import 'package:anywherellm/ui/state/toolkit_controller.dart';
 
 import 'fake_api.dart';
 import 'fake_settings.dart';
-import 'fake_toolkit.dart';
 
 /// A [FakeAnythingLlm] with the app's controllers over it. [connection] is in use from the
 /// start, as if read from the keyring.
@@ -18,10 +16,8 @@ class Rig {
     FakeAnythingLlm? llm,
     FakeSettingsStore? store,
     FakePrefsStore? prefsStore,
-    FakeToolkit? toolkitServer,
     Connection? connection,
   }) : llm = llm ?? FakeAnythingLlm(),
-       toolkitServer = toolkitServer ?? FakeToolkit(),
        store = store ?? FakeSettingsStore(),
        prefsStore = prefsStore ?? FakePrefsStore() {
     settings = SettingsController(
@@ -34,17 +30,10 @@ class Rig {
     sources = SourcesController(this.llm, chat, prefs);
     files = FilesController(this.llm, settings, chat, sources);
     system = SystemController(this.llm, settings);
-    toolkit = ToolkitController(
-      this.toolkitServer,
-      settings,
-      tabState: this.llm.tabState,
-    );
   }
 
   final FakeAnythingLlm llm;
 
-  /// The toolkit beside the fake AnythingLLM, present unless a test makes it absent.
-  final FakeToolkit toolkitServer;
   final FakeSettingsStore store;
   final FakePrefsStore prefsStore;
   late final SettingsController settings;
@@ -53,7 +42,6 @@ class Rig {
   late final SourcesController sources;
   late final FilesController files;
   late final SystemController system;
-  late final ToolkitController toolkit;
 
   /// Reads the prefs and the workspaces, as the app does at start.
   Future<void> start() async {
@@ -63,7 +51,6 @@ class Rig {
   }
 
   void dispose() {
-    toolkit.dispose();
     system.dispose();
     files.dispose();
     sources.dispose();

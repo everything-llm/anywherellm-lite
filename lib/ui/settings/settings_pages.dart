@@ -1,5 +1,5 @@
 /// The pages of Settings. Connection, Appearance and Chat are about this device; Server says what
-/// AnythingLLM runs with and opens Privacy and data, and Memory and Upcoming sit beside it.
+/// AnythingLLM runs with and opens Privacy and data.
 enum SettingsPage {
   connection('Connection', null, needsServer: false),
   appearance('Appearance', null, needsServer: false),
@@ -9,8 +9,6 @@ enum SettingsPage {
     'Type `/` in a message, or tap + beside it.',
     needsServer: false,
   ),
-  memory('Memory', null),
-  upcoming('Upcoming', null),
   server('Server', null),
   privacy('Privacy and data', 'Where your questions and files go.');
 

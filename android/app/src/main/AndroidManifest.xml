@@ -53,8 +53,8 @@
                 <category android:name="android.intent.category.DEFAULT"/>
                 <data android:mimeType="*/*"/>
             </intent-filter>
-            <!-- A pairing link, anywherellm://connect?url=...&key=..., as the toolkit's pair
-                 prints it; the app asks before it connects. -->
+            <!-- A pairing link, anywherellm://connect?url=...&key=...; the app asks before it
+                 connects. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>

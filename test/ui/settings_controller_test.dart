@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:anywherellm/core/toolkit.dart';
 import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/ui/state/settings_controller.dart';
@@ -134,45 +133,10 @@ void main() {
     });
   });
 
-  group('companions', () {
-    final toolkit = Uri.parse('https://toolkit.example.com');
-
-    test(
-      'a pairing code saves where they run, once the key opens the server',
-      () async {
-        final saved = await settings.pair(
-          Pairing(_saved, {toolkitCompanion.code: toolkit}),
-        );
-        expect(saved, isTrue);
-        expect(settings.addressOf(toolkitCompanion), toolkit);
-        expect(store.savedCompanions, {toolkitCompanion.code: toolkit});
-      },
-    );
-
-    test('another key keeps them, and another server forgets them', () async {
-      await settings.pair(Pairing(_saved, {toolkitCompanion.code: toolkit}));
-      await settings.save(_saved.baseUrl, 'K2');
-      expect(settings.addressOf(toolkitCompanion), toolkit);
-      expect(store.savedCompanions, isNotEmpty);
-      await settings.connect('https://other.example:3001', 'K1');
-      expect(store.savedCompanions, isEmpty);
-      expect(
-        settings.addressOf(toolkitCompanion),
-        Uri.parse('https://other.example:3001/anywherellm-bridge'),
-        reason:
-            'another server is looked at on its own origin until a code '
-            'names one',
-      );
-    });
-
-    test('a code that names none keeps them on the same server', () async {
-      await settings.pair(Pairing(_saved, {toolkitCompanion.code: toolkit}));
-      await settings.pair(
-        const Pairing(Connection(baseUrl: 'https://h:3001', apiKey: 'K2')),
-      );
-      expect(settings.addressOf(toolkitCompanion), toolkit);
-      expect(store.savedCompanions, {toolkitCompanion.code: toolkit});
-    });
+  test('a pairing code saves its connection once the key opens the server', () async {
+    expect(await settings.pair(_saved), isTrue);
+    expect(settings.connection, _saved);
+    expect(store.saved, _saved);
   });
 
   group('a test that comes back late', () {
@@ -198,7 +162,7 @@ void main() {
       final testing = settings.testSaved();
       await pumpEventQueue();
       llm.gates.remove('verify');
-      await settings.pair(Pairing(other, const {}));
+      await settings.pair(other);
       gate.complete();
       await testing;
       expect(settings.connection, other);

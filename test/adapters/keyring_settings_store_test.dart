@@ -18,8 +18,8 @@ void main() {
   test('a saved connection loads back', () async {
     FlutterSecureStorage.setMockInitialValues({});
     final store = KeyringSettingsStore();
-    await store.save(Pairing(_connection));
-    expect((await store.load())?.connection, _connection);
+    await store.save(_connection);
+    expect(await store.load(), _connection);
   });
 
   test('an entry saved with a password is written again without it', () async {
@@ -28,64 +28,32 @@ void main() {
           '{"baseUrl":"https://h:3001","apiKey":"K","password":"PASS"}',
     });
     final loaded = await KeyringSettingsStore().load();
-    expect(
-      loaded?.connection,
-      const Connection(baseUrl: 'https://h:3001', apiKey: 'K'),
-    );
+    expect(loaded, const Connection(baseUrl: 'https://h:3001', apiKey: 'K'));
     final stored = await const FlutterSecureStorage().read(
       key: 'anythingllm-connection',
     );
     expect(stored, isNot(contains('PASS')));
   });
 
-  test('companions\' addresses load back with the connection', () async {
-    FlutterSecureStorage.setMockInitialValues({});
-    final store = KeyringSettingsStore();
-    final toolkit = {'toolkit': Uri.parse('https://toolkit.example.com')};
-    await store.save(Pairing(_connection, toolkit));
-    expect((await store.load())?.companions, toolkit);
-  });
-
-  test('a companion kept under its /health name is written again under its code', () async {
+  test('an entry an older version kept companions in is read without them, and written '
+      'again so', () async {
     FlutterSecureStorage.setMockInitialValues({
       'anythingllm-connection':
           '{"baseUrl":"https://h:3001","apiKey":"K",'
-          '"companions":{"anythingllm-toolkit":"https://toolkit.example.com"}}',
+          '"companions":{"toolkit":"https://toolkit.example.com"}}',
     });
     final loaded = await KeyringSettingsStore().load();
-    expect(loaded?.companions, {
-      'toolkit': Uri.parse('https://toolkit.example.com'),
-    });
+    expect(loaded, const Connection(baseUrl: 'https://h:3001', apiKey: 'K'));
     final stored = await const FlutterSecureStorage().read(
       key: 'anythingllm-connection',
     );
-    expect(stored, contains('"toolkit"'));
-    expect(stored, isNot(contains('anythingllm-toolkit')));
+    expect(stored, isNot(contains('toolkit')));
   });
-
-  test(
-    'a companion address that cannot be read is skipped, not the connection',
-    () async {
-      FlutterSecureStorage.setMockInitialValues({
-        'anythingllm-connection':
-            '{"baseUrl":"https://h:3001","apiKey":"K",'
-            '"companions":{"toolkit":"http://[::1","other":"https://other.example.com"}}',
-      });
-      final loaded = await KeyringSettingsStore().load();
-      expect(
-        loaded?.connection,
-        const Connection(baseUrl: 'https://h:3001', apiKey: 'K'),
-      );
-      expect(loaded?.companions, {
-        'other': Uri.parse('https://other.example.com'),
-      });
-    },
-  );
 
   test('clear removes it', () async {
     FlutterSecureStorage.setMockInitialValues({});
     final store = KeyringSettingsStore();
-    await store.save(Pairing(_connection));
+    await store.save(_connection);
     await store.clear();
     expect(await store.load(), isNull);
   });

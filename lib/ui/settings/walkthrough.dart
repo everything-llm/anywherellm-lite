@@ -73,49 +73,6 @@ const connectSteps = [
   ),
 ];
 
-/// Add the toolkit: what it adds, then installing the bridge from its own repository, printing its
-/// pairing link, and opening or scanning that link here.
-const toolkitSteps = [
-  GuideStep(
-    'The toolkit',
-    'Add *Memory* and *Upcoming*.',
-    hero: true,
-    sub:
-        'A free add-on for the computer AnythingLLM runs on. Memory is what every chat '
-        'knows about you; Upcoming is its scheduled tasks.',
-    art: GuideArt.kit,
-  ),
-  GuideStep(
-    'Step 1 · Install',
-    'On the computer AnythingLLM runs on, with Node 20.3 or later, run this.',
-    code: [
-      '\$ git clone https://github.com/BinaryBand/anywherellm-bridge',
-      '\$ cd anywherellm-bridge',
-      '\$ npm install && npm run build',
-      '\$ node dist/anywherellm-bridge.cjs install',
-      '# Docker: add --storage and the folder',
-      '# mounted at /app/server/storage',
-    ],
-  ),
-  GuideStep(
-    'Step 2 · Pair',
-    'Then print the link that connects this phone.',
-    sub:
-        'Your phone must reach AnythingLLM and the toolkit first; the bridge\'s README says '
-        'how.',
-    code: [
-      '\$ node dist/anywherellm-bridge.cjs pair',
-      '~  [anywherellm://connect?url=…&key=…&toolkit=…]',
-    ],
-  ),
-  GuideStep(
-    'Step 3 · Connect',
-    'Open that link on this phone, or turn it into a QR code and scan it.',
-    sub: 'Memory then appears here.',
-    art: GuideArt.pair,
-  ),
-];
-
 /// A walk-through over the whole window, as the Mobile Design pager draws one: Previous, its
 /// [title] and which of the [steps] of how many, and Close; a mark for each screen, which goes
 /// to it; the screens, swiped or stepped with the arrow keys; and a button for the next screen,

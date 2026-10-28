@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
-import '../../core/apps_lean.dart';
 import '../../core/gallery.dart';
 import '../../core/markdown.dart';
 import '../app_scope.dart';
@@ -16,7 +15,6 @@ import '../type.dart';
 import '../widgets/buttons.dart';
 import '../widgets/side_scroll.dart';
 import 'answer_image.dart';
-import 'app_card.dart';
 import 'gallery.dart';
 import 'highlight.dart';
 import 'markdown_lists.dart';
@@ -84,7 +82,6 @@ class AnswerBody extends StatelessWidget {
     final server = settings.connection?.uri;
     // Parsing the answer again to find them is only worth it once an image is drawn.
     Set<Uri>? linked;
-    final card = AppCardBuilder(server);
     return TightListMarkdown(
       data: caret ? '$text$caretMark' : text,
       selectable: !caret,
@@ -105,8 +102,6 @@ class AnswerBody extends StatelessWidget {
       bulletBuilder: (bullet) => listBullet(bullet, body),
       builders: {
         'pre': _CodeBlockBuilder(),
-        'blockquote': card,
-        appCardTag: card,
         'math': MathBuilder(style: body, fallback: code),
         'caret': CaretBuilder(),
       },
