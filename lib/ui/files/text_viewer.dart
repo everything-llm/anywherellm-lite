@@ -19,8 +19,18 @@ import 'workspace_pages.dart';
 class TextViewer extends StatelessWidget {
   const TextViewer({super.key});
 
+  // [workspaceSection] hands back this same const widget whenever the pages rebuild, so the
+  // page listens itself: without it, text that came after the first frame never showed.
   @override
   Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    return ListenableBuilder(
+      listenable: Listenable.merge([scope.files, scope.sources]),
+      builder: (context, _) => _page(context),
+    );
+  }
+
+  Widget _page(BuildContext context) {
     final scope = AppScope.of(context);
     final files = scope.files;
     final t = Tokens.of(context);
