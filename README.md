@@ -2,17 +2,19 @@
 
 A lightweight chat client for an AnythingLLM server, for Android phones. Ask questions in a workspace and get answers drawn from the files you add to it.
 
+**This is the `lite-stock` branch**, a build for plain, unmodified AnythingLLM: it talks to AnythingLLM's own developer API only, with none of the toolkit (anywherellm-bridge) or suite features of `master` (no Memory, Upcoming, skill pages or agent's browser). It installs beside Lite as `local.anywherellm.lite.stock`, labelled **Lite (stock)**, version `1.19.0-stock`.
+
 ## What it does
 
 The app talks only to the AnythingLLM server you set up in Settings, through AnythingLLM's own API, over https.
 
 | Part | What it does |
 | --- | --- |
-| Drawer | Switches workspaces, searches chats, starts a new chat, and lists the open workspace's chats, pinned ones first. **Upcoming** lists the server's scheduled jobs, and **Settings** sits at its foot. |
+| Drawer | Switches workspaces, searches chats, starts a new chat, and lists the open workspace's chats, pinned ones first. **Settings** sits at its foot. |
 | Chat | Shows the open chat. Answers stream in, and **Stop** ends one early. Chips under an answer name the files and pages it used; tap one to see the passages read or the file in Documents. Attach photos or files to a message, dictate it, and have answers read aloud. |
 | Documents | Lists the open workspace's files. Add a file, a link or pasted text. A switch takes a file out of answers without forgetting it. The trash removes a file, with a few seconds to undo. |
 | Workspace pages | The workspace's documents, its instructions, and **Answer from**: whether answers may use tools such as web search, general knowledge and the files, or the files only, and which chat model answers. |
-| Settings | Holds the server address, the developer API key the app gets from the server, and the server's password, which a QR code can fill in. It also changes the server's AI providers, saved memories, website chat widgets, and exports its chats. A connection is saved only once the server accepts it. |
+| Settings | Holds the server address, the developer API key the app gets from the server, and the server's password, which a QR code can fill in. It also shows the server's AI providers and switches its chat model. A connection is saved only once the server accepts it. |
 
 Until a server is saved, the app opens with Settings showing. Other apps can share links, text and files into AnywhereLLM.
 
