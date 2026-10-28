@@ -1,4 +1,3 @@
-
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/state/notice.dart';
 import 'package:flutter/material.dart';
@@ -147,12 +146,9 @@ void main() {
   testWidgets('a card written from the root loads and opens on the server', (
     tester,
   ) async {
-    final llm =
-        answering(
-            'Done.\n\n[![Example](/files/3kQ-card.jpg?v=1)](/files/3kQ.html)',
-          )
-          ..images[Uri.parse('https://h:3001/files/3kQ-card.jpg?v=1')] =
-              pixel;
+    final llm = answering(
+      'Done.\n\n[![Example](/files/3kQ-card.jpg?v=1)](/files/3kQ.html)',
+    )..images[Uri.parse('https://h:3001/files/3kQ-card.jpg?v=1')] = pixel;
     final h = await pumpApp(tester, llm: llm);
     await tester.pumpAndSettle();
     expect(find.byType(Image), findsOneWidget);

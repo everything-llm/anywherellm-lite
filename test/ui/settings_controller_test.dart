@@ -133,11 +133,14 @@ void main() {
     });
   });
 
-  test('a pairing code saves its connection once the key opens the server', () async {
-    expect(await settings.pair(_saved), isTrue);
-    expect(settings.connection, _saved);
-    expect(store.saved, _saved);
-  });
+  test(
+    'a pairing code saves its connection once the key opens the server',
+    () async {
+      expect(await settings.pair(_saved), isTrue);
+      expect(settings.connection, _saved);
+      expect(store.saved, _saved);
+    },
+  );
 
   group('a test that comes back late', () {
     const other = Connection(baseUrl: 'https://other:3001', apiKey: 'K2');

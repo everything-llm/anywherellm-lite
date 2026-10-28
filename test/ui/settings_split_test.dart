@@ -81,11 +81,7 @@ void main() {
   });
 
   testWidgets('Settings opens on Connection beside its list', (tester) async {
-    final h = await pumpApp(
-      tester,
-      llm: planningServer(),
-      size: desktop,
-    );
+    final h = await pumpApp(tester, llm: planningServer(), size: desktop);
     h.shell.openSettings();
     await tester.pumpAndSettle();
 
@@ -96,11 +92,7 @@ void main() {
   });
 
   testWidgets('a row shows its page beside the list', (tester) async {
-    final h = await pumpApp(
-      tester,
-      llm: planningServer(),
-      size: desktop,
-    );
+    final h = await pumpApp(tester, llm: planningServer(), size: desktop);
     h.shell.openSettings();
     await tester.pumpAndSettle();
 
@@ -117,11 +109,7 @@ void main() {
   testWidgets('a page with a parent goes back to it, then Settings closes', (
     tester,
   ) async {
-    final h = await pumpApp(
-      tester,
-      llm: planningServer(),
-      size: desktop,
-    );
+    final h = await pumpApp(tester, llm: planningServer(), size: desktop);
     h.shell.openSettings(SettingsPage.server);
     await tester.pumpAndSettle();
     h.shell.showSettingsPage(SettingsPage.privacy);

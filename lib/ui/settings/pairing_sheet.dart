@@ -42,11 +42,7 @@ class PairingSheet extends StatelessWidget {
           spacing: 16,
           children: [
             FieldCard([
-              InfoRow(
-                'AnythingLLM server',
-                about: pairing.baseUrl,
-                mono: true,
-              ),
+              InfoRow('AnythingLLM server', about: pairing.baseUrl, mono: true),
             ]),
             if (pairing.plainHttp)
               AlertBox(
