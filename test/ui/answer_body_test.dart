@@ -3,6 +3,7 @@ import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/chat/answer_body.dart';
 import 'package:anywherellm/ui/chat/markdown_lists.dart';
 import 'package:anywherellm/ui/chat/wait_line.dart';
+import 'package:anywherellm/ui/icons.dart';
 import 'package:anywherellm/ui/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -191,9 +192,19 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Copy answer').last);
     await tester.pump();
     expect(copied, [_answer.trim()]);
-    expect(find.text('Copied'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 2));
+    // The icon turns to a check in place, no word pushes the row, and a live region says it.
+    AppIcon iconIn(String label) => tester.widget<AppIcon>(
+      find.descendant(
+        of: find.bySemanticsLabel(label).last,
+        matching: find.byType(AppIcon),
+      ),
+    );
     expect(find.text('Copied'), findsNothing);
+    expect(iconIn('Copy answer').name, 'check');
+    expect(find.bySemanticsLabel('Copied'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.bySemanticsLabel('Copied'), findsNothing);
+    expect(iconIn('Copy answer').name, 'copy');
   });
 
   testWidgets('Copy code puts only the code on the clipboard', (tester) async {

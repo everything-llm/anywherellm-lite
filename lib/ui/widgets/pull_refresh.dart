@@ -8,6 +8,8 @@ import '../tokens.dart';
 /// [child], a scroll view from the newest item up ([ScrollView.reverse]), with a pull down past
 /// its oldest end calling [onRefresh]: a pull of [reach] or more, let go, refreshes. A refresh
 /// icon follows the pull at the top and turns while [refreshing], when a pull does nothing.
+/// With the platform's animations off ([MediaQuery.disableAnimationsOf]) the icon stays still,
+/// shown while it refreshes, since House UI removes spin under reduced motion.
 ///
 /// [child]'s physics must let it overscroll its oldest end even when it is too short to scroll,
 /// as [AlwaysScrollableScrollPhysics] does on a platform that clamps.
@@ -39,9 +41,13 @@ class _PullRefreshState extends State<PullRefresh>
     duration: const Duration(milliseconds: 900),
   );
 
+  /// Whether the platform asks for no animation, read where the context allows it.
+  bool _still = false;
+
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _still = MediaQuery.disableAnimationsOf(context);
     _spin();
   }
 
@@ -52,9 +58,10 @@ class _PullRefreshState extends State<PullRefresh>
   }
 
   void _spin() {
-    if (widget.refreshing && !_turn.isAnimating) {
+    final spins = widget.refreshing && !_still;
+    if (spins && !_turn.isAnimating) {
       _turn.repeat();
-    } else if (!widget.refreshing && _turn.isAnimating) {
+    } else if (!spins && _turn.isAnimating) {
       _turn.stop();
     }
   }
@@ -121,7 +128,9 @@ class _PullRefreshState extends State<PullRefresh>
                           border: Border.all(color: t.line),
                         ),
                         child: RotationTransition(
-                          turns: widget.refreshing
+                          turns: _still
+                              ? const AlwaysStoppedAnimation(0)
+                              : widget.refreshing
                               ? _turn
                               : AlwaysStoppedAnimation(shown * 0.75),
                           child: AppIcon(

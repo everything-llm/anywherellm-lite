@@ -292,25 +292,19 @@ class _CopyButtonState extends State<CopyButton> {
     });
   }
 
+  // Copied swaps the icon for a check in its place, so nothing beside it moves, and a live
+  // region around it says Copied to a screen reader.
   @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (_copied)
-          Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: Text('Copied', style: Type.note(t.ink)),
-          ),
-        IconBtn(
-          'copy',
-          tooltip: widget.tooltip,
-          onPressed: _copy,
-          box: widget.box,
-          size: widget.size,
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    liveRegion: true,
+    label: _copied ? 'Copied' : null,
+    child: IconBtn(
+      _copied ? 'check' : 'copy',
+      tooltip: widget.tooltip,
+      onPressed: _copy,
+      box: widget.box,
+      size: widget.size,
+    ),
+  );
 }
