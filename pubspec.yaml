@@ -1,7 +1,7 @@
 name: anywherellm
 description: "A lightweight Android front end for an AnythingLLM server."
 publish_to: 'none'
-version: 1.18.0+36
+version: 1.19.0+37
 
 # Pinned by series. Rolling forward is a deliberate edit to this file.
 environment:
