@@ -8,12 +8,13 @@ import '../state/turn.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';
+import '../widgets/tappable.dart';
 import '../settings/rows.dart';
 import '../shell_popup.dart';
 
-/// The circle an answer's action button takes, its icon at [IconSize.xs], as the Lite prototype
-/// sets the buttons side by side.
-const answerAction = 44.0;
+/// The circle an answer's action button takes, a finger's [Tappable.touchSide], its icon at
+/// [answerActionIcon]; the buttons sit 8 apart, as House UI keeps neighbouring controls.
+const answerAction = Tappable.touchSide;
 
 /// The size of an answer's action icons: Copy, Read aloud, Retry and More.
 const answerActionIcon = IconSize.normal;

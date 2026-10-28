@@ -132,7 +132,8 @@ class _RuledLine extends StatelessWidget {
   }
 }
 
-/// A button in the line over the waiting messages: its words in the accent, 44 tall.
+/// A button in the line over the waiting messages: its words in the accent, a finger's
+/// [Tappable.touchSide] tall.
 class _LineButton extends StatelessWidget {
   const _LineButton(this.label, this.onTap);
 
@@ -145,7 +146,7 @@ class _LineButton extends StatelessWidget {
     onTap: onTap,
     radius: BorderRadius.circular(6),
     child: ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 44),
+      constraints: const BoxConstraints(minHeight: Tappable.touchSide),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Center(
@@ -207,9 +208,10 @@ class _Waiting extends StatelessWidget {
               ),
             ),
           ),
-          // Don't send's target is 44 wide, so the line reaches 12 past the bubble's edge.
+          // Don't send's target is 48 wide, so the line reaches 14 past the bubble's edge, which
+          // keeps its cross where a 44 one put it.
           Transform.translate(
-            offset: const Offset(12, 0),
+            offset: const Offset(14, 0),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [

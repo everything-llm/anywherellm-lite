@@ -8,8 +8,9 @@ import 'tappable.dart';
 
 /// House UI's button: the `primary` one a pill on the accent with its glow, 48 tall, for the one
 /// action a screen exists for; any other on the tile inside a [Tokens.lineStrong] edge, 44
-/// tall, or [danger] inside a [Tokens.danger] one. Its label is 16 at 600 and wraps rather than
-/// truncating. Disabled, it stays readable on [Tokens.sunken]. In an [ActionRow.even] it keeps
+/// tall, or [danger] inside a [Tokens.danger] one. Each is tapped in at least
+/// [Tappable.touchSide], so a 44 tall one takes taps 2 past its edge above and below. Its label
+/// is 16 at 600 and wraps rather than truncating. Disabled, it stays readable on [Tokens.sunken]. In an [ActionRow.even] it keeps
 /// 8 px either side of its label rather than 16.
 class AppButton extends StatelessWidget {
   const AppButton(
@@ -73,6 +74,7 @@ class AppButton extends StatelessWidget {
         : t.lineStrong;
     final radius = BorderRadius.circular(primary ? 999 : Sizes.control);
     return Tappable(
+      touchTarget: true,
       label: label,
       onTap: onPressed,
       radius: radius,
@@ -325,7 +327,7 @@ class TextAction extends StatelessWidget {
       onTap: onTap,
       radius: BorderRadius.circular(6),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 44),
+        constraints: const BoxConstraints(minHeight: Tappable.touchSide),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Align(widthFactor: 1, heightFactor: 1, child: content),

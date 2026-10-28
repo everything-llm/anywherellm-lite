@@ -7,7 +7,8 @@ import 'tappable.dart';
 
 /// A row of equal segments on a [Tokens.sunken] track, one of them chosen: the chosen one a tile
 /// inside a [Tokens.lineStrong] ring, its label at 600. [onChanged] null shows it disabled. Each
-/// segment is at least 44 tall, its label [Type.body].
+/// segment is drawn at least 44 tall and tapped in a finger's [Tappable.touchSide], which
+/// reaches into the track's edge, its label [Type.body].
 class Segmented<T> extends StatelessWidget {
   const Segmented({
     super.key,
@@ -28,7 +29,8 @@ class Segmented<T> extends StatelessWidget {
     return Opacity(
       opacity: onChanged == null ? 0.55 : 1,
       child: Container(
-        padding: const EdgeInsets.all(3),
+        // 3 round the segments; 2 of it above and below is their hit area.
+        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
         decoration: BoxDecoration(
           color: t.sunken,
           borderRadius: BorderRadius.circular(Sizes.control),
@@ -39,6 +41,7 @@ class Segmented<T> extends StatelessWidget {
             for (final (option, label) in options)
               Expanded(
                 child: Tappable(
+                  touchTarget: true,
                   label: label,
                   selected: value == option,
                   onTap: onChanged == null ? null : () => onChanged(option),

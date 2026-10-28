@@ -62,7 +62,7 @@ class AppSwitch extends StatelessWidget {
       dimWhenDisabled: 0.5,
       child: SizedBox(
         width: 52,
-        height: 44,
+        height: Tappable.touchSide,
         child: Center(child: SwitchTrack(value: value)),
       ),
     );

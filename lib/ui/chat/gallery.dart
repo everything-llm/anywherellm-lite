@@ -316,7 +316,7 @@ class _GalleryPageState extends State<GalleryPage> {
                 color: t.tile,
                 dimWhenDisabled: 0.4,
                 child: SizedBox.square(
-                  dimension: 44,
+                  dimension: Tappable.touchSide,
                   child: Center(
                     child: AppIcon(icon, size: IconSize.small, color: t.ink),
                   ),

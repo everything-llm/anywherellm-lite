@@ -145,7 +145,7 @@ class _AnswerImageState extends State<AnswerImage> {
   Widget _missing(BuildContext context, String name, {String? failure}) {
     final t = Tokens.of(context);
     final box = Container(
-      constraints: const BoxConstraints(minHeight: 44),
+      constraints: const BoxConstraints(minHeight: Tappable.touchSide),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: t.sunken,

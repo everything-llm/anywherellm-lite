@@ -344,7 +344,7 @@ class ImageViewer extends StatelessWidget {
                           onTap: onClose,
                           radius: BorderRadius.circular(10),
                           child: SizedBox.square(
-                            dimension: 44,
+                            dimension: Tappable.touchSide,
                             child: Center(
                               child: AppIcon(
                                 'close',

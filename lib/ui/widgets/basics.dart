@@ -155,6 +155,7 @@ class UndoBar extends StatelessWidget {
               ),
             ),
             Tappable(
+              touchTarget: true,
               label: 'Undo',
               onTap: onUndo,
               radius: BorderRadius.circular(6),

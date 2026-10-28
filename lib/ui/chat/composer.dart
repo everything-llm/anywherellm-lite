@@ -848,12 +848,15 @@ class _Form extends StatelessWidget {
                       size: IconSize.small,
                     ),
                   ),
-                // The round button is 40 across in a 48 square, as the Lite prototype draws it.
-                // While this chat answers it is Send when done once something is typed, and Stop
-                // while nothing is.
+                // The round button is 40 across in a 48 square, as the Lite prototype draws it,
+                // 8 from the microphone's square, so the two never abut. While this chat answers
+                // it is Send when done once something is typed, and Stop while nothing is.
                 oneLine(
                   Padding(
-                    padding: const EdgeInsets.all(4),
+                    padding: EdgeInsets.only(
+                      left: onDictate == null ? 4 : 8,
+                      right: 4,
+                    ),
                     child: here && !holdable
                         ? RoundButton(
                             label: 'Stop the answer',

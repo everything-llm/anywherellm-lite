@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 /// The one way a control is tappable: an optional tooltip, a button's semantics, a surface and
 /// an ink well, in that order.
@@ -54,11 +57,14 @@ class Tappable extends StatelessWidget {
   final bool excludeSemantics;
 
   /// True gives a control drawn smaller than a finger a square of [touchSide] to be tapped in,
-  /// where a tap beside it does what [onTap] does.
+  /// where a tap beside it does what [onTap] does. The control keeps the constraints it is
+  /// given, so one that fills the width it is given, as a button in an even row does, still
+  /// fills it.
   final bool touchTarget;
 
-  /// The least a finger needs.
-  static const touchSide = 44.0;
+  /// The least a finger needs: House UI's `size-target-touch`, as Android's 48 dp is. A control
+  /// may be drawn smaller, as a 44 tall button is; its hit area is never smaller than this.
+  static const touchSide = 48.0;
 
   /// [surface] over [shadows] in the shape of its [outline], whose edge it does not draw again.
   Widget _shadowed(ShapeBorder? outline, Widget surface) {
@@ -124,12 +130,66 @@ class Tappable extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       // The control already says what it is and does.
       excludeFromSemantics: true,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minWidth: touchSide,
-          minHeight: touchSide,
-        ),
-        child: Center(widthFactor: 1, heightFactor: 1, child: result),
+      child: _TouchBox(child: result),
+    );
+  }
+}
+
+/// [child] centred in a box at least [Tappable.touchSide] square. Unlike a [ConstrainedBox] over
+/// a [Center], it hands [child] the constraints it is given unloosened, so a control given a
+/// tight width keeps it.
+class _TouchBox extends SingleChildRenderObjectWidget {
+  const _TouchBox({required super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderTouchBox();
+}
+
+class _RenderTouchBox extends RenderShiftedBox {
+  _RenderTouchBox() : super(null);
+
+  @override
+  void performLayout() {
+    final child = this.child;
+    if (child == null) {
+      size = constraints.constrain(const Size.square(Tappable.touchSide));
+      return;
+    }
+    child.layout(constraints, parentUsesSize: true);
+    size = constraints.constrain(
+      Size(
+        math.max(child.size.width, Tappable.touchSide),
+        math.max(child.size.height, Tappable.touchSide),
+      ),
+    );
+    (child.parentData! as BoxParentData).offset = Alignment.center.alongOffset(
+      size - child.size as Offset,
+    );
+  }
+
+  @override
+  double computeMinIntrinsicWidth(double height) =>
+      math.max(super.computeMinIntrinsicWidth(height), Tappable.touchSide);
+
+  @override
+  double computeMaxIntrinsicWidth(double height) =>
+      math.max(super.computeMaxIntrinsicWidth(height), Tappable.touchSide);
+
+  @override
+  double computeMinIntrinsicHeight(double width) =>
+      math.max(super.computeMinIntrinsicHeight(width), Tappable.touchSide);
+
+  @override
+  double computeMaxIntrinsicHeight(double width) =>
+      math.max(super.computeMaxIntrinsicHeight(width), Tappable.touchSide);
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) {
+    final child = this.child?.getDryLayout(constraints) ?? Size.zero;
+    return constraints.constrain(
+      Size(
+        math.max(child.width, Tappable.touchSide),
+        math.max(child.height, Tappable.touchSide),
       ),
     );
   }

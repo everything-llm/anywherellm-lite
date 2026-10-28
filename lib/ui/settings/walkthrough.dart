@@ -520,7 +520,7 @@ class GuideLink extends StatelessWidget {
         onTap: onTap,
         radius: BorderRadius.circular(Sizes.small),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 44),
+          constraints: const BoxConstraints(minHeight: Tappable.touchSide),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Center(

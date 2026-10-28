@@ -556,7 +556,9 @@ class _Hero extends StatelessWidget {
                 radius: BorderRadius.circular(Sizes.small),
                 onTap: () => scope.shell.togglePopup(Popup.workspaces),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 44),
+                  constraints: const BoxConstraints(
+                    minHeight: Tappable.touchSide,
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     // The chevron sits against the name, so it reads as part of what opens.
@@ -602,7 +604,9 @@ class _Hero extends StatelessWidget {
                 child: SizedBox(
                   width: MediaQuery.sizeOf(context).width - 32,
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 44),
+                    constraints: const BoxConstraints(
+                      minHeight: Tappable.touchSide,
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -877,12 +881,13 @@ class _Answer extends StatelessWidget {
         ],
         if (!turn.streaming && (answered || (retry != null && !askAgain))) ...[
           const SizedBox(height: 8),
-          // The buttons are 44 wide, side by side, and the row starts 12 to the left, so the
-          // first icon lines up with the text.
+          // The buttons are 48 wide, 8 apart, and the row starts 15 to the left, so the first
+          // icon lines up with the text.
           Transform.translate(
-            offset: const Offset(-12, 0),
+            offset: Offset(-(answerAction - answerActionIcon.px) / 2, 0),
             child: Wrap(
               crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
               children: [
                 if (answered)
                   CopyButton(
@@ -1035,7 +1040,7 @@ class _Citations extends StatelessWidget {
               widthOf('+${citations.length}', _MoreSources.style),
         ),
         width: box.maxWidth,
-        gap: _Citation.gap,
+        gap: _Citation.apart,
       );
       return _line(context, widths);
     },
@@ -1056,15 +1061,15 @@ class _Citations extends StatelessWidget {
         final open = beside
             ? mine && picked.source == null
             : shell.citedOpen && identical(shell.cited, citations);
-        // The line is 44 tall around its chips, as the Lite prototype draws it.
+        // The line is as tall as its chips' hit areas, a finger's [Tappable.touchSide].
         return ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 44),
+          constraints: const BoxConstraints(minHeight: Tappable.touchSide),
           child: Align(
             alignment: Alignment.centerLeft,
             heightFactor: 1,
             child: ClipRect(
               child: Row(
-                spacing: _Citation.gap,
+                spacing: _Citation.apart,
                 children: [
                   for (final (i, citation) in named.indexed)
                     SizedBox(
@@ -1178,8 +1183,11 @@ class _Citation extends StatelessWidget {
   static const _number = 17.0;
   static const _icon = 13.0;
 
-  /// The room between its parts, and between chips in a line.
+  /// The room between its parts.
   static const gap = 6.0;
+
+  /// The room between chips in a line, as House UI keeps neighbouring controls apart.
+  static const apart = 8.0;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -1196,6 +1204,7 @@ class _Citation extends StatelessWidget {
     final live = present || url != null;
     final passages = present && citation.passages.isNotEmpty;
     final chip = Tappable(
+      touchTarget: true,
       label: present || url == null
           ? 'Source $number: $title'
           : 'Source $number: $title, opens in the browser',
