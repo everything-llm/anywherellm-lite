@@ -16,7 +16,7 @@ from collections.abc import Callable
 from pathlib import Path
 from xml.etree import ElementTree
 
-PACKAGE = "local.anywherellm.lite"
+PACKAGE = "local.anywherellm.lite.stock"
 SCALES = ("window_animation_scale", "transition_animation_scale", "animator_duration_scale")
 ROOT = Path(__file__).resolve().parent.parent
 # Where `flutter build apk --debug` puts the APK.
