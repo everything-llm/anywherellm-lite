@@ -9,7 +9,8 @@ import 'widgets/fields.dart';
 import 'widgets/sheet.dart';
 
 /// A phone's sheet for one chat of the workspace on screen, over the window: its name, which
-/// renames it as it is typed, Pin to the top and Delete chat, which asks first.
+/// renames it as it is typed, Pin to the top and Delete chat, which deletes it at once with a
+/// toast to undo it ([ChatController.delete]), so it asks nothing first.
 class ChatSheet extends StatefulWidget {
   const ChatSheet(this.of, {super.key});
 
@@ -63,12 +64,7 @@ class _ChatSheetState extends State<ChatSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final of = widget.of;
-    return ModalSheet(
-      title: of.deleting ? 'Delete chat' : 'Chat',
-      onClose: _close,
-      child: of.deleting ? _Delete(of) : _sheet(),
-    );
+    return ModalSheet(title: 'Chat', onClose: _close, child: _sheet());
   }
 
   Widget _sheet() {
@@ -112,32 +108,15 @@ class _ChatSheetState extends State<ChatSheet> {
                   tone: RowTone.danger,
                   onTap: answering
                       ? null
-                      : () => scope.shell.openChatSheet(thread, deleting: true),
+                      : () {
+                          scope.shell.closePopup();
+                          unawaited(scope.chat.delete(thread.slug));
+                        },
                 ),
               ]),
             ],
           ),
         );
-      },
-    );
-  }
-}
-
-/// The question before a chat is deleted.
-class _Delete extends StatelessWidget {
-  const _Delete(this.of);
-
-  final ChatSheetFor of;
-
-  @override
-  Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    return SheetQuestion(
-      'Delete ${of.thread.name}? Its messages go with it.',
-      onKeep: scope.shell.closePopup,
-      onConfirm: () {
-        scope.shell.closePopup();
-        unawaited(scope.chat.delete(of.thread.slug));
       },
     );
   }

@@ -153,21 +153,48 @@ void main() {
     },
   );
 
-  // testWidgets for its fake clock, which the undo and flash timers run on.
-  testWidgets('removing offers undo for a few seconds', (tester) async {
-    final rig = await started(planningServer());
-    final first = rig.sources.files.first;
+  // testWidgets for its fake clock, which shows the undo has no timer.
+  testWidgets(
+    'a removal waits for its toast: Undo sends nothing, Close sends it',
+    (tester) async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      Iterable<String> embeds() =>
+          llm.calls.where((c) => c.startsWith('updateEmbeddings'));
+      final first = rig.sources.files.first;
+      await rig.sources.remove(first);
+      expect(rig.sources.removed, same(first));
+      expect(rig.sources.files, hasLength(1));
+      expect(embeds(), isEmpty);
+
+      await rig.sources.undo();
+      expect(rig.sources.removed, isNull);
+      expect(rig.sources.files, hasLength(2));
+      expect(embeds(), isEmpty);
+
+      await rig.sources.remove(rig.sources.files.first);
+      await tester.pump(const Duration(minutes: 5));
+      expect(rig.sources.removed, same(first));
+      expect(embeds(), isEmpty);
+
+      await rig.sources.settleRemoval();
+      expect(rig.sources.removed, isNull);
+      expect(embeds(), ['updateEmbeddings:+-${first.path}']);
+      expect(rig.sources.files.map((f) => f.path), isNot(contains(first.path)));
+      expect(llm.spaces.first.docs, hasLength(1));
+    },
+  );
+
+  test('another removal sends the one its toast held', () async {
+    final llm = planningServer();
+    final rig = await started(llm);
+    final [first, second] = rig.sources.files;
     await rig.sources.remove(first);
-    expect(rig.sources.removed, same(first));
-    expect(rig.sources.files, hasLength(1));
-
-    await rig.sources.undo();
-    expect(rig.sources.removed, isNull);
-    expect(rig.sources.files, hasLength(2));
-
-    await rig.sources.remove(rig.sources.files.first);
-    await tester.pump(SourcesController.undoFor);
-    expect(rig.sources.removed, isNull);
+    await rig.sources.remove(second);
+    expect(rig.sources.removed, same(second));
+    expect(llm.calls.where((c) => c.startsWith('updateEmbeddings')), [
+      'updateEmbeddings:+-${first.path}',
+    ]);
   });
 
   testWidgets('a citation lights its file for a moment', (tester) async {
@@ -196,19 +223,37 @@ void main() {
     expect(rig.sources.files, isEmpty);
   });
 
-  test('a late removal offers no undo in another workspace', () async {
-    final llm = planningServer();
-    final rig = await started(llm);
-    final gate = llm.gates['updateEmbeddings'] = Completer<void>();
-    final removing = rig.sources.remove(rig.sources.files.first);
-    await rig.chat.select('household');
-    gate.complete();
-    await removing;
-    expect(rig.sources.removed, isNull);
-    await rig.sources.undo();
-    expect(llm.spaces.last.docs, isEmpty);
-    expect(llm.spaces.first.docs, hasLength(1));
-  });
+  test(
+    'another workspace sends the removal to the one it was made in',
+    () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      final gate = llm.gates['updateEmbeddings'] = Completer<void>();
+      await rig.sources.remove(rig.sources.files.first);
+      await rig.chat.select('household');
+      expect(rig.sources.removed, isNull);
+      gate.complete();
+      await pumpEventQueue();
+      await rig.sources.undo();
+      expect(llm.spaces.last.docs, isEmpty);
+      expect(llm.spaces.first.docs, hasLength(1));
+      expect(rig.sources.problems, isEmpty);
+    },
+  );
+
+  test(
+    'a removal waiting on another server is dropped, and the file stays',
+    () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.sources.remove(rig.sources.files.first);
+      await rig.settings.save('https://other:3001', 'K2');
+      await pumpEventQueue();
+      expect(rig.sources.removed, isNull);
+      expect(llm.calls.where((c) => c.startsWith('updateEmbeddings')), isEmpty);
+      expect(llm.spaces.first.docs, hasLength(2));
+    },
+  );
 
   test(
     'a server switch stops an upload before the next file or embedding',

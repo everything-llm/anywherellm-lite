@@ -67,11 +67,12 @@ class _ChatViewState extends State<ChatView> {
             // A server that cannot be reached has the banner, in place of the read's failure.
             final unreachable =
                 scope.chat.unreachable.value && scope.settings.configured;
-            final notices = [
-              ?(scope.chat.notice ?? scope.prefs.problem),
-              ?scope.chat.linkNotice,
-            ];
-            if (!unreachable && notices.isEmpty) return const SizedBox.shrink();
+            final notice = scope.chat.notice ?? scope.prefs.problem;
+            // Why a link did not open stays until it is closed, or another chat or message.
+            final link = scope.chat.linkNotice;
+            if (!unreachable && notice == null && link == null) {
+              return const SizedBox.shrink();
+            }
             return Padding(
               padding: unreachable
                   ? const EdgeInsets.fromLTRB(16, 4, 16, 0)
@@ -81,7 +82,13 @@ class _ChatViewState extends State<ChatView> {
                 spacing: 8,
                 children: [
                   if (unreachable) const _Unreachable(),
-                  for (final n in notices) AlertBox.notice(AlertKind.bad, n),
+                  if (notice != null) AlertBox.notice(AlertKind.bad, notice),
+                  if (link != null)
+                    AlertBox.notice(
+                      AlertKind.bad,
+                      link,
+                      onClose: scope.chat.closeLinkNotice,
+                    ),
                 ],
               ),
             );

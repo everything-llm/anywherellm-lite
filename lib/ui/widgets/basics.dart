@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../icons.dart';
 import '../layout.dart';
 import '../state/notice.dart';
 import '../tokens.dart';
@@ -11,12 +12,24 @@ import 'tappable.dart';
 enum AlertKind { warn, bad, info }
 
 class AlertBox extends StatelessWidget {
-  const AlertBox(this.kind, this.title, {super.key, this.text, this.action});
+  const AlertBox(
+    this.kind,
+    this.title, {
+    super.key,
+    this.text,
+    this.action,
+    this.onClose,
+  });
 
   /// A box for [notice]: its title, over what went wrong.
-  AlertBox.notice(this.kind, Notice notice, {super.key, this.action})
-    : title = notice.title,
-      text = notice.text;
+  AlertBox.notice(
+    this.kind,
+    Notice notice, {
+    super.key,
+    this.action,
+    this.onClose,
+  }) : title = notice.title,
+       text = notice.text;
 
   final AlertKind kind;
   final String title;
@@ -24,6 +37,9 @@ class AlertBox extends StatelessWidget {
 
   /// A button under the text, such as the one that asks again.
   final Widget? action;
+
+  /// Puts the box away, for one that stays until it is closed: a Close button at its end.
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -51,33 +67,70 @@ class AlertBox extends StatelessWidget {
           border: border,
           borderRadius: BorderRadius.circular(Sizes.notice),
         ),
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (kind == AlertKind.info)
-              Row(
-                children: [
-                  const ReadyDot(gap: false),
-                  const SizedBox(width: 8),
-                  Expanded(child: heading),
-                ],
-              )
-            else
-              heading,
-            if (text != null) ...[
-              const SizedBox(height: 6),
-              // What it says is a sentence or two, so it is running text.
-              Text(text!, style: Type.body(body)),
-            ],
-            if (action case final action?) ...[
-              const SizedBox(height: 10),
-              Align(alignment: Alignment.centerLeft, child: action),
+            Expanded(child: _says(heading, body)),
+            if (onClose case final onClose?) ...[
+              const SizedBox(width: 8),
+              CloseButtonMark(color: ink, onTap: onClose),
             ],
           ],
         ),
       ),
     );
   }
+
+  /// The title, the sentence and the action, one under another.
+  Widget _says(Widget heading, Color body) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      if (kind == AlertKind.info)
+        Row(
+          children: [
+            const ReadyDot(gap: false),
+            const SizedBox(width: 8),
+            Expanded(child: heading),
+          ],
+        )
+      else
+        heading,
+      if (text != null) ...[
+        const SizedBox(height: 6),
+        // What it says is a sentence or two, so it is running text.
+        Text(text!, style: Type.body(body)),
+      ],
+      if (action case final action?) ...[
+        const SizedBox(height: 10),
+        Align(alignment: Alignment.centerLeft, child: action),
+      ],
+    ],
+  );
+}
+
+/// Close, as a toast or a box that stays until it is closed draws it: a cross in [color],
+/// heard and shown as Close, tapped in a finger's [Tappable.touchSide].
+class CloseButtonMark extends StatelessWidget {
+  const CloseButtonMark({super.key, required this.color, required this.onTap});
+
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Tappable(
+    touchTarget: true,
+    label: 'Close',
+    tooltip: 'Close',
+    onTap: onTap,
+    shape: const CircleBorder(),
+    hoverColor: color.withValues(alpha: 0.1),
+    child: SizedBox.square(
+      dimension: 36,
+      child: Center(
+        child: AppIcon('close', size: IconSize.small, color: color),
+      ),
+    ),
+  );
 }
 
 /// The accent dot beside a chat or workspace whose answer finished while it was not on
@@ -101,18 +154,23 @@ class ReadyDot extends StatelessWidget {
   );
 }
 
-/// A dark bar saying what was just done, with Undo, as after a file is removed or a chat is
-/// deleted.
+/// A dark bar saying what was just done, with Undo and Close, as after a file is removed or a
+/// chat is deleted. It has no clock: it stays until the person undoes, closes or leaves, and
+/// what it reports is done for good only then ([onClose]). Its words wrap.
 class UndoBar extends StatelessWidget {
   const UndoBar(
     this.text, {
     super.key,
     required this.onUndo,
+    required this.onClose,
     this.floating = false,
   });
 
   final String text;
   final VoidCallback onUndo;
+
+  /// Puts the bar away, and with it the chance to undo.
+  final VoidCallback onClose;
 
   /// Over a phone's chat: rounder, its words at 16 and centred, Undo underlined.
   final bool floating;
@@ -124,8 +182,8 @@ class UndoBar extends StatelessWidget {
       liveRegion: true,
       child: Container(
         padding: floating
-            ? const EdgeInsets.fromLTRB(16, 6, 8, 6)
-            : const EdgeInsets.fromLTRB(12, 4, 4, 4),
+            ? const EdgeInsets.fromLTRB(16, 4, 4, 4)
+            : const EdgeInsets.fromLTRB(12, 0, 0, 0),
         decoration: BoxDecoration(
           color: t.ink,
           borderRadius: BorderRadius.circular(
@@ -145,12 +203,13 @@ class UndoBar extends StatelessWidget {
         child: Row(
           children: [
             Expanded(
-              child: Text(
-                text,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: floating ? TextAlign.center : TextAlign.start,
-                style: floating ? Type.body(t.ground) : Type.note(t.ground),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  text,
+                  textAlign: floating ? TextAlign.center : TextAlign.start,
+                  style: floating ? Type.body(t.ground) : Type.note(t.ground),
+                ),
               ),
             ),
             Tappable(
@@ -179,6 +238,8 @@ class UndoBar extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(width: 8),
+            CloseButtonMark(color: t.ground, onTap: onClose),
           ],
         ),
       ),

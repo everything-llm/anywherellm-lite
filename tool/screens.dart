@@ -148,8 +148,10 @@ final _screens = <String, _Setup>{
     h.shell.openChatSheet(_thread(h, 'errands'));
     await _settle(tester);
   },
+  // Delete chat acts at once, with a toast to undo it.
   'chatdel': (tester, h) async {
-    h.shell.openChatSheet(_thread(h, 'errands'), deleting: true);
+    await _openChat(tester, h, 'errands');
+    await h.chat.delete(_thread(h, 'errands').slug);
     await _settle(tester);
   },
   'attach': (tester, h) async {

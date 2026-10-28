@@ -4,7 +4,6 @@ import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/shortcuts.dart';
-import 'package:anywherellm/ui/state/chat_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
@@ -153,7 +152,9 @@ void main() {
       await rig.chat.delete('budget');
       await rig.chat.deleteWorkspace('q3');
       expect(rig.chat.deletedChat, isNull);
-      await tester.pump(ChatController.undoFor + const Duration(seconds: 1));
+      // Nothing is left for the toast's Close to send.
+      await rig.chat.flushDelete();
+      await tester.pump(const Duration(minutes: 1));
       expect(llm.calls.where((c) => c.startsWith('deleteThread')), isEmpty);
       expect(rig.chat.problem, isNull);
       expect(rig.chat.threadsOf('q3'), isEmpty);

@@ -16,7 +16,8 @@ import 'prefs_controller.dart';
 import 'read.dart';
 
 /// The active workspace's Sources: what it answers from, adding files, switching them on and off,
-/// and removing them with a short chance to undo.
+/// and removing them with a toast to undo it, which sends nothing to the server until it is
+/// done with.
 ///
 /// Switching a file off takes it out of the workspace on the server and remembers it here, so it
 /// stays listed. Removing forgets it altogether; the file stays in the server's documents.
@@ -32,9 +33,16 @@ class SourcesController extends ChangeNotifier {
   /// The workspace [files] describe.
   String? _slug;
 
-  /// The workspace's documents, switched on first, and how many of them are on.
-  List<SourceFile> get files => _files;
-  int get onCount => _files.where((f) => f.on).length;
+  /// The workspace's documents, switched on first, and how many of them are on. A file removed
+  /// while its toast can undo it is left out.
+  List<SourceFile> get files => switch (_removed) {
+    null => _files,
+    final removed => [
+      for (final f in _files)
+        if (f.path != removed.file.path) f,
+    ],
+  };
+  int get onCount => files.where((f) => f.on).length;
   List<SourceFile> _files = const [];
 
   late final _workspace = ReadSlot<Workspace>(notifyListeners);
@@ -59,8 +67,14 @@ class SourcesController extends ChangeNotifier {
   List<Notice> problems = const [];
 
   /// The file just removed, for the undo toast.
-  SourceFile? get removed => _removed.value;
-  late final _removed = Fleeting<SourceFile>(undoFor, (_) => notifyListeners());
+  SourceFile? get removed => _removed?.file;
+
+  /// The removal the toast holds, with the workspace and server it was made on: the file is out
+  /// of [files] at once and out of the workspace only once [settleRemoval] sends it.
+  ({String slug, Connection? server, SourceFile file})? _removed;
+
+  /// Whether [dispose] ran.
+  bool _disposed = false;
 
   /// The path of the file a citation pointed at, lit up for a moment.
   String? get flashed => _flashed.value;
@@ -71,7 +85,6 @@ class SourcesController extends ChangeNotifier {
   List<SearchHit>? hits;
   bool searching = false;
 
-  static const undoFor = Duration(seconds: 6);
   static const flashFor = Duration(milliseconds: 1800);
 
   /// The file titled [title], or null when it is no longer in Sources.
@@ -81,14 +94,18 @@ class SourcesController extends ChangeNotifier {
   @override
   void dispose() {
     _chat.removeListener(_chatChanged);
+    _disposed = true;
     chatMode.dispose();
-    _removed.take();
+    // A removal still waiting is dropped, and the file stays: the app sends it as it hides.
+    _removed = null;
     _flashed.take();
     super.dispose();
   }
 
   void _chatChanged() {
     if (_chat.activeSlug == _slug) return;
+    // Another workspace leaves the toast behind: the removal it held goes now.
+    unawaited(settleRemoval());
     _slug = _chat.activeSlug;
     _workspace.reset();
     _files = const [];
@@ -99,7 +116,6 @@ class SourcesController extends ChangeNotifier {
     searched = null;
     hits = null;
     searching = false;
-    _removed.take();
     notifyListeners();
     if (_slug != null) unawaited(refresh());
   }
@@ -252,22 +268,52 @@ class SourcesController extends ChangeNotifier {
     await refresh();
   }
 
-  /// Takes [file] out of Sources. [undo] puts it back for a few seconds after.
-  Future<void> remove(SourceFile file) {
-    final server = _chat.server;
-    return _change('Could not remove ${file.title}', (slug) async {
-      await _put(slug, file, back: false);
-      if (server != _chat.server || slug != _slug) return;
-      _removed.show(file);
-    });
+  /// Takes [file] out of Sources at once, and out of the workspace on the server only once its
+  /// toast is done with ([settleRemoval]): closed, replaced by another removal, left for another
+  /// workspace or the sheet's closing, or the app hiding. [undo] puts it back before then, and
+  /// nothing is sent.
+  Future<void> remove(SourceFile file) async {
+    final slug = _slug;
+    if (slug == null) return;
+    final before = settleRemoval();
+    _removed = (slug: slug, server: _chat.server, file: file);
+    notifyListeners();
+    await before;
   }
 
+  /// Puts back the file [remove] took out, while its toast shows.
   Future<void> undo() async {
-    final file = _removed.take();
-    if (file == null) return;
-    await _change(
-      'Could not put ${file.title} back',
-      (slug) => _put(slug, file, back: true),
+    if (_removed == null) return;
+    _removed = null;
+    notifyListeners();
+  }
+
+  /// Sends the removal the toast holds to the workspace it was made in, then reads that
+  /// workspace again while it is the active one, showing why it failed. One made on another
+  /// server than the one now in use is dropped, and the file stays where it was. Given [of], it
+  /// sends only that file's removal, should another have taken its place meanwhile.
+  Future<void> settleRemoval({SourceFile? of}) async {
+    final removed = _removed;
+    if (removed == null || _disposed) return;
+    if (of != null && removed.file.path != of.path) return;
+    _removed = null;
+    final (:slug, :server, :file) = removed;
+    if (server != _chat.server) {
+      notifyListeners();
+      return;
+    }
+    // Out of the list until the read after the removal says otherwise.
+    if (slug == _slug) {
+      _files = [
+        for (final f in _files)
+          if (f.path != file.path) f,
+      ];
+    }
+    notifyListeners();
+    await _changeIn(
+      slug,
+      'Could not remove ${file.title}',
+      () => _put(slug, file, back: false),
     );
   }
 
@@ -397,11 +443,21 @@ class SourcesController extends ChangeNotifier {
     Future<void> Function(String) op,
   ) async {
     final slug = _slug;
-    final server = _chat.server;
     if (slug == null) return;
+    await _changeIn(slug, failTitle, () => op(slug));
+  }
+
+  /// Runs [op] on workspace [slug], then, while it is the active one on the same server, shows
+  /// why it failed, or nothing, and reads it again.
+  Future<void> _changeIn(
+    String slug,
+    String failTitle,
+    Future<void> Function() op,
+  ) async {
+    final server = _chat.server;
     await changeThenRead(
       failTitle,
-      () => op(slug),
+      op,
       current: () => server == _chat.server && slug == _slug,
       readAgain: (failed) {
         problems = [?failed];

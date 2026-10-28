@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/sources.dart';
 import '../app_scope.dart';
+import '../state/sources_controller.dart';
 import '../settings/rows.dart';
 import '../layout.dart';
 import '../tokens.dart';
@@ -54,9 +55,49 @@ List<Widget> documentNotices(BuildContext context) {
     ],
     if (sources.removed case final file?) ...[
       const SizedBox(height: 10),
-      UndoBar('Removed ${file.title}', onUndo: sources.undo),
+      _RemovedBar(file, key: ValueKey(('removed', file.path))),
     ],
   ];
+}
+
+/// The toast of a document just removed, with Undo and Close. The removal goes to the server
+/// when it is closed, or when the toast leaves the screen, as when the sheet or the pane that
+/// shows it closes.
+class _RemovedBar extends StatefulWidget {
+  const _RemovedBar(this.file, {super.key});
+
+  final SourceFile file;
+
+  @override
+  State<_RemovedBar> createState() => _RemovedBarState();
+}
+
+class _RemovedBarState extends State<_RemovedBar> {
+  late final SourcesController _sources;
+
+  @override
+  void initState() {
+    super.initState();
+    _sources = AppScope.of(context).sources;
+  }
+
+  @override
+  void dispose() {
+    // After the frame: settling tells Sources' listeners, which may not rebuild while the tree
+    // is being torn down.
+    final (sources, file) = (_sources, widget.file);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => unawaited(sources.settleRemoval(of: file)),
+    );
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => UndoBar(
+    'Removed ${widget.file.title}',
+    onUndo: () => unawaited(_sources.undo()),
+    onClose: () => unawaited(_sources.settleRemoval()),
+  );
 }
 
 /// The sheet: what the switches mean, the files in a card, each with its switch, then Add a

@@ -356,6 +356,37 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
     });
 
+    testWidgets('Clear all\'s toast stays until Close, or another chat', (
+      tester,
+    ) async {
+      final (h, llm) = await answering(tester);
+      final thread = h.chat.activeThread!;
+      await queue(tester, 'Second');
+      await tester.tap(control('Clear all'));
+      await tester.pump(const Duration(milliseconds: 300));
+      // No timer: Undo is still there a minute on.
+      await tester.pump(const Duration(minutes: 1));
+      expect(find.text('Cleared 1 waiting message'), findsOneWidget);
+      await tester.tap(control('Close'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Cleared 1 waiting message'), findsNothing);
+      expect(h.chat.clearedOnDeck, isNull);
+      expect(h.chat.onDeck, isEmpty);
+
+      await queue(tester, 'Third');
+      h.chat.clearOnDeck();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(h.chat.clearedOnDeck, 1);
+      await h.chat.open('priorities');
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(h.chat.clearedOnDeck, isNull);
+      expect(find.text('Cleared 1 waiting message'), findsNothing);
+      await h.chat.open(thread);
+      await llm.chat!.close();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(sent(llm, 'Third'), 0);
+    });
+
     testWidgets('past ten the line warns of a long queue', (tester) async {
       final (h, llm) = await answering(tester);
       for (var i = 1; i <= 11; i++) {

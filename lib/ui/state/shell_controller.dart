@@ -38,13 +38,11 @@ class AsideChoice {
 /// camera.
 enum Guide { connect }
 
-/// A phone's sheet for one chat of the workspace on screen: its name, its pin and Delete, or
-/// with [deleting] the question whether to delete it.
+/// A phone's sheet for one chat of the workspace on screen: its name, its pin and Delete.
 class ChatSheetFor {
-  const ChatSheetFor(this.thread, {this.deleting = false});
+  const ChatSheetFor(this.thread);
 
   final Thread thread;
-  final bool deleting;
 }
 
 /// A phone's sheet about the open workspace: a new workspace's name, the open one's new name,
@@ -102,8 +100,7 @@ class ShellController extends ChangeNotifier {
       _popup.value = GalleryOpen(pictures, index, chat: chat);
 
   /// Opens [thread]'s sheet, closing any other popup.
-  void openChatSheet(Thread thread, {bool deleting = false}) =>
-      _popup.value = ChatSheetFor(thread, deleting: deleting);
+  void openChatSheet(Thread thread) => _popup.value = ChatSheetFor(thread);
 
   /// Opens the popup [key], closing any other, or closes it when it is open.
   void togglePopup(Object key) =>

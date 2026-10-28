@@ -245,21 +245,22 @@ class ChatController extends ChangeNotifier with FollowsServer {
     return true;
   }
 
-  /// The messages [clearOnDeck] took out, while [undoClearOnDeck] can put them back.
-  late final _cleared = Fleeting<({String thread, _Deck deck})>(
-    undoFor,
-    (_) => notifyListeners(),
-  );
+  /// The messages [clearOnDeck] took out, while [undoClearOnDeck] can put them back: until the
+  /// toast is closed ([closeClearedOnDeck]), another toast takes its place, or another chat
+  /// shows.
+  final _cleared = Fleeting<({String thread, _Deck deck})>.held();
 
   /// How many messages [undoClearOnDeck] would put back, or null.
   int? get clearedOnDeck => _cleared.value?.deck.next.length;
 
   /// Takes every message waiting in the chat on screen out at once. [undoClearOnDeck] puts them
-  /// back for [undoFor].
+  /// back while its toast shows. It takes the place of a deleted chat's toast, whose delete
+  /// goes now.
   void clearOnDeck() {
     final thread = activeThread;
     final deck = _onDeck[thread];
     if (thread == null || deck == null) return;
+    unawaited(flushDelete());
     _cleared.show((thread: thread, deck: deck));
     _setDeck(thread, deck.slug, const []);
     notifyListeners();
@@ -279,6 +280,12 @@ class ChatController extends ChangeNotifier with FollowsServer {
       ], held: now?.held ?? deck.held);
       _sendOnDeck();
     }
+    notifyListeners();
+  }
+
+  /// Closes the toast of what [clearOnDeck] took out: they are gone for good.
+  void closeClearedOnDeck() {
+    if (_cleared.take() == null) return;
     notifyListeners();
   }
 
@@ -434,16 +441,20 @@ class ChatController extends ChangeNotifier with FollowsServer {
   Notice? get notice =>
       unreachable.value && identical(problem, _readNotice) ? null : problem;
 
-  /// Why a link in an answer did not open. It clears after [linkNoticeFor], or on the next
-  /// message or chat opened.
+  /// Why a link in an answer did not open. It stays until it is closed ([closeLinkNotice]), or
+  /// the next message is sent or chat opened.
   Notice? get linkNotice => _link.value;
 
-  late final _link = Fleeting<Notice>(linkNoticeFor, (_) => notifyListeners());
+  final _link = Fleeting<Notice>.held();
+
+  /// Puts away why a link did not open.
+  void closeLinkNotice() {
+    if (_link.take() == null) return;
+    notifyListeners();
+  }
 
   /// The files and images answers show, read once per server.
   late final bytes = AnswerBytes(_api, report: report);
-
-  static const linkNoticeFor = Duration(seconds: 6);
 
   Workspace? get active => workspaceOf(activeSlug);
 
@@ -752,6 +763,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
   /// Shows workspace [slug] on chat [thread], or on its newest chat, or a draft when it has
   /// none.
   Future<void> select(String? slug, {String? thread}) async {
+    _leaving(thread);
     activeSlug = slug;
     _freshDraft();
     await open(
@@ -763,6 +775,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
   /// again when its last answer is [Turn.unfinished] or the reading is asked for [again], so
   /// what the server saved since shows.
   Future<void> open(String? threadSlug, {bool again = false}) async {
+    if (threadSlug != null && threadSlug != activeThread) _leaving(threadSlug);
     activeThread = threadSlug;
     if (threadSlug != null) {
       _ready.remove(threadSlug);
@@ -822,6 +835,15 @@ class ChatController extends ChangeNotifier with FollowsServer {
   ];
 
   /// Empties the draft, so a send or read meant for the one before leaves it alone.
+  /// Another chat is about to show, [thread] or a draft: a deleted chat's toast is done, so its
+  /// delete goes, and Clear all's toast for another chat goes with what it took out.
+  void _leaving(String? thread) {
+    unawaited(flushDelete());
+    if (_cleared.value case final cleared? when cleared.thread != thread) {
+      _cleared.take();
+    }
+  }
+
   void _freshDraft() {
     _draft = [];
     _draftGo++;
@@ -831,6 +853,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
   /// turns. A chat whose turns are still being read is not empty.
   void newChat() {
     if (ready && turns.isEmpty) return;
+    _leaving(null);
     _freshDraft();
     activeThread = null;
     _rememberChat();
@@ -919,11 +942,9 @@ class ChatController extends ChangeNotifier with FollowsServer {
     });
   }
 
-  /// How long a deleted chat can be put back before it is deleted on the server.
-  static const undoFor = Duration(seconds: 6);
-
-  /// The chat deleted from the list but not yet on the server, while it can be put back.
-  late final _deleted = Fleeting<_Deleted>(undoFor, (d) => unawaited(_send(d)));
+  /// The chat deleted from the list but not yet on the server, while it can be put back: its
+  /// toast has no clock, so nothing is deleted before the person is done with it.
+  final _deleted = Fleeting<_Deleted>.held();
 
   /// Whether [dispose] ran, after which a delete that comes back changes nothing.
   bool _disposed = false;
@@ -932,14 +953,16 @@ class ChatController extends ChangeNotifier with FollowsServer {
   String? get deletedChat => _deleted.value?.chat.name;
 
   /// Takes chat [threadSlug] of the workspace on screen out of the list at once, and deletes it
-  /// on the server [undoFor] later, unless [undoDelete] puts it back first. Another delete, or
-  /// [flushDelete], sends the one waiting at once. The chat on screen gives way to a new chat,
-  /// a draft in the same workspace.
+  /// on the server only once its toast is done: closed ([flushDelete]), replaced by another
+  /// delete or Clear all, left for another chat or workspace, another server, the app hiding or
+  /// [dispose]. [undoDelete] puts it back before then, and nothing is sent. The chat on screen
+  /// gives way to a new chat, a draft in the same workspace.
   Future<void> delete(String threadSlug) async {
     final slug = activeSlug;
     final server = this.server;
     if (slug == null || server == null || isAnswering(threadSlug)) return;
     unawaited(flushDelete());
+    _cleared.take();
     final was = threadsOf(slug);
     final at = was.indexWhere((t) => t.slug == threadSlug);
     if (at < 0) return;
@@ -979,8 +1002,8 @@ class ChatController extends ChangeNotifier with FollowsServer {
     }
   }
 
-  /// Deletes on the server, now, the chat [delete] took out, on the server it was on. A delete
-  /// the server refuses puts the chat back.
+  /// Deletes on the server, now, the chat [delete] took out, on the server it was on, as its
+  /// toast's Close does. A delete the server refuses puts the chat back.
   Future<void> flushDelete() => _send(_deleted.take());
 
   /// Deletes [deleted] on its server, putting it back when the server refuses.
@@ -1363,7 +1386,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
     notifyListeners();
   }
 
-  /// Shows why a link in an answer did not open, for [linkNoticeFor].
+  /// Shows why a link in an answer did not open, until it is closed.
   void reportLink(String title, String text) {
     _link.show(Notice(title, text));
     notifyListeners();

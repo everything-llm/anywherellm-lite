@@ -56,7 +56,11 @@ void main() {
     expect(h.chat.linkNotice?.text, contains('javascript: links'));
     expect(h.chat.linkNotice?.text, isNot(contains('alert')));
     expect(find.text('Could not open the link'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 6));
+    // It has no timer: it stays until it is closed.
+    await tester.pump(const Duration(minutes: 1));
+    expect(h.chat.linkNotice, isNotNull);
+    await tester.tap(control('Close'));
+    await tester.pumpAndSettle();
     expect(h.chat.linkNotice, isNull);
     expect(find.text('Could not open the link'), findsNothing);
   });

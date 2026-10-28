@@ -167,7 +167,7 @@ class AppShell extends StatelessWidget {
                               ),
                               final ChatSheetFor of => ChatSheet(
                                 of,
-                                key: ValueKey((of.thread.slug, of.deleting)),
+                                key: ValueKey(of.thread.slug),
                               ),
                               _ => const SizedBox.shrink(),
                             },
@@ -262,7 +262,7 @@ class _Main extends StatelessWidget {
 }
 
 /// Undo for a chat just deleted, or for the waiting messages Clear all took out, over the chat's
-/// composer while they can be put back.
+/// composer while they can be put back, with Close, which lets them go.
 class _PhoneUndo extends StatelessWidget {
   const _PhoneUndo();
 
@@ -273,12 +273,18 @@ class _PhoneUndo extends StatelessWidget {
     return ListenableBuilder(
       listenable: chat,
       builder: (context, _) {
-        final (String, VoidCallback)? undo = chat.deletedChat != null
-            ? ('Chat deleted', chat.undoDelete)
+        final (String, VoidCallback, VoidCallback)? undo =
+            chat.deletedChat != null
+            ? (
+                'Chat deleted',
+                chat.undoDelete,
+                () => unawaited(chat.flushDelete()),
+              )
             : switch (chat.clearedOnDeck) {
                 final n? => (
                   'Cleared ${plural(n, 'waiting message', 'waiting messages')}',
                   chat.undoClearOnDeck,
+                  chat.closeClearedOnDeck,
                 ),
                 null => null,
               };
@@ -287,7 +293,12 @@ class _PhoneUndo extends StatelessWidget {
           left: 20 + bars.left,
           right: 20 + bars.right,
           bottom: 96 + bars.bottom,
-          child: UndoBar(undo.$1, onUndo: undo.$2, floating: true),
+          child: UndoBar(
+            undo.$1,
+            onUndo: undo.$2,
+            onClose: undo.$3,
+            floating: true,
+          ),
         );
       },
     );

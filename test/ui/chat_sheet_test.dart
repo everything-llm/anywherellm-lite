@@ -48,26 +48,42 @@ void main() {
     expect(h.prefs.pinnedIn('q3'), contains(thread));
   });
 
-  testWidgets('Delete chat asks first, and Keep keeps it', (tester) async {
+  testWidgets('Delete chat acts at once, asks nothing, and its toast waits', (
+    tester,
+  ) async {
     final h = await pumpApp(tester, llm: planningServer());
     final thread = h.chat.activeThread!;
     final name = h.chat.title;
     await _openSheet(tester);
     await tester.tap(control('Delete chat'));
     await tester.pumpAndSettle();
-    expect(find.text('Delete $name? Its messages go with it.'), findsOneWidget);
-    await tester.tap(control('Keep'));
-    await tester.pumpAndSettle();
     expect(find.byType(SheetFrame), findsNothing);
-    expect(h.chat.threadsOf('q3').map((t) => t.slug), contains(thread));
+    expect(find.textContaining('Its messages go with it'), findsNothing);
+    expect(h.chat.threadsOf('q3').map((t) => t.slug), isNot(contains(thread)));
+    expect(h.chat.deletedChat, name);
+    expect(find.text('Chat deleted'), findsOneWidget);
+    // No timer: the server hears nothing while the toast shows.
+    await tester.pump(const Duration(minutes: 1));
+    expect(h.llm.calls.where((c) => c.startsWith('deleteThread')), isEmpty);
+    await tester.tap(control('Close'));
+    await tester.pumpAndSettle();
+    expect(find.text('Chat deleted'), findsNothing);
+    expect(h.llm.calls, contains('deleteThread:$thread'));
+  });
+
+  testWidgets('another chat opened sends the delete the toast held', (
+    tester,
+  ) async {
+    final h = await pumpApp(tester, llm: planningServer());
+    final thread = h.chat.activeThread!;
     await _openSheet(tester);
     await tester.tap(control('Delete chat'));
     await tester.pumpAndSettle();
-    await tester.tap(control('Delete'));
+    expect(h.llm.calls.where((c) => c.startsWith('deleteThread')), isEmpty);
+    await h.chat.open('budget');
     await tester.pumpAndSettle();
-    expect(h.chat.threadsOf('q3').map((t) => t.slug), isNot(contains(thread)));
-    expect(h.chat.deletedChat, name);
-    await h.chat.undoDelete();
+    expect(h.chat.deletedChat, isNull);
+    expect(h.llm.calls, contains('deleteThread:$thread'));
   });
 
   testWidgets('on a new chat the title opens the workspace', (tester) async {
@@ -132,12 +148,11 @@ void main() {
     await _openSheet(tester);
     await tester.tap(control('Delete chat'));
     await tester.pumpAndSettle();
-    await tester.tap(control('Delete'));
-    await tester.pumpAndSettle();
     expect(find.text('Chat deleted'), findsOneWidget);
     await tester.tap(control('Undo'));
     await tester.pumpAndSettle();
     expect(h.chat.threadsOf('q3').map((t) => t.slug), contains(thread));
     expect(find.text('Chat deleted'), findsNothing);
+    expect(h.llm.calls.where((c) => c.startsWith('deleteThread')), isEmpty);
   });
 }

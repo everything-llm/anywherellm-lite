@@ -95,13 +95,34 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remove'));
     await tester.pumpAndSettle();
+    expect(_inPane(find.text('Removed Q3 roadmap.pdf')), findsOneWidget);
+    // Nothing goes to the server while the toast can undo it, however long it stays.
+    await tester.pump(const Duration(minutes: 1));
+    expect(h.llm.calls.where((c) => c.startsWith('updateEmbeddings')), isEmpty);
+    await tester.tap(_inPane(control('Close')));
+    await tester.pumpAndSettle();
     expect(
       h.llm.calls,
       contains('updateEmbeddings:+-custom-documents/Q3 roadmap.pdf.json'),
     );
-    expect(_inPane(find.text('Removed Q3 roadmap.pdf')), findsOneWidget);
-    // The undo lasts its while.
-    await tester.pump(const Duration(seconds: 7));
+    expect(_inPane(find.text('Removed Q3 roadmap.pdf')), findsNothing);
+  });
+
+  testWidgets('a removal goes when its toast leaves the screen', (
+    tester,
+  ) async {
+    final h = await _open(tester, _desktop);
+    await tester.tap(_inPane(find.text('Remove from workspace')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remove'));
+    await tester.pumpAndSettle();
+    expect(h.llm.calls.where((c) => c.startsWith('updateEmbeddings')), isEmpty);
+    h.shell.closePane();
+    await tester.pumpAndSettle();
+    expect(
+      h.llm.calls,
+      contains('updateEmbeddings:+-custom-documents/Q3 roadmap.pdf.json'),
+    );
   });
 
   testWidgets('Documents opens as the pane on a wide window', (tester) async {
