@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The launch screen before Android 12: the robin on the icon's indigo, in light and dark mode
+     alike, as the Android 12 splash in values-v31 shows it. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
-        <bitmap android:gravity="fill" android:src="@drawable/background"/>
+        <color android:color="#343FA9"/>
     </item>
-    <item>
-        <bitmap android:gravity="center" android:src="@drawable/splash"/>
-    </item>
+    <item android:drawable="@drawable/splash_robin" android:gravity="center"/>
 </layer-list>
