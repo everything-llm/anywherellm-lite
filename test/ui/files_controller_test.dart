@@ -33,14 +33,6 @@ void main() {
     expect(rig.files.detail('household'), isNull);
   });
 
-  test('a document\'s text read again asks the server nothing', () async {
-    final llm = planningServer();
-    final rig = await started(llm);
-    final first = await rig.files.textOf(roadmap);
-    expect(await rig.files.textOf(roadmap), first);
-    expect(llm.calls.where((c) => c.startsWith('document')), hasLength(1));
-  });
-
   group('saving', () {
     test('a prompt writes it, and an empty one clears it', () async {
       final llm = planningServer();
@@ -176,27 +168,6 @@ void main() {
       expect(rig.files.workspace, 'q3');
       await rig.files.ensureLoaded();
       expect(rig.files.workspace, 'household');
-    });
-
-    test('a document\'s text is read for viewing and put away', () async {
-      final llm = planningServer();
-      final rig = await started(llm);
-      await rig.files.ensureLoaded();
-      await rig.files.viewText(roadmap, 'Q3 roadmap.pdf');
-      expect(rig.files.reading?.title, 'Q3 roadmap.pdf');
-      expect(rig.files.text, 'The text of Q3 roadmap.pdf.');
-      expect(llm.calls, contains('document:$roadmap'));
-      rig.files.closeText();
-      expect(rig.files.reading, isNull);
-      expect(rig.files.text, isNull);
-    });
-
-    test('another section puts the text away', () async {
-      final rig = await started(planningServer());
-      await rig.files.ensureLoaded();
-      await rig.files.viewText(roadmap, 'Q3 roadmap.pdf');
-      await rig.files.openSection(FilesSection.instructions);
-      expect(rig.files.reading, isNull);
     });
   });
 }

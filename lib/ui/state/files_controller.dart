@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../../core/copy.dart';
 import '../../core/files.dart';
 import '../../core/ports.dart';
 import '../../core/server_models.dart';
@@ -13,8 +12,7 @@ import 'read.dart';
 import 'settings_controller.dart';
 import 'sources_controller.dart';
 
-/// The open workspace's pages: its prompt and its answer settings, the text of one of its
-/// documents, and saving them.
+/// The open workspace's pages: its prompt and its answer settings, and saving them.
 ///
 /// The workspace comes as [SourcesController] last read it, and as this reads it again after a
 /// change; the server's own settings belong to `SystemController`. A new server starts it
@@ -55,27 +53,9 @@ class FilesController extends ChangeNotifier with FollowsServer {
   String? get workspace => _pagesSlug;
   String? _pagesSlug;
 
-  /// The document whose extracted text shows in place of the page, or null for the page.
-  ({String path, String title})? get reading => _reading;
-  ({String path, String title})? _reading;
-
-  late final _text = ReadSlot<DocBody>(notifyListeners);
-
-  /// The text of the documents read lately, by path, the oldest first, so going back to one
-  /// reads nothing again.
-  final _texts = <String, String>{};
-
-  /// How many documents' text [_texts] keeps.
-  static const textsKept = 8;
-
-  /// The text of the document [reading] shows, or null while it loads or when it has none.
-  String? get text => _text.value?.text;
-
   /// Counts each time the workspace the pages show is read afresh, so an editor knows to drop
   /// its draft.
   int revision = 0;
-
-  bool get contentLoading => _text.loading;
 
   /// Whether the workspace the pages show is still being read.
   bool get loading => _pagesSlug != null && _sources.loading;
@@ -96,9 +76,6 @@ class FilesController extends ChangeNotifier with FollowsServer {
   void serverChanged(_) {
     _details.clear();
     _pagesSlug = null;
-    _reading = null;
-    _text.reset();
-    _texts.clear();
     problems = const [];
     notifyListeners();
   }
@@ -151,8 +128,6 @@ class FilesController extends ChangeNotifier with FollowsServer {
   Future<void> openSection(FilesSection section) async {
     _section = section;
     _pagesSlug = _chat.activeSlug;
-    _reading = null;
-    _text.reset();
     problems = const [];
     notifyListeners();
   }
@@ -161,44 +136,6 @@ class FilesController extends ChangeNotifier with FollowsServer {
   void _followWorkspace() {
     if (!_showing || _chat.activeSlug == _pagesSlug) return;
     unawaited(openSection(_section));
-  }
-
-  /// Reads the text the server keeps of the document at [path], called [title], and shows it in
-  /// place of the page.
-  Future<void> viewText(String path, String title) async {
-    _reading = (path: path, title: title);
-    _pagesSlug = _chat.activeSlug;
-    _text.reset();
-    await _text.read(
-      () => _api.document(path),
-      failTitle: 'Could not read $title',
-      kept: (_) => problems = const [],
-      failed: (why) => problems = [why],
-    );
-  }
-
-  /// The text the server keeps of the document at [path], or an [ApiException] when it cannot
-  /// be read or the server left it out. The last [textsKept] read are kept, so reading one again
-  /// asks the server nothing.
-  Future<String> textOf(String path) async {
-    if (_texts.remove(path) case final kept?) return _texts[path] = kept;
-    final at = here;
-    final text =
-        (await _api.document(path)).text ??
-        (throw const ApiException(noDocText));
-    if (at.current) {
-      _texts[path] = text;
-      if (_texts.length > textsKept) _texts.remove(_texts.keys.first);
-    }
-    return text;
-  }
-
-  /// Puts the extracted text away, back to the page.
-  void closeText() {
-    if (_reading == null) return;
-    _reading = null;
-    _text.reset();
-    notifyListeners();
   }
 
   /// Saves [draft] as the open section's prompt or settings. Returns whether it was saved.

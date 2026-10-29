@@ -27,19 +27,11 @@ Future<Harness> _open(WidgetTester tester, Size size) async {
   return h;
 }
 
-/// Whether the row a screen reader hears as starting with [title] is the one chosen.
-bool _chosen(WidgetTester tester, String title) {
-  final row = tester.getSemantics(
-    _inPane(find.bySemanticsLabel(RegExp('^${RegExp.escape(title)},'))).first,
-  );
-  return row.flagsCollection.isSelected == Tristate.isTrue;
-}
-
 void main() {
-  testWidgets('the sidebar opens Documents beside the first one\'s text', (
+  testWidgets('the sidebar opens Documents, whose rows open nothing', (
     tester,
   ) async {
-    await pumpApp(tester, llm: planningServer(), size: _desktop);
+    final h = await pumpApp(tester, llm: planningServer(), size: _desktop);
     await tester.pumpAndSettle();
 
     await tester.tap(
@@ -51,17 +43,37 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(DocumentsPane), findsOneWidget);
-    expect(_inPane(find.text('The text of Q3 roadmap.pdf.')), findsOneWidget);
-    expect(_chosen(tester, 'Q3 roadmap.pdf'), isTrue);
+    expect(_inPane(find.text('Q3 roadmap.pdf')), findsOneWidget);
+    expect(_inPane(find.text('Customer interviews.docx')), findsOneWidget);
+    // No document's text shows, nor a way to it.
+    expect(find.textContaining('The text of'), findsNothing);
+    expect(control('Download the extracted text'), findsNothing);
 
     await tester.tap(_inPane(find.text('Customer interviews.docx')));
     await tester.pumpAndSettle();
-    expect(
-      _inPane(find.text('The text of Customer interviews.docx.')),
-      findsOneWidget,
+    expect(h.shell.pane, Pane.documents);
+    expect(_inPane(find.text('Q3 roadmap.pdf')), findsOneWidget);
+    expect(h.llm.calls.where((c) => c.startsWith('document:')), isEmpty);
+  });
+
+  testWidgets('Open in Documents lights up the cited file\'s row', (
+    tester,
+  ) async {
+    final h = await _open(tester, _desktop);
+    h.shell.openPane(Pane.chats);
+    await tester.pumpAndSettle();
+
+    h.sources.flash('Customer interviews.docx');
+    h.shell.openSources(asPane: true);
+    await tester.pump();
+    final row = tester.widget<DocumentRow>(
+      find.ancestor(
+        of: _inPane(find.text('Customer interviews.docx')),
+        matching: find.byType(DocumentRow),
+      ),
     );
-    expect(_chosen(tester, 'Customer interviews.docx'), isTrue);
-    expect(_chosen(tester, 'Q3 roadmap.pdf'), isFalse);
+    expect(row.flashed, isTrue);
+    await tester.pumpAndSettle(const Duration(seconds: 2));
   });
 
   testWidgets('a switch in the list turns a document off', (tester) async {
@@ -77,23 +89,23 @@ void main() {
     expect(_inPane(find.text('Not used · 120 words')), findsOneWidget);
   });
 
-  testWidgets('Remove from workspace asks first', (tester) async {
+  testWidgets('Remove asks first', (tester) async {
     final h = await _open(tester, _desktop);
 
-    await tester.tap(_inPane(find.text('Remove from workspace')));
+    await tester.tap(_inPane(control('Remove Q3 roadmap.pdf from workspace')));
     await tester.pumpAndSettle();
     expect(
       find.textContaining('Remove Q3 roadmap.pdf from Q3'),
       findsOneWidget,
     );
 
-    await tester.tap(find.text('Keep'));
+    await tester.tap(asked('Keep'));
     await tester.pumpAndSettle();
     expect(h.llm.calls.where((c) => c.startsWith('updateEmbeddings')), isEmpty);
 
-    await tester.tap(_inPane(find.text('Remove from workspace')));
+    await tester.tap(_inPane(control('Remove Q3 roadmap.pdf from workspace')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Remove'));
+    await tester.tap(asked('Remove'));
     await tester.pumpAndSettle();
     expect(_inPane(find.text('Removed Q3 roadmap.pdf')), findsOneWidget);
     // Nothing goes to the server while the toast can undo it, however long it stays.
@@ -112,9 +124,9 @@ void main() {
     tester,
   ) async {
     final h = await _open(tester, _desktop);
-    await tester.tap(_inPane(find.text('Remove from workspace')));
+    await tester.tap(_inPane(control('Remove Q3 roadmap.pdf from workspace')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Remove'));
+    await tester.tap(asked('Remove'));
     await tester.pumpAndSettle();
     expect(h.llm.calls.where((c) => c.startsWith('updateEmbeddings')), isEmpty);
     h.shell.closePane();
@@ -182,22 +194,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(DocumentsPane), findsNothing);
     expect(find.byType(WorkspacePages), findsOneWidget);
-  });
-
-  testWidgets('narrower, a document\'s text takes the list\'s place', (
-    tester,
-  ) async {
-    await _open(tester, _narrow);
-    expect(_inPane(find.text('The text of Q3 roadmap.pdf.')), findsNothing);
-
-    await tester.tap(_inPane(find.text('Q3 roadmap.pdf')));
-    await tester.pumpAndSettle();
-    expect(_inPane(find.text('The text of Q3 roadmap.pdf.')), findsOneWidget);
-    expect(_inPane(find.text('Customer interviews.docx')), findsNothing);
-
-    await tester.tap(control('Back to Documents'));
-    await tester.pumpAndSettle();
-    expect(_inPane(find.text('Customer interviews.docx')), findsOneWidget);
   });
 
   for (final (size, scale) in [

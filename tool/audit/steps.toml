@@ -146,10 +146,10 @@ from = "documents"
 do = ["wait Add a link"]
 
 [[step]]
-name = "document-text"
+name = "remove-document"
 group = "workspace"
 from = "documents"
-do = ["tap View extracted text of Boiler manual", "sleep 1"]
+do = ["tap Remove Boiler manual", "sleep 1"]
 
 [[step]]
 name = "add-link"

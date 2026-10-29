@@ -1235,24 +1235,6 @@ void main() {
       },
     );
 
-    test('a document is asked for by its file name alone', () async {
-      final seen = <http.Request>[];
-      final doc = await _answering({
-        'document': {
-          'name': 'a.json',
-          'title': 'a.md',
-          'pageContent': 'Hello.',
-        },
-      }, seen: seen).document('claude/a.json');
-      expect(seen.single.url.path, '/api/v1/document/a.json');
-      expect((doc.title, doc.text), ('a.md', 'Hello.'));
-
-      final missing = await _failure(
-        _answering({'document': null}).document('claude/b.json'),
-      );
-      expect(missing.status, 404);
-    });
-
     test('the system settings are the settings object', () async {
       final seen = <http.Request>[];
       final settings = await _answering({
@@ -1266,7 +1248,6 @@ void main() {
       final api = _api((_) async => http.Response('{"error":"nope"}', 500));
       for (final call in <Future<void> Function()>[
         () => api.updateWorkspace('w', {'topN': 1}),
-        () => api.document('a'),
         api.systemSettings,
       ]) {
         expect((await _failure(call())).message, isNot(contains('SECRET-KEY')));

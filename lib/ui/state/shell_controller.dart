@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/files.dart';
 import '../../core/gallery.dart';
 import '../../core/server_models.dart';
+import '../../core/sources.dart';
 import '../settings/settings_pages.dart';
 import '../share/shared_item.dart';
 import 'turn.dart';
@@ -45,14 +46,21 @@ class ChatSheetFor {
   final Thread thread;
 }
 
+/// The question whether to take [file] out of the open workspace, over the window.
+class RemoveDocFor {
+  const RemoveDocFor(this.file);
+
+  final SourceFile file;
+}
+
 /// A phone's sheet about the open workspace: a new workspace's name, the open one's new name,
 /// or whether to delete it.
 enum WorkspaceSheet { create, rename, delete }
 
 /// A popup over the window, at most one open at a time: the workspace menu, the composer's Answer
-/// from sheet, the Attach sheet, or a question before
-/// forgetting the server or removing a document. An answer's More sheet
-/// is keyed by its [Turn] instead.
+/// from sheet, the Attach sheet, or the question before forgetting the server. An answer's More
+/// sheet is keyed by its [Turn] instead, and the question before removing a document by its
+/// [RemoveDocFor].
 enum Popup {
   workspaces,
   answerFrom,
@@ -60,9 +68,6 @@ enum Popup {
 
   /// Forget this server?, on the Connection page.
   forgetServer,
-
-  /// Remove from workspace?, under a document's text.
-  removeDoc,
 }
 
 /// What is open over the chat, which is the base screen: the chats as a shelf,
@@ -260,10 +265,8 @@ class ShellController extends ChangeNotifier {
 
   /// Closes everything over the chat, without telling listeners: the shelf, the sheet, the popup,
   /// the workspace's pages, the scanner, the walk-through and Settings.
-  /// A document's text forgets what it was opened over.
   void _reset() {
     _coverChat();
-    _sourcesUnder = null;
     _pane = Pane.chats;
     _workspacePage = null;
     _scanning = false;
@@ -410,35 +413,6 @@ class ShellController extends ChangeNotifier {
     _pane = pane;
     _workspacePage = null;
     _rightOpen = false;
-    _sourcesUnder = null;
-    notifyListeners();
-  }
-
-  /// What showed under the Documents sheet when a document's text was opened from it, or null
-  /// when the text was opened otherwise.
-  Pane? _sourcesUnder;
-
-  /// Shows a document's text, picked in the Documents sheet, in the workspace's pages in place
-  /// of the sheet, which [textClosed] gives back.
-  void showDocText() {
-    _sourcesUnder = _pane;
-    _rightOpen = false;
-    _beside = Beside.sources;
-    _pane = Pane.files;
-    _workspacePage = null;
-    _popup.value = null;
-    notifyListeners();
-  }
-
-  /// After a document's text closes: when it was opened from the Documents sheet, the sheet
-  /// over what showed under it.
-  void textClosed() {
-    final under = _sourcesUnder;
-    if (under == null) return;
-    _sourcesUnder = null;
-    _pane = under;
-    _beside = Beside.sources;
-    _rightOpen = true;
     notifyListeners();
   }
 

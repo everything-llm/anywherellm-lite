@@ -69,9 +69,8 @@ class AppShell extends StatelessWidget {
       if (shell.passagesOpen) return shell.closePassages;
       if (shell.citedOpen) return shell.closeCited;
       if (shell.rightOpen) return shell.closeSources;
-      // The workspace's pages step back: a document's text, a page, then what they opened over.
+      // The workspace's pages step back: a page, then what they opened over.
       if (shell.pane == Pane.files) {
-        if (scope.files.reading != null) return () => closeDocText(scope);
         if (shell.workspacePage != null) {
           return () => shell.showWorkspacePage(null);
         }
@@ -168,6 +167,10 @@ class AppShell extends StatelessWidget {
                               final ChatSheetFor of => ChatSheet(
                                 of,
                                 key: ValueKey(of.thread.slug),
+                              ),
+                              final RemoveDocFor removing => RemoveDocSheet(
+                                removing,
+                                key: ObjectKey(removing),
                               ),
                               _ => const SizedBox.shrink(),
                             },

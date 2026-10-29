@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/sources.dart';
 import '../app_scope.dart';
+import '../icons.dart';
+import '../state/shell_controller.dart';
 import '../state/sources_controller.dart';
 import '../settings/rows.dart';
 import '../layout.dart';
@@ -15,12 +17,11 @@ import '../widgets/controls.dart';
 import '../widgets/upload_queue.dart';
 import '../widgets/rise.dart';
 import '../widgets/sheet.dart';
-import '../widgets/tappable.dart';
 import 'add_source.dart';
 import 'test_question.dart';
 
-/// The active workspace's files, which people see as Documents: switch them on and off, open
-/// the text the server read from each, add them, and test what a question finds in them.
+/// The active workspace's files, which people see as Documents: switch them on and off, remove
+/// them, add them, and test what a question finds in them.
 class SourcesPanel extends StatelessWidget {
   const SourcesPanel({super.key});
 
@@ -100,9 +101,9 @@ class _RemovedBarState extends State<_RemovedBar> {
   );
 }
 
-/// The sheet: what the switches mean, the files in a card, each with its switch, then Add a
-/// file, Add a link and Paste text as buttons, and Test a question. It is as tall as what it
-/// holds.
+/// The sheet: what the switches mean, the files in a card, each with its switch and Remove, then
+/// Add a file, Add a link and Paste text as buttons, and Test a question. It is as tall as what
+/// it holds.
 class _Body extends StatelessWidget {
   const _Body(this.files);
 
@@ -140,7 +141,7 @@ class _Body extends StatelessWidget {
               count: files.length,
               keyOf: (i) => ValueKey(files[i].path),
               row: (context, i) => Rise(
-                child: _FileRow(
+                child: DocumentRow(
                   files[i],
                   flashed: sources.flashed == files[i].path,
                 ),
@@ -179,10 +180,10 @@ class _Body extends StatelessWidget {
   }
 }
 
-/// A file in the sheet's card: its type, name and size, and its switch. Tapped, it shows the
-/// text the server read from it in the workspace's pages, where it is downloaded or removed.
-class _FileRow extends StatelessWidget {
-  const _FileRow(this.file, {required this.flashed});
+/// A file in a card of Documents: its type, name and size, its switch, and Remove, which asks
+/// first ([RemoveDocFor]). A citation's [flashed] fills it for a moment. It opens nothing.
+class DocumentRow extends StatelessWidget {
+  const DocumentRow(this.file, {super.key, required this.flashed});
 
   final SourceFile file;
   final bool flashed;
@@ -195,25 +196,18 @@ class _FileRow extends StatelessWidget {
     return AnimatedContainer(
       duration: motion(context, const Duration(milliseconds: 300)),
       color: flashed ? t.accentSoft : Colors.transparent,
+      constraints: const BoxConstraints(minHeight: Sizes.cardRow),
       child: Row(
         children: [
           Expanded(
-            child: Tappable(
-              label: 'View extracted text of ${file.title}',
-              excludeSemantics: false,
-              onTap: () {
-                scope.shell.showDocText();
-                unawaited(scope.files.viewText(file.path, file.title));
-              },
-              child: Container(
-                constraints: const BoxConstraints(minHeight: Sizes.cardRow),
-                padding: const EdgeInsets.only(left: FieldCard.inset),
-                child: SourceRow(file, meta: file.meta),
-              ),
+            child: Padding(
+              padding: const EdgeInsets.only(left: FieldCard.inset),
+              // Heard as one: its name and size.
+              child: MergeSemantics(child: SourceRow(file, meta: file.meta)),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.only(left: 8, right: FieldCard.inset),
+            padding: const EdgeInsets.only(left: 8),
             child: AppSwitch(
               value: file.on,
               label: 'Use ${file.title} in answers',
@@ -221,7 +215,51 @@ class _FileRow extends StatelessWidget {
               onChanged: (_) => scope.sources.toggle(file),
             ),
           ),
+          // Tapped in 48 around its 44, so 10 keeps it 8 from the switch.
+          Padding(
+            padding: const EdgeInsets.only(left: 10, right: 10),
+            child: IconBtn(
+              'trash',
+              tooltip: 'Remove ${file.title} from workspace',
+              box: 44,
+              size: IconSize.small,
+              onPressed: () => scope.shell.togglePopup(RemoveDocFor(file)),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+/// The question whether to take [removing]'s file out of the open workspace, over the window:
+/// Remove takes it out, with a toast to undo it, and Keep leaves it. A file no longer in the
+/// workspace, as after another workspace opened, is left alone.
+class RemoveDocSheet extends StatelessWidget {
+  const RemoveDocSheet(this.removing, {super.key});
+
+  final RemoveDocFor removing;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final file = removing.file;
+    void close() => scope.shell.closePopup(removing);
+    return ModalSheet(
+      title: 'Remove from workspace',
+      onClose: close,
+      child: SheetQuestion(
+        'Remove ${file.title} from ${scope.chat.active?.name ?? 'this workspace'}? Answers '
+        'stop drawing on it. The server keeps the file, to add again from Documents.',
+        action: 'Remove',
+        onKeep: close,
+        onConfirm: () {
+          close();
+          final sources = scope.sources;
+          if (sources.files.any((f) => f.path == file.path)) {
+            unawaited(sources.remove(file));
+          }
+        },
       ),
     );
   }

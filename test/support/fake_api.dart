@@ -84,9 +84,6 @@ class FakeAnythingLlm with FakeCalls implements AnythingLlmApi {
   /// Every document the server holds, by path, embedded or not.
   final Map<String, WorkspaceDoc> library = {};
 
-  /// The library documents, by path, whose text `document` leaves out, as the server may.
-  final Set<String> textless = {};
-
   /// What [systemSettings] answers.
   Map<String, Object?> system = const {
     'LLMProvider': 'ollama',
@@ -356,16 +353,6 @@ class FakeAnythingLlm with FakeCalls implements AnythingLlmApi {
           }
         }
       }, slug);
-
-  @override
-  Future<DocBody> document(String path) => record('document', () {
-    final doc = library[path];
-    if (doc == null) throw ApiException('There is no document $path.');
-    return DocBody(
-      title: doc.title,
-      text: textless.contains(path) ? null : 'The text of ${doc.title}.',
-    );
-  }, path);
 
   @override
   Future<List<SearchHit>> searchDocs(String slug, String query) => record(

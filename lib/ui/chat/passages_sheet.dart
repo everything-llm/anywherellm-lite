@@ -1,11 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../core/server_models.dart';
 import '../../core/sources.dart';
 import '../app_scope.dart';
-import '../state/shell_controller.dart';
 import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
@@ -39,8 +36,7 @@ class PassagesPanel extends StatelessWidget {
 
 /// What an answer read from one file, in the sheet a citation opens: the file with how many
 /// passages, then each passage, closest first, with how close it was to the question at its top
-/// right when the server said, and View extracted text, which shows the file's whole text in the
-/// workspace's pages.
+/// right when the server said, and Show in Documents, which opens Documents with the file lit up.
 class PassagesView extends StatelessWidget {
   const PassagesView({
     super.key,
@@ -50,7 +46,7 @@ class PassagesView extends StatelessWidget {
 
   final Citation citation;
 
-  /// Closes the sheet, as View extracted text does before it shows the text.
+  /// Closes the sheet, as Show in Documents does before it opens Documents.
   final VoidCallback onClose;
 
   @override
@@ -58,7 +54,7 @@ class PassagesView extends StatelessWidget {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
     final passages = citation.passages;
-    final file = scope.sources.byTitle(citation.title);
+    final present = scope.sources.byTitle(citation.title) != null;
     final count = passages.length == 1
         ? '1 passage'
         : '${passages.length} passages, closest first';
@@ -96,16 +92,14 @@ class PassagesView extends StatelessWidget {
             ),
             const SizedBox(height: 8),
           ],
-          if (file != null) ...[
+          if (present) ...[
             const SizedBox(height: 8),
             ActionRow(even: true, alignment: WrapAlignment.start, [
               AppButton(
-                'View extracted text',
+                'Show in Documents',
                 onPressed: () {
                   onClose();
-                  final files = scope.files;
-                  unawaited(files.viewText(file.path, file.title));
-                  scope.shell.showPane(Pane.files);
+                  showCitedInDocuments(context, citation.title);
                 },
               ),
             ]),

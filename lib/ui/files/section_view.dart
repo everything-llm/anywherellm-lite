@@ -8,7 +8,6 @@ import '../type.dart';
 import '../widgets/buttons.dart';
 import '../widgets/fields.dart';
 import '../widgets/rise.dart';
-import 'text_viewer.dart';
 import 'settings_form.dart';
 
 /// A line of muted text in the middle of the pane.
@@ -137,13 +136,12 @@ class _EditorState extends State<_Editor> {
 }
 
 /// A page of the open workspace: its instructions or its answer settings, the section
-/// [FilesController.section] picks, or the text of one of its documents.
+/// [FilesController.section] picks.
 Widget workspaceSection(BuildContext context) {
   final scope = AppScope.of(context);
   final files = scope.files;
   final workspace = scope.chat.active;
   if (workspace == null) return const Blank('No workspace is open.');
-  if (files.reading != null) return const TextViewer();
   final section = files.section;
   final detail = files.detail(workspace.slug);
   final key = ValueKey('${workspace.slug}#$section#${files.revision}');

@@ -110,18 +110,6 @@ void main() {
   });
 
   group('documents JSON', () {
-    test('a document without its text says so', () {
-      final doc = DocBody.fromJson({
-        'name': 'notes.md-1f2e.json',
-        'title': 'notes.md',
-        'docAuthor': 'Unknown',
-        'docSource': 'a file uploaded by the user.',
-        'wordCount': 120,
-      });
-      expect(doc.text, isNull);
-      expect(doc.title, 'notes.md');
-    });
-
     test('a web page is one whose chunk source is a link', () {
       bool? web(Map<String, Object?> metadata) => WorkspaceDoc.fromJson({
         'docpath': 'c/a.json',
@@ -183,16 +171,6 @@ void main() {
       );
     },
   );
-
-  test('a document\'s text is saved under its title, as a text file', () {
-    expect(textFileName('Q3 roadmap.pdf'), 'Q3 roadmap.pdf.txt');
-    expect(textFileName('notes.md'), 'notes.md');
-    expect(textFileName('meeting-notes.TXT'), 'meeting-notes.TXT');
-    expect(textFileName('Version 1.16'), 'Version 1.16.txt');
-    expect(textFileName('Q&A: what/why?'), 'Q&A- what-why-.txt');
-    expect(textFileName('  '), 'document.txt');
-    expect(textFileName('..'), 'document.txt');
-  });
 
   test('a file name never leaves the folder it is written in', () {
     expect(

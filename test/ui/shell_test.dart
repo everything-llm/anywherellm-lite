@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/ports.dart';
@@ -151,11 +150,16 @@ void main() {
       );
       expect(h.shell.rightOpen, isFalse);
       expect(tester.takeException(), isNull);
-      await tester.tap(control('View extracted text'));
-      await tester.pumpAndSettle();
+      expect(control('View extracted text'), findsNothing);
+      // Show in Documents puts the passages away for Documents, the file lit up in it.
+      await tester.tap(control('Show in Documents'));
+      await tester.pump();
       expect(h.shell.popup.value, isNull);
-      expect(h.shell.pane, Pane.files);
-      expect(h.files.reading?.title, 'Q3 roadmap.pdf');
+      expect((h.shell.rightOpen, h.shell.beside), (true, Beside.sources));
+      expect(h.shell.pane, Pane.chats);
+      expect(h.sources.flashed, 'custom-documents/Q3 roadmap.pdf.json');
+      await tester.pumpAndSettle(const Duration(seconds: 2));
+      expect(find.byType(SourcesPanel), findsOneWidget);
     });
 
     testWidgets('Shift+Enter starts a new line instead of sending', (
@@ -407,62 +411,24 @@ void main() {
       },
     );
 
-    testWidgets(
-      'a file opens its text, which removes it, and the sheet comes back',
-      (tester) async {
-        final llm = planningServer();
-        final h = await withDocuments(tester, llm);
-        await tester.tap(control('View extracted text of Q3 roadmap.pdf'));
-        await tester.pumpAndSettle();
-        expect(h.shell.rightOpen, isFalse);
-        expect(h.files.reading?.title, 'Q3 roadmap.pdf');
-        await tapVisible(tester, control('Remove from workspace'));
-        await tester.pumpAndSettle();
-        expect(h.sources.files.where((f) => f.on), hasLength(2));
-        await tester.tap(asked('Remove'));
-        await tester.pumpAndSettle();
-        // Its undo is in the sheet, which comes back over what showed under it.
-        expect((h.shell.rightOpen, h.shell.beside), (true, Beside.sources));
-        expect(h.shell.pane, Pane.chats);
-        expect(find.text('Removed Q3 roadmap.pdf'), findsOneWidget);
-        await tester.tap(control('Undo'));
-        await tester.pumpAndSettle();
-        expect(h.sources.files, hasLength(2));
-        expect(find.text('Removed Q3 roadmap.pdf'), findsNothing);
-      },
-    );
-
-    testWidgets('a file\'s download saves the text the server read', (
+    testWidgets('a file\'s Remove asks first, and its undo is in the sheet', (
       tester,
     ) async {
-      final h = await withDocuments(tester, planningServer());
-      await tester.tap(control('View extracted text of Q3 roadmap.pdf'));
-      await tester.pumpAndSettle();
-      await tester.tap(control('Download the extracted text'));
-      await tester.pumpAndSettle();
-      expect(
-        utf8.decode(h.saved['Q3 roadmap.pdf.txt']!),
-        'The text of Q3 roadmap.pdf.',
-      );
-    });
-
-    testWidgets('a file whose text cannot be read says why', (tester) async {
-      final llm = planningServer()
-        ..errors['document'] = const ApiException('The server is down.');
+      final llm = planningServer();
       final h = await withDocuments(tester, llm);
-      await tester.tap(control('View extracted text of Q3 roadmap.pdf'));
+      expect(control('View extracted text of Q3 roadmap.pdf'), findsNothing);
+      await tester.tap(control('Remove Q3 roadmap.pdf from workspace'));
       await tester.pumpAndSettle();
-      await tester.tap(control('Download the extracted text'));
+      expect(h.sources.files.where((f) => f.on), hasLength(2));
+      await tester.tap(asked('Remove'));
       await tester.pumpAndSettle();
-      expect(h.saved, isEmpty);
-      // Back gives the sheet back, which says why.
-      await tester.binding.handlePopRoute();
+      expect((h.shell.rightOpen, h.shell.beside), (true, Beside.sources));
+      expect(h.shell.pane, Pane.chats);
+      expect(find.text('Removed Q3 roadmap.pdf'), findsOneWidget);
+      await tester.tap(control('Undo'));
       await tester.pumpAndSettle();
-      expect(
-        inSources(find.text('Could not save Q3 roadmap.pdf')),
-        findsOneWidget,
-      );
-      expect(inSources(find.text('The server is down.')), findsOneWidget);
+      expect(h.sources.files, hasLength(2));
+      expect(find.text('Removed Q3 roadmap.pdf'), findsNothing);
     });
   });
 

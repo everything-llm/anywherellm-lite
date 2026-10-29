@@ -10,28 +10,18 @@ import '../state/shell_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
-import '../widgets/buttons.dart';
 import '../widgets/min_height.dart';
 import '../widgets/phone_page.dart';
 import 'section_view.dart';
-import 'save_file.dart';
 import '../settings/rows.dart';
 import '../widgets/scroll_fades.dart';
-
-/// Closes the document's text shown, giving back the Documents sheet when the text was opened
-/// from it.
-void closeDocText(AppScope scope) {
-  scope.files.closeText();
-  scope.shell.textClosed();
-}
 
 /// What the page of [section] is called: Answer settings is Answer from.
 String _titleOf(FilesSection section) =>
     section == FilesSection.answers ? 'Answer from' : section.title;
 
 /// The open workspace's pages, which [Pane.files] shows. They open on the workspace, with Rename and Delete workspace, and its Documents, Instructions and Answer
-/// from, each with a line of what it holds; a page opens under a back arrow, and the text of a
-/// document over that.
+/// from, each with a line of what it holds; a page opens under a back arrow.
 class WorkspacePages extends StatefulWidget {
   const WorkspacePages({super.key});
 
@@ -68,17 +58,8 @@ class _WorkspacePagesState extends State<WorkspacePages> {
       listenable: Listenable.merge([_files, shell, scope.chat]),
       builder: (context, _) {
         final workspace = scope.chat.active;
-        final reading = _files.reading;
         final page = shell.workspacePage;
-        final (title, back, onBack) = reading != null
-            ? (
-                reading.title,
-                page == null
-                    ? 'Back to the workspace'
-                    : 'Back to ${_titleOf(page)}',
-                () => closeDocText(scope),
-              )
-            : page != null
+        final (title, back, onBack) = page != null
             ? (
                 _titleOf(page),
                 'Back to the workspace',
@@ -94,24 +75,7 @@ class _WorkspacePagesState extends State<WorkspacePages> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              PhonePageHeader(
-                title: title,
-                back: back,
-                onBack: onBack,
-                // A document's text saves from the bar over it.
-                action: reading == null
-                    ? null
-                    : IconBtn.header(
-                        'download',
-                        tooltip: 'Download the extracted text',
-                        onPressed: () => saveText(
-                          context,
-                          reading.title,
-                          () => _files.textOf(reading.path),
-                          report: scope.sources.report,
-                        ),
-                      ),
-              ),
+              PhonePageHeader(title: title, back: back, onBack: onBack),
               for (final problem in _files.problems)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -121,7 +85,7 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                 child: ScrollFades(
                   child: workspace == null
                       ? const Blank('No workspace is open.')
-                      : reading != null || page != null
+                      : page != null
                       ? workspaceSection(context)
                       : _overview(context, workspace.name),
                 ),

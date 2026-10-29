@@ -323,20 +323,6 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     return response.bodyBytes;
   }
 
-  /// The server finds a document by its file name in any folder.
-  @override
-  Future<DocBody> document(String path) async {
-    final name = docName(path);
-    final json = _field(
-      await _get('/api/v1/document/${Uri.encodeComponent(name)}'),
-      'document',
-    );
-    if (json is! Map<String, dynamic>) {
-      throw ApiException('There is no document $name.', status: 404);
-    }
-    return DocBody.fromJson(json);
-  }
-
   @override
   Future<Map<String, Object?>> systemSettings() async {
     final settings = _field(await _get('/api/v1/system'), 'settings');

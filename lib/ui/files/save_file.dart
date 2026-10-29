@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/widgets.dart';
 
 import '../../core/errors.dart';
@@ -47,18 +45,3 @@ Future<void> shareFile(
     scope.chat.report(title, plainMessage(error));
   }
 }
-
-/// Saves what [text] gives, the text the server read from the document called [title], under
-/// [textFileName], as [saveFile] does.
-Future<String?> saveText(
-  BuildContext context,
-  String title,
-  Future<String> Function() text, {
-  void Function(String title, String text)? report,
-}) => saveFile(
-  context,
-  textFileName(title),
-  () async => utf8.encode(await text()),
-  failTitle: 'Could not save $title',
-  report: report,
-);

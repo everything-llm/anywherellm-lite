@@ -117,11 +117,13 @@ final _screens = <String, _Setup>{
     h.shell.openSources();
     await _settle(tester);
   },
-  'doctext': (tester, h) async {
+  'docremove': (tester, h) async {
     await _workspace(tester, h);
     h.shell.openSources();
     await _settle(tester);
-    await tester.tap(find.text('Home insurance.pdf'));
+    await tester.tap(
+      find.byTooltip('Remove Home insurance.pdf from workspace'),
+    );
     await _settle(tester);
   },
   'instr': (tester, h) => _section(tester, h, FilesSection.instructions),

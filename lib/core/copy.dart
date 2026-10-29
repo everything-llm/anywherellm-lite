@@ -2,9 +2,6 @@ import 'dart:convert';
 
 // Wording, kept in one place so every part of the app says the same things.
 
-/// What a document whose text the server left out says in place of it.
-const noDocText = 'The server did not send this document\'s text.';
-
 /// [text] with its first letter raised: `the Vault` as `The Vault`.
 String capitalized(String text) =>
     text.isEmpty ? text : '${text[0].toUpperCase()}${text.substring(1)}';

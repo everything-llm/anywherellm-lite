@@ -463,25 +463,6 @@ class DocEntry {
   String get path => '$folder/$name';
 }
 
-/// One library document as the server describes it on its own: its title and, when the server
-/// sends it, its text.
-class DocBody {
-  const DocBody({required this.title, this.text});
-
-  factory DocBody.fromJson(Map<String, dynamic> json) {
-    final text = json['pageContent'];
-    return DocBody(
-      title: _known(json, 'title') ?? _text(json, 'name'),
-      text: text is String ? text : null,
-    );
-  }
-
-  final String title;
-
-  /// The parsed text, or null when the server left it out.
-  final String? text;
-}
-
 final _metadataBlock = RegExp(
   r'^\s*<document_metadata>[\s\S]*?</document_metadata>\s*',
 );

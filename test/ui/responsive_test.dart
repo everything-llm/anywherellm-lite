@@ -437,7 +437,6 @@ void main() {
 
       testWidgets('each page of the workspace fits', (tester) async {
         final llm = awkward();
-        final path = 'custom-documents/file-$longWord.pdf.json';
         final h = await pumpApp(tester, llm: llm, size: size);
         h.shell
           ..showPane(Pane.files)
@@ -446,7 +445,7 @@ void main() {
         await h.sources.toggle(h.sources.files.first);
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
-        await h.files.viewText(path, 'file-$longWord.pdf');
+        h.shell.togglePopup(RemoveDocFor(h.sources.files.first));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
       });

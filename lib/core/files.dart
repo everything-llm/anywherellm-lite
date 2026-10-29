@@ -1,5 +1,4 @@
-// The open workspace's pages, the name a document's text is saved under, a file's bytes, and
-// the answer settings as JSON.
+// The open workspace's pages, a file's name and bytes, and the answer settings as JSON.
 
 import 'dart:typed_data';
 
@@ -21,22 +20,12 @@ final _notInFileName = RegExp(r'[\x00-\x1f/\\:*?"<>|]');
 
 final _onlyDots = RegExp(r'^\.*$');
 
-final _plainText = RegExp(r'\.(txt|md|markdown)$', caseSensitive: false);
-
 /// [name] as a file name that stays in the folder it is written in: any character a file name
 /// cannot hold, a path separator among them, made `-`, so `../../prefs.json` becomes
 /// `..-..-prefs.json`; [fallback] when nothing but dots is left.
 String plainFileName(String name, {required String fallback}) {
   final plain = name.replaceAll(_notInFileName, '-').trim();
   return _onlyDots.hasMatch(plain) ? fallback : plain;
-}
-
-/// The name a document called [title] is saved under by default: its [plainFileName], ending in
-/// `.txt` unless it already names a plain-text file. The saved file holds the text the server
-/// read, so `report.pdf` becomes `report.pdf.txt`.
-String textFileName(String title) {
-  final name = plainFileName(title, fallback: 'document');
-  return _plainText.hasMatch(name) ? name : '$name.txt';
 }
 
 /// [bytes] as they are when they are already a [Uint8List], copied otherwise.

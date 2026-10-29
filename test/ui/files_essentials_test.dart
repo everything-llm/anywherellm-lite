@@ -1,4 +1,3 @@
-import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/core/upload.dart';
 import 'package:anywherellm/ui/files/workspace_pages.dart';
@@ -85,72 +84,43 @@ void main() {
     },
   );
 
-  testWidgets('a document opens its text, with Download and Remove', (
+  testWidgets('a document is removed from its row, which asks first', (
     tester,
   ) async {
     final h = await openPages(tester);
     await openPage(tester, 'Documents');
-    await tester.tap(control('View extracted text of Q3 roadmap.pdf'));
+    // A row opens nothing: only its switch and Remove act.
+    await tester.tap(inSheet(find.text('Q3 roadmap.pdf')));
     await tester.pumpAndSettle();
-    expect(find.text('The text of Q3 roadmap.pdf.'), findsOneWidget);
-    expect(find.text('Used in answers'), findsOneWidget);
-    await tester.tap(control('Download the extracted text'));
+    expect((h.shell.rightOpen, h.shell.pane), (true, Pane.files));
+    await tester.tap(control('Remove Q3 roadmap.pdf from workspace'));
     await tester.pumpAndSettle();
-    expect(h.saved.keys, contains('Q3 roadmap.pdf.txt'));
-    await tapVisible(tester, control('Remove from workspace'));
-    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Remove Q3 roadmap.pdf from Q3'),
+      findsOneWidget,
+    );
     await tester.tap(asked('Keep'));
     await tester.pumpAndSettle();
-    expect(h.files.reading?.title, 'Q3 roadmap.pdf');
     expect(
       h.llm.calls.where((c) => c.startsWith('updateEmbeddings')),
       isEmpty,
       reason: 'Keep leaves it in the workspace',
     );
-    await tapVisible(tester, control('Remove from workspace'));
+    await tester.tap(control('Remove Q3 roadmap.pdf from workspace'));
     await tester.pumpAndSettle();
     await tester.tap(asked('Remove'));
     await tester.pumpAndSettle();
-    expect(h.files.reading, isNull);
-    // The sheet the text was opened from comes back, with the undo.
+    // The undo is in the sheet, which stays open.
     expect((h.shell.rightOpen, h.shell.beside), (true, Beside.sources));
     expect(inSheet(find.text('Removed Q3 roadmap.pdf')), findsOneWidget);
     expect(
-      h.sources.files.where((f) => f.on).map((f) => f.title),
+      h.sources.files.map((f) => f.title),
       isNot(contains('Q3 roadmap.pdf')),
     );
-    // The undo for the removal lets go.
-    await tester.pump(const Duration(seconds: 7));
-  });
-
-  testWidgets('a document whose text the server left out says so', (
-    tester,
-  ) async {
-    final llm = planningServer()
-      ..textless.add('custom-documents/Q3 roadmap.pdf.json');
-    final h = await openPages(tester, llm: llm);
-    await openPage(tester, 'Documents');
-    await tester.tap(control('View extracted text of Q3 roadmap.pdf'));
+    await tester.tap(inSheet(control('Undo')));
     await tester.pumpAndSettle();
-    expect(
-      find.text('The server sent no text for this document.'),
-      findsOneWidget,
-    );
-    await tester.tap(control('Download the extracted text'));
-    await tester.pumpAndSettle();
-    expect(h.saved, isEmpty);
-    expect(h.sources.problems.single.title, 'Could not save Q3 roadmap.pdf');
-  });
-
-  testWidgets('a text that cannot be read says why', (tester) async {
-    final llm = planningServer()
-      ..errors['document'] = const ApiException('The server is down.');
-    await openPages(tester, llm: llm);
-    await openPage(tester, 'Documents');
-    await tester.tap(control('View extracted text of Q3 roadmap.pdf'));
-    await tester.pumpAndSettle();
-    expect(find.text('Could not read Q3 roadmap.pdf'), findsOneWidget);
-    expect(find.text('The server is down.'), findsOneWidget);
+    expect(h.sources.files.map((f) => f.title), contains('Q3 roadmap.pdf'));
+    expect(h.llm.calls.where((c) => c.startsWith('updateEmbeddings')), isEmpty);
   });
 
   testWidgets('a file added waits, then goes to the workspace', (tester) async {

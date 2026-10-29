@@ -98,9 +98,6 @@ abstract interface class AnythingLlmApi {
   /// rest as they are.
   Future<void> updateWorkspace(String slug, Map<String, Object?> fields);
 
-  /// The library document at [path], `folder/name.json`.
-  Future<DocBody> document(String path);
-
   /// The passages of workspace [slug]'s documents that [query] finds, closest first, with the
   /// workspace's own number and threshold, as an answer would get them.
   Future<List<SearchHit>> searchDocs(String slug, String query);
