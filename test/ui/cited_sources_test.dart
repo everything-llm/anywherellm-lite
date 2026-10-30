@@ -1,6 +1,7 @@
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/widgets/sheet.dart';
+import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
@@ -52,4 +53,38 @@ void main() {
       expect(h.opened.last, Uri.parse('https://site6.example/p'));
     },
   );
+
+  testWidgets('the sheet follows the documents read while it shows', (
+    tester,
+  ) async {
+    final llm = planningServer()..hold = true;
+    final h = await pumpApp(tester, llm: llm);
+    await h.chat.send('What do we know?');
+    await tester.pump();
+    llm.chat!
+      ..add(const WholeAnswer('A few things.'))
+      ..add(
+        const ChatDone([
+          Citation('Q3 roadmap.pdf'),
+          Citation('Notes a'),
+          Citation('Notes b'),
+          Citation('Notes c'),
+          Citation('Notes d'),
+        ]),
+      );
+    await llm.chat!.close();
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byWidgetPredicate(
+        (w) => w is Tappable && w.label.contains('more sources'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(control('Q3 roadmap.pdf, In Documents'), findsOneWidget);
+    llm.spaces[0].docs.removeWhere((d) => d.title == 'Q3 roadmap.pdf');
+    await h.sources.refresh();
+    await tester.pumpAndSettle();
+    expect(control('Q3 roadmap.pdf, In Documents'), findsNothing);
+    expect(control('Q3 roadmap.pdf'), findsOneWidget);
+  });
 }

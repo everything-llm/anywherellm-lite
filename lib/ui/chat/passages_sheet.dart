@@ -14,12 +14,14 @@ import '../widgets/buttons.dart';
 class PassagesPanel extends StatelessWidget {
   const PassagesPanel({super.key});
 
-  // Const where the shell builds it, so it listens to the shell for the citation it shows.
+  // Const where the shell builds it, so it listens to the shell for the citation it shows, and
+  // to Documents for whether it holds the file.
   @override
   Widget build(BuildContext context) {
-    final shell = AppScope.of(context).shell;
+    final scope = AppScope.of(context);
+    final shell = scope.shell;
     return ListenableBuilder(
-      listenable: shell,
+      listenable: Listenable.merge([shell, scope.sources]),
       builder: (context, _) {
         final citation = shell.passages;
         if (citation == null) return const SizedBox.shrink();
