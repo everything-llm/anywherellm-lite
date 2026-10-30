@@ -81,7 +81,9 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(control('Q3 roadmap.pdf, In Documents'), findsOneWidget);
+    // Deleted from the server: out of the workspace and the library both.
     llm.spaces[0].docs.removeWhere((d) => d.title == 'Q3 roadmap.pdf');
+    llm.library.removeWhere((_, d) => d.title == 'Q3 roadmap.pdf');
     await h.sources.refresh();
     await tester.pumpAndSettle();
     expect(control('Q3 roadmap.pdf, In Documents'), findsNothing);

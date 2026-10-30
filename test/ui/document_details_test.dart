@@ -148,7 +148,10 @@ void main() {
     ) async {
       final picker = FakePicker([]);
       FilePickerPlatform.instance = picker;
-      await withDocuments(tester, planningServer());
+      await withDocuments(
+        tester,
+        planningServer()..accepted = {'.md', '.txt', '.pdf'},
+      );
       await tapVisible(tester, inSheet(control('Add a file')));
       await tester.pumpAndSettle();
       expect(picker.type, FileType.custom);
