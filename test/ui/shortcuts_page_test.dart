@@ -2,6 +2,7 @@ import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/shortcuts.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/widgets/sheet.dart';
+import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -77,4 +78,87 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('Save checks the fields and says under each what is wrong', (
+    tester,
+  ) async {
+    final h = await pumpApp(tester, llm: planningServer());
+    h.shell.openSettings(SettingsPage.shortcuts);
+    await tester.pumpAndSettle();
+    await tester.tap(control('New shortcut'));
+    await tester.pumpAndSettle();
+    // Nothing is said before Save but the rules.
+    expect(find.text('Give it a name.'), findsNothing);
+    final save = tester.widget<Tappable>(control('Save'));
+    expect(save.onTap, isNotNull);
+
+    await tapVisible(tester, control('Save'));
+    await tester.pumpAndSettle();
+    expect(find.text('Give it a name.'), findsOneWidget);
+    expect(find.text('Choose what you type after /.'), findsOneWidget);
+    expect(find.text('Write the prompt it sends.'), findsOneWidget);
+    expect(h.prefs.prefs.shortcuts, isEmpty);
+
+    // Each goes as its field is put right.
+    await tester.enterText(_field(0), 'Formal');
+    await tester.enterText(_field(1), 'summarise');
+    await tester.pumpAndSettle();
+    expect(find.text('Give it a name.'), findsNothing);
+    expect(
+      find.text('Another shortcut already uses that name.'),
+      findsOneWidget,
+    );
+    await tester.enterText(_field(1), 'formal');
+    await tester.enterText(_field(2), 'Rewrite it formally.');
+    await tester.pumpAndSettle();
+    await tapVisible(tester, control('Save'));
+    await tester.pumpAndSettle();
+    expect(h.prefs.prefs.shortcuts.single.name, 'formal');
+    expect(find.byType(SheetFrame), findsNothing);
+  });
+
+  testWidgets(
+    'Delete shortcut acts at once, and Undo puts it back in its place',
+    (tester) async {
+      final h = await pumpApp(tester, llm: planningServer());
+      for (final (id, name) in [('1', 'formal'), ('2', 'casual')]) {
+        await h.prefs.saveShortcut(
+          PromptShortcut(
+            id: id,
+            name: name,
+            label: name,
+            prompt: 'Say it $name.',
+          ),
+        );
+      }
+      h.shell.openSettings(SettingsPage.shortcuts);
+      await tester.pumpAndSettle();
+      await tapVisible(tester, control('formal, /formal, Edit'));
+      await tester.pumpAndSettle();
+      await tapVisible(tester, control('Delete shortcut'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SheetFrame), findsNothing);
+      expect(find.text('Delete formal?'), findsNothing);
+      expect(h.prefs.prefs.shortcuts.map((s) => s.id), ['2']);
+      expect(find.text('Deleted formal'), findsOneWidget);
+      // No timer.
+      await tester.pump(const Duration(minutes: 1));
+      expect(find.text('Deleted formal'), findsOneWidget);
+
+      await tester.tap(control('Undo'));
+      await tester.pumpAndSettle();
+      expect(h.prefs.prefs.shortcuts.map((s) => s.id), ['1', '2']);
+      expect(find.text('Deleted formal'), findsNothing);
+
+      // Close lets it go for good.
+      await tapVisible(tester, control('formal, /formal, Edit'));
+      await tester.pumpAndSettle();
+      await tapVisible(tester, control('Delete shortcut'));
+      await tester.pumpAndSettle();
+      await tester.tap(control('Close'));
+      await tester.pumpAndSettle();
+      expect(find.text('Deleted formal'), findsNothing);
+      expect(h.prefs.prefs.shortcuts.map((s) => s.id), ['2']);
+    },
+  );
 }

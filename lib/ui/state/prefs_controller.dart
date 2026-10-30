@@ -190,6 +190,15 @@ class PrefsController extends ChangeNotifier {
     ),
   );
 
+  /// Puts [shortcut] back at [at] among the person's own, as Undo does after it was deleted,
+  /// unless one with its id is there again.
+  Future<void> restoreShortcut(PromptShortcut shortcut, {required int at}) {
+    final list = [...prefs.shortcuts];
+    if (list.any((item) => item.id == shortcut.id)) return Future.value();
+    list.insert(at.clamp(0, list.length), shortcut);
+    return _change(prefs.withShortcuts(list));
+  }
+
   /// Remembers how a local shortcut labelled an exchange on this device.
   Future<void> rememberShortcutUse(
     String slug,

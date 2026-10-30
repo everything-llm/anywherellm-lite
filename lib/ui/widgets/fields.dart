@@ -104,12 +104,17 @@ class AppField extends StatelessWidget {
     this.autofillHints,
     this.maxLines = 1,
     this.autofocus = false,
+    this.invalid = false,
   });
 
   final TextEditingController controller;
 
   /// Whether the field takes the focus when it first shows.
   final bool autofocus;
+
+  /// Whether what it holds is wrong, as its [FieldMessage] says: its edge is then 2 px of
+  /// [Tokens.danger], except while it has the focus.
+  final bool invalid;
 
   /// The accessible name. The field has no visible label of its own.
   final String label;
@@ -192,8 +197,60 @@ class AppField extends StatelessWidget {
             vertical: (height - size * Type.fieldLine) / 2,
           ),
           constraints: BoxConstraints(minHeight: height),
-          enabledBorder: border(fieldEdge(context)),
+          enabledBorder: invalid
+              ? border(t.danger, 2)
+              : border(fieldEdge(context)),
           focusedBorder: border(t.accent, 2),
+        ),
+      ),
+    );
+  }
+}
+
+/// The room kept under a field for what is wrong with it, two lines of body text tall whether
+/// or not there is anything to say, so a message never moves what is under it: [error] after
+/// House UI's failure mark, in ink, or else [help], the field's own rule. It is heard as it
+/// changes, inset 8 to line up with a field's name over it.
+class FieldMessage extends StatelessWidget {
+  const FieldMessage({super.key, this.error, this.help});
+
+  final String? error;
+  final String? help;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final style = Type.body(t.ink);
+    final line = MediaQuery.textScalerOf(context).scale(16) * style.height!;
+    final error = this.error;
+    final said = error ?? help;
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: line * 2),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Semantics(
+          liveRegion: true,
+          child: said == null
+              ? const SizedBox(width: double.infinity)
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: 6,
+                  children: [
+                    if (error != null)
+                      // The mark sits level with the first line.
+                      SizedBox(
+                        height: line,
+                        child: Center(
+                          child: AppIcon(
+                            'danger',
+                            size: IconSize.small,
+                            color: t.danger,
+                          ),
+                        ),
+                      ),
+                    Expanded(child: Text(said, style: style)),
+                  ],
+                ),
         ),
       ),
     );
@@ -210,6 +267,7 @@ class SecretField extends StatefulWidget {
     this.hint,
     this.onSubmitted,
     this.keyboardType,
+    this.invalid = false,
   });
 
   final TextEditingController controller;
@@ -217,6 +275,9 @@ class SecretField extends StatefulWidget {
   final String? hint;
   final ValueChanged<String>? onSubmitted;
   final TextInputType? keyboardType;
+
+  /// Whether what it holds is wrong ([AppField.invalid]).
+  final bool invalid;
 
   @override
   State<SecretField> createState() => _SecretFieldState();
@@ -237,6 +298,7 @@ class _SecretFieldState extends State<SecretField> {
       private: true,
       keyboardType: widget.keyboardType,
       onSubmitted: widget.onSubmitted,
+      invalid: widget.invalid,
       suffix: Tappable(
         label: '$verb ${widget.label}',
         toggled: _shown,
