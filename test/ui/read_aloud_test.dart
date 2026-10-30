@@ -4,11 +4,18 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/fake_api.dart';
 import '../support/pump.dart';
 
+/// Opens the latest answer's Answer sheet, where Read aloud and Stop reading are.
+Future<void> openSheet(WidgetTester tester) async {
+  await tester.tap(control('More: read aloud, ask again, details'));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('there is no Read aloud where the device cannot speak', (
     tester,
   ) async {
     await pumpApp(tester, llm: planningServer());
+    await openSheet(tester);
     expect(control('Read aloud'), findsNothing);
   });
 
@@ -16,29 +23,35 @@ void main() {
     tester,
   ) async {
     final h = await pumpApp(tester, llm: planningServer(), canSpeak: true);
+    await openSheet(tester);
     await tester.tap(control('Read aloud'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(h.speaker!.spoken, ['About 40k.']);
+    await openSheet(tester);
     expect(control('Stop reading'), findsOneWidget);
     await tester.tap(control('Stop reading'));
-    await tester.pump();
+    await tester.pumpAndSettle();
+    await openSheet(tester);
     expect(control('Read aloud'), findsOneWidget);
   });
 
   testWidgets('the button turns back when the reading ends', (tester) async {
     final h = await pumpApp(tester, llm: planningServer(), canSpeak: true);
+    await openSheet(tester);
     await tester.tap(control('Read aloud'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     h.speaker!.finish();
     await tester.pump();
     await tester.pump();
+    await openSheet(tester);
     expect(control('Read aloud'), findsOneWidget);
   });
 
   testWidgets('showing another workspace stops the reading', (tester) async {
     final h = await pumpApp(tester, llm: planningServer(), canSpeak: true);
+    await openSheet(tester);
     await tester.tap(control('Read aloud'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     final stops = h.speaker!.stopped;
     await h.chat.select('household');
     await tester.pumpAndSettle();
@@ -49,6 +62,7 @@ void main() {
   testWidgets('a device that cannot speak says so', (tester) async {
     final h = await pumpApp(tester, llm: planningServer(), canSpeak: true);
     h.speaker!.fails = Exception('No speech engine.');
+    await openSheet(tester);
     await tester.tap(control('Read aloud'));
     await tester.pumpAndSettle();
     expect(find.text('Could not read the answer aloud'), findsOneWidget);

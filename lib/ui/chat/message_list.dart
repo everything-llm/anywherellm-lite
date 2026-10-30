@@ -36,7 +36,6 @@ import 'generated_files.dart';
 import 'passages_sheet.dart';
 import 'question_body.dart';
 import 'sources_aside.dart';
-import 'speaker.dart';
 import 'wait_line.dart';
 import '../widgets/scroll_fades.dart';
 
@@ -95,6 +94,9 @@ class _MessageListState extends State<MessageList> {
   /// The question pinned over the top of the list, or null.
   final _pinned = ValueNotifier<Turn?>(null);
 
+  /// The older answer whose Copy and More show, once tapped.
+  final _revealed = ValueNotifier<Turn?>(null);
+
   /// The list's area, which the turns' places are measured from.
   final _area = GlobalKey();
 
@@ -113,6 +115,7 @@ class _MessageListState extends State<MessageList> {
     _scroll.dispose();
     _away.dispose();
     _pinned.dispose();
+    _revealed.dispose();
     super.dispose();
   }
 
@@ -423,6 +426,7 @@ class _MessageListState extends State<MessageList> {
                       )
                     : _Answer(
                         turn,
+                        revealed: _revealed,
                         retry: i == 0 ? _retryOf(chat) : null,
                         latest: at == latest,
                       ),
@@ -846,19 +850,15 @@ class _Hero extends StatelessWidget {
   }
 }
 
-/// Retry on the chat's last answer: [onPressed] is null while it cannot run, and [tooltip]
-/// says why when the question went with files.
-typedef _Retry = ({VoidCallback? onPressed, String tooltip});
-
-_Retry _retryOf(ChatController chat) {
+AskAgain _retryOf(ChatController chat) {
   final turns = chat.turns;
   final files =
       turns.length >= 2 && turns[turns.length - 2].attachments.isNotEmpty;
   return (
     onPressed: chat.canRetry ? chat.retry : null,
-    tooltip: files
-        ? 'Retry is off: the files sent with the question are not kept'
-        : 'Retry',
+    heard: files
+        ? 'Ask again is off: the files sent with the question are not kept'
+        : 'Ask again',
   );
 }
 
@@ -1001,27 +1001,39 @@ class _NoPictures extends StatelessWidget {
   }
 }
 
+/// An answer. The latest sits on a tile with Copy and More under it; an older one shows them
+/// once tapped, and a tap again hides them. A long press on an answer, or a screen reader's
+/// More, opens its Answer sheet ([AnswerSheets]).
 class _Answer extends StatelessWidget {
-  const _Answer(this.turn, {this.retry, this.latest = false});
+  const _Answer(
+    this.turn, {
+    required this.revealed,
+    this.retry,
+    this.latest = false,
+  });
 
   final Turn turn;
 
-  /// Retry, on the chat's last answer only.
-  final _Retry? retry;
+  /// The older answer whose actions show, as the last tap left it.
+  final ValueNotifier<Turn?> revealed;
 
-  /// Whether this is the chat's latest answer, which sits on a tile.
+  /// Ask again, on the chat's last answer only.
+  final AskAgain? retry;
+
+  /// Whether this is the chat's latest answer.
   final bool latest;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: turn,
+    listenable: Listenable.merge([turn, revealed]),
     builder: (context, _) {
-      final answer = _build(context, null);
+      final answer = _build(context);
       return latest ? _OnTile(child: answer) : answer;
     },
   );
 
-  Widget _build(BuildContext context, Widget? _) {
+  Widget _build(BuildContext context) {
+    final shell = AppScope.of(context).shell;
     final split = splitReasoning(turn.text, streaming: turn.streaming);
     final failure = turn.streaming ? null : modelFailure(split.answer);
     final answered = split.answer.isNotEmpty && failure == null;
@@ -1029,13 +1041,13 @@ class _Answer extends StatelessWidget {
     final inline = turn.streaming && answered && takesCaret(split.answer);
     // An answer cut short shows what came in the second ink, under why it stopped.
     final cut = !turn.streaming && turn.unfinished;
-    const action = answerAction;
-    // The red box asks again itself, so Retry does not show twice.
-    // The box for a model that cannot see pictures has no Ask again, so Retry stays then.
+    // The red box asks again itself, so Ask again does not show twice.
+    // The box for a model that cannot see pictures has no Ask again, so it stays then.
     final error = turn.error;
     final noPictures = error != null && refusesPictures(error);
     final askAgain = error != null && !noPictures && retry?.onPressed != null;
-    return Column(
+    final settled = !turn.streaming && answered;
+    final column = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (failure != null && refusesPictures(failure))
@@ -1043,7 +1055,12 @@ class _Answer extends StatelessWidget {
         else if (failure != null)
           AlertBox(AlertKind.bad, 'The model did not answer', text: failure)
         else if (split.answer.isNotEmpty)
-          AnswerBody(split.answer, muted: cut, caret: inline),
+          AnswerBody(
+            split.answer,
+            muted: cut,
+            caret: inline,
+            selectable: false,
+          ),
         // Until the first words, while a model's reasoning is hidden too, what it waits on.
         if (turn.streaming && split.answer.isEmpty)
           WaitLine(turn)
@@ -1092,70 +1109,38 @@ class _Answer extends StatelessWidget {
         ],
         if (!turn.streaming && (answered || (retry != null && !askAgain))) ...[
           const SizedBox(height: 8),
-          // The buttons are 48 wide, 8 apart, and the row starts 15 to the left, so the first
-          // icon lines up with the text.
-          Transform.translate(
-            offset: Offset(-(answerAction - answerActionIcon.px) / 2, 0),
-            child: Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 8,
-              children: [
-                if (answered)
-                  CopyButton(
-                    split.answer,
-                    tooltip: 'Copy answer',
-                    box: action,
-                    size: answerActionIcon,
-                  ),
-                if (AppScope.of(context).readAloud case final aloud?
-                    when answered)
-                  _ReadAloudButton(aloud, turn),
-                if (retry case final retry? when !askAgain)
-                  IconBtn(
-                    'refresh',
-                    tooltip: retry.tooltip,
-                    onPressed: retry.onPressed,
-                    box: action,
-                    size: answerActionIcon,
-                  ),
-                if (turn.metrics case final metrics?) AnswerMore(turn, metrics),
-                // In Agent mode the server may go on to finish the answer and save it, which
-                // shows when the chat is read again.
-                if (turn.stopped)
-                  Text(
-                    'Stopped · the server may still save it',
-                    style: Type.note(Tokens.of(context).ink),
-                  ),
-              ],
-            ),
+          AnswerActions(
+            turn,
+            answer: answered ? split.answer : '',
+            shown: latest || identical(revealed.value, turn),
+            askAgain: askAgain ? null : retry,
           ),
         ],
       ],
     );
+    if (!settled) return column;
+    void openSheet() => shell.togglePopup(answerSheetOf(turn));
+    return AnswerSheets(
+      turn,
+      answer: split.answer,
+      askAgain: askAgain ? null : retry,
+      child: Semantics(
+        customSemanticsActions: {
+          const CustomSemanticsAction(label: 'More'): openSheet,
+        },
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: latest
+              ? null
+              : () => revealed.value = identical(revealed.value, turn)
+                    ? null
+                    : turn,
+          onLongPress: openSheet,
+          child: column,
+        ),
+      ),
+    );
   }
-}
-
-/// Reads [turn] aloud, or stops it while it is being read.
-class _ReadAloudButton extends StatelessWidget {
-  const _ReadAloudButton(this.aloud, this.turn);
-
-  final ReadAloud aloud;
-  final Turn turn;
-
-  @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: aloud,
-    builder: (context, _) {
-      final reading = identical(aloud.reading, turn);
-      return IconBtn(
-        reading ? 'stop' : 'speaker',
-        tooltip: reading ? 'Stop reading' : 'Read aloud',
-        onPressed: () => aloud.toggle(turn),
-        box: answerAction,
-        size: answerActionIcon,
-      );
-    },
-  );
 }
 
 /// What the agent is doing while the answer runs, such as a tool it runs. It goes when the

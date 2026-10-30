@@ -21,7 +21,7 @@ import 'markdown_lists.dart';
 import 'math.dart';
 import '../icons.dart';
 
-/// An answer's text, drawn as Markdown and selectable. A code block, a table and display math
+/// An answer's text, drawn as Markdown, and selectable unless [selectable] is false. A code block, a table and display math
 /// scroll sideways rather than widen the chat, showing a scrollbar while they do, and a code
 /// block has its own Copy button. A link opens outside the app. An image loads only from the
 /// AnythingLLM server's own host, on any port, and only over https: loading any other would send
@@ -34,9 +34,14 @@ class AnswerBody extends StatelessWidget {
     super.key,
     this.muted = false,
     this.caret = false,
+    this.selectable = true,
   });
 
   final String text;
+
+  /// Whether its words can be selected. In the chat they cannot, since a long press on an
+  /// answer opens its sheet, whose Select text shows them selectable.
+  final bool selectable;
 
   /// Ends the text with the [Caret], for an answer still being written that [takesCaret]. The
   /// text is not selectable meanwhile, since a selectable text holds no widget.
@@ -91,7 +96,7 @@ class AnswerBody extends StatelessWidget {
     Set<Uri>? linked;
     return TightListMarkdown(
       data: caret ? '$text$caretMark' : text,
-      selectable: !caret,
+      selectable: selectable && !caret,
       extensionSet: caret ? _withCaret : answerMarkdown,
       onTapLink: (_, href, _) {
         if (href != null) openAnswerLink(context, href);

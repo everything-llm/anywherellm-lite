@@ -1,6 +1,7 @@
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/ui/chat/answer_body.dart';
+import 'package:anywherellm/ui/widgets/sheet.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
@@ -35,7 +36,9 @@ void main() {
     h.chat.stop();
     await tester.pump(const Duration(milliseconds: 300));
     expect(muted(tester, 'Next quarter we'), isTrue);
-    expect(find.byTooltip('Retry'), findsOneWidget);
+    await tester.tap(control('More: read aloud, ask again, details'));
+    await tester.pumpAndSettle();
+    expect(control('Ask again'), findsOneWidget);
   });
 
   testWidgets('a failed answer asks again in its box, not twice', (
@@ -50,9 +53,20 @@ void main() {
       ..addError(const ApiException('The server stopped the answer.'));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Ask again'), findsOneWidget);
-    expect(find.byTooltip('Retry'), findsNothing);
-    // The chat's earlier answer has its own Copy.
-    expect(find.byTooltip('Copy answer'), findsNWidgets(2));
+    await tester.tap(control('More: read aloud, ask again, details'));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(SheetFrame),
+        matching: control('Ask again'),
+      ),
+      findsNothing,
+      reason: 'the box asks again',
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    // The chat's earlier answer shows its own Copy only once tapped.
+    expect(control('Copy answer'), findsOneWidget);
     expect(muted(tester, 'Next quarter we'), isTrue);
   });
 }

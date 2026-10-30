@@ -294,18 +294,19 @@ $$\frac{a}{b}$$
     });
   });
 
-  testWidgets('a model failure shows as a failure, with Retry and no Copy', (
-    tester,
-  ) async {
-    await _show(tester, 'The agent model failed to respond: 400 bad input');
-    expect(find.text('The model did not answer'), findsOneWidget);
-    expect(
-      find.text('The agent model failed to respond: 400 bad input'),
-      findsOneWidget,
-    );
-    expect(find.byTooltip('Copy answer'), findsNothing);
-    expect(find.byTooltip('Retry'), findsOneWidget);
-  });
+  testWidgets(
+    'a model failure shows as a failure, with Ask again and no Copy',
+    (tester) async {
+      await _show(tester, 'The agent model failed to respond: 400 bad input');
+      expect(find.text('The model did not answer'), findsOneWidget);
+      expect(
+        find.text('The agent model failed to respond: 400 bad input'),
+        findsOneWidget,
+      );
+      expect(control('Copy answer'), findsNothing);
+      expect(control('Ask again'), findsOneWidget);
+    },
+  );
 
   testWidgets('a model that cannot see a picture says so, and offers another', (
     tester,
@@ -409,7 +410,7 @@ $$\frac{a}{b}$$
       await pumpApp(tester, llm: answering('Hello there my friend'));
       await tester.pumpAndSettle();
       final answer = find.byWidgetPredicate(
-        (w) => w is EditableText && w.controller.text.contains('Hello there'),
+        (w) => w is RichText && w.text.toPlainText().contains('Hello there'),
       );
       final before = tester.getSize(answer.first);
       dispatcher.textScaleFactorTestValue = 1.6;

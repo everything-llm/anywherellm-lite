@@ -1,14 +1,30 @@
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/state/notice.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
 import '../support/pixels.dart';
 import '../support/pump.dart';
 
-/// Taps the middle of the link whose text is [text] in a selectable answer, as a person does.
+/// Taps the middle of the link whose text is [text] in an answer, selectable or not, as a
+/// person does.
 Future<void> tapLink(WidgetTester tester, String text) async {
+  for (final element in find.byType(RichText).evaluate()) {
+    final start = (element.widget as RichText).text.toPlainText().indexOf(text);
+    final paragraph = element.renderObject;
+    if (start < 0 || paragraph is! RenderParagraph) continue;
+    final box = paragraph
+        .getBoxesForSelection(
+          TextSelection(baseOffset: start, extentOffset: start + text.length),
+        )
+        .first
+        .toRect();
+    await tester.tapAt(paragraph.localToGlobal(box.center));
+    await tester.pump(const Duration(milliseconds: 500));
+    return;
+  }
   for (final element in find.byType(SelectableText).evaluate()) {
     final selectable = element.widget as SelectableText;
     final start = selectable.textSpan?.toPlainText().indexOf(text) ?? -1;
@@ -160,10 +176,12 @@ void main() {
     // its gesture would.
     tester
         .widget<GestureDetector>(
-          find.ancestor(
-            of: find.byType(Image),
-            matching: find.byType(GestureDetector),
-          ),
+          find
+              .ancestor(
+                of: find.byType(Image),
+                matching: find.byType(GestureDetector),
+              )
+              .first,
         )
         .onTap!();
     await tester.pump(const Duration(milliseconds: 500));

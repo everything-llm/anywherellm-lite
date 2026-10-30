@@ -180,14 +180,15 @@ void main() {
     expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
   });
 
-  testWidgets('Retry shows on the last answer only, and asks again', (
+  testWidgets('Ask again is in the last answer\'s sheet, and asks again', (
     tester,
   ) async {
     final llm = planningServer()..answer = 'About 45k.';
     await pumpApp(tester, llm: llm);
     await ask(tester, 'And next year?');
-    expect(control('Retry'), findsOneWidget);
-    await tester.tap(control('Retry'));
+    await tester.tap(control('More: read aloud, ask again, details'));
+    await tester.pumpAndSettle();
+    await tester.tap(control('Ask again'));
     await tester.pumpAndSettle();
     expect(llm.calls.where((c) => c.startsWith('streamChat')), [
       'streamChat:budget:And next year?',

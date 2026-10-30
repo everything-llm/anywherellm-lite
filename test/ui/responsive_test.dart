@@ -348,11 +348,16 @@ void main() {
         await h.chat.send('measured');
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
+        // More is pressed as its own action: scrolled to, the jump button would sit over it on a
+        // narrow phone, and this is about whether the sheets fit.
+        tester
+            .widget<Tappable>(control('More: read aloud, ask again, details'))
+            .onTap!();
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
         await tapVisible(
           tester,
-          find.bySemanticsLabel(
-            'More for this answer: model, time, tokens, speed and cost',
-          ),
+          control('Details: model, time, tokens, speed and cost'),
         );
         await tester.pumpAndSettle();
         expect(find.text('This answer'), findsOneWidget);
