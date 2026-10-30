@@ -653,7 +653,8 @@ class ChatController extends ChangeNotifier with FollowsServer {
     var failed = true;
     final asked = _made;
     await _try(_readFailed, () async {
-      final read = await _openToUser(await _api.workspaces());
+      var read = await _api.workspaces();
+      if (_narrowedFor case final user?) read = await _openTo(user, read);
       if (!at.current) return;
       failed = false;
       workspaces = read;
@@ -704,13 +705,17 @@ class ChatController extends ChangeNotifier with FollowsServer {
     unawaited(_countDocs());
   }
 
-  /// [all], on a multi-user server where someone is chosen ([PrefsController.chosenUser]), with
-  /// only the workspaces they open ([ServerUser.opens]), read at once. One whose users cannot be
-  /// read stays, as every workspace does with no one chosen: the key opens them all whoever is
-  /// chosen, so one too many hides nothing.
-  Future<List<Workspace>> _openToUser(List<Workspace> all) async {
-    final user = _prefs.chosenUser;
-    if (user == null || user.opensEvery) return all;
+  /// The user chosen on a multi-user server ([PrefsController.chosenUser]) when the workspaces
+  /// are narrowed to theirs: one who is not an admin or a manager. Null shows every workspace.
+  ServerUser? get _narrowedFor => switch (_prefs.chosenUser) {
+    final user? when !user.opensEvery => user,
+    _ => null,
+  };
+
+  /// [all] with only the workspaces [user] opens ([ServerUser.opens]), each read at once. One
+  /// whose users cannot be read stays, as every workspace does with no one chosen: the key opens
+  /// them all whoever is chosen, so one too many hides nothing.
+  Future<List<Workspace>> _openTo(ServerUser user, List<Workspace> all) async {
     Future<bool> opens(Workspace workspace) async {
       final id = workspace.id;
       if (id == null) return true;
