@@ -260,7 +260,8 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   );
 
   /// A bare `GET` of [url], on any port of the server's host as [loadableImage] allows, read
-  /// whole, at most [maxImageBytes]. Any other address is refused unread ([offServerImage]).
+  /// whole, at most [maxImageBytes]. Any other address is refused unread ([offServerImage]), and
+  /// a redirect is not followed, since it could lead to one.
   @override
   Future<Uint8List> answerImage(Uri url) async {
     final connection = _current;
@@ -271,7 +272,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     final response = await _fetch(
       connection,
       timeout,
-      () => _client.send(http.Request('GET', url)),
+      () => _client.send(http.Request('GET', url)..followRedirects = false),
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       unawaited(response.stream.listen(null).cancel());

@@ -1601,6 +1601,8 @@ void main() {
         isNot(contains('authorization')),
       );
       expect(seen.single.headers.values.join(), isNot(contains('SECRET-KEY')));
+      // A redirect could lead off the server's host.
+      expect(seen.single.followRedirects, isFalse);
     });
 
     test('refuses plain http', () async {
