@@ -676,7 +676,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
     }
     if (tapped case (final slug, final thread)
         when workspaces.any((w) => w.slug == slug)) {
-      await select(slug, thread: thread);
+      await select(slug, thread: _kept(slug, thread));
     } else if (active == null) {
       final (slug, thread) = _startChat;
       await select(slug, thread: thread);
@@ -696,15 +696,22 @@ class ChatController extends ChangeNotifier with FollowsServer {
   (String, String)? _tapped;
 
   /// Opens chat [thread] of workspace [slug], as a tapped notification asks. Before the
-  /// workspaces are read, as when the tap started the app, [load] opens it once they are.
+  /// workspaces are read, as when the tap started the app, [load] opens it once they are. A
+  /// workspace gone since opens nothing, and a chat gone since gives way to its workspace's
+  /// newest.
   Future<void> openTapped(String slug, String thread) {
     // No server means no workspaces: a new one empties them.
     if (workspaces.isEmpty) {
       _tapped = (slug, thread);
       return Future.value();
     }
-    return select(slug, thread: thread);
+    if (!workspaces.any((w) => w.slug == slug)) return Future.value();
+    return select(slug, thread: _kept(slug, thread));
   }
+
+  /// [thread] while workspace [slug] still has it, else null.
+  String? _kept(String slug, String thread) =>
+      threadsOf(slug).any((t) => t.slug == thread) ? thread : null;
 
   /// Asks each workspace how many documents it holds, all at once. Best effort: a count that
   /// cannot be read is left out. Sources reports the active workspace's own count.

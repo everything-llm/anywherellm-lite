@@ -373,5 +373,22 @@ void main() {
       await tester.pumpAndSettle();
       expect((h.chat.activeSlug, h.chat.activeThread), (slug, thread));
     });
+
+    testWidgets('a ready answer tapped after its chat went opens no ghost', (
+      tester,
+    ) async {
+      final background = FakeBackground();
+      final llm = planningServer();
+      final h = await pumpApp(tester, llm: llm, background: background);
+      await h.chat.select('household');
+      await tester.pumpAndSettle();
+      background.tap((slug: 'q3', thread: 'gone'));
+      await tester.pumpAndSettle();
+      expect((h.chat.activeSlug, h.chat.activeThread), ('q3', 'budget'));
+      expect(h.chat.problem, isNull);
+      background.tap((slug: 'gone', thread: 'budget'));
+      await tester.pumpAndSettle();
+      expect((h.chat.activeSlug, h.chat.activeThread), ('q3', 'budget'));
+    });
   });
 }
