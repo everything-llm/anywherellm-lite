@@ -243,6 +243,13 @@ final _wide = <String, _Setup>{
     h.shell.openPane(Pane.documents);
     await _settle(tester);
   },
+  'desk-docdetails': (tester, h) async {
+    await _openChat(tester, h, 'budget');
+    h.shell
+      ..openPane(Pane.documents)
+      ..openDocument(h.sources.byTitle('Q3 roadmap.pdf')!.storedName);
+    await _settle(tester);
+  },
   'desk-settings': (tester, h) => _settings(tester, h, SettingsPage.connection),
 };
 
