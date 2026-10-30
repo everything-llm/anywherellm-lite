@@ -19,7 +19,7 @@ import 'prefs_controller.dart';
 import 'settings_controller.dart';
 import 'turn.dart';
 
-/// A chat [ChatController.delete] took out of the list and has not deleted on the server yet.
+/// A chat [ChatController.delete] took out of the list whose delete is on its way to the server.
 class _Deleted {
   const _Deleted({
     required this.server,
@@ -27,7 +27,6 @@ class _Deleted {
     required this.chat,
     required this.at,
     required this.turns,
-    required this.open,
   });
 
   /// The server it is on, which the delete goes to even after another is in use.
@@ -38,9 +37,6 @@ class _Deleted {
   /// Where it was in its workspace's list.
   final int at;
   final List<Turn>? turns;
-
-  /// Whether it was on screen.
-  final bool open;
 }
 
 /// An answer running: the chat it belongs to, null while its draft's thread is being made, and
@@ -312,13 +308,11 @@ class ChatController extends ChangeNotifier with FollowsServer {
   int? get clearedOnDeck => _cleared.value?.deck.next.length;
 
   /// Takes every message waiting in the chat on screen out at once. [undoClearOnDeck] puts them
-  /// back while its toast shows. It takes the place of a deleted chat's toast, whose delete
-  /// goes now.
+  /// back while its toast shows.
   void clearOnDeck() {
     final thread = activeThread;
     final deck = _onDeck[thread];
     if (thread == null || deck == null) return;
-    unawaited(flushDelete());
     _cleared.show((thread: thread, deck: deck));
     _setDeck(thread, deck.slug, const []);
     notifyListeners();
@@ -663,8 +657,6 @@ class ChatController extends ChangeNotifier with FollowsServer {
 
   @override
   void dispose() {
-    // The last chance to send a delete still waiting to be undone.
-    unawaited(flushDelete());
     _disposed = true;
     for (final running in _runs) {
       running.stream?.cancel();
@@ -675,10 +667,6 @@ class ChatController extends ChangeNotifier with FollowsServer {
     unreachable.dispose();
     super.dispose();
   }
-
-  /// A delete still waiting to be undone goes to the server it was made on.
-  @override
-  void leavingServer() => unawaited(flushDelete());
 
   @override
   void serverChanged(_) {
@@ -745,13 +733,11 @@ class ChatController extends ChangeNotifier with FollowsServer {
           }
         }
       }
-      // A chat deleted in the list but not yet on the server is still in the server's list.
-      if (_deleted.value case final deleted?
-          when _threads.containsKey(deleted.slug)) {
-        _threads[deleted.slug] = [
-          for (final t in _threads[deleted.slug]!)
-            if (t.slug != deleted.chat.slug) t,
-        ];
+      // A chat whose delete is still on its way may still be in the server's list.
+      for (final deleted in _deleting) {
+        if (_threads[deleted.slug] case final list?) {
+          list.removeWhere((t) => t.slug == deleted.chat.slug);
+        }
       }
     });
     if (!at.current) return;
@@ -963,10 +949,9 @@ class ChatController extends ChangeNotifier with FollowsServer {
   ];
 
   /// Empties the draft, so a send or read meant for the one before leaves it alone.
-  /// Another chat is about to show, [thread] or a draft: a deleted chat's toast is done, so its
-  /// delete goes, and Clear all's toast for another chat goes with what it took out.
+  /// Another chat is about to show, [thread] or a draft: Clear all's toast for another chat goes
+  /// with what it took out.
   void _leaving(String? thread) {
-    unawaited(flushDelete());
     if (_cleared.value case final cleared? when cleared.thread != thread) {
       _cleared.take();
     }
@@ -1039,8 +1024,6 @@ class ChatController extends ChangeNotifier with FollowsServer {
     await _try('Could not delete the workspace', () async {
       await _api.deleteWorkspace(slug);
       if (!at.current) return;
-      // A chat waiting to be deleted goes with its workspace: its delete would find none.
-      if (_deleted.value?.slug == slug) _deleted.take();
       for (final chat in [
         mainChatOf(slug),
         for (final t in threadsOf(slug)) t.slug,
@@ -1075,75 +1058,52 @@ class ChatController extends ChangeNotifier with FollowsServer {
     });
   }
 
-  /// The chat deleted from the list but not yet on the server, while it can be put back: its
-  /// toast has no clock, so nothing is deleted before the person is done with it.
-  final _deleted = Fleeting<_Deleted>.held();
+  /// The chats [delete] took out of the list whose delete is on its way, which a read of the
+  /// workspaces meanwhile may still list.
+  final _deleting = <_Deleted>[];
 
   /// Whether [dispose] ran, after which a delete that comes back changes nothing.
   bool _disposed = false;
 
-  /// The name of the chat that [undoDelete] would put back, or null.
-  String? get deletedChat => _deleted.value?.chat.name;
-
-  /// Takes chat [threadSlug] of the workspace on screen out of the list at once, and deletes it
-  /// on the server only once its toast is done: closed ([flushDelete]), replaced by another
-  /// delete or Clear all, left for another chat or workspace, another server, the app hiding or
-  /// [dispose]. [undoDelete] puts it back before then, and nothing is sent. The chat on screen
-  /// gives way to a new chat, a draft in the same workspace. Main chat, in no list
-  /// ([threadsOf]), is never deleted.
+  /// Deletes chat [threadSlug] of the workspace on screen for good, once its sheet has asked:
+  /// it leaves the list at once, and the delete goes now, to the server it was made on even
+  /// should another be in use by the time it is answered. A delete the server refuses puts the
+  /// chat back, with why. The chat on screen gives way to a new chat, a draft in the same
+  /// workspace. Main chat, in no list ([threadsOf]), is never deleted.
   Future<void> delete(String threadSlug) async {
     final slug = activeSlug;
     final server = this.server;
     if (slug == null || server == null || isAnswering(threadSlug)) return;
-    unawaited(flushDelete());
-    _cleared.take();
     final was = threadsOf(slug);
     final at = was.indexWhere((t) => t.slug == threadSlug);
     if (at < 0) return;
     final open = activeThread == threadSlug;
-    _deleted.show(
-      _Deleted(
-        server: server,
-        slug: slug,
-        chat: was[at],
-        at: at,
-        turns: _turns[threadSlug],
-        open: open,
-      ),
+    final deleted = _Deleted(
+      server: server,
+      slug: slug,
+      chat: was[at],
+      at: at,
+      turns: _turns[threadSlug],
     );
-    final list = [...was]..removeAt(at);
-    _threads[slug] = list;
+    // What Clear all took out of it has nowhere to go back to.
+    if (_cleared.value?.thread == threadSlug) _cleared.take();
+    _threads[slug] = [...was]..removeAt(at);
     _turns.remove(threadSlug);
     _newest.remove(threadSlug);
     _onDeck.remove(threadSlug);
+    _deleting.add(deleted);
+    final sent = _send(deleted);
     if (open) {
       _freshDraft();
       await this.open(null);
     } else {
       notifyListeners();
     }
+    await sent;
   }
-
-  /// Puts the chat [delete] took out back where it was, and on screen if it was.
-  Future<void> undoDelete() async {
-    final deleted = _deleted.take();
-    if (deleted == null) return;
-    _restore(deleted);
-    if (deleted.open && activeSlug == deleted.slug) {
-      await open(deleted.chat.slug);
-    } else {
-      notifyListeners();
-    }
-  }
-
-  /// Deletes on the server, now, the chat [delete] took out, on the server it was on, as its
-  /// toast's Close does. A delete the server refuses puts the chat back.
-  Future<void> flushDelete() => _send(_deleted.take());
 
   /// Deletes [deleted] on its server, putting it back when the server refuses.
-  Future<void> _send(_Deleted? deleted) async {
-    if (deleted == null) return;
-    notifyListeners();
+  Future<void> _send(_Deleted deleted) async {
     final thread = deleted.chat.slug;
     try {
       await _api.deleteThread(deleted.slug, thread, on: deleted.server);
@@ -1154,12 +1114,17 @@ class ChatController extends ChangeNotifier with FollowsServer {
       if (_disposed || !_restore(deleted)) return;
       problem = Notice('Could not delete the chat', error.message);
       notifyListeners();
+    } finally {
+      _deleting.remove(deleted);
     }
   }
 
-  /// Puts [deleted] back in its list, and says whether it was its server's to put back.
+  /// Puts [deleted] back in its list, and says whether it was its server's to put back: not
+  /// once another server is in use or its workspace is gone.
   bool _restore(_Deleted deleted) {
-    if (server != deleted.server) return false;
+    if (server != deleted.server || !_threads.containsKey(deleted.slug)) {
+      return false;
+    }
     final list = [...threadsOf(deleted.slug)];
     if (list.any((t) => t.slug == deleted.chat.slug)) return true;
     list.insert(deleted.at.clamp(0, list.length), deleted.chat);

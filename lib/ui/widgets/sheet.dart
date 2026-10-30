@@ -425,7 +425,8 @@ class ModalSheet extends StatelessWidget {
 /// A sheet's question before something is deleted, removed or sent: [question], then [keep],
 /// Keep unless it says otherwise, which calls [onKeep], and [action], Delete unless it says
 /// otherwise, which calls [onConfirm] and is off while [onConfirm] is null, side by side.
-/// [action] is drawn as a danger unless [danger] is false, when it is the filled button.
+/// [action] is drawn as a danger, with [keep] the filled button, unless [danger] is false, when
+/// [action] is the filled one.
 class SheetQuestion extends StatelessWidget {
   const SheetQuestion(
     this.question, {
@@ -458,7 +459,8 @@ class SheetQuestion extends StatelessWidget {
         ),
       ),
       ActionRow(even: true, [
-        AppButton(keep, onPressed: onKeep),
+        // Level with the danger beside it.
+        AppButton(keep, primary: danger, compact: true, onPressed: onKeep),
         AppButton(
           action,
           danger: danger,

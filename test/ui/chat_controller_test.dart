@@ -506,19 +506,14 @@ void main() {
     final llm = planningServer();
     final rig = await started(llm);
     await rig.chat.delete('budget');
-    expect(llm.calls, isNot(contains('deleteThread:budget')));
-    expect(rig.chat.deletedChat, 'Budget questions');
-    expect(rig.chat.activeThread, isNull);
-    expect(rig.chat.activeSlug, 'q3');
-    // A second delete sends the first.
-    await rig.chat.open('priorities');
-    await rig.chat.delete('priorities');
     expect(llm.calls, contains('deleteThread:budget'));
     expect(rig.chat.activeThread, isNull);
-    expect(rig.chat.threadsOf('q3'), isEmpty);
-    await rig.chat.flushDelete();
+    expect(rig.chat.activeSlug, 'q3');
+    await rig.chat.open('priorities');
+    await rig.chat.delete('priorities');
     expect(llm.calls, contains('deleteThread:priorities'));
-    expect(rig.chat.deletedChat, isNull);
+    expect(rig.chat.activeThread, isNull);
+    expect(rig.chat.threadsOf('q3'), isEmpty);
   });
 
   group('an answer ready', () {
@@ -551,38 +546,39 @@ void main() {
     });
   });
 
-  group('undoing a delete', () {
-    test('puts the chat back where it was, on screen again', () async {
+  group('a delete', () {
+    test('a read while it is on its way leaves the chat out', () async {
       final llm = planningServer();
       final rig = await started(llm);
-      await rig.chat.delete('budget');
-      await rig.chat.undoDelete();
-      expect(rig.chat.threadsOf('q3').map((t) => t.slug), [
-        'priorities',
-        'budget',
-      ]);
-      expect(rig.chat.activeThread, 'budget');
-      expect(rig.chat.deletedChat, isNull);
-      await rig.chat.flushDelete();
-      expect(llm.calls, isNot(contains('deleteThread:budget')));
+      final gate = llm.gates['deleteThread'] = Completer<void>();
+      final deleting = rig.chat.delete('budget');
+      await pumpEventQueue();
+      await rig.chat.load();
+      expect(
+        rig.chat.threadsOf('q3').map((t) => t.slug),
+        isNot(contains('budget')),
+      );
+      gate.complete();
+      await deleting;
     });
 
-    test('a new server sends the delete to the one it was made on', () async {
+    test('goes to the server it was made on after a new one', () async {
       final llm = planningServer();
       final rig = await started(llm);
-      await rig.chat.delete('budget');
-      await rig.settings.clear();
+      final gate = llm.gates['deleteThread'] = Completer<void>();
+      final deleting = rig.chat.delete('budget');
       await pumpEventQueue();
-      expect(llm.calls, contains('deleteThread:budget'));
+      await rig.settings.clear();
+      gate.complete();
+      await deleting;
       expect(llm.deletedOn['budget']?.baseUrl, sampleConnection.baseUrl);
     });
 
-    test('a delete the server refuses puts the chat back', () async {
+    test('the server refuses puts the chat back', () async {
       final llm = planningServer();
       final rig = await started(llm);
-      await rig.chat.delete('priorities');
       llm.errors['deleteThread'] = const ApiException('No.');
-      await rig.chat.flushDelete();
+      await rig.chat.delete('priorities');
       expect(
         rig.chat.threadsOf('q3').map((t) => t.slug),
         contains('priorities'),

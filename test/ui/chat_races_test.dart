@@ -208,16 +208,18 @@ void main() {
   });
 
   group('a workspace deleted', () {
-    testWidgets('takes the chat waiting to be deleted with it', (tester) async {
+    testWidgets('while a chat\'s delete is on its way puts nothing back', (
+      tester,
+    ) async {
       final llm = planningServer();
       final rig = await _started(llm);
-      await rig.chat.delete('budget');
+      final gate = llm.gates['deleteThread'] = Completer<void>();
+      llm.errors['deleteThread'] = const ApiException('No.');
+      final deleting = rig.chat.delete('budget');
+      await tester.pump();
       await rig.chat.deleteWorkspace('q3');
-      expect(rig.chat.deletedChat, isNull);
-      // Nothing is left for the toast's Close to send.
-      await rig.chat.flushDelete();
-      await tester.pump(const Duration(minutes: 1));
-      expect(llm.calls.where((c) => c.startsWith('deleteThread')), isEmpty);
+      gate.complete();
+      await deleting;
       expect(rig.chat.problem, isNull);
       expect(rig.chat.threadsOf('q3'), isEmpty);
     });
