@@ -10,6 +10,7 @@
 
 import 'dart:io';
 
+import 'package:anywherellm/ui/chat/answer_menu.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/files.dart';
@@ -164,6 +165,11 @@ final _screens = <String, _Setup>{
   'more': (tester, h) async {
     await _openChat(tester, h, 'errands');
     h.shell.togglePopup(h.chat.turns[1]);
+    await _settle(tester);
+  },
+  'answermenu': (tester, h) async {
+    await _openChat(tester, h, 'errands');
+    h.shell.togglePopup(answerSheetOf(h.chat.turns.last));
     await _settle(tester);
   },
   'answerfrom': (tester, h) async {
