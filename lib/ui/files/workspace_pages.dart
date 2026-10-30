@@ -70,28 +70,40 @@ class _WorkspacePagesState extends State<WorkspacePages> {
                 'Back to the chat',
                 () => shell.showPane(Pane.chats),
               );
+        // A page draws this itself, so the instructions can put their buttons in it.
+        Widget top(Widget? action) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            PhonePageHeader(
+              title: title,
+              back: back,
+              onBack: onBack,
+              action: action,
+            ),
+            for (final problem in _files.problems)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                child: AlertBox.notice(AlertKind.bad, problem),
+              ),
+          ],
+        );
         return MinHeight(
           min: Sizes.panelMin,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              PhonePageHeader(title: title, back: back, onBack: onBack),
-              for (final problem in _files.problems)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: AlertBox.notice(AlertKind.bad, problem),
+          child: page != null
+              ? workspaceSection(context, top: top)
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    top(null),
+                    Expanded(
+                      child: ScrollFades(
+                        child: workspace == null
+                            ? const Blank('No workspace is open.')
+                            : _overview(context, workspace.name),
+                      ),
+                    ),
+                  ],
                 ),
-              Expanded(
-                child: ScrollFades(
-                  child: workspace == null
-                      ? const Blank('No workspace is open.')
-                      : page != null
-                      ? workspaceSection(context)
-                      : _overview(context, workspace.name),
-                ),
-              ),
-            ],
-          ),
         );
       },
     );

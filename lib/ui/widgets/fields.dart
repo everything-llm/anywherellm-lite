@@ -14,27 +14,6 @@ Color fieldEdge(BuildContext context) => Tokens.of(context).lineStrong;
 /// A text field's fill.
 Color fieldFill(BuildContext context) => Tokens.of(context).ground;
 
-/// The look of a text area that fills its space, such as the prompt editor: [fill] behind it,
-/// [fieldEdge] round it, and the accent, 2 px, while it has the focus. [padding] is round the
-/// text, 14 on every side unless given.
-InputDecoration editorDecoration(
-  BuildContext context,
-  Color fill, {
-  EdgeInsets? padding,
-}) {
-  OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
-    borderRadius: BorderRadius.circular(Sizes.control),
-    borderSide: BorderSide(color: color, width: width),
-  );
-  return InputDecoration(
-    filled: true,
-    fillColor: fill,
-    contentPadding: padding ?? const EdgeInsets.all(14),
-    enabledBorder: border(fieldEdge(context), 1),
-    focusedBorder: border(Tokens.of(context).accent, 2),
-  );
-}
-
 /// A 2 px ring in the accent, drawn inside [child]'s box with corners of 14, while [focus] has the
 /// focus from a keyboard, as the Lite prototype's `:focus-visible` outlines a field it sits in: a
 /// tap with a finger shows the caret alone. It takes no room of its own.

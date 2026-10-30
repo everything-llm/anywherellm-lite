@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../core/files.dart';
 import '../app_scope.dart';
-import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/buttons.dart';
 import '../widgets/fields.dart';
-import '../widgets/rise.dart';
+import '../widgets/scroll_fades.dart';
+import '../widgets/window_insets.dart';
 import 'settings_form.dart';
 
 /// A line of muted text in the middle of the pane.
@@ -29,15 +29,20 @@ class Blank extends StatelessWidget {
   );
 }
 
-/// The editor for a workspace's `PROMPT.md`, in the mono face its Markdown and tags read best
-/// in, with a scrollbar once the text runs past the field. It takes all the height there is;
-/// Revert and Save slide in under it once the text has changed. Its key changes each time the
-/// text is read afresh, which drops the draft.
+/// A page's header, with [action] at its end when there is one, and the notices under it.
+typedef PageTop = Widget Function(Widget? action);
+
+/// The editor for a workspace's `PROMPT.md`, under [top], the page's header: full width on the
+/// tile, in the mono face its Markdown and tags read best in, with a scrollbar once the text runs
+/// past it. It takes all the height there is. Revert and Save show at the header's end only while
+/// the text differs from what was read, or is being saved. Its key changes each time the text is
+/// read afresh, which drops the draft.
 class _Editor extends StatefulWidget {
-  const _Editor({super.key, required this.prompt});
+  const _Editor({super.key, required this.prompt, required this.top});
 
   /// The workspace's prompt as last read.
   final String prompt;
+  final PageTop top;
 
   @override
   State<_Editor> createState() => _EditorState();
@@ -72,89 +77,127 @@ class _EditorState extends State<_Editor> {
     if (mounted) setState(() => _saving = false);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final t = Tokens.of(context);
-    return Padding(
-      padding: Sizes.pageIn(context),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+  /// Revert and Save, sharing what the header leaves of its line, or null while there is
+  /// nothing to save.
+  Widget? _buttons() {
+    if (!_dirty && !_saving) return null;
+    final ready = _dirty && !_saving;
+    return Flexible(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        spacing: 8,
         children: [
-          Expanded(
-            child: FieldName(
-              label: 'PROMPT.md',
-              child: Scrollbar(
-                controller: _scroll,
-                child: TextField(
-                  controller: _draft,
-                  scrollController: _scroll,
-                  expands: true,
-                  maxLines: null,
-                  textAlignVertical: TextAlignVertical.top,
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  style: Type.mono(15, color: t.ink, height: 1.45),
-                  cursorColor: t.accent,
-                  decoration: editorDecoration(context, t.tile).copyWith(
-                    // An empty prompt says what applies instead.
-                    hintText:
-                        'Empty: the server\'s default system prompt applies.',
-                    hintStyle: Type.mono(15, color: t.muted, height: 1.45),
-                  ),
-                ),
-              ),
+          Flexible(
+            child: AppButton(
+              'Revert',
+              quiet: true,
+              onPressed: ready ? () => _draft.text = _saved : null,
             ),
           ),
-          // Only the buttons follow the draft, so typing rebuilds nothing else. They slide in
-          // once the text has changed, and until then the field has their room.
-          ListenableBuilder(
-            listenable: _draft,
-            builder: (context, _) => AnimatedSize(
-              duration: motion(context, const Duration(milliseconds: 160)),
-              curve: Curves.easeOut,
-              alignment: Alignment.topCenter,
-              child: !_dirty && !_saving
-                  ? null
-                  : Padding(
-                      padding: const EdgeInsets.only(top: 20),
-                      child: ActionRow(
-                        even: true,
-                        saveRevertButtons(
-                          dirty: _dirty,
-                          saving: _saving,
-                          onSave: _save,
-                          onRevert: () => _draft.text = _saved,
-                        ),
-                      ),
-                    ),
+          Flexible(
+            child: AppButton(
+              _saving ? 'Saving…' : 'Save',
+              primary: true,
+              compact: true,
+              onPressed: ready ? _save : null,
             ),
           ),
         ],
       ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    OutlineInputBorder ring(Color color, double width) => OutlineInputBorder(
+      borderRadius: BorderRadius.zero,
+      borderSide: BorderSide(color: color, width: width),
+    );
+    final text = Type.code(t.ink);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Only the header follows the draft, so typing rebuilds nothing else.
+        ListenableBuilder(
+          listenable: _draft,
+          builder: (context, _) => widget.top(_buttons()),
+        ),
+        Expanded(
+          child: FieldName(
+            label: 'PROMPT.md',
+            child: Scrollbar(
+              controller: _scroll,
+              child: TextField(
+                controller: _draft,
+                scrollController: _scroll,
+                expands: true,
+                maxLines: null,
+                textAlignVertical: TextAlignVertical.top,
+                autocorrect: false,
+                enableSuggestions: false,
+                style: text,
+                cursorColor: t.accent,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: t.tile,
+                  // It runs on behind the navigation bar, its text clear of it.
+                  contentPadding: EdgeInsets.fromLTRB(
+                    16,
+                    8,
+                    16,
+                    24 + WindowInsets.of(context).bottom,
+                  ),
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: ring(t.accent, 2),
+                  // An empty prompt says what applies instead.
+                  hintText:
+                      'Empty: the server\'s default system prompt applies.',
+                  hintStyle: text.copyWith(color: t.muted),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
-/// A page of the open workspace: its instructions or its answer settings, the section
-/// [FilesController.section] picks.
-Widget workspaceSection(BuildContext context) {
+/// A page of the open workspace under [top], its header: its instructions or its answer
+/// settings, the section [FilesController.section] picks. The instructions put their buttons in
+/// the header; any other page scrolls under it.
+Widget workspaceSection(BuildContext context, {required PageTop top}) {
   final scope = AppScope.of(context);
   final files = scope.files;
   final workspace = scope.chat.active;
-  if (workspace == null) return const Blank('No workspace is open.');
+  Widget under(Widget page) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      top(null),
+      Expanded(child: ScrollFades(child: page)),
+    ],
+  );
+  if (workspace == null) return under(const Blank('No workspace is open.'));
   final section = files.section;
   final detail = files.detail(workspace.slug);
   final key = ValueKey('${workspace.slug}#$section#${files.revision}');
   return switch (section) {
-    _ when detail == null && files.loading => const Blank('Loading…'),
-    _ when detail == null => Blank(
-      'The server did not send this workspace\'s '
-      '${section == FilesSection.instructions ? 'prompt' : 'settings'}.',
+    _ when detail == null && files.loading => under(const Blank('Loading…')),
+    _ when detail == null => under(
+      Blank(
+        'The server did not send this workspace\'s '
+        '${section == FilesSection.instructions ? 'prompt' : 'settings'}.',
+      ),
     ),
-    FilesSection.instructions => _Editor(key: key, prompt: detail.prompt ?? ''),
-    FilesSection.answers when detail.settings == null => const Blank(
-      'The server did not send this workspace\'s settings.',
+    FilesSection.instructions => _Editor(
+      key: key,
+      prompt: detail.prompt ?? '',
+      top: top,
     ),
-    FilesSection.answers => SettingsForm(key: key, slug: workspace.slug),
+    FilesSection.answers when detail.settings == null => under(
+      const Blank('The server did not send this workspace\'s settings.'),
+    ),
+    FilesSection.answers => under(SettingsForm(key: key, slug: workspace.slug)),
   };
 }

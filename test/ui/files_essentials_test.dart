@@ -138,17 +138,30 @@ void main() {
     final h = await openPages(tester, llm: llm);
     await openPage(tester, 'Instructions');
     expect(h.files.section, FilesSection.instructions);
-    // Save shows once the text has changed.
+    // Save and Revert show only while the text has changed, in the header over the field.
     expect(inPages(control('Save')), findsNothing);
-    await tester.enterText(
-      inPages(find.byType(TextField)),
-      'Answer in French.',
+    expect(inPages(control('Revert')), findsNothing);
+    final field = inPages(find.byType(TextField));
+    await tester.enterText(field, 'Answer in German.');
+    await tester.pumpAndSettle();
+    expect(
+      tester.getBottomLeft(inPages(control('Save'))).dy,
+      lessThanOrEqualTo(tester.getTopLeft(field).dy),
     );
-    // Save slides in under the field.
+    await tester.tap(inPages(control('Revert')));
+    await tester.pumpAndSettle();
+    expect(find.text('Answer from the documents.'), findsOneWidget);
+    expect(inPages(control('Save')), findsNothing);
+    await tester.enterText(field, 'Answer in French.');
     await tester.pumpAndSettle();
     await tester.tap(inPages(control('Save')));
     await tester.pumpAndSettle();
     expect(llm.spaces.first.prompt, 'Answer in French.');
+    expect(inPages(control('Save')), findsNothing);
+    // The editor sets the prompt as code.
+    final style = tester.widget<TextField>(field).style!;
+    expect(style.fontFamily, 'JetBrains Mono');
+    expect(style.fontSize, 15);
   });
 
   testWidgets('Answer from changes the mode as the composer names it', (
