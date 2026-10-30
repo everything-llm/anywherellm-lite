@@ -48,6 +48,23 @@ void main() {
     expect(h.chat.turns.length, turns);
   });
 
+  testWidgets('a message sent instead of an answer puts the question away', (
+    tester,
+  ) async {
+    final llm = planningServer();
+    await pumpApp(tester, llm: llm);
+    await tester.pumpAndSettle();
+
+    await askReset(tester);
+    expect(find.textContaining('Clear this chat?'), findsOneWidget);
+    await tester.enterText(composerField, 'And next quarter?');
+    await tester.pump();
+    await tester.tap(control('Send'));
+    await tester.pumpAndSettle();
+    expect(llm.calls, contains('streamChat:budget:And next quarter?'));
+    expect(find.textContaining('Clear this chat?'), findsNothing);
+  });
+
   testWidgets('typing a slash lists /reset, and Enter on it asks', (
     tester,
   ) async {

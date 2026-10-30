@@ -268,8 +268,9 @@ class ComposerState extends State<Composer> {
     if (sent) _empty();
   }
 
-  /// Empties the composer once its message has gone: the words, the files, the shortcut, and a
-  /// go of dictation, whose later words would land in the next message.
+  /// Empties the composer once its message has gone: the words, the files, the shortcut, a go
+  /// of dictation, whose later words would land in the next message, and the question whether
+  /// to clear the chat, which the message passed over.
   void _empty() {
     widget.draft.clear();
     _go++;
@@ -279,6 +280,7 @@ class ComposerState extends State<Composer> {
       _problem = null;
       _listening = false;
       _shortcut = null;
+      _asking = false;
     });
   }
 
