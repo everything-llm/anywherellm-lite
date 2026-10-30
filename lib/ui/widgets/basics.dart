@@ -68,6 +68,7 @@ class AlertBox extends StatelessWidget {
     this.text,
     this.action,
     this.onClose,
+    this.inline = false,
   });
 
   /// A box for [notice]: its title, over what went wrong.
@@ -77,6 +78,7 @@ class AlertBox extends StatelessWidget {
     super.key,
     this.action,
     this.onClose,
+    this.inline = false,
   }) : title = notice.title,
        text = notice.text;
 
@@ -89,6 +91,10 @@ class AlertBox extends StatelessWidget {
 
   /// Puts the box away, for one that stays until it is closed: a Close button at its end.
   final VoidCallback? onClose;
+
+  /// Whether [title] leads [text] in one paragraph, `**No news** from the server…`, as a banner
+  /// of a sentence or two reads, rather than heading it on a line of its own.
+  final bool inline;
 
   @override
   Widget build(BuildContext context) {
@@ -105,7 +111,18 @@ class AlertBox extends StatelessWidget {
     final ink = t.ink;
     final body = t.ink;
     // As large as the sentence under it, so it heads it rather than reading as a footnote.
-    final heading = Text(title, style: Type.body(ink, weight: FontWeight.w600));
+    final strong = Type.body(ink, weight: FontWeight.w600);
+    final heading = inline && text != null
+        ? Text.rich(
+            TextSpan(
+              style: Type.body(body),
+              children: [
+                TextSpan(text: title, style: strong),
+                TextSpan(text: ' $text'),
+              ],
+            ),
+          )
+        : Text(title, style: strong);
     return Semantics(
       liveRegion: kind != AlertKind.warn,
       container: true,
@@ -162,7 +179,7 @@ class AlertBox extends StatelessWidget {
         )
       else
         heading,
-      if (text != null) ...[
+      if (text != null && !inline) ...[
         const SizedBox(height: 6),
         // What it says is a sentence or two, so it is running text.
         Text(text!, style: Type.body(body)),

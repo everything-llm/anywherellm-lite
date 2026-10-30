@@ -77,9 +77,7 @@ class AnswerWaits {
   /// Waits for [answer], the last turn of chat [thread] in workspace [slug], whose exchange is
   /// newer than [after], the newest the server had saved before it, when that is known.
   void start(Turn answer, String slug, String thread, {int? after}) {
-    final turns = turnsOf(thread) ?? const [];
-    final at = turns.indexOf(answer);
-    final question = at > 0 ? turns[at - 1].text.trim() : '';
+    final question = questionOf(turnsOf(thread) ?? const [], answer);
     final waiting = _Waiting(answer, slug, thread, question)..floor = after;
     // An answer already waited for in this chat is let go of, as when the chat moves on.
     if (_waits[thread] case final old?) {
@@ -150,7 +148,12 @@ class AnswerWaits {
       return _end(waiting);
     }
     if (history != null) {
-      if (_holds(waiting, turns, history)) {
+      if (holds(
+        history,
+        turns: turns,
+        question: waiting.question,
+        floor: waiting.floor,
+      )) {
         saved(slug, thread, [for (final m in history) Turn.saved(m)]);
         return _end(waiting);
       }
@@ -171,23 +174,31 @@ class AnswerWaits {
     changed(waiting.thread);
   }
 
-  /// Whether [history] ends in [waiting]'s answer: its last exchange is newer than the
-  /// [_Waiting.floor]. With none known, the exchange must be newer than every one [turns] know,
-  /// ask [_Waiting.question], and the history must ask it as often as [turns] do: an agent
-  /// answer streamed here has no id, so its exchange can look new.
-  static bool _holds(
-    _Waiting waiting,
-    List<Turn> turns,
-    List<ChatMessage> history,
-  ) {
+  /// The question [answer] answers in [turns], trimmed, or empty when none comes before it.
+  static String questionOf(List<Turn> turns, Turn answer) {
+    final at = turns.indexOf(answer);
+    return at > 0 ? turns[at - 1].text.trim() : '';
+  }
+
+  /// Whether [history] ends in the answer to [question], the last of [turns]: its last exchange
+  /// is newer than [floor], the newest the server had saved before it. With none known, the
+  /// exchange must be newer than every one [turns] know, ask [question], and the history must
+  /// ask it as often as [turns] do: an agent answer streamed here has no id, so its exchange can
+  /// look new.
+  static bool holds(
+    List<ChatMessage> history, {
+    required List<Turn> turns,
+    required String question,
+    int? floor,
+  }) {
     if (history case [
       ...,
       final asked,
       ChatMessage(role: Role.assistant, chatId: final int id),
     ]) {
-      if (waiting.floor case final floor?) return id > floor;
+      if (floor != null) return id > floor;
       bool asks(Role role, String text) =>
-          role == Role.user && text.trim() == waiting.question;
+          role == Role.user && text.trim() == question;
       return turns.every((t) => t.chatId == null || t.chatId! < id) &&
           asks(asked.role, asked.text) &&
           history.where((m) => asks(m.role, m.text)).length >=

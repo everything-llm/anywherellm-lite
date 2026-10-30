@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
@@ -1026,13 +1027,18 @@ class _Answer extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: Listenable.merge([turn, revealed]),
-    builder: (context, _) {
-      final answer = _build(context);
-      return latest ? _OnTile(child: answer) : answer;
-    },
+    builder: (context, _) => _Quiet(
+      turn,
+      builder: (context, quiet) {
+        final answer = _build(context, quiet: quiet);
+        // Gone quiet before any words, the card stands alone under the question.
+        final alone = quiet && turn.text.trim().isEmpty;
+        return latest && !alone ? _OnTile(child: answer) : answer;
+      },
+    ),
   );
 
-  Widget _build(BuildContext context) {
+  Widget _build(BuildContext context, {required bool quiet}) {
     final shell = AppScope.of(context).shell;
     final split = splitReasoning(turn.text, streaming: turn.streaming);
     final failure = turn.streaming ? null : modelFailure(split.answer);
@@ -1063,12 +1069,13 @@ class _Answer extends StatelessWidget {
           ),
         // Until the first words, while a model's reasoning is hidden too, what it waits on.
         if (turn.streaming && split.answer.isEmpty)
-          WaitLine(turn)
+          quiet ? const _NoNews() : WaitLine(turn)
         else ...[
           if (turn.streaming && turn.status != null) _Status(turn.status!),
           if (turn.streaming && !inline)
             // The caret alone where the text cannot end with it, as in a code fence.
             const Padding(padding: EdgeInsets.only(top: 6), child: Caret()),
+          if (quiet) ...[const SizedBox(height: 10), const _NoNews()],
         ],
         if (turn.waiting) ...[
           const SizedBox(height: 10),
@@ -1137,6 +1144,78 @@ class _Answer extends StatelessWidget {
                     : turn,
           onLongPress: openSheet,
           child: column,
+        ),
+      ),
+    );
+  }
+}
+
+/// Builds an answer with whether it is [Turn.quiet], again each time it falls quiet: while it
+/// streams, a timer waits for the moment [Turn.quietAfter] has passed since the server last sent
+/// something, and a piece arriving meanwhile, which rebuilds this, starts the wait again.
+class _Quiet extends StatefulWidget {
+  const _Quiet(this.turn, {required this.builder});
+
+  final Turn turn;
+  final Widget Function(BuildContext context, bool quiet) builder;
+
+  @override
+  State<_Quiet> createState() => _QuietState();
+}
+
+class _QuietState extends State<_Quiet> {
+  Timer? _due;
+
+  @override
+  void dispose() {
+    _due?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _due?.cancel();
+    _due = null;
+    final turn = widget.turn;
+    final heard = turn.heard;
+    if (turn.streaming && heard != null && !turn.quiet) {
+      final left = Turn.quietAfter - clock.now().difference(heard);
+      _due = Timer(left, () {
+        if (mounted) setState(() {});
+      });
+    }
+    return widget.builder(context, turn.quiet);
+  }
+}
+
+/// The card of an answer that has gone [Turn.quiet]: No news from the server for 30 seconds,
+/// with Check, which reads the chat to see whether the server is still there or already saved
+/// the answer ([ChatController.checkQuiet]), and Stop.
+class _NoNews extends StatelessWidget {
+  const _NoNews();
+
+  @override
+  Widget build(BuildContext context) {
+    final chat = AppScope.of(context).chat;
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: AlertBox(
+        AlertKind.warn,
+        'No news',
+        text:
+            'from the server for ${Turn.quietAfter.inSeconds} seconds.',
+        inline: true,
+        action: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            AppButton(
+              'Check',
+              onPressed: () => unawaited(chat.checkQuiet()),
+            ),
+            AppButton('Stop', onPressed: chat.stop),
+          ],
         ),
       ),
     );

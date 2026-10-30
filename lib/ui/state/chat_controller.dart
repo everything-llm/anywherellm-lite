@@ -1296,6 +1296,34 @@ class ChatController extends ChangeNotifier with FollowsServer {
   /// front or Check now is tapped.
   Future<void> checkWaiting() => waits.checkAll();
 
+  /// Reads the chat on screen once while its answer is [Turn.quiet], leaving the answer to run,
+  /// with its quiet time started again. A server that gives no answer at all, or that already
+  /// saved the answer, says the answer's own connection is gone: the answer is let go of and
+  /// waited for, as a dropped one is. A server that answers without it is still at work.
+  Future<void> checkQuiet() async {
+    final running = _here;
+    final thread = running?.thread;
+    if (running == null || thread == null) return;
+    running.answer.listened();
+    final at = here;
+    var gone = false;
+    try {
+      final history = await _api.history(running.slug, thread);
+      final turns = _turns[thread] ?? const <Turn>[];
+      gone = AnswerWaits.holds(
+        history,
+        turns: turns,
+        question: AnswerWaits.questionOf(turns, running.answer),
+        floor: _newest[thread],
+      );
+    } catch (error) {
+      gone = error is ApiException && error.status == null;
+    }
+    if (!gone || !at.current || !_runs.contains(running)) return;
+    unawaited(running.stream?.cancel());
+    _wait(running);
+  }
+
   /// Stops the answer running in the chat on screen, keeping what came so far. Letting go of the
   /// response is what stops it on the server.
   void stop() {

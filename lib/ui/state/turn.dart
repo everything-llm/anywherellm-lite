@@ -18,7 +18,9 @@ class Turn extends ChangeNotifier {
     : role = Role.assistant,
       text = '',
       streaming = true,
-      asked = clock.now();
+      asked = clock.now() {
+    heard = asked;
+  }
 
   Turn.saved(ChatMessage message, {this.shortcutUse})
     : role = message.role,
@@ -36,6 +38,19 @@ class Turn extends ChangeNotifier {
 
   /// When an answer's question was sent, or null for a question or a saved answer.
   final DateTime? asked;
+
+  /// When the server last sent something for a streaming answer: its question going out, then
+  /// each piece of it, or a check that the server is still there ([listened]).
+  DateTime? heard;
+
+  /// How long an answer streams with nothing from the server before it counts as [quiet].
+  static const quietAfter = Duration(seconds: 30);
+
+  /// Whether this answer streams and nothing came from the server for [quietAfter].
+  bool get quiet =>
+      streaming &&
+      heard != null &&
+      clock.now().difference(heard!) >= quietAfter;
 
   /// The files sent with a question.
   List<SentFile> attachments = const [];
@@ -83,9 +98,16 @@ class Turn extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Starts [quietAfter] again from now, as when the person checks on a [quiet] answer.
+  void listened() {
+    heard = clock.now();
+    notifyListeners();
+  }
+
   /// Takes [event] of the streamed answer: more text, a status line, the whole answer, or what
   /// came with its end. Only what is drawn as it streams notifies.
   void take(ChatEvent event) {
+    heard = clock.now();
     switch (event) {
       case TextChunk(:final text):
         this.text += text;
