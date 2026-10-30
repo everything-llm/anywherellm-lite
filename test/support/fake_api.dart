@@ -66,6 +66,8 @@ class FakeAnythingLlm with FakeCalls implements AnythingLlmApi {
 
   /// The workspaces whose read leaves out their settings, as a server may.
   final Set<String> noSettings = {};
+
+  /// Each chat's history, by thread, and a workspace's Main chat's by its [mainChatOf].
   final Map<String, List<ChatMessage>> histories = {};
 
   /// Adds [question] and its [answer] to [thread]'s history as exchange [chatId], as the server
@@ -113,7 +115,8 @@ class FakeAnythingLlm with FakeCalls implements AnythingLlmApi {
   bool hold = false;
   StreamController<ChatEvent>? chat;
 
-  /// Each held answer's controller, by thread: the last one when a chat asked twice.
+  /// Each held answer's controller, by thread or [mainChatOf]: the last one when a chat asked
+  /// twice.
   final Map<String, StreamController<ChatEvent>> chats = {};
 
   /// The status lines [streamChat] sends before the answer, as an agent does.
@@ -221,29 +224,46 @@ class FakeAnythingLlm with FakeCalls implements AnythingLlmApi {
         _space(slug).threads.removeWhere((t) => t.slug == thread);
       }, thread);
 
-  @override
-  Future<void> resetChat(String slug, String thread) =>
-      record('resetChat', () => histories.remove(thread), thread);
+  /// What chat [thread] of workspace [slug] is kept and recorded under: the thread, or for a
+  /// null [thread] the workspace's [mainChatOf]. Main chat is never asked for by that key as a
+  /// thread, since the server knows no such thread.
+  String _chatOf(String slug, String? thread) {
+    if (isMainChat(thread)) {
+      throw StateError(
+        'Main chat goes to the server as no thread, not $thread.',
+      );
+    }
+    return thread ?? mainChatOf(slug);
+  }
 
   @override
-  Future<List<ChatMessage>> history(String slug, String thread) =>
-      record('history', () => histories[thread] ?? const [], thread);
+  Future<void> resetChat(String slug, String? thread) {
+    final chat = _chatOf(slug, thread);
+    return record('resetChat', () => histories.remove(chat), chat);
+  }
+
+  @override
+  Future<List<ChatMessage>> history(String slug, String? thread) {
+    final chat = _chatOf(slug, thread);
+    return record('history', () => histories[chat] ?? const [], chat);
+  }
 
   @override
   Stream<ChatEvent> streamChat(
     String slug,
-    String thread,
+    String? thread,
     String message, {
     List<Attachment> attachments = const [],
     ChatMode? mode,
   }) {
-    calls.add('streamChat:$thread:$message');
+    final key = _chatOf(slug, thread);
+    calls.add('streamChat:$key:$message');
     lastAttachments = attachments;
     lastMode = mode;
     final error = errors['streamChat'];
     if (error != null) return Stream.error(error);
     if (hold) {
-      chat = chats[thread] = StreamController<ChatEvent>();
+      chat = chats[key] = StreamController<ChatEvent>();
       return chat!.stream;
     }
     final id = nextChatId++;

@@ -572,6 +572,51 @@ void main() {
       expect(turns.last.attachments, isEmpty);
     });
 
+    test(
+      'Main chat\'s history is the workspace\'s own, read newest first and put '
+      'oldest first',
+      () async {
+        final seen = <http.Request>[];
+        final turns = await _answering({
+          'history': [
+            {'role': 'user', 'content': 'And now?', 'chatId': 9},
+            {'role': 'assistant', 'content': 'Later.', 'chatId': 9},
+            {'role': 'user', 'content': 'When?', 'chatId': 4},
+            {'role': 'assistant', 'content': 'Soon.', 'chatId': 4},
+          ],
+        }, seen: seen).history('w', null);
+        expect(seen.single.method, 'GET');
+        expect(seen.single.url.path, '/api/v1/workspace/w/chats');
+        expect(seen.single.url.queryParameters, {
+          'orderBy': 'desc',
+          'limit': '${HttpAnythingLlmApi.mainChatExchanges}',
+        });
+        expect(turns.map((t) => (t.text, t.chatId)), [
+          ('When?', 4),
+          ('Soon.', 4),
+          ('And now?', 9),
+          ('Later.', 9),
+        ]);
+      },
+    );
+
+    test('a Main chat history that comes oldest first stays so', () async {
+      final turns = await _answering({
+        'history': [
+          {'role': 'user', 'content': 'When?', 'chatId': 4},
+          {'role': 'assistant', 'content': 'Soon.', 'chatId': 4},
+          {'role': 'user', 'content': 'And now?', 'chatId': 9},
+          {'role': 'assistant', 'content': 'Later.', 'chatId': 9},
+        ],
+      }).history('w', null);
+      expect(turns.map((t) => t.text), [
+        'When?',
+        'Soon.',
+        'And now?',
+        'Later.',
+      ]);
+    });
+
     test('a history keeps the pictures sent with a question', () async {
       final turns = await _answering({
         'history': [
@@ -750,6 +795,37 @@ void main() {
         expect(jsonDecode((seen.single as http.Request).body), {'reset': true});
       },
     );
+
+    test(
+      'Main chat asks the workspace itself, with no thread or session',
+      () async {
+        final seen = <http.BaseRequest>[];
+        await streaming([
+          data({
+            'type': 'textResponseChunk',
+            'textResponse': 'Hi',
+            'close': true,
+          }),
+        ], seen: seen).streamChat('w', null, 'Hello').drain<void>();
+        expect(seen.single.url.path, '/api/v1/workspace/w/stream-chat');
+        expect(jsonDecode((seen.single as http.Request).body), {
+          'message': 'Hello',
+        });
+      },
+    );
+
+    test('resetChat clears Main chat on the workspace itself', () async {
+      final seen = <http.BaseRequest>[];
+      await streaming([
+        data({
+          'type': 'textResponse',
+          'textResponse': 'Chat history was reset!',
+          'close': true,
+        }),
+      ], seen: seen).resetChat('w', null);
+      expect(seen.single.url.path, '/api/v1/workspace/w/stream-chat');
+      expect(jsonDecode((seen.single as http.Request).body), {'reset': true});
+    });
 
     test('a message sends a mode only when it is given one', () async {
       final seen = <http.BaseRequest>[];

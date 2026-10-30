@@ -40,8 +40,9 @@ abstract interface class AnythingLlmApi {
   /// just changed and a delete was still waiting to be undone.
   Future<void> deleteThread(String slug, String thread, {Connection? on});
 
-  /// The chat's turns, oldest first.
-  Future<List<ChatMessage>> history(String slug, String thread);
+  /// The chat's turns, oldest first. A null [thread], here and in [streamChat] and [resetChat],
+  /// is the workspace's Main chat, which is in no thread.
+  Future<List<ChatMessage>> history(String slug, String? thread);
 
   /// Asks [message] in the chat, with [attachments] for this message only, and streams the
   /// answer in [mode], or in the workspace's own chat mode when it is null. The stream fails
@@ -49,7 +50,7 @@ abstract interface class AnythingLlmApi {
   /// though an agent may still finish it and save it to the chat.
   Stream<ChatEvent> streamChat(
     String slug,
-    String thread,
+    String? thread,
     String message, {
     List<Attachment> attachments = const [],
     ChatMode? mode,
@@ -57,7 +58,7 @@ abstract interface class AnythingLlmApi {
 
   /// Clears the chat's history: the model no longer sees its exchanges, and history no longer
   /// lists them. The server keeps the rows, and nothing here brings them back.
-  Future<void> resetChat(String slug, String thread);
+  Future<void> resetChat(String slug, String? thread);
 
   /// Embeds the documents at [adds] in the workspace and drops those at [deletes], by
   /// `folder/name.json` path.

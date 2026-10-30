@@ -119,17 +119,51 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   Future<void> deleteThread(String slug, String thread, {Connection? on}) =>
       _send('DELETE', _thread(slug, thread), null, emptyOk: true, on: on);
 
+  /// How many of Main chat's newest exchanges [history] reads, as its `limit`: the server reads
+  /// 100 when given none. The spec counts the limit in messages, which would halve it.
+  static const mainChatExchanges = 10000;
+
+  /// A thread's history is the whole of it. Main chat's is `workspace/{slug}/chats`, which gives
+  /// only the chats in no thread; it is read newest first, so a chat longer than
+  /// [mainChatExchanges] still ends at its newest, and put oldest first.
   @override
-  Future<List<ChatMessage>> history(String slug, String thread) async => _list(
-    await _get('${_thread(slug, thread)}/chats'),
-    'history',
-    ChatMessage.fromJson,
-  );
+  Future<List<ChatMessage>> history(String slug, String? thread) async {
+    final read = _list(
+      await _get(
+        thread == null
+            ? '${_workspace(slug)}/chats?orderBy=desc&limit=$mainChatExchanges'
+            : '${_thread(slug, thread)}/chats',
+      ),
+      'history',
+      ChatMessage.fromJson,
+    );
+    return thread == null ? _oldestFirst(read) : read;
+  }
+
+  /// [history] read newest exchange first, put oldest first, each question still before its
+  /// answer. An exchange starts at a question. A history whose exchange ids already rise, as
+  /// from a server that took no `orderBy`, is kept as it came.
+  static List<ChatMessage> _oldestFirst(List<ChatMessage> history) {
+    final exchanges = <List<ChatMessage>>[];
+    for (final message in history) {
+      if (message.role == Role.user || exchanges.isEmpty) {
+        exchanges.add([message]);
+      } else {
+        exchanges.last.add(message);
+      }
+    }
+    final (first, last) = (
+      exchanges.firstOrNull?.first.chatId,
+      exchanges.lastOrNull?.first.chatId,
+    );
+    if (first != null && last != null && first < last) return history;
+    return [for (final exchange in exchanges.reversed) ...exchange];
+  }
 
   @override
   Stream<ChatEvent> streamChat(
     String slug,
-    String thread,
+    String? thread,
     String message, {
     List<Attachment> attachments = const [],
     ChatMode? mode,
@@ -142,14 +176,14 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
         'attachments': [for (final a in attachments) attachmentJson(a)],
     };
     final limit = attachments.isEmpty ? timeout : uploadTimeout;
-    return _events('${_thread(slug, thread)}/stream-chat', body, limit);
+    return _events('${_chat(slug, thread)}/stream-chat', body, limit);
   }
 
   /// A `stream-chat` with `reset` and no message, which clears the history and answers with
   /// one closing chunk.
   @override
-  Future<void> resetChat(String slug, String thread) => _events(
-    '${_thread(slug, thread)}/stream-chat',
+  Future<void> resetChat(String slug, String? thread) => _events(
+    '${_chat(slug, thread)}/stream-chat',
     {'reset': true},
     timeout,
   ).drain<void>();
@@ -375,6 +409,12 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
 
   static String _thread(String slug, String thread) =>
       '${_workspace(slug)}/thread/${Uri.encodeComponent(thread)}';
+
+  /// Where chat [thread] of workspace [slug] is asked: its thread, or for Main chat, a null
+  /// [thread], the workspace itself. No `sessionId` is sent, so what Main chat is asked shows in
+  /// the workspace's chat on AnythingLLM's web page too.
+  static String _chat(String slug, String? thread) =>
+      thread == null ? _workspace(slug) : _thread(slug, thread);
 
   Map<String, String> _headers(Connection connection) => {
     'Authorization': 'Bearer ${connection.apiKey}',

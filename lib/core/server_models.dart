@@ -158,16 +158,41 @@ class WorkspaceSettings {
   };
 }
 
-/// One chat in a workspace. The server calls it a thread.
+/// One chat in a workspace. The server calls it a thread, apart from the workspace's Main chat
+/// ([Thread.main]).
 class Thread {
   const Thread({required this.slug, required this.name});
 
   factory Thread.fromJson(Map<String, dynamic> json) =>
       Thread(slug: _text(json, 'slug'), name: _known(json, 'name') ?? 'Chat');
 
+  /// Workspace [workspace]'s Main chat: its own chat, in no thread, the one AnythingLLM's web
+  /// page opens first. It can be neither renamed nor deleted. Its [slug] is [mainChatOf] the
+  /// workspace's.
+  Thread.main(String workspace)
+    : slug = mainChatOf(workspace),
+      name = mainChatName;
+
   final String slug;
   final String name;
 }
+
+/// What a workspace's own chat, which is in no thread, is called.
+const mainChatName = 'Main chat';
+
+/// The key the app keeps workspace [slug]'s Main chat under, wherever it keeps a thread under
+/// the thread's slug. AnythingLLM makes a thread's slug a uuid or slugifies it, so no thread's
+/// slug holds the space this one does.
+String mainChatOf(String slug) => '$_mainChat$slug';
+
+/// Whether [chat], a thread's slug or a [mainChatOf] key, is a workspace's Main chat.
+bool isMainChat(String? chat) => chat?.startsWith(_mainChat) ?? false;
+
+/// The thread [chat] is on the server, or null for Main chat, which the API reaches by its
+/// workspace alone.
+String? threadOnServer(String chat) => isMainChat(chat) ? null : chat;
+
+const _mainChat = 'main ';
 
 enum Role { user, assistant }
 
