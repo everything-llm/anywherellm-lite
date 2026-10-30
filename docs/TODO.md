@@ -7,7 +7,6 @@ What AnythingLLM's own web UI (v1.16.2) does that AnywhereLLM does not yet. Each
 | Gap | What it needs |
 | --- | --- |
 | Generate or edit an image | `POST /v1/openai/images/generations`, multipart with `prompt`, optional `size` and optional `image_references` to edit. It answers a base64 PNG, and only when the server has an image provider set up. |
-| Chats that are in no chat thread | `GET /v1/workspace/{slug}/chats` answers `history`: the chats sent outside any thread, such as the web UI's default workspace chat. Every workspace on the server checked on 2026-10-06 answered an empty list, so this waits until someone uses the default chat. |
 | Settings when a workspace is made | `POST /v1/workspace/new` takes `similarityThreshold`, `openAiTemp`, `openAiHistory`, `queryRefusalResponse` and `topN` besides the `openAiPrompt` New workspace sends. Today they are set afterwards on the workspace's Answer from page. |
 | A documents library in Settings | Every document on the server, beside each workspace's own Documents: `GET /v1/documents` lists the library as a folder tree, a document is added to or taken from a workspace with `update-embeddings`, and `DELETE /v1/system/remove-documents` with `names` deletes it from the server. To be checked against v1.16.2 before building. |
 | Edit a stored answer's text | The web UI edits one answer in place. The app's Edit replaces a question and everything after it; `update-chat`, which rewrites one exchange's text, is not used. |

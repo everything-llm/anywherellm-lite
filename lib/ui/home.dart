@@ -21,8 +21,8 @@ import 'workspace_switcher.dart';
 
 /// The chats list, drawn in the shelf: the open workspace's name as its title, which opens the Workspaces sheet,
 /// with Workspace settings and New chat beside it; the search; then the
-/// workspace's chats under Chats, each with a More button that opens its sheet. A chat opens in
-/// the chat and closes the shelf.
+/// workspace's chats under Chats, Main chat first, each thread with a More button that opens its
+/// sheet. A chat opens in the chat and closes the shelf.
 class ChatsList extends StatefulWidget {
   const ChatsList({super.key});
 
@@ -119,15 +119,10 @@ class _ChatsListState extends State<ChatsList> {
     );
   }
 
-  /// The open workspace's chats, built as they scroll into view: the pinned ones, then the
-  /// ones this device used last, then the rest.
+  /// The open workspace's chats, built as they scroll into view: Main chat, the pinned ones,
+  /// then the ones this device used last, then the rest.
   Widget _chats(BuildContext context, String slug) {
     final rows = chatsInOrder(AppScope.of(context), slug);
-    if (rows.isEmpty) {
-      return const SliverToBoxAdapter(
-        child: FieldCard([CardNote('No chats yet.')]),
-      );
-    }
     return SliverFieldCard(
       count: rows.length,
       keyOf: (i) => ValueKey(rows[i].$1.slug),
@@ -137,15 +132,19 @@ class _ChatsListState extends State<ChatsList> {
   }
 }
 
-/// [slug]'s chats in the order a list of them shows them, each with whether it is pinned: the
-/// pinned ones, then the ones this device used last, then the rest.
-List<(Thread, bool)> chatsInOrder(AppScope scope, String slug) => inListOrder(
-  groupChats(
-    scope.chat.threadsOf(slug),
-    scope.prefs.pinnedIn(slug),
-    scope.prefs.recentIn(slug),
+/// [slug]'s chats in the order a list of them shows them, each with whether it is pinned: its
+/// Main chat ([Thread.main]), which is never pinned, then its threads, the pinned ones, then
+/// the ones this device used last, then the rest.
+List<(Thread, bool)> chatsInOrder(AppScope scope, String slug) => [
+  (Thread.main(slug), false),
+  ...inListOrder(
+    groupChats(
+      scope.chat.threadsOf(slug),
+      scope.prefs.pinnedIn(slug),
+      scope.prefs.recentIn(slug),
+    ),
   ),
-);
+];
 
 /// What a screen reader hears for a chat in a list: its name, whether it is [pinned], and
 /// whether its answer is [ready].
@@ -230,8 +229,8 @@ List<Widget> foundChats(BuildContext context, String query) {
   ];
 }
 
-/// Opens [thread] of [workspace] in the chat, opening the workspace first when another is open,
-/// with nothing over the chat.
+/// Opens [thread] of [workspace], or its Main chat ([Thread.main]), in the chat, opening the
+/// workspace first when another is open, with nothing over the chat.
 Future<void> openThread(AppScope scope, String workspace, Thread thread) async {
   scope.shell.openChat();
   if (scope.chat.activeSlug != workspace) {
@@ -340,8 +339,9 @@ class _FoundWorkspace extends StatelessWidget {
   }
 }
 
-/// A chat in the chats list: its name, after it its pin and whether its answer is ready, and a
-/// More button that opens its sheet. Tapped, it opens in the chat.
+/// A chat in the chats list: its name, after it its pin and whether its answer is ready, and,
+/// for a thread, a More button that opens its sheet; Main chat can be neither renamed nor
+/// deleted, and has none. Tapped, it opens in the chat.
 class _ChatRow extends StatelessWidget {
   const _ChatRow(this.thread, {required this.workspace, required this.pinned});
 
@@ -376,7 +376,7 @@ class _ChatRow extends StatelessWidget {
             ),
           ),
           // A chat's sheet acts on the workspace on screen.
-          if (workspace == chat.activeSlug)
+          if (workspace == chat.activeSlug && !isMainChat(thread.slug))
             IconBtn(
               'more',
               tooltip: 'Rename, pin or delete ${thread.name}',

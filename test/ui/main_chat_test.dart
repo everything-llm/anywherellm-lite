@@ -1,11 +1,21 @@
+import 'dart:ui' show Tristate;
+
 import 'package:anywherellm/core/chat.dart';
+import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/server_models.dart';
+import 'package:anywherellm/ui/chat/chat_view.dart';
+import 'package:anywherellm/ui/home.dart';
+import 'package:anywherellm/ui/sidebar.dart';
 import 'package:anywherellm/ui/state/chat_controller.dart';
+import 'package:anywherellm/ui/state/shell_controller.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
+import '../support/fake_background.dart';
 import '../support/fake_settings.dart';
+import '../support/pump.dart';
 import '../support/rig.dart';
 
 /// Q3 planning's Main chat.
@@ -31,6 +41,9 @@ Future<ChatController> _onMain(Rig rig) async {
   await rig.chat.open(_main);
   return rig.chat;
 }
+
+Finder _inShelf(Finder finder) =>
+    find.descendant(of: find.byType(ChatsList), matching: finder);
 
 void main() {
   group('Main chat', () {
@@ -171,6 +184,143 @@ void main() {
       expect(chat.turns, isEmpty);
       await chat.select('q3', thread: _main);
       expect(chat.turns.last.text, 'Dana does.');
+    });
+  });
+
+  group('Main chat on screen', () {
+    testWidgets('is first in the shelf, with no More', (tester) async {
+      await pumpApp(tester, llm: _withMainChat(), shelf: true);
+      final main = _inShelf(control(mainChatName));
+      expect(main, findsOneWidget);
+      for (final thread in ['Quarter priorities', 'Budget questions']) {
+        expect(
+          tester.getTopLeft(main).dy,
+          lessThan(tester.getTopLeft(_inShelf(control(thread))).dy),
+        );
+      }
+      expect(control('Rename, pin or delete $mainChatName'), findsNothing);
+      expect(control('Rename, pin or delete Budget questions'), findsOneWidget);
+    });
+
+    testWidgets('opens from the shelf with its history, under its name', (
+      tester,
+    ) async {
+      final h = await pumpApp(tester, llm: _withMainChat(), shelf: true);
+      await tester.tap(_inShelf(control(mainChatName)));
+      await tester.pumpAndSettle();
+      expect(h.shell.shelfOpen, isFalse);
+      expect(h.chat.activeThread, _main);
+      expect(find.text('Who owns the launch?'), findsOneWidget);
+      expect(find.text('Dana does.'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(ChatView),
+          matching: find.text(mainChatName),
+        ),
+        findsOneWidget,
+      );
+
+      // It has no sheet to rename, pin or delete it: its name opens the workspace.
+      await tester.tap(control('Q3 planning. Open workspace settings'));
+      await tester.pumpAndSettle();
+      expect(h.shell.popup.value, isNot(isA<ChatSheetFor>()));
+      expect(h.shell.pane, Pane.files);
+    });
+
+    testWidgets('shows Ready in the shelf for an answer that ended elsewhere', (
+      tester,
+    ) async {
+      final llm = _withMainChat()..hold = true;
+      final h = await pumpApp(tester, llm: llm);
+      await h.chat.open(_main);
+      await h.chat.send('And the budget?');
+      await tester.pump();
+      await h.chat.open('budget');
+      llm.chats[_main]!.add(const ChatDone([]));
+      await llm.chats[_main]!.close();
+      h.shell.openShelf();
+      await tester.pumpAndSettle();
+      expect(_inShelf(control('$mainChatName, answer ready')), findsOneWidget);
+      expect(_inShelf(find.text('Ready')), findsOneWidget);
+    });
+
+    testWidgets('waits for a dropped answer by reading its history', (
+      tester,
+    ) async {
+      final llm = _withMainChat()..hold = true;
+      final h = await pumpApp(tester, llm: llm);
+      await h.chat.open(_main);
+      await tester.pump();
+      await h.chat.send('And the budget?');
+      await tester.pump();
+      llm.chats[_main]!
+        ..add(const TextChunk('About'))
+        ..addError(const CutOff('The connection dropped'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Still answering on the server'), findsOneWidget);
+      final reads = llm.calls.where((c) => c == 'history:$_main').length;
+
+      llm.saveExchange(_main, 'And the budget?', 'About 40k.', chatId: 101);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump();
+      expect(llm.calls.where((c) => c == 'history:$_main').length, reads + 1);
+      expect(find.text('Still answering on the server'), findsNothing);
+      expect(find.text('About 40k.'), findsOneWidget);
+      expect(h.chat.finished?.text, 'About 40k.');
+    });
+
+    testWidgets('a ready answer out of sight is a notification that opens it', (
+      tester,
+    ) async {
+      final background = FakeBackground();
+      final llm = _withMainChat()..hold = true;
+      final h = await pumpApp(tester, llm: llm, background: background);
+      await h.chat.open(_main);
+      await h.chat.send('And the budget?');
+      await tester.pump();
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      llm.chats[_main]!
+        ..add(const WholeAnswer('About 40k.'))
+        ..add(const ChatDone([]));
+      await llm.chats[_main]!.close();
+      await tester.pump();
+      expect(background.readied, ['$mainChatName: About 40k. @ q3/$_main']);
+
+      await h.chat.open('budget');
+      background.tap((slug: 'q3', thread: _main));
+      await tester.pumpAndSettle();
+      expect(h.chat.activeThread, _main);
+    });
+
+    testWidgets('is first in the sidebar and marked chosen while it shows', (
+      tester,
+    ) async {
+      final h = await pumpApp(
+        tester,
+        llm: _withMainChat(),
+        size: const Size(1440, 900),
+      );
+      Finder inSidebar(Finder finder) =>
+          find.descendant(of: find.byType(Sidebar), matching: finder);
+      final main = inSidebar(control(mainChatName)).first;
+      expect(
+        tester.getTopLeft(main).dy,
+        lessThan(tester.getTopLeft(inSidebar(control('Budget questions'))).dy),
+      );
+      expect(control('Rename, pin or delete $mainChatName'), findsNothing);
+      await tester.tap(main);
+      await tester.pumpAndSettle();
+      expect(h.chat.activeThread, _main);
+      expect(
+        tester.getSemantics(main).flagsCollection.isSelected,
+        Tristate.isTrue,
+      );
     });
   });
 }

@@ -13,7 +13,7 @@ import 'widgets/list_row.dart';
 /// The chats as a sidebar beside everything on a wide window, in place of the shelf: the open
 /// workspace's name, which opens the Workspaces sheet, with Workspace settings and New chat
 /// beside it; the search; a row for the workspace's Documents; then the workspace's chats under
-/// Chats, and Settings at its foot. The row of what shows is marked as chosen.
+/// Chats, Main chat first, and Settings at its foot. The row of what shows is marked as chosen.
 class Sidebar extends StatefulWidget {
   const Sidebar({super.key});
 
@@ -197,21 +197,10 @@ class _SidebarState extends State<Sidebar> {
     ];
   }
 
-  /// The open workspace's chats, in the shelf's order: the pinned ones, then the ones this
-  /// device used last, then the rest.
+  /// The open workspace's chats, in the shelf's order: Main chat, the pinned ones, then the
+  /// ones this device used last, then the rest.
   Widget _chats(BuildContext context, String slug) {
     final rows = chatsInOrder(AppScope.of(context), slug);
-    if (rows.isEmpty) {
-      return SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-          child: Text(
-            'No chats yet.',
-            style: Type.body(Tokens.of(context).muted),
-          ),
-        ),
-      );
-    }
     return SliverList.separated(
       itemCount: rows.length,
       separatorBuilder: (_, _) => const SizedBox(height: 4),
@@ -225,8 +214,8 @@ class _SidebarState extends State<Sidebar> {
   }
 }
 
-/// A chat in the sidebar: its name, after it its pin and whether its answer is ready, and a More
-/// button that opens its sheet. It is marked as chosen while it shows in the chat.
+/// A chat in the sidebar: its name, after it its pin and whether its answer is ready, and, for a
+/// thread, a More button that opens its sheet. It is marked as chosen while it shows in the chat.
 class _SidebarChat extends StatelessWidget {
   const _SidebarChat(
     this.thread, {
@@ -248,20 +237,22 @@ class _SidebarChat extends StatelessWidget {
     final shown =
         shell.pane == Pane.chats &&
         !shell.settingsOpen &&
-        scope.chat.thread?.slug == thread.slug;
+        scope.chat.activeThread == thread.slug;
     return ListRow(
       title: thread.name,
       heard: chatHeard(thread, pinned: pinned, ready: ready),
       selected: shown,
       badges: chatMarks(t, pinned: pinned, ready: ready),
       onTap: () => openThread(scope, workspace, thread),
-      trailing: IconBtn(
-        'more',
-        tooltip: 'Rename, pin or delete ${thread.name}',
-        box: 48,
-        size: IconSize.small,
-        onPressed: () => shell.openChatSheet(thread),
-      ),
+      trailing: isMainChat(thread.slug)
+          ? null
+          : IconBtn(
+              'more',
+              tooltip: 'Rename, pin or delete ${thread.name}',
+              box: 48,
+              size: IconSize.small,
+              onPressed: () => shell.openChatSheet(thread),
+            ),
     );
   }
 }
