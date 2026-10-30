@@ -40,7 +40,8 @@ import 'sources_aside.dart';
 import 'wait_line.dart';
 import '../widgets/scroll_fades.dart';
 
-/// The chat on screen, newest at the bottom. Empty, it invites a first question.
+/// The chat on screen, newest at the bottom. Empty, it invites a first question, unless
+/// messages wait in it, as after its history was cleared with them held, which then show alone.
 ///
 /// The list is reversed so it starts at the newest turn and stays pinned there as an answer
 /// grows, and builds only the turns in view. Scrolled up from the newest text, what is in view
@@ -249,7 +250,7 @@ class _MessageListState extends State<MessageList> {
     MediaQuery.textScalerOf(context);
     _follow(chat);
     _queuePin();
-    if (turns.isEmpty) {
+    if (turns.isEmpty && chat.onDeck.isEmpty) {
       return _Empty(workspace: workspace.name);
     }
     // The person's text size scales the turns, not the controls around them. The turns are
@@ -302,8 +303,11 @@ class _MessageListState extends State<MessageList> {
             scrolledUp: _scrolledUp,
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
-                (context, i) => _turn(chat, turns, i, latest: latest),
-                childCount: turns.length,
+                (context, i) => turns.isEmpty
+                    ? _deckAlone()
+                    : _turn(chat, turns, i, latest: latest),
+                // With no turns, the messages waiting stand in the list alone.
+                childCount: turns.isEmpty ? 1 : turns.length,
                 findChildIndexCallback: (key) {
                   if (key is! GlobalObjectKey) return null;
                   final at = turns.indexWhere((t) => identical(t, key.value));
@@ -362,6 +366,14 @@ class _MessageListState extends State<MessageList> {
       ],
     );
   }
+
+  /// The messages waiting to be sent in a chat with no turns, in the column the turns take.
+  Widget _deckAlone() => Center(
+    child: SizedBox(
+      width: Sizes.column,
+      child: _withWaiting(const SizedBox.shrink(), newest: true),
+    ),
+  );
 
   /// The messages waiting to be sent, under the newest turn.
   Widget _onDeck() => _Measured(

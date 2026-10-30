@@ -97,6 +97,37 @@ void main() {
     expect(composerText(tester), 'What does this light mean?');
   });
 
+  testWidgets('messages waiting in a chat with no turns still show', (
+    tester,
+  ) async {
+    final llm = planningServer()..hold = true;
+    final h = await pumpApp(tester, llm: llm);
+    await h.chat.send('And next quarter?');
+    await tester.pump();
+    expect(h.chat.sendWhenDone('And the year after?'), isTrue);
+    h.chat.stop();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Paused · 1 waiting'), findsOneWidget);
+
+    // Cleared with the message held: no turns, and the message still in view.
+    await h.chat.reset();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(h.chat.turns, isEmpty);
+    expect(find.text('Paused · 1 waiting'), findsOneWidget);
+    expect(find.text('And the year after?'), findsOneWidget);
+    expect(find.text('Ask about', findRichText: true), findsNothing);
+
+    // And in reach: Resume sends it.
+    llm.hold = false;
+    await tester.tap(control('Resume'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      llm.calls.where((c) => c.endsWith(':And the year after?')),
+      hasLength(1),
+    );
+    expect(find.text('Paused · 1 waiting'), findsNothing);
+  });
+
   testWidgets('a question the server never took says Not sent', (tester) async {
     final llm = planningServer()
       ..errors['streamChat'] = const NotSent('Could not reach the server.');
