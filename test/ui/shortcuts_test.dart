@@ -136,6 +136,32 @@ void main() {
       expect(tester.getSize(row.first).height, 56);
     });
 
+    testWidgets('comes back when the Add sheet closes, and Enter picks it', (
+      tester,
+    ) async {
+      final llm = planningServer();
+      await pumpApp(tester, llm: llm);
+      await tester.enterText(composerField, '/su');
+      await tester.pump();
+      expect(rows(tester), ['Summarise']);
+      await tester.tap(
+        find.byTooltip('Add files or shortcuts to this message'),
+      );
+      await tester.pumpAndSettle();
+      // Another tab rebuilds the message box while the sheet hides the list.
+      await tester.tap(find.text('Shortcuts').last);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(rows(tester), ['Summarise']);
+      await tester.tap(composerField);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
+      expect(find.text('Summarise'), findsOneWidget);
+    });
+
     testWidgets('/s keeps those that start so, /zz says it is sent as typed', (
       tester,
     ) async {

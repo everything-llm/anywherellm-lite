@@ -477,7 +477,12 @@ class ComposerState extends State<Composer> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: Sizes.column),
           child: ListenableBuilder(
-            listenable: _shown,
+            // The / list also reads the popup open, which hides it, and the shortcuts.
+            listenable: Listenable.merge([
+              _shown,
+              scope.shell.popup,
+              scope.prefs,
+            ]),
             builder: (context, _) {
               if (!scope.settings.configured) return const _NoKey();
               return _attachSheet(
