@@ -4,6 +4,7 @@ import '../../core/ports.dart';
 import '../../core/prefs.dart';
 import '../../core/server_models.dart';
 import '../../core/shortcuts.dart';
+import '../../core/users.dart';
 import 'notice.dart';
 
 /// The app's preferences: read once at start, written on every change.
@@ -47,6 +48,17 @@ class PrefsController extends ChangeNotifier {
   Future<void> setOff(String slug, List<OffDoc> docs) async {
     if (_server case final server?) {
       await _change(prefs.withOff(server, slug, docs));
+    }
+  }
+
+  /// Whom chats on the server in use are saved as, or null while no one is chosen there or no
+  /// server is in use.
+  ServerUser? get chosenUser => _server == null ? null : prefs.userOn(_server!);
+
+  /// Saves chats on the server in use as [user] from now on.
+  Future<void> chooseUser(ServerUser user) async {
+    if (_server case final server? when prefs.userOn(server) != user) {
+      await _change(prefs.withUser(server, user));
     }
   }
 

@@ -9,8 +9,10 @@ import '../../core/ports.dart';
 import '../app_scope.dart';
 import '../share/shared_item.dart';
 import '../shell_popup.dart';
+import '../state/prefs_controller.dart';
 import '../state/settings_controller.dart';
 import '../state/shell_controller.dart';
+import '../state/system_controller.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/headline.dart';
@@ -19,16 +21,20 @@ import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
 import '../widgets/fields.dart';
 import '../widgets/keyboard_up.dart';
+import '../widgets/phone_page.dart';
 import '../widgets/scroll_fades.dart';
 import '../widgets/window_insets.dart';
 import 'walkthrough.dart';
 import 'rows.dart';
 import 'scan_view.dart';
+import 'who_uses.dart';
 import '../widgets/sheet.dart';
 
 /// How this device reaches the server: the address and developer key, and what the server
 /// says. The server reads Connected once Test connection passes here,
-/// until the page closes or the connection changes or fails a test.
+/// until the page closes or the connection changes or fails a test. On a server with several
+/// users it says whom chats are saved as, which opens Who uses this app?, and that the key
+/// opens every user's chats.
 class ConnectionPage extends StatelessWidget {
   const ConnectionPage({super.key});
 
@@ -119,8 +125,10 @@ class _OrDivider extends StatelessWidget {
 
 /// The address and key: saved, replaced or forgotten, or read from a QR code. A key is saved
 /// only once the server takes it. Once one is saved, a card names the server and where its key
-/// is kept, with the form to edit it under it while open, then Test connection, Edit connection
-/// and Forget this server, one under another.
+/// is kept, and on a server with several users whom chats are saved as, with the form to edit it
+/// under it while open, then Test connection, Edit connection and Forget this server, one under
+/// another. Who uses this app? opens by itself once after connecting to a server with several
+/// users while no one is chosen there.
 class _KeyCard extends StatefulWidget {
   const _KeyCard();
 
@@ -141,6 +149,12 @@ class _KeyCardState extends State<_KeyCard> {
   /// The shell, which holds whether the camera reads a code, so Back can stop it.
   late final ShellController _shell = AppScope.of(context).shell;
 
+  /// Whether the server has several users, and who they are.
+  late final SystemController _system = AppScope.of(context).system;
+
+  /// Whom chats are saved as.
+  late final PrefsController _prefs = AppScope.of(context).prefs;
+
   /// Why the last scanned code could not be used.
   String? _scanProblem;
 
@@ -158,7 +172,19 @@ class _KeyCardState extends State<_KeyCard> {
     super.initState();
     _url.text = _settings.connection?.baseUrl ?? '';
     _shell.addListener(_takePairing);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _takePairing());
+    _system.addListener(_takeWhoUses);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _takePairing();
+      _takeWhoUses();
+    });
+    if (_settings.configured) _system.wantUsers();
+  }
+
+  /// Opens Who uses this app? when [SystemController.askWhoUses] asked for it after connecting
+  /// and the server has several users, unless someone is chosen there already.
+  void _takeWhoUses() {
+    if (!mounted || !_system.takeWhoUses() || _prefs.chosenUser != null) return;
+    if (_shell.popup.value != Popup.whoUses) _shell.togglePopup(Popup.whoUses);
   }
 
   /// Connects with the pairing code [ShellController.pairWith] left once Connect to this server?
@@ -171,6 +197,7 @@ class _KeyCardState extends State<_KeyCard> {
   @override
   void dispose() {
     _shell.removeListener(_takePairing);
+    _system.removeListener(_takeWhoUses);
     _scroll.dispose();
     _url.dispose();
     _key.dispose();
@@ -185,8 +212,9 @@ class _KeyCardState extends State<_KeyCard> {
       _offer(code);
       return;
     }
-    if (await _settings.connect(_url.text, _key.text) && mounted) {
-      setState(_backToSaved);
+    if (await _settings.connect(_url.text, _key.text)) {
+      _system.askWhoUses();
+      if (mounted) setState(_backToSaved);
     }
   }
 
@@ -246,14 +274,14 @@ class _KeyCardState extends State<_KeyCard> {
       return;
     }
     setState(() => _scanProblem = null);
-    await _settings.pair(pairing);
+    if (await _settings.pair(pairing)) _system.askWhoUses();
     if (mounted) setState(_backToSaved);
   }
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([_settings, _shell]),
+      listenable: Listenable.merge([_settings, _shell, _system, _prefs]),
       builder: (context, _) {
         final connection = _settings.connection;
         final set = connection != null;
@@ -272,14 +300,17 @@ class _KeyCardState extends State<_KeyCard> {
     );
   }
 
-  /// The saved connection's card, then, while Edit connection has it open, the fields; then
-  /// Test connection, Edit connection and Forget this server, which asks first.
+  /// The saved connection's card, with whom chats are saved as on a server with several users,
+  /// then the warning that the key opens every user's chats; then, while Edit connection has it
+  /// open, the fields; then Test connection, Edit connection and Forget this server, which asks
+  /// first.
   Widget _connected(
     BuildContext context,
     Connection connection,
     bool saving,
     VoidCallback startScan,
   ) {
+    final several = _system.multiUser == true;
     final card = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       spacing: 20,
@@ -298,7 +329,16 @@ class _KeyCardState extends State<_KeyCard> {
             'Developer key',
             about: 'Stored in this phone\'s keyring and never shown',
           ),
+          if (several) _savedAs(),
         ]),
+        if (several)
+          const AlertBox(
+            AlertKind.warn,
+            'This server has several users',
+            text:
+                'The key opens all of it: anyone with this phone or the key can read every '
+                'chat, whoever it is saved as.',
+          ),
         // Plain http to a private address: the key crosses unencrypted whatever network the
         // phone is on, where that name or address may be another machine's.
         if (connection.plainHttp)
@@ -361,6 +401,13 @@ class _KeyCardState extends State<_KeyCard> {
         ),
       ],
     );
+    final asked = ShellPopup(
+      popup: Popup.whoUses,
+      title: 'Who uses this app?',
+      present: several,
+      builder: (context, close) => WhoUsesSheet(onDone: close),
+      child: card,
+    );
     return ShellPopup(
       popup: Popup.forgetServer,
       title: 'Forget this server',
@@ -374,7 +421,19 @@ class _KeyCardState extends State<_KeyCard> {
           unawaited(_settings.clear());
         },
       ),
-      child: card,
+      child: asked,
+    );
+  }
+
+  /// Chats saved as, and whom, on a server with several users, which opens Who uses this app?
+  /// to choose another.
+  Widget _savedAs() {
+    final who = _prefs.chosenUser?.name ?? 'No one chosen yet';
+    return NavRow(
+      title: 'Chats saved as',
+      about: who,
+      heard: 'Chats saved as $who. Change',
+      onTap: () => _shell.togglePopup(Popup.whoUses),
     );
   }
 

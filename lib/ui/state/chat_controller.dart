@@ -9,6 +9,7 @@ import '../../core/ports.dart';
 import '../../core/prefs.dart';
 import '../../core/shortcuts.dart';
 import '../../core/server_models.dart';
+import '../../core/users.dart';
 import 'answer_bytes.dart';
 import 'answer_waits.dart';
 import 'fleeting.dart';
@@ -398,6 +399,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
         first.text,
         attachments: first.attachments,
         mode: modeForFiles(first.mode, first.attachments),
+        userId: _prefs.chosenUser?.id,
       ),
     );
   }
@@ -651,7 +653,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
     var failed = true;
     final asked = _made;
     await _try(_readFailed, () async {
-      final read = await _api.workspaces();
+      final read = await _openToUser(await _api.workspaces());
       if (!at.current) return;
       failed = false;
       workspaces = read;
@@ -700,6 +702,30 @@ class ChatController extends ChangeNotifier with FollowsServer {
       notifyListeners();
     }
     unawaited(_countDocs());
+  }
+
+  /// [all], on a multi-user server where someone is chosen ([PrefsController.chosenUser]), with
+  /// only the workspaces they open ([ServerUser.opens]), read at once. One whose users cannot be
+  /// read stays, as every workspace does with no one chosen: the key opens them all whoever is
+  /// chosen, so one too many hides nothing.
+  Future<List<Workspace>> _openToUser(List<Workspace> all) async {
+    final user = _prefs.chosenUser;
+    if (user == null || user.opensEvery) return all;
+    Future<bool> opens(Workspace workspace) async {
+      final id = workspace.id;
+      if (id == null) return true;
+      try {
+        return user.opens(await _api.workspaceUsers(id));
+      } on ApiException {
+        return true;
+      }
+    }
+
+    final open = await Future.wait([for (final w in all) opens(w)]);
+    return [
+      for (final (i, w) in all.indexed)
+        if (open[i]) w,
+    ];
   }
 
   /// How many chats this controller has made on the server, and by chat when each was made, so a
@@ -1101,7 +1127,10 @@ class ChatController extends ChangeNotifier with FollowsServer {
     var threadSlug = activeThread;
     if (threadSlug == null) {
       try {
-        final made = await _api.createThread(slug);
+        final made = await _api.createThread(
+          slug,
+          userId: _prefs.chosenUser?.id,
+        );
         // A new server has started afresh: the chat belongs to the old one.
         if (!at.current) return true;
         threadSlug = made.slug;
@@ -1141,6 +1170,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
         text,
         attachments: attachments,
         mode: modeForFiles(mode, attachments),
+        userId: _prefs.chosenUser?.id,
       ),
     );
     return true;

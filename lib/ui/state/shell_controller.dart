@@ -58,9 +58,9 @@ class RemoveDocFor {
 enum WorkspaceSheet { create, rename, delete }
 
 /// A popup over the window, at most one open at a time: the workspace menu, the composer's Answer
-/// from sheet, the Attach sheet, or the question before forgetting the server. An answer's More
-/// sheet is keyed by its [Turn] instead, and the question before removing a document by its
-/// [RemoveDocFor].
+/// from sheet, the Attach sheet, the question before forgetting the server, or Who uses this
+/// app?. An answer's More sheet is keyed by its [Turn] instead, and the question before removing
+/// a document by its [RemoveDocFor].
 enum Popup {
   workspaces,
   answerFrom,
@@ -68,6 +68,9 @@ enum Popup {
 
   /// Forget this server?, on the Connection page.
   forgetServer,
+
+  /// Who uses this app?, on the Connection page of a server with several users.
+  whoUses,
 }
 
 /// What is open over the chat, which is the base screen: the chats as a shelf,
