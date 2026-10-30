@@ -435,8 +435,9 @@ void main() {
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull, reason: '$page');
         }
+        // The model shows, and nothing opens to change it.
         await tester.scrollUntilVisible(
-          find.text('Chat model'),
+          find.text("The chat model is changed in AnythingLLM's web page."),
           200,
           scrollable: find
               .descendant(
@@ -445,7 +446,6 @@ void main() {
               )
               .first,
         );
-        await tapVisible(tester, find.text('Chat model').last);
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
       });

@@ -176,12 +176,6 @@ from = "workspace"
 do = ["tap Answer from", "wait MODEL"]
 
 [[step]]
-name = "model-picker"
-group = "workspace"
-from = "workspace"
-do = ["tap Answer from", "tap Chat model", "sleep 1"]
-
-[[step]]
 name = "rename"
 group = "workspace"
 from = "workspace"

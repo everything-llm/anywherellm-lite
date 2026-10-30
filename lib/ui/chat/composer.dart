@@ -29,7 +29,6 @@ import '../widgets/segmented.dart';
 import 'answer_from.dart';
 import 'attach_sheet.dart';
 import 'dictation.dart';
-import 'model_picker.dart';
 import 'shortcut_chip.dart';
 
 /// Where a question is written. On a desktop ([AppScope.enterSends]) Enter sends it and
@@ -69,9 +68,6 @@ class ComposerState extends State<Composer> {
   late Object _chatShown;
 
   String _typed = '';
-
-  /// Whether the workspace's chat model picker shows over the field.
-  bool _picking = false;
 
   /// Whether the microphone is listening, and what the message held when it began, which what
   /// is heard follows.
@@ -198,13 +194,11 @@ class ComposerState extends State<Composer> {
     final shown = _chatOnScreen();
     if (shown != _chatShown) {
       _chatShown = shown;
-      if (_picking ||
-          _shortcut != null ||
+      if (_shortcut != null ||
           _asking ||
           _attached.isNotEmpty ||
           _problem != null) {
         setState(() {
-          _picking = false;
           _shortcut = null;
           _asking = false;
           _attached = const [];
@@ -539,8 +533,6 @@ class ComposerState extends State<Composer> {
                   onClearChat: _clearChat,
                   onSend: _send,
                   onHold: _hold,
-                  picking: _picking,
-                  onPickModel: () => setState(() => _picking = !_picking),
                   onDictate: scope.dictation == null ? null : _dictate,
                   listening: _listening,
                   micProblem: _micProblem,
@@ -578,8 +570,6 @@ class _Form extends StatelessWidget {
     required this.onClearChat,
     required this.onSend,
     required this.onHold,
-    required this.picking,
-    required this.onPickModel,
     required this.onDictate,
     required this.listening,
     required this.micProblem,
@@ -609,10 +599,6 @@ class _Form extends StatelessWidget {
 
   /// Puts the message after the ones waiting for the answer running here to end.
   final VoidCallback onHold;
-
-  /// Whether the workspace's chat model picker shows, which [onPickModel] opens and closes.
-  final bool picking;
-  final VoidCallback onPickModel;
 
   /// Starts or ends dictation, or null where the device cannot listen.
   final VoidCallback? onDictate;
@@ -722,10 +708,6 @@ class _Form extends StatelessWidget {
           other: 'Keep',
           onOther: onKeepChat,
         ),
-      if (picking) ...[
-        ModelPicker(onClose: onPickModel),
-        Divider(height: 21, thickness: 1, color: t.line),
-      ],
     ];
 
     // One line of the field: its text's line and its padding, at least a button's 48.
@@ -740,9 +722,6 @@ class _Form extends StatelessWidget {
     );
 
     final card = AnswerFromAnchor(
-      onPickModel: () {
-        if (!picking) onPickModel();
-      },
       child: Container(
         decoration: BoxDecoration(
           color: t.tile,

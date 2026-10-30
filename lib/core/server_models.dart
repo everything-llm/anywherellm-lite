@@ -108,15 +108,25 @@ class Workspace {
 /// How a setting's value is written: a whole number, any number, or text.
 enum SettingType { integer, number, text }
 
-/// One workspace setting: its type, the bounds of a number, and the only values text may take,
-/// when it has a fixed set.
+/// One workspace setting: its type, the bounds of a number, the only values text may take,
+/// when it has a fixed set, and whether the app only reads it.
 class SettingSpec {
-  const SettingSpec(this.type, {this.min = 0, this.max, this.choices});
+  const SettingSpec(
+    this.type, {
+    this.min = 0,
+    this.max,
+    this.choices,
+    this.readOnly = false,
+  });
 
   final SettingType type;
   final num min;
   final num? max;
   final List<String>? choices;
+
+  /// Whether the app reads the setting and never writes it, as the chat model, which
+  /// AnythingLLM's web page changes.
+  final bool readOnly;
 }
 
 /// The workspace settings Files shows, in the order it shows them. Each may be null on the
@@ -126,8 +136,8 @@ const workspaceSettingSpecs = {
   'openAiHistory': SettingSpec(SettingType.integer),
   'topN': SettingSpec(SettingType.integer, min: 1),
   'similarityThreshold': SettingSpec(SettingType.number, max: 1),
-  'chatProvider': SettingSpec(SettingType.text),
-  'chatModel': SettingSpec(SettingType.text),
+  'chatProvider': SettingSpec(SettingType.text, readOnly: true),
+  'chatModel': SettingSpec(SettingType.text, readOnly: true),
   'agentProvider': SettingSpec(SettingType.text),
   'agentModel': SettingSpec(SettingType.text),
   'vectorSearchMode': SettingSpec(SettingType.text),

@@ -7,7 +7,7 @@ import '../app_scope.dart';
 import '../state/turn.dart';
 import '../tokens.dart';
 import '../type.dart';
-import 'model_picker.dart';
+import 'chat_model.dart';
 
 /// What an answer waits on until its first words, as the Lite prototype draws it: a pulsing dot,
 /// the step in plain words, and past 10 s the seconds since the question was sent. The step is

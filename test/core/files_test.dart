@@ -34,8 +34,8 @@ void main() {
 
     test('a changed value is the only field written', () {
       expect(parseSettings(_edited('topN', 6), _settings), {'topN': 6});
-      expect(parseSettings(_edited('chatModel', 'qwen3:8b'), _settings), {
-        'chatModel': 'qwen3:8b',
+      expect(parseSettings(_edited('vectorSearchMode', 'rerank'), _settings), {
+        'vectorSearchMode': 'rerank',
       });
       expect(parseSettings(_edited('openAiTemp', null), _settings), {
         'openAiTemp': null,
@@ -45,6 +45,20 @@ void main() {
           'chatMode': mode,
         });
       }
+    });
+
+    test('the chat model is kept as the server has it, never cleared', () {
+      final own = WorkspaceSettings({
+        ..._settings.values,
+        'chatProvider': 'openai',
+        'chatModel': 'gpt-4o',
+      });
+      expect(parseSettings(settingsText(own), own), isEmpty);
+      expect(parseSettings('{"topN": 5}', own), {'topN': 5});
+      expect(
+        () => parseSettings('{"chatModel": null}', own),
+        throwsA(isA<ApiException>()),
+      );
     });
 
     test('a choice the server left null may stay null', () {
@@ -68,7 +82,12 @@ void main() {
       ),
       (_edited('similarityThreshold', 1.5), 'from 0 to 1'),
       (_edited('openAiTemp', '0.7'), 'openAiTemp must be a number'),
-      (_edited('chatModel', 3), 'chatModel must be text or null'),
+      (_edited('vectorSearchMode', 3), 'vectorSearchMode must be text or null'),
+      (
+        _edited('chatModel', 'qwen3:8b'),
+        "chatModel is changed in AnythingLLM's web page",
+      ),
+      (_edited('chatProvider', 'openai'), 'chatProvider is changed'),
       (
         _edited('chatMode', 'agent'),
         'chatMode must be one of automatic, chat, query',

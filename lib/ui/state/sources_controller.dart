@@ -461,7 +461,8 @@ class SourcesController extends ChangeNotifier {
     await refresh();
   }
 
-  /// The provider and model the workspace answers with, null where it uses the system's.
+  /// The provider and model the workspace answers with, null where it uses the system's. The
+  /// app reads them and never writes them: AnythingLLM's web page changes them.
   String? get chatProvider => _own('chatProvider');
   String? get chatModel => _own('chatModel');
 
@@ -470,24 +471,6 @@ class SourcesController extends ChangeNotifier {
         '' => null,
         final text => text,
       };
-
-  /// Makes the workspace answer with [provider] and [model], null for the system's, the same
-  /// columns the workspace's answer settings write. Says why the server refused, or null.
-  Future<String?> setChatModel(String? provider, String? model) async {
-    final slug = _slug;
-    final server = _chat.server;
-    if (slug == null) return 'No workspace is open.';
-    try {
-      await _api.updateWorkspace(slug, {
-        'chatProvider': provider,
-        'chatModel': model,
-      });
-    } on ApiException catch (error) {
-      return error.message;
-    }
-    if (server == _chat.server && slug == _slug) await refresh();
-    return null;
-  }
 
   /// Lights up the file titled [title] for a moment.
   void flash(String title) {

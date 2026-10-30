@@ -5,16 +5,16 @@ import 'package:flutter/material.dart';
 import '../../core/chat.dart';
 import '../app_scope.dart';
 import '../layout.dart';
+import '../chat/chat_model.dart';
 import '../widgets/buttons.dart';
-import '../chat/model_picker.dart';
 import '../widgets/fields.dart';
-import '../widgets/phone_page.dart';
 import '../widgets/radio_card.dart';
 import '../settings/rows.dart';
 
 /// A workspace's answer settings as a form, in place of `settings.json`, in the composer's words:
-/// Answer from as a card for each mode, the chat model, which opens the [ModelPicker], and what
-/// Files only says when the files do not cover a question. The rest is kept as the server has it.
+/// Answer from as a card for each mode, the chat model it answers with, shown and never written,
+/// and what Files only says when the files do not cover a question. The rest is kept as the
+/// server has it.
 /// Saving sends only what changed, through the same checks as `settings.json`. Its key changes
 /// each time the settings are read afresh, which drops the draft.
 class SettingsForm extends StatefulWidget {
@@ -33,9 +33,6 @@ class _SettingsFormState extends State<SettingsForm> {
   late final TextEditingController _refusal;
   late String? _mode;
   bool _saving = false;
-
-  /// Whether the model picker shows.
-  bool _picking = false;
 
   @override
   void initState() {
@@ -134,23 +131,12 @@ class _SettingsFormState extends State<SettingsForm> {
           builder: (context, _) {
             // The system's model names the row while the workspace has none of its own.
             scope.system.wantSettingsOnce();
-            final own = scope.sources.chatModel;
-            final model = workspaceModel(scope);
             return FieldCard([
-              NavRow(
-                title: 'Chat model',
-                about:
-                    own ??
-                    (model == 'Chat model' ? null : 'The server\'s: $model'),
-                onTap: () => setState(() => _picking = !_picking),
-              ),
+              InfoRow('Chat model', about: workspaceModel(scope)),
             ]);
           },
         ),
-        if (_picking) ...[
-          const SizedBox(height: 8),
-          ModelPicker(onClose: () => setState(() => _picking = false)),
-        ],
+        const ChatModelNote(),
         const CardHeading('When the files do not cover it'),
         AppField(
           controller: _refusal,

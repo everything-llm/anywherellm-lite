@@ -33,14 +33,17 @@ Uint8List bytesOf(List<int> bytes) =>
     bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
 
 /// The settings in [text] that differ from [was], ready to write. Throws [ApiException] when the
-/// text is not a JSON object, names a setting the app does not know, or gives one a value of the
-/// wrong type or range.
+/// text is not a JSON object, names a setting the app does not know, changes one it only reads,
+/// such as the chat model, or gives one a value of the wrong type or range.
 Map<String, Object?> parseSettings(String text, WorkspaceSettings was) {
   final changed = <String, Object?>{};
   for (final MapEntry(:key, :value) in settingsObject(text).entries) {
     final spec = workspaceSettingSpecs[key];
     if (spec == null) throw ApiException('$key is not a workspace setting.');
     if (value == was.values[key]) continue;
+    if (spec.readOnly) {
+      throw ApiException('$key is changed in AnythingLLM\'s web page.');
+    }
     _check(key, spec, value);
     changed[key] = value;
   }

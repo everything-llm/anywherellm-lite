@@ -1,6 +1,5 @@
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/ui/chat/composer.dart';
-import 'package:anywherellm/ui/chat/model_picker.dart';
 import 'package:anywherellm/ui/widgets/sheet.dart';
 import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/material.dart';
@@ -148,19 +147,24 @@ void main() {
     expect(h.shell.answerFromOpen, isFalse);
   });
 
-  testWidgets('the sheet holds the model, which opens the picker', (
+  testWidgets('the sheet names the model, which nothing there changes', (
     tester,
   ) async {
-    await pumpApp(tester, llm: onChat());
+    final llm = onChat();
+    await pumpApp(tester, llm: llm);
     // No model chip in the row: the row has room for one.
     expect(inComposer(find.text('qwen3:8b')), findsNothing);
     await tester.tap(chip);
     await tester.pumpAndSettle();
     expect(menuNote, findsOneWidget);
-    await tester.tap(control('Chat model, qwen3:8b'));
+    expect(inSheet(find.text('Chat model')), findsOneWidget);
+    expect(inSheet(find.text('System default (qwen3:8b)')), findsOneWidget);
+    // A row to read, not a control: a tap leaves the sheet open and writes nothing.
+    expect(control('Chat model, System default (qwen3:8b)'), findsNothing);
+    await tester.tap(inSheet(find.text('Chat model')));
     await tester.pumpAndSettle();
-    expect(find.byType(ModelPicker), findsOneWidget);
-    expect(menuNote, findsNothing);
+    expect(menuNote, findsOneWidget);
+    expect(llm.calls.where((c) => c.startsWith('update')), isEmpty);
   });
 
   for (final size in const [Size(360, 480), Size(412, 915), Size(740, 360)]) {

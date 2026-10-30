@@ -9,10 +9,9 @@ import '../tokens.dart';
 import '../type.dart';
 import '../settings/rows.dart';
 import '../shell_popup.dart';
-import '../widgets/phone_page.dart';
 import '../widgets/radio_card.dart';
+import 'chat_model.dart';
 import 'composer_chip.dart';
-import 'model_picker.dart';
 
 /// Whether the open workspace's chat mode can be changed now: it has been read, and no answer
 /// runs in it.
@@ -97,17 +96,12 @@ class _AnswerFromChipState extends State<AnswerFromChip> {
 }
 
 /// [child], the composer's card, with the Answer from sheet over the window while
-/// [ShellController.answerFromOpen], its modes as cards, ending with the Chat model row
-/// [onPickModel] answers. A tap outside, Esc or Back closes
-/// it, and so do another workspace and an answer starting in this one.
+/// [ShellController.answerFromOpen], its modes as cards, ending with the Chat model the
+/// workspace answers with. A tap outside, Esc or Back closes it, and so do another workspace and
+/// an answer starting in this one.
 class AnswerFromAnchor extends StatelessWidget {
-  const AnswerFromAnchor({
-    super.key,
-    required this.onPickModel,
-    required this.child,
-  });
+  const AnswerFromAnchor({super.key, required this.child});
 
-  final VoidCallback onPickModel;
   final Widget child;
 
   @override
@@ -131,7 +125,7 @@ class AnswerFromAnchor extends StatelessWidget {
           builder: (context, _) {
             if (!_canChoose(scope)) return const SizedBox.shrink();
             scope.system.wantSettingsOnce();
-            return _Sheet(onPickModel: onPickModel, onClose: close);
+            return _Sheet(onClose: close);
           },
         ),
         child: child!,
@@ -142,11 +136,11 @@ class AnswerFromAnchor extends StatelessWidget {
 }
 
 /// The Answer from sheet: the three modes as cards, a note that the choice is the workspace's,
-/// and the Model row, since the composer has room for one chip.
+/// and the Chat model it answers with, shown and not chosen, since the composer has room for one
+/// chip.
 class _Sheet extends StatelessWidget {
-  const _Sheet({required this.onPickModel, required this.onClose});
+  const _Sheet({required this.onClose});
 
-  final VoidCallback onPickModel;
   final VoidCallback onClose;
 
   @override
@@ -181,16 +175,7 @@ class _Sheet extends StatelessWidget {
               style: Type.note(t.ink),
             ),
           ),
-          FieldCard([
-            NavRow(
-              title: 'Chat model',
-              about: workspaceModel(scope),
-              onTap: () {
-                onClose();
-                onPickModel();
-              },
-            ),
-          ]),
+          FieldCard([InfoRow('Chat model', about: workspaceModel(scope))]),
         ],
       ),
     );
