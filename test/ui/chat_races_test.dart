@@ -149,6 +149,22 @@ void main() {
       expect(llm.calls.where((c) => c.startsWith('streamChat')), isEmpty);
     });
 
+    test('a refresh while its thread is made still sends it', () async {
+      final llm = planningServer();
+      final rig = await _started(llm);
+      await rig.chat.select('household');
+      final gate = llm.gates['createThread'] = Completer<void>();
+      final sending = rig.chat.send('What bills are due?');
+      await pumpEventQueue();
+      await rig.chat.refresh();
+      gate.complete();
+      await sending;
+      await pumpEventQueue();
+      expect(llm.calls, contains('streamChat:th-1:What bills are due?'));
+      expect(rig.chat.turns.last.error, isNull);
+      expect(rig.chat.turns.last.text, llm.answer);
+    });
+
     test(
       'keeps its thread when the workspaces were read before it was made',
       () async {

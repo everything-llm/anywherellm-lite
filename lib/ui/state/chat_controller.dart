@@ -521,7 +521,8 @@ class ChatController extends ChangeNotifier with FollowsServer {
   Future<void> refresh() async {
     if (server == null || _refreshing) return;
     _refreshing = true;
-    if (_here case final running?) {
+    // A draft's first message whose chat is still being made has no answer yet to let go of.
+    if (_here case final running? when running.stream != null) {
       unawaited(running.stream?.cancel());
       _finish(
         running,
