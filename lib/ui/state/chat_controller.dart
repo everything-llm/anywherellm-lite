@@ -101,8 +101,10 @@ typedef _Deck = ({String slug, List<OnDeck> next, bool held});
 /// AnythingLLM keeps each run's history and saved answer by its thread.
 ///
 /// A chat not yet asked anything is a draft: it lives only here until its first message, which
-/// makes the thread on the server. Everything it knows is about the [server] in use; a new server
-/// starts it afresh.
+/// makes the thread on the server. Each workspace also has its Main chat, which is in no thread:
+/// it is kept wherever a thread is, under [mainChatOf] the workspace's slug, and goes to the
+/// server as no thread ([threadOnServer]). Everything it knows is about the [server] in use; a
+/// new server starts it afresh.
 class ChatController extends ChangeNotifier with FollowsServer {
   ChatController(this._api, SettingsController settings, this._prefs) {
     followServer(settings);
@@ -122,7 +124,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
 
   String? activeSlug;
 
-  /// The chat on screen, or null for a draft.
+  /// The chat on screen: a thread's slug, the workspace's [mainChatOf], or null for a draft.
   String? activeThread;
 
   final Map<String, List<Turn>> _turns = {};
@@ -272,7 +274,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
     final cleared = _cleared.take();
     if (cleared == null) return;
     final (:thread, :deck) = cleared;
-    if (threadsOf(deck.slug).any((t) => t.slug == thread)) {
+    if (_has(deck.slug, thread)) {
       final now = _onDeck[thread];
       _setDeck(thread, deck.slug, [
         ...deck.next,
@@ -392,7 +394,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
       running,
       _api.streamChat(
         deck.slug,
-        thread,
+        threadOnServer(thread),
         first.text,
         attachments: first.attachments,
         mode: modeForFiles(first.mode, first.attachments),
@@ -462,13 +464,27 @@ class ChatController extends ChangeNotifier with FollowsServer {
   Workspace? workspaceOf(String? slug) =>
       workspaces.where((w) => w.slug == slug).firstOrNull;
 
+  /// Workspace [slug]'s threads, oldest made first. Its Main chat is in none.
   List<Thread> threadsOf(String slug) => _threads[slug] ?? const [];
 
+  /// Whether workspace [slug] has chat [chat]: its Main chat, or one of its threads.
+  bool _has(String slug, String chat) =>
+      chat == mainChatOf(slug) || threadsOf(slug).any((t) => t.slug == chat);
+
+  /// The thread on screen, or null for a draft and for Main chat, which has no sheet.
   Thread? get thread => activeSlug == null
       ? null
       : threadsOf(activeSlug!).where((t) => t.slug == activeThread).firstOrNull;
 
-  String get title => thread?.name ?? newChatName;
+  /// Whether the chat on screen is its workspace's Main chat.
+  bool get onMainChat => isMainChat(activeThread);
+
+  String get title => onMainChat ? mainChatName : thread?.name ?? newChatName;
+
+  /// The name of chat [chat] of workspace [slug], or null when it has none, as a thread gone.
+  String? nameOf(String slug, String chat) => isMainChat(chat)
+      ? mainChatName
+      : threadsOf(slug).where((t) => t.slug == chat).firstOrNull?.name;
 
   /// The turns of the chat on screen. A list handed out here is never changed afterwards: every
   /// change sets a new list, since the view may still be drawing from the old one.
@@ -542,7 +558,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
       if (slug != null &&
           thread != null &&
           !isAnswering(thread) &&
-          !threadsOf(slug).any((t) => t.slug == thread)) {
+          !_has(slug, thread)) {
         _turns.remove(thread);
         if (_onDeck.containsKey(thread)) _setDeck(thread, slug, const []);
         await select(slug);
@@ -752,8 +768,8 @@ class ChatController extends ChangeNotifier with FollowsServer {
         !workspaces.any((w) => w.slug == last.slug)) {
       return (_firstSlug, null);
     }
-    final kept = threadsOf(last.slug).any((t) => t.slug == last.thread);
-    return (last.slug, kept ? last.thread : null);
+    final chat = last.thread;
+    return (last.slug, chat != null && _has(last.slug, chat) ? chat : null);
   }
 
   /// Remembers the chat on screen as the one to open at start.
@@ -769,7 +785,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
     notifyListeners();
   }
 
-  /// Shows workspace [slug] on chat [thread], or on its newest chat, or a draft when it has
+  /// Shows workspace [slug] on chat [thread], or on its newest thread, or a draft when it has
   /// none.
   Future<void> select(String? slug, {String? thread}) async {
     _leaving(thread);
@@ -809,7 +825,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
     final shown = known;
     final newest = _newest[threadSlug];
     await _try('Could not read the chat', () async {
-      final history = await _api.history(slug, threadSlug);
+      final history = await _api.history(slug, threadOnServer(threadSlug));
       if (!at.current) return;
       // A message sent or an answer settled while the read was away says more than it does.
       if (!identical(_turns[threadSlug], shown) ||
@@ -858,10 +874,11 @@ class ChatController extends ChangeNotifier with FollowsServer {
     _draftGo++;
   }
 
-  /// Starts a draft, unless the chat on screen is already empty: a draft, or a chat read with no
-  /// turns. A chat whose turns are still being read is not empty.
+  /// Starts a draft, unless the chat on screen is already empty: a draft, or a thread read with
+  /// no turns. A chat whose turns are still being read is not empty, and Main chat, empty or not,
+  /// gives way to a draft, since what it is asked stays in it.
   void newChat() {
-    if (ready && turns.isEmpty) return;
+    if (ready && turns.isEmpty && !onMainChat) return;
     _leaving(null);
     _freshDraft();
     activeThread = null;
@@ -921,11 +938,14 @@ class ChatController extends ChangeNotifier with FollowsServer {
       if (!at.current) return;
       // A chat waiting to be deleted goes with its workspace: its delete would find none.
       if (_deleted.value?.slug == slug) _deleted.take();
-      for (final t in threadsOf(slug)) {
-        _turns.remove(t.slug);
-        _newest.remove(t.slug);
-        _named.remove(t.slug);
-        _onDeck.remove(t.slug);
+      for (final chat in [
+        mainChatOf(slug),
+        for (final t in threadsOf(slug)) t.slug,
+      ]) {
+        _turns.remove(chat);
+        _newest.remove(chat);
+        _named.remove(chat);
+        _onDeck.remove(chat);
       }
       _threads.remove(slug);
       docCounts.remove(slug);
@@ -938,10 +958,11 @@ class ChatController extends ChangeNotifier with FollowsServer {
     });
   }
 
+  /// Renames thread [threadSlug] of the workspace on screen. Main chat keeps its name.
   Future<void> rename(String threadSlug, String name) async {
     final slug = activeSlug;
     final clean = name.trim();
-    if (slug == null || clean.isEmpty) return;
+    if (slug == null || clean.isEmpty || isMainChat(threadSlug)) return;
     final at = here;
     await _try('Could not rename the chat', () async {
       await _api.renameThread(slug, threadSlug, clean);
@@ -965,7 +986,8 @@ class ChatController extends ChangeNotifier with FollowsServer {
   /// on the server only once its toast is done: closed ([flushDelete]), replaced by another
   /// delete or Clear all, left for another chat or workspace, another server, the app hiding or
   /// [dispose]. [undoDelete] puts it back before then, and nothing is sent. The chat on screen
-  /// gives way to a new chat, a draft in the same workspace.
+  /// gives way to a new chat, a draft in the same workspace. Main chat, in no list
+  /// ([threadsOf]), is never deleted.
   Future<void> delete(String threadSlug) async {
     final slug = activeSlug;
     final server = this.server;
@@ -1113,7 +1135,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
       running,
       _api.streamChat(
         slug,
-        thread,
+        threadOnServer(thread),
         text,
         attachments: attachments,
         mode: modeForFiles(mode, attachments),
@@ -1209,7 +1231,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
     notifyListeners();
     await _try('Could not clear the chat', () async {
       try {
-        await _api.resetChat(slug, thread);
+        await _api.resetChat(slug, threadOnServer(thread));
         if (!at.current) return;
         _turns[thread] = [];
         _newest[thread] = -1;
@@ -1292,7 +1314,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
     final at = here;
     final go = _learning[thread] = Object();
     try {
-      final history = await _api.history(slug, thread);
+      final history = await _api.history(slug, threadOnServer(thread));
       // Only the latest read counts: an answer that ended meanwhile, as a waiting message
       // sent since, settled the chat afresh.
       if (at.current && identical(_learning[thread], go)) {

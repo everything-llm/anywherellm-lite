@@ -8,7 +8,8 @@ import '../state/chat_controller.dart';
 import '../state/turn.dart';
 import '../state/shell_controller.dart';
 
-/// The chat a tapped notification opens.
+/// The chat a tapped notification opens: its workspace, and its thread's slug or, for Main
+/// chat, the workspace's `mainChatOf`.
 typedef ChatTarget = ({String slug, String thread});
 
 /// What lets an answer go on while the app is out of sight: Android keeps an app that holds a
@@ -79,13 +80,10 @@ class KeepAnswering {
     _seen = finished;
     final where = _chat.finishedIn;
     if (_front || finished == null || where == null) return;
-    final chat = _chat
-        .threadsOf(where.slug)
-        .where((t) => t.slug == where.thread);
     final answer = plainText(splitReasoning(finished.text).answer);
     unawaited(
       _work.ready(
-        title: chat.firstOrNull?.name ?? 'Answer ready',
+        title: _chat.nameOf(where.slug, where.thread) ?? 'Answer ready',
         body: clip(answer, 200),
         slug: where.slug,
         thread: where.thread,

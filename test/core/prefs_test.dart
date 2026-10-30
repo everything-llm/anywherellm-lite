@@ -1,4 +1,5 @@
 import 'package:anywherellm/core/prefs.dart';
+import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/core/shortcuts.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -331,5 +332,32 @@ void main() {
       expect(prefs.keepsChat(server, 'plans', 't1'), isTrue);
       expect(prefs.withoutChat(server, 'plans', 't1').onDeck, isEmpty);
     });
+  });
+
+  test('Main chat, whose key names its workspace, follows a slug change', () {
+    const use = ShortcutUse(label: 'Translate', detail: 'French');
+    final prefs = const Prefs()
+        .withLastChat(_s, 'plans', mainChatOf('plans'))
+        .withOnDeck(_s, 'plans', mainChatOf('plans'), const [
+          SavedOnDeck('And French?'),
+        ])
+        .withShortcutUse(
+          Prefs.shortcutUseKey(_s, 'plans', mainChatOf('plans'), 42),
+          use,
+        );
+    final moved = prefs.withRenamedWorkspace(_s, 'plans', 'plans-2');
+    expect(moved.lastChat, LastChat('plans-2', mainChatOf('plans-2'), _s));
+    expect(moved.onDeckIn(_s, 'plans-2', mainChatOf('plans-2')), hasLength(1));
+    expect(moved.shortcutUses.keys, [
+      Prefs.shortcutUseKey(_s, 'plans-2', mainChatOf('plans-2'), 42),
+    ]);
+    // A thread of the workspace keeps its slug.
+    expect(
+      const Prefs()
+          .withLastChat(_s, 'plans', 't1')
+          .withRenamedWorkspace(_s, 'plans', 'plans-2')
+          .lastChat,
+      const LastChat('plans-2', 't1', _s),
+    );
   });
 }

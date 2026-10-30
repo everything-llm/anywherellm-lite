@@ -3,6 +3,7 @@
 import 'dart:convert';
 
 import 'json.dart';
+import 'server_models.dart';
 import 'shortcuts.dart';
 
 /// A document switched off in a workspace: no longer embedded there, but still listed in its
@@ -390,11 +391,17 @@ class Prefs {
 
   /// These prefs with what is kept of workspace [from] on [server], its order, switched-off
   /// documents, last chat, pins, recent chats, shortcuts and their uses, and the messages waiting
-  /// in its chats, moved to [to], as when a workspace's slug changes.
+  /// in its chats, moved to [to], as when a workspace's slug changes. Its Main chat's key names
+  /// the slug ([mainChatOf]), so it moves too.
   Prefs withRenamedWorkspace(String server, String from, String to) {
     if (from == to) return this;
     final fromKey = offKey(server, from);
     final toKey = offKey(server, to);
+    final (fromMain, toMain) = (mainChatOf(from), mainChatOf(to));
+    // A chat, or a chat and an exchange id after a space, of the workspace.
+    String chat(String key) => key == fromMain || key.startsWith('$fromMain ')
+        ? '$toMain${key.substring(fromMain.length)}'
+        : key;
     return _copy(
       switchedOff: {
         for (final entry in switchedOff.entries)
@@ -408,7 +415,10 @@ class Prefs {
           if (s == from) to else if (s != to) s,
       ],
       lastChat: () => lastChatIn(server, from)
-          ? LastChat(to, lastChat!.thread, server)
+          ? LastChat(to, switch (lastChat!.thread) {
+              final thread? => chat(thread),
+              null => null,
+            }, server)
           : lastChat,
       pinned: _moved(pinned, fromKey, toKey),
       recent: _moved(recent, fromKey, toKey),
@@ -418,19 +428,23 @@ class Prefs {
               ? shortcut.inWorkspace(toKey)
               : shortcut,
       ],
-      shortcutUses: _movedUnder(shortcutUses, fromKey, toKey),
-      onDeck: _movedUnder(onDeck, fromKey, toKey),
+      shortcutUses: _movedUnder(shortcutUses, fromKey, toKey, chat),
+      onDeck: _movedUnder(onDeck, fromKey, toKey, chat),
     );
   }
 
-  /// [map] with each key under workspace key [from], as `<from> <rest>`, under [to] instead.
+  /// [map] with each key under workspace key [from], as `<from> <rest>`, under [to] instead, as
+  /// `<to> <moved(rest)>`.
   static Map<String, T> _movedUnder<T>(
     Map<String, T> map,
     String from,
     String to,
+    String Function(String rest) moved,
   ) => {
     for (final MapEntry(:key, :value) in map.entries)
-      key.startsWith('$from ') ? '$to ${key.substring(from.length + 1)}' : key:
+      key.startsWith('$from ')
+              ? '$to ${moved(key.substring(from.length + 1))}'
+              : key:
           value,
   };
 

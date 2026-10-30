@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/ports.dart';
 import '../../core/prefs.dart';
+import '../../core/server_models.dart';
 import '../../core/shortcuts.dart';
 import 'notice.dart';
 
@@ -53,24 +54,29 @@ class PrefsController extends ChangeNotifier {
   Future<void> setWorkspaceOrder(List<String> slugs) =>
       _change(prefs.withOrder(slugs));
 
-  /// Notes that this device used chat [thread] of workspace [slug] now, for Recent.
+  /// Notes that this device used chat [thread] of workspace [slug] now, for Recent. Main chat,
+  /// always first in the list, is never Recent, so it takes no thread's place there.
   Future<void> useChat(String slug, String thread) async {
     final server = _server;
     // Already the last used, as when its answer ends while it is on screen: nothing to write.
-    if (server != null && prefs.recentIn(server, slug).firstOrNull != thread) {
+    if (server != null &&
+        !isMainChat(thread) &&
+        prefs.recentIn(server, slug).firstOrNull != thread) {
       await _change(prefs.withUse(server, slug, thread));
     }
   }
 
   /// Notes the chat on screen in one write: chat [thread] of workspace [slug] as the last chat
-  /// and, when it is no draft, the last used, as a chat opened is.
+  /// and, when it is a thread, the last used, as a chat opened is.
   Future<void> showChat(String slug, String? thread) async {
     final server = _server;
     if (server == null || prefs.lastChat == LastChat(slug, thread, server)) {
       return;
     }
     var next = prefs.withLastChat(server, slug, thread);
-    if (thread != null) next = next.withUse(server, slug, thread);
+    if (thread != null && !isMainChat(thread)) {
+      next = next.withUse(server, slug, thread);
+    }
     await _change(next);
   }
 

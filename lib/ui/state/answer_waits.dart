@@ -32,8 +32,9 @@ class _Waiting {
   void cancel() => next?.cancel();
 }
 
-/// The answers whose connection dropped while AnythingLLM may still finish them, by chat, each
-/// read for in its chat's history until the server saved it.
+/// The answers whose connection dropped while AnythingLLM may still finish them, by chat (a
+/// thread's slug, or a workspace's [mainChatOf]), each read for in its chat's history until the
+/// server saved it.
 class AnswerWaits {
   AnswerWaits(
     this._api, {
@@ -138,7 +139,7 @@ class AnswerWaits {
     waiting.reads++;
     List<ChatMessage>? history;
     try {
-      history = await _api.history(slug, thread);
+      history = await _api.history(slug, threadOnServer(thread));
     } on Object {
       // Out of reach for now, or a read that failed some other way: read again next time.
     }
