@@ -217,7 +217,7 @@ do = ["tap Connection", "tap Edit connection", "sleep 1"]
 name = "connection-forget"
 group = "settings"
 from = "settings"
-do = ["tap Connection", "tap Forget this server", "sleep 1"]
+do = ["tap Connection", "tap Forget server", "sleep 1"]
 
 [[step]]
 name = "appearance"

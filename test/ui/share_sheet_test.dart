@@ -51,6 +51,8 @@ void main() {
     );
     expect(inSheet(find.text('Share to AnywhereLLM Lite')), findsOneWidget);
     expect(inSheet(find.text('Prices')), findsOneWidget);
+    // Its title wraps rather than losing its end.
+    expect(tester.widget<Text>(inSheet(find.text('Prices'))).maxLines, isNull);
     expect(tester.takeException(), isNull);
     await tester.tap(inSheet(control('Household')));
     await tester.pumpAndSettle();

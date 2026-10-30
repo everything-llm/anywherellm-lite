@@ -326,6 +326,14 @@ class Prefs {
         onDeck: _with(onDeck, chatKey(server, slug, thread), const []),
       );
 
+  /// These prefs with nothing waiting in any chat on [server], as when it is forgotten.
+  Prefs withoutOnDeckOn(String server) => _copy(
+    onDeck: {
+      for (final MapEntry(:key, :value) in onDeck.entries)
+        if (!key.startsWith('$server ')) key: value,
+    },
+  );
+
   /// Whether chat [thread] of workspace [slug] on [server] is pinned or recent, or has messages
   /// waiting.
   bool keepsChat(String server, String slug, String thread) =>

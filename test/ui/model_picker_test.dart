@@ -65,6 +65,11 @@ void main() {
     final h = await openAnswerFrom(tester, llm);
     await openPicker(tester);
     expect(find.text('Chat model for Q3 planning'), findsOneWidget);
+    // A title wraps rather than losing its end.
+    expect(
+      tester.widget<Text>(find.text('Chat model for Q3 planning')).maxLines,
+      isNull,
+    );
     await tester.tap(find.text('Ollama'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('OpenAI').last);

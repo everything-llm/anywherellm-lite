@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:anywherellm/core/chat.dart';
 import 'package:anywherellm/core/ports.dart';
+import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/ui/chat/chat_view.dart';
 import 'package:anywherellm/ui/chat/wait_line.dart';
 import 'package:anywherellm/ui/settings/settings_dialog.dart';
@@ -399,7 +400,7 @@ void main() {
         findsOneWidget,
       );
       expect(inSources(find.text('Sources')), findsNothing);
-      expect(find.text('Q3 planning · 2 docs in use'), findsOneWidget);
+      expect(find.text('Q3 planning · 2 documents in use'), findsOneWidget);
     });
 
     testWidgets(
@@ -410,7 +411,7 @@ void main() {
         await tester.tap(find.byType(AppSwitch).first);
         await tester.pumpAndSettle();
         expect(h.sources.onCount, 1);
-        expect(find.text('Q3 planning · 1 doc in use'), findsOneWidget);
+        expect(find.text('Q3 planning · 1 document in use'), findsOneWidget);
         expect(inSources(find.text('Not used · 120 words')), findsOneWidget);
         double opacityOf(Finder finder) => tester
             .widgetList<Opacity>(
@@ -604,22 +605,32 @@ void main() {
       expect(control('Edit connection'), findsOneWidget);
     });
 
-    testWidgets('Forget asks in a sheet, then deletes the key', (tester) async {
+    testWidgets('Forget server asks in a sheet, then deletes the key and what '
+        'waits to be sent', (tester) async {
       final h = await pumpApp(tester, llm: planningServer());
+      final server = sampleConnection.baseUrl;
+      await h.prefs.setOnDeck('q3', 'budget', const [SavedOnDeck('Later')]);
       h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
-      await tapVisible(tester, control('Forget this server'));
+      await tapVisible(tester, control('Forget server'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Forget h?'), findsOneWidget);
+      expect(
+        find.text(
+          'Forget h? Its key, drafts and waiting messages leave this phone. '
+          'This can\u2019t be undone.',
+        ),
+        findsOneWidget,
+      );
       await tester.tap(asked('Keep'));
       await tester.pumpAndSettle();
       expect(h.settings.connection, sampleConnection);
-      await tapVisible(tester, control('Forget this server'));
+      await tapVisible(tester, control('Forget server'));
       await tester.pumpAndSettle();
-      await tester.tap(asked('Forget'));
+      await tester.tap(asked('Forget server'));
       await tester.pumpAndSettle();
       expect(h.settings.configured, isFalse);
       expect(find.text('The saved key was deleted.'), findsOneWidget);
+      expect(h.prefs.prefs.onDeckIn(server, 'q3', 'budget'), isEmpty);
     });
 
     testWidgets('Back with the keyboard up only puts the keyboard away', (
@@ -840,13 +851,13 @@ void main() {
       'a phone\'s chat header names the workspace and its documents over the chat',
       (tester) async {
         final h = await pumpApp(tester, llm: planningServer());
-        expect(find.text('Q3 planning · 2 docs in use'), findsOneWidget);
+        expect(find.text('Q3 planning · 2 documents in use'), findsOneWidget);
         // A pull down refreshes, and Documents is under the workspace's settings.
         expect(find.byTooltip('Refresh'), findsNothing);
         expect(control('Documents, 2 on'), findsNothing);
         expect(find.byTooltip('New chat'), findsOneWidget);
         // On a saved chat the title opens the chat's sheet.
-        await tester.tap(find.text('Q3 planning · 2 docs in use'));
+        await tester.tap(find.text('Q3 planning · 2 documents in use'));
         await tester.pumpAndSettle();
         expect(h.shell.popup.value, isA<ChatSheetFor>());
         expect(tester.takeException(), isNull);

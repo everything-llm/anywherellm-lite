@@ -116,6 +116,10 @@ class PrefsController extends ChangeNotifier {
     }
   }
 
+  /// Forgets the messages kept waiting in every chat on [server], as Forget server does.
+  Future<void> forgetOnDeckOn(String server) =>
+      _changeIfNew(prefs.withoutOnDeckOn(server));
+
   /// The messages kept waiting in chat [thread] of workspace [slug] of the server in use.
   List<SavedOnDeck> onDeckIn(String slug, String thread) =>
       _server == null ? const [] : prefs.onDeckIn(_server!, slug, thread);

@@ -40,7 +40,7 @@ class WorkspaceSwitcher extends StatelessWidget {
           (w) => w.slug != active?.slug && chat.readyIn(w.slug),
         );
         final docs = count != null && count > 0
-            ? ', ${plural(count, 'doc', 'docs')}'
+            ? ', ${plural(count, 'document', 'documents')}'
             : '';
         final name = active == null
             ? 'Workspaces'

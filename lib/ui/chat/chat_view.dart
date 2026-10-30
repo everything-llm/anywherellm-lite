@@ -407,7 +407,7 @@ class _Header extends StatelessWidget {
                           Flexible(
                             child: Text(
                               '${workspace.name} · '
-                              '${plural(docs, 'doc', 'docs')} in use',
+                              '${plural(docs, 'document', 'documents')} in use',
                               style: Type.caption(
                                 t.ink,
                                 weight: FontWeight.w700,

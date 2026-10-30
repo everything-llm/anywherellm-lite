@@ -8,7 +8,7 @@ import '../support/pump.dart';
 
 /// Opens the sheet of the chat on screen from the header's title.
 Future<void> _openSheet(WidgetTester tester) async {
-  await tester.tap(find.text('Q3 planning · 2 docs in use'));
+  await tester.tap(find.text('Q3 planning · 2 documents in use'));
   await tester.pumpAndSettle();
 }
 
@@ -97,7 +97,7 @@ void main() {
     final h = await pumpApp(tester, llm: planningServer());
     h.chat.newChat();
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Q3 planning · 2 docs in use'));
+    await tester.tap(find.text('Q3 planning · 2 documents in use'));
     await tester.pumpAndSettle();
     expect(h.shell.popup.value, isNot(isA<ChatSheetFor>()));
     expect(h.shell.pane.name, 'files');

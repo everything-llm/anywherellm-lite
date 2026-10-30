@@ -109,8 +109,6 @@ class _ModelPickerState extends State<ModelPicker> {
                 Expanded(
                   child: Text(
                     'Chat model for ${scope.chat.active?.name ?? 'this workspace'}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: Type.caption(t.ink, weight: FontWeight.w600),
                   ),
                 ),

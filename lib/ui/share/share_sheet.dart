@@ -200,12 +200,7 @@ class _ShareSheetState extends State<ShareSheet> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Type.body(t.ink),
-                            ),
+                            Text(name, style: Type.body(t.ink)),
                             Text(
                               about,
                               maxLines: 1,

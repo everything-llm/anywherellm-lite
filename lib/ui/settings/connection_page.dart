@@ -126,7 +126,7 @@ class _OrDivider extends StatelessWidget {
 /// The address and key: saved, replaced or forgotten, or read from a QR code. A key is saved
 /// only once the server takes it. Once one is saved, a card names the server and where its key
 /// is kept, and on a server with several users whom chats are saved as, with the form to edit it
-/// under it while open, then Test connection, Edit connection and Forget this server, one under
+/// under it while open, then Test connection, Edit connection and Forget server, one under
 /// another. Who uses this app? opens by itself once after connecting to a server with several
 /// users while no one is chosen there.
 class _KeyCard extends StatefulWidget {
@@ -312,7 +312,7 @@ class _KeyCardState extends State<_KeyCard> {
 
   /// The saved connection's card, with whom chats are saved as on a server with several users,
   /// then the warning that the key opens every user's chats; then, while Edit connection has it
-  /// open, the fields; then Test connection, Edit connection and Forget this server, which asks
+  /// open, the fields; then Test connection, Edit connection and Forget server, which asks
   /// first.
   Widget _connected(
     BuildContext context,
@@ -403,9 +403,8 @@ class _KeyCardState extends State<_KeyCard> {
         ),
         _Tall(
           AppButton(
-            'Forget this server',
+            'Forget server',
             danger: true,
-            quiet: true,
             onPressed: () => _shell.togglePopup(Popup.forgetServer),
           ),
         ),
@@ -418,16 +417,20 @@ class _KeyCardState extends State<_KeyCard> {
       builder: (context, close) => WhoUsesSheet(onDone: close),
       child: card,
     );
+    // What waits to be sent to it goes with its key; a draft goes as another server is used.
     return ShellPopup(
       popup: Popup.forgetServer,
-      title: 'Forget this server',
+      title: 'Forget server',
       builder: (context, close) => SheetQuestion(
-        'Forget ${connection.host}? Its key leaves this phone, and connecting again takes the '
-        'key or a pairing code.',
-        action: 'Forget',
+        'Forget ${connection.host}? Its key, drafts and waiting messages leave this phone. '
+        'This can’t be undone.',
+        action: 'Forget server',
         onKeep: close,
         onConfirm: () {
           close();
+          unawaited(
+            AppScope.of(context).prefs.forgetOnDeckOn(connection.baseUrl),
+          );
           unawaited(_settings.clear());
         },
       ),
