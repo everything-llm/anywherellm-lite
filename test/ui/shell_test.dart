@@ -367,7 +367,9 @@ void main() {
         expect(named, isNotEmpty);
         expect(named, [for (var i = 1; i <= named.length; i++) i]);
         expect(named.length, lessThanOrEqualTo(3));
-        await tester.tap(control('${9 - named.length} more sources'));
+        await tester.tap(
+          control('${9 - named.length} more sources. Show all 9'),
+        );
         await tester.pumpAndSettle();
         expect(h.shell.citedOpen, isTrue);
         expect(find.text('Sources'), findsOneWidget);

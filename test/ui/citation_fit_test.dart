@@ -81,7 +81,7 @@ void main() {
       );
     await llm.chat!.close();
     await tester.pumpAndSettle();
-    for (final i in [1, 2, 3]) {
+    for (final i in [1, 2]) {
       final name = tester.renderObject<RenderParagraph>(
         find
             .descendant(
@@ -95,7 +95,7 @@ void main() {
     final more = tester.renderObject<RenderParagraph>(
       find
           .descendant(
-            of: control('3 more sources'),
+            of: control('4 more sources. Show all 6'),
             matching: find.byType(RichText),
           )
           .last,
@@ -143,7 +143,10 @@ void main() {
             final folded = count - shown.length;
             if (folded > 0) {
               // The sample chat's earlier answer may fold into a chip of the same count.
-              expect(control('$folded more sources'), findsWidgets);
+              expect(
+                control('$folded more sources. Show all $count'),
+                findsWidgets,
+              );
             } else {
               expect(find.textContaining(RegExp(r'^\+\d')), findsNothing);
             }

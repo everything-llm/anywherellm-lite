@@ -75,8 +75,15 @@ class AnswerBody extends StatelessWidget {
     const lineHeight = 1.5;
     final body = Type.sans(Type.chat, color: ink, height: lineHeight);
     final code = Type.mono(15, color: ink, height: 1.45);
-    TextStyle heading(double size) =>
-        Type.display(size, color: ink, height: 1.3);
+    // A model's headings are bold body text at every level, so a wordy answer's many headings
+    // never outshout the answer itself.
+    final heading = Type.sans(
+      Type.chat,
+      weight: FontWeight.w600,
+      color: ink,
+      height: lineHeight,
+    );
+    const headingPadding = EdgeInsets.only(top: 4);
     final border = BorderSide(color: t.line);
     final settings = AppScope.of(context).settings;
     final server = settings.connection?.uri;
@@ -119,15 +126,18 @@ class AnswerBody extends StatelessWidget {
         // A code block draws its own box; the package's default would set it on a square of
         // Material's card colour.
         codeblockDecoration: const BoxDecoration(),
-        h1: heading(22),
-        h2: heading(20),
-        h3: heading(18),
-        h4: heading(Type.chat),
-        h5: heading(Type.chat),
-        h6: heading(Type.chat),
-        h1Padding: const EdgeInsets.only(top: 6),
-        h2Padding: const EdgeInsets.only(top: 6),
-        h3Padding: const EdgeInsets.only(top: 4),
+        h1: heading,
+        h2: heading,
+        h3: heading,
+        h4: heading,
+        h5: heading,
+        h6: heading,
+        h1Padding: headingPadding,
+        h2Padding: headingPadding,
+        h3Padding: headingPadding,
+        h4Padding: headingPadding,
+        h5Padding: headingPadding,
+        h6Padding: headingPadding,
         em: body.copyWith(fontStyle: FontStyle.italic),
         strong: Type.sans(
           Type.chat,

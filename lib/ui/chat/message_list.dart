@@ -48,6 +48,11 @@ import '../widgets/scroll_fades.dart';
 /// streaming answer rebuilds only itself. Another chat opens at its newest turn, and a message
 /// sent scrolls there. Scrolled up past [_MessageListState._jumpFrom], a round button over the
 /// composer scrolls back to it.
+///
+/// A question sits 8 above its answer and each exchange is 28 below the one before. The latest
+/// answer sits on a tile; older answers are flat. Once a question has scrolled up out of view
+/// while its answer still runs under the top of the list, the question stays pinned there on one
+/// line, and tapping it scrolls back to it.
 class MessageList extends StatefulWidget {
   const MessageList({super.key, required this.onEdit, required this.onPutBack});
 
@@ -87,11 +92,97 @@ class _MessageListState extends State<MessageList> {
   /// state.
   final _waitingKey = GlobalKey();
 
+  /// The question pinned over the top of the list, or null.
+  final _pinned = ValueNotifier<Turn?>(null);
+
+  /// The list's area, which the turns' places are measured from.
+  final _area = GlobalKey();
+
+  /// Whether [_pinned] is to be worked out again after this frame.
+  bool _pinQueued = false;
+
+  /// How tall the pinned question's bar is, its rule included.
+  static const _pinBar = _PinnedQuestion.height + 1;
+
+  /// How far a question sits above its answer, and an exchange below the one before.
+  static const _toAnswer = 8.0;
+  static const _toExchange = 28.0;
+
   @override
   void dispose() {
     _scroll.dispose();
     _away.dispose();
+    _pinned.dispose();
     super.dispose();
+  }
+
+  /// Works out [_pinned] again once this frame is laid out, so the turns' places are current.
+  void _queuePin() {
+    if (_pinQueued) return;
+    _pinQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _pinQueued = false;
+      if (mounted) _pinned.value = _pinnedQuestion();
+    });
+  }
+
+  /// [turn]'s box and where its top sits under the top of the list, or null while it is not
+  /// laid out.
+  (RenderBox, double)? _placeOf(Turn turn) {
+    final area = _area.currentContext?.findRenderObject();
+    final box = _keyOf(turn).currentContext?.findRenderObject();
+    if (area is! RenderBox || box is! RenderBox || !box.attached) return null;
+    if (!area.hasSize || !box.hasSize) return null;
+    return (box, box.localToGlobal(Offset.zero, ancestor: area).dy);
+  }
+
+  /// The question whose answer runs under the pinned bar's place while the question itself sits
+  /// above it, out of view; null when the turn there is a question, or none is.
+  Turn? _pinnedQuestion() {
+    final turns = AppScope.of(context).chat.turns;
+    for (var at = turns.length - 1; at > 0; at--) {
+      final answer = turns[at];
+      final question = turns[at - 1];
+      if (answer.role == Role.user || question.role != Role.user) continue;
+      // Turns far below the view are not laid out; the first one up there that is, is.
+      if (_placeOf(answer) case (final box, final top)) {
+        if (top >= _pinBar) continue;
+        return top + box.size.height > _pinBar ? question : null;
+      }
+    }
+    return null;
+  }
+
+  /// Scrolls back to [question], whose bubble comes to rest where the list's padding starts.
+  /// A question far up a long answer is not laid out yet, so the list first brings its answer's
+  /// top into view, and finds the question from there.
+  void _toQuestion(Turn question) {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    final turns = AppScope.of(context).chat.turns;
+    final at = turns.indexOf(question);
+    if (at < 0) return;
+    // The list is reversed, so its offset counts up as older turns come down into view.
+    double to(double top) => (position.pixels - top).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if (_placeOf(question) case (_, final top)) {
+      final above = at == 0 ? 0.0 : _toExchange;
+      _scroll.glideTo(
+        context,
+        to(top + above - 12),
+        const Duration(milliseconds: 250),
+      );
+      return;
+    }
+    if (at + 1 >= turns.length) return;
+    if (_placeOf(turns[at + 1]) case (_, final top)) {
+      _scroll.jumpTo(to(top - position.viewportDimension / 2));
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _placeOf(question) != null) _toQuestion(question);
+      });
+    }
   }
 
   /// Follows the list's offset, which a scroll changes and so does the newest turn growing
@@ -105,6 +196,7 @@ class _MessageListState extends State<MessageList> {
     };
     if (metrics != null && metrics.axis == Axis.vertical) {
       _away.value = metrics.pixels > _jumpFrom;
+      _queuePin();
     }
     return false;
   }
@@ -152,6 +244,7 @@ class _MessageListState extends State<MessageList> {
     // when the system's text size changes while the chat shows.
     MediaQuery.textScalerOf(context);
     _follow(chat);
+    _queuePin();
     if (turns.isEmpty) {
       return _Empty(workspace: workspace.name);
     }
@@ -183,6 +276,7 @@ class _MessageListState extends State<MessageList> {
   Widget _turns(BuildContext context, List<Turn> turns) {
     final scope = AppScope.of(context);
     final chat = scope.chat;
+    final latest = turns.lastIndexWhere((t) => t.role != Role.user);
     // A pull down past the oldest turn reads the chat again.
     // The list is reversed, so a long chat opens at its newest turn; it is as tall as its turns
     // and sits at the top, so a short chat starts under the header, as the Lite prototype
@@ -204,7 +298,7 @@ class _MessageListState extends State<MessageList> {
             scrolledUp: _scrolledUp,
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
-                (context, i) => _turn(chat, turns, i),
+                (context, i) => _turn(chat, turns, i, latest: latest),
                 childCount: turns.length,
                 findChildIndexCallback: (key) {
                   if (key is! GlobalObjectKey) return null;
@@ -218,6 +312,7 @@ class _MessageListState extends State<MessageList> {
       ],
     );
     final top = Align(
+      key: _area,
       alignment: Alignment.topCenter,
       child: NotificationListener<Notification>(
         onNotification: _onScroll,
@@ -246,6 +341,20 @@ class _MessageListState extends State<MessageList> {
                 : const SizedBox.shrink(),
           ),
         ),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: ValueListenableBuilder(
+            valueListenable: _pinned,
+            builder: (context, question, _) => question == null
+                ? const SizedBox.shrink()
+                : _PinnedQuestion(
+                    question.text,
+                    onTap: () => _toQuestion(question),
+                  ),
+          ),
+        ),
       ],
     );
   }
@@ -257,12 +366,20 @@ class _MessageListState extends State<MessageList> {
     child: OnDeckView(onPutBack: widget.onPutBack),
   );
 
-  /// The [i]th turn from the newest.
-  Widget _turn(ChatController chat, List<Turn> turns, int i) {
+  /// The [i]th turn from the newest; [latest] is the place in [turns] of the latest answer.
+  Widget _turn(
+    ChatController chat,
+    List<Turn> turns,
+    int i, {
+    required int latest,
+  }) {
     final scope = AppScope.of(context);
-    final turn = turns[turns.length - 1 - i];
-    final first = i == turns.length - 1;
-    // Every turn is 14 from the one before.
+    final at = turns.length - 1 - i;
+    final turn = turns[at];
+    final first = at == 0;
+    final answers =
+        turn.role != Role.user && !first && turns[at - 1].role == Role.user;
+    final above = first ? 0.0 : (answers ? _toAnswer : _toExchange);
     return _Measured(
       key: _keyOf(turn),
       into: i == 0 ? _newest : null,
@@ -277,7 +394,7 @@ class _MessageListState extends State<MessageList> {
           child: _withWaiting(
             newest: i == 0,
             Padding(
-              padding: EdgeInsets.only(top: first ? 0 : 16),
+              padding: EdgeInsets.only(top: above),
               child: Rise(
                 child: turn.role == Role.user
                     ? ListenableBuilder(
@@ -304,7 +421,11 @@ class _MessageListState extends State<MessageList> {
                           },
                         ),
                       )
-                    : _Answer(turn, retry: i == 0 ? _retryOf(chat) : null),
+                    : _Answer(
+                        turn,
+                        retry: i == 0 ? _retryOf(chat) : null,
+                        latest: at == latest,
+                      ),
               ),
             ),
           ),
@@ -319,6 +440,90 @@ class _MessageListState extends State<MessageList> {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [turn, if (newest) _onDeck()],
   );
+}
+
+/// The latest answer's tile: [Tokens.tile] inside its [Tokens.tileEdge], on the tile's shadow,
+/// reaching [out] past the column on each side, its text inside the edge and [pad].
+class _OnTile extends StatelessWidget {
+  const _OnTile({required this.child});
+
+  final Widget child;
+
+  static const out = 8.0;
+  static const pad = 16.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return LayoutBuilder(
+      builder: (context, box) => OverflowBox(
+        fit: OverflowBoxFit.deferToChild,
+        minWidth: box.maxWidth + 2 * out,
+        maxWidth: box.maxWidth + 2 * out,
+        child: Container(
+          padding: const EdgeInsets.all(pad),
+          decoration: BoxDecoration(
+            color: t.tile,
+            border: Border.all(color: t.tileEdge),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: t.tileShadow,
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// The question of the answer being read, pinned over the top of the list once it has scrolled
+/// out of view: one line, cut short with an ellipsis, on the ground over a rule. Tapping it
+/// scrolls back to the question.
+class _PinnedQuestion extends StatelessWidget {
+  const _PinnedQuestion(this.text, {required this.onTap});
+
+  final String text;
+  final VoidCallback onTap;
+
+  /// Its height, without the rule under it.
+  static const height = 44.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final line = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: t.ground,
+        border: Border(bottom: BorderSide(color: t.line)),
+      ),
+      child: Tappable(
+        label: 'Back to the question: $line',
+        excludeSemantics: true,
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: height),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                AppIcon('arrowUp', size: IconSize.small, color: t.ink),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    line,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
+                    style: Type.sans(Type.chat, color: t.ink, height: 1.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// The round button over the composer that scrolls the chat back to its newest text: 48 across
@@ -797,16 +1002,24 @@ class _NoPictures extends StatelessWidget {
 }
 
 class _Answer extends StatelessWidget {
-  const _Answer(this.turn, {this.retry});
+  const _Answer(this.turn, {this.retry, this.latest = false});
 
   final Turn turn;
 
   /// Retry, on the chat's last answer only.
   final _Retry? retry;
 
+  /// Whether this is the chat's latest answer, which sits on a tile.
+  final bool latest;
+
   @override
-  Widget build(BuildContext context) =>
-      ListenableBuilder(listenable: turn, builder: _build);
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: turn,
+    builder: (context, _) {
+      final answer = _build(context, null);
+      return latest ? _OnTile(child: answer) : answer;
+    },
+  );
 
   Widget _build(BuildContext context, Widget? _) {
     final split = splitReasoning(turn.text, streaming: turn.streaming);
@@ -972,8 +1185,8 @@ class _Status extends StatelessWidget {
 
 /// The sources an answer drew on, in one line that never wraps, so the answer keeps its height:
 /// the first by name, as many as fit with at least [readable] characters of their names and at
-/// most three (four when there are only four), then the rest folded into one "+N" chip that
-/// lists them all in a sheet ([fitChips]). A web page is named by its site. On a wide window a
+/// most two, then the rest folded into one "+N more" chip that lists them all in a sheet
+/// ([fitChips]), so the answer never drowns in its sources. A web page is named by its site. On a wide window a
 /// chip picks its source, and +N the answer, in the Sources panel beside the chat instead.
 class _Citations extends StatelessWidget {
   const _Citations(this.turn);
@@ -981,7 +1194,7 @@ class _Citations extends StatelessWidget {
   final Turn turn;
 
   /// How many are named before the rest fold, at most.
-  static const shown = 3;
+  static const shown = 2;
 
   /// The fewest characters of a name a chip shows; one that can't fit them folds.
   static const readable = 8;
@@ -1006,7 +1219,7 @@ class _Citations extends StatelessWidget {
       }
 
       // Only the ones that may lead the line are measured; the rest can only fold.
-      final most = citations.length <= shown + 1 ? citations.length : shown;
+      final most = math.min(citations.length, shown);
       final names = [for (final c in citations.take(most)) citedName(c)];
       final whole = [
         for (final name in names)
@@ -1033,7 +1246,7 @@ class _Citations extends StatelessWidget {
         more: math.max(
           Tappable.touchSide,
           _MoreSources.frame +
-              widthOf('+${citations.length}', _MoreSources.style),
+              widthOf('+${citations.length} more', _MoreSources.style),
         ),
         width: box.maxWidth,
         gap: _Citation.apart,
@@ -1083,6 +1296,7 @@ class _Citations extends StatelessWidget {
                   if (folded)
                     _MoreSources(
                       citations.length - widths.length,
+                      of: citations.length,
                       open: open,
                       onTap: beside
                           ? () => shell.aside.value = AsideChoice(turn)
@@ -1100,9 +1314,17 @@ class _Citations extends StatelessWidget {
 
 /// How many more sources an answer has, which lists them all; lit while they show.
 class _MoreSources extends StatelessWidget {
-  const _MoreSources(this.count, {required this.open, required this.onTap});
+  const _MoreSources(
+    this.count, {
+    required this.of,
+    required this.open,
+    required this.onTap,
+  });
 
   final int count;
+
+  /// How many sources the answer has in all.
+  final int of;
   final bool open;
   final VoidCallback onTap;
 
@@ -1121,7 +1343,7 @@ class _MoreSources extends StatelessWidget {
     final t = Tokens.of(context);
     return Tappable(
       touchTarget: true,
-      label: '$count more sources',
+      label: '$count more sources. Show all $of',
       toggled: open,
       onTap: onTap,
       radius: BorderRadius.circular(99),
@@ -1135,7 +1357,7 @@ class _MoreSources extends StatelessWidget {
             widthFactor: 1,
             heightFactor: 1,
             child: Text(
-              '+$count',
+              '+$count more',
               style: style.copyWith(color: open ? t.accent : t.ink),
             ),
           ),

@@ -4,6 +4,7 @@ import 'package:anywherellm/core/prefs.dart';
 import 'package:anywherellm/core/server_models.dart';
 import 'package:anywherellm/ui/chat/answer_body.dart';
 import 'package:anywherellm/ui/chat/message_list.dart';
+import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -147,15 +148,25 @@ void main() {
       ChatMessage(role: Role.assistant, text: 'All of it. ' * 80),
       const ChatMessage(role: Role.user, text: 'Is that all?'),
       const ChatMessage(role: Role.assistant, text: 'Yes.'),
+      const ChatMessage(role: Role.user, text: 'Thanks.'),
+      const ChatMessage(role: Role.assistant, text: 'Any time.'),
     ];
     await pumpApp(tester, llm: llm);
     await tester.pumpAndSettle();
-    final answers = find.byType(AnswerBody);
-    expect(answers, findsNWidgets(2));
-    expect(
-      tester.getTopLeft(answers.last).dx,
-      tester.getTopLeft(answers.first).dx,
-    );
+    expect(find.byType(AnswerBody), findsNWidgets(3));
+    double start(String text) => tester
+        .getTopLeft(
+          find.ancestor(
+            of: find.textContaining(text, findRichText: true).first,
+            matching: find.byType(AnswerBody),
+          ),
+        )
+        .dx;
+    final wrapped = start('All of it.');
+    expect(start('Yes.'), wrapped);
+    // The latest answer sits on a tile 8 out past the column, its text inside the tile's edge
+    // and 16 of padding.
+    expect(start('Any time.'), wrapped - 8 + 1 + 16);
   });
 
   testWidgets('sending while scrolled up brings the new question into view', (
@@ -227,5 +238,34 @@ void main() {
     await h.chat.open('priorities');
     await tester.pumpAndSettle();
     expect(_scrolledUp(tester), 0);
+  });
+
+  testWidgets('a long answer pins its question, and a tap scrolls back to it', (
+    tester,
+  ) async {
+    await pumpApp(tester, llm: answering(_long));
+    await tester.pumpAndSettle();
+    // The chat opens at the end of the answer, its question scrolled up out of view.
+    final pinned = control('Back to the question: Where?');
+    expect(pinned, findsOneWidget);
+
+    await tester.tap(pinned);
+    await tester.pumpAndSettle();
+    expect(pinned, findsNothing);
+    final list = tester.getRect(find.byType(MessageList));
+    final question = tester.getRect(find.text('Where?'));
+    expect(question.top, greaterThanOrEqualTo(list.top));
+    expect(question.bottom, lessThanOrEqualTo(list.bottom));
+  });
+
+  testWidgets('a question in view is not pinned', (tester) async {
+    await pumpApp(tester, llm: answering('Here.'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is Tappable && w.label.startsWith('Back to the question'),
+      ),
+      findsNothing,
+    );
   });
 }

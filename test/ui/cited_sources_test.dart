@@ -33,7 +33,7 @@ void main() {
           if (find.text('site$i.example').evaluate().isNotEmpty) i,
       ];
       expect(shown, [for (var i = 1; i <= shown.length; i++) i]);
-      await tester.tap(control('${7 - shown.length} more sources'));
+      await tester.tap(control('${7 - shown.length} more sources. Show all 7'));
       await tester.pumpAndSettle();
       final sheet = find.byType(SheetFrame);
       expect(

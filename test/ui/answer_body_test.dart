@@ -164,10 +164,16 @@ void main() {
           );
         }
         // Nothing behind the rounded box paints a colour of its own: the package's wrapper of a
-        // code block is bare.
+        // code block is bare. The answer's own tile lies outside the answer's body.
         final behind = tester
             .widgetList<Container>(
-              find.ancestor(of: copy, matching: find.byType(Container)),
+              find.ancestor(
+                of: copy,
+                matching: find.descendant(
+                  of: find.byType(AnswerBody),
+                  matching: find.byType(Container),
+                ),
+              ),
             )
             .map((c) => c.decoration)
             .whereType<BoxDecoration>()
