@@ -714,8 +714,10 @@ class _Form extends StatelessWidget {
         AlertBox(AlertKind.bad, 'Can’t listen.', text: problem, inline: true),
       if (asking)
         _FormNote(
-          'Clear this chat? The model forgets it, and it no longer shows here or in AnythingLLM.',
-          action: 'Clear',
+          'Clear this chat?',
+          'The model forgets it, and it no longer shows here or in AnythingLLM. This can’t '
+              'be undone.',
+          action: 'Clear this chat',
           onAction: onClearChat,
           other: 'Keep',
           onOther: onKeepChat,
@@ -1202,41 +1204,58 @@ class RoundButton extends StatelessWidget {
   );
 }
 
-/// A line over the field about the message, with the [action] that undoes it.
+/// A question in the composer's note before something is done for good: [title], [text] under
+/// it, then [other] and [action] at its end, the second under the first when the line is too
+/// narrow for both.
 class _FormNote extends StatelessWidget {
   const _FormNote(
+    this.title,
     this.text, {
     required this.action,
     required this.onAction,
-    this.other,
-    this.onOther,
+    required this.other,
+    required this.onOther,
   });
 
+  final String title;
   final String text;
   final String action;
   final VoidCallback onAction;
 
-  /// A second answer beside [action], such as Keep.
-  final String? other;
-  final VoidCallback? onOther;
+  /// The answer beside [action] that leaves things as they are, such as Keep.
+  final String other;
+  final VoidCallback onOther;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Row(
-      children: [
-        Expanded(child: Text(text, style: Type.note(Tokens.of(context).ink))),
-        if (other case final other?) ...[
-          TextAction.plain(other, onOther!),
-          const SizedBox(width: 12),
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 2,
+        children: [
+          Semantics(
+            header: true,
+            child: Text(
+              title,
+              style: Type.caption(t.ink, weight: FontWeight.w600),
+            ),
+          ),
+          Text(text, style: Type.note(t.ink)),
+          Wrap(
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            children: [
+              TextAction.plain(other, onOther),
+              TextAction.plain(action, onAction),
+            ],
+          ),
         ],
-        if (other == null)
-          TextAction('close', action, onAction)
-        else
-          TextAction.plain(action, onAction),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
 /// In place of the composer until a key is saved.

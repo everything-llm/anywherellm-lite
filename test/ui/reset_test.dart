@@ -24,10 +24,17 @@ void main() {
     expect(h.chat.turns, isNotEmpty);
 
     await askReset(tester);
-    expect(find.textContaining('Clear this chat?'), findsOneWidget);
+    expect(find.text('Clear this chat?'), findsOneWidget);
+    expect(
+      find.text(
+        'The model forgets it, and it no longer shows here or in AnythingLLM. This can\u2019t '
+        'be undone.',
+      ),
+      findsOneWidget,
+    );
     expect(llm.calls, isNot(contains('resetChat:$thread')));
 
-    await tester.tap(find.text('Clear'));
+    await tester.tap(control('Clear this chat'));
     await tester.pumpAndSettle();
     expect(llm.calls, contains('resetChat:$thread'));
     expect(h.chat.turns, isEmpty);
