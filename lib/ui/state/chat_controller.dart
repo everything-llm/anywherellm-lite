@@ -528,6 +528,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
         error:
             'Let go of this answer to read the chat again. The server may still finish '
             'it; refresh again later to see it.',
+        letGo: true,
       );
     }
     notifyListeners();
@@ -1308,8 +1309,14 @@ class ChatController extends ChangeNotifier with FollowsServer {
 
   /// Ends [running], with [error] when it failed, unless it was already stopped or dropped. A
   /// [notSent] question never reached the server: it stays in the chat marked [Turn.notSent],
-  /// with no answer under it.
-  void _finish(_Running running, {String? error, bool notSent = false}) {
+  /// with no answer under it. An answer [refresh] let go of ([letGo]) is judged once its chat
+  /// is read again.
+  void _finish(
+    _Running running, {
+    String? error,
+    bool notSent = false,
+    bool letGo = false,
+  }) {
     if (!_runs.remove(running)) return;
     if ((running.thread, running.nameAs) case (final thread?, final message?)
         when !_named.contains(thread)) {
@@ -1343,8 +1350,9 @@ class ChatController extends ChangeNotifier with FollowsServer {
       _dropTurn(running.answer);
     }
     // Before telling anyone, so [working] holds while a chat has messages waiting. The answer
-    // [refresh] lets go of is judged once the chat is read again.
-    if (running.thread case final thread? when !_refreshing) {
+    // [refresh] lets go of is judged once the chat is read again; any other that ends while it
+    // reads is judged now.
+    if (running.thread case final thread? when !letGo) {
       _holdIfCut(thread);
     }
     _sendOnDeck();

@@ -100,6 +100,33 @@ void main() {
     );
   });
 
+  group('a refresh', () {
+    test(
+      'holds the messages waiting in another chat whose answer fails meanwhile',
+      () async {
+        final llm = _server()..hold = true;
+        final rig = await _started(llm);
+        await rig.chat.send('And next year?');
+        expect(rig.chat.sendWhenDone('And the year after?'), isTrue);
+        await rig.chat.open('priorities');
+        final gate = llm.gates['workspaces'] = Completer<void>();
+        final refreshing = rig.chat.refresh();
+        await pumpEventQueue();
+        llm.chats['budget']!.addError(const ApiException('The model failed.'));
+        await pumpEventQueue();
+        gate.complete();
+        await refreshing;
+        await pumpEventQueue();
+        expect(
+          llm.calls,
+          isNot(contains('streamChat:budget:And the year after?')),
+        );
+        await rig.chat.open('budget');
+        expect(rig.chat.onDeckHeld, isTrue);
+      },
+    );
+  });
+
   group('a draft', () {
     test('stopped while its thread is made is still named', () async {
       final llm = planningServer();
