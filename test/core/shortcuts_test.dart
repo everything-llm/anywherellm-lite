@@ -41,6 +41,13 @@ void main() {
     );
 
     expect(templated.expand('an email'), 'Rewrite an email in a formal tone.');
+    // A space before a mark goes, and the mark stays.
+    expect(
+      builtInPromptShortcuts
+          .singleWhere((shortcut) => shortcut.name == 'explain')
+          .expand('why the sky is blue ?'),
+      'Explain why the sky is blue? in plain words, as if to someone new to it.',
+    );
     expect(templated.expand(''), 'Rewrite in a formal tone.');
     expect(
       plain.expand('in three sentences'),

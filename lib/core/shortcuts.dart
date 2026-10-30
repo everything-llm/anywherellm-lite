@@ -62,7 +62,7 @@ class PromptShortcut {
     }
     return prompt
         .replaceAll('{text}', value)
-        .replaceAll(_spaceBeforeMark, r'$1')
+        .replaceAllMapped(_spaceBeforeMark, (mark) => mark[1]!)
         .trim();
   }
 
