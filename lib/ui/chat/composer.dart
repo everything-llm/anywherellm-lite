@@ -499,6 +499,12 @@ class ComposerState extends State<Composer> {
                     FocusManager.instance.primaryFocus?.unfocus();
                     scope.shell.togglePopup(Popup.attach);
                   },
+                  onReviewFiles: () {
+                    // On the tab that lists them, whichever tab showed last.
+                    setState(() => _shortcutsTab = false);
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    scope.shell.togglePopup(Popup.attach);
+                  },
                   onSelectShortcut: _selectShortcut,
                   onClearShortcut: _clearShortcut,
                   asking: _asking,
@@ -537,6 +543,7 @@ class _Form extends StatelessWidget {
     required this.shortcut,
     required this.problem,
     required this.onAttach,
+    required this.onReviewFiles,
     required this.onSelectShortcut,
     required this.onClearShortcut,
     required this.asking,
@@ -561,6 +568,9 @@ class _Form extends StatelessWidget {
 
   /// Opens the Attach sheet.
   final VoidCallback onAttach;
+
+  /// Opens the Attach sheet on the files attached.
+  final VoidCallback onReviewFiles;
   final ValueChanged<PromptShortcut> onSelectShortcut;
   final VoidCallback onClearShortcut;
 
@@ -761,7 +771,7 @@ class _Form extends StatelessWidget {
                   if (attached.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
-                      child: _FilesPill(attached.length, onTap: onAttach),
+                      child: _FilesPill(attached.length, onTap: onReviewFiles),
                     ),
                   // The model is a row in the Answer from sheet, since the row has room for
                   // one chip.

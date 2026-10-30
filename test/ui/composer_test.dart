@@ -586,6 +586,26 @@ void main() {
       },
     );
 
+    testWidgets('the files pill opens it on the files, not the shortcuts', (
+      tester,
+    ) async {
+      FilePickerPlatform.instance = FakePicker([contract()]);
+      await pumpApp(tester, llm: planningServer());
+      await tester.tap(
+        find.byTooltip('Add files or shortcuts to this message'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(control('Files'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Shortcuts').last);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      await tester.tap(control('1 file attached. Review'));
+      await tester.pumpAndSettle();
+      expect(_inSheet(find.text('contract.pdf')), findsOneWidget);
+    });
+
     testWidgets(
       'the sheet adds from the photos and says when the camera fails',
       (tester) async {
