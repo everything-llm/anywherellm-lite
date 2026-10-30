@@ -80,7 +80,13 @@ void main() {
     h.dictation!.available = false;
     await tester.tap(control('Dictate'));
     await tester.pump();
-    expect(find.text('Could not listen'), findsOneWidget);
+    expect(
+      find.text(
+        'Can’t listen. Speech input is off for this app. Turn it on in Android '
+        'settings.',
+      ),
+      findsOneWidget,
+    );
     expect(control('Dictate'), findsOneWidget);
   });
 

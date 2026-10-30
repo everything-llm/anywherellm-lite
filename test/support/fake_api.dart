@@ -412,9 +412,12 @@ class FakeAnythingLlm with FakeCalls implements AnythingLlmApi {
         );
       }, '$slug:$path:$pinned');
 
+  /// What [acceptedExtensions] answers: some of the types stock AnythingLLM reads.
+  Set<String> accepted = {'.md', '.txt', '.pdf', '.html', '.docx', '.csv'};
+
   @override
   Future<Set<String>> acceptedExtensions() =>
-      record('acceptedExtensions', () => {'.md', '.txt', '.pdf'});
+      record('acceptedExtensions', () => accepted);
 
   /// Files the server reads in as `<folder>/<name>.json`, `custom-documents` by default; the
   /// call is recorded as `upload:<name>`, or `upload:<folder>/<name>` into a folder named.

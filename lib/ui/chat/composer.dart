@@ -155,8 +155,7 @@ class ComposerState extends State<Composer> {
       setState(() {
         _listening = false;
         _micProblem =
-            'Speech recognition is not available, or the microphone is not allowed. '
-            "Allow it in Android's settings for the app.";
+            'Speech input is off for this app. Turn it on in Android settings.';
       });
     }
   }
@@ -373,19 +372,46 @@ class ComposerState extends State<Composer> {
     );
   }
 
+  /// What the files attached come to, together.
+  int get _held => _attached.fold(0, (sum, a) => sum + a.bytes.length);
+
   /// Attaches [files], unless another chat than [shown] is on screen once they are read. A file
-  /// that is too big or cannot be read is named in [_problem] instead.
+  /// that is not attached says why in [_problem] instead: one that would take the message past
+  /// [maxAttachmentBytes], a document of a type the server does not read (asked first, once
+  /// for the workspace), and one that cannot be read. One file alone is called This photo or
+  /// This file, as the board says it; of several, each is named.
   Future<void> _addFiles(List<XFile> files, Object shown) async {
     final added = <Attachment>[];
     final problems = <String>[];
+    final accepted = files.any((f) => attachmentMime(f.name) == documentMime)
+        ? await _scope.sources.acceptedTypes()
+        : null;
+    var held = _held;
     for (final file in files) {
+      final picture = attachmentMime(file.name) != documentMime;
+      final subject = files.length > 1
+          ? file.name
+          : picture
+          ? 'This photo'
+          : 'This file';
       try {
-        final wrong = attachmentProblem(file.name, await file.length());
-        if (wrong != null) {
+        if (attachedTypeProblem(file.name, accepted) case final wrong?) {
           problems.add(wrong);
           continue;
         }
-        added.add(Attachment.of(file.name, await file.readAsBytes()));
+        if (attachmentProblem(subject, await file.length(), held: held)
+            case final wrong?) {
+          problems.add(wrong);
+          continue;
+        }
+        final bytes = await file.readAsBytes();
+        if (attachmentProblem(subject, bytes.length, held: held)
+            case final wrong?) {
+          problems.add(wrong);
+          continue;
+        }
+        added.add(Attachment.of(file.name, bytes));
+        held += bytes.length;
       } on Exception {
         problems.add('${file.name} could not be read.');
       }
@@ -398,7 +424,7 @@ class ComposerState extends State<Composer> {
   bool _pasted(Uint8List bytes, String mime) {
     final name = pastedImageName(mime, [for (final a in _attached) a.name]);
     if (name == null) return false;
-    final wrong = attachmentProblem(name, bytes.length);
+    final wrong = attachmentProblem('This photo', bytes.length, held: _held);
     _add([if (wrong == null) Attachment.of(name, bytes)], [?wrong], _chatShown);
     return true;
   }
@@ -683,9 +709,9 @@ class _Form extends StatelessWidget {
     // What sits over the field, in the card's own padding.
     final notes = [
       if (problem case final problem?)
-        AlertBox(AlertKind.bad, 'Could not attach', text: problem),
+        AlertBox(AlertKind.bad, 'Not attached.', text: problem, inline: true),
       if (micProblem case final problem?)
-        AlertBox(AlertKind.bad, 'Could not listen', text: problem),
+        AlertBox(AlertKind.bad, 'Can’t listen.', text: problem, inline: true),
       if (asking)
         _FormNote(
           'Clear this chat? The model forgets it, and it no longer shows here or in AnythingLLM.',

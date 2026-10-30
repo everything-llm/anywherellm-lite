@@ -238,7 +238,7 @@ bool? finishesWhenDropped(ChatMode? mode, String message) =>
         null => null,
       };
 
-/// The largest file one message may carry.
+/// The most a message's files may come to, together.
 const maxAttachmentBytes = 20 * 1024 * 1024;
 
 const _imageTypes = {
@@ -272,11 +272,27 @@ String? pastedImageName(String mime, Iterable<String> taken) {
   }
 }
 
-/// Why [name], of [size] bytes, cannot go with a message, or null.
-String? attachmentProblem(String name, int size) => size > maxAttachmentBytes
-    ? '$name is ${sizeText(size)}; a message takes '
-          '${maxAttachmentBytes ~/ (1024 * 1024)} MB at most. Add it in Documents instead.'
-    : null;
+/// Why a file of [size] bytes, named [subject] (its name, or `This photo`), cannot go with a
+/// message that already holds [held] bytes of files, or null: a message takes
+/// [maxAttachmentBytes] at most, all its files together.
+String? attachmentProblem(String subject, int size, {int held = 0}) {
+  if (held + size <= maxAttachmentBytes) return null;
+  final already = held > 0
+      ? ', and the message already holds ${sizeText(held)}'
+      : '';
+  return '$subject is ${sizeText(size)}$already; a message takes '
+      '${maxAttachmentBytes ~/ (1024 * 1024)} MB at most. Add it in Documents instead.';
+}
+
+/// Why the server will not read the document [name] attached to a message, as [accepted], the
+/// extensions it reads, say, or null. A picture goes to the model, not the server's reader, and
+/// null [accepted], a server that has not said, decides for itself.
+String? attachedTypeProblem(String name, Set<String>? accepted) =>
+    attachmentMime(name) != documentMime ||
+        accepted == null ||
+        accepted.contains(extensionOf(name))
+    ? null
+    : 'This server can’t read $name. Save it as a PDF or spreadsheet, then attach it.';
 
 /// An answer split into the model's reasoning and the answer itself.
 typedef Reasoned = ({String reasoning, String answer, bool thinking});

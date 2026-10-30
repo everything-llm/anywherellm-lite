@@ -186,7 +186,13 @@ void main() {
           find.byWidgetPredicate((w) => w is Tappable && w.label == 'Dictate'),
         );
         await tester.pump();
-        expect(find.text('Could not listen'), findsOneWidget);
+        expect(
+          find.text(
+            'Can’t listen. Speech input is off for this app. Turn it on in Android '
+            'settings.',
+          ),
+          findsOneWidget,
+        );
         expect(tester.takeException(), isNull);
       });
 

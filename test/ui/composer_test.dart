@@ -136,6 +136,54 @@ void main() {
     expect(_inSheet(find.text('contract.pdf')), findsNothing);
   });
 
+  testWidgets('a file the server cannot read is not attached', (tester) async {
+    FilePickerPlatform.instance = FakePicker([Picked('Budget.numbers')]);
+    final llm = planningServer();
+    await pumpApp(tester, llm: llm);
+    await attachFiles(tester);
+    expect(
+      find.text(
+        'Not attached. This server can’t read Budget.numbers. Save it as a PDF or '
+        'spreadsheet, then attach it.',
+      ),
+      findsOneWidget,
+    );
+    expect(control('1 file attached. Review'), findsNothing);
+    expect(llm.calls.where((c) => c == 'acceptedExtensions'), hasLength(1));
+
+    // The server's types are asked once for the workspace.
+    FilePickerPlatform.instance = FakePicker([contract()]);
+    await attachFiles(tester);
+    expect(control('1 file attached. Review'), findsOneWidget);
+    expect(find.textContaining('Not attached.'), findsNothing);
+    expect(llm.calls.where((c) => c == 'acceptedExtensions'), hasLength(1));
+  });
+
+  testWidgets('a message holds 20 MB of files at most, all together', (
+    tester,
+  ) async {
+    const mb = 1024 * 1024;
+    FilePickerPlatform.instance = FakePicker([
+      Picked('a.pdf', List.filled(12 * mb, 1)),
+    ]);
+    await pumpApp(tester, llm: planningServer());
+    await attachFiles(tester);
+    expect(control('1 file attached. Review'), findsOneWidget);
+
+    FilePickerPlatform.instance = FakePicker([
+      Picked('b.pdf', List.filled(9 * mb, 1)),
+    ]);
+    await attachFiles(tester);
+    expect(
+      find.text(
+        'Not attached. This file is 9.0 MB, and the message already holds 12.0 MB; a '
+        'message takes 20 MB at most. Add it in Documents instead.',
+      ),
+      findsOneWidget,
+    );
+    expect(control('1 file attached. Review'), findsOneWidget);
+  });
+
   testWidgets("a picture from the keyboard's clipboard is attached", (
     tester,
   ) async {
@@ -628,7 +676,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(control('Done'));
         await tester.pumpAndSettle();
-        expect(find.text('Could not attach'), findsOneWidget);
+        expect(find.textContaining('Not attached.'), findsOneWidget);
         expect(find.textContaining('The camera did not open'), findsOneWidget);
         expect(control('1 file attached. Review'), findsOneWidget);
       },

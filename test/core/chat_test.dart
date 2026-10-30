@@ -52,8 +52,30 @@ void main() {
     test('a file over the cap is refused with its size', () {
       expect(attachmentProblem('a.pdf', maxAttachmentBytes), isNull);
       expect(
-        attachmentProblem('a.pdf', maxAttachmentBytes + 1),
-        startsWith('a.pdf is 20.0 MB'),
+        attachmentProblem('This photo', maxAttachmentBytes + 1),
+        'This photo is 20.0 MB; a message takes 20 MB at most. Add it in Documents '
+        'instead.',
+      );
+    });
+
+    test('the cap holds for all of a message\'s files together', () {
+      const mb = 1024 * 1024;
+      expect(attachmentProblem('b.pdf', 5 * mb, held: 15 * mb), isNull);
+      expect(
+        attachmentProblem('b.pdf', 6 * mb, held: 15 * mb),
+        startsWith('b.pdf is 6.0 MB, and the message already holds 15.0 MB;'),
+      );
+    });
+
+    test('a document of a type the server does not read is refused', () {
+      const read = {'.pdf', '.xlsx'};
+      expect(attachedTypeProblem('Budget.xlsx', read), isNull);
+      expect(attachedTypeProblem('photo.png', read), isNull);
+      expect(attachedTypeProblem('Budget.numbers', null), isNull);
+      expect(
+        attachedTypeProblem('Budget.numbers', read),
+        'This server can’t read Budget.numbers. Save it as a PDF or spreadsheet, then '
+        'attach it.',
       );
     });
 
