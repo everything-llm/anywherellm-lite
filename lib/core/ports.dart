@@ -74,13 +74,14 @@ abstract interface class AnythingLlmApi {
   /// The file extensions the server can read in, lower case with the dot: `.md`.
   Future<Set<String>> acceptedExtensions();
 
-  /// Sends [bytes] as the file [name] into the server's default library folder, with the
-  /// details in [meta], and returns the documents the server made of it. Attaches them to no
-  /// workspace.
+  /// Sends [bytes] as the file [name] into the library [folder], or the server's default one
+  /// when it is null, with the details in [meta], and returns the documents the server made of
+  /// it. Attaches them to no workspace.
   Future<List<DocEntry>> upload(
     String name,
     List<int> bytes, {
     DocMeta meta = const DocMeta(),
+    String? folder,
   });
 
   /// Has the server read in the web page at [url], with the details in [meta], and returns the
@@ -97,6 +98,24 @@ abstract interface class AnythingLlmApi {
     String text, {
     DocMeta meta = const DocMeta(),
   });
+
+  /// The server's library: each folder, in the server's order, with the documents in it.
+  Future<List<LibraryFolder>> libraryFolders();
+
+  /// Makes the library folder [name]. One that is there already is an [ApiException].
+  Future<void> createFolder(String name);
+
+  /// Moves each document [from] one `folder/name.json` path [to] another. Throws [ApiException]
+  /// when the server leaves one where it is, as it does each one a workspace uses.
+  Future<void> moveDocuments(List<({String from, String to})> moves);
+
+  /// Deletes the documents at [paths] from the server, and so from every workspace.
+  Future<void> deleteDocuments(List<String> paths);
+
+  /// Has workspace [slug] read the document at [path] whole with every answer, or only the
+  /// passages closest to the question: the server's pin. Only a document the workspace uses
+  /// has one.
+  Future<void> pinDocument(String slug, String path, {required bool pinned});
 
   /// Writes the workspace columns in [fields], such as `openAiPrompt` or `topN`, and leaves the
   /// rest as they are.

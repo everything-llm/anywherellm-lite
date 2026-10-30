@@ -220,14 +220,18 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     };
   }
 
+  /// A [folder] goes in the path, and the server makes it when it has none of that name.
   @override
   Future<List<DocEntry>> upload(
     String name,
     List<int> bytes, {
     DocMeta meta = const DocMeta(),
+    String? folder,
   }) async {
     final connection = _current;
-    const path = '/api/v1/document/upload';
+    final path = folder == null
+        ? '/api/v1/document/upload'
+        : '/api/v1/document/upload/${Uri.encodeComponent(folder)}';
     final body = await _call(connection, uploadTimeout, () async {
       final request =
           http.MultipartRequest('POST', Uri.parse('${connection.baseUrl}$path'))
@@ -273,6 +277,80 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
       refused: 'The server could not save $title.',
     ),
   );
+
+  /// The server lists each folder with its documents; a folder it lists without them is read on
+  /// its own.
+  @override
+  Future<List<LibraryFolder>> libraryFolders() async {
+    final listed = libraryFoldersOf(
+      _field(await _get('/api/v1/documents'), 'localFiles'),
+    );
+    return Future.wait([
+      for (final (name, docs) in listed)
+        docs == null ? _folder(name) : Future.value(LibraryFolder(name, docs)),
+    ]);
+  }
+
+  /// The library folder [name] with every document in it.
+  Future<LibraryFolder> _folder(String name) async => LibraryFolder(
+    name,
+    libraryDocsOf(
+      name,
+      _field(
+        await _get('/api/v1/documents/folder/${Uri.encodeComponent(name)}'),
+        'documents',
+      ),
+    ),
+  );
+
+  @override
+  Future<void> createFolder(String name) => _send(
+    'POST',
+    '/api/v1/document/create-folder',
+    {'name': name},
+    refused: 'The server did not make the folder $name.',
+  );
+
+  /// The server answers success with a `message` when it left files where they were, as it does
+  /// each one a workspace uses.
+  @override
+  Future<void> moveDocuments(List<({String from, String to})> moves) async {
+    final body = await _send('POST', '/api/v1/document/move-files', {
+      'files': [
+        for (final (:from, :to) in moves) {'from': from, 'to': to},
+      ],
+    }, refused: 'The server did not move the document.');
+    if (saidIn(body) != null) throw const ApiException(notMoved);
+  }
+
+  @override
+  Future<void> deleteDocuments(List<String> paths) => _send(
+    'DELETE',
+    '/api/v1/system/remove-documents',
+    {'names': paths},
+    refused: 'The server did not delete the document.',
+  );
+
+  /// The server answers a document the workspace does not use with a bare 404.
+  @override
+  Future<void> pinDocument(
+    String slug,
+    String path, {
+    required bool pinned,
+  }) async {
+    try {
+      await _send('POST', '${_workspace(slug)}/update-pin', {
+        'docPath': path,
+        'pinStatus': pinned,
+      });
+    } on ApiException catch (error) {
+      if (error.status != 404) rethrow;
+      throw const ApiException(
+        'This workspace does not use the document.',
+        status: 404,
+      );
+    }
+  }
 
   /// The documents an upload, a link or pasted text made, from the server's answer [body].
   List<DocEntry> _documents(Object? body) =>
@@ -739,6 +817,12 @@ Map<String, String> attachmentJson(Attachment attachment) {
     'contentString': 'data:$type;base64,${base64Encode(attachment.bytes)}',
   };
 }
+
+/// Why a document a workspace uses stays where it is: the server moves only the ones no
+/// workspace uses.
+const notMoved =
+    'A workspace uses it, and the server moves only documents no workspace uses. Switch it off '
+    'there first.';
 
 /// The most bytes one image in an answer may take.
 const maxImageBytes = 16 * 1024 * 1024;

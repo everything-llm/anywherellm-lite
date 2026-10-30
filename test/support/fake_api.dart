@@ -89,7 +89,11 @@ class FakeAnythingLlm with FakeCalls implements AnythingLlmApi {
   ];
 
   /// Every document the server holds, by path, embedded or not.
-  final Map<String, WorkspaceDoc> library = {};
+  final Map<String, LibraryDoc> library = {};
+
+  /// The library's folders, in the order [library] lists them; a document's folder not named
+  /// here follows them.
+  final List<String> folders = ['custom-documents'];
 
   /// What [systemSettings] answers.
   Map<String, Object?> system = const {
@@ -322,25 +326,113 @@ class FakeAnythingLlm with FakeCalls implements AnythingLlmApi {
     final docs = _space(slug).docs;
     docs.removeWhere((d) => deletes.contains(d.path));
     for (final path in adds) {
-      if (!docs.any((d) => d.path == path)) docs.add(library[path]!);
+      if (!docs.any((d) => d.path == path)) docs.add(embedded(library[path]!));
     }
   }, '+${adds.join(',')}-${deletes.join(',')}');
+
+  /// Each folder of [folders], then any other a document is in, with its documents in the order
+  /// they were added.
+  @override
+  Future<List<LibraryFolder>> libraryFolders() => record('libraryFolders', () {
+    final names = {
+      ...folders,
+      for (final path in library.keys) docFolder(path),
+    };
+    return [
+      for (final name in names)
+        LibraryFolder(name, [
+          for (final doc in library.values)
+            if (docFolder(doc.path) == name) doc,
+        ]),
+    ];
+  });
+
+  @override
+  Future<void> createFolder(String name) => record('createFolder', () {
+    if (folders.contains(name)) {
+      throw const ApiException('Folder by that name already exists');
+    }
+    folders.add(name);
+  }, name);
+
+  /// Leaves every document where it is when a workspace uses one of them, as the server leaves
+  /// that one.
+  @override
+  Future<void> moveDocuments(List<({String from, String to})> moves) =>
+      record('moveDocuments', () {
+        final used = {
+          for (final w in spaces)
+            for (final d in w.docs) d.path,
+        };
+        if (moves.any((m) => used.contains(m.from))) {
+          throw const ApiException(movedNot);
+        }
+        for (final (:from, :to) in moves) {
+          final doc = library.remove(from)!;
+          library[to] = LibraryDoc(
+            path: to,
+            title: doc.title,
+            words: doc.words,
+            web: doc.web,
+            link: doc.link,
+            fileName: doc.fileName,
+            published: doc.published,
+          );
+          if (!folders.contains(docFolder(to))) folders.add(docFolder(to));
+        }
+      }, [for (final m in moves) '${m.from}>${m.to}'].join(','));
+
+  @override
+  Future<void> deleteDocuments(List<String> paths) =>
+      record('deleteDocuments', () {
+        library.removeWhere((path, _) => paths.contains(path));
+        for (final w in spaces) {
+          w.docs.removeWhere((d) => paths.contains(d.path));
+        }
+      }, paths.join(','));
+
+  @override
+  Future<void> pinDocument(String slug, String path, {required bool pinned}) =>
+      record('pinDocument', () {
+        final docs = _space(slug).docs;
+        final at = docs.indexWhere((d) => d.path == path);
+        if (at < 0) {
+          throw const ApiException(
+            'This workspace does not use the document.',
+            status: 404,
+          );
+        }
+        final doc = docs[at];
+        docs[at] = WorkspaceDoc(
+          path: doc.path,
+          title: doc.title,
+          words: doc.words,
+          web: doc.web,
+          pinned: pinned,
+        );
+      }, '$slug:$path:$pinned');
 
   @override
   Future<Set<String>> acceptedExtensions() =>
       record('acceptedExtensions', () => {'.md', '.txt', '.pdf'});
 
-  /// Files the server reads in as `<folder>/<name>.json`, `custom-documents` by default.
+  /// Files the server reads in as `<folder>/<name>.json`, `custom-documents` by default; the
+  /// call is recorded as `upload:<name>`, or `upload:<folder>/<name>` into a folder named.
   @override
   Future<List<DocEntry>> upload(
     String name,
     List<int> bytes, {
     DocMeta meta = const DocMeta(),
+    String? folder,
   }) => record('upload', () {
-    final doc = DocEntry(folder: 'custom-documents', name: '$name.json');
-    _keep(doc, name, meta, words: bytes.length, web: false);
+    final doc = DocEntry(
+      folder: folder ?? 'custom-documents',
+      name: '$name.json',
+    );
+    if (!folders.contains(doc.folder)) folders.add(doc.folder);
+    _keep(doc, name, meta, words: bytes.length, web: false, file: name);
     return [doc];
-  }, name);
+  }, folder == null ? name : '$folder/$name');
 
   /// A page the server reads in as `custom-documents/url-<host>.json`.
   @override
@@ -385,13 +477,16 @@ class FakeAnythingLlm with FakeCalls implements AnythingLlmApi {
     DocMeta meta, {
     required int words,
     required bool web,
+    String? file,
   }) {
     metaOf[doc.path] = meta;
-    library[doc.path] = WorkspaceDoc(
+    library[doc.path] = LibraryDoc(
       path: doc.path,
       title: meta.title.trim().isEmpty ? title : meta.title.trim(),
       words: words,
       web: web,
+      link: web ? 'https://$title' : null,
+      fileName: file,
     );
   }
 
@@ -487,16 +582,37 @@ class FakeAnythingLlm with FakeCalls implements AnythingLlmApi {
   Future<List<int>> exportChats() => record('exportChats', () => exported);
 }
 
-/// A document in the server's library, ready to embed or put in a workspace.
-WorkspaceDoc libraryDoc(FakeAnythingLlm llm, String title, {int? words = 120}) {
-  final doc = WorkspaceDoc(
-    path: 'custom-documents/$title.json',
+/// Why the fake leaves a document a workspace uses where it is, as the server does.
+const movedNot = 'A workspace uses it.';
+
+/// A document in the server's library, in [folder], as a workspace holds it once embedded,
+/// ready to put in a workspace's docs.
+WorkspaceDoc libraryDoc(
+  FakeAnythingLlm llm,
+  String title, {
+  int? words = 120,
+  String folder = 'custom-documents',
+  String? published,
+}) {
+  final doc = LibraryDoc(
+    path: '$folder/$title.json',
     title: title,
     words: words,
+    fileName: title,
+    published: published,
   );
   llm.library[doc.path] = doc;
-  return doc;
+  if (!llm.folders.contains(folder)) llm.folders.add(folder);
+  return embedded(doc);
 }
+
+/// [doc] as a workspace holds it once embedded.
+WorkspaceDoc embedded(LibraryDoc doc) => WorkspaceDoc(
+  path: doc.path,
+  title: doc.title,
+  words: doc.words,
+  web: doc.web,
+);
 
 /// A server with the mockup's workspaces: Q3 planning with two chats and two files, and an empty
 /// Household.

@@ -16,17 +16,29 @@ const sampleServerConnection = Connection(
   apiKey: 'K1',
 );
 
-WorkspaceDoc _doc(FakeAnythingLlm llm, String name, int words, {String? web}) {
-  final doc = WorkspaceDoc(
-    path: web == null
-        ? 'custom-documents/$name.json'
-        : 'custom-documents/url-$web-0f3a.json',
+WorkspaceDoc _doc(
+  FakeAnythingLlm llm,
+  String name,
+  int words, {
+  String? web,
+  String folder = 'custom-documents',
+}) {
+  if (!llm.folders.contains(folder)) llm.folders.add(folder);
+  final doc = LibraryDoc(
+    path: web == null ? '$folder/$name.json' : '$folder/url-$web-0f3a.json',
     title: name,
     words: words,
+    web: web != null,
+    link: web == null ? null : 'https://$web/',
+    fileName: web == null ? name : null,
+    published: '10/12/2026, 9:30:00 AM',
   );
   llm.library[doc.path] = doc;
-  return doc;
+  return embedded(doc);
 }
+
+/// The folder of the household's papers, as the prototype's Documents groups them.
+const _bills = 'Bills and papers';
 
 /// How the prototype's sample answers ran.
 const _metrics = AnswerMetrics(
@@ -48,11 +60,17 @@ FakeAnythingLlm sampleServer() {
       'Household',
       threads: [const Thread(slug: 'errands', name: 'Weekend errands')],
       docs: [
-        _doc(llm, 'Boiler manual.pdf', 9300),
-        _doc(llm, 'Home insurance.pdf', 6120),
-        _doc(llm, 'Lease agreement.docx', 3480),
-        _doc(llm, 'Example Heating prices', 640, web: 'example-heating.com'),
-        _doc(llm, 'Recycling schedule.pdf', 410),
+        _doc(llm, 'Home insurance.pdf', 6120, folder: _bills),
+        _doc(llm, 'Lease agreement.docx', 3480, folder: _bills),
+        _doc(llm, 'Recycling schedule.pdf', 410, folder: _bills),
+        _doc(
+          llm,
+          'Example Heating prices',
+          640,
+          web: 'example-heating.com',
+          folder: _bills,
+        ),
+        _doc(llm, 'Boiler manual.pdf', 9300, folder: 'Manuals'),
       ],
       prompt:
           'You help run the household. Answer from the documents and say which '

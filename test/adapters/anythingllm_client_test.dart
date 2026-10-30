@@ -428,6 +428,216 @@ void main() {
     });
   });
 
+  group('library', () {
+    test('lists each folder with its documents and their details', () async {
+      final seen = <http.Request>[];
+      final folders = await _answering({
+        'localFiles': {
+          'name': 'documents',
+          'type': 'folder',
+          'items': [
+            {
+              'name': 'custom-documents',
+              'type': 'folder',
+              'items': [
+                {
+                  'name': 'notes.md-1f2e.json',
+                  'type': 'file',
+                  'url': 'file:///app/collector/hotdir/notes.md',
+                  'title': 'Meeting notes',
+                  'chunkSource': '',
+                  'published': '1/16/2024, 3:07:00 PM',
+                  'wordCount': 93,
+                  'pinnedWorkspaces': [],
+                },
+                {
+                  'name': 'url-example.com-9a.json',
+                  'type': 'file',
+                  'url': 'file://example_com.html',
+                  'title': 'example_com.html',
+                  'chunkSource': 'link://https://example.com/',
+                  'wordCount': '12',
+                },
+                {'type': 'file'},
+              ],
+            },
+            {'name': 'Manuals', 'type': 'folder', 'items': []},
+          ],
+        },
+      }, seen: seen).libraryFolders();
+      expect(seen.single.url.path, '/api/v1/documents');
+      expect(folders.map((f) => (f.name, f.docs.length)), [
+        ('custom-documents', 2),
+        ('Manuals', 0),
+      ]);
+      final [notes, page] = folders.first.docs;
+      expect(
+        (notes.path, notes.title, notes.words, notes.web, notes.link),
+        (
+          'custom-documents/notes.md-1f2e.json',
+          'Meeting notes',
+          93,
+          false,
+          null,
+        ),
+      );
+      expect(notes.fileName, 'notes.md');
+      expect(notes.published, '1/16/2024, 3:07:00 PM');
+      expect(
+        (page.web, page.link, page.words),
+        (true, 'https://example.com/', 12),
+      );
+    });
+
+    test('a folder listed without its documents is read on its own', () async {
+      final seen = <http.Request>[];
+      final folders = await _api((request) async {
+        seen.add(request);
+        return http.Response(
+          jsonEncode(
+            request.url.path == '/api/v1/documents'
+                ? {
+                    'localFiles': {
+                      'items': [
+                        {'name': 'Bills and papers', 'type': 'folder'},
+                      ],
+                    },
+                  }
+                : {
+                    'folder': 'Bills and papers',
+                    'documents': [
+                      {'name': 'lease.docx-3.json', 'type': 'file'},
+                    ],
+                  },
+          ),
+          200,
+        );
+      }).libraryFolders();
+      expect(seen.map((r) => r.url.path), [
+        '/api/v1/documents',
+        '/api/v1/documents/folder/Bills%20and%20papers',
+      ]);
+      expect(
+        folders.single.docs.single.path,
+        'Bills and papers/lease.docx-3.json',
+      );
+      expect(folders.single.docs.single.title, 'lease.docx-3.json');
+    });
+
+    test('an upload into a folder names it in the path', () async {
+      final seen = <http.Request>[];
+      await _answering({
+        'success': true,
+        'documents': [],
+      }, seen: seen).upload('a.md', const [1], folder: 'Bills and papers');
+      expect(
+        seen.single.url.path,
+        '/api/v1/document/upload/Bills%20and%20papers',
+      );
+    });
+
+    test('a folder is made by name', () async {
+      final seen = <http.Request>[];
+      await _answering({
+        'success': true,
+        'message': null,
+      }, seen: seen).createFolder('Manuals');
+      expect(seen.single.method, 'POST');
+      expect(seen.single.url.path, '/api/v1/document/create-folder');
+      expect(jsonDecode(seen.single.body), {'name': 'Manuals'});
+    });
+
+    test(
+      'a folder already there is refused with the server\'s words',
+      () async {
+        final error = await _failure(
+          _answering({
+            'success': false,
+            'message': 'Folder by that name already exists',
+          }, status: 500).createFolder('Manuals'),
+        );
+        expect(error.message, 'Folder by that name already exists');
+      },
+    );
+
+    test('a move posts each document from one path to another', () async {
+      final seen = <http.Request>[];
+      await _answering({
+        'success': true,
+        'message': null,
+      }, seen: seen).moveDocuments([
+        (from: 'custom-documents/a.json', to: 'Manuals/a.json'),
+      ]);
+      expect(seen.single.url.path, '/api/v1/document/move-files');
+      expect(jsonDecode(seen.single.body), {
+        'files': [
+          {'from': 'custom-documents/a.json', 'to': 'Manuals/a.json'},
+        ],
+      });
+    });
+
+    test(
+      'a move the server leaves undone is a failure that says why',
+      () async {
+        final error = await _failure(
+          _answering({
+            'success': true,
+            'message': '1/1 files not moved. Unembed them from all workspaces.',
+          }).moveDocuments([(from: 'a/b.json', to: 'c/b.json')]),
+        );
+        expect(error.message, notMoved);
+      },
+    );
+
+    test('a delete sends the paths by name', () async {
+      final seen = <http.Request>[];
+      await _answering({
+        'success': true,
+        'message': 'Documents removed successfully',
+      }, seen: seen).deleteDocuments(['custom-documents/a.json']);
+      expect(seen.single.method, 'DELETE');
+      expect(seen.single.url.path, '/api/v1/system/remove-documents');
+      expect(jsonDecode(seen.single.body), {
+        'names': ['custom-documents/a.json'],
+      });
+    });
+
+    test('Read in full pins the document in the workspace', () async {
+      final seen = <http.Request>[];
+      await _answering({
+        'message': 'Pin status updated successfully',
+      }, seen: seen).pinDocument('w', 'custom-documents/a.json', pinned: true);
+      expect(seen.single.url.path, '/api/v1/workspace/w/update-pin');
+      expect(jsonDecode(seen.single.body), {
+        'docPath': 'custom-documents/a.json',
+        'pinStatus': true,
+      });
+    });
+
+    test('a pin on a document the workspace does not use says so', () async {
+      final error = await _failure(
+        _api((_) async => http.Response('Not Found', 404))
+            .pinDocument('w', 'a/b.json', pinned: true),
+      );
+      expect(error.message, 'This workspace does not use the document.');
+    });
+
+    test('a workspace\'s documents say whether they are pinned', () async {
+      final w = await _answering({
+        'workspace': [
+          {
+            'slug': 'w',
+            'documents': [
+              {'docpath': 'f/a.json', 'pinned': true, 'metadata': '{}'},
+              {'docpath': 'f/b.json', 'pinned': false},
+            ],
+          },
+        ],
+      }).workspace('w');
+      expect(w.documents.map((d) => d.pinned), [true, false]);
+    });
+  });
+
   group('workspace and chat writes', () {
     test('a new workspace posts its name and reads the answer', () async {
       final seen = <http.Request>[];

@@ -408,10 +408,12 @@ class WorkspaceDoc {
     required this.title,
     this.words,
     this.web,
+    this.pinned = false,
   });
 
   /// The `metadata` field is the document's own JSON as a string. Its `chunkSource` is
-  /// `link://<url>` for a web page and empty for any other document.
+  /// `link://<url>` for a web page and empty for any other document. `pinned` is the
+  /// workspace's own column.
   factory WorkspaceDoc.fromJson(Map<String, dynamic> json) {
     final path = _text(json, 'docpath');
     final metadata = switch (json['metadata']) {
@@ -432,6 +434,7 @@ class WorkspaceDoc {
         final String source => _linkOf(source) != null,
         _ => null,
       },
+      pinned: json['pinned'] == true || json['pinned'] == 1,
     );
   }
 
@@ -442,7 +445,94 @@ class WorkspaceDoc {
 
   /// Whether it is a web page, or null when its metadata does not say.
   final bool? web;
+
+  /// Whether the workspace reads it in full with every answer, rather than only the passages
+  /// closest to the question: the server's pin.
+  final bool pinned;
 }
+
+/// A document in the server's library, embedded in any workspace or none, with the details its
+/// own JSON keeps.
+class LibraryDoc {
+  const LibraryDoc({
+    required this.path,
+    required this.title,
+    this.words,
+    this.web,
+    this.link,
+    this.fileName,
+    this.published,
+  });
+
+  /// One item of [folder]'s list: its `name` is the stored file, and the rest is the document's
+  /// own JSON less its text. Null for an item with no name, or one that is not a file.
+  static LibraryDoc? fromJson(String folder, Map<String, dynamic> json) {
+    final name = _text(json, 'name');
+    final type = json['type'];
+    if (name.isEmpty || (type != null && type != 'file')) return null;
+    final source = json['chunkSource'];
+    final link = _linkOf(source);
+    final url = _text(json, 'url');
+    return LibraryDoc(
+      path: '$folder/$name',
+      title: _known(json, 'title') ?? name,
+      words: _asInt(json['wordCount']),
+      web: source is String ? link != null : null,
+      link: link,
+      fileName: url.startsWith('file://') && !url.endsWith('/')
+          ? docName(url)
+          : null,
+      published: _known(json, 'published'),
+    );
+  }
+
+  /// `folder/name.json`, as workspaces name it.
+  final String path;
+  final String title;
+  final int? words;
+
+  /// Whether it is a web page, or null when its details do not say.
+  final bool? web;
+
+  /// The address a web page was read from, or null for any other document.
+  final String? link;
+
+  /// The name of the file it was read in from, the last part of its `file://` address, or null
+  /// when it names none.
+  final String? fileName;
+
+  /// When the server read it in, as the server wrote it: its own clock's `toLocaleString`, such as
+  /// `1/16/2024, 3:07:00 PM`.
+  final String? published;
+}
+
+/// A folder of the server's library and the documents in it.
+class LibraryFolder {
+  const LibraryFolder(this.name, this.docs);
+
+  final String name;
+  final List<LibraryDoc> docs;
+}
+
+/// The folders of `GET /v1/documents`' `localFiles`, in the server's order, each with its
+/// documents, or with null in their place where the server left them out, to be read with
+/// `documents/folder/{name}`.
+List<(String, List<LibraryDoc>?)> libraryFoldersOf(Object? localFiles) {
+  final folders = <(String, List<LibraryDoc>?)>[];
+  if (localFiles is! Map) return folders;
+  for (final folder in jsonObjects(localFiles['items'])) {
+    final name = _text(folder, 'name');
+    if (name.isEmpty || folder['type'] == 'file') continue;
+    final items = folder['items'];
+    folders.add((name, items is List ? libraryDocsOf(name, items) : null));
+  }
+  return folders;
+}
+
+/// The documents of [folder] in the list [items].
+List<LibraryDoc> libraryDocsOf(String folder, Object? items) => [
+  for (final item in jsonObjects(items)) ?LibraryDoc.fromJson(folder, item),
+];
 
 /// The details the server keeps with a document, given when it is added. An empty field is left
 /// for the server to fill.
