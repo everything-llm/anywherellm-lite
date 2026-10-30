@@ -6,6 +6,7 @@ import 'package:anywherellm/core/connection.dart';
 import 'package:anywherellm/core/outputs.dart';
 import 'package:anywherellm/core/ports.dart';
 import 'package:anywherellm/core/server_models.dart';
+import 'package:anywherellm/core/users.dart';
 
 import 'fake_calls.dart';
 
@@ -17,6 +18,7 @@ class FakeWorkspace {
   FakeWorkspace(
     this.slug,
     this.name, {
+    this.id,
     List<Thread>? threads,
     List<WorkspaceDoc>? docs,
     this.prompt,
@@ -27,6 +29,9 @@ class FakeWorkspace {
 
   String slug;
   String name;
+
+  /// The server's number for it, which [FakeAnythingLlm.members] is keyed by.
+  final int? id;
   final List<Thread> threads;
   final List<WorkspaceDoc> docs;
   String? prompt;
@@ -134,6 +139,26 @@ class FakeAnythingLlm with FakeCalls implements AnythingLlmApi {
   /// The slug [renameWorkspace] gives the workspace, when set. The server keeps it otherwise.
   String? renamedSlug;
 
+  /// Whether the server has several users, which [multiUser] answers.
+  bool several = false;
+
+  /// What [users] answers on a server with [several] users.
+  List<ServerUser> people = const [];
+
+  /// The users each workspace lists, by [FakeWorkspace.id]; [workspaceUsers] answers none for
+  /// one not here.
+  final Map<int, List<WorkspaceMember>> members = {};
+
+  /// The user each chat was made as by [createThread], by its slug, null for none.
+  final Map<String, int?> madeAs = {};
+
+  /// The user the last message asked was sent as, or null for none.
+  int? lastUserId;
+
+  /// What [exportChats] answers.
+  List<int> exported =
+      'id,workspace,prompt,response\n1,Q3 planning,Hi,Hello\n'.codeUnits;
+
   var _made = 0;
 
   FakeWorkspace _space(String slug) => spaces.firstWhere(
@@ -154,7 +179,12 @@ class FakeAnythingLlm with FakeCalls implements AnythingLlmApi {
     'workspaces',
     () => [
       for (final w in spaces)
-        Workspace(slug: w.slug, name: w.name, threads: [...w.threads]),
+        Workspace(
+          slug: w.slug,
+          name: w.name,
+          id: w.id,
+          threads: [...w.threads],
+        ),
     ],
   );
 
@@ -200,11 +230,13 @@ class FakeAnythingLlm with FakeCalls implements AnythingLlmApi {
   }, slug);
 
   @override
-  Future<Thread> createThread(String slug) => record('createThread', () {
-    final made = Thread(slug: 'th-${++_made}', name: newChatName);
-    _space(slug).threads.add(made);
-    return made;
-  }, slug);
+  Future<Thread> createThread(String slug, {int? userId}) =>
+      record('createThread', () {
+        final made = Thread(slug: 'th-${++_made}', name: newChatName);
+        _space(slug).threads.add(made);
+        madeAs[made.slug] = userId;
+        return made;
+      }, slug);
 
   @override
   Future<void> renameThread(String slug, String thread, String name) =>
@@ -255,11 +287,13 @@ class FakeAnythingLlm with FakeCalls implements AnythingLlmApi {
     String message, {
     List<Attachment> attachments = const [],
     ChatMode? mode,
+    int? userId,
   }) {
     final key = _chatOf(slug, thread);
     calls.add('streamChat:$key:$message');
     lastAttachments = attachments;
     lastMode = mode;
+    lastUserId = userId;
     final error = errors['streamChat'];
     if (error != null) return Stream.error(error);
     if (hold) {
@@ -429,6 +463,28 @@ class FakeAnythingLlm with FakeCalls implements AnythingLlmApi {
   @override
   Future<Map<String, Object?>> systemSettings() =>
       record('systemSettings', () => system);
+
+  @override
+  Future<bool> multiUser() => record('multiUser', () => several);
+
+  /// A single-user server refuses, as the server answers HTTP 401.
+  @override
+  Future<List<ServerUser>> users() => record('users', () {
+    if (!several) {
+      throw const ApiException('The server rejected the key.', status: 401);
+    }
+    return people;
+  });
+
+  @override
+  Future<List<WorkspaceMember>> workspaceUsers(int workspaceId) => record(
+    'workspaceUsers',
+    () => members[workspaceId] ?? const [],
+    '$workspaceId',
+  );
+
+  @override
+  Future<List<int>> exportChats() => record('exportChats', () => exported);
 }
 
 /// A document in the server's library, ready to embed or put in a workspace.

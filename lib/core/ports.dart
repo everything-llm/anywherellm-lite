@@ -4,6 +4,7 @@ import 'chat.dart';
 import 'connection.dart';
 import 'prefs.dart';
 import 'server_models.dart';
+import 'users.dart';
 
 export 'errors.dart';
 
@@ -31,8 +32,8 @@ abstract interface class AnythingLlmApi {
   /// Deletes the workspace with its chats. Its documents stay in the library.
   Future<void> deleteWorkspace(String slug);
 
-  /// A new chat named [newChatName].
-  Future<Thread> createThread(String slug);
+  /// A new chat named [newChatName], saved as user [userId] on a multi-user server when given.
+  Future<Thread> createThread(String slug, {int? userId});
 
   Future<void> renameThread(String slug, String thread, String name);
 
@@ -45,15 +46,17 @@ abstract interface class AnythingLlmApi {
   Future<List<ChatMessage>> history(String slug, String? thread);
 
   /// Asks [message] in the chat, with [attachments] for this message only, and streams the
-  /// answer in [mode], or in the workspace's own chat mode when it is null. The stream fails
-  /// with [ApiException]. Cancelling the subscription lets go of the answer, which stops it,
-  /// though an agent may still finish it and save it to the chat.
+  /// answer in [mode], or in the workspace's own chat mode when it is null. On a multi-user
+  /// server the exchange is saved as user [userId] when given. The stream fails with
+  /// [ApiException]. Cancelling the subscription lets go of the answer, which stops it, though
+  /// an agent may still finish it and save it to the chat.
   Stream<ChatEvent> streamChat(
     String slug,
     String? thread,
     String message, {
     List<Attachment> attachments = const [],
     ChatMode? mode,
+    int? userId,
   });
 
   /// Clears the chat's history: the model no longer sees its exchanges, and history no longer
@@ -118,6 +121,19 @@ abstract interface class AnythingLlmApi {
 
   /// How many vectors the server's vector database holds, across every workspace.
   Future<int> vectorCount();
+
+  /// Whether the server has several users, each with their own login.
+  Future<bool> multiUser();
+
+  /// Everyone with an account on a multi-user server. A single-user server refuses.
+  Future<List<ServerUser>> users();
+
+  /// The users workspace [workspaceId] lists on a multi-user server, by its [Workspace.id]. An
+  /// admin or a manager opens it whether listed or not.
+  Future<List<WorkspaceMember>> workspaceUsers(int workspaceId);
+
+  /// Every chat the server holds, every user's, as the bytes of one CSV file.
+  Future<List<int>> exportChats();
 }
 
 /// Where the connection is kept between runs.

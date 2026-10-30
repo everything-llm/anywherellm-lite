@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'json.dart';
 import 'server_models.dart';
 import 'shortcuts.dart';
+import 'users.dart';
 
 /// A document switched off in a workspace: no longer embedded there, but still listed in its
 /// Sources so it can be switched back on.
@@ -167,6 +168,7 @@ class Prefs {
     this.shortcuts = const [],
     this.shortcutUses = const {},
     this.onDeck = const {},
+    this.users = const {},
   });
 
   /// How many chats [recent] keeps for a workspace.
@@ -211,6 +213,16 @@ class Prefs {
   /// The messages waiting in each chat, by [chatKey], first to go first, kept so they survive
   /// the app closing.
   final Map<String, List<SavedOnDeck>> onDeck;
+
+  /// Whom this device's chats are saved as on each multi-user server, by the server's address.
+  final Map<String, ServerUser> users;
+
+  /// Whom chats are saved as on [server], or null while no one is chosen there.
+  ServerUser? userOn(String server) => users[server];
+
+  /// These prefs with chats on [server] saved as [user].
+  Prefs withUser(String server, ServerUser user) =>
+      _copy(users: {...users, server: user});
 
   /// The key of chat [thread] of workspace [slug] on [server] in [onDeck].
   static String chatKey(String server, String slug, String thread) =>
@@ -299,6 +311,7 @@ class Prefs {
     List<PromptShortcut>? shortcuts,
     Map<String, ShortcutUse>? shortcutUses,
     Map<String, List<SavedOnDeck>>? onDeck,
+    Map<String, ServerUser>? users,
   }) => Prefs(
     switchedOff: switchedOff ?? this.switchedOff,
     workspaceOrder: workspaceOrder ?? this.workspaceOrder,
@@ -311,6 +324,7 @@ class Prefs {
     shortcuts: shortcuts ?? this.shortcuts,
     shortcutUses: shortcutUses ?? this.shortcutUses,
     onDeck: onDeck ?? this.onDeck,
+    users: users ?? this.users,
   );
 
   /// [map] with [key] set to [list], or without it when [list] is empty.
@@ -521,6 +535,10 @@ class Prefs {
         for (final entry in onDeck.entries)
           entry.key: [for (final m in entry.value) m.toJson()],
       },
+    if (users.isNotEmpty)
+      'users': {
+        for (final MapEntry(:key, :value) in users.entries) key: value.toJson(),
+      },
   });
 
   /// Reads what [encode] wrote. Anything it cannot read falls back to the default, and keys it
@@ -565,8 +583,17 @@ class Prefs {
       ],
       shortcutUses: _shortcutUsesOf(json['shortcutUses']),
       onDeck: _onDeckOf(json['onDeck']),
+      users: _usersOf(json['users']),
     );
   }
+
+  /// Each server's chosen user in [json], as [users] is written.
+  static Map<String, ServerUser> _usersOf(Object? json) => {
+    if (json is Map)
+      for (final MapEntry(:key, :value) in json.entries)
+        if (ServerUser.fromSaved(value) case final user? when key is String)
+          key: user,
+  };
 
   /// Each chat's waiting messages in [json], as [onDeck] is written.
   static Map<String, List<SavedOnDeck>> _onDeckOf(Object? json) => {

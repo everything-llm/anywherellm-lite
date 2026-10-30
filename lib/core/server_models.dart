@@ -46,6 +46,7 @@ class Workspace {
   const Workspace({
     required this.slug,
     required this.name,
+    this.id,
     this.threads = const [],
     this.documents = const [],
     this.prompt,
@@ -58,6 +59,7 @@ class Workspace {
     return Workspace(
       slug: slug,
       name: _known(json, 'name') ?? slug,
+      id: _asInt(json['id']),
       prompt: prompt is String ? prompt : null,
       settings: WorkspaceSettings.fromJson(json),
       threads: [
@@ -75,6 +77,7 @@ class Workspace {
   Workspace withName(String name) => Workspace(
     slug: slug,
     name: name,
+    id: id,
     threads: threads,
     documents: documents,
     prompt: prompt,
@@ -83,6 +86,10 @@ class Workspace {
 
   final String slug;
   final String name;
+
+  /// The server's number for it, which the admin calls take in place of the slug, or null when
+  /// the answer left it out.
+  final int? id;
 
   /// Named only when every workspace is read at once: the server leaves the names out when it
   /// answers for one.

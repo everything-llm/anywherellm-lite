@@ -12,6 +12,7 @@ import '../core/json.dart';
 import '../core/ports.dart';
 import '../core/server_models.dart';
 import '../core/upload.dart';
+import '../core/users.dart';
 import 'anythingllm_stream.dart';
 import 'unreachable.dart';
 
@@ -100,10 +101,12 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   Future<void> deleteWorkspace(String slug) =>
       _send('DELETE', _workspace(slug), null, emptyOk: true);
 
+  /// The server saves the thread as user [userId] without checking it, on a multi-user server.
   @override
-  Future<Thread> createThread(String slug) async {
+  Future<Thread> createThread(String slug, {int? userId}) async {
     final body = await _send('POST', '${_workspace(slug)}/thread/new', {
       'name': newChatName,
+      'userId': ?userId,
     });
     return Thread.fromJson(
       _written(body, 'thread', 'The server did not start a chat.'),
@@ -167,11 +170,14 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     String message, {
     List<Attachment> attachments = const [],
     ChatMode? mode,
+    int? userId,
   }) {
-    // With no `mode` the server answers in the workspace's own chat mode.
+    // With no `mode` the server answers in the workspace's own chat mode. It takes `userId` as
+    // given, without checking it.
     final body = {
       'message': message,
       'mode': ?mode?.name,
+      'userId': ?userId,
       if (attachments.isNotEmpty)
         'attachments': [for (final a in attachments) attachmentJson(a)],
     };
@@ -393,6 +399,39 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     final num count => count.toInt(),
     _ => throw const ApiException(_refused),
   };
+
+  /// A single-user server answers too, with `isMultiUser` false.
+  @override
+  Future<bool> multiUser() async =>
+      _field(await _get('/api/v1/admin/is-multi-user-mode'), 'isMultiUser') ==
+      true;
+
+  /// A single-user server answers HTTP 401, which reads as a rejected key.
+  @override
+  Future<List<ServerUser>> users() async => [
+    for (final json in jsonObjects(
+      _field(await _get('/api/v1/users'), 'users'),
+    ))
+      ?ServerUser.fromJson(json),
+  ];
+
+  /// The server's own schema lists each as `userId` and `role`; one that carries `username`
+  /// instead of an id is matched by it.
+  @override
+  Future<List<WorkspaceMember>> workspaceUsers(int workspaceId) async => [
+    for (final json in jsonObjects(
+      _field(
+        await _get('/api/v1/admin/workspaces/$workspaceId/users'),
+        'users',
+      ),
+    ))
+      ?WorkspaceMember.fromJson(json),
+  ];
+
+  /// The server answers the CSV itself, as `text/csv`, with every user's chats.
+  @override
+  Future<List<int>> exportChats() =>
+      _file('/api/v1/system/export-chats?type=csv');
 
   /// The connection in use.
   Connection get _current =>

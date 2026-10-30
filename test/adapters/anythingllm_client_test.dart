@@ -1639,6 +1639,137 @@ void main() {
     );
   });
 
+  group('several users', () {
+    test('whether the server has several users is its own answer', () async {
+      final seen = <http.Request>[];
+      expect(
+        await _answering({'isMultiUser': true}, seen: seen).multiUser(),
+        isTrue,
+      );
+      expect(seen.single.method, 'GET');
+      expect(seen.single.url.path, '/api/v1/admin/is-multi-user-mode');
+      expect(await _answering({'isMultiUser': false}).multiUser(), isFalse);
+      expect(await _answering({}).multiUser(), isFalse);
+    });
+
+    test('the users are each an id, a name and a role', () async {
+      final seen = <http.Request>[];
+      final users = await _answering({
+        'users': [
+          {'id': 1, 'username': 'john_doe', 'role': 'admin'},
+          {'id': 2, 'username': 'jane_smith', 'role': 'default'},
+          {'username': 'no id', 'role': 'default'},
+        ],
+      }, seen: seen).users();
+      expect(seen.single.url.path, '/api/v1/users');
+      expect(
+        [for (final u in users) (u.id, u.name, u.role)],
+        [(1, 'john_doe', 'admin'), (2, 'jane_smith', 'default')],
+      );
+    });
+
+    test('a single-user server refuses the users', () async {
+      final error = await _failure(
+        _api(
+          (_) async => http.Response(
+            'Instance is not in Multi-User mode. Permission denied.',
+            401,
+          ),
+        ).users(),
+      );
+      expect(error.status, 401);
+    });
+
+    test('a workspace\'s users are read by its id', () async {
+      final seen = <http.Request>[];
+      final members = await _answering({
+        'users': [
+          {'userId': 1, 'role': 'admin'},
+          {'userId': 2, 'role': 'member'},
+        ],
+      }, seen: seen).workspaceUsers(79);
+      expect(seen.single.url.path, '/api/v1/admin/workspaces/79/users');
+      expect([for (final m in members) m.id], [1, 2]);
+    });
+
+    test('each workspace carries its id', () async {
+      final list = await _answering({
+        'workspaces': [
+          {'id': 79, 'slug': 'q3', 'name': 'Q3'},
+          {'slug': 'bare', 'name': 'Bare'},
+        ],
+      }).workspaces();
+      expect([for (final w in list) w.id], [79, null]);
+    });
+
+    test('a new chat names the user it is saved as, when given', () async {
+      final seen = <http.Request>[];
+      final api = _answering({
+        'thread': {'slug': 'th-1', 'name': 'New chat', 'user_id': 2},
+      }, seen: seen);
+      await api.createThread('w', userId: 2);
+      await api.createThread('w');
+      expect(
+        [for (final r in seen) jsonDecode(r.body)],
+        [
+          {'name': 'New chat', 'userId': 2},
+          {'name': 'New chat'},
+        ],
+      );
+    });
+
+    test('a message names the user it is saved as, when given', () async {
+      final seen = <http.BaseRequest>[];
+      final api = HttpAnythingLlmApi(
+        holder: ConnectionHolder(_connection),
+        client: MockClient.streaming((request, body) async {
+          seen.add(request);
+          await body.drain<void>();
+          return http.StreamedResponse(
+            Stream.value(
+              utf8.encode(
+                'data: ${jsonEncode({'type': 'textResponseChunk', 'textResponse': '', 'close': true})}\n\n',
+              ),
+            ),
+            200,
+          );
+        }),
+      );
+      await api.streamChat('w', 't', 'Hi', userId: 2).drain<void>();
+      await api.streamChat('w', 't', 'Hi').drain<void>();
+      expect(seen.first.url.path, '/api/v1/workspace/w/thread/t/stream-chat');
+      expect(
+        [for (final r in seen) jsonDecode((r as http.Request).body)],
+        [
+          {'message': 'Hi', 'userId': 2},
+          {'message': 'Hi'},
+        ],
+      );
+    });
+
+    test('export chats is the CSV the server sends', () async {
+      final seen = <http.Request>[];
+      const csv = 'id,workspace,prompt,response\n1,Q3,Hi,Hello\n';
+      final bytes = await _api((request) async {
+        seen.add(request);
+        return http.Response(
+          csv,
+          200,
+          headers: {'content-type': 'text/csv; charset=utf-8'},
+        );
+      }).exportChats();
+      expect(seen.single.method, 'GET');
+      expect(seen.single.url.path, '/api/v1/system/export-chats');
+      expect(seen.single.url.queryParameters, {'type': 'csv'});
+      expect(seen.single.headers['Authorization'], 'Bearer SECRET-KEY');
+      expect(utf8.decode(bytes), csv);
+      final refused = await _failure(
+        _answering({'error': 'Invalid export type'}, status: 400).exportChats(),
+      );
+      expect(refused.message, 'Invalid export type');
+    });
+  });
+
   group('answerImage', () {
     final picture = Uri.parse(
       'https://host.example.ts.net:8080/pictures/a.png',
