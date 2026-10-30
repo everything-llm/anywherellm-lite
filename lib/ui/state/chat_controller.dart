@@ -725,9 +725,11 @@ class ChatController extends ChangeNotifier with FollowsServer {
     return select(slug, thread: _kept(slug, thread));
   }
 
-  /// [thread] while workspace [slug] still has it, else null.
+  /// [thread] while workspace [slug] still has it, else null. Main chat is always there.
   String? _kept(String slug, String thread) =>
-      threadsOf(slug).any((t) => t.slug == thread) ? thread : null;
+      thread == mainChatOf(slug) || threadsOf(slug).any((t) => t.slug == thread)
+      ? thread
+      : null;
 
   /// Asks each workspace how many documents it holds, all at once. Best effort: a count that
   /// cannot be read is left out. Sources reports the active workspace's own count.
