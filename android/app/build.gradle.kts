@@ -8,7 +8,7 @@ plugins {
 
 // Release signing is read from android/key.properties, which is gitignored; `appstore sync`
 // writes it the first time it builds this app. Android keys an installed app to its signing
-// certificate, so the first key to publish local.anywherellm.lite.stock must sign every later
+// certificate, so the first key to publish local.anywherellm.lite must sign every later
 // update -- which is why a missing key.properties fails the release build instead of falling
 // back to the debug keystore.
 val keystoreProperties = Properties().apply {
@@ -28,7 +28,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "local.anywherellm.lite.stock"
+        applicationId = "local.anywherellm.lite"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -70,7 +70,7 @@ if (!hasReleaseKey) {
                 throw GradleException(
                     "android/key.properties is missing, so this release build has no signing " +
                     "key. Publishing debug-signed would tie every future update of " +
-                    "local.anywherellm.lite.stock to ~/.android/debug.keystore. Run " +
+                    "local.anywherellm.lite to ~/.android/debug.keystore. Run " +
                     "`appstore sync`, which writes it, or create it with storeFile, " +
                     "storePassword, keyAlias and keyPassword."
                 )

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 AnywhereLLM is a Flutter chat client for Android phones for an AnythingLLM server. It shows workspaces and their chats (each workspace's Main chat and its AnythingLLM threads), streams answers, and manages each workspace's documents, instructions and answer settings in the workspace's pages. It shows an answer that finished out of sight as an Android notification. It keeps the server address and API key in the Android Keystore and its other preferences in a JSON file. It calls AnythingLLM's own API, and nothing else, directly, over https or over plain http on a private network (below); there is no backend of its own.
 
-**This is the `lite-stock` branch**: a build for plain, unmodified AnythingLLM. It has none of master's toolkit (anywherellm-bridge) or suite features: no companion server is probed, paired with or stored, and there is no Memory, Upcoming, toolkit card, Add the toolkit guide, apps-lean/Library/Vault pages, agent's browser or tabs sheet, and no page web view. Every request goes to AnythingLLM's own developer API (and an answer's images on its host). It installs beside Lite as `local.anywherellm.lite.stock`, labelled `Lite (stock)`.
+**A client for plain, unmodified AnythingLLM**, the only AnywhereLLM Lite since 1.20.0 (the build with the toolkit is in history, tagged `suite-app-1.19.0`). It has none of that build's toolkit (anywherellm-bridge) or suite features: no companion server is probed, paired with or stored, and there is no Memory, Upcoming, toolkit card, Add the toolkit guide, apps-lean/Library/Vault pages, agent's browser or tabs sheet, and no page web view. Every request goes to AnythingLLM's own developer API (and an answer's images on its host). 
 
 ## Commands
 
@@ -30,7 +30,7 @@ The F-Droid store page's feature graphic and phone screenshots come from `tool/s
 ## Naming
 
 - The product is **AnywhereLLM Lite**, on `master`. Lite has launcher label `AnywhereLLM Lite` (`android/app/src/main/AndroidManifest.xml`) and application ID `local.anywherellm.lite` (`applicationId` in `android/app/build.gradle.kts`). The Kotlin `namespace` stays `local.anywherellm.anywherellm`, which only names the generated classes. The store builds it from a clone at `~/Dev/Apps/anywherellm_lite` kept on `master`, so that clone's `android/key.properties` holds Lite's own release key. The Dart package is `anywherellm`, so imports are `package:anywherellm/...`. The repository folder is still `everything`.
-- On `lite-stock` the launcher label is `Lite (stock)`, the application ID `local.anywherellm.lite.stock` and the version `1.19.3-stock`, so it installs beside Lite with a keyring of its own; both claim `anywherellm://connect` links, so Android asks which opens one.
+- The launcher label is `AnywhereLLM Lite`, the application ID `local.anywherellm.lite` and the version `1.20.0`: it took the toolkit build's ID and key, so it installs over that build as an update and keeps its saved key, and its preferences file loads, the fields it does not know left aside.
 - `flutter_secure_storage` keys its keyring entry by the application ID. Changing `applicationId` orphans any saved key.
 
 ## Architecture
