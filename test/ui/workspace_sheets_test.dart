@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:anywherellm/ui/widgets/sheet.dart';
+import 'package:anywherellm/ui/widgets/tappable.dart';
 import 'package:anywherellm/ui/workspace_sheets.dart';
 import 'package:anywherellm/ui/workspace_switcher.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -92,5 +94,51 @@ void main() {
       tester.getBottomLeft(find.text('Create')).dy,
       lessThanOrEqualTo(640 - 24),
     );
+  });
+
+  testWidgets('Reorder moves a workspace up or down, then Done goes back', (
+    tester,
+  ) async {
+    final h = await pumpApp(tester, llm: planningServer(), shelf: true);
+    await tester.tap(find.byType(WorkspaceSwitcher));
+    await tester.pumpAndSettle();
+    await tester.tap(control('Reorder'));
+    await tester.pumpAndSettle();
+    expect(find.text('Reorder workspaces'), findsOneWidget);
+    expect(
+      find.text(
+        'Move a workspace up or down. You can also press and hold a row, then drag it.',
+      ),
+      findsOneWidget,
+    );
+    bool on(String label) =>
+        tester.widget<Tappable>(control(label)).onTap != null;
+    // The first can go only down, the last only up.
+    expect(on('Move Q3 planning up'), isFalse);
+    expect(on('Move Q3 planning down'), isTrue);
+    expect(on('Move Household up'), isTrue);
+    expect(on('Move Household down'), isFalse);
+
+    await tester.tap(control('Move Q3 planning down'));
+    await tester.pumpAndSettle();
+    expect(h.chat.orderedWorkspaces.map((w) => w.slug), ['household', 'q3']);
+    expect(on('Move Household up'), isFalse);
+    await tester.tap(control('Move Q3 planning up'));
+    await tester.pumpAndSettle();
+    expect(h.chat.orderedWorkspaces.map((w) => w.slug), ['q3', 'household']);
+
+    await tester.tap(control('Done'));
+    await tester.pumpAndSettle();
+    expect(h.shell.popup.value, Popup.workspaces);
+    expect(find.text('Reorder workspaces'), findsNothing);
+  });
+
+  testWidgets('one workspace has nothing to reorder', (tester) async {
+    final llm = planningServer()..spaces.removeLast();
+    await pumpApp(tester, llm: llm, shelf: true);
+    await tester.tap(find.byType(WorkspaceSwitcher));
+    await tester.pumpAndSettle();
+    expect(find.text('Workspaces'), findsWidgets);
+    expect(control('Reorder'), findsNothing);
   });
 }

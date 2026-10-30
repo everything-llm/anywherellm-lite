@@ -39,12 +39,16 @@ class SheetFrame extends StatefulWidget {
     this.padding = const EdgeInsets.fromLTRB(16, 4, 16, 24),
     this.bare = false,
     this.header,
+    this.action,
   });
 
   final String title;
   final VoidCallback onClose;
   final Widget child;
   final SheetHeight height;
+
+  /// A control in the header between the title and Close, such as Reorder.
+  final Widget? action;
 
   /// Around [child].
   final EdgeInsets padding;
@@ -147,6 +151,7 @@ class _SheetFrameState extends State<SheetFrame>
                 title: widget.title,
                 onClose: widget.onClose,
                 divided: tall,
+                action: widget.action,
               ),
             ),
         ],
@@ -254,19 +259,23 @@ class _InSheet extends InheritedWidget {
   bool updateShouldNotify(_InSheet old) => false;
 }
 
-/// A sheet's header: [title] as [Type.title] and a 48 px Close on [Tokens.sunken] inside a
-/// [Tokens.lineStrong] ring, with a rule under it when [divided].
+/// A sheet's header: [title] as [Type.title], any [action], and a 48 px Close on
+/// [Tokens.sunken] inside a [Tokens.lineStrong] ring, with a rule under it when [divided].
 class SheetHeader extends StatelessWidget {
   const SheetHeader({
     super.key,
     required this.title,
     required this.onClose,
     this.divided = false,
+    this.action,
   });
 
   final String title;
   final VoidCallback onClose;
   final bool divided;
+
+  /// A control before Close, such as Reorder, level with the title's first line.
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -299,6 +308,7 @@ class SheetHeader extends StatelessWidget {
               ),
             ),
           ),
+          if (action case final action?) ...[const SizedBox(width: 4), action],
           const SizedBox(width: 4),
           Tappable(
             touchTarget: true,
@@ -405,6 +415,8 @@ class ModalSheet extends StatelessWidget {
     required this.onClose,
     required this.child,
     this.autofocus = true,
+    this.action,
+    this.padding = const EdgeInsets.fromLTRB(16, 4, 16, 24),
   });
 
   final String title;
@@ -412,12 +424,24 @@ class ModalSheet extends StatelessWidget {
   final Widget child;
   final bool autofocus;
 
+  /// A control in the header before Close ([SheetHeader.action]).
+  final Widget? action;
+
+  /// Around [child], as [SheetFrame.padding].
+  final EdgeInsets padding;
+
   @override
   Widget build(BuildContext context) => CallbackShortcuts(
     bindings: {const SingleActivator(LogicalKeyboardKey.escape): onClose},
     child: Focus(
       autofocus: autofocus,
-      child: SheetFrame(title: title, onClose: onClose, child: child),
+      child: SheetFrame(
+        title: title,
+        onClose: onClose,
+        action: action,
+        padding: padding,
+        child: child,
+      ),
     ),
   );
 }

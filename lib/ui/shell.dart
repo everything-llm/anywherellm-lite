@@ -166,6 +166,7 @@ class AppShell extends StatelessWidget {
                                 title: 'Workspaces',
                                 onClose: () =>
                                     shell.closePopup(Popup.workspaces),
+                                action: const ReorderButton(),
                                 child: SingleChildScrollView(
                                   child: WorkspaceMenu(
                                     onCreate: () => shell.togglePopup(
@@ -173,6 +174,13 @@ class AppShell extends StatelessWidget {
                                     ),
                                   ),
                                 ),
+                              ),
+                              Popup.reorderWorkspaces => ModalSheet(
+                                title: 'Reorder workspaces',
+                                onClose: () =>
+                                    shell.closePopup(Popup.reorderWorkspaces),
+                                padding: EdgeInsets.zero,
+                                child: const WorkspaceOrder(),
                               ),
                               final GalleryOpen open => GalleryPage(
                                 open,

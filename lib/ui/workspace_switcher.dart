@@ -10,9 +10,12 @@ import 'tokens.dart';
 import 'type.dart';
 import 'settings/rows.dart';
 import 'widgets/basics.dart';
+import 'widgets/buttons.dart';
+import 'widgets/fields.dart';
 import 'widgets/phone_page.dart';
 import 'widgets/tappable.dart';
 import 'widgets/scroll_fades.dart';
+import 'widgets/sheet.dart';
 
 /// The shelf's title: the open workspace's name at [size] and a chevron, which open the
 /// Workspaces sheet. Its documents are heard, not shown.
@@ -79,8 +82,9 @@ class WorkspaceSwitcher extends StatelessWidget {
 }
 
 /// The Workspaces sheet: the workspaces in one card, each with how many documents it has, to
-/// open one or press and hold to drag it to another place, and New workspace in another. The
-/// rest is in the workspace's settings.
+/// open one or press and hold to drag it to another place, and New workspace in another. Its
+/// header's [ReorderButton] puts them in order with buttons instead. The rest is in the
+/// workspace's settings.
 class WorkspaceMenu extends StatelessWidget {
   const WorkspaceMenu({super.key, required this.onCreate});
 
@@ -102,28 +106,7 @@ class WorkspaceMenu extends StatelessWidget {
     final ordered = scope.chat.orderedWorkspaces;
     final list = ConstrainedBox(
       constraints: const BoxConstraints(maxHeight: 400),
-      // A card in a sheet is the page's own ground, which the fades blend into.
-      child: ScrollFades(
-        child: ReorderableListView.builder(
-          shrinkWrap: true,
-          // The row starts a drag, not a handle beside it.
-          buildDefaultDragHandles: false,
-          itemCount: ordered.length,
-          onReorderItem: (from, to) {
-            final slugs = [for (final w in ordered) w.slug];
-            slugs.insert(to, slugs.removeAt(from));
-            scope.prefs.setWorkspaceOrder(slugs);
-          },
-          // The dragged row is drawn in the app's overlay, outside AppScope, so it is shown as
-          // a name alone.
-          proxyDecorator: (child, i, animation) => _DragGhost(ordered[i].name),
-          itemBuilder: (context, i) => _WorkspaceItem(
-            ordered[i],
-            key: ValueKey(ordered[i].slug),
-            index: i,
-          ),
-        ),
-      ),
+      child: _OrderList(ordered, row: (w, _) => _WorkspaceItem(w)),
     );
     return Semantics(
       container: true,
@@ -148,15 +131,173 @@ class WorkspaceMenu extends StatelessWidget {
   }
 }
 
+/// The Workspaces sheet's Reorder, in its header, which opens Reorder workspaces in the sheet's
+/// place while there are two workspaces or more to put in order.
+class ReorderButton extends StatelessWidget {
+  const ReorderButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final t = Tokens.of(context);
+    return ListenableBuilder(
+      listenable: scope.chat,
+      builder: (context, _) => scope.chat.workspaces.length < 2
+          ? const SizedBox.shrink()
+          // A word on no fill, sized to itself, since the title takes the rest of the line.
+          : Tappable(
+              touchTarget: true,
+              label: 'Reorder',
+              radius: BorderRadius.circular(Sizes.small),
+              onTap: () => scope.shell.togglePopup(Popup.reorderWorkspaces),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Center(
+                    widthFactor: 1,
+                    child: Text('Reorder', style: Type.label(t.accent)),
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
+}
+
+/// Reorder workspaces, in the Workspaces sheet's place: how to move them, then the workspaces in
+/// the order [Prefs.workspaceOrder] gives, each with Move up and Move down, off at the ends of
+/// the list, and dragged after a press and hold as in the Workspaces sheet; then Done, under a
+/// rule, which gives the Workspaces sheet back. Each move is saved as it is made.
+class WorkspaceOrder extends StatelessWidget {
+  const WorkspaceOrder({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final t = Tokens.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Flexible(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              spacing: 12,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: HelpText(
+                    'Move a workspace up or down. You can also press and hold a row, then '
+                    'drag it.',
+                  ),
+                ),
+                // The list scrolls in what is left of the sheet.
+                Flexible(
+                  child: ListenableBuilder(
+                    listenable: Listenable.merge([scope.chat, scope.prefs]),
+                    builder: (context, _) {
+                      final ordered = scope.chat.orderedWorkspaces;
+                      // A card as a [FieldCard] draws it, as tall as its rows.
+                      return Semantics(
+                        container: true,
+                        label: 'Workspaces in order',
+                        child: Container(
+                          clipBehavior: Clip.antiAlias,
+                          decoration: cardDecoration(
+                            t,
+                            inSheet: SheetFrame.holds(context),
+                          ),
+                          child: _OrderList(
+                            ordered,
+                            row: (w, i) => _OrderRow(
+                              w,
+                              up: i > 0 ? () => _move(scope, i, -1) : null,
+                              down: i < ordered.length - 1
+                                  ? () => _move(scope, i, 1)
+                                  : null,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: t.line)),
+          ),
+          child: ActionRow(even: true, [
+            AppButton(
+              'Done',
+              primary: true,
+              onPressed: () => scope.shell.togglePopup(Popup.workspaces),
+            ),
+          ]),
+        ),
+      ],
+    );
+  }
+
+  /// Moves the workspace at [i] in the order [by] places, one up or down.
+  static void _move(AppScope scope, int i, int by) {
+    final slugs = [for (final w in scope.chat.orderedWorkspaces) w.slug];
+    slugs.insert(i + by, slugs.removeAt(i));
+    scope.prefs.setWorkspaceOrder(slugs);
+  }
+}
+
+/// [ordered] in a list a press and hold drags a row of, each row built by [row] under a rule
+/// after the first; a drag saves the order. It scrolls past the room it is given.
+class _OrderList extends StatelessWidget {
+  const _OrderList(this.ordered, {required this.row});
+
+  final List<Workspace> ordered;
+  final Widget Function(Workspace workspace, int index) row;
+
+  @override
+  Widget build(BuildContext context) {
+    final prefs = AppScope.of(context).prefs;
+    // A card in a sheet is the page's own ground, which the fades blend into.
+    return ScrollFades(
+      child: ReorderableListView.builder(
+        shrinkWrap: true,
+        // The row starts a drag, not a handle beside it.
+        buildDefaultDragHandles: false,
+        itemCount: ordered.length,
+        onReorderItem: (from, to) {
+          final slugs = [for (final w in ordered) w.slug];
+          slugs.insert(to, slugs.removeAt(from));
+          prefs.setWorkspaceOrder(slugs);
+        },
+        // The dragged row is drawn in the app's overlay, outside AppScope, so it is shown as
+        // a name alone.
+        proxyDecorator: (child, i, animation) => _DragGhost(ordered[i].name),
+        // A press and hold starts the drag, since a touch would otherwise scroll.
+        itemBuilder: (context, i) => ReorderableDelayedDragStartListener(
+          key: ValueKey(ordered[i].slug),
+          index: i,
+          child: Ruled(ruled: i > 0, child: row(ordered[i], i)),
+        ),
+      ),
+    );
+  }
+}
+
 /// A workspace in the sheet, with its document count: tapped, it opens; pressed and held, it
 /// moves.
 class _WorkspaceItem extends StatelessWidget {
-  const _WorkspaceItem(this.workspace, {super.key, required this.index});
+  const _WorkspaceItem(this.workspace);
 
   final Workspace workspace;
-
-  /// Where the row sits in the list, for dragging it to another place.
-  final int index;
 
   @override
   Widget build(BuildContext context) {
@@ -166,28 +307,87 @@ class _WorkspaceItem extends StatelessWidget {
     final active = chat.activeSlug == workspace.slug;
     final ready = !active && chat.readyIn(workspace.slug);
     final count = chat.docCounts[workspace.slug];
-    // A press and hold starts the drag, since a touch would otherwise scroll.
-    return ReorderableDelayedDragStartListener(
-      index: index,
-      child: Ruled(
-        ruled: index > 0,
-        child: CardRow(
-          workspace.name,
-          heard: ready ? '${workspace.name}, answer ready' : null,
-          checked: active,
-          onTap: () {
-            scope.shell.closePopup(Popup.workspaces);
-            if (!active) chat.select(workspace.slug);
-          },
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            spacing: 8,
-            children: [
-              if (ready) const ReadyMark(),
-              if (count != null)
-                Text(plural(count, 'doc', 'docs'), style: Type.note(t.ink)),
-            ],
-          ),
+    return CardRow(
+      workspace.name,
+      heard: ready ? '${workspace.name}, answer ready' : null,
+      checked: active,
+      onTap: () {
+        scope.shell.closePopup(Popup.workspaces);
+        if (!active) chat.select(workspace.slug);
+      },
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        spacing: 8,
+        children: [
+          if (ready) const ReadyMark(),
+          if (count != null)
+            Text(
+              plural(count, 'document', 'documents'),
+              style: Type.note(t.ink),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A workspace in Reorder workspaces: its name over its document count, then Move up and Move
+/// down, each off where [up] or [down] is null.
+class _OrderRow extends StatelessWidget {
+  const _OrderRow(this.workspace, {required this.up, required this.down});
+
+  final Workspace workspace;
+  final VoidCallback? up;
+  final VoidCallback? down;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final count = AppScope.of(context).chat.docCounts[workspace.slug];
+    final name = workspace.name;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: Sizes.cardRow),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(FieldCard.inset, 8, 12, 8),
+        child: Row(
+          spacing: 12,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name, style: Type.body(t.ink)),
+                  if (count != null)
+                    Text(
+                      plural(count, 'document', 'documents'),
+                      style: Type.note(t.ink),
+                    ),
+                ],
+              ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              spacing: 8,
+              children: [
+                IconBtn(
+                  'arrowUp',
+                  tooltip: 'Move $name up',
+                  box: 48,
+                  filled: true,
+                  size: IconSize.small,
+                  onPressed: up,
+                ),
+                IconBtn(
+                  'arrowDown',
+                  tooltip: 'Move $name down',
+                  box: 48,
+                  filled: true,
+                  size: IconSize.small,
+                  onPressed: down,
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

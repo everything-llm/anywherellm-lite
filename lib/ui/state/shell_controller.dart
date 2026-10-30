@@ -50,12 +50,15 @@ class ChatSheetFor {
 /// or whether to delete it.
 enum WorkspaceSheet { create, rename, delete }
 
-/// A popup over the window, at most one open at a time: the workspace menu, the composer's Answer
-/// from sheet, the Attach sheet, the question before forgetting the server, Who uses this app?,
-/// or a document's Move to folder sheet or question before deleting it. An answer's This answer
-/// sheet is keyed by its [Turn] instead.
+/// A popup over the window, at most one open at a time: the workspace menu and its Reorder
+/// workspaces, the composer's Answer from sheet, the Attach sheet, the question before forgetting
+/// the server, Who uses this app?, or a document's Move to folder sheet or question before
+/// deleting it. An answer's This answer sheet is keyed by its [Turn] instead.
 enum Popup {
   workspaces,
+
+  /// Reorder workspaces, opened from the workspace menu's Reorder.
+  reorderWorkspaces,
   answerFrom,
   attach,
 

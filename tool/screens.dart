@@ -140,6 +140,10 @@ final _screens = <String, _Setup>{
     h.shell.togglePopup(Popup.workspaces);
     await _settle(tester);
   },
+  'wsreorder': (tester, h) async {
+    h.shell.togglePopup(Popup.reorderWorkspaces);
+    await _settle(tester);
+  },
   'wsnew': (tester, h) async {
     h.shell.togglePopup(WorkspaceSheet.create);
     await _settle(tester);
