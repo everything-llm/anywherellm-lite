@@ -77,6 +77,14 @@ void main() {
       // The server's documents are there to switch on.
       expect(control('No documents in use. Open Documents'), findsOneWidget);
       expect(control('What can I do here?'), findsNothing);
+      // The chevron after the name is balanced, so the name sits in the middle.
+      final name = tester.getCenter(
+        find.descendant(
+          of: control('Workspace: Household. Switch workspace'),
+          matching: find.text('Household'),
+        ),
+      );
+      expect(name.dx, closeTo(tester.getCenter(find.byType(ChatView)).dx, 1));
     });
 
     testWidgets(

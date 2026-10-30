@@ -734,21 +734,24 @@ class _Empty extends StatelessWidget {
   }
 }
 
-/// Ask about the workspace, which switches it, over its documents in use, which open Documents.
+/// Ask about the workspace, which switches it, over its documents in use, which open Documents,
+/// as the board's ready view draws it: the name in the accent at the headline's weight with a
+/// muted chevron after it, balanced by as much room before it so the name stays in the middle,
+/// and the documents line 8 under it with its chevron muted.
 class _Hero extends StatelessWidget {
   const _Hero(this.workspace);
 
   final String workspace;
 
+  /// The room between the name and its chevron.
+  static const _toChevron = 8.0;
+
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final sources = scope.sources;
-    final titleStyle = Headline.styleOf(context).copyWith(
-      fontWeight: FontWeight.w700,
-      fontVariations: const [FontVariation('wght', 700)],
-      color: Tokens.of(context).accent,
-    );
+    final titleStyle = Headline.styleOf(context)
+        .copyWith(color: Tokens.of(context).accent);
     return Rise(
       duration: const Duration(milliseconds: 400),
       child: Column(
@@ -758,7 +761,6 @@ class _Hero extends StatelessWidget {
             width: double.infinity,
             child: Headline('Ask about', textAlign: TextAlign.center),
           ),
-          const SizedBox(height: 6),
           ListenableBuilder(
             listenable: scope.shell.popup,
             builder: (context, _) => SizedBox(
@@ -776,6 +778,7 @@ class _Hero extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     // The chevron sits against the name, so it reads as part of what opens.
                     children: [
+                      SizedBox(width: _toChevron + IconSize.large.px),
                       Flexible(
                         child: Text(
                           workspace,
@@ -783,10 +786,10 @@ class _Hero extends StatelessWidget {
                           style: titleStyle,
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: _toChevron),
                       AppIcon(
                         'down',
-                        size: IconSize.row,
+                        size: IconSize.large,
                         color: Tokens.of(context).muted,
                       ),
                     ],
@@ -795,7 +798,7 @@ class _Hero extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           ListenableBuilder(
             listenable: sources,
             builder: (context, _) {
@@ -823,7 +826,7 @@ class _Hero extends StatelessWidget {
                       children: [
                         AppIcon(
                           'doc',
-                          size: IconSize.xs,
+                          size: IconSize.small,
                           color: Tokens.of(context).ink,
                         ),
                         const SizedBox(width: 8),
@@ -838,8 +841,8 @@ class _Hero extends StatelessWidget {
                         const SizedBox(width: 8),
                         AppIcon(
                           'chevron',
-                          size: IconSize.tiny,
-                          color: Tokens.of(context).ink,
+                          size: IconSize.small,
+                          color: Tokens.of(context).muted,
                         ),
                       ],
                     ),
