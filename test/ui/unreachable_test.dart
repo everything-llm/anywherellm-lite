@@ -23,7 +23,7 @@ void main() {
     // The message box stays open.
     expect(composerField, findsOneWidget);
     // Nothing was read, so no empty state claims there are no workspaces.
-    expect(find.text('No workspaces yet'), findsNothing);
+    expect(find.text('Make a workspace to start asking'), findsNothing);
   });
 
   testWidgets('a later failure shows under the banner', (tester) async {

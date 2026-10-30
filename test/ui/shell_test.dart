@@ -474,12 +474,36 @@ void main() {
       tester,
     ) async {
       final h = await pumpApp(tester, connection: null);
-      expect(find.text('Welcome to AnywhereLLM'), findsOneWidget);
+      expect(find.text('Connect a server to start asking'), findsOneWidget);
+      expect(
+        find.text(
+          'Add your AnythingLLM server\u2019s address and key in Settings.',
+        ),
+        findsOneWidget,
+      );
+      expect(control('New workspace'), findsNothing);
       await tapVisible(tester, control('Open Settings'));
       await tester.pumpAndSettle();
       expect(h.shell.settingsOpen, isTrue);
       expect(h.shell.settingsPage, SettingsPage.connection);
       expect(control('Connect'), findsOneWidget);
+    });
+
+    testWidgets('with no workspace, New workspace makes one from the chat', (
+      tester,
+    ) async {
+      final llm = planningServer()..spaces.clear();
+      final h = await pumpApp(tester, llm: llm);
+      expect(find.text('Make a workspace to start asking'), findsOneWidget);
+      expect(
+        find.text(
+          'A workspace holds the documents your questions are answered from.',
+        ),
+        findsOneWidget,
+      );
+      await tapVisible(tester, control('New workspace'));
+      await tester.pumpAndSettle();
+      expect(h.shell.popup.value, WorkspaceSheet.create);
     });
 
     testWidgets('a key the server takes is saved and the workspaces load', (

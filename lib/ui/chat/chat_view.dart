@@ -311,16 +311,19 @@ class _Body extends StatelessWidget {
         if (scope.settings.configured && chat.unreachable.value) {
           return const SizedBox.shrink();
         }
+        // With no workspace yet, New workspace makes one here; the composer's own banner
+        // leads to Settings while there is no server.
+        final none = scope.settings.configured && !chat.loading;
         final (title, text) = !scope.settings.configured
             ? (
-                'Welcome to AnywhereLLM',
-                'Set up your AnythingLLM server in Settings to begin.',
+                'Connect a server to start asking',
+                'Add your AnythingLLM server’s address and key in Settings.',
               )
             : chat.loading
             ? ('Loading…', '')
             : (
-                'No workspaces yet',
-                'Make one with New workspace, under the workspace\'s name at the top of the chats.',
+                'Make a workspace to start asking',
+                'A workspace holds the documents your questions are answered from.',
               );
         return Center(
           child: SingleChildScrollView(
@@ -335,6 +338,14 @@ class _Body extends StatelessWidget {
                     text,
                     textAlign: TextAlign.center,
                     style: Type.body(t.muted),
+                  ),
+                ],
+                if (none) ...[
+                  const SizedBox(height: 20),
+                  AppButton(
+                    'New workspace',
+                    onPressed: () =>
+                        scope.shell.togglePopup(WorkspaceSheet.create),
                   ),
                 ],
               ],
