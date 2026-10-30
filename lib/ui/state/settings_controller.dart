@@ -22,6 +22,10 @@ class SettingsController extends ChangeNotifier {
 
   ConnectionCheck check = ConnectionCheck.idle;
 
+  /// Whether [check] is of the connection in use, as [testSaved]'s is, rather than of one being
+  /// tried before it is saved.
+  bool checkedInUse = false;
+
   /// What the last test or save said.
   String? message;
 
@@ -60,6 +64,7 @@ class SettingsController extends ChangeNotifier {
   Future<bool> _check(Connection candidate) async {
     final go = ++_checks;
     check = ConnectionCheck.testing;
+    checkedInUse = candidate == connection;
     message = null;
     notifyListeners();
     var opens = false;
@@ -143,6 +148,7 @@ class SettingsController extends ChangeNotifier {
       return Connection.parse(url, key);
     } on ApiException catch (error) {
       check = ConnectionCheck.failed;
+      checkedInUse = false;
       message = error.message;
       notifyListeners();
       return null;

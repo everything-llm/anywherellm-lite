@@ -281,6 +281,20 @@ void main() {
     },
   );
 
+  testWidgets('a key tried and refused leaves the saved server Connected', (
+    tester,
+  ) async {
+    final llm = planningServer();
+    final h = await pumpApp(tester, llm: llm);
+    llm.verifyError = const ApiException('The server rejected the key.');
+    expect(await h.settings.connect('https://other:3001', 'K2'), isFalse);
+    expect(await h.settings.connect('https://other:3001', ''), isFalse);
+    h.shell.openSettings();
+    await tester.pumpAndSettle();
+    expect(find.text('Connected'), findsOneWidget);
+    expect(find.text('Not answering'), findsNothing);
+  });
+
   testWidgets("a phone's Settings opens on the server, which it can test", (
     tester,
   ) async {

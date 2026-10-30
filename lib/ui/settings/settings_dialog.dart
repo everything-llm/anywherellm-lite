@@ -200,8 +200,10 @@ class _ServerCard extends StatelessWidget {
     final settings = scope.settings;
     final t = Tokens.of(context);
     final connection = settings.connection!;
+    // A connection being tried says nothing of the saved one.
+    final check = settings.checkedInUse ? settings.check : ConnectionCheck.idle;
     // The word in ink beside its status's icon; Testing… is no status, so it stands alone.
-    final (state, status) = switch (settings.check) {
+    final (state, status) = switch (check) {
       ConnectionCheck.testing => ('Testing…', null),
       ConnectionCheck.failed => ('Not answering', Status.danger),
       _ when scope.chat.unreachable.value => (
@@ -223,7 +225,7 @@ class _ServerCard extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: Type.code(t.muted),
         ),
-        if (settings.check == ConnectionCheck.failed)
+        if (check == ConnectionCheck.failed)
           if (settings.message case final message?)
             Text(message, style: Type.note(t.danger)),
       ],
