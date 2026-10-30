@@ -15,12 +15,13 @@ import 'notice.dart';
 import 'prefs_controller.dart';
 import 'read.dart';
 
-/// The active workspace's Sources: what it answers from, adding files, switching them on and off,
-/// and removing them with a toast to undo it, which sends nothing to the server until it is
-/// done with.
+/// The active workspace's Sources, which people see as Documents: the server's library, each
+/// document with whether the workspace answers from it; adding documents, switching them on and
+/// off, having answers read one in full, moving one to another folder and deleting one from the
+/// server.
 ///
-/// Switching a file off takes it out of the workspace on the server and remembers it here, so it
-/// stays listed. Removing forgets it altogether; the file stays in the server's documents.
+/// Switching a document off takes it out of the workspace on the server; it stays in the
+/// library, so it stays listed. A new document goes into the folder one was last moved to.
 class SourcesController extends ChangeNotifier {
   SourcesController(this._api, this._chat, this._prefs) {
     _chat.addListener(_chatChanged);
@@ -33,21 +34,22 @@ class SourcesController extends ChangeNotifier {
   /// The workspace [files] describe.
   String? _slug;
 
-  /// The workspace's documents, switched on first, and how many of them are on. A file removed
-  /// while its toast can undo it is left out.
-  List<SourceFile> get files => switch (_removed) {
-    null => _files,
-    final removed => [
-      for (final f in _files)
-        if (f.path != removed.file.path) f,
-    ],
-  };
+  /// The library's documents, folder by folder, each on where the workspace answers from it, and
+  /// how many of them are on.
+  List<SourceFile> get files => _files;
   int get onCount => files.where((f) => f.on).length;
   List<SourceFile> _files = const [];
 
-  late final _workspace = ReadSlot<Workspace>(notifyListeners);
+  /// The library's folders in the server's order, those with no documents too, or none before
+  /// the library is read.
+  List<String> get folders => [
+    for (final folder in _library.value ?? const <LibraryFolder>[]) folder.name,
+  ];
 
-  bool get loading => _workspace.loading;
+  late final _workspace = ReadSlot<Workspace>(notifyListeners);
+  late final _library = ReadSlot<List<LibraryFolder>>(notifyListeners);
+
+  bool get loading => _workspace.loading || _library.loading;
 
   /// The workspace as last read, from which [files] and [chatMode] come, or null before then.
   Workspace? get read => _workspace.value;
@@ -66,16 +68,6 @@ class SourcesController extends ChangeNotifier {
   /// Why the last load or change failed, one notice per file that could not be added.
   List<Notice> problems = const [];
 
-  /// The file just removed, for the undo toast.
-  SourceFile? get removed => _removed?.file;
-
-  /// The removal the toast holds, with the workspace and server it was made on: the file is out
-  /// of [files] at once and out of the workspace only once [settleRemoval] sends it.
-  ({String slug, Connection? server, SourceFile file})? _removed;
-
-  /// Whether [dispose] ran.
-  bool _disposed = false;
-
   /// The path of the file a citation pointed at, lit up for a moment.
   String? get flashed => _flashed.value;
   late final _flashed = Fleeting<String>(flashFor, (_) => notifyListeners());
@@ -91,23 +83,24 @@ class SourcesController extends ChangeNotifier {
   SourceFile? byTitle(String title) =>
       files.where((f) => f.title == title).firstOrNull;
 
+  /// The file stored as [name] ([SourceFile.storedName]), in whichever folder, or null when the
+  /// library no longer has it.
+  SourceFile? byName(String name) =>
+      files.where((f) => f.storedName == name).firstOrNull;
+
   @override
   void dispose() {
     _chat.removeListener(_chatChanged);
-    _disposed = true;
     chatMode.dispose();
-    // A removal still waiting is dropped, and the file stays: the app sends it as it hides.
-    _removed = null;
     _flashed.take();
     super.dispose();
   }
 
   void _chatChanged() {
     if (_chat.activeSlug == _slug) return;
-    // Another workspace leaves the toast behind: the removal it held goes now.
-    unawaited(settleRemoval());
     _slug = _chat.activeSlug;
     _workspace.reset();
+    _library.reset();
     _files = const [];
     chatMode.value = null;
     problems = const [];
@@ -120,18 +113,33 @@ class SourcesController extends ChangeNotifier {
     if (_slug != null) unawaited(refresh());
   }
 
-  /// Reads the active workspace's documents again.
-  Future<void> refresh() async {
+  /// Reads the active workspace's documents again, and the library with them unless [library]
+  /// is false, as after a change to the workspace alone.
+  Future<void> refresh({bool library = true}) async {
     final slug = _slug;
     final server = _chat.server;
     if (slug == null) return;
-    await _workspace.read(
-      () => _api.workspace(slug),
-      failTitle: 'Could not read this workspace\'s files',
-      current: () => server == _chat.server && slug == _slug,
-      kept: _apply,
-      failed: (why) => problems = [why],
-    );
+    bool current() => server == _chat.server && slug == _slug;
+    final failed = <Notice>[];
+    await Future.wait([
+      _workspace.read(
+        () => _api.workspace(slug),
+        failTitle: 'Could not read this workspace\'s files',
+        current: current,
+        failed: failed.add,
+      ),
+      if (library)
+        _library.read(
+          _api.libraryFolders,
+          failTitle: 'Could not read the server\'s documents',
+          current: current,
+          failed: failed.add,
+        ),
+    ]);
+    if (!current()) return;
+    if (failed.isNotEmpty) problems = failed;
+    if (read case final workspace?) _apply(workspace);
+    notifyListeners();
   }
 
   /// Shows [workspace], already read by someone else, when it is the active one.
@@ -143,47 +151,72 @@ class SourcesController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Takes what [files] and [chatMode] say from [workspace], the one [read] holds.
+  /// Takes what [files] and [chatMode] say from [workspace], the one [read] holds, and the
+  /// library as last read.
   void _apply(Workspace workspace) {
-    _files = mergeSources(workspace.documents, _prefs.offIn(workspace.slug));
+    _files = librarySources(_library.value, workspace.documents);
     chatMode.value = ChatMode.fromServer(
       workspace.settings?.values['chatMode'],
     );
     _chat.setDocCount(workspace.slug, workspace.documents.length);
   }
 
-  /// Switches [file] on, embedding it in the workspace, or off, taking it out.
+  /// Switches [file] on, embedding it in the workspace, or off, taking it out. It stays in the
+  /// library either way.
   Future<void> toggle(SourceFile file) => _change(
     file.on
         ? 'Could not switch ${file.title} off'
         : 'Could not switch ${file.title} on',
-    (slug) async {
-      final server = _chat.server;
-      await _embed(slug, file, on: !file.on);
-      // The switched-off list is kept by server: another one now has its own.
-      if (server != _chat.server) return;
-      await _remember(slug, file, off: file.on);
-    },
+    (slug) => _embed(slug, file, on: !file.on),
+    library: false,
   );
 
-  /// Sends each file in turn, then embeds all the server made of them at once. Each file that
-  /// cannot be added says why, and the rest still go.
+  /// Has the workspace's answers read [file] whole, or only its passages closest to the
+  /// question, which is the server's pin. Only a file the workspace answers from has one.
+  Future<void> readWhole(SourceFile file, bool whole) => _change(
+    whole
+        ? 'Could not have answers read ${file.title} in full'
+        : 'Could not stop reading ${file.title} in full',
+    (slug) => _api.pinDocument(slug, file.path, pinned: whole),
+    library: false,
+  );
+
+  /// The extensions the server reads, as `.md`, asked once a workspace, or null when it would
+  /// not say.
+  Future<Set<String>?> acceptedTypes() async {
+    if (_accepted case final known?) return known;
+    final slug = _slug;
+    final server = _chat.server;
+    try {
+      final accepted = await _api.acceptedExtensions();
+      if (server == _chat.server && slug == _slug) _accepted = accepted;
+      return accepted;
+    } on ApiException {
+      // The server decides each file then.
+      return null;
+    }
+  }
+
+  /// The folder a new document goes into: the one a document was last moved to, while the
+  /// library still has it, or null for the server's default.
+  String? get _newFolder => switch (_prefs.lastFolder) {
+    final folder? when folders.contains(folder) => folder,
+    _ => null,
+  };
+
+  /// Sends each file in turn into the folder used last, then embeds all the server made of them
+  /// at once. Each file that cannot be added says why, and the rest still go.
   Future<void> upload(List<UploadFile> picked) async {
     final slug = _slug;
     final server = _chat.server;
     if (slug == null || picked.isEmpty) return;
-    var accepted = _accepted;
-    try {
-      accepted ??= await _api.acceptedExtensions();
-      if (server == _chat.server && slug == _slug) _accepted = accepted;
-    } on ApiException {
-      // The server decides each file then.
-    }
+    final accepted = await acceptedTypes();
     if (server != _chat.server) return;
     final sent = await sendEach(
       _api,
       picked,
       accepted: accepted,
+      folder: _newFolder,
       shouldContinue: () => server == _chat.server,
       onSending: (name) {
         if (slug != _slug) return;
@@ -224,22 +257,62 @@ class SourcesController extends ChangeNotifier {
     await _readIn(slug, name, () => _api.uploadText(name, text, meta: meta));
   }
 
-  /// Runs [read], which reads [name] in on the server, then adds what it made.
+  /// Runs [read], which reads [name] in on the server into its default folder, then moves what
+  /// it made into the folder used last and adds it.
   Future<void> _readIn(
     String slug,
     String name,
     Future<List<DocEntry>> Function() read,
   ) async {
     final server = _chat.server;
+    final folder = _newFolder;
     sending = name;
     notifyListeners();
+    final List<DocEntry> made;
     try {
-      await _embedMade(server, slug, await read(), const []);
+      made = await read();
     } on ApiException catch (error) {
       await _embedMade(server, slug, const [], [
         Notice('Could not add $name', error.message),
       ]);
+      return;
     }
+    final notices = <Notice>[];
+    await _embedMade(
+      server,
+      slug,
+      // Moved only on the server that made them.
+      folder == null || server != _chat.server
+          ? made
+          : await _into(folder, made, notices),
+      notices,
+    );
+  }
+
+  /// [made] moved into [folder], those in it already as they are; when the server will not move
+  /// them they stay where they are, and [notices] says why.
+  Future<List<DocEntry>> _into(
+    String folder,
+    List<DocEntry> made,
+    List<Notice> notices,
+  ) async {
+    final moving = [
+      for (final doc in made)
+        if (doc.folder != folder) doc,
+    ];
+    if (moving.isEmpty) return made;
+    try {
+      await _api.moveDocuments([
+        for (final doc in moving) (from: doc.path, to: '$folder/${doc.name}'),
+      ]);
+    } on ApiException catch (error) {
+      notices.add(Notice('Could not put it in $folder', error.message));
+      return made;
+    }
+    return [
+      for (final doc in made)
+        doc.folder == folder ? doc : DocEntry(folder: folder, name: doc.name),
+    ];
   }
 
   /// Embeds [made] in workspace [slug] and shows [refused], with one more notice if embedding
@@ -268,59 +341,69 @@ class SourcesController extends ChangeNotifier {
     await refresh();
   }
 
-  /// Takes [file] out of Sources at once, and out of the workspace on the server only once its
-  /// toast is done with ([settleRemoval]): closed, replaced by another removal, left for another
-  /// workspace or the sheet's closing, or the app hiding. [undo] puts it back before then, and
-  /// nothing is sent.
-  Future<void> remove(SourceFile file) async {
+  /// Moves [file] into the library [folder], which a new document then goes into. The server
+  /// moves only a document no workspace uses, so one this workspace answers from is taken out of
+  /// it first and put back once moved, read in full again if it was; one the server leaves
+  /// where it is, as another workspace uses it, is put back as it was, and the notice says why.
+  Future<void> move(SourceFile file, String folder) async {
     final slug = _slug;
-    if (slug == null) return;
-    final before = settleRemoval();
-    _removed = (slug: slug, server: _chat.server, file: file);
-    notifyListeners();
-    await before;
-  }
-
-  /// Puts back the file [remove] took out, while its toast shows.
-  Future<void> undo() async {
-    if (_removed == null) return;
-    _removed = null;
-    notifyListeners();
-  }
-
-  /// Sends the removal the toast holds to the workspace it was made in, then reads that
-  /// workspace again while it is the active one, showing why it failed. One made on another
-  /// server than the one now in use is dropped, and the file stays where it was. Given [of], it
-  /// sends only that file's removal, should another have taken its place meanwhile.
-  Future<void> settleRemoval({SourceFile? of}) async {
-    final removed = _removed;
-    if (removed == null || _disposed) return;
-    if (of != null && removed.file.path != of.path) return;
-    _removed = null;
-    final (:slug, :server, :file) = removed;
-    if (server != _chat.server) {
-      notifyListeners();
-      return;
+    final server = _chat.server;
+    if (slug == null || folder == file.folder) return;
+    final to = '$folder/${file.storedName}';
+    var moved = false;
+    Notice? failed;
+    try {
+      if (file.on) await _embed(slug, file, on: false);
+      try {
+        await _api.moveDocuments([(from: file.path, to: to)]);
+        moved = true;
+      } on ApiException catch (error) {
+        failed = Notice('Could not move ${file.title}', error.message);
+      }
+      if (file.on) await _putBack(slug, file, moved ? to : file.path);
+    } on ApiException catch (error) {
+      failed ??= Notice(
+        moved
+            ? 'Moved ${file.title}, but could not switch it back on'
+            : 'Could not move ${file.title}',
+        error.message,
+      );
     }
-    // Out of the list until the read after the removal says otherwise.
-    if (slug == _slug) {
-      _files = [
-        for (final f in _files)
-          if (f.path != file.path) f,
-      ];
-    }
-    notifyListeners();
-    await _changeIn(
-      slug,
-      'Could not remove ${file.title}',
-      () => _put(slug, file, back: false),
-    );
+    if (server != _chat.server) return;
+    if (moved) await _prefs.setLastFolder(folder);
+    if (slug != _slug) return;
+    problems = [?failed];
+    await refresh();
   }
 
-  /// Takes [file] out of the workspace's answers, or puts it [back]: a switched-on file by its
-  /// embedding, a switched-off one by the note of it in the prefs.
-  Future<void> _put(String slug, SourceFile file, {required bool back}) =>
-      file.on ? _embed(slug, file, on: back) : _remember(slug, file, off: back);
+  /// Embeds [file] in workspace [slug] again at [path], read in full again if it was.
+  Future<void> _putBack(String slug, SourceFile file, String path) async {
+    await _api.updateEmbeddings(slug, adds: [path]);
+    if (file.pinned) await _api.pinDocument(slug, path, pinned: true);
+  }
+
+  /// Makes the library folder [name], or finds it there already, and reads the library again.
+  /// Says why it could not, or null.
+  Future<String?> createFolder(String name) async {
+    final folder = name.trim();
+    if (folderProblem(folder) case final problem?) return problem;
+    if (folders.contains(folder)) return null;
+    final slug = _slug;
+    final server = _chat.server;
+    try {
+      await _api.createFolder(folder);
+    } on ApiException catch (error) {
+      return error.message;
+    }
+    if (server == _chat.server && slug == _slug) await refresh();
+    return null;
+  }
+
+  /// Deletes [file] from the server, and so from every workspace that answers from it.
+  Future<void> delete(SourceFile file) => _change(
+    'Could not delete ${file.title}',
+    (_) => _api.deleteDocuments([file.path]),
+  );
 
   /// Finds the passages of the switched-on files that [query] would give an answer, as the
   /// workspace's own settings choose them.
@@ -428,40 +511,24 @@ class SourcesController extends ChangeNotifier {
         deletes: [if (!on) file.path],
       );
 
-  /// Adds [file] to the workspace's remembered switched-off files, or drops it from them.
-  Future<void> _remember(String slug, SourceFile file, {required bool off}) =>
-      _prefs.setOff(slug, [
-        for (final doc in _prefs.offIn(slug))
-          if (doc.path != file.path) doc,
-        if (off) file.asOff,
-      ]);
-
-  /// Runs [op] on the active workspace, then shows why it failed, or nothing, and reads the
-  /// workspace again, while it is still the active one on the same server.
+  /// Runs [op] on the active workspace, then, while it is still the active one on the same
+  /// server, shows why it failed, or nothing, and reads the workspace again, and the library
+  /// unless [library] is false.
   Future<void> _change(
     String failTitle,
-    Future<void> Function(String) op,
-  ) async {
+    Future<void> Function(String) op, {
+    bool library = true,
+  }) async {
     final slug = _slug;
-    if (slug == null) return;
-    await _changeIn(slug, failTitle, () => op(slug));
-  }
-
-  /// Runs [op] on workspace [slug], then, while it is the active one on the same server, shows
-  /// why it failed, or nothing, and reads it again.
-  Future<void> _changeIn(
-    String slug,
-    String failTitle,
-    Future<void> Function() op,
-  ) async {
     final server = _chat.server;
+    if (slug == null) return;
     await changeThenRead(
       failTitle,
-      op,
+      () => op(slug),
       current: () => server == _chat.server && slug == _slug,
       readAgain: (failed) {
         problems = [?failed];
-        return refresh();
+        return refresh(library: library);
       },
     );
   }

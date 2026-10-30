@@ -21,6 +21,7 @@ import 'shelf.dart';
 import 'sidebar.dart';
 import 'share/shared_item.dart';
 import 'workspace_sheets.dart';
+import 'sources/document_details.dart';
 import 'sources/sources_panel.dart';
 import 'workspace_switcher.dart';
 import 'state/shell_controller.dart';
@@ -66,6 +67,8 @@ class AppShell extends StatelessWidget {
       if (shell.popup.value != null) return shell.closePopup;
       if (shell.settingsOpen) return () => shell.settingsBack(split: split);
       if (shell.shelfOpen && !sidebar) return shell.closeShelf;
+      // A document's details, over the sheet or in the Documents pane.
+      if (shell.document != null) return shell.closeDocument;
       if (shell.passagesOpen) return shell.closePassages;
       if (shell.citedOpen) return shell.closeCited;
       if (shell.rightOpen) return shell.closeSources;
@@ -117,6 +120,21 @@ class AppShell extends StatelessWidget {
                         Positioned.fill(child: _Main(sidebar: sidebar)),
                         // The sheet's own scrim closes it.
                         if (shell.rightOpen) Positioned.fill(child: right),
+                        // A document's details over the sheet; the Documents pane shows its own.
+                        if (shell.document case final name?
+                            when shell.pane != Pane.documents)
+                          Positioned.fill(
+                            child: ColoredBox(
+                              color: t.ground,
+                              child: SafeArea(
+                                bottom: false,
+                                child: DocumentDetailsPage(
+                                  name,
+                                  key: ValueKey(('details', name)),
+                                ),
+                              ),
+                            ),
+                          ),
                         // Over the sheet, since a page opened from elsewhere, as a pairing
                         // link opens Connection, shows over what showed.
                         if (shell.settingsOpen && !sidebar)
@@ -167,10 +185,6 @@ class AppShell extends StatelessWidget {
                               final ChatSheetFor of => ChatSheet(
                                 of,
                                 key: ValueKey(of.thread.slug),
-                              ),
-                              final RemoveDocFor removing => RemoveDocSheet(
-                                removing,
-                                key: ObjectKey(removing),
                               ),
                               _ => const SizedBox.shrink(),
                             },

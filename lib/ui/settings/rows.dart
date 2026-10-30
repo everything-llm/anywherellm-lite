@@ -61,9 +61,13 @@ class CardCaption extends StatelessWidget {
 /// whose hairlines stop [inset] short of its sides, where its rows keep their
 /// text. In a [SheetFrame] it is filled with [Tokens.ground], as a card in a sheet is.
 class FieldCard extends StatelessWidget {
-  const FieldCard(this.rows, {super.key});
+  const FieldCard(this.rows, {super.key, this.ruledAt});
 
   final List<Widget> rows;
+
+  /// Whether the row at an index has a hairline over it, when not every row but the first has,
+  /// as a row under a heading of its own has none.
+  final bool Function(int i)? ruledAt;
 
   /// How far the rows keep their text from the card's sides.
   static const inset = 20.0;
@@ -77,7 +81,8 @@ class FieldCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (final (i, row) in rows.indexed) Ruled(ruled: i > 0, child: row),
+          for (final (i, row) in rows.indexed)
+            Ruled(ruled: ruledAt?.call(i) ?? i > 0, child: row),
         ],
       ),
     );
@@ -110,11 +115,15 @@ class SliverFieldCard extends StatelessWidget {
     required this.count,
     required this.row,
     this.keyOf,
+    this.ruledAt,
   });
 
   final int count;
   final IndexedWidgetBuilder row;
   final Key Function(int i)? keyOf;
+
+  /// As [FieldCard.ruledAt].
+  final bool Function(int i)? ruledAt;
 
   @override
   Widget build(BuildContext context) {
@@ -146,7 +155,10 @@ class SliverFieldCard extends StatelessWidget {
               bottom: i == count - 1 ? corner : Radius.zero,
             ),
             clipBehavior: i == 0 || i == count - 1 ? Clip.antiAlias : Clip.none,
-            child: Ruled(ruled: i > 0, child: row(context, i)),
+            child: Ruled(
+              ruled: ruledAt?.call(i) ?? i > 0,
+              child: row(context, i),
+            ),
           ),
         ),
       ),

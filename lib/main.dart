@@ -126,13 +126,10 @@ class _SessionHostState extends State<SessionHost> {
     _system = SystemController(widget.llm, widget.settings);
     _readAloud = ReadAloud(DeviceSpeaker(), _chat, widget.prefs);
     _keepAnswering = KeepAnswering(_background, _chat, widget.shell);
-    // A deleted chat or a removed document waiting to be undone goes as the app hides: Android
-    // can end a hidden app without a word.
+    // A deleted chat waiting to be undone goes as the app hides: Android can end a hidden app
+    // without a word.
     _lifecycle = AppLifecycleListener(
-      onHide: () {
-        unawaited(_chat.flushDelete());
-        unawaited(_sources.settleRemoval());
-      },
+      onHide: () => unawaited(_chat.flushDelete()),
     );
     _loaded = _load();
   }

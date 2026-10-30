@@ -31,12 +31,16 @@ final class Picked extends PlatformFile {
   Stream<Uint8List> readAsByteStream() => Stream.value(bytes);
 }
 
-/// A file picker that picks [files], once [picked] completes when it is given.
+/// A file picker that picks [files], once [picked] completes when it is given, and keeps the
+/// [type] and [allowedExtensions] it was last opened with.
 class FakePicker extends FilePickerPlatform {
   FakePicker(this.files, {this.picked});
 
   List<PlatformFile> files;
   final Future<void>? picked;
+
+  FileType? type;
+  List<String>? allowedExtensions;
 
   @override
   Future<List<PlatformFile>> pickFiles({
@@ -52,6 +56,8 @@ class FakePicker extends FilePickerPlatform {
     LinuxOptions linuxOptions = const LinuxOptions(),
     WebOptions webOptions = const WebOptions(),
   }) async {
+    this.type = type;
+    this.allowedExtensions = allowedExtensions;
     await picked;
     return files;
   }

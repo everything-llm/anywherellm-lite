@@ -17,17 +17,23 @@ class _Pending {
 }
 
 /// The files picked to add, which wait in a list, each with its own details and a remove
-/// button, until Add sends them all through [onSend].
+/// button, until Add sends them all through [onSend]. The picker offers only the [types] the
+/// server reads.
 class UploadQueue extends StatefulWidget {
   const UploadQueue({
     super.key,
     required this.onSend,
     required this.onProblem,
     required this.trigger,
+    this.types,
   });
 
   final Future<void> Function(List<UploadFile> files) onSend;
   final void Function(String title, String text) onProblem;
+
+  /// The extensions the file picker offers, as `.md`, asked for as it opens; null, or none
+  /// known, offers any file.
+  final Future<Set<String>?> Function()? types;
 
   /// What opens the file picker, given the way to open it, such as an Add a file button among
   /// others.
@@ -78,13 +84,21 @@ class _UploadQueueState extends State<UploadQueue> {
     await widget.onSend(files);
   }
 
-  /// Opens the system's file picker and lists what is picked, or says why the picker would not
-  /// open. Nothing is read until it is sent, and an unreadable file becomes a reason instead of
-  /// an error.
+  /// Opens the system's file picker on the [UploadQueue.types] the server reads, and lists what
+  /// is picked, or says why the picker would not open. Nothing is read until it is sent, and an
+  /// unreadable file becomes a reason instead of an error.
   Future<void> _browse() async {
+    final types = [
+      for (final type in await widget.types?.call() ?? const <String>{})
+        if (type.startsWith('.') && type.length > 1) type.substring(1),
+    ]..sort();
+    if (!mounted) return;
     final List<PlatformFile> picked;
     try {
-      picked = await FilePicker.pickFiles();
+      picked = await FilePicker.pickFiles(
+        type: types.isEmpty ? FileType.any : FileType.custom,
+        allowedExtensions: types.isEmpty ? null : types,
+      );
     } catch (error) {
       if (mounted) widget.onProblem('Could not open the file picker', '$error');
       return;

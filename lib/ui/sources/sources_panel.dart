@@ -1,17 +1,15 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../core/sources.dart';
 import '../app_scope.dart';
 import '../icons.dart';
-import '../state/shell_controller.dart';
 import '../state/sources_controller.dart';
 import '../settings/rows.dart';
 import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
 import '../widgets/basics.dart';
+import '../widgets/tappable.dart';
 import '../widgets/buttons.dart';
 import '../widgets/controls.dart';
 import '../widgets/upload_queue.dart';
@@ -20,8 +18,8 @@ import '../widgets/sheet.dart';
 import 'add_source.dart';
 import 'test_question.dart';
 
-/// The active workspace's files, which people see as Documents: switch them on and off, remove
-/// them, add them, and test what a question finds in them.
+/// The server's library, which people see as Documents: switch each document on and off for the
+/// active workspace, open one's details, add documents, and test what a question finds in them.
 class SourcesPanel extends StatelessWidget {
   const SourcesPanel({super.key});
 
@@ -41,7 +39,7 @@ class SourcesPanel extends StatelessWidget {
   }
 }
 
-/// What waits, is being added or went wrong, and the undo of a removal, under the ways to add.
+/// What waits, is being added or went wrong, under the ways to add.
 List<Widget> documentNotices(BuildContext context) {
   final sources = AppScope.of(context).sources;
   final t = Tokens.of(context);
@@ -54,56 +52,65 @@ List<Widget> documentNotices(BuildContext context) {
       const SizedBox(height: 10),
       AlertBox.notice(AlertKind.bad, problem),
     ],
-    if (sources.removed case final file?) ...[
-      const SizedBox(height: 10),
-      _RemovedBar(file, key: ValueKey(('removed', file.path))),
-    ],
   ];
 }
 
-/// The toast of a document just removed, with Undo and Close. The removal goes to the server
-/// when it is closed, or when the toast leaves the screen, as when the sheet or the pane that
-/// shows it closes.
-class _RemovedBar extends StatefulWidget {
-  const _RemovedBar(this.file, {super.key});
+/// The line over Documents' card: what its switches mean, or that the library is empty.
+String documentsCaption(SourcesController sources) =>
+    sources.files.isEmpty && !sources.loading
+    ? 'No documents on the server yet.'
+    : 'Answers draw on the ones switched on.';
 
-  final SourceFile file;
-
-  @override
-  State<_RemovedBar> createState() => _RemovedBarState();
+/// What Documents' card holds, top to bottom: the [files], each folder's name, a [String], over
+/// its files once they are in more than one folder.
+List<Object> documentItems(List<SourceFile> files) {
+  final folders = byFolder(files);
+  if (folders.length < 2) return files;
+  return [
+    for (final (folder, inIt) in folders) ...[folder, ...inIt],
+  ];
 }
 
-class _RemovedBarState extends State<_RemovedBar> {
-  late final SourcesController _sources;
+/// Whether the item of Documents' card at [i] has a hairline over it: every one but the first,
+/// and a file under its folder's name.
+bool documentRuled(List<Object> items, int i) =>
+    i > 0 && items[i - 1] is! String;
+
+/// The item of Documents' card [item]: a folder's name, or a file's row, lit while it is the
+/// one whose details show beside the list ([chosen]) or a citation [flashed] it.
+Widget documentItem(
+  Object item, {
+  required bool flashed,
+  bool chosen = false,
+}) => switch (item) {
+  final SourceFile file => DocumentRow(
+    file,
+    key: ValueKey(file.path),
+    flashed: flashed,
+    chosen: chosen,
+  ),
+  final folder => FolderHeading('$folder', key: ValueKey(('folder', folder))),
+};
+
+/// A library folder's name over its documents in Documents' card, small, in ink.
+class FolderHeading extends StatelessWidget {
+  const FolderHeading(this.name, {super.key});
+
+  final String name;
 
   @override
-  void initState() {
-    super.initState();
-    _sources = AppScope.of(context).sources;
-  }
-
-  @override
-  void dispose() {
-    // After the frame: settling tells Sources' listeners, which may not rebuild while the tree
-    // is being torn down.
-    final (sources, file) = (_sources, widget.file);
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => unawaited(sources.settleRemoval(of: file)),
-    );
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => UndoBar(
-    'Removed ${widget.file.title}',
-    onUndo: () => unawaited(_sources.undo()),
-    onClose: () => unawaited(_sources.settleRemoval()),
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(FieldCard.inset, 12, FieldCard.inset, 4),
+    child: Semantics(
+      header: true,
+      child: Text(name, style: Type.caption(Tokens.of(context).ink)),
+    ),
   );
 }
 
-/// The sheet: what the switches mean, the files in a card, each with its switch and Remove, then
-/// Add a file, Add a link and Paste text as buttons, and Test a question. It is as tall as what
-/// it holds.
+/// The sheet: what the switches mean, the library in a card, each document with its switch,
+/// under its folder's name once there is more than one, then Add a file, Add a link and Paste
+/// text as buttons, and Test a question. It is as tall as what it holds.
 class _Body extends StatelessWidget {
   const _Body(this.files);
 
@@ -116,6 +123,7 @@ class _Body extends StatelessWidget {
     final sources = scope.sources;
     final slug = scope.chat.activeSlug;
     final card = files.isNotEmpty || sources.loading;
+    final items = documentItems(files);
     return CustomScrollView(
       shrinkWrap: true,
       slivers: [
@@ -123,11 +131,7 @@ class _Body extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              CardCaption(
-                files.isEmpty && !sources.loading
-                    ? 'No documents in this workspace yet.'
-                    : 'Answers draw on the ones switched on.',
-              ),
+              CardCaption(documentsCaption(sources)),
               ...documentNotices(context),
               const SizedBox(height: 16),
             ],
@@ -138,13 +142,20 @@ class _Body extends StatelessWidget {
             SliverToBoxAdapter(child: FieldCard(const [CardNote('Loading…')]))
           else
             SliverFieldCard(
-              count: files.length,
-              keyOf: (i) => ValueKey(files[i].path),
+              count: items.length,
+              keyOf: (i) => switch (items[i]) {
+                final SourceFile file => ValueKey(file.path),
+                final folder => ValueKey(('folder', folder)),
+              },
+              ruledAt: (i) => documentRuled(items, i),
               row: (context, i) => Rise(
-                child: DocumentRow(
-                  files[i],
-                  flashed: sources.flashed == files[i].path,
-                ),
+                child: switch (items[i]) {
+                  final SourceFile file => documentItem(
+                    file,
+                    flashed: sources.flashed == file.path,
+                  ),
+                  final folder => documentItem(folder, flashed: false),
+                },
               ),
             ),
           const SliverToBoxAdapter(child: SizedBox(height: 16)),
@@ -157,6 +168,7 @@ class _Body extends StatelessWidget {
                 key: ValueKey(('queue', slug)),
                 onSend: sources.upload,
                 onProblem: sources.report,
+                types: sources.acceptedTypes,
                 trigger: (browse) => AddSource(
                   key: ValueKey(('add', slug)),
                   leading: AppButton('Add a file', onPressed: browse),
@@ -180,34 +192,54 @@ class _Body extends StatelessWidget {
   }
 }
 
-/// A file in a card of Documents: its type, name and size, its switch, and Remove, which asks
-/// first ([RemoveDocFor]). A citation's [flashed] fills it for a moment. It opens nothing.
+/// A file in Documents' card: its type, name and the line under it, which open its details, then
+/// its switch, which puts it in the open workspace's answers or takes it out. A citation's
+/// [flashed], or being the one whose details show beside the list ([chosen]), fills it.
 class DocumentRow extends StatelessWidget {
-  const DocumentRow(this.file, {super.key, required this.flashed});
+  const DocumentRow(
+    this.file, {
+    super.key,
+    required this.flashed,
+    this.chosen = false,
+  });
 
   final SourceFile file;
   final bool flashed;
+  final bool chosen;
 
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
-    // A citation's flash fills the row.
     return AnimatedContainer(
       duration: motion(context, const Duration(milliseconds: 300)),
-      color: flashed ? t.accentSoft : Colors.transparent,
+      color: flashed || chosen ? t.accentSoft : Colors.transparent,
       constraints: const BoxConstraints(minHeight: Sizes.cardRow),
       child: Row(
         children: [
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(left: FieldCard.inset),
-              // Heard as one: its name and size.
-              child: MergeSemantics(child: SourceRow(file, meta: file.meta)),
+            child: Tappable(
+              label: 'Details of ${file.title}',
+              selected: chosen ? true : null,
+              onTap: () => scope.shell.openDocument(file.storedName),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: Sizes.cardRow),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(FieldCard.inset, 8, 0, 8),
+                  child: Row(
+                    spacing: 8,
+                    children: [
+                      Expanded(child: SourceRow(file, meta: file.meta)),
+                      AppIcon('chevron', size: IconSize.xs, color: t.muted),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
+          // In a 52 column at the card's inset, as a [FieldRow]'s switch is.
           Padding(
-            padding: const EdgeInsets.only(left: 8),
+            padding: const EdgeInsets.only(left: 6, right: FieldCard.inset),
             child: AppSwitch(
               value: file.on,
               label: 'Use ${file.title} in answers',
@@ -215,51 +247,7 @@ class DocumentRow extends StatelessWidget {
               onChanged: (_) => scope.sources.toggle(file),
             ),
           ),
-          // Tapped in 48 around its 44, so 10 keeps it 8 from the switch.
-          Padding(
-            padding: const EdgeInsets.only(left: 10, right: 10),
-            child: IconBtn(
-              'trash',
-              tooltip: 'Remove ${file.title} from workspace',
-              box: 44,
-              size: IconSize.small,
-              onPressed: () => scope.shell.togglePopup(RemoveDocFor(file)),
-            ),
-          ),
         ],
-      ),
-    );
-  }
-}
-
-/// The question whether to take [removing]'s file out of the open workspace, over the window:
-/// Remove takes it out, with a toast to undo it, and Keep leaves it. A file no longer in the
-/// workspace, as after another workspace opened, is left alone.
-class RemoveDocSheet extends StatelessWidget {
-  const RemoveDocSheet(this.removing, {super.key});
-
-  final RemoveDocFor removing;
-
-  @override
-  Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    final file = removing.file;
-    void close() => scope.shell.closePopup(removing);
-    return ModalSheet(
-      title: 'Remove from workspace',
-      onClose: close,
-      child: SheetQuestion(
-        'Remove ${file.title} from ${scope.chat.active?.name ?? 'this workspace'}? Answers '
-        'stop drawing on it. The server keeps the file, to add again from Documents.',
-        action: 'Remove',
-        onKeep: close,
-        onConfirm: () {
-          close();
-          final sources = scope.sources;
-          if (sources.files.any((f) => f.path == file.path)) {
-            unawaited(sources.remove(file));
-          }
-        },
       ),
     );
   }

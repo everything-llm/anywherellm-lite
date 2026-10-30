@@ -64,6 +64,19 @@ Future<void> _section(
   await _settle(tester);
 }
 
+/// Home insurance.pdf's details over the Documents sheet, with [popup] open over them.
+Future<void> _docDetails(WidgetTester tester, Harness h, [Popup? popup]) async {
+  await _workspace(tester, h);
+  h.shell
+    ..openSources()
+    ..openDocument(h.sources.byTitle('Home insurance.pdf')!.storedName);
+  await _settle(tester);
+  if (popup != null) {
+    h.shell.togglePopup(popup);
+    await _settle(tester);
+  }
+}
+
 Future<void> _settings(
   WidgetTester tester,
   Harness h,
@@ -118,15 +131,9 @@ final _screens = <String, _Setup>{
     h.shell.openSources();
     await _settle(tester);
   },
-  'docremove': (tester, h) async {
-    await _workspace(tester, h);
-    h.shell.openSources();
-    await _settle(tester);
-    await tester.tap(
-      find.byTooltip('Remove Home insurance.pdf from workspace'),
-    );
-    await _settle(tester);
-  },
+  'docdetails': (tester, h) => _docDetails(tester, h),
+  'docmove': (tester, h) => _docDetails(tester, h, Popup.moveDocument),
+  'docdelete': (tester, h) => _docDetails(tester, h, Popup.deleteDocument),
   'instr': (tester, h) => _section(tester, h, FilesSection.instructions),
   'answers': (tester, h) => _section(tester, h, FilesSection.answers),
   'wsmenu': (tester, h) async {

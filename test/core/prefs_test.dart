@@ -7,20 +7,13 @@ const _s = 'https://s:3001';
 const _t = 'https://t:3001';
 
 void main() {
-  test('round-trips through its JSON', () {
-    const prefs = Prefs(
-      switchedOff: {
-        '$_s q3': [
-          OffDoc(path: 'custom-documents/a.json', title: 'a.md', words: 9),
-        ],
-      },
-    );
+  test('the folder used last round-trips, by server', () {
+    final prefs = const Prefs()
+        .withLastFolder(_s, 'Manuals')
+        .withLastFolder(_t, 'Bills and papers');
     final back = Prefs.decode(prefs.encode());
-    final doc = back.offIn(_s, 'q3').single;
-    expect(
-      (doc.path, doc.title, doc.words),
-      ('custom-documents/a.json', 'a.md', 9),
-    );
+    expect(back.lastFolders, {_s: 'Manuals', _t: 'Bills and papers'});
+    expect(const Prefs().encode(), isNot(contains('lastFolders')));
   });
 
   test('shortcuts and their sent exchange details round-trip', () {
@@ -43,47 +36,33 @@ void main() {
     );
   });
 
-  test('whether a switched-off file is a web page round-trips when known', () {
-    const prefs = Prefs(
-      switchedOff: {
-        '$_s q3': [
-          OffDoc(path: 'f/a.json', title: 'a', web: true),
-          OffDoc(path: 'f/b.json', title: 'b'),
-        ],
-      },
-    );
-    expect(prefs.encode(), isNot(contains('"web":null')));
-    final [web, unknown] = Prefs.decode(prefs.encode()).offIn(_s, 'q3');
-    expect((web.web, unknown.web), (true, null));
-  });
-
   test('text that is not its JSON reads as the defaults', () {
-    for (final text in ['', 'nope', '[]', '{"switchedOff": 3}']) {
+    for (final text in ['', 'nope', '[]', '{"lastFolders": 3}']) {
       final prefs = Prefs.decode(text);
-      expect(prefs.switchedOff, isEmpty, reason: text);
+      expect(prefs.lastFolders, isEmpty, reason: text);
+      expect(prefs.workspaceOrder, isEmpty, reason: text);
     }
   });
 
-  test('an old file with the answers switch still loads', () {
-    final prefs = Prefs.decode(
-      '{"groundedOnly": true, "switchedOff": {"w": [{"path": "f/x.json"}]}}',
-    );
-    expect(prefs.adoptedBy(_s).offIn(_s, 'w').single.path, 'f/x.json');
-    expect(prefs.encode(), isNot(contains('groundedOnly')));
-  });
+  test(
+    'an old file with the answers switch and switched-off documents loads',
+    () {
+      final prefs = Prefs.decode(
+        '{"groundedOnly": true, "switchedOff": {"w": [{"path": "f/x.json"}]},'
+        ' "workspaceOrder": ["w"]}',
+      );
+      expect(prefs.workspaceOrder, ['w']);
+      expect(prefs.hasUnowned, isFalse);
+      expect(prefs.encode(), isNot(contains('groundedOnly')));
+      expect(prefs.encode(), isNot(contains('switchedOff')));
+    },
+  );
 
-  test('entries it cannot read are skipped', () {
+  test('a folder it cannot read is skipped', () {
     final prefs = Prefs.decode(
-      '{"switchedOff": {"w": [{"path": ""}, 7, {"path": "f/x.json"}]}}',
+      '{"lastFolders": {"$_s": "", "$_t": 7, "https://u": "Manuals"}}',
     );
-    expect(prefs.adoptedBy(_s).offIn(_s, 'w').single.title, 'f/x.json');
-  });
-
-  test('withOff replaces one workspace and drops it when empty', () {
-    const doc = OffDoc(path: 'p', title: 't');
-    final prefs = const Prefs().withOff(_s, 'a', [doc]).withOff(_s, 'b', [doc]);
-    expect(prefs.switchedOff.keys, ['$_s a', '$_s b']);
-    expect(prefs.withOff(_s, 'a', []).switchedOff.keys, ['$_s b']);
+    expect(prefs.lastFolders, {'https://u': 'Manuals'});
   });
 
   test('the order, theme and text size round-trip', () {
@@ -185,39 +164,27 @@ void main() {
     expect(prefs.withRenamedWorkspace(_s, 'b', 'c').workspaceOrder, ['a', 'c']);
   });
 
-  test('switching a document off keeps the other prefs', () {
+  test('the folder used last keeps the other prefs', () {
     final prefs = const Prefs()
         .withTheme(ThemePref.light)
         .withOrder(['a'])
-        .withOff(_s, 'a', const [OffDoc(path: 'f/x.json', title: 'x')]);
+        .withLastFolder(_s, 'Manuals');
     expect(prefs.theme, ThemePref.light);
     expect(prefs.workspaceOrder, ['a']);
-    expect(prefs.withoutWorkspace(_s, 'a').workspaceOrder, isEmpty);
+    expect(prefs.withoutWorkspace(_s, 'a').lastFolders, {_s: 'Manuals'});
   });
 
   test(
-    'two servers keep apart what is switched off in same-named workspaces',
+    'what was saved before servers were told apart goes to the first one',
     () {
-      const a = OffDoc(path: 'f/a.json', title: 'a');
-      final prefs = const Prefs().withOff(_s, 'my-workspace', [a]);
-      expect(prefs.offIn(_s, 'my-workspace').single.path, 'f/a.json');
-      expect(prefs.offIn(_t, 'my-workspace'), isEmpty);
+      final prefs = Prefs.decode('{"lastChat": {"slug": "w", "thread": "t1"}}');
+      expect(prefs.hasUnowned, isTrue);
+      final adopted = prefs.adoptedBy(_s);
+      expect(adopted.hasUnowned, isFalse);
+      expect(adopted.lastChat, const LastChat('w', 't1', _s));
+      expect(Prefs.decode(adopted.encode()).hasUnowned, isFalse);
     },
   );
-
-  test('what was saved before servers were told apart goes to the first one', () {
-    final prefs = Prefs.decode(
-      '{"switchedOff": {"w": [{"path": "f/x.json"}], "$_t w": [{"path": "f/y.json"}]},'
-      ' "lastChat": {"slug": "w", "thread": "t1"}}',
-    );
-    expect(prefs.hasUnowned, isTrue);
-    final adopted = prefs.adoptedBy(_s);
-    expect(adopted.hasUnowned, isFalse);
-    expect(adopted.offIn(_s, 'w').single.path, 'f/x.json');
-    expect(adopted.offIn(_t, 'w').single.path, 'f/y.json');
-    expect(adopted.lastChat, const LastChat('w', 't1', _s));
-    expect(Prefs.decode(adopted.encode()).hasUnowned, isFalse);
-  });
 
   group('pinned and recent chats', () {
     test('round-trip through its JSON, by server and workspace', () {
@@ -265,16 +232,6 @@ void main() {
       expect(noWorkspace.pinnedIn(_s, 'q3'), isEmpty);
       expect(noWorkspace.recentIn(_s, 'q3'), isEmpty);
       expect(noWorkspace.pinnedIn(_s, 'home'), ['h']);
-    });
-
-    test('a deleted workspace takes its switched-off documents with it', () {
-      final off = [OffDoc(path: 'f/a.json', title: 'a')];
-      final prefs = const Prefs()
-          .withOff(_s, 'q3', off)
-          .withOff(_s, 'home', off);
-      final noWorkspace = prefs.withoutWorkspace(_s, 'q3');
-      expect(noWorkspace.offIn(_s, 'q3'), isEmpty);
-      expect(noWorkspace.offIn(_s, 'home'), isNotEmpty);
     });
 
     test('move with a workspace whose slug changes', () {

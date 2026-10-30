@@ -18,8 +18,8 @@ class PrefsController extends ChangeNotifier {
   /// Why the last change could not be saved. The change still holds for this run.
   Notice? problem;
 
-  /// The address of the server in use, which the switched-off documents and the last chat
-  /// belong to, or null when none is.
+  /// The address of the server in use, which the pins, recent chats, last folder and the last
+  /// chat belong to, or null when none is.
   String? _server;
 
   Future<void> load() async {
@@ -28,8 +28,8 @@ class PrefsController extends ChangeNotifier {
     await _adopt();
   }
 
-  /// Makes [server] the one the switched-off documents and the last chat are about. What was
-  /// saved before servers were told apart becomes the first server's.
+  /// Makes [server] the one the pins, recent chats, last folder and the last chat are about.
+  /// What was saved before servers were told apart becomes the first server's.
   Future<void> useServer(String? server) async {
     _server = server;
     await _adopt();
@@ -41,13 +41,14 @@ class PrefsController extends ChangeNotifier {
     }
   }
 
-  /// The documents switched off in workspace [slug] of the server in use.
-  List<OffDoc> offIn(String slug) =>
-      _server == null ? const [] : prefs.offIn(_server!, slug);
+  /// The library folder of the server in use that a document was last moved into, or null.
+  String? get lastFolder =>
+      _server == null ? null : prefs.lastFolders[_server!];
 
-  Future<void> setOff(String slug, List<OffDoc> docs) async {
-    if (_server case final server?) {
-      await _change(prefs.withOff(server, slug, docs));
+  /// Makes [folder] the one a new document goes into on the server in use.
+  Future<void> setLastFolder(String folder) async {
+    if (_server case final server? when prefs.lastFolders[server] != folder) {
+      await _change(prefs.withLastFolder(server, folder));
     }
   }
 

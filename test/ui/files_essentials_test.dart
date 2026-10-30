@@ -84,44 +84,26 @@ void main() {
     },
   );
 
-  testWidgets('a document is removed from its row, which asks first', (
-    tester,
-  ) async {
-    final h = await openPages(tester);
-    await openPage(tester, 'Documents');
-    // A row opens nothing: only its switch and Remove act.
-    await tester.tap(inSheet(find.text('Q3 roadmap.pdf')));
-    await tester.pumpAndSettle();
-    expect((h.shell.rightOpen, h.shell.pane), (true, Pane.files));
-    await tester.tap(control('Remove Q3 roadmap.pdf from workspace'));
-    await tester.pumpAndSettle();
-    expect(
-      find.textContaining('Remove Q3 roadmap.pdf from Q3'),
-      findsOneWidget,
-    );
-    await tester.tap(asked('Keep'));
-    await tester.pumpAndSettle();
-    expect(
-      h.llm.calls.where((c) => c.startsWith('updateEmbeddings')),
-      isEmpty,
-      reason: 'Keep leaves it in the workspace',
-    );
-    await tester.tap(control('Remove Q3 roadmap.pdf from workspace'));
-    await tester.pumpAndSettle();
-    await tester.tap(asked('Remove'));
-    await tester.pumpAndSettle();
-    // The undo is in the sheet, which stays open.
-    expect((h.shell.rightOpen, h.shell.beside), (true, Beside.sources));
-    expect(inSheet(find.text('Removed Q3 roadmap.pdf')), findsOneWidget);
-    expect(
-      h.sources.files.map((f) => f.title),
-      isNot(contains('Q3 roadmap.pdf')),
-    );
-    await tester.tap(inSheet(control('Undo')));
-    await tester.pumpAndSettle();
-    expect(h.sources.files.map((f) => f.title), contains('Q3 roadmap.pdf'));
-    expect(h.llm.calls.where((c) => c.startsWith('updateEmbeddings')), isEmpty);
-  });
+  testWidgets(
+    'a row opens its details over the sheet, and Back gives it back',
+    (tester) async {
+      final h = await openPages(tester);
+      await openPage(tester, 'Documents');
+      expect(control('Remove Q3 roadmap.pdf from workspace'), findsNothing);
+      await tester.tap(inSheet(control('Details of Q3 roadmap.pdf')));
+      await tester.pumpAndSettle();
+      expect(h.shell.document, 'Q3 roadmap.pdf.json');
+      expect(find.text('Document details'), findsOneWidget);
+      await tester.tap(control('Back to Documents'));
+      await tester.pumpAndSettle();
+      expect(h.shell.document, isNull);
+      expect((h.shell.rightOpen, h.shell.pane), (true, Pane.files));
+      expect(
+        h.llm.calls.where((c) => c.startsWith('updateEmbeddings')),
+        isEmpty,
+      );
+    },
+  );
 
   testWidgets('a file added waits, then goes to the workspace', (tester) async {
     final llm = planningServer();

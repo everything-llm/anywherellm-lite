@@ -76,7 +76,7 @@ void main() {
     await saving;
   });
 
-  test('lists the workspace\'s files, on', () async {
+  test('lists the library, on where the workspace uses it', () async {
     final rig = await started(planningServer());
     expect(rig.sources.files.map((f) => (f.title, f.on)), [
       ('Q3 roadmap.pdf', true),
@@ -85,46 +85,52 @@ void main() {
     expect(rig.sources.onCount, 2);
   });
 
-  test('switching off unembeds the file and keeps it listed', () async {
+  test('switching off unembeds the file, which stays in the library', () async {
     final llm = planningServer();
     final rig = await started(llm);
+    int libraryReads() => llm.calls.where((c) => c == 'libraryFolders').length;
+    final read = libraryReads();
     await rig.sources.toggle(rig.sources.files.first);
     expect(
       llm.calls,
       contains('updateEmbeddings:+-custom-documents/Q3 roadmap.pdf.json'),
     );
     expect(rig.sources.files.map((f) => (f.title, f.on)), [
-      ('Customer interviews.docx', true),
       ('Q3 roadmap.pdf', false),
+      ('Customer interviews.docx', true),
     ]);
-    expect(
-      rig.prefsStore.saved.offIn(rig.chat.server!.baseUrl, 'q3').single.title,
-      'Q3 roadmap.pdf',
-    );
+    expect(llm.library, hasLength(2));
+    // A switch changes the workspace alone: the library is not read again.
+    expect(libraryReads(), read);
 
-    await rig.sources.toggle(rig.sources.files.last);
+    await rig.sources.toggle(rig.sources.files.first);
     expect(rig.sources.files.every((f) => f.on), isTrue);
-    expect(rig.prefsStore.saved.offIn(rig.chat.server!.baseUrl, 'q3'), isEmpty);
   });
 
-  test(
-    'a file switched off as the server changes is not kept for the new one',
-    () async {
-      final llm = planningServer();
-      final rig = await started(llm);
-      final gate = llm.gates['updateEmbeddings'] = Completer<void>();
-      final switching = rig.sources.toggle(rig.sources.files.first);
-      await pumpEventQueue();
-      await rig.settings.save('https://other:3001', 'K2');
-      gate.complete();
-      await switching;
-      expect(rig.prefsStore.saved.offIn('https://other:3001', 'q3'), isEmpty);
-      expect(
-        rig.prefsStore.saved.offIn(sampleConnection.baseUrl, 'q3'),
-        isEmpty,
-      );
-    },
-  );
+  test('every document on the server is listed, by its folder', () async {
+    final llm = planningServer();
+    libraryDoc(llm, 'Boiler manual.pdf', folder: 'Manuals');
+    final rig = await started(llm);
+    expect(rig.sources.files.map((f) => (f.title, f.folder, f.on)), [
+      ('Q3 roadmap.pdf', 'custom-documents', true),
+      ('Customer interviews.docx', 'custom-documents', true),
+      ('Boiler manual.pdf', 'Manuals', false),
+    ]);
+    expect(rig.sources.folders, ['custom-documents', 'Manuals']);
+    expect(rig.sources.onCount, 2);
+    expect(rig.chat.docCounts['q3'], 2);
+  });
+
+  test('a library that cannot be read leaves the workspace\'s own', () async {
+    final llm = planningServer()
+      ..errors['libraryFolders'] = const ApiException('busy');
+    final rig = await started(llm);
+    expect(rig.sources.files, hasLength(2));
+    expect(
+      rig.sources.problems.single.title,
+      'Could not read the server\'s documents',
+    );
+  });
 
   test('an added file is uploaded and embedded', () async {
     final llm = planningServer();
@@ -153,50 +159,6 @@ void main() {
     },
   );
 
-  // testWidgets for its fake clock, which shows the undo has no timer.
-  testWidgets(
-    'a removal waits for its toast: Undo sends nothing, Close sends it',
-    (tester) async {
-      final llm = planningServer();
-      final rig = await started(llm);
-      Iterable<String> embeds() =>
-          llm.calls.where((c) => c.startsWith('updateEmbeddings'));
-      final first = rig.sources.files.first;
-      await rig.sources.remove(first);
-      expect(rig.sources.removed, same(first));
-      expect(rig.sources.files, hasLength(1));
-      expect(embeds(), isEmpty);
-
-      await rig.sources.undo();
-      expect(rig.sources.removed, isNull);
-      expect(rig.sources.files, hasLength(2));
-      expect(embeds(), isEmpty);
-
-      await rig.sources.remove(rig.sources.files.first);
-      await tester.pump(const Duration(minutes: 5));
-      expect(rig.sources.removed, same(first));
-      expect(embeds(), isEmpty);
-
-      await rig.sources.settleRemoval();
-      expect(rig.sources.removed, isNull);
-      expect(embeds(), ['updateEmbeddings:+-${first.path}']);
-      expect(rig.sources.files.map((f) => f.path), isNot(contains(first.path)));
-      expect(llm.spaces.first.docs, hasLength(1));
-    },
-  );
-
-  test('another removal sends the one its toast held', () async {
-    final llm = planningServer();
-    final rig = await started(llm);
-    final [first, second] = rig.sources.files;
-    await rig.sources.remove(first);
-    await rig.sources.remove(second);
-    expect(rig.sources.removed, same(second));
-    expect(llm.calls.where((c) => c.startsWith('updateEmbeddings')), [
-      'updateEmbeddings:+-${first.path}',
-    ]);
-  });
-
   testWidgets('a citation lights its file for a moment', (tester) async {
     final rig = await started(planningServer());
     rig.sources.flash('Q3 roadmap.pdf');
@@ -216,44 +178,13 @@ void main() {
     expect(rig.sources.files.first.on, isTrue);
   });
 
-  test('another workspace shows its own files', () async {
+  test('another workspace shows the library with its own switches', () async {
     final rig = await started(planningServer());
     await rig.chat.select('household');
     await pumpEventQueue();
-    expect(rig.sources.files, isEmpty);
+    expect(rig.sources.files, hasLength(2));
+    expect(rig.sources.files.any((f) => f.on), isFalse);
   });
-
-  test(
-    'another workspace sends the removal to the one it was made in',
-    () async {
-      final llm = planningServer();
-      final rig = await started(llm);
-      final gate = llm.gates['updateEmbeddings'] = Completer<void>();
-      await rig.sources.remove(rig.sources.files.first);
-      await rig.chat.select('household');
-      expect(rig.sources.removed, isNull);
-      gate.complete();
-      await pumpEventQueue();
-      await rig.sources.undo();
-      expect(llm.spaces.last.docs, isEmpty);
-      expect(llm.spaces.first.docs, hasLength(1));
-      expect(rig.sources.problems, isEmpty);
-    },
-  );
-
-  test(
-    'a removal waiting on another server is dropped, and the file stays',
-    () async {
-      final llm = planningServer();
-      final rig = await started(llm);
-      await rig.sources.remove(rig.sources.files.first);
-      await rig.settings.save('https://other:3001', 'K2');
-      await pumpEventQueue();
-      expect(rig.sources.removed, isNull);
-      expect(llm.calls.where((c) => c.startsWith('updateEmbeddings')), isEmpty);
-      expect(llm.spaces.first.docs, hasLength(2));
-    },
-  );
 
   test(
     'a server switch stops an upload before the next file or embedding',
@@ -274,22 +205,6 @@ void main() {
         isEmpty,
       );
       expect(rig.sources.sending, isNull);
-    },
-  );
-
-  test(
-    'renaming an unordered workspace keeps its switched-off sources',
-    () async {
-      final llm = planningServer()..renamedSlug = 'q4';
-      final rig = await started(llm);
-      await rig.sources.toggle(rig.sources.files.first);
-      await rig.chat.renameWorkspace('q3', 'Q4');
-      await pumpEventQueue();
-      expect(rig.prefs.offIn('q3'), isEmpty);
-      expect(rig.prefs.offIn('q4'), hasLength(1));
-      expect(rig.sources.files.where((file) => !file.on), hasLength(1));
-      await rig.sources.toggle(rig.sources.files.last);
-      expect(llm.spaces.first.docs, hasLength(2));
     },
   );
 
@@ -331,6 +246,154 @@ void main() {
     await pumpEventQueue();
     await rig.sources.upload([file('b.md')]);
     expect(llm.calls.where((c) => c == 'acceptedExtensions'), hasLength(2));
+  });
+
+  group('a document\'s details', () {
+    test('Read in full pins it in the workspace', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      await rig.sources.readWhole(rig.sources.files.first, true);
+      expect(
+        llm.calls,
+        contains('pinDocument:q3:custom-documents/Q3 roadmap.pdf.json:true'),
+      );
+      expect(rig.sources.files.first.pinned, isTrue);
+      expect(rig.sources.files.first.meta, '120 words · Read in full');
+    });
+
+    test('one no workspace uses moves, and its folder is used next', () async {
+      final llm = planningServer();
+      final doc = libraryDoc(llm, 'Boiler manual.pdf');
+      llm.folders.add('Manuals');
+      final rig = await started(llm);
+      final boiler = rig.sources.files.firstWhere((f) => f.path == doc.path);
+      await rig.sources.move(boiler, 'Manuals');
+      expect(
+        llm.calls,
+        contains('moveDocuments:${doc.path}>Manuals/Boiler manual.pdf.json'),
+      );
+      expect(llm.calls.where((c) => c.startsWith('updateEmbeddings')), isEmpty);
+      expect(rig.sources.byName(boiler.storedName)?.folder, 'Manuals');
+      expect(rig.prefs.lastFolder, 'Manuals');
+
+      await rig.sources.upload([file('a.md')]);
+      expect(llm.calls, contains('upload:Manuals/a.md'));
+      expect(rig.sources.byName('a.md.json')?.folder, 'Manuals');
+    });
+
+    test(
+      'one this workspace uses comes out, moves, and goes back in whole',
+      () async {
+        final llm = planningServer();
+        final rig = await started(llm);
+        llm.folders.add('Manuals');
+        await rig.sources.readWhole(rig.sources.files.first, true);
+        final roadmap = rig.sources.files.first;
+        await rig.sources.move(roadmap, 'Manuals');
+        const to = 'Manuals/Q3 roadmap.pdf.json';
+        expect(
+          llm.calls,
+          containsAllInOrder([
+            'updateEmbeddings:+-${roadmap.path}',
+            'moveDocuments:${roadmap.path}>$to',
+            'updateEmbeddings:+$to-',
+            'pinDocument:q3:$to:true',
+          ]),
+        );
+        final moved = rig.sources.byName(roadmap.storedName)!;
+        expect((moved.folder, moved.on, moved.pinned), ('Manuals', true, true));
+        expect(rig.sources.problems, isEmpty);
+      },
+    );
+
+    test(
+      'one another workspace uses stays, back in this one, and says why',
+      () async {
+        final llm = planningServer();
+        llm.spaces.last.docs.add(llm.spaces.first.docs.first);
+        llm.folders.add('Manuals');
+        final rig = await started(llm);
+        final roadmap = rig.sources.files.first;
+        await rig.sources.move(roadmap, 'Manuals');
+        expect(
+          llm.calls,
+          containsAllInOrder([
+            'updateEmbeddings:+-${roadmap.path}',
+            'moveDocuments:${roadmap.path}>Manuals/Q3 roadmap.pdf.json',
+            'updateEmbeddings:+${roadmap.path}-',
+          ]),
+        );
+        final stayed = rig.sources.byName(roadmap.storedName)!;
+        expect((stayed.folder, stayed.on), ('custom-documents', true));
+        expect(
+          rig.sources.problems.single.title,
+          'Could not move Q3 roadmap.pdf',
+        );
+        expect(rig.sources.problems.single.text, movedNot);
+        expect(rig.prefs.lastFolder, isNull);
+      },
+    );
+
+    test('a folder is made once, and one already there is found', () async {
+      final llm = planningServer();
+      final rig = await started(llm);
+      expect(await rig.sources.createFolder(' Manuals '), isNull);
+      expect(llm.calls, contains('createFolder:Manuals'));
+      expect(rig.sources.folders, ['custom-documents', 'Manuals']);
+      expect(await rig.sources.createFolder('Manuals'), isNull);
+      expect(
+        llm.calls.where((c) => c.startsWith('createFolder')),
+        hasLength(1),
+      );
+      expect(await rig.sources.createFolder('a/b'), isNotNull);
+      expect(
+        llm.calls.where((c) => c.startsWith('createFolder')),
+        hasLength(1),
+      );
+    });
+
+    test(
+      'a delete takes it off the server and out of every workspace',
+      () async {
+        final llm = planningServer();
+        final rig = await started(llm);
+        final roadmap = rig.sources.files.first;
+        await rig.sources.delete(roadmap);
+        expect(llm.calls, contains('deleteDocuments:${roadmap.path}'));
+        expect(rig.sources.byName(roadmap.storedName), isNull);
+        expect(rig.chat.docCounts['q3'], 1);
+      },
+    );
+
+    test('a link and pasted text go into the folder used last', () async {
+      final llm = planningServer();
+      llm.folders.add('Manuals');
+      final rig = await started(llm);
+      await rig.prefs.setLastFolder('Manuals');
+      rig.sources.addLink('https://example.com/page');
+      await pumpEventQueue();
+      expect(
+        llm.calls,
+        containsAllInOrder([
+          'uploadLink:https://example.com/page',
+          'moveDocuments:custom-documents/url-example.com.json>Manuals/url-example.com.json',
+          'updateEmbeddings:+Manuals/url-example.com.json-',
+        ]),
+      );
+      await rig.sources.addText('Notes', 'Some text');
+      expect(rig.sources.byName('raw-Notes.json')?.folder, 'Manuals');
+    });
+
+    test(
+      'a folder used last that is gone sends a new one to the default',
+      () async {
+        final llm = planningServer();
+        final rig = await started(llm);
+        await rig.prefs.setLastFolder('Gone');
+        await rig.sources.upload([file('a.md')]);
+        expect(llm.calls, contains('upload:a.md'));
+      },
+    );
   });
 
   group('links and text', () {

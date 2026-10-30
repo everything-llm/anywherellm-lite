@@ -46,21 +46,14 @@ class ChatSheetFor {
   final Thread thread;
 }
 
-/// The question whether to take [file] out of the open workspace, over the window.
-class RemoveDocFor {
-  const RemoveDocFor(this.file);
-
-  final SourceFile file;
-}
-
 /// A phone's sheet about the open workspace: a new workspace's name, the open one's new name,
 /// or whether to delete it.
 enum WorkspaceSheet { create, rename, delete }
 
 /// A popup over the window, at most one open at a time: the workspace menu, the composer's Answer
-/// from sheet, the Attach sheet, the question before forgetting the server, or Who uses this
-/// app?. An answer's More sheet is keyed by its [Turn] instead, and the question before removing
-/// a document by its [RemoveDocFor].
+/// from sheet, the Attach sheet, the question before forgetting the server, Who uses this app?,
+/// or a document's Move to folder sheet or question before deleting it. An answer's This answer
+/// sheet is keyed by its [Turn] instead.
 enum Popup {
   workspaces,
   answerFrom,
@@ -71,6 +64,11 @@ enum Popup {
 
   /// Who uses this app?, on the Connection page of a server with several users.
   whoUses,
+  /// Move to folder, over the [ShellController.document] whose details show.
+  moveDocument,
+
+  /// Delete from server, over the [ShellController.document] whose details show.
+  deleteDocument,
 }
 
 /// What is open over the chat, which is the base screen: the chats as a shelf,
@@ -121,6 +119,28 @@ class ShellController extends ChangeNotifier {
 
   bool _rightOpen = false;
   FilesSection? _workspacePage;
+  String? _document;
+
+  /// The document whose details show, by its [SourceFile.storedName], which moving it to
+  /// another folder keeps, or null: over the Documents sheet as a page of its own, or in the
+  /// Documents pane, beside its list on a wide window.
+  String? get document => _document;
+
+  /// Shows the details of the document stored as [name], closing any popup.
+  void openDocument(String name) {
+    _popup.value = null;
+    if (name == _document) return;
+    _document = name;
+    notifyListeners();
+  }
+
+  /// Puts the document's details away, back to Documents.
+  void closeDocument() {
+    if (_document == null) return;
+    _document = null;
+    notifyListeners();
+  }
+
   bool _scanning = false;
   Guide? _guide;
   int _guideStep = 0;
@@ -275,6 +295,7 @@ class ShellController extends ChangeNotifier {
     _scanning = false;
     _guide = null;
     _rightOpen = false;
+    _document = null;
     _settingsOpen = false;
     _settingsPage = null;
     _settingsDirect = false;
@@ -298,8 +319,11 @@ class ShellController extends ChangeNotifier {
   void closePane() =>
       showPane(_pane == Pane.documents && _overPages ? Pane.files : Pane.chats);
 
-  /// Closes the sheet over the chat, whatever it shows.
-  void closeSources() => _setRight(open: false, beside: Beside.sources);
+  /// Closes the sheet over the chat, whatever it shows, and a document's details over it.
+  void closeSources() {
+    _document = null;
+    _setRight(open: false, beside: Beside.sources);
+  }
 
   /// Shows the passages an answer read from [citation]'s file in the sheet over the chat,
   /// opening it, or closes it when it already shows them.
@@ -416,6 +440,7 @@ class ShellController extends ChangeNotifier {
     _pane = pane;
     _workspacePage = null;
     _rightOpen = false;
+    _document = null;
     notifyListeners();
   }
 

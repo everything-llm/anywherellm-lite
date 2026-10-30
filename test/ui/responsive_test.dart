@@ -255,7 +255,11 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.bySemanticsLabel('Details of a-$longWord.pdf'));
+        // Under the server's documents, below the fold.
+        await tapVisible(
+          tester,
+          find.bySemanticsLabel('Details of a-$longWord.pdf'),
+        );
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
       });
@@ -450,9 +454,14 @@ void main() {
         await h.sources.toggle(h.sources.files.first);
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
-        h.shell.togglePopup(RemoveDocFor(h.sources.files.first));
+        h.shell.openDocument(h.sources.files.first.storedName);
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
+        for (final popup in [Popup.moveDocument, Popup.deleteDocument]) {
+          h.shell.togglePopup(popup);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull, reason: '$popup');
+        }
       });
     });
   }

@@ -968,20 +968,6 @@ void main() {
       expect(rig.chat.activeThread, 'budget');
     });
 
-    test('a deleted workspace\'s switched-off files are forgotten', () async {
-      final rig = await started(
-        planningServer(),
-        prefs: const Prefs(
-          switchedOff: {
-            'household': [OffDoc(path: 'custom-documents/a.json', title: 'a')],
-          },
-        ),
-      );
-      await rig.chat.deleteWorkspace('household');
-      await pumpEventQueue();
-      expect(rig.prefs.offIn('household'), isEmpty);
-    });
-
     test('a workspace with an answer running cannot be deleted', () async {
       final llm = planningServer()..hold = true;
       final rig = await started(llm);

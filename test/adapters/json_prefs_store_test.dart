@@ -14,7 +14,7 @@ void main() {
   test('with no file, the defaults', () async {
     final prefs = await JsonPrefsStore(File('${dir.path}/none/prefs.json'))
         .load();
-    expect(prefs.switchedOff, isEmpty);
+    expect(prefs.lastFolders, isEmpty);
   });
 
   test('a file that is not JSON, or not UTF-8, gives the defaults', () async {
@@ -27,40 +27,29 @@ void main() {
       await file.writeAsBytes(bytes);
       final prefs = await JsonPrefsStore(file).load();
       expect(prefs.theme, ThemePref.system);
-      expect(prefs.switchedOff, isEmpty);
+      expect(prefs.lastFolders, isEmpty);
     }
   });
 
   test('saves, making the folder, and loads what it saved', () async {
     final file = File('${dir.path}/anywherellm/prefs.json');
-    await JsonPrefsStore(file).save(
-      const Prefs(
-        switchedOff: {
-          'https://s w': [OffDoc(path: 'f/a.json', title: 'a')],
-        },
-      ),
-    );
+    await JsonPrefsStore(file)
+        .save(const Prefs(lastFolders: {'https://s': 'Manuals'}));
     expect(file.existsSync(), isTrue);
     expect(File('${file.path}.tmp').existsSync(), isFalse);
     expect(
-      (await JsonPrefsStore(file).load()).offIn('https://s', 'w').single.title,
-      'a',
+      (await JsonPrefsStore(file).load()).lastFolders['https://s'],
+      'Manuals',
     );
   });
 
   test('saves at once land in order, the last one winning', () async {
     final store = JsonPrefsStore(File('${dir.path}/anywherellm/prefs.json'));
     await Future.wait([
-      store.save(
-        const Prefs(
-          switchedOff: {
-            'w': [OffDoc(path: 'f/a.json', title: 'a')],
-          },
-        ),
-      ),
+      store.save(const Prefs(lastFolders: {'https://s': 'Manuals'})),
       store.save(const Prefs()),
     ]);
-    expect((await store.load()).switchedOff, isEmpty);
+    expect((await store.load()).lastFolders, isEmpty);
   });
 
   test('saves made while one writes go as the newest alone', () async {

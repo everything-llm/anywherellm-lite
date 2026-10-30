@@ -74,7 +74,8 @@ void main() {
         findsOneWidget,
       );
       expect(control('Workspace: Household. Switch workspace'), findsOneWidget);
-      expect(control('No documents yet. Open Documents'), findsOneWidget);
+      // The server's documents are there to switch on.
+      expect(control('No documents in use. Open Documents'), findsOneWidget);
       expect(control('What can I do here?'), findsNothing);
     });
 
@@ -236,7 +237,8 @@ void main() {
       await tester.tap(control('Household'));
       await tester.pumpAndSettle();
       expect(h.chat.activeSlug, 'household');
-      expect(control('No documents yet. Open Documents'), findsOneWidget);
+      // The server's documents are there to switch on.
+      expect(control('No documents in use. Open Documents'), findsOneWidget);
     });
 
     testWidgets('the empty chat document line reflects switched-off files', (
@@ -248,10 +250,10 @@ void main() {
 
       h.shell.openSources();
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(AppSwitch).first);
+      await tester.tap(control('Use Q3 roadmap.pdf in answers'));
       await tester.pumpAndSettle();
       expect(control('1 document in use. Open Documents'), findsOneWidget);
-      await tester.tap(find.byType(AppSwitch).first);
+      await tester.tap(control('Use Customer interviews.docx in answers'));
       h.shell.closeSources();
       await tester.pumpAndSettle();
       expect(control('No documents in use. Open Documents'), findsOneWidget);
@@ -413,24 +415,20 @@ void main() {
       },
     );
 
-    testWidgets('a file\'s Remove asks first, and its undo is in the sheet', (
+    testWidgets('a file\'s row opens its details, which Back closes first', (
       tester,
     ) async {
-      final llm = planningServer();
-      final h = await withDocuments(tester, llm);
+      final h = await withDocuments(tester, planningServer());
       expect(control('View extracted text of Q3 roadmap.pdf'), findsNothing);
-      await tester.tap(control('Remove Q3 roadmap.pdf from workspace'));
+      expect(control('Remove Q3 roadmap.pdf from workspace'), findsNothing);
+      await tester.tap(control('Details of Q3 roadmap.pdf'));
       await tester.pumpAndSettle();
-      expect(h.sources.files.where((f) => f.on), hasLength(2));
-      await tester.tap(asked('Remove'));
+      expect(h.shell.document, 'Q3 roadmap.pdf.json');
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
+      expect(h.shell.document, isNull);
       expect((h.shell.rightOpen, h.shell.beside), (true, Beside.sources));
       expect(h.shell.pane, Pane.chats);
-      expect(find.text('Removed Q3 roadmap.pdf'), findsOneWidget);
-      await tester.tap(control('Undo'));
-      await tester.pumpAndSettle();
-      expect(h.sources.files, hasLength(2));
-      expect(find.text('Removed Q3 roadmap.pdf'), findsNothing);
     });
   });
 

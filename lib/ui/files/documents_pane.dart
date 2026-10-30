@@ -6,6 +6,7 @@ import '../layout.dart';
 import '../settings/rows.dart';
 import '../list_detail.dart';
 import '../sources/add_source.dart';
+import '../sources/document_details.dart';
 import '../sources/sources_panel.dart';
 import '../sources/test_question.dart';
 import '../widgets/buttons.dart';
@@ -14,9 +15,10 @@ import '../widgets/upload_queue.dart';
 import 'section_view.dart';
 
 /// The open workspace's Documents as a page, which [Pane.documents] shows on a wide window: its
-/// title with Add a file, Add a link and Paste text, then its documents in a card, each with its
-/// switch and Remove, as the Documents sheet has them, and Test a question. A citation's flash
-/// fills its file's row for a moment.
+/// title with Add a file, Add a link and Paste text, then the library in a card, each document
+/// with its switch, under its folder's name, as the Documents sheet has them, and Test a
+/// question. A document's details show beside the list, or, on a window too narrow for both, in
+/// its place, with Back. A citation's flash fills its file's row for a moment.
 class DocumentsPane extends StatelessWidget {
   const DocumentsPane({super.key});
 
@@ -24,7 +26,7 @@ class DocumentsPane extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     return ListenableBuilder(
-      listenable: Listenable.merge([scope.chat, scope.sources]),
+      listenable: Listenable.merge([scope.chat, scope.sources, scope.shell]),
       builder: (context, _) => switch (scope.chat.activeSlug) {
         // What waits for Add and a question belong to one workspace.
         final slug? => _Documents(key: ValueKey(slug)),
@@ -39,7 +41,14 @@ class _Documents extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final files = AppScope.of(context).sources.files;
+    final scope = AppScope.of(context);
+    final files = scope.sources.files;
+    final open = scope.shell.document;
+    final split = Wide.split(context);
+    // Too narrow for the list beside them, the details fill the pane, with Back.
+    if (open != null && !split) {
+      return DocumentDetailsPage(open, key: ValueKey(('details', open)));
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -54,7 +63,15 @@ class _Documents extends StatelessWidget {
         Expanded(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: _list(context, files),
+            child: open == null
+                ? _list(context, files)
+                : ListDetail(
+                    list: _list(context, files, chosen: open),
+                    detail: DocumentDetailsCard(
+                      open,
+                      key: ValueKey(('details', open)),
+                    ),
+                  ),
           ),
         ),
       ],
@@ -70,9 +87,7 @@ class _Documents extends StatelessWidget {
       'Documents',
       about: [
         ?scope.chat.active?.name,
-        files.isEmpty && !scope.sources.loading
-            ? 'No documents in this workspace yet.'
-            : 'Answers draw on the ones switched on.',
+        documentsCaption(scope.sources),
       ].join(' · '),
     );
     return PaneHeader(
@@ -84,6 +99,7 @@ class _Documents extends StatelessWidget {
         key: ValueKey(('queue', slug)),
         onSend: scope.sources.upload,
         onProblem: scope.sources.report,
+        types: scope.sources.acceptedTypes,
         trigger: (browse) => AddSource(
           key: ValueKey(('add', slug)),
           leading: AppButton('Add a file', compact: true, onPressed: browse),
@@ -111,12 +127,13 @@ class _Documents extends StatelessWidget {
     );
   }
 
-  /// The documents in a card, each with its switch and Remove, then Test a question, no wider
-  /// than a column.
-  Widget _list(BuildContext context, List<SourceFile> files) {
+  /// The library in a card, each document with its switch, under its folder's name, the one
+  /// whose details show beside them [chosen], then Test a question, no wider than a column.
+  Widget _list(BuildContext context, List<SourceFile> files, {String? chosen}) {
     final scope = AppScope.of(context);
     final sources = scope.sources;
     final slug = scope.chat.activeSlug;
+    final items = documentItems(files);
     return ScrollFades(
       child: ListView(
         children: [
@@ -130,12 +147,15 @@ class _Documents extends StatelessWidget {
                   if (files.isEmpty && sources.loading)
                     FieldCard(const [CardNote('Loading…')])
                   else if (files.isNotEmpty)
-                    FieldCard([
-                      for (final file in files)
-                        DocumentRow(
-                          file,
-                          key: ValueKey(file.path),
-                          flashed: sources.flashed == file.path,
+                    FieldCard(ruledAt: (i) => documentRuled(items, i), [
+                      for (final item in items)
+                        documentItem(
+                          item,
+                          flashed:
+                              item is SourceFile &&
+                              sources.flashed == item.path,
+                          chosen:
+                              item is SourceFile && item.storedName == chosen,
                         ),
                     ]),
                   const SizedBox(height: 12),
