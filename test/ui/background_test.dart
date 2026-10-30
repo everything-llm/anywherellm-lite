@@ -298,6 +298,101 @@ void main() {
     });
   });
 
+  group('what a dropped answer shows', () {
+    /// The app with a question sent in [mode] and its answer held open.
+    Future<(Harness, FakeAnythingLlm)> asking(
+      WidgetTester tester,
+      ChatMode mode,
+    ) async {
+      final llm = planningServer()..hold = true;
+      final h = await pumpApp(tester, llm: llm);
+      await h.chat.send('Can you build it in English?', mode: mode);
+      await tester.pump();
+      return (h, llm);
+    }
+
+    testWidgets('Connection lost while the server cannot be reached', (
+      tester,
+    ) async {
+      final (h, llm) = await _asking(tester);
+      llm.errors['history'] = const ApiException('Could not reach the server.');
+      llm.chat!
+        ..add(const TextChunk('Building it'))
+        ..addError(_dropped);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Connection lost'), findsOneWidget);
+      expect(find.text('Checking what the server saved.'), findsOneWidget);
+      expect(find.text('Stopped here'), findsOneWidget);
+      expect(control('Check now'), findsOneWidget);
+      expect(find.text('Still answering on the server'), findsNothing);
+
+      // The server answers again, without the answer yet.
+      llm.errors.remove('history');
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump();
+      expect(find.text('Connection lost'), findsNothing);
+      expect(find.text('Still answering on the server'), findsOneWidget);
+      expect(find.text('Stopped here'), findsNothing);
+
+      _saved(llm, h.chat.activeThread!, 'Here is the English word game.');
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump();
+      expect(find.text('Here is the English word game.'), findsOneWidget);
+      expect(find.text('This answer may be cut short.'), findsNothing);
+    });
+
+    testWidgets('a chat answer read after the drop may be cut short', (
+      tester,
+    ) async {
+      final (h, llm) = await asking(tester, ChatMode.chat);
+      llm.chat!
+        ..add(const TextChunk('Building'))
+        ..addError(_dropped);
+      await tester.pump(const Duration(milliseconds: 300));
+      _saved(llm, h.chat.activeThread!, 'Building it in');
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump();
+      expect(find.text('Building it in'), findsOneWidget);
+      expect(find.text('This answer may be cut short.'), findsOneWidget);
+
+      // Ask again asks the question again in its place.
+      llm.hold = false;
+      await tester.tap(control('Ask again'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('This answer may be cut short.'), findsNothing);
+      expect(_sent(llm, 'Can you build it in English?'), 2);
+    });
+
+    testWidgets('an agent answer read after the drop is whole', (tester) async {
+      final (h, llm) = await asking(tester, ChatMode.automatic);
+      llm.chat!.addError(_dropped);
+      await tester.pump(const Duration(milliseconds: 300));
+      _saved(llm, h.chat.activeThread!, 'Here is the English word game.');
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump();
+      expect(find.text('Here is the English word game.'), findsOneWidget);
+      expect(find.text('This answer may be cut short.'), findsNothing);
+    });
+
+    testWidgets('nothing saved says where the answer stopped, not saved', (
+      tester,
+    ) async {
+      final (h, llm) = await _asking(tester);
+      llm.chat!
+        ..add(const TextChunk('Building it'))
+        ..addError(_dropped);
+      await tester.pump(const Duration(milliseconds: 300));
+      for (var i = 0; i < AnswerWaits.waitReads; i++) {
+        await tester.pump(const Duration(seconds: 20));
+      }
+      await tester.pump();
+      expect(find.text('Stopped here · not saved'), findsOneWidget);
+      expect(find.text('Building it'), findsOneWidget);
+      expect(control('Ask again'), findsOneWidget);
+      expect(h.chat.working, isFalse);
+    });
+  });
+
   group('the app out of sight', () {
     testWidgets('holds itself while an answer runs or is waited for', (
       tester,

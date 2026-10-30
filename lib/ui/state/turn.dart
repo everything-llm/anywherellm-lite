@@ -84,6 +84,14 @@ class Turn extends ChangeNotifier {
   /// is read until the server has saved it ([ChatController.checkWaiting]).
   bool waiting = false;
 
+  /// How this answer stands since its connection dropped, or null for one whose connection held.
+  Dropped? dropped;
+
+  /// Whether this answer was read from the server after its connection dropped, in a mode in
+  /// which AnythingLLM stops an answer once it notices the drop and saves what was written: it
+  /// may be cut short ([finishesWhenDropped]).
+  bool mayBeCut = false;
+
   /// Whether the server may finish this answer after the app let go of it: it failed, was
   /// stopped or is [waiting].
   bool get unfinished =>
@@ -91,6 +99,13 @@ class Turn extends ChangeNotifier {
 
   /// What an agent is doing while the answer runs, such as a tool it runs, or null.
   String? status;
+
+  /// Says how this dropped answer stands now.
+  void droppedAs(Dropped how) {
+    if (dropped == how) return;
+    dropped = how;
+    notifyListeners();
+  }
 
   /// Ends the wait for a [waiting] answer, showing whatever was set on it meanwhile.
   void stopWaiting() {
@@ -130,4 +145,20 @@ class Turn extends ChangeNotifier {
     }
     notifyListeners();
   }
+}
+
+/// How an answer whose connection dropped stands, while and after its chat is read for what the
+/// server saved.
+enum Dropped {
+  /// No read since the drop has reached the server: the connection is lost.
+  lost,
+
+  /// A read reached the server, which has not saved the answer yet: it is still answering.
+  answering,
+
+  /// The server saved no answer in all the time the chat was read for one.
+  unsaved,
+
+  /// The chat moved on before the server's answer was read.
+  movedOn,
 }

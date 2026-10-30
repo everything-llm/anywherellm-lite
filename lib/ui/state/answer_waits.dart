@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 
+import '../../core/chat.dart';
 import '../../core/ports.dart';
 import '../../core/server_models.dart';
 import 'turn.dart';
@@ -8,11 +9,15 @@ import 'turn.dart';
 /// An answer whose connection dropped, read for in its chat's history until the server saved
 /// it, or [AnswerWaits.waitReads] reads found nothing.
 class _Waiting {
-  _Waiting(this.answer, this.slug, this.thread, this.question);
+  _Waiting(this.answer, this.slug, this.thread, this.question, this.finishes);
 
   final Turn answer;
   final String slug;
   final String thread;
+
+  /// Whether the server finishes the answer after a drop ([finishesWhenDropped]), or null when
+  /// that is not known.
+  final bool? finishes;
 
   /// The question [answer] answers, trimmed.
   final String question;
@@ -55,7 +60,7 @@ class AnswerWaits {
   final void Function(String thread) changed;
 
   /// How many times the chat of an answer whose connection dropped is read before it counts as
-  /// failed: every 5 s for 2 minutes, then every 20 s to 30 minutes.
+  /// failed: at once, then every 5 s to 2 minutes, then every 20 s to 30 minutes.
   static const waitReads = 24 + 84;
   static const _quickReads = 24;
 
@@ -75,21 +80,35 @@ class AnswerWaits {
   bool has(String thread) => _waits.containsKey(thread);
 
   /// Waits for [answer], the last turn of chat [thread] in workspace [slug], whose exchange is
-  /// newer than [after], the newest the server had saved before it, when that is known.
-  void start(Turn answer, String slug, String thread, {int? after}) {
+  /// newer than [after], the newest the server had saved before it, when that is known. The chat
+  /// is read at once, to see what the server saved. [finishes] says whether the server goes on
+  /// to finish the answer after the drop ([finishesWhenDropped]); when it does not, the answer
+  /// read may be cut short ([Turn.mayBeCut]).
+  void start(
+    Turn answer,
+    String slug,
+    String thread, {
+    int? after,
+    bool? finishes,
+  }) {
     final question = questionOf(turnsOf(thread) ?? const [], answer);
-    final waiting = _Waiting(answer, slug, thread, question)..floor = after;
+    final waiting = _Waiting(answer, slug, thread, question, finishes)
+      ..floor = after;
     // An answer already waited for in this chat is let go of, as when the chat moves on.
     if (_waits[thread] case final old?) {
       old.cancel();
       if (!identical(old.answer, answer)) {
-        old.answer.error = _movedOn;
+        old.answer
+          ..error = _movedOn
+          ..dropped = Dropped.movedOn;
         old.answer.stopWaiting();
       }
     }
     _waits[thread] = waiting;
-    answer.waiting = true;
-    _checkLater(waiting);
+    answer
+      ..waiting = true
+      ..dropped = Dropped.lost;
+    unawaited(_check(waiting));
   }
 
   /// Reads chat [thread] now for its answer, or joins the read under way.
@@ -125,9 +144,11 @@ class AnswerWaits {
         .whenComplete(() => waiting.reading = null);
   }
 
-  /// Takes [waiting]'s answer from its chat's history once the server saved it ([_holds]).
-  /// After [waitReads] reads the answer fails; a chat that moved on, as by a new message, stops
-  /// the reading and says why the answer is missing. A wait [clear] ended changes nothing.
+  /// Takes [waiting]'s answer from its chat's history once the server saved it ([holds]). A read
+  /// that reaches the server without it says the server is still answering, and one that fails
+  /// says the connection is lost. After [waitReads] reads the answer fails; a chat that moved
+  /// on, as by a new message, stops the reading and says why the answer is missing. A wait
+  /// [clear] ended changes nothing.
   Future<void> _read(_Waiting waiting) async {
     final (answer, slug, thread) = (
       waiting.answer,
@@ -144,7 +165,9 @@ class AnswerWaits {
     if (!identical(_waits[thread], waiting)) return;
     final turns = turnsOf(thread);
     if (turns == null || !identical(turns.lastOrNull, answer)) {
-      answer.error = _movedOn;
+      answer
+        ..error = _movedOn
+        ..dropped = Dropped.movedOn;
       return _end(waiting);
     }
     if (history != null) {
@@ -154,15 +177,24 @@ class AnswerWaits {
         question: waiting.question,
         floor: waiting.floor,
       )) {
-        saved(slug, thread, [for (final m in history) Turn.saved(m)]);
+        final now = [for (final m in history) Turn.saved(m)];
+        now.last.mayBeCut = waiting.finishes == false;
+        saved(slug, thread, now);
         return _end(waiting);
       }
-      waiting.floor = history.map((m) => m.chatId ?? -1).fold<int>(-1, max);
+      // Never back: a read can lag behind what the chat already knows was saved.
+      waiting.floor = max(
+        waiting.floor ?? -1,
+        history.map((m) => m.chatId ?? -1).fold<int>(-1, max),
+      );
     }
     if (waiting.reads >= waitReads) {
-      answer.error = 'The connection dropped, and the server saved no answer within 30 minutes.';
+      answer
+        ..error = 'The connection dropped, and the server saved no answer within 30 minutes.'
+        ..dropped = Dropped.unsaved;
       return _end(waiting);
     }
+    answer.droppedAs(history == null ? Dropped.lost : Dropped.answering);
     _checkLater(waiting);
   }
 

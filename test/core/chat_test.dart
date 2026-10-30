@@ -196,6 +196,20 @@ void main() {
       );
     });
 
+    test('only an agent answer is finished on the server after a drop', () {
+      expect(
+        [
+          finishesWhenDropped(ChatMode.automatic, 'Plan a trip'),
+          finishesWhenDropped(ChatMode.chat, 'Plan a trip'),
+          finishesWhenDropped(ChatMode.query, 'Plan a trip'),
+          finishesWhenDropped(ChatMode.chat, '@agent plan a trip'),
+          finishesWhenDropped(null, 'Plan a trip'),
+          finishesWhenDropped(null, '@agent plan a trip'),
+        ],
+        [true, false, false, true, null, true],
+      );
+    });
+
     test('an agent\'s thoughts read as plain status lines', () {
       expect(
         agentStatus('@agent is executing `web-browsing` tool {\n "q": 1\n}'),

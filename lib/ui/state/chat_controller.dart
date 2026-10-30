@@ -46,7 +46,13 @@ class _Deleted {
 /// An answer running: the chat it belongs to, null while its draft's thread is being made, and
 /// the stream it reads.
 class _Running {
-  _Running(this.question, this.answer, this.slug, this.shortcutUse);
+  _Running(
+    this.question,
+    this.answer,
+    this.slug,
+    this.shortcutUse, {
+    this.finishes,
+  });
 
   final Turn question;
   final Turn answer;
@@ -61,6 +67,10 @@ class _Running {
   String? nameAs;
 
   final ShortcutUse? shortcutUse;
+
+  /// Whether the server finishes this answer after its connection drops
+  /// ([finishesWhenDropped]), or null when that is not known.
+  final bool? finishes;
 }
 
 /// A message waiting in a chat to be sent when the answer before it ends ([sendWhenDone]).
@@ -387,8 +397,16 @@ class ChatController extends ChangeNotifier with FollowsServer {
     );
     final answer = Turn.answer();
     _turns[thread] = [..._turns[thread]!, user, answer];
-    final running = _Running(user, answer, deck.slug, first.shortcutUse)
-      ..thread = thread;
+    final running = _Running(
+      user,
+      answer,
+      deck.slug,
+      first.shortcutUse,
+      finishes: finishesWhenDropped(
+        modeForFiles(first.mode, first.attachments) ?? first.mode,
+        first.text,
+      ),
+    )..thread = thread;
     _runs.add(running);
     if (thread == activeThread) _sends++;
     _follow(
@@ -1120,8 +1138,16 @@ class ChatController extends ChangeNotifier with FollowsServer {
     );
     final answer = Turn.answer();
     final turns = [...this.turns, user, answer];
-    final running = _Running(user, answer, slug, shortcutUse)
-      ..thread = activeThread;
+    final running = _Running(
+      user,
+      answer,
+      slug,
+      shortcutUse,
+      finishes: finishesWhenDropped(
+        modeForFiles(mode, attachments) ?? mode,
+        text,
+      ),
+    )..thread = activeThread;
     _runs.add(running);
     final at = here;
     final draftGo = _draftGo;
@@ -1288,7 +1314,13 @@ class ChatController extends ChangeNotifier with FollowsServer {
       return _finish(running, error: 'The connection dropped.');
     }
     // Waiting before the run ends, so [working] holds throughout.
-    waits.start(running.answer, running.slug, thread, after: _newest[thread]);
+    waits.start(
+      running.answer,
+      running.slug,
+      thread,
+      after: _newest[thread],
+      finishes: running.finishes,
+    );
     _finish(running);
   }
 

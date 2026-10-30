@@ -1,3 +1,4 @@
+import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/ui/state/answer_waits.dart';
 import 'package:anywherellm/ui/state/turn.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -41,8 +42,11 @@ void main() {
     expect(first.waiting, isFalse);
     expect(first.error, isNotNull);
     expect(second.waiting, isTrue);
+    // Each wait reads the chat at once; after that only the second reads again.
+    await tester.pump();
+    final atOnce = _reads(llm);
     await tester.pump(const Duration(seconds: 5));
-    expect(_reads(llm), 1);
+    expect(_reads(llm), atOnce + 1);
     waits.clear();
   });
 
@@ -85,4 +89,49 @@ void main() {
     expect(answer.waiting, isTrue);
     waits.clear();
   });
+
+  testWidgets('a read that reaches the server says it is still answering', (
+    tester,
+  ) async {
+    final llm = FakeAnythingLlm()
+      ..errors['history'] = const ApiException('Could not reach the server.');
+    final answer = Turn.answer();
+    final turns = {
+      't': [Turn.user('Q?'), answer],
+    };
+    final (waits, _) = _waits(llm, turns);
+    waits.start(answer, 's', 't', after: 1);
+    await tester.pump();
+    expect(answer.dropped, Dropped.lost);
+    llm.errors.remove('history');
+    await tester.pump(const Duration(seconds: 5));
+    expect(answer.dropped, Dropped.answering);
+    llm.errors['history'] = const ApiException('Could not reach the server.');
+    await tester.pump(const Duration(seconds: 5));
+    expect(answer.dropped, Dropped.lost);
+    waits.clear();
+  });
+
+  for (final (finishes, cut) in [(false, true), (true, false), (null, false)]) {
+    testWidgets(
+      'an answer saved after the drop ${cut ? 'may be' : 'is not'} cut '
+      'short when the server ${switch (finishes) {
+        true => 'finishes it',
+        false => 'stops it',
+        null => 'is not known to finish it',
+      }}',
+      (tester) async {
+        final llm = FakeAnythingLlm()..saveExchange('t', 'Q?', 'A.', chatId: 2);
+        final answer = Turn.answer();
+        final turns = {
+          't': [Turn.user('Q?'), answer],
+        };
+        final (waits, saved) = _waits(llm, turns);
+        waits.start(answer, 's', 't', after: 1, finishes: finishes);
+        await tester.pump();
+        expect(saved.single.last.text, 'A.');
+        expect(saved.single.last.mayBeCut, cut);
+      },
+    );
+  }
 }

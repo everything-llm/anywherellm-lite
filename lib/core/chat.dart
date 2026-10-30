@@ -194,6 +194,19 @@ ChatMode? modeForFiles(ChatMode? mode, List<Attachment> attachments) =>
     ? ChatMode.chat
     : null;
 
+/// Whether AnythingLLM 1.16.2 finishes an answer to [message], asked in [mode], and saves it
+/// whole after the connection drops: an agent runs to its end, in [ChatMode.automatic] or for a
+/// message that starts with `@agent`, while a chat or query answer stops once the server notices
+/// the drop and saves what was written by then. Null when [mode] is not known.
+bool? finishesWhenDropped(ChatMode? mode, String message) =>
+    message.trimLeft().startsWith('@agent')
+    ? true
+    : switch (mode) {
+        ChatMode.automatic => true,
+        ChatMode.chat || ChatMode.query => false,
+        null => null,
+      };
+
 /// The largest file one message may carry.
 const maxAttachmentBytes = 20 * 1024 * 1024;
 

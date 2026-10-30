@@ -1077,20 +1077,25 @@ class _Answer extends StatelessWidget {
             const Padding(padding: EdgeInsets.only(top: 6), child: Caret()),
           if (quiet) ...[const SizedBox(height: 10), const _NoNews()],
         ],
+        // Where the words stopped coming, once the connection dropped, unless the server is
+        // known to be writing the rest.
+        if (split.answer.isNotEmpty &&
+            !turn.streaming &&
+            switch (turn.dropped) {
+              Dropped.lost => turn.waiting,
+              Dropped.unsaved || Dropped.movedOn => true,
+              Dropped.answering || null => false,
+            }) ...[
+          const SizedBox(height: 8),
+          _StoppedHere(saved: turn.dropped != Dropped.unsaved),
+        ],
+        if (turn.mayBeCut) ...[
+          const SizedBox(height: 4),
+          _MayBeCut(onAskAgain: retry?.onPressed),
+        ],
         if (turn.waiting) ...[
           const SizedBox(height: 10),
-          AlertBox(
-            AlertKind.info,
-            'Still answering on the server',
-            text:
-                'The connection dropped. AnythingLLM keeps going, and the answer shows '
-                'here once it is saved.',
-            action: AppButton(
-              'Check now',
-              onPressed: () =>
-                  unawaited(AppScope.of(context).chat.checkWaiting()),
-            ),
-          ),
+          _Dropped(turn.dropped),
         ],
         if (noPictures) ...[
           const SizedBox(height: 10),
@@ -1102,7 +1107,13 @@ class _Answer extends StatelessWidget {
             'The answer stopped',
             text: error,
             action: askAgain
-                ? AppButton('Ask again', onPressed: retry!.onPressed)
+                ? AppButton(
+                    'Ask again',
+                    // Nothing came of the question at all, so asking again is what is left.
+                    primary: turn.dropped == Dropped.unsaved,
+                    compact: true,
+                    onPressed: retry!.onPressed,
+                  )
                 : null,
           ),
         ],
@@ -1145,6 +1156,151 @@ class _Answer extends StatelessWidget {
           onLongPress: openSheet,
           child: column,
         ),
+      ),
+    );
+  }
+}
+
+/// The card of an answer whose connection dropped while its chat is read for what the server
+/// saved: Connection lost while no read has reached the server since, and Still answering on
+/// the server once one has and the answer is not saved yet; each with Check now, which reads
+/// the chat at once ([ChatController.checkWaiting]).
+class _Dropped extends StatelessWidget {
+  const _Dropped(this.how);
+
+  final Dropped? how;
+
+  @override
+  Widget build(BuildContext context) {
+    final chat = AppScope.of(context).chat;
+    final check = AppButton(
+      'Check now',
+      onPressed: () => unawaited(chat.checkWaiting()),
+    );
+    if (how == Dropped.answering) {
+      return AlertBox(
+        AlertKind.info,
+        'Still answering on the server',
+        text:
+            'The connection dropped. AnythingLLM keeps going, and the answer shows here once '
+            'it is saved.',
+        action: check,
+      );
+    }
+    // A warning is not a live region of its own, and this one changes as the chat is read.
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: AlertBox(
+        AlertKind.warn,
+        'Connection lost',
+        text: 'Checking what the server saved.',
+        action: check,
+      ),
+    );
+  }
+}
+
+/// Under the words of an answer whose connection dropped: a stop mark and Stopped here, with
+/// `not saved` once the server saved no answer.
+class _StoppedHere extends StatelessWidget {
+  const _StoppedHere({required this.saved});
+
+  /// False once the server is known to have saved no answer.
+  final bool saved;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Row(
+      spacing: 6,
+      children: [
+        // A filled square, as a stop mark is drawn on the boards.
+        SizedBox.square(
+          dimension: IconSize.small.px,
+          child: Center(
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: t.ink,
+                borderRadius: BorderRadius.circular(1.5),
+              ),
+            ),
+          ),
+        ),
+        Flexible(
+          child: Text(
+            saved ? 'Stopped here' : 'Stopped here · not saved',
+            style: Type.note(t.ink),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Under an answer read from the server after its connection dropped, in a mode in which the
+/// server stops it once it notices ([Turn.mayBeCut]): This answer may be cut short., with Ask
+/// again where it can run.
+class _MayBeCut extends StatelessWidget {
+  const _MayBeCut({required this.onAskAgain});
+
+  final VoidCallback? onAskAgain;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 8,
+        children: [
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: Tappable.touchSide),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              spacing: 6,
+              children: [
+                AppIcon(
+                  Status.warning.icon,
+                  size: IconSize.small,
+                  color: Status.warning.color(t),
+                ),
+                Flexible(
+                  child: Text(
+                    'This answer may be cut short.',
+                    style: Type.body(t.ink),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (onAskAgain case final ask?)
+            Tappable(
+              label: 'Ask again',
+              onTap: ask,
+              radius: BorderRadius.circular(Sizes.small),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minHeight: Tappable.touchSide,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Align(
+                    widthFactor: 1,
+                    heightFactor: 1,
+                    child: Text(
+                      'Ask again',
+                      style: Type.body(t.accent, weight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -1203,17 +1359,13 @@ class _NoNews extends StatelessWidget {
       child: AlertBox(
         AlertKind.warn,
         'No news',
-        text:
-            'from the server for ${Turn.quietAfter.inSeconds} seconds.',
+        text: 'from the server for ${Turn.quietAfter.inSeconds} seconds.',
         inline: true,
         action: Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
-            AppButton(
-              'Check',
-              onPressed: () => unawaited(chat.checkQuiet()),
-            ),
+            AppButton('Check', onPressed: () => unawaited(chat.checkQuiet())),
             AppButton('Stop', onPressed: chat.stop),
           ],
         ),
