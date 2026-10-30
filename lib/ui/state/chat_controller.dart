@@ -1208,6 +1208,8 @@ class ChatController extends ChangeNotifier with FollowsServer {
         _newest[thread] = -1;
       } finally {
         _clearing.remove(thread);
+        // Messages resumed while it cleared go on now.
+        _sendOnDeck();
       }
     });
   }

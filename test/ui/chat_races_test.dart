@@ -127,6 +127,25 @@ void main() {
     );
   });
 
+  group('a chat being cleared', () {
+    test('sends on the messages resumed meanwhile once it is clear', () async {
+      final llm = _server()..hold = true;
+      final rig = await _started(llm);
+      await rig.chat.send('And next year?');
+      expect(rig.chat.sendWhenDone('Kept'), isTrue);
+      rig.chat.stop();
+      expect(rig.chat.onDeckHeld, isTrue);
+      final gate = llm.gates['resetChat'] = Completer<void>();
+      final clearing = rig.chat.reset();
+      await pumpEventQueue();
+      rig.chat.resumeOnDeck();
+      expect(llm.calls, isNot(contains('streamChat:budget:Kept')));
+      gate.complete();
+      await clearing;
+      expect(llm.calls, contains('streamChat:budget:Kept'));
+    });
+  });
+
   group('a draft', () {
     test('stopped while its thread is made is still named', () async {
       final llm = planningServer();
