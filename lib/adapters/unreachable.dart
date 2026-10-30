@@ -7,8 +7,9 @@ import '../core/errors.dart';
 
 /// [error], from sending a request to [name] that may take [limit], in plain words. [name] is
 /// what was asked, as `The server`, and [where] what a failed connection names,
-/// as its host. An error of any other kind gets a fixed message with no error text, since a
-/// header the platform refused is quoted in it, key and all.
+/// as its host. A connection that could not be made or closed unanswered is [Unreachable]. An
+/// error of any other kind gets a fixed message with no error text, since a header the platform
+/// refused is quoted in it, key and all.
 ApiException unreachable(
   Exception error, {
   required String name,
@@ -24,13 +25,13 @@ ApiException unreachable(
       '$name\'s certificate could not be verified.',
     ),
     // Before [http.ClientException], which a socket's failure may also be.
-    SocketException(:final message) => ApiException(
+    SocketException(:final message) => Unreachable(
       'Could not reach $where: $message',
     ),
-    http.ClientException(:final message) => ApiException(
+    http.ClientException(:final message) => Unreachable(
       'Could not reach $lower: $message',
     ),
-    _ => ApiException('Could not reach $lower.'),
+    _ => Unreachable('Could not reach $lower.'),
   };
 }
 

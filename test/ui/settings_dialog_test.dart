@@ -151,8 +151,9 @@ void main() {
     await tester.pumpAndSettle();
     final link = tester.getBottomLeft(control('How connecting works')).dy;
     expect(link, greaterThan(tester.view.physicalSize.height / 3 * 2));
-    // Connect stays under the fields, well above it.
-    expect(tester.getBottomLeft(control('Connect')).dy, lessThan(link - 100));
+    // Connect stays under the fields, with room between it and the link.
+    final top = tester.getTopLeft(control('How connecting works')).dy;
+    expect(tester.getBottomLeft(control('Connect')).dy, lessThan(top - 24));
   });
 
   testWidgets('on a short screen the help link follows Connect and scrolls', (

@@ -224,27 +224,38 @@ class _KeyCardState extends State<_KeyCard> {
     unawaited(_settings.testSaved());
   }
 
-  /// The address field, named [label] to a screen reader.
-  Widget _urlField(String label) => AppField(
+  /// The address field, named [label] to a screen reader, edged as [invalid] when what the
+  /// last try said is about it.
+  Widget _urlField(String label, {bool invalid = false}) => AppField(
     controller: _url,
     label: label,
     hint: _example,
     keyboardType: TextInputType.url,
     autofillHints: const [AutofillHints.url],
+    invalid: invalid,
   );
 
   /// The developer key field, which sends the form on Enter unless it is [saving].
-  Widget _keyField(bool saving) => SecretField(
+  Widget _keyField(bool saving, {bool invalid = false}) => SecretField(
     controller: _key,
     label: 'AnythingLLM developer API key',
     hint: 'Paste the AnythingLLM API key',
     // Not a password: AppField leaves it out of autofill, so no saved login is offered for it.
     keyboardType: TextInputType.visiblePassword,
     onSubmitted: (_) => saving ? null : _save(),
+    invalid: invalid,
   );
 
-  /// Why the last scan or try failed, when it did.
-  List<String> get _notes => [?_scanProblem, ?_settings.message];
+  /// Why the last scan or try failed, when it did, or what the last save said; with [fields],
+  /// only what is about neither field, since each field says its own under it.
+  List<String> _notes({bool fields = false}) => [
+    ?_scanProblem,
+    if (!fields || _settings.wrong == null) ?_settings.message,
+  ];
+
+  /// What the last try said is wrong with [field], or null.
+  String? _wrongWith(ConnectionField field) =>
+      _settings.wrong == field ? _settings.message : null;
 
   /// Closes the form on the saved connection, letting go of what was typed.
   void _backToSaved() {
@@ -367,7 +378,7 @@ class _KeyCardState extends State<_KeyCard> {
               ]),
             ],
           ),
-        for (final note in _notes)
+        for (final note in _notes())
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: HelpText(note, status: true),
@@ -513,8 +524,9 @@ class _KeyCardState extends State<_KeyCard> {
   }
 
   /// The first run: the welcome, Scan QR code first where there is a camera, then the address and
-  /// the developer key, each under its name, where to find a key, and Connect, in groups 28
-  /// apart with 12 or less inside one. Connect is the filled button; Scan QR code is outlined,
+  /// the developer key, each under its name and over the room kept for what is wrong with it, so
+  /// an error never moves the page, where to find a key, and Connect, in groups 28 apart with 12
+  /// or less inside one. Connect is the filled button; Scan QR code is outlined,
   /// with a QR icon before its label. It is top-aligned and scrolls, so a short screen loses
   /// nothing: How connecting works sits at the foot while there is room and follows Connect where
   /// there is not. With the keyboard up Connect leaves the page and stays above the keyboard, in
@@ -523,19 +535,22 @@ class _KeyCardState extends State<_KeyCard> {
     final scanner = _scanner;
     final typing = KeyboardUp.of(context);
     final t = Tokens.of(context);
+    final notes = _notes(fields: true);
+    final addressWrong = _wrongWith(ConnectionField.address);
+    final keyWrong = _wrongWith(ConnectionField.key);
     final connect = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       spacing: 12,
       children: [
-        // Why the last try failed, which takes room only while there is something to say.
-        if (_notes.isNotEmpty)
+        // Why a scan or a pairing failed, which takes room only while there is something to say.
+        if (notes.isNotEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               spacing: 8,
               children: [
-                for (final note in _notes) HelpText(note, status: true),
+                for (final note in notes) HelpText(note, status: true),
               ],
             ),
           ),
@@ -569,21 +584,36 @@ class _KeyCardState extends State<_KeyCard> {
               const _OrDivider('or enter a key'),
             ],
           ),
+        // Each field's message room spaces it from the next.
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 12,
+          spacing: 6,
           children: [
             NamedControl(
               'Server address',
               quiet: true,
               labelled: true,
-              _urlField('Server address'),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: 6,
+                children: [
+                  _urlField('Server address', invalid: addressWrong != null),
+                  FieldMessage(error: addressWrong),
+                ],
+              ),
             ),
             NamedControl(
               'Developer API key',
               quiet: true,
               labelled: true,
-              _keyField(saving),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: 6,
+                children: [
+                  _keyField(saving, invalid: keyWrong != null),
+                  FieldMessage(error: keyWrong),
+                ],
+              ),
             ),
             Align(
               alignment: Alignment.centerLeft,

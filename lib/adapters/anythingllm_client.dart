@@ -53,7 +53,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
   Future<void> verify(Connection connection) async {
     final body = await _get('/api/v1/auth', on: connection);
     if (body is! Map || body['authenticated'] != true) {
-      throw const ApiException('The server did not accept the key.');
+      throw const KeyRefused('The server did not accept the key.');
     }
   }
 
@@ -745,7 +745,7 @@ class HttpAnythingLlmApi implements AnythingLlmApi {
     final status = response.statusCode;
     final body = _json(response);
     if (status == 401 || status == 403) {
-      throw ApiException('The server rejected the key.', status: status);
+      throw KeyRefused('The server rejected the key.', status: status);
     }
     if (status < 200 || status >= 300) {
       throw ApiException(

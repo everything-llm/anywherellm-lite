@@ -6,6 +6,9 @@ import 'notice.dart';
 
 enum ConnectionCheck { idle, testing, ok, failed }
 
+/// A field of the form that connects: the server's address, or the developer key.
+enum ConnectionField { address, key }
+
 /// The AnythingLLM address and developer key: the one in use, testing a candidate, saving and
 /// removing. Listeners hear of a new connection as soon as the client uses it, before the
 /// keyring has written it.
@@ -28,6 +31,18 @@ class SettingsController extends ChangeNotifier {
 
   /// What the last test or save said.
   String? message;
+
+  /// The field of the typed address and key that [message] says is wrong, or null when it is
+  /// about neither, as a pairing code's or a saved connection's test is.
+  ConnectionField? wrong;
+
+  /// What [connect] says of a key the server would not take, under the key.
+  static const keyRefused =
+      'That key didn\u2019t work. Copy it again from AnythingLLM\u2019s settings.';
+
+  /// What [connect] says of an address no connection could be made to, under the address.
+  static const notReached =
+      'Can\u2019t reach that address. Check it opens in a browser on this phone.';
 
   /// Why the keyring could not be read or written. The connection still works for this run.
   Notice? keyringProblem;
@@ -61,36 +76,48 @@ class SettingsController extends ChangeNotifier {
   /// Asks the server whether [candidate] opens it, into [check] and [message]. True when it did
   /// and said so; an answer that comes after another test began, or the connection in use changed,
   /// says nothing and is false.
-  Future<bool> _check(Connection candidate) async {
+  /// When [typed], a failure names the field it is about in [wrong], in the words the form says
+  /// it in.
+  Future<bool> _check(Connection candidate, {bool typed = false}) async {
     final go = ++_checks;
     check = ConnectionCheck.testing;
     checkedInUse = candidate == connection;
     message = null;
+    wrong = null;
     notifyListeners();
-    var opens = false;
-    String? why;
+    ApiException? failed;
     try {
       await _api.verify(candidate);
-      opens = true;
     } on ApiException catch (error) {
-      why = error.message;
+      failed = error;
     }
     if (go != _checks) return false;
-    check = opens ? ConnectionCheck.ok : ConnectionCheck.failed;
-    message = opens ? 'Connected to ${candidate.host}.' : why;
+    check = failed == null ? ConnectionCheck.ok : ConnectionCheck.failed;
+    message = switch (failed) {
+      null => 'Connected to ${candidate.host}.',
+      KeyRefused() when typed => keyRefused,
+      Unreachable() when typed => notReached,
+      ApiException(:final message) => message,
+    };
+    if (typed && failed != null) {
+      wrong = failed is KeyRefused
+          ? ConnectionField.key
+          : ConnectionField.address;
+    }
     notifyListeners();
-    return opens;
+    return failed == null;
   }
 
-  /// Saves [url] and [key] only once the server accepts them. True when it did.
+  /// Saves [url] and [key] only once the server accepts them. True when it did. A failure names
+  /// the field it is about ([wrong]).
   Future<bool> connect(String url, String key) async {
     final candidate = _parse(url, key);
-    return candidate != null && await _connect(candidate);
+    return candidate != null && await _connect(candidate, typed: true);
   }
 
   /// Uses [candidate] once the server takes its key.
-  Future<bool> _connect(Connection candidate) async {
-    if (!await _check(candidate)) return false;
+  Future<bool> _connect(Connection candidate, {bool typed = false}) async {
+    if (!await _check(candidate, typed: typed)) return false;
     await _use(candidate, 'The key was saved.');
     return true;
   }
@@ -109,6 +136,7 @@ class SettingsController extends ChangeNotifier {
     _holder.current = candidate;
     _checks++;
     check = ConnectionCheck.idle;
+    wrong = null;
     notifyListeners();
     await _keyring(
       'Could not save the connection',
@@ -123,6 +151,7 @@ class SettingsController extends ChangeNotifier {
     _holder.current = null;
     _checks++;
     check = ConnectionCheck.idle;
+    wrong = null;
     notifyListeners();
     await _keyring(
       'Could not remove the saved connection',
@@ -142,14 +171,19 @@ class SettingsController extends ChangeNotifier {
     }
   }
 
-  /// The connection [url] and [key] describe, or null after saying what is wrong with them.
+  /// The connection [url] and [key] describe, or null after saying what is wrong with them and
+  /// which of them it is ([wrong]): the address first.
   Connection? _parse(String url, String key) {
+    var field = ConnectionField.address;
     try {
+      normalizeBaseUrl(url);
+      field = ConnectionField.key;
       return Connection.parse(url, key);
     } on ApiException catch (error) {
       check = ConnectionCheck.failed;
       checkedInUse = false;
       message = error.message;
+      wrong = field;
       notifyListeners();
       return null;
     }

@@ -63,10 +63,39 @@ void main() {
     test('a bad address or an empty key never reaches the server', () async {
       await settings.connect('nonsense', 'K1');
       expect(settings.check, ConnectionCheck.failed);
+      expect(settings.wrong, ConnectionField.address);
       await settings.connect('https://h:3001', '  ');
       expect(settings.message, 'Enter the API key.');
+      expect(settings.wrong, ConnectionField.key);
       expect(llm.verified, isEmpty);
     });
+
+    test(
+      'names the field a typed try failed on, in the form\'s words',
+      () async {
+        llm.verifyError = const KeyRefused('The server rejected the key.');
+        await settings.connect('https://h:3001', 'bad');
+        expect(settings.wrong, ConnectionField.key);
+        expect(settings.message, SettingsController.keyRefused);
+        llm.verifyError = const Unreachable('Could not reach h: refused');
+        await settings.connect('https://h:3001', 'K1');
+        expect(settings.wrong, ConnectionField.address);
+        expect(settings.message, SettingsController.notReached);
+        // A server that answers wrongly is the address's, in its own words.
+        llm.verifyError = const ApiException('The server answered HTTP 500.');
+        await settings.connect('https://h:3001', 'K1');
+        expect(settings.wrong, ConnectionField.address);
+        expect(settings.message, 'The server answered HTTP 500.');
+        // A saved connection's test is about neither field.
+        llm.verifyError = null;
+        await settings.connect('https://h:3001', 'K1');
+        expect(settings.wrong, isNull);
+        llm.verifyError = const KeyRefused('The server rejected the key.');
+        await settings.testSaved();
+        expect(settings.wrong, isNull);
+        expect(settings.message, 'The server rejected the key.');
+      },
+    );
 
     test('of the saved connection notifies on start and on finish', () async {
       store.saved = _saved;

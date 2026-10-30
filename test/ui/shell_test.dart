@@ -506,22 +506,60 @@ void main() {
       expect(inHome('Q3 planning'), findsOneWidget);
     });
 
-    testWidgets('a key the server refuses is not saved', (tester) async {
+    testWidgets('a key the server refuses is not saved, and says so under the '
+        'key without moving the page', (tester) async {
       final llm = planningServer()
-        ..verifyError = const ApiException('The server rejected the key.');
-      final h = await pumpApp(tester, llm: llm, connection: null);
+        ..verifyError = const KeyRefused('The server rejected the key.');
+      // Wide enough that the test font's square letters fit the message in its two lines.
+      final h = await pumpApp(
+        tester,
+        llm: llm,
+        connection: null,
+        size: const Size(800, 900),
+      );
       h.shell.openSettings(SettingsPage.connection);
       await tester.pumpAndSettle();
+      final key = find.bySemanticsLabel('AnythingLLM developer API key').last;
       await tester.enterText(addressField, 'https://h:3001');
-      await tester.enterText(
-        find.bySemanticsLabel('AnythingLLM developer API key').last,
-        'WRONG',
-      );
+      await tester.enterText(key, 'WRONG');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      final where = tester.getTopLeft(control('Connect'));
       await tapVisible(tester, control('Connect'));
       await tester.pumpAndSettle();
       expect(h.store.saved, isNull);
-      expect(find.text('The server rejected the key.'), findsOneWidget);
-      expect(control('Connect'), findsOneWidget);
+      final said = find.text(
+        'That key didn\u2019t work. Copy it again from AnythingLLM\u2019s settings.',
+      );
+      expect(said, findsOneWidget);
+      expect(
+        tester.getTopLeft(said).dy,
+        greaterThan(tester.getBottomLeft(key).dy),
+      );
+      expect(tester.getTopLeft(control('Connect')), where);
+    });
+
+    testWidgets('an address that cannot be reached says so under the address', (
+      tester,
+    ) async {
+      final llm = planningServer()
+        ..verifyError = const Unreachable('Could not reach h: refused');
+      final h = await pumpApp(tester, llm: llm, connection: null);
+      h.shell.openSettings(SettingsPage.connection);
+      await tester.pumpAndSettle();
+      final key = find.bySemanticsLabel('AnythingLLM developer API key').last;
+      await tester.enterText(addressField, 'https://h:3001');
+      await tester.enterText(key, 'K1');
+      await tapVisible(tester, control('Connect'));
+      await tester.pumpAndSettle();
+      expect(h.store.saved, isNull);
+      final said = find.text(
+        'Can\u2019t reach that address. Check it opens in a browser on this phone.',
+      );
+      expect(said, findsOneWidget);
+      final below = tester.getTopLeft(said).dy;
+      expect(below, greaterThan(tester.getBottomLeft(addressField).dy));
+      expect(below, lessThan(tester.getTopLeft(key).dy));
     });
 
     testWidgets('a replaced key closes the form once saved', (tester) async {
