@@ -275,4 +275,39 @@ void main() {
       expect(enabled(tester, 'Done'), isFalse);
     });
   });
+
+  group('Privacy and data', () {
+    testWidgets('Export chats saves the server\'s CSV', (tester) async {
+      final llm = planningServer();
+      final h = await pumpApp(tester, llm: llm);
+      h.shell.openSettings(SettingsPage.privacy);
+      await tester.pumpAndSettle();
+      expect(find.text('Your chats'), findsOneWidget);
+      expect(
+        find.text('Every chat on the server, as one spreadsheet file.'),
+        findsOneWidget,
+      );
+      await tapVisible(tester, control('Export chats'));
+      await tester.pumpAndSettle();
+      expect(llm.calls, contains('exportChats'));
+      final name = h.saved.keys.single;
+      expect(name, startsWith('anythingllm-chats-'));
+      expect(name, endsWith('.csv'));
+      expect(h.saved[name], llm.exported);
+    });
+
+    testWidgets('a refused export says why, on the page', (tester) async {
+      final llm = planningServer()
+        ..errors['exportChats'] = const ApiException('Invalid export type');
+      final h = await pumpApp(tester, llm: llm);
+      h.shell.openSettings(SettingsPage.privacy);
+      await tester.pumpAndSettle();
+      await tapVisible(tester, control('Export chats'));
+      await tester.pumpAndSettle();
+      expect(h.saved, isEmpty);
+      expect(find.text('Could not export the chats'), findsOneWidget);
+      expect(find.text('Invalid export type'), findsOneWidget);
+      expect(enabled(tester, 'Export chats'), isTrue);
+    });
+  });
 }

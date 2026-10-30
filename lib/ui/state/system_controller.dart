@@ -178,6 +178,10 @@ class SystemController extends ChangeNotifier with FollowsServer {
     return several;
   }
 
+  /// Every chat the server holds, every user's, as one CSV file's bytes. Throws
+  /// [ApiException] when the server refuses.
+  Future<List<int>> exportChats() => _api.exportChats();
+
   @override
   void serverChanged(_) {
     _wanted = false;
