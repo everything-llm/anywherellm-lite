@@ -127,7 +127,7 @@ void main() {
         contains('updateEmbeddings:+Manuals/Boiler manual.pdf.json-'),
       );
       expect(inSheet(find.text('9,300 words')), findsOneWidget);
-      expect(find.text('Q3 planning · 3 docs in use'), findsOneWidget);
+      expect(find.text('Q3 planning · 3 documents in use'), findsOneWidget);
 
       await tapVisible(
         tester,

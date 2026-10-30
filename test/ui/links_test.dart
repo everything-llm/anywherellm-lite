@@ -1,4 +1,5 @@
 import 'package:anywherellm/core/server_models.dart';
+import 'package:anywherellm/ui/chat/answer_body.dart';
 import 'package:anywherellm/ui/state/notice.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -11,7 +12,11 @@ import '../support/pump.dart';
 /// Taps the middle of the link whose text is [text] in an answer, selectable or not, as a
 /// person does.
 Future<void> tapLink(WidgetTester tester, String text) async {
-  for (final element in find.byType(RichText).evaluate()) {
+  final words = find.descendant(
+    of: find.byType(AnswerBody),
+    matching: find.byType(RichText),
+  );
+  for (final element in words.evaluate()) {
     final start = (element.widget as RichText).text.toPlainText().indexOf(text);
     final paragraph = element.renderObject;
     if (start < 0 || paragraph is! RenderParagraph) continue;

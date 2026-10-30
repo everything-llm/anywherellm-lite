@@ -136,7 +136,7 @@ void main() {
       await chat.rename(_main, 'Launch');
       await chat.delete(_main);
       expect(llm.calls.where((c) => c.startsWith('renameThread')), isEmpty);
-      expect(chat.deletedChat, isNull);
+      expect(llm.calls.where((c) => c.startsWith('deleteThread')), isEmpty);
       expect(chat.activeThread, _main);
       expect(chat.title, mainChatName);
     });
