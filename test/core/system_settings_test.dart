@@ -1,3 +1,4 @@
+import 'package:anywherellm/core/providers.dart';
 import 'package:anywherellm/core/system_settings.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -20,21 +21,26 @@ const _server = <String, Object?>{
 };
 
 void main() {
-  test(
-    'every chat provider the server takes but two names its model setting',
-    () {
-      expect(
-        systemChoices['LLMProvider']!.where(
-          (p) => !chatModelKeys.containsKey(p),
-        ),
-        ['textgenwebui', 'anythingllm-router'],
-      );
-      expect(
-        chatModelKeys.keys,
-        everyElement(isIn(systemChoices['LLMProvider']!)),
-      );
-    },
-  );
+  test('every chat provider the app names but two names its model setting', () {
+    final named = [for (final p in chatProviders.providers) p.value];
+    expect(named.where((p) => !chatModelKeys.containsKey(p)), [
+      'textgenwebui',
+      'anythingllm-router',
+    ]);
+    expect(chatModelKeys.keys, everyElement(isIn(named)));
+  });
+
+  test('the system answers with its provider\'s model setting', () {
+    expect(systemChatModel(_server), (
+      provider: 'generic-openai',
+      model: 'glm-5.3-flash',
+    ));
+    expect(systemChatModel({'LLMProvider': 'anythingllm-router'}), (
+      provider: 'anythingllm-router',
+      model: '',
+    ));
+    expect(systemChatModel(null), (provider: '', model: ''));
+  });
 
   test('a setting reads as text, and a secret as empty', () {
     expect(settingText(_server, 'LLMProvider'), 'generic-openai');

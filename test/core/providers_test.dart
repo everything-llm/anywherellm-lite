@@ -1,33 +1,12 @@
 import 'package:anywherellm/core/providers.dart';
-import 'package:anywherellm/core/system_settings.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('every chat provider the server takes has a name', () {
-    for (final value in systemChoices['LLMProvider']!) {
-      expect(chatProviders.named(value), isNotNull, reason: value);
-    }
-  });
-
   test('a provider the app does not know still shows by its value', () {
     expect(chatProviders.labelOf('ollama'), 'Ollama');
     expect(chatProviders.labelOf('brand-new'), 'brand-new');
     expect(chatProviders.labelOf(''), 'None');
-    expect(chatProviders.choices('brand-new').last, 'brand-new');
-    expect(
-      chatProviders.choices('ollama'),
-      unorderedEquals(systemChoices['LLMProvider']!),
-    );
-    expect(vectorProviders.choices('lancedb'), contains('pgvector'));
-  });
-
-  test('a chooser offers its values in the order the app lists them', () {
-    expect(chatProviders.choices('ollama').first, 'generic-openai');
-    expect(transcriptionProviders.choices('local'), [
-      'local',
-      'openai',
-      'generic-openai',
-    ]);
+    expect(vectorProviders.labelOf('pgvector'), 'PGVector');
   });
 
   test('privacy says where the chat model answers', () {

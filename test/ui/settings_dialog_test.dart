@@ -266,6 +266,7 @@ void main() {
       h.shell.openSettings(SettingsPage.server);
       await tester.pumpAndSettle();
       for (final row in [
+        'Chat provider',
         'Chat model',
         'Document search model',
         'Document storage',

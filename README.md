@@ -14,7 +14,7 @@ The app talks only to the AnythingLLM server you set up in Settings, through Any
 | Chat | Shows the open chat. Answers stream in, and **Stop** ends one early. Chips under an answer name the files and pages it used; tap one to see the passages read or the file in Documents. Attach photos or files to a message, dictate it, and have answers read aloud. |
 | Documents | Lists the open workspace's files. Add a file, a link or pasted text. A switch takes a file out of answers without forgetting it. The trash removes a file, with a few seconds to undo. |
 | Workspace pages | The workspace's documents, its instructions, and **Answer from**: whether answers may use tools such as web search, general knowledge and the files, or the files only, and which chat model answers, which AnythingLLM's own web page changes. |
-| Settings | Holds the server address, the developer API key the app gets from the server, and the server's password, which a QR code can fill in. It also shows the server's AI providers and switches its chat model. A connection is saved only once the server accepts it. |
+| Settings | Holds the server address, the developer API key the app gets from the server, and the server's password, which a QR code can fill in. It also shows the server's AI providers and its chat model. A connection is saved only once the server accepts it. |
 
 Until a server is saved, the app opens with Settings showing. Other apps can share links, text and files into AnywhereLLM.
 

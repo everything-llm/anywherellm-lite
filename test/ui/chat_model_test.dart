@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/ui/settings/rows.dart';
+import 'package:anywherellm/ui/settings/settings_pages.dart';
 import 'package:anywherellm/ui/state/shell_controller.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -116,6 +117,49 @@ void main() {
       }
       expect(writes(llm), isEmpty);
       expect(llm.spaces[0].settings['chatModel'], 'llama3.1:8b');
+    });
+  });
+
+  group('the Server page', () {
+    Future<Harness> openServer(WidgetTester tester, FakeAnythingLlm llm) async {
+      final h = await pumpApp(tester, llm: llm, size: const Size(390, 1200));
+      h.shell.openSettings(SettingsPage.server);
+      await tester.pumpAndSettle();
+      return h;
+    }
+
+    testWidgets('shows the chat provider and model, and changes neither', (
+      tester,
+    ) async {
+      final llm = planningServer();
+      await openServer(tester, llm);
+      expect(find.text('Chat provider'), findsOneWidget);
+      expect(find.text('Ollama'), findsOneWidget);
+      expect(find.text('Chat model'), findsOneWidget);
+      expect(find.text('qwen3:8b'), findsOneWidget);
+      expect(find.text(_note), findsOneWidget);
+      expect(find.text('Change'), findsNothing);
+      await tester.tap(find.text('Chat model'));
+      await tester.pumpAndSettle();
+      expect(find.text('Save'), findsNothing);
+      expect(writes(llm), isEmpty);
+    });
+
+    testWidgets('a provider that serves its own model names none', (
+      tester,
+    ) async {
+      final llm = planningServer()
+        ..system = const {'LLMProvider': 'anythingllm-router'};
+      await openServer(tester, llm);
+      expect(find.text('Model router'), findsOneWidget);
+      expect(find.text('Chosen by Model router'), findsOneWidget);
+    });
+
+    testWidgets('a provider with no model set says so', (tester) async {
+      final llm = planningServer()..system = const {'LLMProvider': 'openai'};
+      await openServer(tester, llm);
+      expect(find.text('OpenAI'), findsOneWidget);
+      expect(find.text('Not set'), findsOneWidget);
     });
   });
 }

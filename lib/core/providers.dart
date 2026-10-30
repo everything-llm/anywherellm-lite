@@ -29,24 +29,10 @@ class ProviderSetting {
     return null;
   }
 
-  /// What [value] is called, or [value] itself when the app does not know it.
+  /// What [value] is called, or [value] itself when the app does not know it, as a provider
+  /// newer than the app.
   String labelOf(String value) =>
       value.isEmpty ? 'None' : named(value)?.label ?? value;
-
-  /// The values the chooser offers while the server has [current]: those the server takes, in
-  /// [providers]' order and then any the app has no name for, and [current] as well when it is
-  /// none of them, so a provider newer than the app still shows.
-  List<String> choices(String current) {
-    final taken = systemChoices[chooser];
-    return [
-      for (final p in providers)
-        if (taken == null || taken.contains(p.value)) p.value,
-      for (final value in taken ?? const <String>[])
-        if (named(value) == null) value,
-      if (!(taken ?? const []).contains(current) && named(current) == null)
-        current,
-    ];
-  }
 }
 
 const chatProviders = ProviderSetting('LLMProvider', [

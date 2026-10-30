@@ -1,46 +1,5 @@
-// The server's own settings, as GET /v1/system gives them: the values a provider setting takes,
-// the setting that names each provider's chat model, and a setting read as text.
-
-/// The values the server checks a provider setting against: `LLMProvider`'s, which the chat
-/// model picker offers.
-const systemChoices = {
-  'LLMProvider': [
-    'openai',
-    'azure',
-    'anthropic',
-    'gemini',
-    'lmstudio',
-    'localai',
-    'ollama', //
-    'togetherai',
-    'fireworksai',
-    'mistral',
-    'perplexity',
-    'openrouter',
-    'novita', //
-    'groq',
-    'koboldcpp',
-    'textgenwebui',
-    'cohere',
-    'litellm',
-    'generic-openai', //
-    'bedrock',
-    'deepseek',
-    'apipie',
-    'xai',
-    'nvidia-nim',
-    'ppio',
-    'moonshotai', //
-    'cometapi',
-    'foundry',
-    'zai',
-    'giteeai',
-    'llmman',
-    'privatemode',
-    'sambanova', //
-    'lemonade', 'minimax', 'cerebras', 'omlx', 'anythingllm-router', 'vertex',
-  ],
-};
+// The server's own settings, as GET /v1/system gives them: the setting that names each
+// provider's chat model, and a setting read as text.
 
 /// The setting that names the chat model, by each `LLMProvider` that has one, from AnythingLLM
 /// 1.16.2's `KEY_MAPPING`. Text Generation Web UI serves whatever model it has loaded, and the
