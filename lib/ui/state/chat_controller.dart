@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:math' show max;
+import 'dart:math' show max, min;
 
 import 'package:flutter/foundation.dart';
 
@@ -147,6 +147,15 @@ class OnDeck {
 /// resumes them or sends another message.
 typedef _Deck = ({String slug, List<OnDeck> next, bool held});
 
+/// Messages [ChatController.dropOnDeck] or [ChatController.clearOnDeck] took out of a chat of
+/// workspace [slug] at once, each with where it was then, in order, and whether those waiting
+/// were [held].
+typedef _Removal = ({
+  String slug,
+  List<({int at, OnDeck item})> items,
+  bool held,
+});
+
 /// The workspaces and their chats, the chat on screen, and the answers running.
 ///
 /// One answer runs at a time in each chat; chats of one workspace answer at once, since
@@ -281,15 +290,16 @@ class ChatController extends ChangeNotifier with FollowsServer {
     return true;
   }
 
-  /// Takes [item] out of the messages waiting in the chat on screen, and says whether it was
-  /// there.
-  bool dropOnDeck(OnDeck item) {
+  /// Takes [item] out of the messages waiting in the chat on screen at once, and says whether
+  /// it was there. [undoRemoveOnDeck] puts it back while its toast shows, unless [undoable] is
+  /// false, as when it goes back in the message box.
+  bool dropOnDeck(OnDeck item, {bool undoable = true}) {
     final thread = activeThread;
     final deck = _onDeck[thread];
-    if (thread == null ||
-        deck == null ||
-        !deck.next.any((o) => identical(o, item))) {
-      return false;
+    final at = deck?.next.indexWhere((o) => identical(o, item)) ?? -1;
+    if (thread == null || deck == null || at < 0) return false;
+    if (undoable) {
+      _removed(thread, deck, [(at: at, item: item)]);
     }
     _setDeck(thread, deck.slug, [
       for (final o in deck.next)
@@ -299,44 +309,73 @@ class ChatController extends ChangeNotifier with FollowsServer {
     return true;
   }
 
-  /// The messages [clearOnDeck] took out, while [undoClearOnDeck] can put them back: until the
-  /// toast is closed ([closeClearedOnDeck]), another toast takes its place, or another chat
-  /// shows.
-  final _cleared = Fleeting<({String thread, _Deck deck})>.held();
+  /// What [dropOnDeck] and [clearOnDeck] took out of one chat, the latest last, while
+  /// [undoRemoveOnDeck] can put them back: until the toast is closed ([closeRemovedOnDeck]) or
+  /// another chat shows. It has no clock.
+  final _cleared = Fleeting<({String thread, List<_Removal> removals})>.held();
 
-  /// How many messages [undoClearOnDeck] would put back, or null.
-  int? get clearedOnDeck => _cleared.value?.deck.next.length;
+  /// How many messages the latest removal took out, which [undoRemoveOnDeck] would put back, or
+  /// null.
+  int? get removedOnDeck => _cleared.value?.removals.last.items.length;
 
-  /// Takes every message waiting in the chat on screen out at once. [undoClearOnDeck] puts them
-  /// back while its toast shows.
+  /// Adds [items], taken out of [deck] in chat [thread], to what Undo can put back: after the
+  /// others taken out of that chat, or in their place for another chat.
+  void _removed(
+    String thread,
+    _Deck deck,
+    List<({int at, OnDeck item})> items,
+  ) {
+    final before = _cleared.value;
+    _cleared.show((
+      thread: thread,
+      removals: [
+        if (before != null && before.thread == thread) ...before.removals,
+        (slug: deck.slug, items: items, held: deck.held),
+      ],
+    ));
+  }
+
+  /// Takes every message waiting in the chat on screen out at once. [undoRemoveOnDeck] puts
+  /// them back while its toast shows.
   void clearOnDeck() {
     final thread = activeThread;
     final deck = _onDeck[thread];
     if (thread == null || deck == null) return;
-    _cleared.show((thread: thread, deck: deck));
+    _removed(thread, deck, [
+      for (final (at, item) in deck.next.indexed) (at: at, item: item),
+    ]);
     _setDeck(thread, deck.slug, const []);
     notifyListeners();
   }
 
-  /// Puts back what [clearOnDeck] took out, ahead of any message written since, in its chat
-  /// unless that chat is gone.
-  void undoClearOnDeck() {
+  /// Puts back what the latest removal took out, each where it was among those waiting now, so
+  /// what Clear all took goes ahead of any message written since, in its chat unless that chat
+  /// is gone. The toast then offers the removal before it, if any.
+  void undoRemoveOnDeck() {
     final cleared = _cleared.take();
     if (cleared == null) return;
-    final (:thread, :deck) = cleared;
-    if (_has(deck.slug, thread)) {
+    final (:thread, :removals) = cleared;
+    final last = removals.last;
+    if (removals.length > 1) {
+      _cleared.show((
+        thread: thread,
+        removals: removals.sublist(0, removals.length - 1),
+      ));
+    }
+    if (_has(last.slug, thread)) {
       final now = _onDeck[thread];
-      _setDeck(thread, deck.slug, [
-        ...deck.next,
-        ...?now?.next,
-      ], held: now?.held ?? deck.held);
+      final next = [...?now?.next];
+      for (final (:at, :item) in last.items) {
+        next.insert(min(at, next.length), item);
+      }
+      _setDeck(thread, last.slug, next, held: now?.held ?? last.held);
       _sendOnDeck();
     }
     notifyListeners();
   }
 
-  /// Closes the toast of what [clearOnDeck] took out: they are gone for good.
-  void closeClearedOnDeck() {
+  /// Closes the toast of what was taken out of the messages waiting: they are gone for good.
+  void closeRemovedOnDeck() {
     if (_cleared.take() == null) return;
     notifyListeners();
   }
@@ -948,15 +987,15 @@ class ChatController extends ChangeNotifier with FollowsServer {
     ...?_turns[thread]?.where((t) => t.notSent),
   ];
 
-  /// Empties the draft, so a send or read meant for the one before leaves it alone.
-  /// Another chat is about to show, [thread] or a draft: Clear all's toast for another chat goes
-  /// with what it took out.
+  /// Another chat is about to show, [thread] or a draft: the toast of what was taken out of the
+  /// messages waiting in another chat goes with them.
   void _leaving(String? thread) {
     if (_cleared.value case final cleared? when cleared.thread != thread) {
       _cleared.take();
     }
   }
 
+  /// Empties the draft, so a send or read meant for the one before leaves it alone.
   void _freshDraft() {
     _draft = [];
     _draftGo++;
@@ -1085,7 +1124,7 @@ class ChatController extends ChangeNotifier with FollowsServer {
       at: at,
       turns: _turns[threadSlug],
     );
-    // What Clear all took out of it has nowhere to go back to.
+    // What was taken out of its messages waiting has nowhere to go back to.
     if (_cleared.value?.thread == threadSlug) _cleared.take();
     _threads[slug] = [...was]..removeAt(at);
     _turns.remove(threadSlug);

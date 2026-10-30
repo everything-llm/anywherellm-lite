@@ -172,7 +172,7 @@ class ComposerState extends State<Composer> {
   /// ahead of what is typed and its files ahead of those attached. Like [edit], it drops the
   /// shortcut chosen, since its words are what a shortcut expanded to.
   void putBack(OnDeck item) {
-    if (!_scope.chat.dropOnDeck(item)) return;
+    if (!_scope.chat.dropOnDeck(item, undoable: false)) return;
     final typed = widget.draft.text;
     setState(() {
       _shortcut = null;

@@ -286,8 +286,8 @@ class _Main extends StatelessWidget {
   }
 }
 
-/// Undo for the waiting messages Clear all took out, over the chat's composer while they can be
-/// put back, with Close, which lets them go.
+/// Undo for the waiting messages Don't send or Clear all took out, over the chat's composer while
+/// they can be put back, with Close, which lets them go.
 class _PhoneUndo extends StatelessWidget {
   const _PhoneUndo();
 
@@ -299,11 +299,11 @@ class _PhoneUndo extends StatelessWidget {
       listenable: chat,
       builder: (context, _) {
         final (String, VoidCallback, VoidCallback)? undo =
-            switch (chat.clearedOnDeck) {
+            switch (chat.removedOnDeck) {
               final n? => (
-                'Cleared ${plural(n, 'waiting message', 'waiting messages')}',
-                chat.undoClearOnDeck,
-                chat.closeClearedOnDeck,
+                'Removed ${plural(n, 'waiting message', 'waiting messages')}',
+                chat.undoRemoveOnDeck,
+                chat.closeRemovedOnDeck,
               ),
               null => null,
             };

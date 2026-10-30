@@ -372,6 +372,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       expect(typed(tester), 'Second\nDraft');
       expect(h.chat.onDeck.map((o) => o.text), ['Third']);
+      // It is in the box, so there is nothing to undo.
+      expect(h.chat.removedOnDeck, isNull);
       expect(find.text('Sends when this answer ends.'), findsOneWidget);
       await llm.chat!.close();
       await tester.pump(const Duration(milliseconds: 300));
@@ -390,11 +392,11 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       expect(h.chat.onDeck, isEmpty);
       expect(find.text('Second'), findsNothing);
-      expect(find.text('Cleared 2 waiting messages'), findsOneWidget);
+      expect(find.text('Removed 2 waiting messages'), findsOneWidget);
       await tester.tap(find.text('Undo'));
       await tester.pump(const Duration(milliseconds: 300));
       expect(h.chat.onDeck.map((o) => o.text), ['Second', 'Third']);
-      expect(find.text('Cleared 2 waiting messages'), findsNothing);
+      expect(find.text('Removed 2 waiting messages'), findsNothing);
       await llm.chat!.close();
       await tester.pump(const Duration(milliseconds: 300));
       expect(sent(llm, 'Second'), 1);
@@ -414,21 +416,21 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       // No timer: Undo is still there a minute on.
       await tester.pump(const Duration(minutes: 1));
-      expect(find.text('Cleared 1 waiting message'), findsOneWidget);
+      expect(find.text('Removed 1 waiting message'), findsOneWidget);
       await tester.tap(control('Close'));
       await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('Cleared 1 waiting message'), findsNothing);
-      expect(h.chat.clearedOnDeck, isNull);
+      expect(find.text('Removed 1 waiting message'), findsNothing);
+      expect(h.chat.removedOnDeck, isNull);
       expect(h.chat.onDeck, isEmpty);
 
       await queue(tester, 'Third');
       h.chat.clearOnDeck();
       await tester.pump(const Duration(milliseconds: 300));
-      expect(h.chat.clearedOnDeck, 1);
+      expect(h.chat.removedOnDeck, 1);
       await h.chat.open('priorities');
       await tester.pump(const Duration(milliseconds: 300));
-      expect(h.chat.clearedOnDeck, isNull);
-      expect(find.text('Cleared 1 waiting message'), findsNothing);
+      expect(h.chat.removedOnDeck, isNull);
+      expect(find.text('Removed 1 waiting message'), findsNothing);
       await h.chat.open(thread);
       await llm.chat!.close();
       await tester.pump(const Duration(milliseconds: 300));
@@ -494,6 +496,40 @@ void main() {
       expect(typed(tester), 'Not yet');
       await llm.chat!.close();
       await tester.pump(const Duration(milliseconds: 300));
+    });
+
+    testWidgets("Don't send acts at once, and Undo puts each back in turn", (
+      tester,
+    ) async {
+      final (h, llm) = await answering(tester);
+      await queue(tester, 'Second');
+      await queue(tester, 'Third');
+      await queue(tester, 'Fourth');
+      await tester.tap(find.bySemanticsLabel("Don't send Third"));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(h.chat.onDeck.map((o) => o.text), ['Second', 'Fourth']);
+      expect(find.text('Removed 1 waiting message'), findsOneWidget);
+      await tester.tap(find.bySemanticsLabel("Don't send Second"));
+      await tester.pump(const Duration(milliseconds: 300));
+      // No timer: Undo is still there a minute on.
+      await tester.pump(const Duration(minutes: 1));
+      expect(find.text('Removed 1 waiting message'), findsOneWidget);
+      expect(h.chat.onDeck.map((o) => o.text), ['Fourth']);
+      // The latest comes back first, then the one before it, each where it was.
+      await tester.tap(control('Undo'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(h.chat.onDeck.map((o) => o.text), ['Second', 'Fourth']);
+      expect(find.text('Removed 1 waiting message'), findsOneWidget);
+      await tester.tap(control('Undo'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(h.chat.onDeck.map((o) => o.text), ['Second', 'Third', 'Fourth']);
+      expect(h.chat.removedOnDeck, isNull);
+      expect(control('Undo'), findsNothing);
+      for (var i = 0; i < 4; i++) {
+        await llm.chat!.close();
+        await tester.pump(const Duration(milliseconds: 300));
+      }
+      expect(sent(llm, 'Third'), 1);
     });
 
     testWidgets('they go on while another chat shows', (tester) async {
