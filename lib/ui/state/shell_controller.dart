@@ -67,6 +67,7 @@ enum Popup {
 
   /// Who uses this app?, on the Connection page of a server with several users.
   whoUses,
+
   /// Move to folder, over the [ShellController.document] whose details show.
   moveDocument,
 

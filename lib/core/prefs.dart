@@ -185,6 +185,7 @@ class Prefs {
   /// These prefs with chats on [server] saved as [user].
   Prefs withUser(String server, ServerUser user) =>
       _copy(users: {...users, server: user});
+
   /// The library folder a document was last moved into on each server, by its address, which a
   /// new document goes into.
   final Map<String, String> lastFolders;

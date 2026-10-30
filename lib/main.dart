@@ -129,7 +129,6 @@ class _SessionHostState extends State<SessionHost> {
     _loaded = _load();
   }
 
-
   @override
   void dispose() {
     _readAloud.dispose();
