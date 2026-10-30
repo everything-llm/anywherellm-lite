@@ -43,6 +43,30 @@ void main() {
     );
   });
 
+  testWidgets('a message waiting follows Hide shortcut prompts too', (
+    tester,
+  ) async {
+    final h = await pumpApp(tester, llm: planningServer()..hold = true);
+    await h.chat.send('And next quarter?');
+    const expanded = 'Translate your last answer into French.';
+    expect(
+      h.chat.sendWhenDone(
+        expanded,
+        shortcutUse: const ShortcutUse(label: 'Translate', detail: 'French'),
+      ),
+      isTrue,
+    );
+    await tester.pump();
+    expect(find.text(expanded), findsOneWidget);
+    await h.prefs.setSwitch(ChatSwitch.hideShortcutPrompts, true);
+    await tester.pump();
+    expect(find.text(expanded), findsNothing);
+    expect(
+      find.text('Shortcut · the server keeps the full prompt'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets(
     'a shortcut pasted as /name into an empty message becomes a chip',
     (tester) async {

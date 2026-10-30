@@ -32,8 +32,15 @@ class OnDeckView extends StatelessWidget {
       ? '$count waiting · a long queue'
       : 'Each sends in turn, when the answer before it ends.';
 
+  // The chat rebuilds it as the messages change; the list holds it as the prefs change, so it
+  // listens to them itself.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: AppScope.of(context).prefs,
+    builder: _build,
+  );
+
+  Widget _build(BuildContext context, Widget? _) {
     final scope = AppScope.of(context);
     final chat = scope.chat;
     final items = chat.onDeck;
