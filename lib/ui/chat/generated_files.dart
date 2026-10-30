@@ -12,14 +12,15 @@ import '../icons.dart';
 import '../layout.dart';
 import '../tokens.dart';
 import '../type.dart';
+import '../widgets/basics.dart';
 import '../widgets/buttons.dart';
 import '../widgets/tappable.dart';
 
 /// The files and images an agent made with an answer. An image shows, read from the server with
 /// the key as any other call is, under a line naming its type and size, with Save and, where
 /// the device can share, Share; tapped, it opens over the window. A file is a card with its
-/// type, name and size and Save. Each saves through [AppScope.save], and a failure shows as the
-/// chat's problem.
+/// type, name and size and Save. Each saves through [AppScope.save], and a line under it says
+/// once it was saved; a failure shows as the chat's problem.
 class GeneratedFiles extends StatelessWidget {
   const GeneratedFiles(this.files, {super.key});
 
@@ -57,30 +58,23 @@ Future<void> shareMadeFile(BuildContext context, GeneratedFile file) {
   return shareFile(context, file.name, () => chat.bytes.file(file));
 }
 
-/// Save, which asks where to save [file] and saves it, reading Saved once the file is saved.
-class _SaveButton extends StatefulWidget {
-  const _SaveButton(this.file);
+/// Save, which asks where to save [file] and saves it, telling [onSaved] once it went through.
+/// It keeps its label, so the file can be saved again elsewhere.
+class _SaveButton extends StatelessWidget {
+  const _SaveButton(this.file, {required this.onSaved});
 
   final GeneratedFile file;
-
-  @override
-  State<_SaveButton> createState() => _SaveButtonState();
-}
-
-class _SaveButtonState extends State<_SaveButton> {
-  bool _saved = false;
+  final VoidCallback onSaved;
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    final name = widget.file.name;
     return Tappable(
       touchTarget: true,
-      label: _saved ? 'Saved $name' : 'Save $name',
-      tooltip: _saved ? null : 'Save',
+      label: 'Save ${file.name}',
+      tooltip: 'Save',
       onTap: () async {
-        final saved = await saveMadeFile(context, widget.file);
-        if (mounted && saved) setState(() => _saved = true);
+        if (await saveMadeFile(context, file)) onSaved();
       },
       radius: BorderRadius.circular(8),
       child: SizedBox(
@@ -90,13 +84,9 @@ class _SaveButtonState extends State<_SaveButton> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              AppIcon(
-                _saved ? 'check' : 'download',
-                size: IconSize.xs,
-                color: t.accent,
-              ),
+              AppIcon('download', size: IconSize.xs, color: t.accent),
               const SizedBox(width: 6),
-              Text(_saved ? 'Saved' : 'Save', style: Type.caption(t.accent)),
+              Text('Save', style: Type.caption(t.accent)),
             ],
           ),
         ),
@@ -105,7 +95,55 @@ class _SaveButtonState extends State<_SaveButton> {
   }
 }
 
-/// A file an agent made: a card with its type, name and size and Save.
+/// What [card] builds round a Save for [file], over the line that says, once it is saved, that
+/// it was: House UI's success mark and Saved with the file's name, heard as it shows. Where it
+/// went is the system's save dialog's to know, so the line does not say.
+class _Saves extends StatefulWidget {
+  const _Saves(this.file, {required this.card});
+
+  final GeneratedFile file;
+  final Widget Function(Widget save) card;
+
+  @override
+  State<_Saves> createState() => _SavesState();
+}
+
+class _SavesState extends State<_Saves> {
+  bool _saved = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      spacing: 2,
+      children: [
+        widget.card(
+          _SaveButton(
+            widget.file,
+            onSaved: () {
+              if (mounted) setState(() => _saved = true);
+            },
+          ),
+        ),
+        Semantics(
+          liveRegion: true,
+          child: _saved
+              ? StatusWord(
+                  'Saved ${widget.file.name}',
+                  status: Status.success,
+                  style: Type.note(t.ink),
+                )
+              : const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+}
+
+/// A file an agent made: a card with its type, name and size and Save, and under it, once
+/// saved, the line that says so.
 class _MadeFile extends StatelessWidget {
   const _MadeFile(this.file, {super.key});
 
@@ -115,34 +153,37 @@ class _MadeFile extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final size = file.size;
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 420),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
-        decoration: BoxDecoration(
-          color: t.tile,
-          border: Border.all(color: t.line),
-          borderRadius: BorderRadius.circular(Sizes.small),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TypeTile.label(sourceExt(file.name)),
-            const SizedBox(width: 10),
-            Flexible(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(file.name, style: Type.caption(t.ink)),
-                  if (size != null)
-                    Text(sizeText(size), style: Type.note(t.ink)),
-                ],
+    return _Saves(
+      file,
+      card: (save) => ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
+          decoration: BoxDecoration(
+            color: t.tile,
+            border: Border.all(color: t.line),
+            borderRadius: BorderRadius.circular(Sizes.small),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TypeTile.label(sourceExt(file.name)),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(file.name, style: Type.caption(t.ink)),
+                    if (size != null)
+                      Text(sizeText(size), style: Type.note(t.ink)),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            _SaveButton(file),
-          ],
+              const SizedBox(width: 8),
+              save,
+            ],
+          ),
         ),
       ),
     );
@@ -187,51 +228,55 @@ class _MadeImageState extends State<_MadeImage> {
         final bytes = snapshot.data;
         if (bytes == null) return _MadeFile(file);
         final size = file.size ?? bytes.length;
-        final image = Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Tappable(
-              label: 'Open ${file.name}',
-              onTap: () => scope.shell.togglePopup(file),
-              radius: BorderRadius.circular(8),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 360),
-                  child: Image.memory(
-                    bytes,
-                    gaplessPlayback: true,
-                    fit: BoxFit.contain,
-                    cacheHeight: (360 * MediaQuery.devicePixelRatioOf(context))
-                        .round(),
-                    semanticLabel: file.name,
-                    errorBuilder: (_, _, _) => _MadeFile(file),
+        final image = _Saves(
+          file,
+          card: (save) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Tappable(
+                label: 'Open ${file.name}',
+                onTap: () => scope.shell.togglePopup(file),
+                radius: BorderRadius.circular(8),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 360),
+                    child: Image.memory(
+                      bytes,
+                      gaplessPlayback: true,
+                      fit: BoxFit.contain,
+                      cacheHeight:
+                          (360 * MediaQuery.devicePixelRatioOf(context))
+                              .round(),
+                      semanticLabel: file.name,
+                      errorBuilder: (_, _, _) => _MadeFile(file),
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 4,
-              children: [
-                Text(
-                  'Image · ${sourceExt(file.name)} · ${sizeText(size)}',
-                  style: Type.note(t.ink),
-                ),
-                _SaveButton(file),
-                if (scope.share != null)
-                  IconBtn(
-                    'share',
-                    tooltip: 'Share ${file.name}',
-                    onPressed: () => shareMadeFile(context, file),
-                    box: 30,
-                    size: IconSize.xs,
+              const SizedBox(height: 2),
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 4,
+                children: [
+                  Text(
+                    'Image · ${sourceExt(file.name)} · ${sizeText(size)}',
+                    style: Type.note(t.ink),
                   ),
-              ],
-            ),
-          ],
+                  save,
+                  if (scope.share != null)
+                    IconBtn(
+                      'share',
+                      tooltip: 'Share ${file.name}',
+                      onPressed: () => shareMadeFile(context, file),
+                      box: 30,
+                      size: IconSize.xs,
+                    ),
+                ],
+              ),
+            ],
+          ),
         );
         return ViewerWhileOpen(file, bytes, child: image);
       },

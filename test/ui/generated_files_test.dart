@@ -40,10 +40,18 @@ void main() {
     expect(find.text('report.pdf'), findsOneWidget);
     expect(find.text('2.0 KB'), findsOneWidget);
     expect(llm.calls, isNot(contains('generatedFile:pdf-1.pdf')));
+    expect(find.text('Saved report.pdf'), findsNothing);
     await tester.tap(control('Save report.pdf'));
     await tester.pumpAndSettle();
     expect(h.saved['report.pdf'], [37, 80, 68, 70]);
-    expect(control('Saved report.pdf'), findsOneWidget);
+    // Save keeps its label, and a line under the card says it was saved.
+    expect(control('Save report.pdf'), findsOneWidget);
+    expect(find.text('Saved report.pdf'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Saved report.pdf')).dy,
+      greaterThan(tester.getBottomLeft(find.text('report.pdf')).dy),
+    );
+    expect(find.textContaining('Downloads'), findsNothing);
   });
 
   testWidgets('a file the server no longer has says so', (tester) async {
@@ -53,7 +61,7 @@ void main() {
     await tester.tap(control('Save report.pdf'));
     await tester.pumpAndSettle();
     expect(h.saved, isEmpty);
-    expect(control('Saved report.pdf'), findsNothing);
+    expect(find.text('Saved report.pdf'), findsNothing);
     expect(find.text('Could not get report.pdf'), findsOneWidget);
     expect(find.text('File not found'), findsOneWidget);
   });
@@ -74,6 +82,7 @@ void main() {
     await tester.tap(control('Save cat.png'));
     await tester.pumpAndSettle();
     expect(h.saved['cat.png'], pixel);
+    expect(find.text('Saved cat.png'), findsOneWidget);
     expect(
       llm.calls.where((c) => c == 'generatedFile:img-1.png'),
       hasLength(1),
