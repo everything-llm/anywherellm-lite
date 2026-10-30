@@ -141,4 +141,25 @@ void main() {
     expect(find.text('Workspaces'), findsWidgets);
     expect(control('Reorder'), findsNothing);
   });
+
+  testWidgets('Delete workspace asks first, saying it can\'t be undone', (
+    tester,
+  ) async {
+    final llm = planningServer();
+    final h = await pumpApp(tester, llm: llm);
+    h.shell.togglePopup(WorkspaceSheet.delete);
+    await tester.pumpAndSettle();
+    expect(find.text('Delete workspace?'), findsOneWidget);
+    expect(
+      find.text(
+        'Delete Q3 planning and its 2 chats? Its documents stay in the library. '
+        'This can\u2019t be undone.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(control('Delete workspace'));
+    await tester.pumpAndSettle();
+    expect(llm.calls, contains('deleteWorkspace:q3'));
+    expect(h.chat.workspaces.map((w) => w.slug), ['household']);
+  });
 }

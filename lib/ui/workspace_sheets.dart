@@ -11,8 +11,8 @@ import 'widgets/fields.dart';
 import 'widgets/sheet.dart';
 
 /// A phone's sheet about the open workspace, over the window: a new workspace's name and
-/// instructions, the open one's new name, or whether to delete it, with Keep and Delete side by
-/// side.
+/// instructions, the open one's new name, or whether to delete it (Delete workspace?), with Keep
+/// and Delete workspace side by side.
 class WorkspaceSheetView extends StatefulWidget {
   const WorkspaceSheetView(this.kind, {super.key});
 
@@ -61,7 +61,7 @@ class _WorkspaceSheetViewState extends State<WorkspaceSheetView> {
     final title = switch (widget.kind) {
       WorkspaceSheet.create => 'New workspace',
       WorkspaceSheet.rename => 'Rename workspace',
-      WorkspaceSheet.delete => 'Delete workspace',
+      WorkspaceSheet.delete => 'Delete workspace?',
     };
     // A name's field takes the focus itself.
     return ModalSheet(
@@ -130,7 +130,9 @@ class _WorkspaceSheetViewState extends State<WorkspaceSheetView> {
       'chats',
     );
     return SheetQuestion(
-      'Delete ${active?.name} and its $chats? Its documents stay in the library.',
+      'Delete ${active?.name} and its $chats? Its documents stay in the library. This '
+      'can’t be undone.',
+      action: 'Delete workspace',
       onKeep: _close,
       onConfirm: active == null || !chat.activeIdle
           ? null
