@@ -38,8 +38,9 @@ Object answerSheetOf(Turn turn) => _answerSheets[turn] ??= Object();
 /// Under an answer: Copy and More while [shown], as the latest answer has them and an older one
 /// once tapped; then, with Show details under every answer on ([ChatSwitch.answerDetails]),
 /// how the answer ran. More opens the Answer sheet ([AnswerSheets]), which holds the rest one
-/// step away. With no [answer] to copy, as when the model gave none, Ask again stands in their
-/// place. An answer stopped in Agent mode says the server may still save it.
+/// step away; a failed answer has Copy alone ([more] false). With no [answer] to copy, as when
+/// the model gave none, Ask again stands in their place. An answer stopped in Agent mode says
+/// the server may still save it.
 class AnswerActions extends StatelessWidget {
   const AnswerActions(
     this.turn, {
@@ -47,6 +48,7 @@ class AnswerActions extends StatelessWidget {
     required this.answer,
     required this.shown,
     this.askAgain,
+    this.more = true,
   });
 
   final Turn turn;
@@ -55,6 +57,9 @@ class AnswerActions extends StatelessWidget {
   final String answer;
   final bool shown;
   final AskAgain? askAgain;
+
+  /// Whether More shows beside Copy.
+  final bool more;
 
   @override
   Widget build(BuildContext context) {
@@ -71,13 +76,14 @@ class AnswerActions extends StatelessWidget {
         final buttons = [
           if (shown && answer.isNotEmpty) ...[
             _CopyAction(answer),
-            LabelAction(
-              'More',
-              end: 'down',
-              heard: 'More: read aloud, ask again, details',
-              expanded: identical(shell.popup.value, sheet),
-              onTap: () => shell.togglePopup(sheet),
-            ),
+            if (more)
+              LabelAction(
+                'More',
+                end: 'down',
+                heard: 'More: read aloud, ask again, details',
+                expanded: identical(shell.popup.value, sheet),
+                onTap: () => shell.togglePopup(sheet),
+              ),
           ] else if (answer.isEmpty && askAgain != null)
             LabelAction(
               'Ask again',

@@ -255,7 +255,7 @@ void main() {
           const ApiException('The server closed the connection.'),
         );
         await tester.pump(const Duration(milliseconds: 300));
-        expect(find.text('The answer stopped'), findsOneWidget);
+        expect(find.textContaining('Answer stopped.'), findsOneWidget);
         expect(find.text('Paused · 1 waiting'), findsOneWidget);
         expect(sent(llm, 'Second'), 0);
 

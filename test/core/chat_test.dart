@@ -78,6 +78,32 @@ void main() {
     });
   });
 
+  group('failureText', () {
+    test('a provider with too much to do is busy, for as long as it says', () {
+      expect(
+        failureText(
+          '429 Rate limit reached. Please try again in 6.5s. Visit x.',
+        ),
+        'The model is busy right now. Ask again in about 7 seconds.',
+      );
+      expect(
+        failureText('529 {"type":"overloaded_error"}'),
+        'The model is busy right now. Ask again in a minute.',
+      );
+      expect(
+        failureText('RESOURCE_EXHAUSTED: retry after 1 second'),
+        'The model is busy right now. Ask again in about a second.',
+      );
+    });
+
+    test('any other failure is said as it came', () {
+      expect(
+        failureText('The server stopped the answer.'),
+        'The server stopped the answer.',
+      );
+    });
+  });
+
   group('splitReasoning', () {
     test('takes a think block out of the answer', () {
       final split = splitReasoning('<think>Red, clearly.</think>red');

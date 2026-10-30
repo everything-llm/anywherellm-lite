@@ -44,7 +44,57 @@ void main() {
     await tester.pump();
     llm.chat!.addError(const ApiException('The server stopped the answer.'));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('The answer stopped'), findsOneWidget);
+    expect(
+      find.text('Answer stopped. The server stopped the answer.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a busy model says so in few words, with Ask again', (
+    tester,
+  ) async {
+    final llm = planningServer()..hold = true;
+    final h = await pumpApp(tester, llm: llm);
+    await h.chat.send('And next quarter?');
+    await tester.pump();
+    const raw =
+        '429 Rate limit reached for gpt-4o on tokens per min (TPM): Limit 30000. Please '
+        'try again in 20s. Visit https://platform.openai.com/account/rate-limits.';
+    llm.chat!
+      ..add(const TextChunk('Next quarter'))
+      ..addError(const ApiException(raw));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      find.text(
+        'Answer stopped. The model is busy right now. Ask again in about 20 seconds.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('platform.openai.com'), findsNothing);
+    expect(control('Ask again'), findsOneWidget);
+    // Its words can be copied; there is no More.
+    expect(control('Copy answer'), findsOneWidget);
+    expect(control('More: read aloud, ask again, details'), findsNothing);
+  });
+
+  testWidgets('a picture refused while streaming asks without it', (
+    tester,
+  ) async {
+    final llm = planningServer()..hold = true;
+    final h = await pumpApp(tester, llm: llm);
+    await h.chat.send('What does this light mean?');
+    await tester.pump();
+    llm.chat!.addError(
+      const ApiException(
+        '400 image_url is only supported by certain models.',
+        status: 400,
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('Picture refused.'), findsOneWidget);
+    await tester.tap(control('Remove the picture'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(composerText(tester), 'What does this light mean?');
   });
 
   testWidgets('a question the server never took says Not sent', (tester) async {

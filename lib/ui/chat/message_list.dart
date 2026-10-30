@@ -430,6 +430,9 @@ class _MessageListState extends State<MessageList> {
                         revealed: _revealed,
                         retry: i == 0 ? _retryOf(chat) : null,
                         latest: at == latest,
+                        onWithoutPicture: answers
+                            ? () => widget.onEdit(turns[at - 1].text)
+                            : null,
                       ),
               ),
             ),
@@ -938,8 +941,9 @@ class _UserBubble extends StatelessWidget {
   }
 }
 
-/// What stands under a message that did not reach the server: Not sent in red, then Try again,
-/// which sends it as it was, and Edit, which puts its words back in the message box.
+/// What stands under a message that did not reach the server: Not sent beside the danger mark,
+/// then Try again, which sends it as it was, and Edit, which puts its words back in the message
+/// box.
 class _NotSent extends StatelessWidget {
   const _NotSent({required this.onTryAgain, required this.onEdit});
 
@@ -955,12 +959,13 @@ class _NotSent extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AppIcon('alert', size: IconSize.small, color: t.danger),
-          const SizedBox(width: 6),
-          Text(
-            'Not sent',
-            style: Type.caption(t.danger, weight: FontWeight.w700),
+          AppIcon(
+            Status.danger.icon,
+            size: IconSize.small,
+            color: Status.danger.color(t),
           ),
+          const SizedBox(width: 6),
+          Text('Not sent', style: Type.caption(t.ink, weight: FontWeight.w600)),
           const SizedBox(width: 6),
           if (onTryAgain case final again?)
             TextAction.plain('Try again', again),
@@ -971,46 +976,39 @@ class _NotSent extends StatelessWidget {
   }
 }
 
-/// In place of a failure that says the workspace's chat model takes text only, with Change the
-/// model, which opens the Answer from sheet and its Chat model row. It is off while an answer
-/// runs in the workspace, as the sheet is.
+/// In place of a failure that says the workspace's chat model takes text only: Picture
+/// refused., with Remove the picture, which puts the question's words back in the message box,
+/// without the picture, to send again.
 class _NoPictures extends StatelessWidget {
-  const _NoPictures();
+  const _NoPictures({required this.onWithoutPicture});
+
+  final VoidCallback? onWithoutPicture;
 
   @override
-  Widget build(BuildContext context) {
-    final scope = AppScope.of(context);
-    return ListenableBuilder(
-      listenable: scope.chat,
-      builder: (context, _) {
-        final open = scope.chat.activeIdle;
-        return AlertBox(
-          AlertKind.bad,
-          'This model cannot see pictures',
-          text:
-              "The workspace's chat model reads text only, so it refused the picture. Choose "
-              'one that reads images in Answer from, Chat model, or ask without the picture.',
-          action: AppButton(
-            'Change the model',
-            onPressed: open
-                ? () => scope.shell.togglePopup(Popup.answerFrom)
-                : null,
-          ),
-        );
-      },
-    );
-  }
+  Widget build(BuildContext context) => AlertBox(
+    AlertKind.bad,
+    'Picture refused.',
+    text: 'This chat model can’t read pictures. Send your message without the picture.',
+    inline: true,
+    action: switch (onWithoutPicture) {
+      final again? => AppButton('Remove the picture', onPressed: again),
+      null => null,
+    },
+  );
 }
 
 /// An answer. The latest sits on a tile with Copy and More under it; an older one shows them
 /// once tapped, and a tap again hides them. A long press on an answer, or a screen reader's
-/// More, opens its Answer sheet ([AnswerSheets]).
+/// More, opens its Answer sheet ([AnswerSheets]). A failure says why in a red box in few words
+/// ([failureText]), with Ask again in the box on the chat's last answer; a failed answer's
+/// words keep Copy but not More.
 class _Answer extends StatelessWidget {
   const _Answer(
     this.turn, {
     required this.revealed,
     this.retry,
     this.latest = false,
+    this.onWithoutPicture,
   });
 
   final Turn turn;
@@ -1023,6 +1021,9 @@ class _Answer extends StatelessWidget {
 
   /// Whether this is the chat's latest answer.
   final bool latest;
+
+  /// Puts the question's words back in the message box, for a model that refused its picture.
+  final VoidCallback? onWithoutPicture;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -1047,19 +1048,39 @@ class _Answer extends StatelessWidget {
     final inline = turn.streaming && answered && takesCaret(split.answer);
     // An answer cut short shows what came in the second ink, under why it stopped.
     final cut = !turn.streaming && turn.unfinished;
-    // The red box asks again itself, so Ask again does not show twice.
-    // The box for a model that cannot see pictures has no Ask again, so it stays then.
+    // The red box asks again itself, so Ask again does not show twice. The box for a model
+    // that cannot see pictures asks for the question without its picture instead, and a
+    // question with a picture cannot be asked again as it was.
     final error = turn.error;
-    final noPictures = error != null && refusesPictures(error);
-    final askAgain = error != null && !noPictures && retry?.onPressed != null;
+    final noPictures =
+        (error != null && refusesPictures(error)) ||
+        (failure != null && refusesPictures(failure));
+    final askAgain =
+        (error != null || failure != null) &&
+        !noPictures &&
+        retry?.onPressed != null;
+    AppButton? again({bool primary = false}) => askAgain
+        ? AppButton(
+            'Ask again',
+            primary: primary,
+            compact: true,
+            onPressed: retry!.onPressed,
+          )
+        : null;
     final settled = !turn.streaming && answered;
     final column = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (failure != null && refusesPictures(failure))
-          const _NoPictures()
+        if (failure != null && noPictures)
+          _NoPictures(onWithoutPicture: onWithoutPicture)
         else if (failure != null)
-          AlertBox(AlertKind.bad, 'The model did not answer', text: failure)
+          AlertBox(
+            AlertKind.bad,
+            'The model',
+            text: 'didn’t answer. Ask again in a minute.',
+            inline: true,
+            action: again(),
+          )
         else if (split.answer.isNotEmpty)
           AnswerBody(
             split.answer,
@@ -1097,24 +1118,27 @@ class _Answer extends StatelessWidget {
           const SizedBox(height: 10),
           _Dropped(turn.dropped),
         ],
-        if (noPictures) ...[
+        if (error != null && noPictures) ...[
           const SizedBox(height: 10),
-          const _NoPictures(),
+          _NoPictures(onWithoutPicture: onWithoutPicture),
+        ] else if (error != null && turn.dropped == Dropped.unsaved)
+        // Nothing came of the question at all, so asking again is what is left.
+        ...[
+          const SizedBox(height: 10),
+          AlertBox(
+            AlertKind.bad,
+            'Answer stopped',
+            text: error,
+            action: again(primary: true),
+          ),
         ] else if (error != null) ...[
           const SizedBox(height: 10),
           AlertBox(
             AlertKind.bad,
-            'The answer stopped',
-            text: error,
-            action: askAgain
-                ? AppButton(
-                    'Ask again',
-                    // Nothing came of the question at all, so asking again is what is left.
-                    primary: turn.dropped == Dropped.unsaved,
-                    compact: true,
-                    onPressed: retry!.onPressed,
-                  )
-                : null,
+            'Answer stopped.',
+            text: failureText(error),
+            inline: true,
+            action: again(),
           ),
         ],
         if (!turn.streaming && turn.citations.isNotEmpty) ...[
@@ -1125,13 +1149,16 @@ class _Answer extends StatelessWidget {
           const SizedBox(height: 12),
           GeneratedFiles(turn.files),
         ],
-        if (!turn.streaming && (answered || (retry != null && !askAgain))) ...[
+        if (!turn.streaming &&
+            (answered || (retry != null && !askAgain && !noPictures))) ...[
           const SizedBox(height: 8),
           AnswerActions(
             turn,
             answer: answered ? split.answer : '',
             shown: latest || identical(revealed.value, turn),
             askAgain: askAgain ? null : retry,
+            // A failed answer's words can be copied; the box says the rest.
+            more: error == null,
           ),
         ],
       ],

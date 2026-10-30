@@ -298,30 +298,44 @@ $$\frac{a}{b}$$
     'a model failure shows as a failure, with Ask again and no Copy',
     (tester) async {
       await _show(tester, 'The agent model failed to respond: 400 bad input');
-      expect(find.text('The model did not answer'), findsOneWidget);
       expect(
-        find.text('The agent model failed to respond: 400 bad input'),
+        find.text('The model didn’t answer. Ask again in a minute.'),
         findsOneWidget,
       );
+      // In few words, as the board says it, not the provider's.
+      expect(
+        find.text('The agent model failed to respond: 400 bad input'),
+        findsNothing,
+      );
       expect(control('Copy answer'), findsNothing);
+      // Once, in the box.
       expect(control('Ask again'), findsOneWidget);
+      expect(find.text('Ask again'), findsOneWidget);
     },
   );
 
-  testWidgets('a model that cannot see a picture says so, and offers another', (
-    tester,
-  ) async {
-    await _show(
-      tester,
-      'The agent model failed to respond: 400 messages.content.type is invalid, '
-      "allowed values: ['text']",
-    );
-    expect(find.text('This model cannot see pictures'), findsOneWidget);
-    expect(find.text('The model did not answer'), findsNothing);
-    await tester.tap(find.text('Change the model'));
-    await tester.pumpAndSettle();
-    expect(find.text('Applies to every chat in Q3 planning.'), findsOneWidget);
-  });
+  testWidgets(
+    'a model that cannot see a picture says so, and asks without it',
+    (tester) async {
+      await _show(
+        tester,
+        'The agent model failed to respond: 400 messages.content.type is invalid, '
+        "allowed values: ['text']",
+      );
+      expect(
+        find.text(
+          'Picture refused. This chat model can’t read pictures. Send your message '
+          'without the picture.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('didn’t answer'), findsNothing);
+      expect(control('Ask again'), findsNothing);
+      await tester.tap(control('Remove the picture'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(composerText(tester), 'Where?');
+    },
+  );
 
   testWidgets('a streaming answer has no Copy until it ends', (tester) async {
     final llm = _server()..hold = true;

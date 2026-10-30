@@ -151,6 +151,37 @@ final _textOnly = RegExp(
 /// picture because it takes text only.
 bool refusesPictures(String failure) => _textOnly.hasMatch(failure);
 
+/// The ways a model's provider says it has too much to do: a 429 or 529, a rate limit, an
+/// overloaded or busy model, Gemini's `RESOURCE_EXHAUSTED`.
+final _busy = RegExp(
+  r'\b(429|529)\b|rate.?limit|too many requests|overloaded|\bbusy\b|resource.?exhausted',
+  caseSensitive: false,
+);
+
+/// The seconds a provider says to wait, as in OpenAI's `Please try again in 20s.` or a
+/// `retry after 20 seconds`.
+final _waitFor = RegExp(
+  r'(?:try again|retry)(?: after| in)(?: about)? (\d+(?:\.\d+)?) ?(?:s\b|secs?\b|seconds?\b)',
+  caseSensitive: false,
+);
+
+/// What a failed answer's [error] says in few words, as the chat shows it under Answer
+/// stopped.: a provider with too much to do is `The model is busy right now.`, with how long to
+/// wait when it says, and any other error as it came, since nothing shorter says as much.
+String failureText(String error) {
+  if (!_busy.hasMatch(error)) return error;
+  final wait = switch (_waitFor.firstMatch(error)) {
+    final match? => double.parse(match[1]!).ceil(),
+    null => null,
+  };
+  final when = wait == null || wait > 120
+      ? 'a minute'
+      : wait <= 1
+      ? 'about a second'
+      : 'about $wait seconds';
+  return 'The model is busy right now. Ask again in $when.';
+}
+
 /// The name a chat takes from its first [message]: its first line, cut to 42 characters.
 String defaultTitle(String message) {
   final line = message.trim().split('\n').first.trim();

@@ -53,7 +53,13 @@ void main() {
       ..addError(const ApiException('The server stopped the answer.'));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Ask again'), findsOneWidget);
-    await tester.tap(control('More: read aloud, ask again, details'));
+    // Copy alone under its words; its sheet opens with a long press.
+    expect(control('More: read aloud, ask again, details'), findsNothing);
+    await tester.longPress(
+      find.byWidgetPredicate(
+        (w) => w is AnswerBody && w.text == 'Next quarter we',
+      ),
+    );
     await tester.pumpAndSettle();
     expect(
       find.descendant(
