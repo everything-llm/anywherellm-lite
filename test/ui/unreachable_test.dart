@@ -1,5 +1,6 @@
 import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/ui/settings/settings_pages.dart';
+import 'package:anywherellm/ui/state/chat_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_api.dart';
@@ -48,6 +49,31 @@ void main() {
     await tester.pumpAndSettle();
     expect(llm.calls.where((c) => c == 'workspaces').length, before + 1);
     expect(find.text(title), findsNothing);
+  });
+
+  testWidgets('the banner clears itself once the server answers', (
+    tester,
+  ) async {
+    final llm = planningServer()
+      ..errors['workspaces'] = const ApiException('Down');
+    await pumpApp(tester, llm: llm);
+    int reads() => llm.calls.where((c) => c == 'workspaces').length;
+    final before = reads();
+    await tester.pump(ChatController.retryEvery);
+    await tester.pump();
+    // Read again, and still down.
+    expect(reads(), before + 1);
+    expect(find.text(title), findsOneWidget);
+
+    llm.errors.remove('workspaces');
+    await tester.pump(ChatController.retryEvery);
+    await tester.pumpAndSettle();
+    expect(find.text(title), findsNothing);
+    expect(find.text('No workspaces yet'), findsNothing);
+    // Once it answers, nothing more is read for the banner.
+    final after = reads();
+    await tester.pump(ChatController.retryEvery * 2);
+    expect(reads(), after);
   });
 
   testWidgets('Connection opens the address and key', (tester) async {

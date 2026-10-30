@@ -73,6 +73,51 @@ class _Running {
   final bool? finishes;
 }
 
+/// [ChatController.unreachable]: whether the server is out of reach, which calls [_retry]
+/// every [ChatController.retryEvery] while it is and something listens, so no server is read for
+/// a banner nobody shows, and a widget that leaves takes the timer with it.
+class _Unreachable extends ValueNotifier<bool> {
+  _Unreachable(this._retry) : super(false);
+
+  final VoidCallback _retry;
+  Timer? _timer;
+
+  @override
+  set value(bool value) {
+    super.value = value;
+    _follow();
+  }
+
+  @override
+  void addListener(VoidCallback listener) {
+    super.addListener(listener);
+    _follow();
+  }
+
+  @override
+  void removeListener(VoidCallback listener) {
+    super.removeListener(listener);
+    _follow();
+  }
+
+  /// Starts the timer while the server is out of reach and watched, and stops it otherwise.
+  void _follow() {
+    if (value && hasListeners) {
+      _timer ??= Timer.periodic(ChatController.retryEvery, (_) => _retry());
+    } else {
+      _timer?.cancel();
+      _timer = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _timer = null;
+    super.dispose();
+  }
+}
+
 /// A message waiting in a chat to be sent when the answer before it ends ([sendWhenDone]).
 class OnDeck {
   OnDeck(
@@ -446,7 +491,14 @@ class ChatController extends ChangeNotifier with FollowsServer {
   bool loading = false;
 
   /// Whether the last read of the workspaces failed: the server is out of reach or refused.
-  final unreachable = ValueNotifier(false);
+  /// While it holds and something shows it, as the chat's banner does, the workspaces are read
+  /// again every [retryEvery], so the banner clears itself once the server answers.
+  late final ValueNotifier<bool> unreachable = _Unreachable(() {
+    if (!loading) unawaited(load());
+  });
+
+  /// How often the workspaces are read again while the server is [unreachable].
+  static const retryEvery = Duration(seconds: 15);
 
   /// Counts the drafts started, so a draft's first message does not take the person away from a
   /// newer draft when its thread is made.
