@@ -302,7 +302,6 @@ class _KeyCardState extends State<_KeyCard> {
           _scanProblem = null;
         });
         return _guide(
-          startScan,
           set
               ? _connected(context, connection, saving, startScan)
               : _firstRun(context, saving, startScan),
@@ -461,28 +460,24 @@ class _KeyCardState extends State<_KeyCard> {
       );
 
   /// [child], with How connecting works over the whole window while the shell says so. Its
-  /// end scans a code where there is a camera, through [startScan].
-  Widget _guide(VoidCallback startScan, Widget child) {
-    final canScan = _scanner != null;
-    return OverlayWhile(
-      open: _shell.guide == Guide.connect,
-      overlay: (context) => Walkthrough(
-        title: 'How connecting works',
-        steps: connectSteps,
-        initial: _shell.guideStep,
-        onClose: () => _shell.showGuide(null),
-        end: canScan ? 'Scan QR code' : 'Close',
-        endAbout: canScan
-            ? 'or close and type the address and key'
-            : 'then type the address and key',
-        onEnd: () {
-          _shell.showGuide(null);
-          if (canScan && !_shell.scanning) startScan();
-        },
-      ),
-      child: child,
-    );
-  }
+  /// end, Enter the address and key, closes it on this page's fields, and the camera with it.
+  Widget _guide(Widget child) => OverlayWhile(
+    open: _shell.guide == Guide.connect,
+    overlay: (context) => Walkthrough(
+      title: 'How connecting works',
+      steps: connectSteps,
+      initial: _shell.guideStep,
+      onClose: () => _shell.showGuide(null),
+      end: 'Enter the address and key',
+      endAbout: 'Closes this guide',
+      onEnd: () {
+        _shell
+          ..showGuide(null)
+          ..setScanning(false);
+      },
+    ),
+    child: child,
+  );
 
   /// [child], the first run's scroll, held at its end while the keyboard is [typing] up, which
   /// is where the fields are, until a drag moves it. It stops short of the end where the end would

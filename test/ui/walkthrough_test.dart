@@ -88,31 +88,55 @@ void main() {
       expect(find.text('2 of ${connectSteps.length}'), findsOneWidget);
     });
 
-    testWidgets('the last screen scans a code where there is a camera', (
-      tester,
-    ) async {
-      final h = await _firstRun(tester, canScan: true);
+    testWidgets('the first screen says what to bring', (tester) async {
+      await _firstRun(tester);
       await _openGuide(tester);
-      await tester.tap(control('Screen ${connectSteps.length}: The address'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Scan QR code').last);
-      await tester.pumpAndSettle();
-      expect(h.shell.guiding, isFalse);
-      expect(h.shell.scanning, isTrue);
-      expect(find.text('Fake scan'), findsOneWidget);
+      expect(find.text('You need two things to connect'), findsOneWidget);
+      expect(
+        find.text(
+          'Your AnythingLLM server\u2019s address, and a key made in its settings.',
+        ),
+        findsOneWidget,
+      );
+      expect(control('Begin, Next: the key'), findsOneWidget);
     });
 
-    testWidgets('without a camera the last screen closes the guide', (
+    testWidgets('the last screen closes the guide on Connect\'s fields', (
       tester,
     ) async {
       final h = await _firstRun(tester);
       await _openGuide(tester);
       await tester.tap(control('Screen ${connectSteps.length}: The address'));
       await tester.pumpAndSettle();
-      await tester.tap(control('Close, then type the address and key'));
+      await tester.tap(control('Enter the address and key, Closes this guide'));
       await tester.pumpAndSettle();
       expect(h.shell.guiding, isFalse);
       expect(h.shell.scanning, isFalse);
+      expect(control('Connect'), findsOneWidget);
+    });
+
+    testWidgets('opened from the camera, its end closes the camera too', (
+      tester,
+    ) async {
+      final h = await _firstRun(tester, canScan: true);
+      await tester.tap(control('Scan QR code'));
+      await tester.pumpAndSettle();
+      await _openGuide(tester);
+      await tester.tap(control('Screen ${connectSteps.length}: The address'));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byType(Walkthrough),
+          matching: find.text('Scan QR code'),
+        ),
+        findsNothing,
+      );
+      await tester.tap(control('Enter the address and key, Closes this guide'));
+      await tester.pumpAndSettle();
+      expect(h.shell.guiding, isFalse);
+      expect(h.shell.scanning, isFalse);
+      // Scan QR code stays where it was, on the page itself.
+      expect(control('Scan QR code'), findsOneWidget);
     });
 
     testWidgets(

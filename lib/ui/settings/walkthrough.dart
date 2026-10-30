@@ -52,9 +52,9 @@ const connectKeyStep = 1;
 const connectSteps = [
   GuideStep(
     'Getting connected',
-    'Your phone, *your* AnythingLLM.',
+    'You need two things to connect',
     hero: true,
-    sub: 'You need two things: the server\'s address and a key.',
+    sub: 'Your AnythingLLM server’s address, and a key made in its settings.',
     art: GuideArt.hero,
   ),
   GuideStep(
@@ -64,8 +64,8 @@ const connectSteps = [
   ),
   GuideStep(
     'The address',
-    'The one you open AnythingLLM at in a browser. Away from your home network or '
-        'Tailscale, it starts https.',
+    'The address is the one you open AnythingLLM at in a browser.',
+    sub: 'Away from your home network or Tailscale, it starts https.',
     lines: [
       ('At home', '`http://192.168.1.20:3001`'),
       ('Tailscale', '`https://box.tail1234.ts.net`'),
@@ -200,7 +200,7 @@ class _WalkthroughState extends State<Walkthrough> {
                                 : 'Continue',
                             about: last
                                 ? widget.endAbout
-                                : 'next · ${steps[_at + 1].kicker.toLowerCase()}',
+                                : 'Next: ${steps[_at + 1].kicker.toLowerCase()}',
                             onTap: last ? widget.onEnd : () => _go(_at + 1),
                           ),
                           // The hint gives way on a short window, where the screen needs the room.
