@@ -75,8 +75,14 @@ class _ModelPickerState extends State<ModelPicker> {
     if (problem == null) widget.onClose();
   }
 
+  // What holds it does not follow the server's settings, which may be read once it shows.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: AppScope.of(context).system,
+    builder: _build,
+  );
+
+  Widget _build(BuildContext context, Widget? _) {
     final scope = AppScope.of(context);
     final t = Tokens.of(context);
     final system = systemChatModel(scope.system.settings);

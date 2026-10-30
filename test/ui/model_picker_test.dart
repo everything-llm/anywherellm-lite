@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:anywherellm/core/errors.dart';
 import 'package:anywherellm/core/files.dart';
 import 'package:anywherellm/ui/chat/model_picker.dart';
@@ -37,6 +39,23 @@ void main() {
   testWidgets('the row names a model of the workspace\'s own', (tester) async {
     await openAnswerFrom(tester, ownModel());
     expect(find.text('llama3.1:8b'), findsOneWidget);
+  });
+
+  testWidgets('names the system\'s model once the settings are read', (
+    tester,
+  ) async {
+    final llm = planningServer();
+    final gate = llm.gates['systemSettings'] = Completer<void>();
+    await openAnswerFrom(tester, llm);
+    await openPicker(tester);
+    expect(find.text('Empty uses the system default.'), findsOneWidget);
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Empty uses the system default, qwen3:8b.'),
+      findsOneWidget,
+    );
+    expect(find.text('System default (Ollama)'), findsOneWidget);
   });
 
   testWidgets('Save gives the workspace another provider and model', (
